@@ -1,0 +1,125 @@
+/* Ottanio Admin Theme (Palette 1) */
+:root{
+  --primary: #0F8B8D;
+  --primary-hover: #0B6E70;
+  --secondary: #334155;
+  --accent: #22D3EE;
+
+  --bg: #F6F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #EEF2F6;
+
+  --text: #0F172A;
+  --muted: #475569;
+  --outline: #CBD5E1;
+
+  --radius: 12px;
+}
+
+/* Base */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+a:link, a:visited { color: var(--primary); }
+a:hover { color: var(--primary-hover); }
+
+/* Header */
+#header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--outline);
+}
+#header a:link, #header a:visited { color: var(--text); }
+#branding h1, #branding h1 a:link, #branding h1 a:visited { color: var(--text); }
+
+/* “Accent line” sotto header (effetto Material) */
+#header::after{
+  content:"";
+  display:block;
+  height: 3px;
+  background: var(--primary);
+  margin-top: 10px;
+}
+
+/* Breadcrumbs */
+div.breadcrumbs {
+  background: transparent;
+  color: var(--muted);
+}
+div.breadcrumbs a { color: var(--primary); }
+
+/* Content wrappers / modules */
+#content, .module, .inline-group, fieldset, .submit-row {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+}
+.module h2, .module caption, fieldset h2 {
+  background: var(--surface-2);
+  color: var(--text);
+  border-bottom: 1px solid var(--outline);
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+
+/* Tables */
+#result_list, .results table {
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+#result_list thead th {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+#result_list tbody tr:nth-child(odd) { background: #fff; }
+#result_list tbody tr:nth-child(even){ background: var(--surface); }
+
+/* Sidebar (Django recenti) */
+#nav-sidebar {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+}
+#nav-sidebar .current-model a,
+#nav-sidebar .current-app .section:link,
+#nav-sidebar .current-app .section:visited {
+  color: var(--text);
+}
+#nav-sidebar a:hover { color: var(--primary-hover); }
+
+/* Buttons */
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #fff;
+  border-radius: 10px;
+}
+.button:hover, input[type=submit]:hover, a.button:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+/* Secondary-like button (es. “History”, “View on site” a volte) */
+.object-tools a:link, .object-tools a:visited {
+  background: var(--surface-2);
+  color: var(--secondary);
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+}
+.object-tools a:hover {
+  border-color: var(--primary);
+  color: var(--primary-hover);
+}
+
+/* Form fields focus */
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-color: var(--primary);
+}
+
+/* Messages */
+.messagelist li.success { border-left: 4px solid #16A34A; }
+.messagelist li.warning { border-left: 4px solid #F59E0B; }
+.messagelist li.error   { border-left: 4px solid #EF4444; }
