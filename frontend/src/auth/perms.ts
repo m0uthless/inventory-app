@@ -50,6 +50,12 @@ export const PERMS = {
       change: "maintenance.change_maintenanceevent",
       delete: "maintenance.delete_maintenanceevent",
     },
+    template: {
+      view:   "maintenance.view_maintenancetemplate",
+      add:    "maintenance.add_maintenancetemplate",
+      change: "maintenance.change_maintenancetemplate",
+      delete: "maintenance.delete_maintenancetemplate",
+    },
     notification: {
       view: "maintenance.view_maintenancenotification",
     },
@@ -64,6 +70,21 @@ export const PERMS = {
   wiki: {
     page: { view: "wiki.view_wikipage" },
   },
+
+  drive: {
+    folder: {
+      view:   "drive.view_drivefolder",
+      add:    "drive.add_drivefolder",
+      change: "drive.change_drivefolder",
+      delete: "drive.delete_drivefolder",
+    },
+    file: {
+      view:   "drive.view_drivefile",
+      add:    "drive.add_drivefile",
+      change: "drive.change_drivefile",
+      delete: "drive.delete_drivefile",
+    },
+  },
 } as const;
 
 export const TRASH_VIEW_ANY = [
@@ -73,9 +94,15 @@ export const TRASH_VIEW_ANY = [
   PERMS.inventory.inventory.view,
 ] as const;
 
+export const DRIVE_VIEW_ANY = [
+  PERMS.drive.folder.view,
+  PERMS.drive.file.view,
+] as const;
+
 export const MAINTENANCE_VIEW_ANY = [
   PERMS.maintenance.plan.view,
   PERMS.maintenance.event.view,
   PERMS.maintenance.tech.view,
+  PERMS.maintenance.template.view,
   PERMS.maintenance.notification.view,
 ] as const;

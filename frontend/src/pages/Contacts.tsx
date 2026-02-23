@@ -5,11 +5,11 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Drawer,
   FormControl,
   FormControlLabel,
   IconButton,
+  LinearProgress,
   InputLabel,
   MenuItem,
   Select,
@@ -26,6 +26,7 @@ import {
 
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
@@ -49,7 +50,6 @@ import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
 import { useToast } from "../ui/toast";
 
-import DetailDrawerHeader from "../ui/DetailDrawerHeader";
 import ConfirmDeleteDialog from "../ui/ConfirmDeleteDialog";
 import ConfirmActionDialog from "../ui/ConfirmActionDialog";
 import { PERMS } from "../auth/perms";
@@ -118,44 +118,6 @@ async function copyToClipboard(text: string) {
   }
 }
 
-function FieldRow(props: {
-  label: string;
-  value?: string | null;
-  mono?: boolean;
-  onCopy?: () => void | Promise<void>;
-}) {
-  const { label, value, mono, onCopy } = props;
-  const v = value ?? "";
-  return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
-      </Box>
-
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : undefined,
-            wordBreak: "break-word",
-          }}
-        >
-          {v || "—"}
-        </Typography>
-      </Box>
-
-      {v && onCopy ? (
-        <Tooltip title="Copia">
-          <IconButton size="small" onClick={onCopy}>
-            <ContentCopyIcon fontSize="inherit" />
-          </IconButton>
-        </Tooltip>
-      ) : (
-        <Box sx={{ width: 36 }} />
-      )}
-    </Stack>
-  );
-}
 
 const cols: GridColDef<ContactRow>[] = [
   { field: "name", headerName: "Nome", flex: 1, minWidth: 220 },
@@ -659,15 +621,6 @@ const doRestore = React.useCallback(async () => {
 
   return (
     <Stack spacing={2}>
-      <Box>
-        <Typography variant="h5">
-          Contatti
-        </Typography>
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Filtri condivisibili via URL e drawer dettagli.
-        </Typography>
-      </Box>
-
       <EntityListCard
         toolbar={{
           q: grid.q,
@@ -782,169 +735,159 @@ const doRestore = React.useCallback(async () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 520 } } }}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 460 } } }}
       >
-        <Stack sx={{ p: 2 }} spacing={1.5}>
-          <DetailDrawerHeader
-            title={detail?.name || (selectedId ? `Contatto #${selectedId}` : "Contatto")}
-            subtitle={`${customerLabel(detail)}${siteLabel(detail) ? ` • ${siteLabel(detail)}` : ""}`}
-            onClose={closeDrawer}
-            actions={
-              <>
-                {hasPerm(PERMS.crm.contact.change) && detail?.deleted_at ? (
-                  <Tooltip title="Ripristina">
-                    <span>
-                      <IconButton onClick={doRestore} disabled={!detail || restoreBusy}>
-                        <RestoreFromTrashIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                ) : null}
+        <Stack sx={{ height: "100%", overflow: "hidden" }}>
 
-                {hasPerm(PERMS.crm.contact.change) ? (
-                  <Tooltip title="Modifica">
-                    <span>
-                      <IconButton onClick={openEdit} disabled={!detail || Boolean(detail?.deleted_at)}>
-                        <EditIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                ) : null}
+          {/* ── HERO BANNER ── */}
+          <Box sx={{
+            background: "linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)",
+            px: 2.5, pt: 2.25, pb: 2.25,
+            position: "relative", overflow: "hidden", flexShrink: 0,
+          }}>
+            <Box sx={{ position:"absolute", top:-44, right:-44, width:130, height:130, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+            <Box sx={{ position:"absolute", bottom:-26, left:52, width:90, height:90, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
 
-                {hasPerm(PERMS.crm.contact.delete) && !detail?.deleted_at ? (
-                  <Tooltip title="Elimina">
-                    <span>
-                      <IconButton onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}>
-                        <DeleteOutlineIcon />
+            {/* badge + actions */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb:1.25, position:"relative", zIndex:2 }}>
+              <Chip size="small"
+                label={detail?.is_primary ? "● Primario" : "● Non primario"}
+                sx={{ bgcolor:"rgba(20,255,180,0.18)", color:"#a7f3d0", fontWeight:700, fontSize:10, letterSpacing:"0.07em", border:"1px solid rgba(167,243,208,0.3)", height:22 }}
+              />
+              <Stack direction="row" spacing={0.75}>
+                <Can perm={PERMS.crm.contact.change}>
+                  {detail?.deleted_at ? (
+                    <Tooltip title="Ripristina"><span>
+                      <IconButton size="small" onClick={doRestore} disabled={!detail || restoreBusy}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                        <RestoreFromTrashIcon fontSize="small" />
                       </IconButton>
-                    </span>
-                  </Tooltip>
-                ) : null}
-              </>
-            }
-          />
-
-          {detailLoading ? (
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-              <CircularProgress size={18} />
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Caricamento…
-              </Typography>
+                    </span></Tooltip>
+                  ) : (
+                    <Tooltip title="Modifica"><span>
+                      <IconButton size="small" onClick={openEdit} disabled={!detail}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
+                  )}
+                </Can>
+                <Can perm={PERMS.crm.contact.delete}>
+                  {!detail?.deleted_at && (
+                    <Tooltip title="Elimina"><span>
+                      <IconButton size="small" onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(239,68,68,0.28)", color:"#fca5a5" } }}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
+                  )}
+                </Can>
+                <Tooltip title="Chiudi">
+                  <IconButton size="small" onClick={closeDrawer}
+                    sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
             </Stack>
-          ) : detail ? (
-            <>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {detail.is_primary ? (
-                  <Chip size="small" label="Primario" />
-                ) : (
-                  <Chip size="small" variant="outlined" label="Non primario" />
+
+            {/* name + customer/site */}
+            <Box sx={{ position:"relative", zIndex:1 }}>
+              {detail?.deleted_at && <Chip size="small" color="error" label="Eliminato" sx={{ mb:0.75, height:20, fontSize:10 }} />}
+              <Typography sx={{ color:"#fff", fontSize:26, fontWeight:900, letterSpacing:"-0.025em", lineHeight:1.1, mb:0.5 }}>
+                {detail?.name || (selectedId ? `Contatto #${selectedId}` : "Contatto")}
+              </Typography>
+              <Typography variant="body2" sx={{ color:"rgba(255,255,255,0.58)" }}>
+                {[customerLabel(detail), siteLabel(detail)].filter(Boolean).join(" · ") || " "}
+              </Typography>
+              {detail?.department && (
+                <Typography variant="caption" sx={{ color:"rgba(255,255,255,0.45)", display:"block", mt:0.25 }}>
+                  {detail.department}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+
+          {detailLoading && <LinearProgress sx={{ height:2 }} />}
+
+          {/* ── SCROLLABLE BODY ── */}
+          <Box sx={{ flex:1, overflowY:"auto", px:2.5, py:2, display:"flex", flexDirection:"column", gap:1.5 }}>
+            {detailLoading ? (
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ py:2 }}>
+                <CircularProgress size={18} />
+                <Typography variant="body2" sx={{ opacity:0.7 }}>Caricamento…</Typography>
+              </Stack>
+            ) : detail ? (
+              <>
+                {/* Quick nav */}
+                <Stack direction="row" spacing={1} sx={{ flexWrap:"wrap" }}>
+                  {detail.customer && (
+                    <Button size="small" variant="outlined"
+                      onClick={() => navigate(`/customers${buildQuery({ open: detail.customer })}`)}>
+                      Apri cliente
+                    </Button>
+                  )}
+                  {detail.site && (
+                    <Button size="small" variant="outlined"
+                      onClick={() => navigate(`/sites${buildQuery({ open: detail.site, customer: detail.customer ?? "" })}`)}>
+                      Apri sito
+                    </Button>
+                  )}
+                  <Button size="small" variant="outlined"
+                    onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer ?? "", site: detail.site ?? "" })}`)}>
+                    Apri inventario
+                  </Button>
+                </Stack>
+
+                {/* Dati contatto */}
+                <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                  <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"block", mb:1 }}>
+                    Dati contatto
+                  </Typography>
+                  <Stack spacing={0.75}>
+                    {([
+                      { label:"Nome",     value: detail.name,        mono: false },
+                      { label:"Email",    value: detail.email,       mono: true  },
+                      { label:"Telefono", value: detail.phone,       mono: true  },
+                      { label:"Reparto",  value: detail.department,  mono: false },
+                      { label:"Cliente",  value: customerLabel(detail), mono: false },
+                      { label:"Sito",     value: siteLabel(detail),  mono: false },
+                    ] as { label: string; value?: string | null; mono: boolean }[]).filter(r => r.value).map((r) => (
+                      <Stack key={r.label} direction="row" alignItems="center" justifyContent="space-between">
+                        <Typography variant="caption" sx={{ color:"text.disabled", minWidth:70 }}>{r.label}</Typography>
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography variant="body2" sx={{ fontWeight:600, fontFamily: r.mono ? "monospace" : undefined }}>
+                            {r.value}
+                          </Typography>
+                          {r.mono && r.value && (
+                            <Tooltip title="Copia">
+                              <IconButton size="small" onClick={async () => { await copyToClipboard(r.value!); toast.success("Copiato ✅"); }}>
+                                <ContentCopyIcon sx={{ fontSize:13 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </Stack>
+                    ))}
+                  </Stack>
+                </Box>
+
+                {/* Note */}
+                {detail.notes && (
+                  <Box sx={{ bgcolor:"#fafafa", border:"1px solid", borderColor:"grey.100", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"block", mb:0.75 }}>
+                      Note
+                    </Typography>
+                    <Typography variant="body2" sx={{ color:"text.secondary", lineHeight:1.7, whiteSpace:"pre-wrap" }}>
+                      {detail.notes}
+                    </Typography>
+                  </Box>
                 )}
-                {detail.department ? <Chip size="small" label={detail.department} /> : null}
-              </Stack>
-
-              {/* Deep links */}
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {detail.customer ? (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => navigate(`/customers${buildQuery({ open: detail.customer })}`)}
-                  >
-                    Apri cliente
-                  </Button>
-                ) : null}
-
-                {detail.site ? (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() =>
-                      navigate(`/sites${buildQuery({ open: detail.site, customer: detail.customer ?? "" })}`)
-                    }
-                  >
-                    Apri sito
-                  </Button>
-                ) : null}
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() =>
-                    navigate(
-                      `/inventory${buildQuery({
-                        customer: detail.customer ?? "",
-                        site: detail.site ?? "",
-                      })}`
-                    )
-                  }
-                >
-                  Apri inventario
-                </Button>
-              </Stack>
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Dettagli
-              </Typography>
-
-              <FieldRow
-                label="Nome"
-                value={detail.name ?? ""}
-                onCopy={
-                  detail.name
-                    ? async () => {
-	                        await copyToClipboard(detail.name ?? "");
-                        toast.success("Copiato ✅");
-                      }
-                    : undefined
-                }
-              />
-
-              <FieldRow
-                label="Email"
-                value={detail.email ?? ""}
-                mono
-                onCopy={
-                  detail.email
-                    ? async () => {
-                        await copyToClipboard(detail.email ?? "");
-                        toast.success("Copiato ✅");
-                      }
-                    : undefined
-                }
-              />
-
-              <FieldRow
-                label="Telefono"
-                value={detail.phone ?? ""}
-                mono
-                onCopy={
-                  detail.phone
-                    ? async () => {
-                        await copyToClipboard(detail.phone ?? "");
-                        toast.success("Copiato ✅");
-                      }
-                    : undefined
-                }
-              />
-
-              <FieldRow label="Reparto" value={detail.department ?? ""} />
-              <FieldRow label="Cliente" value={customerLabel(detail)} />
-              <FieldRow label="Sito" value={siteLabel(detail)} />
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Note
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {detail.notes || "—"}
-              </Typography>
-            </>
-          ) : (
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Nessun dettaglio disponibile.
-            </Typography>
-          )}
+              </>
+            ) : (
+              <Typography variant="body2" sx={{ opacity:0.7 }}>Nessun dettaglio disponibile.</Typography>
+            )}
+          </Box>
         </Stack>
       </Drawer>
 

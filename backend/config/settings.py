@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "inventory",
     "maintenance",
     "wiki",
+    "drive",
 ]
 
 # --- CSRF / Origin handling ---
@@ -122,7 +123,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.2.1",
+    "VERSION": "0.3.0",
 }
 
 REST_FRAMEWORK = {

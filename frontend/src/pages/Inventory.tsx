@@ -33,6 +33,8 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import { Can } from "../auth/Can";
+import { useExportCsv } from "../ui/useExportCsv";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { useAuth } from "../auth/AuthProvider";
 
 import type { GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
@@ -355,6 +357,7 @@ function fmtTs(ts?: string | null) {
 
 export default function Inventory() {
   const toast = useToast();
+  const { exporting, exportCsv } = useExportCsv();
   const { hasPerm } = useAuth();
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets);
   const navigate = useNavigate();
@@ -893,16 +896,42 @@ const doRestore = async () => {
           onViewModeChange: (v) => grid.setViewMode(v, { keepOpen: true }),
           onReset: () => grid.reset(["customer", "site", "type"]),
           rightActions: (
-            <Can perm={PERMS.inventory.inventory.change}>
+            <Stack direction="row" spacing={1} alignItems="center">
               <Button
                 size="small"
-                variant="contained"
-                disabled={restoreBusy || grid.view !== "deleted" || selectedCount === 0}
-                onClick={() => setBulkRestoreDlgOpen(true)}
+                variant="outlined"
+                startIcon={<FileDownloadOutlinedIcon />}
+                disabled={exporting}
+                onClick={() => exportCsv({
+                  url: "/inventories/",
+                  params: { search: grid.q, ordering: grid.ordering, ...includeDeletedParams(grid.includeDeleted) },
+                  filename: "inventario",
+                  columns: [
+                    { label: "K-Number",       getValue: (r: any) => r.knumber },
+                    { label: "Hostname",        getValue: (r: any) => r.hostname },
+                    { label: "Seriale",         getValue: (r: any) => r.serial_number },
+                    { label: "Tipo",            getValue: (r: any) => r.type_label },
+                    { label: "Stato",           getValue: (r: any) => r.status_label },
+                    { label: "Cliente",         getValue: (r: any) => r.customer_name },
+                    { label: "Sito",            getValue: (r: any) => r.site_display_name || r.site_name },
+                    { label: "Note",            getValue: (r: any) => r.notes },
+                  ],
+                })}
+                sx={{ borderColor: "grey.300", color: "text.secondary" }}
               >
-                Ripristina selezionati
+                {exporting ? "Esportazione…" : "Esporta CSV"}
               </Button>
-            </Can>
+              <Can perm={PERMS.inventory.inventory.change}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={restoreBusy || grid.view !== "deleted" || selectedCount === 0}
+                  onClick={() => setBulkRestoreDlgOpen(true)}
+                >
+                  Ripristina selezionati
+                </Button>
+              </Can>
+            </Stack>
           ),
           createButton: (
             <Can perm={PERMS.inventory.inventory.add}>

@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Drawer,
   FormControl,
   IconButton,
@@ -21,6 +20,7 @@ import {
   DialogActions,
   Tabs,
   Tab,
+  LinearProgress,
   List,
   ListItem,
   ListItemButton,
@@ -31,6 +31,10 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
+import CloseIcon from "@mui/icons-material/Close";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import type { GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
@@ -48,7 +52,6 @@ import { Can } from "../auth/Can";
 import { apiErrorToMessage } from "../api/error";
 import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
-import DetailDrawerHeader from "../ui/DetailDrawerHeader";
 import ConfirmDeleteDialog from "../ui/ConfirmDeleteDialog";
 import ConfirmActionDialog from "../ui/ConfirmActionDialog";
 import { PERMS } from "../auth/perms";
@@ -56,7 +59,7 @@ import EntityListCard from "../ui/EntityListCard";
 import StatusChip from "../ui/StatusChip";
 import FilterChip from "../ui/FilterChip";
 import CustomFieldsEditor from "../ui/CustomFieldsEditor";
-import CustomFieldsDisplay from "../ui/CustomFieldsDisplay";
+import LeafletMap from "../ui/LeafletMap";
 
 type LookupItem = { id: number; label: string; key?: string };
 
@@ -132,30 +135,6 @@ async function copyToClipboard(text: string) {
   }
 }
 
-function FieldRow(props: { label: string; value?: string | null; mono?: boolean }) {
-  const { label, value, mono } = props;
-  const v = value ?? "";
-  return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
-      </Box>
-
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : undefined,
-            wordBreak: "break-word",
-          }}
-        >
-          {v || "—"}
-        </Typography>
-      </Box>
-    </Stack>
-  );
-
-}
 
 type ContactMini = {
   id: number;
@@ -187,8 +166,8 @@ function viewQuery(includeDeleted: boolean, onlyDeleted: boolean) {
   return {};
 }
 
-function SiteContactsTab(props: { customerId: number; siteId: number; includeDeleted: boolean; onlyDeleted: boolean }) {
-  const { customerId, siteId, includeDeleted, onlyDeleted } = props;
+function SiteContactsTab(props: { customerId: number; siteId: number; includeDeleted: boolean; onlyDeleted: boolean; onCount?: (n: number) => void }) {
+  const { customerId, siteId, includeDeleted, onlyDeleted, onCount } = props;
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -208,6 +187,7 @@ function SiteContactsTab(props: { customerId: number; siteId: number; includeDel
   const { rows, rowCount, loading } = useDrfList<ContactMini>('/contacts/', params, (e: unknown) =>
     toast.error(apiErrorToMessage(e))
   );
+  React.useEffect(() => { onCount?.(rowCount); }, [rowCount, onCount]);
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
@@ -287,8 +267,8 @@ function SiteContactsTab(props: { customerId: number; siteId: number; includeDel
   );
 }
 
-function SiteInventoriesTab(props: { customerId: number; siteId: number; includeDeleted: boolean; onlyDeleted: boolean }) {
-  const { customerId, siteId, includeDeleted, onlyDeleted } = props;
+function SiteInventoriesTab(props: { customerId: number; siteId: number; includeDeleted: boolean; onlyDeleted: boolean; onCount?: (n: number) => void }) {
+  const { customerId, siteId, includeDeleted, onlyDeleted, onCount } = props;
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -308,6 +288,7 @@ function SiteInventoriesTab(props: { customerId: number; siteId: number; include
   const { rows, rowCount, loading } = useDrfList<InventoryMini>('/inventories/', params, (e: unknown) =>
     toast.error(apiErrorToMessage(e))
   );
+  React.useEffect(() => { onCount?.(rowCount); }, [rowCount, onCount]);
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
@@ -508,6 +489,31 @@ export default function Sites() {
   const [detail, setDetail] = React.useState<SiteDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [drawerTab, setDrawerTab] = React.useState(0);
+  const [invCount,  setInvCount]  = React.useState<number | null>(null);
+  const [contactCount, setContactCount] = React.useState<number | null>(null);
+
+  // Address for map
+  const siteAddress = React.useMemo(() => {
+    if (!detail) return null;
+    const parts = [detail.address_line1?.trim(), detail.city?.trim()].filter(Boolean);
+    return parts.length ? parts.join(", ") : null;
+  }, [detail]);
+
+  // Fetch counts when detail loads
+  React.useEffect(() => {
+    if (!detail) return;
+    let cancelled = false;
+    setInvCount(null); setContactCount(null);
+    Promise.all([
+      api.get("/inventories/", { params: { site: detail.id, page_size: 1 } }),
+      api.get("/contacts/",    { params: { site: detail.id, page_size: 1 } }),
+    ]).then(([invRes, ctRes]) => {
+      if (cancelled) return;
+      setInvCount(Number(invRes.data?.count ?? 0));
+      setContactCount(Number(ctRes.data?.count ?? 0));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [detail]);
 
   // delete/restore
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false);
@@ -571,6 +577,7 @@ export default function Sites() {
 
   const closeDrawer = React.useCallback(() => {
     setDrawerOpen(false);
+    setInvCount(null); setContactCount(null);
     grid.setOpenId(null);
   }, [grid]);
 
@@ -864,12 +871,6 @@ const doRestore = React.useCallback(async () => {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h5">
-          Siti
-        </Typography>
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Filtri condivisibili via URL e drawer dettagli.
-        </Typography>
       </Box>
 
       <EntityListCard
@@ -967,147 +968,191 @@ const doRestore = React.useCallback(async () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 520 } } }}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 460 } } }}
       >
-        <Stack sx={{ p: 2 }} spacing={1.5}>
-          <DetailDrawerHeader
-            title={detail?.display_name || detail?.name || (selectedId ? `Sito #${selectedId}` : "Sito")}
-            subtitle={customerLabel(detail) || undefined}
-            onClose={closeDrawer}
-            actions={
-              <>
-                {hasPerm(PERMS.crm.site.change) && detail?.deleted_at ? (
-                  <Tooltip title="Ripristina">
-                    <span>
-                      <IconButton onClick={doRestore} disabled={!detail || restoreBusy}>
-                        <RestoreFromTrashIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                ) : null}
+        <Stack sx={{ height: "100%", overflow: "hidden" }}>
 
-                {hasPerm(PERMS.crm.site.change) ? (
-                  <Tooltip title="Modifica">
-                    <span>
-                      <IconButton onClick={openEdit} disabled={!detail || Boolean(detail?.deleted_at)}>
-                        <EditIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                ) : null}
+          {/* ── HERO BANNER ── */}
+          <Box sx={{
+            background: "linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)",
+            px: 2.5, pt: 2.25, pb: 2.25,
+            position: "relative",
+            overflow: "hidden",
+            flexShrink: 0,
+          }}>
+            <Box sx={{ position:"absolute", top:-44, right:-44, width:130, height:130, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+            <Box sx={{ position:"absolute", bottom:-26, left:52, width:90, height:90, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
 
-                {hasPerm(PERMS.crm.site.delete) && !detail?.deleted_at ? (
-                  <Tooltip title="Elimina">
-                    <span>
-                      <IconButton onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}>
-                        <DeleteOutlineIcon />
+            {/* row 1: status + actions */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position:"relative", zIndex:2 }}>
+              <Chip
+                size="small"
+                label={`● ${detail?.status_label ?? "—"}`}
+                sx={{ bgcolor:"rgba(20,255,180,0.18)", color:"#a7f3d0", fontWeight:700, fontSize:10, letterSpacing:"0.07em", border:"1px solid rgba(167,243,208,0.3)", height:22 }}
+              />
+              <Stack direction="row" spacing={0.75}>
+                <Can perm={PERMS.crm.site.change}>
+                  {detail?.deleted_at ? (
+                    <Tooltip title="Ripristina"><span>
+                      <IconButton size="small" onClick={doRestore} disabled={!detail || restoreBusy}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                        <RestoreFromTrashIcon fontSize="small" />
                       </IconButton>
-                    </span>
-                  </Tooltip>
-                ) : null}
-              </>
-            }
-          />
+                    </span></Tooltip>
+                  ) : (
+                    <Tooltip title="Modifica"><span>
+                      <IconButton size="small" onClick={openEdit} disabled={!detail}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
+                  )}
+                </Can>
+                <Can perm={PERMS.crm.site.delete}>
+                  {!detail?.deleted_at && (
+                    <Tooltip title="Elimina"><span>
+                      <IconButton size="small" onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(239,68,68,0.28)", color:"#fca5a5" } }}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
+                  )}
+                </Can>
+                <Tooltip title="Chiudi">
+                  <IconButton size="small" onClick={closeDrawer}
+                    sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            </Stack>
+
+            {/* row 2: name + city */}
+            <Box sx={{ position:"relative", zIndex:1 }}>
+              {detail?.deleted_at && <Chip size="small" color="error" label="Eliminato" sx={{ mb:0.75, height:20, fontSize:10 }} />}
+              <Typography sx={{ color:"#fff", fontSize:26, fontWeight:900, letterSpacing:"-0.025em", lineHeight:1.1, mb:0.5 }}>
+                {detail?.display_name || detail?.name || (selectedId ? `Sito #${selectedId}` : "Sito")}
+              </Typography>
+              {detail?.city && (
+                <Typography variant="body2" sx={{ color:"rgba(255,255,255,0.58)" }}>
+                  📍 {detail.city}{detail.postal_code ? ` ${detail.postal_code}` : ""}
+                </Typography>
+              )}
+            </Box>
+
+          </Box>
+
+          {/* ── TABS ── */}
+          {detailLoading ? <LinearProgress sx={{ height:2 }} /> : null}
+          <Box sx={{ borderBottom:"1px solid", borderColor:"divider", px:2.5 }}>
+            <Tabs value={drawerTab} onChange={(_, v) => setDrawerTab(v)}>
+              <Tab label="Dettagli"  sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+              <Tab label={contactCount != null ? `Contatti (${contactCount})` : "Contatti"} sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+              <Tab label={invCount    != null ? `Inventari (${invCount})`    : "Inventari"} sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+            </Tabs>
+          </Box>
+
+          {/* ── SCROLLABLE CONTENT ── */}
+          <Box sx={{ flex:1, overflowY:"auto", px:2.5, py:2, display:"flex", flexDirection:"column", gap:1.5 }}>
 
           {detailLoading ? (
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ py:2 }}>
               <CircularProgress size={18} />
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Caricamento…
-              </Typography>
+              <Typography variant="body2" sx={{ opacity:0.7 }}>Caricamento…</Typography>
             </Stack>
           ) : detail ? (
             <>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {detail.status_label ? <StatusChip statusId={detail.status} label={detail.status_label} /> : null}
-                {detail.city ? <Chip size="small" label={detail.city} /> : null}
-                {detail.postal_code ? <Chip size="small" label={detail.postal_code} /> : null}
-              </Stack>
+              {/* TAB 0 — Dettagli */}
+              {drawerTab === 0 && (
+                <>
+                  {/* Contact card */}
+                  <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                      <BusinessOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                      Identificazione
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between">
+                        <Typography variant="caption" sx={{ color:"text.disabled" }}>Nome</Typography>
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography variant="body2" sx={{ fontWeight:600 }}>{detail.name || "—"}</Typography>
+                          {detail.name && (
+                            <Tooltip title="Copia"><IconButton size="small" onClick={async () => { await copyToClipboard(detail.name); toast.success("Copiato ✅"); }}>
+                              <ContentCopyIcon sx={{ fontSize:13 }} />
+                            </IconButton></Tooltip>
+                          )}
+                        </Stack>
+                      </Stack>
+                      {detail.display_name && detail.display_name !== detail.name && (
+                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                          <Typography variant="caption" sx={{ color:"text.disabled" }}>Nome visualizzato</Typography>
+                          <Typography variant="body2" sx={{ fontWeight:600 }}>{detail.display_name}</Typography>
+                        </Stack>
+                      )}
+                      <Stack direction="row" alignItems="center" justifyContent="space-between">
+                        <Typography variant="caption" sx={{ color:"text.disabled" }}>Cliente</Typography>
+                        <Typography variant="body2" sx={{ fontWeight:600 }}>{customerLabel(detail) || "—"}</Typography>
+                      </Stack>
+                    </Stack>
+                  </Box>
 
-              <Tabs
-                value={drawerTab}
-                onChange={(_, v) => setDrawerTab(v)}
-                variant="fullWidth"
-                sx={{ mt: 0.5 }}
-              >
-                <Tab label="Dettagli" />
-                <Tab label="Contatti" />
-                <Tab label="Inventari" />
-              </Tabs>
+                  {/* Indirizzo + mappa */}
+                  {siteAddress && (
+                    <Box sx={{ bgcolor:"#fff", borderRadius:2, border:"1px solid", borderColor:"grey.200", overflow:"hidden" }}>
+                      <Box sx={{ px:1.75, pt:1.5, pb:1.25 }}>
+                        <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:0.5 }}>
+                          <LocationOnOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                          Indirizzo
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight:600, color:"text.primary" }}>{siteAddress}</Typography>
+                      </Box>
+                      <Box sx={{ borderTop:"1px solid", borderColor:"grey.100" }}>
+                        <LeafletMap address={siteAddress} height={320} zoom={15} />
+                      </Box>
+                    </Box>
+                  )}
 
-              <Box sx={{ display: drawerTab === 0 ? "block" : "none" }}>
-                {/* Deep links */}
-              
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Identificazione
-              </Typography>
+                  {/* Note */}
+                  {detail.notes && (
+                    <Box sx={{ bgcolor:"#fafafa", border:"1px solid", borderColor:"grey.100", borderRadius:2, p:1.75 }}>
+                      <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:0.75 }}>
+                        <NotesOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                        Note
+                      </Typography>
+                      <Typography variant="body2" sx={{ color:"text.secondary", lineHeight:1.7, whiteSpace:"pre-wrap" }}>
+                        {detail.notes}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
 
-              <Stack direction="row" spacing={1} alignItems="center">
-                <FieldRow label="Nome" value={detail.name ?? ""} />
-                {detail.name ? (
-                  <Tooltip title="Copia">
-                    <IconButton
-                      size="small"
-                      onClick={async () => {
-                        await copyToClipboard(detail.name);
-                        toast.success("Copiato ✅");
-                      }}
-                    >
-                      <ContentCopyIcon fontSize="inherit" />
-                    </IconButton>
-                  </Tooltip>
-                ) : null}
-              </Stack>
-
-              <FieldRow label="Nome visualizzato" value={detail.display_name ?? ""} />
-              <FieldRow label="Cliente" value={customerLabel(detail)} />
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Indirizzo
-              </Typography>
-              <FieldRow label="Indirizzo" value={detail.address_line1 ?? ""} />
-              <FieldRow label="Città" value={detail.city ?? ""} />
-              <FieldRow label="CAP" value={detail.postal_code ?? ""} mono />
-              <FieldRow label="Provincia" value={detail.province ?? ""} />
-              <FieldRow label="Paese" value={detail.country ?? ""} mono />
-
-              <CustomFieldsDisplay entity="site" value={detail.custom_fields} />
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Note
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {detail.notes || "—"}
-              </Typography>
-              </Box>
-
-              <Box sx={{ display: drawerTab === 1 ? "block" : "none" }}>
+              {/* TAB 1 — Contatti */}
+              {drawerTab === 1 && (
                 <SiteContactsTab
                   customerId={detail.customer ?? 0}
                   siteId={detail.id}
                   includeDeleted={grid.includeDeleted}
                   onlyDeleted={grid.onlyDeleted}
+                  onCount={setContactCount}
                 />
-              </Box>
+              )}
 
-              <Box sx={{ display: drawerTab === 2 ? "block" : "none" }}>
+              {/* TAB 2 — Inventari */}
+              {drawerTab === 2 && (
                 <SiteInventoriesTab
                   customerId={detail.customer ?? 0}
                   siteId={detail.id}
                   includeDeleted={grid.includeDeleted}
                   onlyDeleted={grid.onlyDeleted}
+                  onCount={setInvCount}
                 />
-              </Box>
+              )}
             </>
           ) : (
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Nessun dettaglio disponibile.
-            </Typography>
+            <Typography variant="body2" sx={{ opacity:0.7 }}>Nessun dettaglio disponibile.</Typography>
           )}
+          </Box>
         </Stack>
       </Drawer>
 

@@ -3,7 +3,9 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Avatar,
+  Badge,
   Box,
+  Chip,
   Divider,
   Drawer,
   IconButton,
@@ -14,6 +16,8 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Popover,
+  Stack,
   TextField,
   Toolbar,
   Tooltip,
@@ -26,11 +30,12 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import LogoutIcon from "@mui/icons-material/Logout";
+import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import PersonIcon from "@mui/icons-material/Person";
 import AddIcon from "@mui/icons-material/Add";
-import Badge from "@mui/material/Badge";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
+import FolderIcon from "@mui/icons-material/FolderOutlined";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -41,6 +46,7 @@ import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import HandymanIcon from "@mui/icons-material/Handyman";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import { Backdrop, Fade, Zoom } from "@mui/material";
+import { api } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import AppFooter from "./AppFooter";
 import WeatherWidget from "./WeatherWidget";
@@ -66,6 +72,7 @@ const NAV: NavItem[] = [
 
   { label: "Manutenzione", path: "/maintenance", icon: <HandymanIcon />, permAny: ["maintenance.view_maintenanceplan","maintenance.view_maintenanceevent","maintenance.view_tech"] },
 
+  { label: "Drive", path: "/drive", icon: <FolderIcon />, permAny: ["drive.view_drivefolder", "drive.view_drivefile"] },
   { label: "Wiki", path: "/wiki", icon: <MenuBookIcon />, perm: "wiki.view_wikipage" },
 ];
 
@@ -83,31 +90,6 @@ type CreateAction = {
 
 export function AppLayout() {
   const { me, logout, hasPerm } = useAuth();
-  // --- Badge scadenze manutenzione ---
-  const canViewPlans = hasPerm("maintenance.view_maintenanceplan");
-  const [overdueCount, setOverdueCount] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!canViewPlans) return;
-
-    const fetchCount = () => {
-      // Contiamo overdue + next7 in due chiamate parallele (page_size=1 per leggerezza)
-      Promise.all([
-        fetch("/api/maintenance-plans/?due=overdue&is_active=true&page_size=1", { credentials: "include" }),
-        fetch("/api/maintenance-plans/?due=next7&is_active=true&page_size=1", { credentials: "include" }),
-      ])
-        .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
-        .then(([d1, d2]) => setOverdueCount((d1.count ?? 0) + (d2.count ?? 0)))
-        .catch(() => {});
-    };
-
-    fetchCount();
-    const interval = window.setInterval(fetchCount, 5 * 60 * 1000); // refresh ogni 5 min
-    return () => window.clearInterval(interval);
-  }, [canViewPlans]);
-  // --- fine badge ---
-
-
   const nav = useNavigate();
   const loc = useLocation();
 
@@ -160,6 +142,31 @@ if (q.toLowerCase() === EGG_TRIGGER) {
 
   // Drawer mobile
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // ── Maintenance notifications ─────────────────────────────────────────────
+  type DuePlan = { id: number; name: string; customer_name?: string; next_due_date: string; days_left: number };
+  const [duePlans, setDuePlans] = React.useState<DuePlan[]>([]);
+  const [notifAnchor, setNotifAnchor] = React.useState<null | HTMLElement>(null);
+
+  React.useEffect(() => {
+    const fetchDue = () => {
+      api.get("/maintenance-plans/", { params: { due: "soon", page_size: 20, ordering: "next_due_date" } })
+        .then((r) => {
+          const plans = r.data?.results ?? r.data ?? [];
+          const today = new Date();
+          const enriched = plans.map((p: any) => {
+            const due = new Date(p.next_due_date);
+            const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            return { ...p, days_left: diff };
+          });
+          setDuePlans(enriched);
+        })
+        .catch(() => {});
+    };
+    fetchDue();
+    const interval = setInterval(fetchDue, 5 * 60 * 1000); // refresh every 5 min
+    return () => clearInterval(interval);
+  }, []);
 
   // Sidebar mini-variant (desktop) persistita
   const [desktopOpen, setDesktopOpen] = React.useState(() => {
@@ -253,8 +260,6 @@ if (q.toLowerCase() === EGG_TRIGGER) {
 
   const renderNavItem = (it: NavItem, isMini: boolean) => {
     const selected = isSelected(loc.pathname, it.path);
-    const isMaintenance = it.path === "/maintenance";
-    const showBadge = isMaintenance && canViewPlans && overdueCount > 0;
 
     const btn = (
       <ListItemButton
@@ -280,18 +285,20 @@ if (q.toLowerCase() === EGG_TRIGGER) {
             justifyContent: "center",
           },
 
-          "&.Mui-selected": { backgroundColor: "#0f766e", color: "#fff" },
+          "&.Mui-selected": {
+            backgroundColor: "#0f766e",
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.08) 100%)",
+            color: "#fff",
+            boxShadow: "0 2px 6px rgba(15,118,110,0.45)",
+          },
           "&.Mui-selected .MuiListItemIcon-root": { color: "#fff" },
-          "&.Mui-selected:hover": { backgroundColor: alpha("#0f766e", 0.92) },
+          "&.Mui-selected:hover": {
+            backgroundColor: alpha("#0f766e", 0.92),
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.08) 100%)",
+          },
         }}
       >
-        <ListItemIcon sx={{ minWidth: isMini ? "auto" : 38 }}>
-          {showBadge ? (
-            <Badge badgeContent={overdueCount > 99 ? "99+" : overdueCount} color="error" max={99}>
-              {it.icon}
-            </Badge>
-          ) : it.icon}
-        </ListItemIcon>
+        <ListItemIcon sx={{ minWidth: isMini ? "auto" : 38 }}>{it.icon}</ListItemIcon>
 
         <ListItemText
           primary={it.label}
@@ -360,7 +367,7 @@ if (q.toLowerCase() === EGG_TRIGGER) {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden", bgcolor: "background.default" }}>
       {/* AppBar FULL WIDTH */}
       <AppBar
         position="fixed"
@@ -476,20 +483,14 @@ if (q.toLowerCase() === EGG_TRIGGER) {
               </Tooltip>
             )}
 
-            {/* Badge scadenze manutenzione */}
-            {canViewPlans && overdueCount > 0 && (
-              <Tooltip title={`${overdueCount} piani in scadenza o scaduti`}>
-                <IconButton
-                  onClick={() => nav("/maintenance?tab=plans&p_due=overdue")}
-                  aria-label="Piani in scadenza"
-                  sx={{ color: "warning.main" }}
-                >
-                  <Badge badgeContent={overdueCount > 99 ? "99+" : overdueCount} color="error" max={99}>
-                    <WarningAmberIcon />
-                  </Badge>
-                </IconButton>
-              </Tooltip>
-            )}
+            {/* Maintenance notification bell */}
+            <Tooltip title={duePlans.length ? `${duePlans.length} piani in scadenza` : "Nessuna scadenza imminente"}>
+              <IconButton onClick={(e) => setNotifAnchor(e.currentTarget)} size="small">
+                <Badge badgeContent={duePlans.length || null} color="warning" max={9}>
+                  <NotificationsOutlinedIcon fontSize="small" sx={{ color: duePlans.length ? "warning.main" : "inherit" }} />
+                </Badge>
+              </IconButton>
+            </Tooltip>
 
             {/* User avatar dopo search/+ */}
             <Tooltip title={displayName}>
@@ -500,6 +501,55 @@ if (q.toLowerCase() === EGG_TRIGGER) {
           </Box>
         </Toolbar>
       </AppBar>
+
+      {/* Maintenance notifications popover */}
+      <Popover
+        open={Boolean(notifAnchor)}
+        anchorEl={notifAnchor}
+        onClose={() => setNotifAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        PaperProps={{ sx: { width: 340, borderRadius: 2.5, mt: 0.5 } }}
+      >
+        <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Scadenze manutenzione</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled" }}>Piani in scadenza entro 30 giorni</Typography>
+        </Box>
+        {duePlans.length === 0 ? (
+          <Box sx={{ px: 2, py: 3, textAlign: "center" }}>
+            <Typography variant="body2" sx={{ color: "text.disabled" }}>✅ Nessuna scadenza imminente</Typography>
+          </Box>
+        ) : (
+          <Stack divider={<Divider />}>
+            {duePlans.map((p) => (
+              <ListItemButton key={p.id} onClick={() => { setNotifAnchor(null); nav("/maintenance"); }}
+                sx={{ px: 2, py: 1.25 }}>
+                <BuildOutlinedIcon sx={{ fontSize: 18, color: p.days_left <= 7 ? "error.main" : "warning.main", mr: 1.5, flexShrink: 0 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>{p.name}</Typography>
+                  {p.customer_name && (
+                    <Typography variant="caption" sx={{ color: "text.disabled" }}>{p.customer_name}</Typography>
+                  )}
+                </Box>
+                <Chip
+                  size="small"
+                  label={p.days_left <= 0 ? "Scaduto" : p.days_left === 1 ? "Domani" : `${p.days_left}gg`}
+                  color={p.days_left <= 0 ? "error" : p.days_left <= 7 ? "warning" : "default"}
+                  sx={{ fontSize: 10, ml: 1, flexShrink: 0 }}
+                />
+              </ListItemButton>
+            ))}
+          </Stack>
+        )}
+        <Box sx={{ px: 2, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
+          <ListItemButton onClick={() => { setNotifAnchor(null); nav("/maintenance"); }}
+            sx={{ borderRadius: 1.5, justifyContent: "center" }}>
+            <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
+              Vai alla Manutenzione →
+            </Typography>
+          </ListItemButton>
+        </Box>
+      </Popover>
 
       {/* Quick Create menu */}
       <Menu
@@ -602,11 +652,13 @@ if (q.toLowerCase() === EGG_TRIGGER) {
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
+          height: "100vh",
+          overflow: "hidden",
         }}
       >
-        <Toolbar />
+        <Toolbar sx={{ flexShrink: 0 }} />
 
-        <Box sx={{ p: { xs: 2, md: 3 }, flex: 1 }}>
+        <Box sx={{ p: { xs: 2, md: 3 }, flex: 1, overflowY: "auto", minHeight: 0 }}>
           <Outlet />
         </Box>
 

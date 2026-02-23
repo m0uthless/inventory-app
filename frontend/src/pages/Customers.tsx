@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Drawer,
   FormControl,
   IconButton,
@@ -25,12 +24,13 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  LinearProgress,
 } from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
+import CloseIcon from "@mui/icons-material/Close";
 
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { Can } from "../auth/Can";
@@ -48,13 +48,19 @@ import { apiErrorToMessage } from "../api/error";
 import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
 import ActionButton from "../ui/ActionButton";
-import DetailDrawerHeader from "../ui/DetailDrawerHeader";
+import { useExportCsv } from "../ui/useExportCsv";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import MonitorOutlinedIcon from "@mui/icons-material/MonitorOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
 import ConfirmDeleteDialog from "../ui/ConfirmDeleteDialog";
 import ConfirmActionDialog from "../ui/ConfirmActionDialog";
 import { PERMS } from "../auth/perms";
 import EntityListCard from "../ui/EntityListCard";
 import StatusChip from "../ui/StatusChip";
 import CustomFieldsEditor from "../ui/CustomFieldsEditor";
+import LeafletMap from "../ui/LeafletMap";
 import FilterChip from "../ui/FilterChip";
 
 type LookupItem = { id: number; label: string; key?: string };
@@ -104,34 +110,7 @@ const asId = (v: unknown): number | "" => {
   return s === "" ? "" : Number(s);
 };
 
-async function copyToClipboard(text: string) {
-  if (!text) return;
-  await navigator.clipboard.writeText(text);
-}
 
-function FieldRow(props: { label: string; value?: string | null; mono?: boolean }) {
-  const { label, value, mono } = props;
-  const v = value ?? "";
-  return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
-      </Box>
-
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : undefined,
-            wordBreak: "break-word",
-          }}
-        >
-          {v || "—"}
-        </Typography>
-      </Box>
-    </Stack>
-  );
-}
 type SiteMini = {
   id: number;
   name?: string | null;
@@ -162,8 +141,8 @@ function viewQuery(includeDeleted: boolean, onlyDeleted: boolean) {
   return {};
 }
 
-function CustomerSitesTab(props: { customerId: number; includeDeleted: boolean; onlyDeleted: boolean }) {
-  const { customerId, includeDeleted, onlyDeleted } = props;
+function CustomerSitesTab(props: { customerId: number; includeDeleted: boolean; onlyDeleted: boolean; onCount?: (n: number) => void }) {
+  const { customerId, includeDeleted, onlyDeleted, onCount } = props;
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -183,6 +162,8 @@ function CustomerSitesTab(props: { customerId: number; includeDeleted: boolean; 
   const { rows, rowCount, loading } = useDrfList<SiteMini>('/sites/', params, (e: unknown) =>
     toast.error(apiErrorToMessage(e))
   );
+
+  React.useEffect(() => { onCount?.(rowCount); }, [rowCount, onCount]);
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
@@ -209,34 +190,21 @@ function CustomerSitesTab(props: { customerId: number; includeDeleted: boolean; 
           </Typography>
         </Stack>
       ) : rows.length ? (
-        <List dense disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+        <List dense disablePadding sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
           {rows.map((s, idx) => {
             const label = s.display_name || s.name || `Sito #${s.id}`;
-            const secParts = [s.city || '', s.status_label || ''].filter(Boolean);
-            const secondary = secParts.length ? secParts.join(' • ') : undefined;
-            const q = {
-              open: s.id,
-              customer: customerId,
-              ...(s.deleted_at ? { view: "all" } : viewQuery(includeDeleted, onlyDeleted)),
-            };
+            const q = { open: s.id, customer: customerId, ...(s.deleted_at ? { view: "all" } : viewQuery(includeDeleted, onlyDeleted)) };
             return (
-              <ListItem key={s.id} disablePadding divider={idx < rows.length - 1}>
-                <ListItemButton
-                  onClick={() => navigate(`/sites${buildQuery(q)}`)}
-                sx={{
-                  py: 1,
-                  ...(s.deleted_at
-                    ? { opacity: 0.65, textDecoration: 'line-through' as const }
-                    : null),
-                }}
-              >
-                <ListItemText
-                  primary={label}
-                  secondary={secondary}
-                  primaryTypographyProps={{ noWrap: true, sx: { fontWeight: 600 } }}
-                  secondaryTypographyProps={{ noWrap: true }}
-                />
-                {s.deleted_at ? <Chip size="small" color="error" label="Eliminato" /> : null}
+              <ListItem key={s.id} disablePadding
+                sx={{ bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.03)' : 'transparent' }}>
+                <ListItemButton onClick={() => navigate(`/sites${buildQuery(q)}`)}
+                  sx={{ py: 0.75, opacity: s.deleted_at ? 0.55 : 1,
+                    textDecoration: s.deleted_at ? 'line-through' : 'none' }}>
+                  <ListItemText
+                    primary={label}
+                    primaryTypographyProps={{ noWrap: true, variant: 'body2', sx: { fontWeight: 600 } }}
+                  />
+                  {s.deleted_at ? <Chip size="small" color="error" label="Eliminato" sx={{ ml: 1 }} /> : null}
                 </ListItemButton>
               </ListItem>
             );
@@ -251,8 +219,8 @@ function CustomerSitesTab(props: { customerId: number; includeDeleted: boolean; 
   );
 }
 
-function CustomerInventoriesTab(props: { customerId: number; includeDeleted: boolean; onlyDeleted: boolean }) {
-  const { customerId, includeDeleted, onlyDeleted } = props;
+function CustomerInventoriesTab(props: { customerId: number; includeDeleted: boolean; onlyDeleted: boolean; onCount?: (n: number) => void }) {
+  const { customerId, includeDeleted, onlyDeleted, onCount } = props;
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -272,6 +240,8 @@ function CustomerInventoriesTab(props: { customerId: number; includeDeleted: boo
   const { rows, rowCount, loading } = useDrfList<InventoryMini>('/inventories/', params, (e: unknown) =>
     toast.error(apiErrorToMessage(e))
   );
+
+  React.useEffect(() => { onCount?.(rowCount); }, [rowCount, onCount]);
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
@@ -298,35 +268,22 @@ function CustomerInventoriesTab(props: { customerId: number; includeDeleted: boo
           </Typography>
         </Stack>
       ) : rows.length ? (
-        <List dense disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+        <List dense disablePadding sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
           {rows.map((inv, idx) => {
-            const primary = inv.hostname || inv.knumber || inv.serial_number || `Inventario #${inv.id}`;
-            const secParts = [inv.type_label || '', inv.status_label || '', inv.site_display_name || inv.site_name || ''].filter(Boolean);
-            const secondary = secParts.length ? secParts.join(' • ') : undefined;
-            const q = {
-              open: inv.id,
-              customer: customerId,
-              site: inv.site ?? '',
-              ...(inv.deleted_at ? { view: "all" } : viewQuery(includeDeleted, onlyDeleted)),
-            };
+            const name = inv.hostname || inv.knumber || inv.serial_number || `#${inv.id}`;
+            const label = [inv.type_label, name].filter(Boolean).join(' · ');
+            const q = { open: inv.id, customer: customerId, site: inv.site ?? '', ...(inv.deleted_at ? { view: "all" } : viewQuery(includeDeleted, onlyDeleted)) };
             return (
-              <ListItem key={inv.id} disablePadding divider={idx < rows.length - 1}>
-                <ListItemButton
-                  onClick={() => navigate(`/inventory${buildQuery(q)}`)}
-                sx={{
-                  py: 1,
-                  ...(inv.deleted_at
-                    ? { opacity: 0.65, textDecoration: 'line-through' as const }
-                    : null),
-                }}
-              >
-                <ListItemText
-                  primary={primary}
-                  secondary={secondary}
-                  primaryTypographyProps={{ noWrap: true, sx: { fontWeight: 600 } }}
-                  secondaryTypographyProps={{ noWrap: true }}
-                />
-                {inv.deleted_at ? <Chip size="small" color="error" label="Eliminato" /> : null}
+              <ListItem key={inv.id} disablePadding
+                sx={{ bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.03)' : 'transparent' }}>
+                <ListItemButton onClick={() => navigate(`/inventory${buildQuery(q)}`)}
+                  sx={{ py: 0.75, opacity: inv.deleted_at ? 0.55 : 1,
+                    textDecoration: inv.deleted_at ? 'line-through' : 'none' }}>
+                  <ListItemText
+                    primary={label}
+                    primaryTypographyProps={{ noWrap: true, variant: 'body2', sx: { fontWeight: 600 } }}
+                  />
+                  {inv.deleted_at ? <Chip size="small" color="error" label="Eliminato" sx={{ ml: 1 }} /> : null}
                 </ListItemButton>
               </ListItem>
             );
@@ -336,6 +293,102 @@ function CustomerInventoriesTab(props: { customerId: number; includeDeleted: boo
         <Typography variant="body2" sx={{ opacity: 0.7 }}>
           —
         </Typography>
+      )}
+    </Stack>
+  );
+}
+
+
+// ─── CustomerDriveTab ─────────────────────────────────────────────────────────
+
+type DriveMini = {
+  id: number;
+  name: string;
+  mime_type?: string;
+  size_human?: string;
+  updated_at: string;
+  kind: "file" | "folder";
+};
+
+function CustomerDriveTab({ customerId }: { customerId: number }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [items, setItems] = React.useState<DriveMini[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [total, setTotal] = React.useState(0);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      api.get("/drive-folders/", { params: { customer: customerId, page_size: 15, ordering: "name" } }),
+      api.get("/drive-files/",   { params: { customer: customerId, page_size: 15, ordering: "name" } }),
+    ]).then(([fRes, fiRes]) => {
+      if (cancelled) return;
+      const folders: DriveMini[] = (fRes.data?.results ?? fRes.data ?? []).map((f: any) => ({ ...f, kind: "folder" as const }));
+      const files: DriveMini[]   = (fiRes.data?.results ?? fiRes.data ?? []).map((f: any) => ({ ...f, kind: "file" as const }));
+      setItems([...folders, ...files]);
+      setTotal((fRes.data?.count ?? 0) + (fiRes.data?.count ?? 0));
+    }).catch((e: unknown) => toast.error(apiErrorToMessage(e)))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [customerId]);
+
+  function fileEmoji(mime?: string) {
+    if (!mime) return "📁";
+    if (mime.startsWith("image/")) return "🖼️";
+    if (mime === "application/pdf") return "📄";
+    return "📝";
+  }
+
+  return (
+    <Stack spacing={1.25} sx={{ pt: 1 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>File Drive</Typography>
+          <Chip size="small" label={total} />
+        </Stack>
+        <ActionButton tone="secondary" onClick={() => navigate("/drive")}>
+          Apri Drive
+        </ActionButton>
+      </Stack>
+
+      {loading ? (
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
+          <CircularProgress size={18} />
+          <Typography variant="body2" sx={{ opacity: 0.7 }}>Caricamento…</Typography>
+        </Stack>
+      ) : items.length ? (
+        <List dense disablePadding sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+          {items.map((item, idx) => (
+            <ListItem key={`${item.kind}-${item.id}`} disablePadding
+              sx={{ bgcolor: idx % 2 === 1 ? "rgba(15,118,110,0.03)" : "transparent" }}>
+              <ListItemText
+                sx={{ px: 1.5, py: 0.75 }}
+                primary={
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <span style={{ fontSize: 14 }}>{item.kind === "folder" ? "📁" : fileEmoji(item.mime_type)}</span>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1 }}>{item.name}</Typography>
+                    {item.size_human && (
+                      <Typography variant="caption" sx={{ color: "text.disabled", flexShrink: 0 }}>{item.size_human}</Typography>
+                    )}
+                  </Stack>
+                }
+              />
+            </ListItem>
+          ))}
+          {total > items.length && (
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate("/drive")} sx={{ py: 0.75, justifyContent: "center" }}>
+                <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 600 }}>
+                  + altri {total - items.length} elementi
+                </Typography>
+              </ListItemButton>
+            </ListItem>
+          )}
+        </List>
+      ) : (
+        <Typography variant="body2" sx={{ opacity: 0.7 }}>Nessun file collegato.</Typography>
       )}
     </Stack>
   );
@@ -399,6 +452,8 @@ export default function Customers() {
   const toast = useToast();
   const navigate = useNavigate();
   const loc = useLocation();
+  const { exporting, exportCsv } = useExportCsv();
+
   const grid = useServerGrid({
     defaultOrdering: "display_name",
     allowedOrderingFields: ["display_name", "status_label", "city", "primary_contact_name", "vat_number", "tax_code", "deleted_at"],
@@ -467,6 +522,27 @@ export default function Customers() {
   const [detail, setDetail] = React.useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [drawerTab, setDrawerTab] = React.useState(0);
+  const [sitesCount, setSitesCount] = React.useState<number | null>(null);
+  const [invCount, setInvCount] = React.useState<number | null>(null);
+  const [driveCount, setDriveCount] = React.useState<number | null>(null);
+
+  // Fetch all KPI counts whenever detail changes (don't wait for tabs to render)
+  React.useEffect(() => {
+    if (!detail) return;
+    let cancelled = false;
+    Promise.all([
+      api.get("/sites/",         { params: { customer: detail.id, page_size: 1 } }),
+      api.get("/inventories/",   { params: { customer: detail.id, page_size: 1 } }),
+      api.get("/drive-files/",   { params: { customer: detail.id, page_size: 1 } }),
+      api.get("/drive-folders/", { params: { customer: detail.id, page_size: 1 } }),
+    ]).then(([sitesRes, invRes, filesRes, foldersRes]) => {
+      if (cancelled) return;
+      setSitesCount(Number(sitesRes.data?.count ?? 0));
+      setInvCount(Number(invRes.data?.count ?? 0));
+      setDriveCount(Number(filesRes.data?.count ?? 0) + Number(foldersRes.data?.count ?? 0));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [detail]);
 
 const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false);
 const [deleteBusy, setDeleteBusy] = React.useState(false);
@@ -493,8 +569,13 @@ const [restoreBusy, setRestoreBusy] = React.useState(false);
     const key = Object.keys(cf).find((k) => k.trim().toLowerCase() === "indirizzo");
     if (!key) return null;
     const v = (cf as any)[key];
-    return typeof v === "string" && v.trim() ? v.trim() : null;
+    if (typeof v !== "string" || !v.trim()) return null;
+    // Append city to improve Nominatim geocoding accuracy
+    const parts = [v.trim(), detail?.city?.trim()].filter(Boolean);
+    return parts.join(", ");
   }, [detail]);
+
+
 
   const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean) => {
     setDetailLoading(true);
@@ -548,6 +629,9 @@ const [restoreBusy, setRestoreBusy] = React.useState(false);
     setSelectedId(id);
     setDrawerOpen(true);
     setDrawerTab(0);
+    setSitesCount(null);
+    setInvCount(null);
+    setDriveCount(null);
     loadDetail(id);
     grid.setOpenId(id);
   };
@@ -808,12 +892,6 @@ const doRestore = async () => {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h5">
-          Clienti
-        </Typography>
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Filtri condivisibili via URL e drawer dettagli.
-        </Typography>
       </Box>
 
       <EntityListCard
@@ -824,16 +902,40 @@ const doRestore = async () => {
           onViewModeChange: (v) => grid.setViewMode(v, { keepOpen: true }),
           onReset: () => grid.reset(["status", "city"]),
           rightActions: (
-            <Can perm={PERMS.crm.customer.change}>
+            <Stack direction="row" spacing={1} alignItems="center">
               <Button
                 size="small"
-                variant="contained"
-                disabled={restoreBusy || grid.view !== "deleted" || selectedCount === 0}
-                onClick={() => setBulkRestoreDlgOpen(true)}
+                variant="outlined"
+                startIcon={<FileDownloadOutlinedIcon />}
+                disabled={exporting}
+                onClick={() => exportCsv({
+                  url: "/customers/",
+                  params: { search: grid.q, ordering: grid.ordering, ...includeDeletedParams(grid.includeDeleted) },
+                  filename: "clienti",
+                  columns: [
+                    { label: "Codice",    getValue: (r: any) => r.code },
+                    { label: "Nome",      getValue: (r: any) => r.display_name || r.name },
+                    { label: "P.IVA",     getValue: (r: any) => r.vat_number },
+                    { label: "Città",     getValue: (r: any) => r.city },
+                    { label: "Stato",     getValue: (r: any) => r.status_label },
+                    { label: "Note",      getValue: (r: any) => r.notes },
+                  ],
+                })}
+                sx={{ borderColor: "grey.300", color: "text.secondary" }}
               >
-                Ripristina selezionati
+                {exporting ? "Esportazione…" : "Esporta CSV"}
               </Button>
-            </Can>
+              <Can perm={PERMS.crm.customer.change}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={restoreBusy || grid.view !== "deleted" || selectedCount === 0}
+                  onClick={() => setBulkRestoreDlgOpen(true)}
+                >
+                  Ripristina selezionati
+                </Button>
+              </Can>
+            </Stack>
           ),
           createButton: (
             <Can perm={PERMS.crm.customer.add}>
@@ -925,184 +1027,219 @@ const doRestore = async () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 520 } } }}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 460 } } }}
       >
-        <Stack sx={{ p: 2 }} spacing={1.5}>
-          <DetailDrawerHeader
-            title={detail?.display_name || (selectedId ? `Cliente #${selectedId}` : "Cliente")}
-            subtitle={detail?.code ? detail.code : undefined}
-            onClose={closeDrawer}
-            divider={false}
-            actions={
-              <>
+        <Stack sx={{ height: "100%", overflow: "hidden" }}>
+
+          {/* ── HERO BANNER ── */}
+          <Box sx={{
+            background: "linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)",
+            px: 2.5, pt: 2.25, pb: 2.25,
+            position: "relative",
+            overflow: "hidden",
+            flexShrink: 0,
+          }}>
+            {/* decorative blobs */}
+            <Box sx={{ position:"absolute", top:-44, right:-44, width:130, height:130, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+            <Box sx={{ position:"absolute", bottom:-26, left:52, width:90, height:90, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
+
+            {/* row 1: status badge + action icons */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position:"relative", zIndex:2 }}>
+              <Chip
+                size="small"
+                label={`● ${detail?.status_label ?? "—"}`}
+                sx={{
+                  bgcolor: "rgba(20,255,180,0.18)",
+                  color: "#a7f3d0",
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: "0.07em",
+                  border: "1px solid rgba(167,243,208,0.3)",
+                  height: 22,
+                }}
+              />
+              <Stack direction="row" spacing={0.75}>
                 <Can perm={PERMS.crm.customer.change}>
                   {detail?.deleted_at ? (
                     <Tooltip title="Ripristina">
                       <span>
-                        <IconButton onClick={doRestore} disabled={!detail || restoreBusy}>
-                          <RestoreFromTrashIcon />
+                        <IconButton size="small" onClick={doRestore} disabled={!detail || restoreBusy}
+                          sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5,
+                            "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                          <RestoreFromTrashIcon fontSize="small" />
                         </IconButton>
                       </span>
                     </Tooltip>
-                  ) : null}
+                  ) : (
+                    <Tooltip title="Modifica">
+                      <span>
+                        <IconButton size="small" onClick={openEdit} disabled={!detail}
+                          sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5,
+                            "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
                 </Can>
-
-                <Can perm={PERMS.crm.customer.change}>
-                  <Tooltip title="Modifica">
-                    <span>
-                      <IconButton onClick={openEdit} disabled={!detail || Boolean(detail?.deleted_at)}>
-                        <EditIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Can>
-
                 <Can perm={PERMS.crm.customer.delete}>
-                  {!detail?.deleted_at ? (
+                  {!detail?.deleted_at && (
                     <Tooltip title="Elimina">
                       <span>
-                        <IconButton onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}>
-                          <DeleteOutlineIcon />
+                        <IconButton size="small" onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}
+                          sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5,
+                            "&:hover":{ bgcolor:"rgba(239,68,68,0.28)", color:"#fca5a5" } }}>
+                          <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       </span>
                     </Tooltip>
-                  ) : null}
+                  )}
                 </Can>
-              </>
-            }
-          />
-
-          {detailLoading ? (
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-              <CircularProgress size={18} />
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Caricamento…
-              </Typography>
-            </Stack>
-          ) : detail ? (
-            <>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {detail.deleted_at ? <Chip size="small" color="error" label="Eliminato" /> : null}
-                {detail.vat_number ? <Chip size="small" label={`P.IVA: ${detail.vat_number}`} /> : null}
-                {detail.tax_code ? <Chip size="small" label={`CF: ${detail.tax_code}`} /> : null}
-              </Stack>
-
-              <Tabs
-                value={drawerTab}
-                onChange={(_, v) => setDrawerTab(v)}
-                variant="fullWidth"
-                sx={{ mt: 0.5 }}
-              >
-                <Tab label="Dettagli" />
-                <Tab label="Siti" />
-                <Tab label="Inventari" />
-              </Tabs>
-
-              <Box sx={{ display: drawerTab === 0 ? "block" : "none" }}>
-                <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Dettagli
-              </Typography>
-
-              <Stack direction="row" spacing={1} alignItems="center">
-                <FieldRow label="Codice" value={detail.code} mono />
-                <Tooltip title="Copia">
-                  <IconButton
-                    size="small"
-                    onClick={async () => {
-                      await copyToClipboard(detail.code);
-                      toast.success("Copiato ✅");
-                    }}
-                  >
-                    <ContentCopyIcon fontSize="inherit" />
+                <Tooltip title="Chiudi">
+                  <IconButton size="small" onClick={closeDrawer}
+                    sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5,
+                      "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                    <CloseIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               </Stack>
+            </Stack>
 
-              <FieldRow label="Nome" value={detail.name} />
-              <FieldRow label="Nome visualizzato" value={detail.display_name} />
-              {detail.deleted_at ? <FieldRow label="Eliminato il" value={detail.deleted_at} mono /> : null}
-              <FieldRow label="P.IVA" value={detail.vat_number ?? ""} mono />
-              <FieldRow label="Codice fiscale" value={detail.tax_code ?? ""} mono />
-
-              {detail.custom_fields && Object.keys(detail.custom_fields).length > 0 ? (
-                <Stack>
-                  {Object.entries(detail.custom_fields).map(([k, v]) => (
-                    <Stack key={k} direction="row" spacing={1} alignItems="center">
-                      <FieldRow label={k} value={typeof v === "string" ? v : JSON.stringify(v)} />
-                      {typeof v === "string" && v.trim() ? (
-                        <Tooltip title="Copia">
-                          <IconButton
-                            size="small"
-                            onClick={async () => {
-                              await copyToClipboard(v);
-                              toast.success("Copiato ✅");
-                            }}
-                          >
-                            <ContentCopyIcon fontSize="inherit" />
-                          </IconButton>
-                        </Tooltip>
-                      ) : null}
-                    </Stack>
-                  ))}
-                </Stack>
-              ) : (
-                <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                  —
+            {/* row 2: name + city */}
+            <Box sx={{ position:"relative", zIndex:1, mb: 2 }}>
+              {detail?.deleted_at && (
+                <Chip size="small" color="error" label="Eliminato" sx={{ mb: 0.75, height:20, fontSize:10 }} />
+              )}
+              <Typography sx={{ color:"#fff", fontSize:26, fontWeight:900, letterSpacing:"-0.025em", lineHeight:1.1, mb:0.5 }}>
+                {detail?.display_name || (selectedId ? `Cliente #${selectedId}` : "Cliente")}
+              </Typography>
+              {detail?.city && (
+                <Typography variant="body2" sx={{ color:"rgba(255,255,255,0.58)" }}>
+                  📍 {detail.city}
                 </Typography>
               )}
+            </Box>
 
-              {/* Google Maps if custom field "Indirizzo" exists */}
-              {address ? (
-                <>
-                  
-                  
-                  <Box
-                    sx={{
-                      borderRadius: 2,
-                      overflow: "hidden",
-                      border: "1px solid",
-                      borderColor: "divider",
-                      height: 260,
-                    }}
-                  >
-                    <iframe
-                      title="Google Maps"
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
-                    />
+          </Box>
+
+          {/* ── TABS ── */}
+          {detailLoading ? (
+            <LinearProgress sx={{ height:2 }} />
+          ) : null}
+
+          <Box sx={{ borderBottom:"1px solid", borderColor:"divider", px:2.5 }}>
+            <Tabs value={drawerTab} onChange={(_, v) => setDrawerTab(v)}>
+              <Tab label="Dettagli" sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+              <Tab label={sitesCount != null ? `Siti (${sitesCount})` : "Siti"} sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+              <Tab label={invCount != null ? `Inventari (${invCount})` : "Inventari"} sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+              <Tab label={driveCount != null ? `Drive (${driveCount})` : "Drive"} sx={{ fontSize:13, minWidth:0, px:1.5 }} />
+            </Tabs>
+          </Box>
+
+          {/* ── SCROLLABLE CONTENT ── */}
+          <Box sx={{ flex:1, overflowY:"auto", px:2.5, py:2, display:"flex", flexDirection:"column", gap:1.5 }}>
+            {!detail && !detailLoading ? (
+              <Typography variant="body2" sx={{ opacity:0.6 }}>Nessun dettaglio disponibile.</Typography>
+            ) : null}
+
+            {/* TAB 0 — Dettagli */}
+            {drawerTab === 0 && detail && (
+              <>
+                {/* Contatto primario */}
+                <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                  <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                    <PersonOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                    Contatto primario
+                  </Typography>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} flexWrap="wrap">
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight:700, color:"text.primary" }}>
+                        {detail.primary_contact_name || "—"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color:"text.secondary" }}>
+                        {detail.primary_contact_email || ""}
+                      </Typography>
+                    </Box>
+                    {detail.primary_contact_phone && (
+                      <Chip size="small" label={detail.primary_contact_phone}
+                        sx={{ bgcolor:"#f0fdf4", color:"#0f766e", border:"1px solid #bbf7d0", fontWeight:600, fontSize:11 }} />
+                    )}
+                  </Stack>
+                </Box>
+
+                {/* Informazioni (P.IVA + tutti i custom fields) */}
+                <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                  <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                    <MonitorOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                    Informazioni
+                  </Typography>
+                  <Stack divider={<Box sx={{ borderBottom:"1px solid", borderColor:"grey.50" }} />}>
+                    {detail.vat_number && (
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py:0.75 }}>
+                        <Typography variant="caption" sx={{ color:"text.disabled" }}>P.IVA</Typography>
+                        <Typography variant="body2" sx={{ fontWeight:600, fontFamily:"monospace", fontSize:12 }}>{detail.vat_number}</Typography>
+                      </Stack>
+                    )}
+                    {detail.custom_fields && typeof detail.custom_fields === "object" &&
+                      Object.entries(detail.custom_fields as Record<string, any>)
+                        .filter(([k, v]) => v !== "" && v !== null && v !== undefined && k.trim().toLowerCase() !== "indirizzo")
+                        .map(([k, v]) => (
+                          <Stack key={k} direction="row" justifyContent="space-between" alignItems="center" sx={{ py:0.75 }}>
+                            <Typography variant="caption" sx={{ color:"text.disabled" }}>{k}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight:600, maxWidth:220, textAlign:"right", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {String(v)}
+                            </Typography>
+                          </Stack>
+                        ))
+                    }
+                  </Stack>
+                </Box>
+
+                {/* Indirizzo + mappa */}
+                {address && (
+                  <Box sx={{ bgcolor:"#fff", borderRadius:2, border:"1px solid", borderColor:"grey.200", overflow:"hidden" }}>
+                    <Box sx={{ px:1.75, pt:1.5, pb:1.25 }}>
+                      <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:0.5 }}>
+                        <LocationOnOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                        Indirizzo
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight:600, color:"text.primary" }}>{address}</Typography>
+                    </Box>
+                    <Box sx={{ borderTop:"1px solid", borderColor:"grey.100" }}>
+                      <LeafletMap address={address} height={320} zoom={15} />
+                    </Box>
                   </Box>
+                )}
 
-                  
-                </>
-              ) : null}
+                {/* Note */}
+                <Box sx={{ bgcolor:"#fafafa", border:"1px solid", borderColor:"grey.100", borderRadius:2, p:1.75 }}>
+                  <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:0.75 }}>
+                    <NotesOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                    Note
+                  </Typography>
+                  <Typography variant="body2" sx={{ color:"text.secondary", lineHeight:1.7, whiteSpace:"pre-wrap" }}>
+                    {detail.notes || "—"}
+                  </Typography>
+                </Box>
+              </>
+            )}
 
-              <Divider />
+            {/* TAB 1 — Siti */}
+            {drawerTab === 1 && detail && (
+              <CustomerSitesTab customerId={detail.id} includeDeleted={grid.includeDeleted} onlyDeleted={grid.onlyDeleted} onCount={setSitesCount} />
+            )}
 
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Note
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {detail.notes || "—"}
-              </Typography>
-              </Box>
+            {/* TAB 2 — Inventari */}
+            {drawerTab === 2 && detail && (
+              <CustomerInventoriesTab customerId={detail.id} includeDeleted={grid.includeDeleted} onlyDeleted={grid.onlyDeleted} onCount={setInvCount} />
+            )}
 
-              <Box sx={{ display: drawerTab === 1 ? "block" : "none" }}>
-                <CustomerSitesTab customerId={detail.id} includeDeleted={grid.includeDeleted} onlyDeleted={grid.onlyDeleted} />
-              </Box>
+            {/* TAB 3 — Drive */}
+            {drawerTab === 3 && detail && (
+              <CustomerDriveTab customerId={detail.id} />
+            )}
+          </Box>
 
-              <Box sx={{ display: drawerTab === 2 ? "block" : "none" }}>
-                <CustomerInventoriesTab customerId={detail.id} includeDeleted={grid.includeDeleted} onlyDeleted={grid.onlyDeleted} />
-              </Box>
-            </>
-          ) : (
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Nessun dettaglio disponibile.
-            </Typography>
-          )}
         </Stack>
       </Drawer>
 

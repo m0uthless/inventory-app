@@ -15,6 +15,9 @@ import {
   Typography,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import FolderIcon from "@mui/icons-material/Folder";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { apiGet } from "../api/client";
@@ -44,6 +47,9 @@ export default function Search() {
   const [sites, setSites] = React.useState<any[]>([]);
   const [contacts, setContacts] = React.useState<any[]>([]);
   const [inventories, setInventories] = React.useState<any[]>([]);
+  const [driveFiles, setDriveFiles] = React.useState<any[]>([]);
+  const [driveFolders, setDriveFolders] = React.useState<any[]>([]);
+  const [maintenance, setMaintenance] = React.useState<any[]>([]);
 
   // keep local input in sync when URL changes (back/forward)
   React.useEffect(() => {
@@ -59,22 +65,31 @@ export default function Search() {
         setSites([]);
         setContacts([]);
         setInventories([]);
+        setDriveFiles([]);
+        setDriveFolders([]);
+        setMaintenance([]);
         return;
       }
 
       const params = { search: term, page: 1, page_size: 10 };
 
-      const [c, s, ct, inv] = await Promise.all([
-        apiGet<ApiPage<any>>("/customers/", { params }),
-        apiGet<ApiPage<any>>("/sites/", { params }),
-        apiGet<ApiPage<any>>("/contacts/", { params }),
-        apiGet<ApiPage<any>>("/inventories/", { params }),
+      const [c, s, ct, inv, df, dfo, mnt] = await Promise.all([
+        apiGet<ApiPage<any>>("/customers/",       { params }),
+        apiGet<ApiPage<any>>("/sites/",           { params }),
+        apiGet<ApiPage<any>>("/contacts/",        { params }),
+        apiGet<ApiPage<any>>("/inventories/",     { params }),
+        apiGet<ApiPage<any>>("/drive-files/",     { params }),
+        apiGet<ApiPage<any>>("/drive-folders/",   { params }),
+        apiGet<ApiPage<any>>("/maintenance-plans/", { params }),
       ]);
 
       setCustomers(c.results || []);
       setSites(s.results || []);
       setContacts(ct.results || []);
       setInventories(inv.results || []);
+      setDriveFiles(df.results || []);
+      setDriveFolders(dfo.results || []);
+      setMaintenance(mnt.results || []);
     } catch (e) {
       toast.error(errMsg(e));
     } finally {
@@ -104,6 +119,7 @@ export default function Search() {
 
   const Section = ({
     title,
+    icon,
     items,
     onOpen,
     onViewAll,
@@ -111,6 +127,7 @@ export default function Search() {
     getSecondary,
   }: {
     title: string;
+    icon?: React.ReactNode;
     items: any[];
     onOpen: (id: number) => void;
     onViewAll: () => void;
@@ -119,6 +136,7 @@ export default function Search() {
   }) => (
     <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
       <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1 }}>
+        {icon}
         <Typography variant="subtitle1">{title}</Typography>
         <Box sx={{ flex: 1 }} />
         <Button size="small" endIcon={<OpenInNewIcon />} onClick={onViewAll}>
@@ -159,12 +177,12 @@ export default function Search() {
           Ricerca
         </Typography>
         <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Cerca clienti, siti, contatti e inventari.
+          Cerca in clienti, siti, contatti, inventari, Drive e manutenzione.
         </Typography>
 
         <TextField
           fullWidth
-          placeholder="Cerca clienti, siti, contatti, inventari…"
+          placeholder="Cerca in tutta l'applicazione…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
@@ -249,6 +267,36 @@ export default function Search() {
             onViewAll={() => nav(qParam ? `/inventory?search=${encodeURIComponent(qParam)}` : "/inventory")}
             getPrimary={(x) => x.hostname || x.name || "Inventario"}
             getSecondary={(x) => [x.knumber, x.serial_number].filter(Boolean).join(" • ")}
+          />
+
+          <Section
+            title="Drive — File"
+            icon={<InsertDriveFileOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />}
+            items={driveFiles}
+            onOpen={() => nav("/drive")}
+            onViewAll={() => nav("/drive")}
+            getPrimary={(x) => x.name}
+            getSecondary={(x) => [x.size_human, x.folder_name || "Root"].filter(Boolean).join(" • ")}
+          />
+
+          <Section
+            title="Drive — Cartelle"
+            icon={<FolderIcon fontSize="small" sx={{ color: "#f59e0b" }} />}
+            items={driveFolders}
+            onOpen={() => nav("/drive")}
+            onViewAll={() => nav("/drive")}
+            getPrimary={(x) => x.name}
+            getSecondary={(x) => `${x.files_count} file`}
+          />
+
+          <Section
+            title="Manutenzione"
+            icon={<BuildOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />}
+            items={maintenance}
+            onOpen={() => nav("/maintenance")}
+            onViewAll={() => nav("/maintenance")}
+            getPrimary={(x) => x.name || x.title || `Piano #${x.id}`}
+            getSecondary={(x) => [x.customer_name, x.status_label].filter(Boolean).join(" • ")}
           />
         </Stack>
       )}

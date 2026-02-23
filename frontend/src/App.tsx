@@ -14,9 +14,9 @@ import MaintenanceWip from "./pages/MaintenanceWip";
 import Wiki from "./pages/Wiki";
 import Search from "./pages/Search";
 import Trash from "./pages/Trash";
+import Drive from "./pages/Drive";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
 
 import { RequireAuth } from "./auth/RequireAuth";
 
@@ -100,7 +100,7 @@ const router = createBrowserRouter([
               "maintenance.view_tech",
             ]}
           >
-            <Maintenance />
+            <MaintenanceWip />
           </RequireAnyPerm>
         ),
       },
@@ -115,14 +115,9 @@ const router = createBrowserRouter([
               "maintenance.view_tech",
             ]}
           >
-            <MaintenanceWip />
+            <Maintenance />
           </RequireAnyPerm>
         ),
-      },
-
-      {
-        path: "dashboard_wip",
-        element: <Dashboard />,
       },
 
       {
@@ -134,11 +129,24 @@ const router = createBrowserRouter([
         ),
       },
 
+      {
+        path: "drive",
+        element: (
+          <RequireAnyPerm
+            perms={[
+              "drive.view_drivefolder",
+              "drive.view_drivefile",
+            ]}
+          >
+            <Drive />
+          </RequireAnyPerm>
+        ),
+      },
+
       { path: "search", element: <Search /> },
       { path: "profile", element: <Profile /> },
     ],
   },
-  { path: "*", element: <NotFound /> },
 ]);
 
 export default function App() {

@@ -40,6 +40,8 @@ import { useUrlNumberParam, useUrlStringParam } from "../hooks/useUrlParam";
 import { useDrfList } from "../hooks/useDrfList";
 import { buildDrfListParams } from "../api/drf";
 import { api } from "../api/client";
+import { useExportCsv } from "../ui/useExportCsv";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { useToast } from "../ui/toast";
 import { apiErrorToMessage } from "../api/error";
 import { Can } from "../auth/Can";
@@ -57,7 +59,7 @@ import { emptySelectionModel } from "../utils/gridSelection";
 // -----------------------------------------------------------------------------
 
 type LookupItem   = { id: number; label: string };
-type CustomerItem = { id: number; code: string; name: string };
+type CustomerItem = { id: number; code: string; name: string; display_name?: string };
 type PlanRow = {
   id: number;
   customer: number;
@@ -273,6 +275,7 @@ const PLAN0: PlanForm = {
 
 function PlansTab() {
   const toast = useToast();
+  const { exporting, exportCsv } = useExportCsv();
   const grid = useServerGrid({
     defaultOrdering: "next_due_date",
     allowedOrderingFields: ["next_due_date", "title", "updated_at"],
@@ -282,8 +285,13 @@ function PlansTab() {
   const [dueFilter, setDue]         = useUrlStringParam("p_due");
   const [actFilter, setAct]         = useUrlStringParam("p_active");
 
-  const { rows: customers } = useDrfList<CustomerItem>("/customers/", { ordering: "name", page_size: 500 });
-  const { rows: invTypes }  = useDrfList<LookupItem>("/inventory-types/", { ordering: "label", page_size: 200 });
+  const { rows: customers } = useDrfList<CustomerItem>("/customers/", { ordering: "display_name", page_size: 500 });
+  const [invTypes, setInvTypes] = React.useState<LookupItem[]>([]);
+  React.useEffect(() => {
+    api.get("/inventory-types/", { params: { ordering: "label" } })
+      .then((r) => setInvTypes(Array.isArray(r.data) ? r.data : (r.data?.results ?? [])))
+      .catch(() => {});
+  }, []);
 
   const listParams = React.useMemo(() => buildDrfListParams({
     search: grid.search, ordering: grid.ordering,
@@ -486,9 +494,37 @@ function PlansTab() {
           viewMode: grid.view, onViewModeChange: (v) => grid.setViewMode(v, { keepOpen: true }),
           onReset: () => { grid.reset(["p_customer","p_due","p_active"]); setCustomerId(""); setDue(""); setAct(""); },
           createButton: (
-            <Can perm={PERMS.maintenance.plan.add}>
-              <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>Nuovo</Button>
-            </Can>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                size="small" variant="outlined"
+                startIcon={<FileDownloadOutlinedIcon />}
+                disabled={exporting}
+                onClick={() => exportCsv({
+                  url: "/maintenance-plans/",
+                  params: {
+                    search: grid.search, ordering: grid.ordering,
+                    ...(customerId ? { customer: customerId } : {}),
+                    ...(dueFilter  ? { due: dueFilter }       : {}),
+                    ...(actFilter  ? { is_active: actFilter }  : {}),
+                  },
+                  filename: "piani_manutenzione",
+                  columns: [
+                    { label: "ID",            getValue: (r: any) => r.id },
+                    { label: "Nome",          getValue: (r: any) => r.name },
+                    { label: "Cliente",       getValue: (r: any) => r.customer_name },
+                    { label: "Stato",         getValue: (r: any) => r.status_label },
+                    { label: "Prossima data", getValue: (r: any) => r.next_due_date },
+                    { label: "Note",          getValue: (r: any) => r.notes },
+                  ],
+                })}
+                sx={{ borderColor: "grey.300", color: "text.secondary" }}
+              >
+                {exporting ? "Esportazione…" : "Esporta CSV"}
+              </Button>
+              <Can perm={PERMS.maintenance.plan.add}>
+                <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>Nuovo</Button>
+              </Can>
+            </Stack>
           ),
         }}
         grid={{
@@ -509,7 +545,7 @@ function PlansTab() {
             <Select label="Cliente" value={customerId === "" ? "" : String(customerId)}
               onChange={(e) => setCustomerId(e.target.value === "" ? "" : Number(e.target.value))}>
               <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.code} — {c.name}</MenuItem>)}
+              {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" fullWidth>
@@ -629,7 +665,7 @@ function PlansTab() {
                 value={form.customer === "" ? "" : String(form.customer)}
                 onChange={(e) => ff({ customer: e.target.value === "" ? "" : Number(e.target.value) })}>
                 <MenuItem value="">—</MenuItem>
-                {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.code} — {c.name}</MenuItem>)}
+                {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
               </Select>
             </FormControl>
 
@@ -716,6 +752,7 @@ function PlansTab() {
                 }
               />
               <TextField size="small" label="Data prevista *" type="date" fullWidth
+                sx={{ mt: 1.5 }}
                 value={form.next_due_date} InputLabelProps={{ shrink: true }}
                 disabled={form.next_due_date_auto && Boolean(form.next_due_date)}
                 onChange={(e) => ff({ next_due_date: e.target.value, next_due_date_auto: false })}
@@ -768,7 +805,7 @@ function NotificationsTab() {
   const [customerId, setCustomerId] = useUrlNumberParam("n_customer");
   const [statusF,    setStatusF]    = useUrlStringParam("n_status");
 
-  const { rows: customers } = useDrfList<CustomerItem>("/customers/", { ordering: "name", page_size: 500 });
+  const { rows: customers } = useDrfList<CustomerItem>("/customers/", { ordering: "display_name", page_size: 500 });
 
   const listParams = React.useMemo(() => buildDrfListParams({
     search: grid.search, ordering: grid.ordering,
@@ -819,7 +856,7 @@ function NotificationsTab() {
             <Select label="Cliente" value={customerId === "" ? "" : String(customerId)}
               onChange={(e) => setCustomerId(e.target.value === "" ? "" : Number(e.target.value))}>
               <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.code} — {c.name}</MenuItem>)}
+              {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" fullWidth>
@@ -1092,7 +1129,7 @@ function EventsTab() {
             <Select label="Cliente" value={customerId === "" ? "" : String(customerId)}
               onChange={(e) => setCustomerId(e.target.value === "" ? "" : Number(e.target.value))}>
               <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.code} — {c.name}</MenuItem>)}
+              {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" fullWidth>
@@ -1486,10 +1523,6 @@ export default function Maintenance() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h5">Manutenzione</Typography>
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Piani per cliente, rapportini di esecuzione, notifiche e tecnici.
-        </Typography>
       </Box>
 
       <Card sx={{ mb: 0 }}>

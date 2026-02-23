@@ -28,6 +28,7 @@ from wiki.api import (
     WikiLinkViewSet,
 )
 from config.search_api import SearchAPIView
+from drive.api import DriveFolderViewSet, DriveFileViewSet
 from audit.api import AuditEventViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
 
@@ -52,6 +53,9 @@ router.register(r"wiki-attachments", WikiAttachmentViewSet, basename="wiki-attac
 router.register(r"wiki-links", WikiLinkViewSet, basename="wiki-link")
 router.register(r"audit-events", AuditEventViewSet, basename="audit-event")
 router.register(r"custom-field-definitions", CustomFieldDefinitionViewSet, basename="custom-field-definition")
+
+router.register(r"drive-folders", DriveFolderViewSet, basename="drive-folder")
+router.register(r"drive-files",   DriveFileViewSet,   basename="drive-file")
 
 
 urlpatterns = [
