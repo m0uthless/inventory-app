@@ -870,9 +870,14 @@ const doRestore = React.useCallback(async () => {
 
   return (
     <Stack spacing={2}>
-      <Box>
-      </Box>
-
+<Box>
+  <Typography variant="h5">
+    Siti
+  </Typography>
+  <Typography variant="body2" sx={{ opacity: 0.7 }}>
+    Lista di tutti i multi-site legati a un cliente.
+  </Typography>
+</Box>
       <EntityListCard
         toolbar={{
           q: grid.q,

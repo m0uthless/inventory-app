@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  CardContent,
   Checkbox,
   Chip,
   CircularProgress,
@@ -27,8 +28,12 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Menu,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
@@ -155,6 +160,7 @@ type EventForm = {
   result: "ok" | "ko" | "partial" | "";
   tech: number | "";
   notes: string;
+  pdf_file: File | null;
 };
 
 type TechForm = {
@@ -915,11 +921,353 @@ const RESULT_LABELS: Record<string, string> = {
 };
 
 type InventoryItem = { id: number; hostname?: string | null; knumber?: string | null; type_label?: string | null };
+type SiteItem = { id: number; name: string; display_name?: string | null };
+type TodoRow = {
+  plan_id: number;
+  plan_title: string;
+  inventory_id: number;
+  customer_id: number;
+  customer_code: string;
+  customer_name: string;
+  site_id?: number | null;
+  site_name?: string | null;
+  type_label?: string | null;
+  knumber?: string | null;
+  hostname?: string | null;
+  next_due_date: string;
+  schedule_type: string;
+  interval_value?: number | null;
+  interval_unit?: string | null;
+  fixed_month?: number | null;
+  fixed_day?: number | null;
+};
 
 const EVENT0: EventForm = {
   plan: "", inventory: "", performed_at: new Date().toISOString().slice(0, 10),
-  result: "", tech: "", notes: "",
+  result: "", tech: "", notes: "", pdf_file: null,
 };
+
+// =============================================================================
+// TODO TAB — Da Fare
+// =============================================================================
+function TodoTab() {
+  const toast = useToast();
+
+  const { rows: customers } = useDrfList<CustomerItem>("/customers/", { ordering: "display_name", page_size: 500 });
+  const { rows: allTechs }  = useDrfList<{ id: number; full_name: string }>(
+    "/techs/", { ordering: "last_name", page_size: 500, is_active: "true" }
+  );
+
+  const [customerF, setCustomerF] = useUrlNumberParam("td_customer");
+  const [siteF,     setSiteF]     = useUrlNumberParam("td_site");
+  const [filterSites, setFilterSites] = React.useState<SiteItem[]>([]);
+
+  // Load sites when customer filter changes
+  React.useEffect(() => {
+    if (!customerF) { setFilterSites([]); setSiteF(""); return; }
+    api.get<{ results: SiteItem[] }>("/sites/", {
+      params: { customer: customerF, ordering: "name", page_size: 500 },
+    }).then((r) => setFilterSites(r.data.results ?? [])).catch(() => {});
+  }, [customerF]);
+
+  const [rows, setRows] = React.useState<TodoRow[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  const load = React.useCallback(() => {
+    setLoading(true);
+    const params: Record<string, any> = {};
+    if (customerF) params.customer = customerF;
+    if (siteF)     params.site = siteF;
+    api.get<TodoRow[]>("/maintenance-plans/todo/", { params })
+      .then((r) => setRows(r.data))
+      .catch((e) => toast.error(apiErrorToMessage(e)))
+      .finally(() => setLoading(false));
+  }, [customerF, siteF]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  // ── menu state ──
+  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [menuRow,    setMenuRow]    = React.useState<TodoRow | null>(null);
+  const openMenu = (e: React.MouseEvent<HTMLElement>, row: TodoRow) => {
+    e.stopPropagation(); setMenuAnchor(e.currentTarget); setMenuRow(row);
+  };
+  const closeMenu = () => { setMenuAnchor(null); };
+
+  // ── Cambia data prevista dialog ──
+  const [dateDlgOpen, setDateDlgOpen] = React.useState(false);
+  const [newDate,     setNewDate]     = React.useState("");
+  const [dateSaving,  setDateSaving]  = React.useState(false);
+  const openDateDlg = () => {
+    setNewDate(menuRow?.next_due_date ?? "");
+    closeMenu(); setDateDlgOpen(true);
+  };
+  const saveDate = async () => {
+    if (!menuRow || !newDate) return;
+    setDateSaving(true);
+    try {
+      await api.patch(`/maintenance-plans/${menuRow.plan_id}/`, { next_due_date: newDate });
+      toast.success("Data aggiornata ✅"); setDateDlgOpen(false); load();
+    } catch (e) { toast.error(apiErrorToMessage(e)); }
+    finally { setDateSaving(false); }
+  };
+
+  // ── Elimina piano dialog ──
+  const [delDlgOpen, setDelDlgOpen] = React.useState(false);
+  const [delBusy,    setDelBusy]    = React.useState(false);
+  const openDelDlg = () => { closeMenu(); setDelDlgOpen(true); };
+  const doDelete = async () => {
+    if (!menuRow) return;
+    setDelBusy(true);
+    try {
+      await api.delete(`/maintenance-plans/${menuRow.plan_id}/`);
+      toast.success("Piano eliminato ✅"); setDelDlgOpen(false); load();
+    } catch (e) { toast.error(apiErrorToMessage(e)); }
+    finally { setDelBusy(false); }
+  };
+
+  // ── Carica Rapportino dialog (mini form) ──
+  type MiniForm = { plan: number | ""; inventory: number | ""; performed_at: string; result: string; tech: number | ""; notes: string; pdf_file: File | null };
+  const MINI0: MiniForm = { plan: "", inventory: "", performed_at: new Date().toISOString().slice(0, 10), result: "", tech: "", notes: "", pdf_file: null };
+  const [evDlgOpen,  setEvDlgOpen]  = React.useState(false);
+  const [evForm,     setEvForm]     = React.useState<MiniForm>(MINI0);
+  const [evSaving,   setEvSaving]   = React.useState(false);
+  const [planInvs,   setPlanInvs]   = React.useState<InventoryItem[]>([]);
+  const evf = (p: Partial<MiniForm>) => setEvForm((x) => ({ ...x, ...p }));
+  const pdfInputRef = React.useRef<HTMLInputElement>(null);
+
+  const openEvDlg = () => {
+    if (!menuRow) return;
+    closeMenu();
+    setEvForm({ ...MINI0, plan: menuRow.plan_id, inventory: menuRow.inventory_id });
+    setEvDlgOpen(true);
+  };
+
+  // Load inventories for the selected plan (via plan's customer)
+  React.useEffect(() => {
+    if (!evForm.plan || !menuRow) { setPlanInvs([]); return; }
+    api.get<{ results: InventoryItem[] }>("/inventories/", {
+      params: { customer: menuRow.customer_id, ordering: "hostname", page_size: 500 },
+    }).then((r) => setPlanInvs(r.data.results ?? [])).catch(() => {});
+  }, [evForm.plan, menuRow]);
+
+  const saveEvent = async () => {
+    if (!evForm.plan)         { toast.warning("Piano richiesto."); return; }
+    if (!evForm.inventory)    { toast.warning("Inventario richiesto."); return; }
+    if (!evForm.performed_at) { toast.warning("Data richiesta."); return; }
+    if (!evForm.result)       { toast.warning("Risultato richiesto."); return; }
+    if (!evForm.tech)         { toast.warning("Tecnico richiesto."); return; }
+    setEvSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("plan",         String(evForm.plan));
+      fd.append("inventory",    String(evForm.inventory));
+      fd.append("performed_at", evForm.performed_at);
+      fd.append("result",       evForm.result);
+      fd.append("tech",         String(evForm.tech));
+      if (evForm.notes.trim()) fd.append("notes", evForm.notes.trim());
+      if (evForm.pdf_file)     fd.append("pdf_file", evForm.pdf_file);
+      await api.post("/maintenance-events/", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success("Rapportino creato ✅"); setEvDlgOpen(false); load();
+    } catch (e) { toast.error(apiErrorToMessage(e)); }
+    finally { setEvSaving(false); }
+  };
+
+  // ── columns ──
+  const fcnt = [customerF, siteF].filter(Boolean).length;
+
+  return (
+    <>
+      <Card>
+        <CardContent sx={{ pt: 1.5, pb: 2, "&:last-child": { pb: 2 } }}>
+          <Stack spacing={1.5}>
+            {/* Toolbar */}
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }} justifyContent="space-between">
+              <FilterChip activeCount={fcnt} onReset={() => { setCustomerF(""); setSiteF(""); }}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Cliente</InputLabel>
+                  <Select label="Cliente" value={customerF === "" ? "" : String(customerF)}
+                    onChange={(e) => { setCustomerF(e.target.value === "" ? "" : Number(e.target.value)); setSiteF(""); }}>
+                    <MenuItem value="">Tutti</MenuItem>
+                    {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <FormControl size="small" fullWidth disabled={!customerF}>
+                  <InputLabel>Sito</InputLabel>
+                  <Select label="Sito" value={siteF === "" ? "" : String(siteF)}
+                    onChange={(e) => setSiteF(e.target.value === "" ? "" : Number(e.target.value))}>
+                    <MenuItem value="">Tutti</MenuItem>
+                    {filterSites.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </FilterChip>
+            </Stack>
+
+            {/* Table */}
+            {loading ? (
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
+                <CircularProgress size={18} />
+                <Typography variant="body2" sx={{ opacity: 0.7 }}>Caricamento…</Typography>
+              </Stack>
+            ) : rows.length === 0 ? (
+              <Typography variant="body2" sx={{ opacity: 0.6, py: 2 }}>Nessuna manutenzione da fare.</Typography>
+            ) : (
+              <Box sx={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(0,0,0,0.12)" }}>
+                      {["Cliente", "Sito", "Tipo", "K-number", "Hostname", "Prossima scadenza", ""].map((h) => (
+                        <th key={h} style={{ textAlign: "left", padding: "6px 12px", fontWeight: 600, opacity: 0.7, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => (
+                      <tr key={`${row.plan_id}-${row.inventory_id}`}
+                        style={{ borderBottom: "1px solid rgba(0,0,0,0.06)", background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)" }}>
+                        <td style={{ padding: "7px 12px", whiteSpace: "nowrap" }}>{row.customer_code} — {row.customer_name}</td>
+                        <td style={{ padding: "7px 12px", whiteSpace: "nowrap" }}>{row.site_name ?? "—"}</td>
+                        <td style={{ padding: "7px 12px", whiteSpace: "nowrap" }}>{row.type_label ?? "—"}</td>
+                        <td style={{ padding: "7px 12px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{row.knumber ?? "—"}</td>
+                        <td style={{ padding: "7px 12px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{row.hostname ?? "—"}</td>
+                        <td style={{ padding: "7px 12px", whiteSpace: "nowrap" }}>
+                          <Chip size="small"
+                            label={row.next_due_date}
+                            color={row.next_due_date < new Date().toISOString().slice(0,10) ? "error" : "default"}
+                            variant={row.next_due_date < new Date().toISOString().slice(0,10) ? "filled" : "outlined"}
+                          />
+                        </td>
+                        <td style={{ padding: "4px 8px" }}>
+                          <Tooltip title="Azioni">
+                            <IconButton size="small" onClick={(e) => openMenu(e, row)}>
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Box>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {/* 3-dot context menu */}
+      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={closeMenu}>
+        <MenuItem onClick={openEvDlg}>
+          <UploadFileIcon fontSize="small" sx={{ mr: 1 }} /> Carica Rapportino
+        </MenuItem>
+        <MenuItem onClick={openDateDlg}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} /> Cambia data prevista
+        </MenuItem>
+        <MenuItem onClick={openDelDlg} sx={{ color: "error.main" }}>
+          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina manutenzione
+        </MenuItem>
+      </Menu>
+
+      {/* Cambia data prevista */}
+      <Dialog open={dateDlgOpen} onClose={() => setDateDlgOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Cambia data prevista</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+              Piano: <strong>{menuRow?.plan_title}</strong>
+            </Typography>
+            <TextField size="small" label="Nuova data prevista" type="date" fullWidth
+              value={newDate} InputLabelProps={{ shrink: true }}
+              onChange={(e) => setNewDate(e.target.value)} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDateDlgOpen(false)}>Annulla</Button>
+          <Button variant="contained" onClick={saveDate} disabled={dateSaving || !newDate}>
+            {dateSaving ? "Salvataggio…" : "Salva"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Elimina piano */}
+      <ConfirmDeleteDialog open={delDlgOpen} busy={delBusy}
+        title="Elimina manutenzione"
+        description={`Eliminare il piano "${menuRow?.plan_title}" e tutte le sue notifiche? L'operazione è reversibile dal cestino.`}
+        onClose={() => setDelDlgOpen(false)} onConfirm={doDelete} />
+
+      {/* Carica Rapportino dialog */}
+      <Dialog open={evDlgOpen} onClose={() => setEvDlgOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Carica Rapportino</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+              Piano: <strong>{menuRow?.plan_title}</strong> — {menuRow?.customer_name}
+            </Typography>
+            <FormControl size="small" fullWidth required>
+              <InputLabel>Inventario *</InputLabel>
+              <Select label="Inventario *"
+                value={evForm.inventory === "" ? "" : String(evForm.inventory)}
+                onChange={(e) => evf({ inventory: e.target.value === "" ? "" : Number(e.target.value) })}>
+                <MenuItem value="">—</MenuItem>
+                {planInvs.map((i) => (
+                  <MenuItem key={i.id} value={String(i.id)}>
+                    {i.hostname || `#${i.id}`}{i.knumber ? ` · ${i.knumber}` : ""}{i.type_label ? ` (${i.type_label})` : ""}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField size="small" label="Data esecuzione *" type="date" fullWidth
+              value={evForm.performed_at} InputLabelProps={{ shrink: true }}
+              onChange={(e) => evf({ performed_at: e.target.value })} />
+            <FormControl size="small" fullWidth required>
+              <InputLabel>Risultato *</InputLabel>
+              <Select label="Risultato *" value={evForm.result}
+                onChange={(e) => evf({ result: e.target.value })}>
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="ok">OK</MenuItem>
+                <MenuItem value="ko">KO</MenuItem>
+                <MenuItem value="partial">Parziale</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth required>
+              <InputLabel>Tecnico *</InputLabel>
+              <Select label="Tecnico *"
+                value={evForm.tech === "" ? "" : String(evForm.tech)}
+                onChange={(e) => evf({ tech: e.target.value === "" ? "" : Number(e.target.value) })}>
+                <MenuItem value="">—</MenuItem>
+                {allTechs.map((t) => <MenuItem key={t.id} value={String(t.id)}>{t.full_name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField size="small" label="Note" value={evForm.notes} fullWidth multiline minRows={2}
+              onChange={(e) => evf({ notes: e.target.value })} />
+            {/* PDF upload */}
+            <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: "none" }}
+              onChange={(e) => evf({ pdf_file: e.target.files?.[0] ?? null })} />
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Button variant="outlined" size="small" startIcon={<AttachFileIcon />}
+                onClick={() => pdfInputRef.current?.click()}>
+                {evForm.pdf_file ? evForm.pdf_file.name : "Allega PDF"}
+              </Button>
+              {evForm.pdf_file && (
+                <Tooltip title="Rimuovi allegato">
+                  <IconButton size="small" onClick={() => { evf({ pdf_file: null }); if (pdfInputRef.current) pdfInputRef.current.value = ""; }}>
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEvDlgOpen(false)}>Annulla</Button>
+          <Button variant="contained" onClick={saveEvent} disabled={evSaving}>
+            {evSaving ? "Salvataggio…" : "Salva"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
 
 function EventsTab() {
   const toast = useToast();
@@ -940,8 +1288,11 @@ function EventsTab() {
     "/techs/", { ordering: "last_name", page_size: 500, is_active: "true" }
   );
 
-  // Inventari caricati dinamicamente in base al piano selezionato nel form
   const [formInventories, setFormInventories] = React.useState<InventoryItem[]>([]);
+  const [formCustomerId,  setFormCustomerId]  = React.useState<number | "">("");
+  const [formSiteId,      setFormSiteId]      = React.useState<number | "">("");
+  const [formSites,       setFormSites]       = React.useState<SiteItem[]>([]);
+  const pdfInputRef = React.useRef<HTMLInputElement>(null);
 
   const listParams = React.useMemo(() => buildDrfListParams({
     search: grid.search, ordering: grid.ordering,
@@ -980,21 +1331,28 @@ function EventsTab() {
   const [resBusy,  setResBusy]  = React.useState(false);
   const ff = (p: Partial<EventForm>) => setForm((x) => ({ ...x, ...p }));
 
-  // Carica inventari del piano selezionato nel form
+  // Carica siti quando cambia il cliente nel form
   React.useEffect(() => {
-    if (!form.plan) { setFormInventories([]); return; }
-    api.get<{ results: any[] }>("/inventories/", {
-      params: { page_size: 500, ordering: "hostname" },
-    }).then((r) => {
-      // Filtra client-side per covered inventories — in mancanza di endpoint dedicato
-      // mostriamo tutti gli inventory (il backend non espone covered list direttamente)
-      setFormInventories(r.data.results ?? []);
-    }).catch(() => {});
-  }, [form.plan]);
+    if (!formCustomerId) { setFormSites([]); setFormSiteId(""); return; }
+    api.get<{ results: SiteItem[] }>("/sites/", {
+      params: { customer: formCustomerId, ordering: "name", page_size: 500 },
+    }).then((r) => setFormSites(r.data.results ?? [])).catch(() => {});
+  }, [formCustomerId]);
+
+  // Carica inventari in base al cliente + sito selezionati nel form
+  React.useEffect(() => {
+    if (!formCustomerId) { setFormInventories([]); return; }
+    const params: Record<string, any> = { customer: formCustomerId, ordering: "hostname", page_size: 500 };
+    if (formSiteId) params.site = formSiteId;
+    api.get<{ results: InventoryItem[] }>("/inventories/", { params })
+      .then((r) => setFormInventories(r.data.results ?? []))
+      .catch(() => {});
+  }, [formCustomerId, formSiteId]);
 
   const openCreate = () => {
     setDlgMode("create"); setDlgId(null);
     setForm({ ...EVENT0, performed_at: new Date().toISOString().slice(0, 10) });
+    setFormCustomerId(""); setFormSiteId(""); setFormSites([]);
     setDlgOpen(true);
   };
 
@@ -1008,7 +1366,14 @@ function EventsTab() {
       result:       (detail.result as any) ?? "",
       tech:         detail.tech ?? "",
       notes:        detail.notes ?? "",
+      pdf_file:     null,
     });
+    // Pre-load inventories for edit: customer derivato dal piano
+    api.get<any>(`/maintenance-plans/${detail.plan}/`)
+      .then((r) => {
+        const custId = r.data.customer;
+        if (custId) { setFormCustomerId(custId); }
+      }).catch(() => {});
     setDlgOpen(true);
   };
 
@@ -1019,23 +1384,24 @@ function EventsTab() {
     if (!form.result)       { toast.warning("Seleziona il risultato."); return; }
     if (!form.tech)         { toast.warning("Seleziona un tecnico."); return; }
 
-    const payload = {
-      plan:         Number(form.plan),
-      inventory:    Number(form.inventory),
-      performed_at: form.performed_at,
-      result:       form.result,
-      tech:         Number(form.tech),
-      notes:        form.notes.trim() || null,
-    };
+    const fd = new FormData();
+    fd.append("plan",         String(Number(form.plan)));
+    fd.append("inventory",    String(Number(form.inventory)));
+    fd.append("performed_at", form.performed_at);
+    fd.append("result",       form.result);
+    fd.append("tech",         String(Number(form.tech)));
+    if (form.notes.trim()) fd.append("notes", form.notes.trim());
+    if (form.pdf_file)     fd.append("pdf_file", form.pdf_file);
 
     setDlgSave(true);
     try {
       let id: number;
+      const headers = { "Content-Type": "multipart/form-data" };
       if (dlgMode === "create") {
-        const r = await api.post<EventRow>("/maintenance-events/", payload);
+        const r = await api.post<EventRow>("/maintenance-events/", fd, { headers });
         id = r.data.id; toast.success("Rapportino creato ✅");
       } else {
-        const r = await api.patch<EventRow>(`/maintenance-events/${dlgId}/`, payload);
+        const r = await api.patch<EventRow>(`/maintenance-events/${dlgId}/`, fd, { headers });
         id = r.data.id; toast.success("Rapportino aggiornato ✅");
       }
       setDlgOpen(false); reload(); grid.setOpenId(id);
@@ -1219,22 +1585,50 @@ function EventsTab() {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 0.5 }}>
 
+            {/* Cliente (obbligatorio) */}
             <FormControl size="small" fullWidth required>
+              <InputLabel>Cliente *</InputLabel>
+              <Select label="Cliente *"
+                value={formCustomerId === "" ? "" : String(formCustomerId)}
+                onChange={(e) => {
+                  const v = e.target.value === "" ? "" : Number(e.target.value);
+                  setFormCustomerId(v); setFormSiteId(""); ff({ plan: "", inventory: "" });
+                }}>
+                <MenuItem value="">—</MenuItem>
+                {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+
+            {/* Sito (facoltativo) */}
+            <FormControl size="small" fullWidth disabled={!formCustomerId}>
+              <InputLabel>Sito (facoltativo)</InputLabel>
+              <Select label="Sito (facoltativo)"
+                value={formSiteId === "" ? "" : String(formSiteId)}
+                onChange={(e) => { setFormSiteId(e.target.value === "" ? "" : Number(e.target.value)); ff({ inventory: "" }); }}>
+                <MenuItem value="">Tutti i siti</MenuItem>
+                {formSites.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+
+            {/* Piano filtrato per cliente */}
+            <FormControl size="small" fullWidth required disabled={!formCustomerId}>
               <InputLabel>Piano *</InputLabel>
               <Select label="Piano *"
                 value={form.plan === "" ? "" : String(form.plan)}
                 onChange={(e) => ff({ plan: e.target.value === "" ? "" : Number(e.target.value), inventory: "" })}>
                 <MenuItem value="">—</MenuItem>
-                {allPlans.map((p) => <MenuItem key={p.id} value={String(p.id)}>{p.title}</MenuItem>)}
+                {allPlans
+                  .filter((p) => !formCustomerId || (p as any).customer === formCustomerId)
+                  .map((p) => <MenuItem key={p.id} value={String(p.id)}>{p.title}</MenuItem>)}
               </Select>
             </FormControl>
 
-            <FormControl size="small" fullWidth required>
+            {/* Inventario filtrato per cliente + sito */}
+            <FormControl size="small" fullWidth required disabled={!formCustomerId}>
               <InputLabel>Inventario *</InputLabel>
               <Select label="Inventario *"
                 value={form.inventory === "" ? "" : String(form.inventory)}
-                onChange={(e) => ff({ inventory: e.target.value === "" ? "" : Number(e.target.value) })}
-                disabled={!form.plan}>
+                onChange={(e) => ff({ inventory: e.target.value === "" ? "" : Number(e.target.value) })}>
                 <MenuItem value="">—</MenuItem>
                 {formInventories.map((i) => (
                   <MenuItem key={i.id} value={String(i.id)}>
@@ -1271,6 +1665,23 @@ function EventsTab() {
 
             <TextField size="small" label="Note" value={form.notes} fullWidth multiline minRows={2}
               onChange={(e) => ff({ notes: e.target.value })} />
+
+            {/* PDF allegato */}
+            <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: "none" }}
+              onChange={(e) => ff({ pdf_file: e.target.files?.[0] ?? null })} />
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Button variant="outlined" size="small" startIcon={<AttachFileIcon />}
+                onClick={() => pdfInputRef.current?.click()}>
+                {form.pdf_file ? form.pdf_file.name : "Allega PDF rapportino"}
+              </Button>
+              {form.pdf_file && (
+                <Tooltip title="Rimuovi">
+                  <IconButton size="small" onClick={() => { ff({ pdf_file: null }); if (pdfInputRef.current) pdfInputRef.current.value = ""; }}>
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -1514,20 +1925,27 @@ function TechsTab() {
 // MAIN
 // -----------------------------------------------------------------------------
 
-type TabKey = "plans" | "events" | "notifications" | "techs";
+type TabKey = "todo" | "plans" | "events" | "notifications" | "techs";
 
 export default function Maintenance() {
   const [tabParam, setTabParam] = useUrlStringParam("tab");
-  const tab: TabKey = (["plans","events","notifications","techs"].includes(tabParam) ? tabParam : "plans") as TabKey;
+  const tab: TabKey = (["todo","plans","events","notifications","techs"].includes(tabParam) ? tabParam : "todo") as TabKey;
 
   return (
     <Stack spacing={2}>
       <Box>
+        <Typography variant="h5">
+          Manutenzione
+        </Typography>
+        <Typography variant="body2" sx={{ opacity: 0.7 }}>
+          Piani, eventi e tecnici di manutenzione.
+        </Typography>
       </Box>
 
       <Card sx={{ mb: 0 }}>
         <Box sx={{ px: 2, borderBottom: "1px solid", borderColor: "divider" }}>
           <Tabs value={tab} onChange={(_, v) => setTabParam(v)} variant="scrollable" allowScrollButtonsMobile>
+            <Tab value="todo"          label="Da Fare" />
             <Tab value="plans"         label="Piani" />
             <Tab value="events"        label="Rapportini" />
             <Tab value="notifications" label="Notifiche" />
@@ -1536,6 +1954,7 @@ export default function Maintenance() {
         </Box>
       </Card>
 
+      {tab === "todo"          && <TodoTab />}
       {tab === "plans"         && <PlansTab />}
       {tab === "events"        && <EventsTab />}
       {tab === "notifications" && <NotificationsTab />}

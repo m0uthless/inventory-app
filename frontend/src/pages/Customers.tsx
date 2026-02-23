@@ -248,7 +248,7 @@ function CustomerInventoriesTab(props: { customerId: number; includeDeleted: boo
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Inventari
+            Clienti
           </Typography>
           <Chip size="small" label={rowCount} />
         </Stack>
@@ -892,8 +892,13 @@ const doRestore = async () => {
   return (
     <Stack spacing={2}>
       <Box>
+        <Typography variant="h5">
+          Clienti
+        </Typography>
+        <Typography variant="body2" sx={{ opacity: 0.7 }}>
+          Lista di tutti i clienti presenti nel Site-Repo.
+        </Typography>
       </Box>
-
       <EntityListCard
         toolbar={{
           q: grid.q,

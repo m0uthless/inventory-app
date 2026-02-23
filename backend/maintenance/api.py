@@ -1,10 +1,10 @@
 import calendar
 from datetime import date, timedelta
 
-from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from rest_framework import serializers, viewsets
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
@@ -173,16 +173,9 @@ class MaintenancePlanSerializer(serializers.ModelSerializer):
         return list(obj.inventory_types.values_list("label", flat=True))
 
     def get_covered_count(self, obj):
-        # Usa annotazione se siamo in list() (evita N+1); fallback per retrieve singolo
-        if hasattr(obj, "_covered_count_ann"):
-            return obj._covered_count_ann
         return obj.covered_inventories().count()
 
     def get_last_done_date(self, obj):
-        # Usa annotazione se siamo in list() (evita N+1); fallback per retrieve singolo
-        if hasattr(obj, "_last_done_date_ann"):
-            v = obj._last_done_date_ann
-            return str(v) if v else None
         last = obj.events.filter(deleted_at__isnull=True).order_by("-performed_at").first()
         return str(last.performed_at) if last else None
 
@@ -232,12 +225,6 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
             MaintenancePlan.objects
             .select_related("customer")
             .prefetch_related("inventory_types")
-            .annotate(
-                _last_done_date_ann=Max(
-                    "events__performed_at",
-                    filter=Q(events__deleted_at__isnull=True),
-                )
-            )
         )
 
         # Filtro per tipo inventario (multi: ?inventory_type=1&inventory_type=2)
@@ -256,59 +243,6 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
             qs = qs.filter(next_due_date__gte=today, next_due_date__lte=today + timedelta(days=30))
 
         return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
-
-    # ------------------------------------------------------------------
-    # covered_count bulk annotation (evita N+1 sulla lista)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _annotate_covered_count(plans):
-        """
-        Calcola covered_count per una pagina di piani con al massimo 2 query
-        aggiuntive (invece di 1 query per piano).
-        Imposta obj._covered_count_ann su ogni istanza.
-        """
-        from collections import defaultdict
-        from inventory.models import Inventory
-
-        if not plans:
-            return
-
-        customer_ids = list({p.customer_id for p in plans})
-        type_ids_by_plan = {
-            p.id: set(p.inventory_types.values_list("id", flat=True))
-            for p in plans
-        }
-
-        # Unica query: conta inventory attivi per (customer, type)
-        rows = (
-            Inventory.objects
-            .filter(customer_id__in=customer_ids, deleted_at__isnull=True)
-            .values("customer_id", "type_id")
-            .annotate(n=Count("id"))
-        )
-        counts: dict = defaultdict(lambda: defaultdict(int))
-        for row in rows:
-            counts[row["customer_id"]][row["type_id"]] = row["n"]
-
-        for p in plans:
-            p._covered_count_ann = sum(
-                counts[p.customer_id].get(t, 0)
-                for t in type_ids_by_plan.get(p.id, set())
-            )
-
-    def list(self, request, *args, **kwargs):
-        response = super().list(request, *args, **kwargs)
-        # Annotiamo covered_count sulla stessa pagina già caricata da super()
-        qs_filtered = self.filter_queryset(self.get_queryset())
-        paginator = self.paginator
-        if paginator is not None:
-            page = paginator.paginate_queryset(qs_filtered, request, view=self)
-            if page is not None:
-                self._annotate_covered_count(page)
-        return response
-
-    # ------------------------------------------------------------------
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
@@ -364,6 +298,66 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
         return Response({"next_due_date": result.isoformat()})
 
 
+    @action(detail=False, methods=["get"])
+    def todo(self, request):
+        """
+        Ritorna una riga per ogni (piano, inventory) con next_due_date valorizzata.
+        Le righe sono ordinate per next_due_date, cliente, sito.
+        Filtri: ?customer=ID  ?site=ID
+        """
+        plans = (
+            MaintenancePlan.objects
+            .filter(deleted_at__isnull=True, is_active=True, next_due_date__isnull=False)
+            .select_related("customer")
+            .prefetch_related("inventory_types")
+        )
+        customer = request.query_params.get("customer")
+        if customer:
+            plans = plans.filter(customer_id=customer)
+
+        from inventory.models import Inventory
+        rows = []
+        for plan in plans:
+            invs = (
+                Inventory.objects
+                .filter(
+                    customer=plan.customer,
+                    type_id__in=plan.inventory_types.values_list("id", flat=True),
+                    deleted_at__isnull=True,
+                )
+                .select_related("site", "type")
+            )
+            site = request.query_params.get("site")
+            if site:
+                invs = invs.filter(site_id=site)
+            for inv in invs:
+                rows.append({
+                    "plan_id":       plan.id,
+                    "plan_title":    plan.title,
+                    "inventory_id":  inv.id,
+                    "customer_id":   plan.customer_id,
+                    "customer_code": plan.customer.code,
+                    "customer_name": plan.customer.name,
+                    "site_id":       inv.site_id,
+                    "site_name":     (inv.site.display_name or inv.site.name) if inv.site else None,
+                    "type_label":    inv.type.label if inv.type_id else None,
+                    "knumber":       inv.knumber,
+                    "hostname":      inv.hostname,
+                    "next_due_date": str(plan.next_due_date),
+                    "schedule_type":  plan.schedule_type,
+                    "interval_value": plan.interval_value,
+                    "interval_unit":  plan.interval_unit,
+                    "fixed_month":    plan.fixed_month,
+                    "fixed_day":      plan.fixed_day,
+                })
+        rows.sort(key=lambda r: (
+            r["next_due_date"] or "",
+            r["customer_name"] or "",
+            r["site_name"] or "",
+        ))
+        return Response(rows)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Events
 # ─────────────────────────────────────────────────────────────────────────────
@@ -399,6 +393,7 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
             "tech",
             "tech_name",
             "notes",
+            "pdf_file",
             "created_at",
             "updated_at",
             "deleted_at",
@@ -406,8 +401,9 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
 
 
 class MaintenanceEventViewSet(viewsets.ModelViewSet):
-    serializer_class = MaintenanceEventSerializer
-    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    serializer_class  = MaintenanceEventSerializer
+    filter_backends   = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    parser_classes    = [MultiPartParser, FormParser]
 
     filterset_fields = ["inventory", "plan", "tech", "result"]
     search_fields    = [
@@ -445,6 +441,29 @@ class MaintenanceEventViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
         instance.save(update_fields=["deleted_at"])
+
+    def perform_create(self, serializer):
+        """Salva l'evento e ricalcola automaticamente next_due_date del piano."""
+        event = serializer.save()
+        self._recalculate_plan_due_date(event)
+
+    def _recalculate_plan_due_date(self, event):
+        """
+        Dopo la creazione di un rapportino, avanza next_due_date del piano
+        al prossimo ciclo basandosi su performed_at.
+        """
+        plan = event.plan
+        next_date = compute_next_due_date(
+            plan.schedule_type,
+            plan.interval_value,
+            plan.interval_unit,
+            plan.fixed_month,
+            plan.fixed_day,
+            reference_year=event.performed_at.year + 1,
+        )
+        if next_date and next_date > plan.next_due_date:
+            plan.next_due_date = next_date
+            plan.save(update_fields=["next_due_date", "updated_at"])
 
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):

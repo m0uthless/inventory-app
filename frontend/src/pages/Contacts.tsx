@@ -621,6 +621,14 @@ const doRestore = React.useCallback(async () => {
 
   return (
     <Stack spacing={2}>
+       <Box>
+         <Typography variant="h5">
+           Contatti
+         </Typography>
+         <Typography variant="body2" sx={{ opacity: 0.7 }}>
+           Schede di tutti i contatti legati a uno o più clienti.
+         </Typography>
+       </Box>
       <EntityListCard
         toolbar={{
           q: grid.q,

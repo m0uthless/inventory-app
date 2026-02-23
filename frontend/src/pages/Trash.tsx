@@ -389,13 +389,12 @@ export default function Trash() {
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ fontWeight: 900, mb: 1 }}>
+      <Typography variant="h5" sx={{ fontWeight: 900 }}>
         Cestino
       </Typography>
       <Typography variant="body2" sx={{ opacity: 0.7, mb: 2 }}>
         Qui trovi gli elementi eliminati (soft-delete). Puoi filtrare e ripristinare in blocco.
       </Typography>
-
       <ConfirmActionDialog
         open={bulkRestoreDlgOpen}
         busy={restoreBusy}

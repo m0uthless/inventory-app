@@ -387,14 +387,15 @@ export default function Audit() {
   } as const;
 
   return (
-    <Stack spacing={2}>
-      <Typography variant="h5">
-        Audit
-      </Typography>
-      <Typography variant="body2" sx={{ opacity: 0.7 }}>
-        Log degli eventi di sistema.
-      </Typography>
-
+<Stack spacing={2}>
+  <Box>
+    <Typography variant="h5">
+      Audit
+    </Typography>
+    <Typography variant="body2" sx={{ opacity: 0.7 }}>
+      Log degli eventi di sistema.
+    </Typography>
+  </Box>
       <Card>
         <CardContent sx={{ pt: 1.5, pb: 2, "&:last-child": { pb: 2 } }}>
           <Stack spacing={1.5}>

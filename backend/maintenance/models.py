@@ -103,8 +103,9 @@ class MaintenanceEvent(TimeStampedModel):
     performed_at = models.DateField()
     result       = models.CharField(max_length=16, choices=MaintenanceResult.choices)
 
-    tech  = models.ForeignKey(Tech, on_delete=models.PROTECT, related_name="events")
-    notes = models.TextField(null=True, blank=True)
+    tech     = models.ForeignKey(Tech, on_delete=models.PROTECT, related_name="events")
+    notes    = models.TextField(null=True, blank=True)
+    pdf_file = models.FileField(upload_to="maintenance_events/", null=True, blank=True)
 
     class Meta:
         verbose_name = "Rapportino"

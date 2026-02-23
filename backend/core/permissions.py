@@ -1,42 +1,54 @@
-from rest_framework.exceptions import NotAuthenticated
+from __future__ import annotations
+
 from rest_framework.permissions import BasePermission, DjangoModelPermissions
 
 
 class IsAuthenticatedDjangoModelPermissions(DjangoModelPermissions):
-    """Like DjangoModelPermissions, but unauthenticated users get 401 (not 403)."""
+    """Same as DRF's DjangoModelPermissions, but requires authentication."""
 
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            raise NotAuthenticated()
-        return super().has_permission(request, view)
+    authenticated_users_only = True
 
 
 class CanRestoreModelPermission(BasePermission):
-    """Permission for `restore` actions.
+    """Generic permission helper for `restore` actions.
 
-    Uses the model behind the viewset and checks for the standard Django
-    `change_<model>` permission.
-
-    This avoids DRF's default mapping where POST would require `add_<model>`.
+    By default it requires the `change` permission for the view's model.
+    A view can override this by defining `restore_permission`.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> bool:
         user = getattr(request, "user", None)
-        if not user or not user.is_authenticated:
+        if not user or not getattr(user, "is_authenticated", False):
             return False
 
-        model = None
-        qs = getattr(view, "queryset", None)
-        if qs is not None and getattr(qs, "model", None) is not None:
-            model = qs.model
-        else:
-            try:
-                model = view.get_queryset().model
-            except Exception:
-                model = None
+        explicit = getattr(view, "restore_permission", None)
+        if explicit:
+            return bool(user.has_perm(explicit))
 
-        if model is None:
+        # Infer from queryset model (common for ModelViewSet)
+        try:
+            model = view.get_queryset().model
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            return bool(user.has_perm(f"{app_label}.change_{model_name}"))
+        except Exception:
             return False
 
-        perm = f"{model._meta.app_label}.change_{model._meta.model_name}"
-        return bool(user.has_perm(perm))
+
+class IsStaffOrAdminGroup(BasePermission):
+    """Allow access to staff/superusers OR users in the `admin` group.
+
+    Useful for endpoints that are not tied to a model/queryset (e.g. API docs).
+    """
+
+    admin_group_name = "admin"
+
+    def has_permission(self, request, view) -> bool:
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            return True
+
+        return bool(user.groups.filter(name=self.admin_group_name).exists())

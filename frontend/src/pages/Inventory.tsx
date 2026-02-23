@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Drawer,
   IconButton,
   Stack,
@@ -29,8 +28,14 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import LinearProgress from "@mui/material/LinearProgress";
+import FingerprintIcon from "@mui/icons-material/Fingerprint";
+import WifiOutlinedIcon from "@mui/icons-material/WifiOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import MemoryOutlinedIcon from "@mui/icons-material/MemoryOutlined";
+import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
 
 import { Can } from "../auth/Can";
 import { useExportCsv } from "../ui/useExportCsv";
@@ -50,13 +55,11 @@ import { useToast } from "../ui/toast";
 import { apiErrorToMessage } from "../api/error";
 import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
-import DetailDrawerHeader from "../ui/DetailDrawerHeader";
 import ConfirmDeleteDialog from "../ui/ConfirmDeleteDialog";
 import ConfirmActionDialog from "../ui/ConfirmActionDialog";
 import { PERMS } from "../auth/perms";
 import EntityListCard from "../ui/EntityListCard";
 import CustomFieldsEditor from "../ui/CustomFieldsEditor";
-import CustomFieldsDisplay from "../ui/CustomFieldsDisplay";
 import { getInventoryTypeIcon, INVENTORY_TYPE_ICON_COLOR } from "../ui/inventoryTypeIcon";
 import FilterChip from "../ui/FilterChip";
 
@@ -103,6 +106,7 @@ type InventoryDetail = {
   srsa_ip?: string | null;
 
   type?: number | null;
+  type_key?: string | null;
   type_label?: string | null;
 
   status: number;
@@ -155,6 +159,44 @@ type InventoryForm = {
   notes: string;
 };
 
+// ── REGOLE CAMPI PER TIPO INVENTARIO ─────────────────────────────────────────
+// Per ogni tipo, elenca i campi DISABILITATI nel form di creazione/modifica.
+// Campo non elencato = sempre abilitato.
+// Aggiungi nuovi tipi o modifica i profili senza toccare il codice del form.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type InventoryFieldName =
+  | "hostname" | "local_ip" | "srsa_ip"          // rete
+  | "os_user"  | "os_pwd"                         // credenziali OS
+  | "app_usr"  | "app_pwd"                        // credenziali app
+  | "vnc_pwd"                                     // VNC
+  | "manufacturer" | "model" | "warranty_end_date"; // hardware
+
+// ── Profili riusabili ─────────────────────────────────────────────────────────
+const PROFILE_MANAGEMENT: InventoryFieldName[] = [
+  "vnc_pwd", "app_usr", "app_pwd",
+];
+const PROFILE_LOAD_BALANCER: InventoryFieldName[] = [
+  "vnc_pwd", "os_user", "os_pwd", "app_usr", "app_pwd",
+];
+const PROFILE_STORAGE: InventoryFieldName[] = [
+  "vnc_pwd", "os_user", "os_pwd",
+];
+
+// ── Mappa tipo → campi disabilitati ──────────────────────────────────────────
+const TYPE_DISABLED_FIELDS: Partial<Record<string, InventoryFieldName[]>> = {
+  management:    PROFILE_MANAGEMENT,
+  management1:   PROFILE_MANAGEMENT,
+  management2:   PROFILE_MANAGEMENT,
+  management3:   PROFILE_MANAGEMENT,
+  management4:   PROFILE_MANAGEMENT,
+  load_balancer1: PROFILE_LOAD_BALANCER,
+  load_balancer2: PROFILE_LOAD_BALANCER,
+  storage:        PROFILE_STORAGE,
+  // Aggiungi altri tipi qui, es:
+  // robot:       ["vnc_pwd", "app_usr", "app_pwd"],
+};
+
 const asId = (v: unknown): number | "" => {
   const s = String(v);
   return s === "" ? "" : Number(s);
@@ -165,39 +207,6 @@ async function copyToClipboard(text: string) {
   await navigator.clipboard.writeText(text);
 }
 
-function FieldRow(props: { label: string; value?: string | null; mono?: boolean; onCopy?: () => void }) {
-  const { label, value, mono, onCopy } = props;
-  const v = value ?? "";
-  return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
-      </Box>
-
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : undefined,
-            wordBreak: "break-word",
-          }}
-        >
-          {v || "—"}
-        </Typography>
-      </Box>
-
-      {v && onCopy ? (
-        <Tooltip title="Copia">
-          <IconButton size="small" onClick={onCopy}>
-            <ContentCopyIcon fontSize="inherit" />
-          </IconButton>
-        </Tooltip>
-      ) : (
-        <Box sx={{ width: 36 }} />
-      )}
-    </Stack>
-  );
-}
 
 function SecretRow(props: { label: string; value?: string | null; onCopy?: () => void }) {
   const { label, value, onCopy } = props;
@@ -266,8 +275,8 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
   );
 }
 
-function PasswordField(props: { label: string; value: string; onChange: (v: string) => void }) {
-  const { label, value, onChange } = props;
+function PasswordField(props: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean; helperText?: string }) {
+  const { label, value, onChange, disabled, helperText } = props;
   const [show, setShow] = React.useState(false);
 
   return (
@@ -277,6 +286,8 @@ function PasswordField(props: { label: string; value: string; onChange: (v: stri
       value={value}
       onChange={(e) => onChange(e.target.value)}
       fullWidth
+      disabled={disabled}
+      helperText={helperText}
       type={show ? "text" : "password"}
       InputProps={{
         endAdornment: (
@@ -360,6 +371,7 @@ export default function Inventory() {
   const { exporting, exportCsv } = useExportCsv();
   const { hasPerm } = useAuth();
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets);
+
   const navigate = useNavigate();
   const loc = useLocation();
   const grid = useServerGrid({
@@ -472,6 +484,19 @@ export default function Inventory() {
   });
 
   const [formErrors, setFormErrors] = React.useState<{ customer?: string; status?: string; name?: string }>({});
+
+  // Campi disabilitati in base al tipo selezionato
+  const selectedTypeKey = React.useMemo(
+    () => (form.type !== "" ? types.find((t) => t.id === form.type)?.key ?? null : null),
+    [form.type, types]
+  );
+  const disabledFields = React.useMemo((): Set<InventoryFieldName> => {
+    const fields = TYPE_DISABLED_FIELDS[selectedTypeKey ?? ""] ?? [];
+    return new Set(fields);
+  }, [selectedTypeKey]);
+  const df = (f: InventoryFieldName) => disabledFields.has(f);
+  const dfHelp = (f: InventoryFieldName) =>
+    df(f) ? "Non applicabile per questo tipo" : undefined;
 
   const loadCustomers = React.useCallback(async () => {
     try {
@@ -1045,298 +1070,289 @@ const doRestore = async () => {
         </FilterChip>
       </EntityListCard>
 
-      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: { xs: "100%", sm: 520 } } }}>
-        <Stack sx={{ p: 2 }} spacing={1.5}>
-          <DetailDrawerHeader
-            title={detail?.hostname || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : "Inventario")}
-            subtitle={detail?.customer_code ? `${detail.customer_code} — ${detail.customer_name}` : undefined}
-            onClose={closeDrawer}
-            actions={
-              <>
+      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 460 } } }}>
+        <Stack sx={{ height: "100%", overflow: "hidden" }}>
+
+          {/* ── HERO BANNER ── */}
+          <Box sx={{
+            background: "linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)",
+            px: 2.5, pt: 2.25, pb: 2.25,
+            position: "relative", overflow: "hidden", flexShrink: 0,
+          }}>
+            <Box sx={{ position:"absolute", top:-44, right:-44, width:130, height:130, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+            <Box sx={{ position:"absolute", bottom:-26, left:52, width:90, height:90, borderRadius:"50%", bgcolor:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
+
+            {/* row 1: status chip + actions */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb:1.25, position:"relative", zIndex:2 }}>
+              <Chip size="small"
+                label={`● ${detail?.status_label ?? "—"}`}
+                sx={{ bgcolor:"rgba(20,255,180,0.18)", color:"#a7f3d0", fontWeight:700, fontSize:10, letterSpacing:"0.07em", border:"1px solid rgba(167,243,208,0.3)", height:22 }}
+              />
+              <Stack direction="row" spacing={0.75}>
                 <Can perm={PERMS.inventory.inventory.change}>
                   {detail?.deleted_at ? (
-                    <Tooltip title="Ripristina">
-                      <span>
-                        <IconButton onClick={doRestore} disabled={!detail || restoreBusy}>
-                          <RestoreFromTrashIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ) : null}
-                </Can>
-
-                <Can perm={PERMS.inventory.inventory.change}>
-                  <Tooltip title="Modifica">
-                    <span>
-                      <IconButton onClick={openEdit} disabled={!detail || Boolean(detail?.deleted_at)}>
-                        <EditIcon />
+                    <Tooltip title="Ripristina"><span>
+                      <IconButton size="small" onClick={doRestore} disabled={!detail || restoreBusy}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                        <RestoreFromTrashIcon fontSize="small" />
                       </IconButton>
-                    </span>
-                  </Tooltip>
+                    </span></Tooltip>
+                  ) : (
+                    <Tooltip title="Modifica"><span>
+                      <IconButton size="small" onClick={openEdit} disabled={!detail}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
+                  )}
                 </Can>
-
                 <Can perm={PERMS.inventory.inventory.delete}>
-                  {!detail?.deleted_at ? (
-                    <Tooltip title="Elimina">
-                      <span>
-                        <IconButton onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}>
-                          <DeleteOutlineIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ) : null}
+                  {!detail?.deleted_at && (
+                    <Tooltip title="Elimina"><span>
+                      <IconButton size="small" onClick={() => setDeleteDlgOpen(true)} disabled={!detail || deleteBusy}
+                        sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(239,68,68,0.28)", color:"#fca5a5" } }}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
+                  )}
                 </Can>
-              </>
-            }
-          />
-
-          {detailLoading ? (
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-              <CircularProgress size={18} />
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Caricamento…
-              </Typography>
+                <Tooltip title="Chiudi">
+                  <IconButton size="small" onClick={closeDrawer}
+                    sx={{ color:"rgba(255,255,255,0.85)", bgcolor:"rgba(255,255,255,0.12)", borderRadius:1.5, "&:hover":{ bgcolor:"rgba(255,255,255,0.22)" } }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
             </Stack>
-          ) : detail ? (
-            <>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {detail.type_label ? <Chip size="small" label={detail.type_label} /> : null}
-                {detail.status_label ? <Chip size="small" label={detail.status_label} /> : null}
-              </Stack>
 
-              {/* Deep-links */}
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<OpenInNewIcon />}
-                  onClick={() =>
-                    window.open(
-                      `/inventory${buildQuery({
-                        open: detail.id,
-                        customer: detail.customer,
-                        site: detail.site ?? "",
-                        ...(detail.deleted_at ? { view: "all" } : {}),
-                      })}`,
-                      "_blank"
-                    )
-                  }
-                >
-                  Apri in nuova scheda
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => navigate(`/customers${buildQuery({ open: detail.customer })}`)}
-                >
-                  Apri cliente
-                </Button>
-
-                {detail.site ? (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => navigate(`/sites${buildQuery({ open: detail.site, customer: detail.customer })}`)}
-                  >
-                    Apri sito
-                  </Button>
-                ) : null}
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer, site: detail.site ?? "" })}`)}
-                >
-                  Apri lista (filtrata)
-                </Button>
-              </Stack>
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Identificazione
-              </Typography>
-
-              <FieldRow
-                label="Nome"
-                value={detail.name || ""}
-                onCopy={async () => {
-                  await copyToClipboard(detail.name);
-                  toast.success("Copiato ✅");
-                }}
-              />
-
-              <FieldRow
-                label="Sito"
-                value={detail.site_display_name || detail.site_name || ""}
-                onCopy={async () => {
-                  const v = detail.site_display_name || detail.site_name || "";
-                  if (v) {
-                    await copyToClipboard(v);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-              <FieldRow
-                label="K-number"
-                value={detail.knumber}
-                mono
-                onCopy={async () => {
-                  if (detail.knumber) {
-                    await copyToClipboard(detail.knumber);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-              <FieldRow
-                label="Seriale"
-                value={detail.serial_number}
-                mono
-                onCopy={async () => {
-                  if (detail.serial_number) {
-                    await copyToClipboard(detail.serial_number);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Rete
-              </Typography>
-              <FieldRow
-                label="Hostname"
-                value={detail.hostname}
-                mono
-                onCopy={async () => {
-                  if (detail.hostname) {
-                    await copyToClipboard(detail.hostname);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-              <FieldRow
-                label="IP locale"
-                value={detail.local_ip}
-                mono
-                onCopy={async () => {
-                  if (detail.local_ip) {
-                    await copyToClipboard(detail.local_ip);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-              <FieldRow
-                label="IP SRSA"
-                value={detail.srsa_ip}
-                mono
-                onCopy={async () => {
-                  if (detail.srsa_ip) {
-                    await copyToClipboard(detail.srsa_ip);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Credenziali
-              </Typography>
-              {!canViewSecrets ? (
-                <Typography variant="body2" sx={{ opacity: 0.7, fontStyle: "italic", mt: 0.5 }}>
-                  Non autorizzato a visualizzare le password.
+            {/* row 2: type icon + hostname + customer/site */}
+            <Box sx={{ position:"relative", zIndex:1 }}>
+              {detail?.deleted_at && <Chip size="small" color="error" label="Eliminato" sx={{ mb:0.75, height:20, fontSize:10 }} />}
+              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb:0.5 }}>
+                {(() => {
+                  const TypeIcon = getInventoryTypeIcon(detail?.type_key);
+                  return (
+                    <Box sx={{
+                      width:44, height:44, borderRadius:2, flexShrink:0,
+                      bgcolor:"rgba(255,255,255,0.15)", backdropFilter:"blur(4px)",
+                      border:"1px solid rgba(255,255,255,0.2)",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                    }}>
+                      <TypeIcon sx={{ fontSize:26, color:"rgba(255,255,255,0.9)" }} />
+                    </Box>
+                  );
+                })()}
+                <Typography sx={{ color:"#fff", fontSize:24, fontWeight:900, letterSpacing:"-0.025em", lineHeight:1.15 }}>
+                  {detail?.hostname || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : "Inventario")}
                 </Typography>
-              ) : null}
-              <FieldRow
-                label="Utente OS"
-                value={detail.os_user}
-                mono
-                onCopy={async () => {
-                  if (detail.os_user) {
-                    await copyToClipboard(detail.os_user);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-              {canViewSecrets ? (
-                <SecretRow
-                  label="Password OS"
-                  value={detail.os_pwd}
-                  onCopy={async () => {
-                    if (detail.os_pwd) {
-                      await copyToClipboard(detail.os_pwd);
-                      toast.success("Copiato ✅");
-                    }
-                  }}
-                />
-              ) : (
-                <FieldRow label="Password OS" value="Non autorizzato" mono />
-              )}
-              <FieldRow
-                label="Utente App"
-                value={detail.app_usr}
-                mono
-                onCopy={async () => {
-                  if (detail.app_usr) {
-                    await copyToClipboard(detail.app_usr);
-                    toast.success("Copiato ✅");
-                  }
-                }}
-              />
-              {canViewSecrets ? (
-                <SecretRow
-                  label="Password App"
-                  value={detail.app_pwd}
-                  onCopy={async () => {
-                    if (detail.app_pwd) {
-                      await copyToClipboard(detail.app_pwd);
-                      toast.success("Copiato ✅");
-                    }
-                  }}
-                />
-              ) : (
-                <FieldRow label="Password App" value="Non autorizzato" mono />
-              )}
-              {canViewSecrets ? (
-                <SecretRow
-                  label="Password VNC"
-                  value={detail.vnc_pwd}
-                  onCopy={async () => {
-                    if (detail.vnc_pwd) {
-                      await copyToClipboard(detail.vnc_pwd);
-                      toast.success("Copiato ✅");
-                    }
-                  }}
-                />
-              ) : (
-                <FieldRow label="Password VNC" value="Non autorizzato" mono />
-              )}
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Hardware
+              </Stack>
+              <Typography variant="body2" sx={{ color:"rgba(255,255,255,0.58)" }}>
+                {[detail?.customer_name, detail?.site_display_name || detail?.site_name].filter(Boolean).join(" · ") || " "}
               </Typography>
-              <FieldRow label="Produttore" value={detail.manufacturer ?? ""} />
-              <FieldRow label="Modello" value={detail.model ?? ""} />
-              <FieldRow label="Fine garanzia" value={detail.warranty_end_date ?? ""} mono />
+              {detail?.type_label && (
+                <Typography variant="caption" sx={{ color:"rgba(255,255,255,0.45)", display:"block", mt:0.25 }}>
+                  {detail.type_label}
+                </Typography>
+              )}
+            </Box>
+          </Box>
 
-              <CustomFieldsDisplay entity="inventory" value={detail.custom_fields} />
+          {detailLoading && <LinearProgress sx={{ height:2 }} />}
 
-              <Divider />
+          {/* ── SCROLLABLE BODY ── */}
+          <Box sx={{ flex:1, overflowY:"auto", px:2.5, py:2, display:"flex", flexDirection:"column", gap:1.5 }}>
+            {detailLoading ? (
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ py:2 }}>
+                <CircularProgress size={18} />
+                <Typography variant="body2" sx={{ opacity:0.7 }}>Caricamento…</Typography>
+              </Stack>
+            ) : detail ? (
+              <>
+                {/* Quick nav */}
+                <Stack direction="row" spacing={1} sx={{ flexWrap:"wrap" }}>
+                  <Button size="small" variant="outlined"
+                    onClick={() => navigate(`/customers${buildQuery({ customer: detail.customer })}`)}>
+                    Apri cliente
+                  </Button>
+                  {detail.site && (
+                    <Button size="small" variant="outlined"
+                      onClick={() => navigate(`/sites${buildQuery({ customer: detail.customer })}`)}>
+                      Apri sito
+                    </Button>
+                  )}
+                  <Button size="small" variant="outlined"
+                    onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer, site: detail.site ?? "" })}`)}>
+                    Lista filtrata
+                  </Button>
+                </Stack>
 
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Note
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {detail.notes || "—"}
-              </Typography>
-            </>
-          ) : (
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Nessun dettaglio disponibile.
-            </Typography>
-          )}
+                {/* ── Identificazione ── */}
+                {[detail.name, detail.knumber, detail.serial_number, detail.site_display_name || detail.site_name].some(Boolean) && (
+                  <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                      <FingerprintIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                      Identificazione
+                    </Typography>
+                    <Stack divider={<Box sx={{ borderBottom:"1px solid", borderColor:"grey.50" }} />}>
+                      {[
+                        { label:"Nome",     value: detail.name,      mono: false, copy: true  },
+                        { label:"Sito",     value: detail.site_display_name || detail.site_name, mono: false, copy: false },
+                        { label:"K-number", value: detail.knumber,   mono: true,  copy: true  },
+                        { label:"Seriale",  value: detail.serial_number, mono: true, copy: true },
+                      ].filter(r => r.value).map(r => (
+                        <Stack key={r.label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py:0.75 }}>
+                          <Typography variant="caption" sx={{ color:"text.disabled", minWidth:80 }}>{r.label}</Typography>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography variant="body2" sx={{ fontWeight:600, fontFamily: r.mono ? "monospace" : undefined, fontSize: r.mono ? 12 : undefined }}>
+                              {r.value}
+                            </Typography>
+                            {r.copy && r.value && (
+                              <Tooltip title="Copia">
+                                <IconButton size="small" onClick={async () => { await copyToClipboard(r.value!); toast.success("Copiato ✅"); }}>
+                                  <ContentCopyIcon sx={{ fontSize:13 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* ── Rete ── */}
+                {[detail.hostname, detail.local_ip, detail.srsa_ip].some(Boolean) && (
+                  <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                      <WifiOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                      Rete
+                    </Typography>
+                    <Stack divider={<Box sx={{ borderBottom:"1px solid", borderColor:"grey.50" }} />}>
+                      {[
+                        { label:"Hostname", value: detail.hostname },
+                        { label:"IP locale", value: detail.local_ip },
+                        { label:"IP SRSA",   value: detail.srsa_ip },
+                      ].filter(r => r.value).map(r => (
+                        <Stack key={r.label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py:0.75 }}>
+                          <Typography variant="caption" sx={{ color:"text.disabled", minWidth:80 }}>{r.label}</Typography>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography variant="body2" sx={{ fontWeight:600, fontFamily:"monospace", fontSize:12 }}>{r.value}</Typography>
+                            <Tooltip title="Copia">
+                              <IconButton size="small" onClick={async () => { await copyToClipboard(r.value!); toast.success("Copiato ✅"); }}>
+                                <ContentCopyIcon sx={{ fontSize:13 }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* ── Credenziali ── */}
+                {(canViewSecrets
+                    ? [detail.os_user, detail.os_pwd, detail.app_usr, detail.app_pwd, detail.vnc_pwd]
+                    : [detail.os_user, detail.app_usr]
+                  ).some(Boolean) && (
+                  <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                      <LockOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                      Credenziali
+                    </Typography>
+                    {!canViewSecrets && (
+                      <Typography variant="caption" sx={{ color:"text.disabled", fontStyle:"italic", display:"block", mb:0.5 }}>
+                        Password non visibili (permessi insufficienti)
+                      </Typography>
+                    )}
+                    <Stack divider={<Box sx={{ borderBottom:"1px solid", borderColor:"grey.50" }} />}>
+                      {detail.os_user && (
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py:0.75 }}>
+                          <Typography variant="caption" sx={{ color:"text.disabled", minWidth:100 }}>Utente OS</Typography>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography variant="body2" sx={{ fontWeight:600, fontFamily:"monospace", fontSize:12 }}>{detail.os_user}</Typography>
+                            <Tooltip title="Copia"><IconButton size="small" onClick={async () => { await copyToClipboard(detail.os_user!); toast.success("Copiato ✅"); }}><ContentCopyIcon sx={{ fontSize:13 }} /></IconButton></Tooltip>
+                          </Stack>
+                        </Stack>
+                      )}
+                      {canViewSecrets && detail.os_pwd && (
+                        <Box sx={{ py:0.75 }}>
+                          <SecretRow label="Password OS" value={detail.os_pwd} onCopy={async () => { await copyToClipboard(detail.os_pwd!); toast.success("Copiato ✅"); }} />
+                        </Box>
+                      )}
+                      {detail.app_usr && (
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py:0.75 }}>
+                          <Typography variant="caption" sx={{ color:"text.disabled", minWidth:100 }}>Utente App</Typography>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography variant="body2" sx={{ fontWeight:600, fontFamily:"monospace", fontSize:12 }}>{detail.app_usr}</Typography>
+                            <Tooltip title="Copia"><IconButton size="small" onClick={async () => { await copyToClipboard(detail.app_usr!); toast.success("Copiato ✅"); }}><ContentCopyIcon sx={{ fontSize:13 }} /></IconButton></Tooltip>
+                          </Stack>
+                        </Stack>
+                      )}
+                      {canViewSecrets && detail.app_pwd && (
+                        <Box sx={{ py:0.75 }}>
+                          <SecretRow label="Password App" value={detail.app_pwd} onCopy={async () => { await copyToClipboard(detail.app_pwd!); toast.success("Copiato ✅"); }} />
+                        </Box>
+                      )}
+                      {canViewSecrets && detail.vnc_pwd && (
+                        <Box sx={{ py:0.75 }}>
+                          <SecretRow label="Password VNC" value={detail.vnc_pwd} onCopy={async () => { await copyToClipboard(detail.vnc_pwd!); toast.success("Copiato ✅"); }} />
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* ── Hardware + custom fields ── */}
+                {[detail.manufacturer, detail.model, detail.warranty_end_date,
+                  ...Object.values(detail.custom_fields ?? {})].some(v => v !== "" && v !== null && v !== undefined) && (
+                  <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:1 }}>
+                      <MemoryOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                      Hardware
+                    </Typography>
+                    <Stack divider={<Box sx={{ borderBottom:"1px solid", borderColor:"grey.50" }} />}>
+                      {[
+                        { label:"Produttore",    value: detail.manufacturer },
+                        { label:"Modello",       value: detail.model },
+                        { label:"Fine garanzia", value: detail.warranty_end_date, mono: true },
+                      ].filter(r => r.value).map(r => (
+                        <Stack key={r.label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py:0.75 }}>
+                          <Typography variant="caption" sx={{ color:"text.disabled", minWidth:100 }}>{r.label}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight:600, fontFamily: r.mono ? "monospace" : undefined, fontSize: r.mono ? 12 : undefined }}>{r.value}</Typography>
+                        </Stack>
+                      ))}
+                      {detail.custom_fields && typeof detail.custom_fields === "object" &&
+                        Object.entries(detail.custom_fields as Record<string, any>)
+                          .filter(([, v]) => v !== "" && v !== null && v !== undefined)
+                          .map(([k, v]) => (
+                            <Stack key={k} direction="row" alignItems="center" justifyContent="space-between" sx={{ py:0.75 }}>
+                              <Typography variant="caption" sx={{ color:"text.disabled", minWidth:100 }}>{k}</Typography>
+                              <Typography variant="body2" sx={{ fontWeight:600, maxWidth:220, textAlign:"right", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{String(v)}</Typography>
+                            </Stack>
+                          ))
+                      }
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* ── Note ── */}
+                {detail.notes && (
+                  <Box sx={{ bgcolor:"#fafafa", border:"1px solid", borderColor:"grey.100", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:0.75, mb:0.75 }}>
+                      <NotesOutlinedIcon sx={{ fontSize:14, color:"text.disabled" }} />
+                      Note
+                    </Typography>
+                    <Typography variant="body2" sx={{ color:"text.secondary", lineHeight:1.7, whiteSpace:"pre-wrap" }}>
+                      {detail.notes}
+                    </Typography>
+                  </Box>
+                )}
+              </>
+            ) : (
+              <Typography variant="body2" sx={{ opacity:0.7 }}>Nessun dettaglio disponibile.</Typography>
+            )}
+          </Box>
         </Stack>
       </Drawer>
 
@@ -1435,38 +1451,44 @@ const doRestore = async () => {
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="Hostname" value={form.hostname} onChange={(e) => setForm((f) => ({ ...f, hostname: e.target.value }))} fullWidth />
-              <TextField size="small" label="IP locale" value={form.local_ip} onChange={(e) => setForm((f) => ({ ...f, local_ip: e.target.value }))} fullWidth />
-              <TextField size="small" label="SRSA IP" value={form.srsa_ip} onChange={(e) => setForm((f) => ({ ...f, srsa_ip: e.target.value }))} fullWidth />
+              <TextField size="small" label="Hostname" value={form.hostname} onChange={(e) => setForm((f) => ({ ...f, hostname: e.target.value }))} fullWidth disabled={df("hostname")} helperText={dfHelp("hostname")} />
+              <TextField size="small" label="IP locale" value={form.local_ip} onChange={(e) => setForm((f) => ({ ...f, local_ip: e.target.value }))} fullWidth disabled={df("local_ip")} helperText={dfHelp("local_ip")} />
+              <TextField size="small" label="SRSA IP" value={form.srsa_ip} onChange={(e) => setForm((f) => ({ ...f, srsa_ip: e.target.value }))} fullWidth disabled={df("srsa_ip")} helperText={dfHelp("srsa_ip")} />
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="Utente OS" value={form.os_user} onChange={(e) => setForm((f) => ({ ...f, os_user: e.target.value }))} fullWidth />
+              <TextField size="small" label="Utente OS" value={form.os_user} onChange={(e) => setForm((f) => ({ ...f, os_user: e.target.value }))} fullWidth disabled={df("os_user")} helperText={dfHelp("os_user")} />
               {canViewSecrets ? (
-                <PasswordField label="Password OS" value={form.os_pwd} onChange={(v) => setForm((f) => ({ ...f, os_pwd: v }))} />
+                <PasswordField label="Password OS" value={form.os_pwd} onChange={(v) => setForm((f) => ({ ...f, os_pwd: v }))} disabled={df("os_pwd")} helperText={dfHelp("os_pwd")} />
               ) : (
                 <TextField size="small" label="Password OS" value="" fullWidth disabled helperText="Non autorizzato" />
               )}
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="Utente App" value={form.app_usr} onChange={(e) => setForm((f) => ({ ...f, app_usr: e.target.value }))} fullWidth />
+              <TextField size="small" label="Utente App" value={form.app_usr} onChange={(e) => setForm((f) => ({ ...f, app_usr: e.target.value }))} fullWidth disabled={df("app_usr")} helperText={dfHelp("app_usr")} />
               {canViewSecrets ? (
-                <PasswordField label="Password App" value={form.app_pwd} onChange={(v) => setForm((f) => ({ ...f, app_pwd: v }))} />
+                <PasswordField label="Password App" value={form.app_pwd} onChange={(v) => setForm((f) => ({ ...f, app_pwd: v }))} disabled={df("app_pwd")} helperText={dfHelp("app_pwd")} />
               ) : (
                 <TextField size="small" label="Password App" value="" fullWidth disabled helperText="Non autorizzato" />
               )}
               {canViewSecrets ? (
-                <PasswordField label="Password VNC" value={form.vnc_pwd} onChange={(v) => setForm((f) => ({ ...f, vnc_pwd: v }))} />
+                <PasswordField
+                  label="Password VNC"
+                  value={form.vnc_pwd}
+                  onChange={(v) => setForm((f) => ({ ...f, vnc_pwd: v }))}
+                  disabled={df("vnc_pwd")}
+                  helperText={dfHelp("vnc_pwd")}
+                />
               ) : (
                 <TextField size="small" label="Password VNC" value="" fullWidth disabled helperText="Non autorizzato" />
               )}
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="Produttore" value={form.manufacturer} onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))} fullWidth />
-              <TextField size="small" label="Modello" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} fullWidth />
-              <TextField size="small" label="Fine garanzia (YYYY-MM-DD)" value={form.warranty_end_date} onChange={(e) => setForm((f) => ({ ...f, warranty_end_date: e.target.value }))} fullWidth />
+              <TextField size="small" label="Produttore" value={form.manufacturer} onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))} fullWidth disabled={df("manufacturer")} helperText={dfHelp("manufacturer")} />
+              <TextField size="small" label="Modello" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} fullWidth disabled={df("model")} helperText={dfHelp("model")} />
+              <TextField size="small" label="Fine garanzia (YYYY-MM-DD)" value={form.warranty_end_date} onChange={(e) => setForm((f) => ({ ...f, warranty_end_date: e.target.value }))} fullWidth disabled={df("warranty_end_date")} helperText={dfHelp("warranty_end_date")} />
             </Stack>
 
             <CustomFieldsEditor

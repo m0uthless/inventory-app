@@ -49,3 +49,29 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.action} {self.content_type.app_label}.{self.content_type.model}#{self.object_id}"
+
+
+class AuthAttempt(models.Model):
+    """Track authentication attempts (success/failure).
+
+    Used by audit.utils.log_auth_attempt().
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    username = models.CharField(max_length=150)
+    success = models.BooleanField(default=False)
+
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["username", "created_at"]),
+            models.Index(fields=["success", "created_at"]),
+        ]
+
+    def __str__(self):
+        status = "OK" if self.success else "FAIL"
+        return f"{self.created_at:%Y-%m-%d %H:%M} {status} {self.username}"

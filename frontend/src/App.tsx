@@ -100,7 +100,7 @@ const router = createBrowserRouter([
               "maintenance.view_tech",
             ]}
           >
-            <MaintenanceWip />
+            <Maintenance />
           </RequireAnyPerm>
         ),
       },
@@ -115,7 +115,7 @@ const router = createBrowserRouter([
               "maintenance.view_tech",
             ]}
           >
-            <Maintenance />
+            <MaintenanceWip />
           </RequireAnyPerm>
         ),
       },

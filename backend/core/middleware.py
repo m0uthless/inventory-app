@@ -1,23 +1,40 @@
+"""Custom middleware utilities.
+
+This project uses session authentication (cookies). For a SPA served from a different
+origin in *development* (e.g. Vite on :5173) Django's CSRF middleware can reject
+requests due to strict Origin/Referer checks.
+
+`CsrfAllowAllOriginsMiddleware` is a development helper that relaxes Origin/Referer
+checks while **keeping CSRF token validation active**.
+
+IMPORTANT:
+- It is effective only when `settings.DEBUG` is True.
+- It never disables CSRF token validation.
+
+In production you should configure `CSRF_TRUSTED_ORIGINS` properly instead.
+"""
+
+from __future__ import annotations
+
+from django.conf import settings
 from django.middleware.csrf import CsrfViewMiddleware
 
 
 class CsrfAllowAllOriginsMiddleware(CsrfViewMiddleware):
-    """CSRF middleware che accetta qualsiasi Origin/Referer.
+    """Relax Origin/Referer checks in development without disabling CSRF tokens."""
 
-    Utile in LAN/dev quando apri l'admin da IP/host diversi e non vuoi
-    mantenere aggiornata CSRF_TRUSTED_ORIGINS.
+    def _should_relax(self) -> bool:
+        return bool(
+            getattr(settings, "DEBUG", False)
+            and getattr(settings, "CSRF_ALLOW_ALL_ORIGINS", False)
+        )
 
-    ATTENZIONE: abilitalo solo in ambienti di sviluppo/rete interna.
-    """
+    def _origin_verified(self, request) -> bool:  # type: ignore[override]
+        if self._should_relax():
+            return True
+        return super()._origin_verified(request)
 
-    def _origin_verified(self, request):
-        return True
-
-    def _check_referer(self, request):
-        return
-
-    def process_view(self, request, callback, callback_args, callback_kwargs):
-        # Aggiungiamo il flag che Django controlla prima di tutto il resto:
-        # se presente, salta completamente la verifica CSRF.
-        request._dont_enforce_csrf_checks = True
-        return super().process_view(request, callback, callback_args, callback_kwargs)
+    def _check_referer(self, request) -> None:  # type: ignore[override]
+        if self._should_relax():
+            return None
+        return super()._check_referer(request)
