@@ -3,6 +3,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.contrib.postgres.fields import ArrayField
 from core.models import TimeStampedModel, InventoryType, InventoryStatus
+from core.crypto import encrypt
 from crm.models import Customer, Site
 
 class Inventory(TimeStampedModel):
@@ -43,6 +44,16 @@ class Inventory(TimeStampedModel):
         permissions = [
             ("view_secrets", "Can view inventory secrets"),
         ]
+        indexes = [
+            # Hot paths:
+            # - list views filter by deleted_at (soft delete)
+            # - list views commonly scope by customer/site
+            # - ordering frequently uses updated_at
+            models.Index(fields=["deleted_at"], name="inv_deleted_at_idx"),
+            models.Index(fields=["customer", "deleted_at"], name="inv_customer_del_idx"),
+            models.Index(fields=["site", "deleted_at"], name="inv_site_del_idx"),
+            models.Index(fields=["updated_at"], name="inv_updated_at_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["knumber"],
@@ -62,3 +73,13 @@ class Inventory(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Encrypt secrets at-rest (usernames remain plaintext).
+        # We keep backward compatibility: existing plaintext rows are allowed
+        # and will be encrypted on next save.
+        for field in ("os_pwd", "app_pwd", "vnc_pwd"):
+            val = getattr(self, field, None)
+            if val not in (None, ""):
+                setattr(self, field, encrypt(val))
+        return super().save(*args, **kwargs)

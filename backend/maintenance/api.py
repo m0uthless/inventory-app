@@ -12,29 +12,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from core.models import InventoryType
 from core.permissions import CanRestoreModelPermission
+from core.soft_delete import apply_soft_delete_filters
 from maintenance.models import (
     Tech,
     MaintenancePlan,
     MaintenanceEvent,
     MaintenanceNotification,
 )
-
-
-_TRUTHY = {"1", "true", "yes", "on"}
-
-
-def _apply_deleted_filters(qs, request, action_name: str | None = None):
-    include_deleted = (request.query_params.get("include_deleted") or "").lower()
-    only_deleted    = (request.query_params.get("only_deleted") or "").lower()
-
-    if (action_name or "") == "restore":
-        include_deleted = "1"
-
-    if only_deleted in _TRUTHY:
-        return qs.filter(deleted_at__isnull=False)
-    if include_deleted in _TRUTHY:
-        return qs
-    return qs.filter(deleted_at__isnull=True)
 
 
 def _add_months(d: date, months: int) -> date:
@@ -118,8 +102,8 @@ class TechViewSet(viewsets.ModelViewSet):
     ordering          = ["last_name", "first_name"]
 
     def get_queryset(self):
-        return _apply_deleted_filters(
-            Tech.objects.all(), self.request, getattr(self, "action", None)
+        return apply_soft_delete_filters(
+            Tech.objects.all(), request=self.request, action_name=getattr(self, "action", "")
         )
 
     def perform_destroy(self, instance):
@@ -242,7 +226,7 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
         elif due == "next30":
             qs = qs.filter(next_due_date__gte=today, next_due_date__lte=today + timedelta(days=30))
 
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
@@ -436,7 +420,7 @@ class MaintenanceEventViewSet(viewsets.ModelViewSet):
         if customer:
             qs = qs.filter(plan__customer_id=customer)
 
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
@@ -551,7 +535,7 @@ class MaintenanceNotificationViewSet(viewsets.ModelViewSet):
         if customer:
             qs = qs.filter(plan__customer_id=customer)
 
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()

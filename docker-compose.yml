@@ -5,8 +5,8 @@ services:
       POSTGRES_DB: inventory_app
       POSTGRES_USER: inventory_app
       POSTGRES_PASSWORD: inventory_app
-    ports:
-      - "5432:5432"
+    # Security: do not expose Postgres outside the Docker network by default.
+    # If you need psql from the host in dev, prefer `docker compose exec db psql ...`
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,6 +19,10 @@ services:
     build: ./backend
     env_file:
       - ./.env
+    environment:
+      # Dev convenience: run migrations automatically at container start.
+      # In production, set RUN_MIGRATIONS=0 and run migrations as a controlled deploy step.
+      RUN_MIGRATIONS: "1"
     volumes:
       - ./backend:/app
       - ./data:/app/data

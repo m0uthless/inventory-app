@@ -35,3 +35,47 @@ export function apiErrorToMessage(err: unknown): string {
   const status = e.response.status;
   return `Errore (${status}).`;
 }
+
+
+export function apiErrorToFieldErrors(err: unknown): Record<string, string> | null {
+  const e = err as AxiosError<any>;
+  if (!e?.response) return null;
+  if (e.response.status !== 400) return null;
+
+  const data = e.response.data;
+  if (!isObject(data)) return null;
+
+  const out: Record<string, string> = {};
+
+  const add = (k: string, v: unknown) => {
+    if (!k || k === "detail") return;
+    if (Array.isArray(v)) {
+      const first = v.find((x) => typeof x === "string") as any;
+      if (typeof first === "string" && first.trim()) out[k] = first;
+      else if (v.length) out[k] = String(v[0]);
+      return;
+    }
+    if (typeof v === "string" && v.trim()) out[k] = v;
+  };
+
+  for (const [k, v] of Object.entries(data)) {
+    if (k === "detail") continue;
+
+    // DRF convention for form-level errors
+    if (k === "non_field_errors") {
+      if (Array.isArray(v) && v.length) out["_error"] = String(v[0]);
+      else if (typeof v === "string") out["_error"] = v;
+      continue;
+    }
+
+    if (isObject(v)) {
+      // Flatten 1-level nested errors (e.g. custom_fields.xxx)
+      for (const [k2, v2] of Object.entries(v)) add(`${k}.${k2}`, v2);
+      continue;
+    }
+
+    add(k, v);
+  }
+
+  return Object.keys(out).length ? out : null;
+}

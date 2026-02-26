@@ -1,162 +1,111 @@
-# Site Repository (inventory-app)
+# inventory-app (Site Repository)
 
-App web per la gestione di Clienti, Siti, Contatti e Inventari (con credenziali e metadati), con Wiki, Maintenance e Audit log.
-Frontend in React + TypeScript (Vite + MUI) e backend Django + Postgres, orchestrati via Docker Compose.
+App web per la gestione di **Clienti**, **Siti**, **Contatti** e **Inventari** (con metadati e credenziali), con moduli **Wiki**, **Maintenance**, **Drive** e **Audit log**.
+
+- **Backend**: Django + Django REST Framework + Postgres
+- **Frontend**: React + TypeScript (Vite) + Material UI
+- **Runtime**: Docker Compose + Nginx (proxy + static/media)
 
 ## Versione
-- Current: **0.2.1**
-- Vedi `CHANGELOG.md` per lo storico.
+- Current: **0.3.0**
+- OpenAPI: `/api/schema/` (e `/api/docs/`)
 
 ---
 
-## Stack
-- **Backend**: Django + Django REST Framework
-- **DB**: Postgres
-- **Frontend**: React + TS (Vite) + Material UI
-- **Reverse proxy**: Nginx (serve frontend e proxy `/api` verso backend)
+## Porte (default)
+- Frontend (nginx): `http://localhost:6383`
+- Backend API (nginx): `http://localhost:6382/api/`
+- Django admin: `http://localhost:6382/admin/`
+- Postgres: `localhost:5432` *(solo dev; vedi note sicurezza sotto)*
 
 ---
 
-## Porte
-- **UI**: `http://localhost:6383`
-- **API**: `http://localhost:6383/api` (proxy Nginx → backend)
+## Quickstart (sviluppo)
+1) Crea `.env` partendo da `.env.example`
 
-> Nota: la UI parla sempre con l’API tramite base URL `/api`.
-
----
-
-## Avvio rapido (Docker)
-Prerequisiti:
-- Docker + Docker Compose
-
-1) Build & run
+2) Avvia lo stack:
 ```bash
 docker compose up -d --build
 ```
 
-2) Migrations (prima installazione)
+3) Migrazioni + seed (lookup + gruppi/permessi di base):
 ```bash
 docker compose exec backend python manage.py migrate
-```
-
-3) Seed lookup di base (status, type, settings, ecc.)
-```bash
 docker compose exec backend python manage.py seed_defaults
 ```
 
-4) Crea un utente admin
+4) Crea un superuser:
 ```bash
 docker compose exec backend python manage.py createsuperuser
 ```
 
-Apri:
-- UI: `http://localhost:6383`
+---
+
+## Stack / cartelle
+- `backend/` — progetto Django (API, admin, auth a sessione)
+- `frontend/` — React+TS (build Vite, UI MUI)
+- `nginx/` — config Nginx (API proxy, static/media)
+- `data/` — cartella persistente per export/import (non DB)
 
 ---
 
-## Auth e permessi
-- Autenticazione **a sessione** (cookie).
-- Endpoint tipici:
-  - `POST /api/auth/login/`
-  - `POST /api/auth/logout/`
-  - `GET /api/me/`
-- UI con guard sulle route e azioni in base ai permessi.
+## Auth, CSRF e CORS (session-based)
+L’autenticazione è **a sessione** (cookie). Il frontend usa `withCredentials` e invia CSRF via header `X-CSRFToken` (axios XSRF defaults).
 
-Ruoli/gruppi tipici:
-- **admin**
-- **editor**
-- **viewer**
+### Endpoint auth
+- `POST /api/auth/login/`
+- `POST /api/auth/logout/`
+- `GET  /api/auth/csrf/` (inizializza il cookie CSRF)
+- `GET  /api/me/` (utente + permessi + profilo)
+- `POST /api/me/change-password/`
 
 ---
 
-## Funzionalità principali
-
-### CRM
-- **Customers** (codice auto `C-000001`, …)
-- **Sites** (1:N con Customer)
-- **Contacts** (primario per sito)
-
-### Inventory
-- Inventari con:
-  - tipo/stato
-  - serial/knumber
-  - hostname, IP locali
-  - credenziali OS/app/VNC (in chiaro lato DB: gestire accessi/permessi con attenzione)
-    - le **password** sono esposte via API/UI solo con permesso `inventory.view_secrets`
-
-### Soft delete + Restore
-Molte entità supportano:
-- soft delete (`deleted_at`)
-- query param:
-  - `?include_deleted=1`
-  - `?only_deleted=1`
-- endpoint restore:
-  - `POST /.../{id}/restore/`
-
-In **0.2.0** è presente anche il **Cestino unificato** (UI) con **bulk restore**.
-
-### Audit
-- Audit log su create/update/delete/restore
-- In **0.2.0**: UI Audit con filtri + diff leggibile
-- Tracciamento eventi auth (0.2.0):
-  - `login`
-  - `login_failed`
-  - `logout`
-
-### Wiki
-- Pagine e categorie in Markdown
-- Render HTML con hardening anti-XSS (0.1.x → 0.2.0)
-
-### Maintenance
-- Tech, templates, plans, events, notifications
-- Supporto soft-delete/restore uniformato in 0.1.x/0.2.0
+## Soft delete + Restore
+Le entità principali supportano soft delete (`deleted_at`) e ripristino:
+- query param: `include_deleted=1` / `only_deleted=1`
+- action: `POST /api/<resource>/<id>/restore/`
+- bulk: `POST /api/<resource>/bulk_restore/` con body `{"ids":[...]}`
 
 ---
 
-## Querystring e liste (0.2.0)
-Le liste principali (Customers/Sites/Contacts/Inventory) e Audit/Trash supportano in modo coerente:
-- `page`, `page_size`
-- `search`
-- `ordering`
-- modalità vista (attivi/tutti/cestino), dove applicabile
+## Drive (file/folder)
+Modulo “Drive” con ACL lato API.  
+⚠️ **Nginx blocca l’accesso diretto ai drive files** sotto `/api/media/drive/` per evitare bypass delle ACL.
 
 ---
 
-## Import CSV (backend)
-Sono presenti comandi di import custom (tipicamente con modalità dry-run/rollback):
-- `import_customers`
-- `import_sites`
-- `import_contacts`
-- `import_inventories`
+## Note importanti (sicurezza / produzione)
+Questa repo è pronta per LAN/dev, ma **prima di prod**:
+- **Non esporre Postgres** pubblicamente (rimuovere `ports: "5432:5432"` o bind su localhost).
+- Impostare `DJANGO_SECRET_KEY` forte e `DJANGO_DEBUG=0`.
+- Configurare `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ORIGINS` e `CSRF_TRUSTED_ORIGINS`.
+- **Non usare** `CSRF_ALLOW_ALL_ORIGINS=1` in ambienti non controllati (è un bypass dell’Origin check).
+- Le credenziali inventario sono salvate in chiaro: valutare cifratura at-rest (KMS/fernet/field encryption) e policy di accesso.
 
 ---
 
-## Migrazione dati / altro server
-Questo progetto è pensato per essere portabile via:
-- codice (zip/repo)
-- docker compose
-- dump del DB (se vuoi migrare i dati)
-
-Note:
-- Se non ti serve migrare i dati, basta codice + compose.
-- Per migrare i dati Postgres: usa `pg_dump`/`pg_restore` sul volume/istanza Postgres.
-
----
-
-## Sicurezza (note pratiche)
-- Le credenziali inventario possono essere in chiaro: limita l’accesso, usa RBAC e (se necessario) cifra lato DB in futuro.
-- In produzione evita configurazioni permissive (es. CORS “allow all”).
-- Considera HTTPS e secure cookies lato reverse proxy.
-
----
-
-## Troubleshooting
-- Se cambi `.env`/env_file nel compose, spesso serve **ricreare** i container:
+## Dev tips
+- Log backend:
 ```bash
-docker compose down
+docker compose logs -f backend
+docker compose logs -f backend_nginx
+```
+
+- Rebuild pulito:
+```bash
+docker compose down -v
 docker compose up -d --build
 ```
 
-- Se la favicon non cambia, fai hard refresh:
-  - Windows/Linux: `Ctrl+Shift+R`
-  - macOS: `Cmd+Shift+R`
+- Frontend in hot-reload (opzionale, senza nginx):
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+---
+
+## Licenza
+TBD (interna/proprietaria finché non definita).

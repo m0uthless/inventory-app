@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.conf import settings
 from django.db import transaction
 
 from rest_framework.views import APIView
@@ -12,6 +13,66 @@ from rest_framework import status
 from audit.utils import log_event
 from core.models import UserProfile
 from crm.models import Customer
+
+
+def _validate_avatar_upload(uploaded_file):
+    """Validazione pratica per l'upload dell'avatar.
+
+    - dimensione massima (bytes)
+    - content-type consentiti
+    - verifica che sia un'immagine valida
+    - limite dimensioni massime in pixel
+
+    Non effettua resize: valida soltanto.
+    """
+
+    if uploaded_file is None:
+        return None
+
+    max_bytes = getattr(settings, "PROFILE_AVATAR_MAX_BYTES", 2 * 1024 * 1024)
+    max_dim = getattr(settings, "PROFILE_AVATAR_MAX_DIM", 1024)
+    allowed_ct = set(
+        getattr(
+            settings,
+            "PROFILE_AVATAR_ALLOWED_CONTENT_TYPES",
+            ["image/jpeg", "image/png", "image/webp"],
+        )
+    )
+
+    try:
+        size = int(getattr(uploaded_file, "size", 0) or 0)
+    except Exception:
+        size = 0
+
+    if max_bytes and size and size > int(max_bytes):
+        return f"File troppo grande. Max {int(max_bytes) // (1024 * 1024)} MB."
+
+    content_type = (getattr(uploaded_file, "content_type", "") or "").lower()
+    if allowed_ct and content_type and content_type not in allowed_ct:
+        return "Formato non supportato. Usa JPG, PNG o WEBP."
+
+    # Verifica immagine (Pillow) e dimensioni.
+    try:
+        from PIL import Image
+
+        uploaded_file.seek(0)
+        img = Image.open(uploaded_file)
+        img.verify()
+
+        uploaded_file.seek(0)
+        img2 = Image.open(uploaded_file)
+        w, h = img2.size
+        if max_dim and (w > int(max_dim) or h > int(max_dim)):
+            return f"Immagine troppo grande. Dimensione massima {int(max_dim)}x{int(max_dim)} px."
+    except Exception:
+        return "File immagine non valido o corrotto."
+    finally:
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
+
+    return None
 
 User = get_user_model()
 
@@ -117,6 +178,9 @@ class MeAPIView(APIView):
             if raw in ("", None):
                 profile.avatar = None
             else:
+                err = _validate_avatar_upload(raw)
+                if err:
+                    return Response({"avatar": err}, status=status.HTTP_400_BAD_REQUEST)
                 profile.avatar = raw
 
         profile.save()

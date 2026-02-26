@@ -34,6 +34,8 @@ class AuditEvent(models.Model):
     # Optional diff / metadata
     changes = models.JSONField(null=True, blank=True)
 
+    metadata = models.JSONField(default=dict, blank=True)
+
     path = models.CharField(max_length=255, null=True, blank=True)
     method = models.CharField(max_length=8, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)

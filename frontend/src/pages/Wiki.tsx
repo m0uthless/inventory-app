@@ -7,6 +7,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  List,
+  ListItemButton,
+  ListItemText,
+  Collapse,
   Drawer,
   FormControl,
   IconButton,
@@ -22,6 +26,8 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
@@ -57,6 +63,22 @@ type PageDetail = PageRow & {
   created_at?: string | null;
   notes?: string | null;
 };
+
+
+type TreeNode = {
+  id: number;
+  title: string;
+  slug: string;
+  category?: number | null;
+  category_name?: string | null;
+  parent?: number | null;
+  is_published: boolean;
+  updated_at?: string | null;
+  children: TreeNode[];
+};
+
+type TreeCategory = { id: number | null; name: string; pages: TreeNode[] };
+
 
 async function copyToClipboard(text: string) {
   if (!text) return;
@@ -153,6 +175,11 @@ export default function Wiki() {
   const [renderHtml, setRenderHtml] = React.useState<string>("");
   const [renderLoading, setRenderLoading] = React.useState(false);
 
+const [layout, setLayout] = React.useState<"list" | "tree">("tree");
+const [tree, setTree] = React.useState<TreeCategory[]>([]);
+const [expanded, setExpanded] = React.useState<Record<number, boolean>>({});
+
+
   const loadCategories = React.useCallback(async () => {
     const res = await api.get<ApiPage<Category>>("/wiki-categories/", { params: { ordering: "sort_order,name", page_size: 200 } });
     setCategories(res.data.results ?? []);
@@ -171,6 +198,22 @@ export default function Wiki() {
       setLoading(false);
     }
   }, [search, categoryId, published]);
+
+const loadTree = React.useCallback(async () => {
+  setLoading(true);
+  try {
+    const params: any = {};
+    if (search) params.search = search;
+    if (categoryId !== "") params.category = categoryId;
+    if (published !== "") params.is_published = published;
+    const res = await api.get<TreeCategory[]>("/wiki-pages/tree/", { params });
+    setTree(res.data ?? []);
+  } finally {
+    setLoading(false);
+  }
+}, [search, categoryId, published]);
+
+
 
   const loadDetail = React.useCallback(async (id: number) => {
     setDetailLoading(true);
@@ -213,10 +256,65 @@ export default function Wiki() {
   }, [loadCategories]);
 
   React.useEffect(() => {
-    load();
-  }, [load]);
+    if (layout === "tree") loadTree();
+    else load();
+  }, [load, loadTree, layout]);
+
+  
+const toggleExpanded = (id: number) => {
+  setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+};
+
+const renderNode = (node: TreeNode, depth: number) => {
+  const hasChildren = (node.children?.length ?? 0) > 0;
+  const isOpen = !!expanded[node.id];
 
   return (
+    <React.Fragment key={node.id}>
+      <ListItemButton
+        dense
+        sx={{ pl: 1 + depth * 2 }}
+        onClick={() => {
+          setSelectedId(node.id);
+          setDrawerOpen(true);
+          loadDetail(node.id);
+        }}
+      >
+        {hasChildren ? (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpanded(node.id);
+            }}
+            sx={{ mr: 0.5 }}
+          >
+            {isOpen ? <ExpandMoreIcon fontSize="inherit" /> : <ChevronRightIcon fontSize="inherit" />}
+          </IconButton>
+        ) : (
+          <Box sx={{ width: 34 }} />
+        )}
+
+        <ListItemText
+          primaryTypographyProps={{ variant: "body2", noWrap: true }}
+          primary={node.title}
+          secondary={node.slug}
+          secondaryTypographyProps={{ variant: "caption", noWrap: true, sx: { opacity: 0.7 } }}
+        />
+      </ListItemButton>
+
+      {hasChildren ? (
+        <Collapse in={isOpen} timeout="auto" unmountOnExit>
+          <List disablePadding>
+            {node.children.map((c) => renderNode(c, depth + 1))}
+          </List>
+        </Collapse>
+      ) : null}
+    </React.Fragment>
+  );
+};
+
+return (
     <Stack spacing={2}>
       <Box>
         <Typography variant="h5">
@@ -262,6 +360,15 @@ export default function Wiki() {
               </Select>
             </FormControl>
 
+
+<FormControl size="small" sx={{ minWidth: 160, width: { xs: "100%", md: 180 } }}>
+  <InputLabel>View</InputLabel>
+  <Select label="View" value={layout} onChange={(e) => setLayout(e.target.value as any)}>
+    <MenuItem value="tree">Tree</MenuItem>
+    <MenuItem value="list">List</MenuItem>
+  </Select>
+</FormControl>
+
             <Button
               variant="outlined"
               onClick={() => {
@@ -276,24 +383,52 @@ export default function Wiki() {
             </Button>
           </Stack>
 
-          <Box sx={{ height: 640 }}>
-            <DataGrid
-              rows={rows}
-              columns={cols}
-              loading={loading}
-              disableRowSelectionOnClick
-              slots={{ toolbar: GridToolbar }}
-              slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } }}
-              initialState={{ pagination: { paginationModel: { pageSize: 25, page: 0 } } }}
-              pageSizeOptions={[10, 25, 50, 100]}
-              onRowClick={(params) => {
-                const rowId = Number(params.row.id);
-                setSelectedId(rowId);
-                setDrawerOpen(true);
-                loadDetail(rowId);
-              }}
-            />
-          </Box>
+          
+{layout === "tree" ? (
+  <Card variant="outlined" sx={{ height: 640, overflow: "auto" }}>
+    <CardContent sx={{ py: 1 }}>
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Stack spacing={1}>
+          {tree.map((c) => (
+            <Box key={String(c.id ?? "uncat")}>
+              <Typography variant="subtitle2" sx={{ px: 1, py: 0.5, opacity: 0.8 }}>
+                {c.name}
+              </Typography>
+              <List dense disablePadding>
+                {c.pages.map((p) => renderNode(p, 0))}
+              </List>
+              <Divider sx={{ my: 1 }} />
+            </Box>
+          ))}
+        </Stack>
+      )}
+    </CardContent>
+  </Card>
+) : (
+  <Box sx={{ height: 640 }}>
+    <DataGrid
+      rows={rows}
+      columns={cols}
+      loading={loading}
+      disableRowSelectionOnClick
+      slots={{ toolbar: GridToolbar }}
+      slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } }}
+      initialState={{ pagination: { paginationModel: { pageSize: 25, page: 0 } } }}
+      pageSizeOptions={[10, 25, 50, 100]}
+      onRowClick={(params) => {
+        const rowId = Number(params.row.id);
+        setSelectedId(rowId);
+        setDrawerOpen(true);
+        loadDetail(rowId);
+      }}
+    />
+  </Box>
+)}
+
         </CardContent>
       </Card>
 

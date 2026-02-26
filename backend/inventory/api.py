@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db import IntegrityError, transaction
 from django.db.models import F
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -12,6 +13,21 @@ from crm.models import Site
 from inventory.models import Inventory
 from audit.utils import log_event, to_change_value_for_field, to_primitive
 from custom_fields.validation import normalize_and_validate_custom_fields
+from core.soft_delete import apply_soft_delete_filters
+from core.crypto import decrypt
+from core.integrity import raise_integrity_error_as_validation
+
+
+class DecryptedSecretField(serializers.CharField):
+    """Serializer field that transparently decrypts values stored encrypted in DB."""
+
+    def to_representation(self, value):
+        try:
+            return decrypt(value)
+        except Exception:
+            # In case of misconfiguration (missing key) avoid crashing the API.
+            # We prefer returning a placeholder over a 500.
+            return None
 
 
 class SecretsPermissionMixin:
@@ -77,6 +93,11 @@ class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSeriali
     type_key = serializers.CharField(source="type.key", read_only=True)
     type_label = serializers.CharField(source="type.label", read_only=True)
 
+    # Decrypt secrets only for users who can see them (fields are removed by the mixin otherwise).
+    os_pwd = DecryptedSecretField(required=False, allow_null=True)
+    app_pwd = DecryptedSecretField(required=False, allow_null=True)
+    vnc_pwd = DecryptedSecretField(required=False, allow_null=True)
+
     class Meta:
         model = Inventory
         fields = [
@@ -132,6 +153,16 @@ class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSeriali
 
     def validate(self, attrs):
         """Required fields + consistency + custom_fields validation."""
+        # Normalize common "empty string" inputs coming from forms/CSV/imports.
+        # These fields are nullable and have conditional unique constraints; keeping
+        # them as "" would accidentally trigger uniqueness violations.
+        for f in ("knumber", "serial_number"):
+            if f in attrs:
+                v = attrs.get(f)
+                if isinstance(v, str):
+                    v = v.strip()
+                attrs[f] = None if v in (None, "") else v
+
         customer = attrs.get("customer") if "customer" in attrs else getattr(self.instance, "customer", None)
         status_obj = attrs.get("status") if "status" in attrs else getattr(self.instance, "status", None)
         site = attrs.get("site") if "site" in attrs else getattr(self.instance, "site", None)
@@ -144,6 +175,28 @@ class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSeriali
         if site is not None and customer is not None:
             if isinstance(site, Site) and site.customer_id != customer.id:
                 raise serializers.ValidationError({"site": "Site non appartiene al customer selezionato."})
+
+        # Pre-empt DB unique constraint errors with a friendly validation message.
+        # Constraints are scoped to active (not soft-deleted) inventories.
+        instance_pk = getattr(self.instance, "pk", None)
+
+        serial_number = attrs.get("serial_number") if "serial_number" in attrs else None
+        if serial_number:
+            qs = Inventory.objects.filter(deleted_at__isnull=True, serial_number=serial_number)
+            if instance_pk:
+                qs = qs.exclude(pk=instance_pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {"serial_number": "Serial number già presente su un inventario attivo."}
+                )
+
+        knumber = attrs.get("knumber") if "knumber" in attrs else None
+        if knumber:
+            qs = Inventory.objects.filter(deleted_at__isnull=True, knumber=knumber)
+            if instance_pk:
+                qs = qs.exclude(pk=instance_pk)
+            if qs.exists():
+                raise serializers.ValidationError({"knumber": "K-number già presente su un inventario attivo."})
 
         # Validate / normalize custom_fields based on definitions
         if self.instance is None:
@@ -239,6 +292,34 @@ class InventoryViewSet(viewsets.ModelViewSet):
             return InventoryDetailSerializer
         return InventoryWriteSerializer
 
+    def create(self, request, *args, **kwargs):
+        """Convert DB integrity errors into 400 ValidationError."""
+        try:
+            with transaction.atomic():
+                return super().create(request, *args, **kwargs)
+        except IntegrityError as e:
+            raise_integrity_error_as_validation(
+                e,
+                constraint_map={
+                    "ux_inventories_knumber_active": {"knumber": "K-number già presente su un inventario attivo."},
+                    "ux_inventories_serial_active": {"serial_number": "Serial number già presente su un inventario attivo."},
+                },
+            )
+
+    def update(self, request, *args, **kwargs):
+        """Convert DB integrity errors into 400 ValidationError."""
+        try:
+            with transaction.atomic():
+                return super().update(request, *args, **kwargs)
+        except IntegrityError as e:
+            raise_integrity_error_as_validation(
+                e,
+                constraint_map={
+                    "ux_inventories_knumber_active": {"knumber": "K-number già presente su un inventario attivo."},
+                    "ux_inventories_serial_active": {"serial_number": "Serial number già presente su un inventario attivo."},
+                },
+            )
+
 
     def _changes_from_validated(self, instance, validated):
         changes = {}
@@ -278,19 +359,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
             status_label=F("status__label"),
         )
 
-        truthy = {"1", "true", "yes", "on"}
-        include_deleted = (self.request.query_params.get('include_deleted') or '').lower()
-        only_deleted = (self.request.query_params.get('only_deleted') or '').lower()
-
-        if getattr(self, 'action', '') == 'restore':
-            include_deleted = '1'
-
-        if only_deleted in truthy:
-            qs = qs.filter(deleted_at__isnull=False)
-        elif include_deleted in truthy:
-            pass  # include anche i deleted
-        else:
-            qs = qs.filter(deleted_at__isnull=True)
+        qs = apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
         # filtro customer via querystring
         customer = self.request.query_params.get("customer")

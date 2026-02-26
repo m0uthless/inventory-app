@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+import { Box, LinearProgress, Typography } from "@mui/material";
 import {
   DataGrid,
   GridToolbar,
@@ -93,6 +93,15 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     emptyState,
   } = props;
 
+
+  const LoadingOverlay = function LoadingOverlayImpl() {
+    return (
+      <Box sx={{ width: "100%", position: "absolute", top: 0, left: 0 }}>
+        <LinearProgress />
+      </Box>
+    );
+  };
+
   const NoRowsOverlay = emptyState
     ? function NoRowsOverlayImpl() {
         return (
@@ -135,8 +144,17 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         onRowSelectionModelChange={onRowSelectionModelChange}
         slots={
           showGridToolbar
-            ? ({ toolbar: GridToolbar, ...(slots || {}), ...(NoRowsOverlay ? { noRowsOverlay: NoRowsOverlay } : {}) } as any)
-            : ({ ...(slots || {}), ...(NoRowsOverlay ? { noRowsOverlay: NoRowsOverlay } : {}) } as any)
+            ? ({
+                toolbar: GridToolbar,
+                loadingOverlay: (slots as any)?.loadingOverlay ?? LoadingOverlay,
+                ...(slots || {}),
+                ...(NoRowsOverlay ? { noRowsOverlay: NoRowsOverlay } : {}),
+              } as any)
+            : ({
+                loadingOverlay: (slots as any)?.loadingOverlay ?? LoadingOverlay,
+                ...(slots || {}),
+                ...(NoRowsOverlay ? { noRowsOverlay: NoRowsOverlay } : {}),
+              } as any)
         }
         slotProps={slotProps as any}
         rowCount={rowCount}

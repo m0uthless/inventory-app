@@ -1,0 +1,30 @@
+services:
+  db:
+    # In production, DO NOT rely on default credentials.
+    # Require env vars; Compose will error if missing.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    restart: unless-stopped
+
+  backend:
+    # Production safety: do not auto-run migrations on container start.
+    environment:
+      RUN_MIGRATIONS: "0"
+      DJANGO_DEBUG: "0"
+    # Production: do not bind-mount source code from the host.
+    volumes:
+      - staticfiles:/app/staticfiles
+      - media:/app/media
+      - data:/app/data
+    restart: unless-stopped
+
+  backend_nginx:
+    restart: unless-stopped
+
+  frontend:
+    restart: unless-stopped
+
+volumes:
+  data:

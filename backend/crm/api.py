@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db import IntegrityError, transaction
 from django.db.models import OuterRef, Subquery, F
 from django.db.models import TextField
 from django.db.models.fields.json import KeyTextTransform
@@ -16,6 +17,8 @@ from rest_framework.response import Response
 from crm.models import Customer, Site, Contact
 from audit.utils import log_event, to_change_value_for_field, to_primitive
 from custom_fields.validation import normalize_and_validate_custom_fields
+from core.soft_delete import apply_soft_delete_filters
+from core.integrity import raise_integrity_error_as_validation
 
 
 
@@ -174,6 +177,36 @@ class CustomerViewSet(viewsets.ModelViewSet):
     ]
     ordering = ["name"]
 
+    def create(self, request, *args, **kwargs):
+        """Convert DB integrity errors into 400 ValidationError."""
+        try:
+            with transaction.atomic():
+                return super().create(request, *args, **kwargs)
+        except IntegrityError as e:
+            raise_integrity_error_as_validation(
+                e,
+                constraint_map={
+                    "ux_customers_code_active": {"code": "Codice cliente già presente su un cliente attivo."},
+                    "ux_customers_vat_active": {"vat_number": "Partita IVA già presente su un cliente attivo."},
+                    "ux_customers_tax_active": {"tax_code": "Codice fiscale già presente su un cliente attivo."},
+                },
+            )
+
+    def update(self, request, *args, **kwargs):
+        """Convert DB integrity errors into 400 ValidationError."""
+        try:
+            with transaction.atomic():
+                return super().update(request, *args, **kwargs)
+        except IntegrityError as e:
+            raise_integrity_error_as_validation(
+                e,
+                constraint_map={
+                    "ux_customers_code_active": {"code": "Codice cliente già presente su un cliente attivo."},
+                    "ux_customers_vat_active": {"vat_number": "Partita IVA già presente su un cliente attivo."},
+                    "ux_customers_tax_active": {"tax_code": "Codice fiscale già presente su un cliente attivo."},
+                },
+            )
+
     def get_queryset(self):
         qs = Customer.objects.select_related("status")
 
@@ -203,21 +236,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
             primary_contact_phone=Subquery(primary_qs.values("phone")[:1]),
         )
 
-        truthy = {"1", "true", "yes", "on"}
-        include_deleted = (self.request.query_params.get("include_deleted") or "").lower()
-        only_deleted = (self.request.query_params.get("only_deleted") or "").lower()
-
-        if getattr(self, "action", "") == "restore":
-            include_deleted = "1"
-
-        if only_deleted in truthy:
-            qs = qs.filter(deleted_at__isnull=False)
-        elif include_deleted in truthy:
-            pass
-        else:
-            qs = qs.filter(deleted_at__isnull=True)
-
-        return qs
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
 
     def _changes_from_validated(self, instance, validated):
@@ -388,21 +407,7 @@ class SiteViewSet(viewsets.ModelViewSet):
             status_label=F("status__label"),
         )
 
-        truthy = {"1", "true", "yes", "on"}
-        include_deleted = (self.request.query_params.get("include_deleted") or "").lower()
-        only_deleted = (self.request.query_params.get("only_deleted") or "").lower()
-
-        if getattr(self, "action", "") == "restore":
-            include_deleted = "1"
-
-        if only_deleted in truthy:
-            qs = qs.filter(deleted_at__isnull=False)
-        elif include_deleted in truthy:
-            pass
-        else:
-            qs = qs.filter(deleted_at__isnull=True)
-
-        return qs
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
 
     def _changes_from_validated(self, instance, validated):
@@ -542,21 +547,7 @@ class ContactViewSet(viewsets.ModelViewSet):
             site_display_name=Coalesce(F("site__display_name"), F("site__name")),
         )
 
-        truthy = {"1", "true", "yes", "on"}
-        include_deleted = (self.request.query_params.get("include_deleted") or "").lower()
-        only_deleted = (self.request.query_params.get("only_deleted") or "").lower()
-
-        if getattr(self, "action", "") == "restore":
-            include_deleted = "1"
-
-        if only_deleted in truthy:
-            qs = qs.filter(deleted_at__isnull=False)
-        elif include_deleted in truthy:
-            pass
-        else:
-            qs = qs.filter(deleted_at__isnull=True)
-
-        return qs
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         before = getattr(instance, 'deleted_at', None)

@@ -2,19 +2,74 @@
 
 Tutte le modifiche rilevanti al progetto sono documentate qui.
 
-Formato ispirato a “Keep a Changelog”.
+Formato ispirato a “Keep a Changelog” + SemVer.
 Le date sono in timezone Europe/Rome.
 
 ---
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-02-25
 
 ### Added
-- Permission `inventory.view_secrets` per limitare la visualizzazione delle password inventario (OS/App/VNC).
+- (TBD) Hardening prod: security headers, rate limiting login, audit retention config.
 
 ### Changed
-- UI Inventory: le password sono mascherate e visibili/copiabili solo agli utenti con permesso `inventory.view_secrets`.
-- UI Login: dopo l'autenticazione si torna sempre alla Dashboard (/) invece dell'ultima pagina visitata.
+- (TBD) Consolidamento endpoint Search (unificato) + ottimizzazione query.
+
+### Fixed
+- (TBD) Bugfix selezionati dalla review (vedi sezione “Roadmap 0.3.0 stabile”).
+
+### Security
+- (TBD) Riduzione superficie: rimozione opzioni “allow all origins” per CSRF in ambienti non-dev.
+
+### Technical Debt
+- (TBD) Refactor mixin soft-delete/queryset + riduzione duplicazioni.
+
+---
+
+## [0.3.0-alpha.1] - 2026-02-24
+
+### Added
+- **Audit**:
+  - AuditEvent per create/update/delete/restore (con masking aggressivo dei campi sensibili).
+  - Tracciamento tentativi di autenticazione (login/logout/login_failed).
+  - UI Audit con filtri e drawer diff.
+- **Custom Fields “veri”**:
+  - Definizioni (CustomFieldDefinition) con validazione/normalizzazione su JSONField.
+  - Supporto flag `is_sensitive` (mask in audit).
+- **User Profile**:
+  - Avatar upload e pagina profilo.
+  - Preferred customer (scoping UX lato UI).
+- **Drive**:
+  - Cartelle/file con API dedicate + upload multipart.
+  - Protezione Nginx contro bypass ACL su drive media.
+- **Search (UI)**: pagina di ricerca globale (fan-out su endpoint list in base ai permessi).
+- **Trash (UI)**: cestino unificato con selezione multipla e bulk restore.
+- **Permessi a gruppi** (admin/editor/viewer) con sidebar/azioni condizionali.
+- **DataGrid server-side** (pagination/search/ordering) sulle liste principali.
+
+### Changed
+- Stack Docker Compose: aggiunto Nginx per backend (porta **6382**) e Nginx per frontend (porta **6383**).
+- Inventory:
+  - secrets (OS/App/VNC) **solo** nel dettaglio e mascherati in UI.
+  - introdotto permesso `inventory.view_secrets` per visualizzare/copiarli.
+- Wiki: rendering hardening con sanitizzazione HTML (anti-XSS).
+- Allineamento metadati versione (frontend package*, OpenAPI).
+
+### Fixed
+- Fix incoerenze endpoint bulk restore (`/bulk_restore/`) e parametri query coerenti (`page/page_size/search/ordering`).
+- Fix doppio evento `login` su Audit.
+- Fix vari su DataGrid (typing/JSX, columnVisibilityModel, selection model compatibile MUI X).
+- Restore Contatti ri-applica regola “primario” per evitare duplicati.
+
+### Security
+- Audit masking: password/token/secret/apiKey/privateKey ecc. mascherati.
+- Docs OpenAPI: pubbliche in DEBUG, ristrette in prod a staff/superuser o gruppo `admin`.
+
+### Technical Debt
+- Presenza di endpoint/bozza backend per Search non cablata nei `urls.py` (file `backend/config/search_api.py`).
+- Alcune logiche soft-delete/restore e alias ordering replicate tra viewset.
+
+---
 
 ## [0.2.1] - 2026-02-18
 
@@ -27,6 +82,8 @@ Le date sono in timezone Europe/Rome.
 ### Changed
 - Allineamento metadati di versione (frontend package*, OpenAPI).
 - Pulizia repo: aggiunto `.gitignore`, previsto `data/.gitkeep`.
+
+---
 
 ## [0.2.0] - 2026-02-18
 
@@ -55,17 +112,13 @@ Le date sono in timezone Europe/Rome.
 - Fix vari di typing/JSX e visibilità colonne DataGrid (es. rimozione `hide` a favore di `columnVisibilityModel`).
 - Rimozione “Reimposta” nel Cestino (non necessario e comportamento non corretto).
 
-### Notes / Migration
-- Le liste usano query params coerenti (`search`, `ordering`, `view`), mantenendo compatibilità con alcuni parametri legacy quando presenti.
-- Eventi auth compaiono in Audit solo se passano dagli endpoint backend (es. logout non tracciabile se chiudi il browser senza chiamare API).
-
 ---
 
 ## [0.1.0] - 2026-02-17
 
 ### Added
 - Backend Django + Postgres con moduli:
-  - `core`, `crm`, `inventory`, `maintenance`, `wiki`, `audit`, `custom_fields` (JSON custom fields su alcune entità).
+  - `core`, `crm`, `inventory`, `maintenance`, `wiki`, `audit`, `custom_fields`.
 - Soft delete + restore per entità principali (con query param include/only deleted).
 - Seed di lookup di base (`seed_defaults`).
 - Comandi import CSV custom (customers/sites/contacts/inventories) con modalità controllata.
@@ -79,6 +132,4 @@ Le date sono in timezone Europe/Rome.
 - Correzioni varie su configurazioni e coerenza doc/porte rispetto allo stack (README aggiornato rispetto al runtime reale).
 
 ### Notes
-- Wiki e Maintenance presenti ma con priorità evolutiva successiva (feature “hold”/espandibili).
 - Il DB non è incluso negli export zip: per migrare i dati serve dump/restore di Postgres separato.
-

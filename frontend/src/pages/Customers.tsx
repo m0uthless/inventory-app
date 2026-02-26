@@ -6,6 +6,7 @@ import {
   CircularProgress,
   Drawer,
   FormControl,
+  FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
@@ -44,7 +45,7 @@ import { buildDrfListParams, includeDeletedParams } from "../api/drf";
 import { useDrfList } from "../hooks/useDrfList";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import { useToast } from "../ui/toast";
-import { apiErrorToMessage } from "../api/error";
+import { apiErrorToFieldErrors, apiErrorToMessage } from "../api/error";
 import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
 import ActionButton from "../ui/ActionButton";
@@ -474,7 +475,13 @@ export default function Customers() {
       return { title: "Cestino vuoto", subtitle: "Non ci sono clienti eliminati." };
     }
     if (!grid.search.trim()) {
-      return { title: "Nessun cliente", subtitle: "Crea un nuovo cliente o cambia i filtri." };
+      return { title: "Nessun cliente", subtitle: "Crea un nuovo cliente o cambia i filtri.", action: (
+        <Can perm={PERMS.crm.customer.add}>
+          <Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}>
+            Crea cliente
+          </Button>
+        </Can>
+      ) };
     }
     return { title: "Nessun risultato", subtitle: "Prova a cambiare ricerca o filtri." };
   }, [grid.view, grid.search]);
@@ -562,6 +569,8 @@ const [restoreBusy, setRestoreBusy] = React.useState(false);
     custom_fields: {},
     notes: "",
   });
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+
 
   const address = React.useMemo(() => {
     const cf = detail?.custom_fields ?? null;
@@ -760,9 +769,16 @@ const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
 }, [openDrawer, restoreBusy, deleteBusy, grid.view]);
 
 
+  // If opened from global Search, we can return back to the Search results on close.
+  const returnTo = React.useMemo(() => {
+    return new URLSearchParams(loc.search).get("return");
+  }, [loc.search]);
+
+
   const closeDrawer = () => {
     setDrawerOpen(false);
     grid.setOpenId(null);
+    if (returnTo) navigate(returnTo, { replace: true });
   };
 
   const openCreateOnceRef = React.useRef(false);
@@ -772,6 +788,7 @@ const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
     setDlgId(null);
     setForm({ status: "", name: "", display_name: "", vat_number: "", tax_code: "", custom_fields: {}, notes: "" });
     setDlgOpen(true);
+    setFieldErrors({});
   };
 
   React.useEffect(() => {
@@ -796,6 +813,7 @@ const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
       notes: detail.notes ?? "",
     });
     setDlgOpen(true);
+    setFieldErrors({});
   };
 
   const save = async () => {
@@ -832,7 +850,13 @@ const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
       reloadList();
       openDrawer(id);
     } catch (e) {
-      toast.error(apiErrorToMessage(e));
+      const fe = apiErrorToFieldErrors(e);
+      if (fe) {
+        setFieldErrors(fe);
+        toast.error(fe._error || "Controlla i campi evidenziati.");
+      } else {
+        toast.error(apiErrorToMessage(e));
+      }
     } finally {
       setDlgSaving(false);
     }
@@ -997,7 +1021,7 @@ const doRestore = async () => {
             setCity("", { patch: { search: grid.q, page: 1 }, keepOpen: true });
           }}
         >
-          <FormControl size="small" fullWidth>
+          <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
             <InputLabel>Stato</InputLabel>
             <Select
               label="Stato"
@@ -1281,7 +1305,7 @@ const doRestore = async () => {
         <DialogTitle>{dlgMode === "create" ? "Nuovo cliente" : "Modifica cliente"}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <FormControl size="small" fullWidth>
+            <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
               <InputLabel>Stato</InputLabel>
               <Select
                 label="Stato"
@@ -1295,21 +1319,23 @@ const doRestore = async () => {
                   </MenuItem>
                 ))}
               </Select>
+              {fieldErrors.status ? <FormHelperText>{fieldErrors.status}</FormHelperText> : null}
             </FormControl>
 
-            <TextField size="small" label="Nome" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} fullWidth />
+            <TextField size="small" label="Nome" value={form.name} onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setFieldErrors((er) => { const n = { ...er }; delete n.name; return n; }); }} error={Boolean(fieldErrors.name)} helperText={fieldErrors.name || " "} fullWidth />
             <TextField
               size="small"
               label="Nome visualizzato"
               value={form.display_name}
-              onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-              helperText="Se vuoto, verrà usato Nome."
+              onChange={(e) => { setForm((f) => ({ ...f, display_name: e.target.value })); setFieldErrors((er) => { const n = { ...er }; delete n.display_name; return n; }); }}
+              error={Boolean(fieldErrors.display_name)}
+              helperText={fieldErrors.display_name || "Se vuoto, verrà usato Nome."}
               fullWidth
             />
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="P.IVA" value={form.vat_number} onChange={(e) => setForm((f) => ({ ...f, vat_number: e.target.value }))} fullWidth />
-              <TextField size="small" label="Codice fiscale" value={form.tax_code} onChange={(e) => setForm((f) => ({ ...f, tax_code: e.target.value }))} fullWidth />
+              <TextField size="small" label="P.IVA" value={form.vat_number} onChange={(e) => { setForm((f) => ({ ...f, vat_number: e.target.value })); setFieldErrors((er) => { const n = { ...er }; delete n.vat_number; return n; }); }} error={Boolean(fieldErrors.vat_number)} helperText={fieldErrors.vat_number || " "} fullWidth />
+              <TextField size="small" label="Codice fiscale" value={form.tax_code} onChange={(e) => { setForm((f) => ({ ...f, tax_code: e.target.value })); setFieldErrors((er) => { const n = { ...er }; delete n.tax_code; return n; }); }} error={Boolean(fieldErrors.tax_code)} helperText={fieldErrors.tax_code || " "} fullWidth />
             </Stack>
 
             <CustomFieldsEditor

@@ -1,483 +1,180 @@
 import * as React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-
 import {
   Box,
-  Button,
+  Card,
+  CardContent,
   CircularProgress,
   Divider,
-  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import SearchIcon from "@mui/icons-material/Search";
-import FolderIcon from "@mui/icons-material/Folder";
-import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
-import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-
-import { apiGet } from "../api/client";
-import { useAuth } from "../auth/AuthProvider";
-import { PERMS } from "../auth/perms";
+import { api } from "../api/client";
 import { useToast } from "../ui/toast";
+import { apiErrorToMessage } from "../api/error";
 
-type ApiPage<T> = {
-  count: number;
-  results: T[];
-};
-
-function extractResults<T>(data: unknown): T[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data as T[];
-  const d = data as { results?: unknown };
-  if (Array.isArray(d.results)) return d.results as T[];
-  return [];
-}
-
-function errMsg(e: any): string {
-  const d = e?.response?.data;
-  if (!d) return "Errore.";
-  if (typeof d === "string") return d;
-  if (typeof d?.detail === "string") return d.detail;
-  return "Errore.";
-}
-
-type SectionProps = {
+type SearchResult = {
+  kind: string;
+  id: number;
   title: string;
-  icon?: React.ReactNode;
-  items: any[];
-  onOpen: (id: number) => void;
-  onViewAll: () => void;
-  getPrimary: (x: any) => string;
-  getSecondary?: (x: any) => string;
+  subtitle?: string | null;
 };
 
-function Section({
-  title,
-  icon,
-  items,
-  onOpen,
-  onViewAll,
-  getPrimary,
-  getSecondary,
-}: SectionProps) {
-  return (
-    <Paper sx={{ p: 2, borderRadius: 2 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-        <Stack direction="row" alignItems="center" gap={1}>
-          {icon ? <Box sx={{ display: "flex", alignItems: "center" }}>{icon}</Box> : null}
-          <Typography variant="h6">{title}</Typography>
-        </Stack>
+type SearchResponse = {
+  q: string;
+  results: SearchResult[];
+};
 
-        <Button
-          size="small"
-          variant="text"
-          onClick={onViewAll}
-          endIcon={<OpenInNewIcon fontSize="small" />}
-        >
-          Vedi tutto
-        </Button>
-      </Stack>
+const KIND_LABEL: Record<string, string> = {
+  inventory: "Inventario",
+  customer: "Clienti",
+  site: "Siti",
+  contact: "Contatti",
+  drive_folder: "Drive · Cartelle",
+  drive_file: "Drive · File",
+  maintenance_plan: "Manutenzione",
+  wiki_page: "Wiki",
+};
 
-      <Divider sx={{ my: 1 }} />
-
-      {items.length === 0 ? (
-        <Typography sx={{ px: 0.5, py: 1 }} color="text.secondary">
-          Nessun risultato.
-        </Typography>
-      ) : (
-        <List dense disablePadding>
-          {items.map((x) => (
-            <ListItemButton
-              key={String(x.id)}
-              onClick={() => onOpen(Number(x.id))}
-              sx={{ py: 1.1 }}
-            >
-              <ListItemText
-                primary={getPrimary(x)}
-                secondary={getSecondary ? getSecondary(x) : undefined}
-              />
-            </ListItemButton>
-          ))}
-        </List>
-      )}
-    </Paper>
-  );
+function groupByKind(results: SearchResult[]): Record<string, SearchResult[]> {
+  return results.reduce((acc, r) => {
+    (acc[r.kind] ||= []).push(r);
+    return acc;
+  }, {} as Record<string, SearchResult[]>);
 }
 
 export default function Search() {
-  const nav = useNavigate();
   const toast = useToast();
-  const { hasPerm } = useAuth();
-
+  const navigate = useNavigate();
+  const loc = useLocation();
   const [sp, setSp] = useSearchParams();
-  const qParam = (sp.get("search") || sp.get("q") || "").trim();
 
-  const [q, setQ] = React.useState(qParam);
+  const q = (sp.get("q") ?? sp.get("search") ?? "").trim();
+
   const [loading, setLoading] = React.useState(false);
+  const [results, setResults] = React.useState<SearchResult[]>([]);
 
-  const [customers, setCustomers] = React.useState<any[]>([]);
-  const [sites, setSites] = React.useState<any[]>([]);
-  const [contacts, setContacts] = React.useState<any[]>([]);
-  const [inventories, setInventories] = React.useState<any[]>([]);
-  const [driveFiles, setDriveFiles] = React.useState<any[]>([]);
-  const [driveFolders, setDriveFolders] = React.useState<any[]>([]);
-  const [maintenancePlans, setMaintenancePlans] = React.useState<any[]>([]);
+  const returnTo = React.useMemo(() => {
+    // return to *this* search page (keep whatever params are there)
+    return loc.pathname + loc.search;
+  }, [loc.pathname, loc.search]);
 
-  const canCustomers = hasPerm(PERMS.crm.customer.view);
-  const canSites = hasPerm(PERMS.crm.site.view);
-  const canContacts = hasPerm(PERMS.crm.contact.view);
-  const canInventories = hasPerm(PERMS.inventory.inventory.view);
-  const canDriveFiles = hasPerm(PERMS.drive.file.view);
-  const canDriveFolders = hasPerm(PERMS.drive.folder.view);
-  const canMaintenancePlans = hasPerm(PERMS.maintenance.plan.view);
-
-  const hasAnySection =
-    canCustomers ||
-    canSites ||
-    canContacts ||
-    canInventories ||
-    canDriveFiles ||
-    canDriveFolders ||
-    canMaintenancePlans;
-
-  // keep local input in sync when URL changes (back/forward)
   React.useEffect(() => {
-    setQ(qParam);
-  }, [qParam]);
-
-  const runSearch = React.useCallback(
-    async (query: string) => {
-      const term = query.trim();
-
+    let cancelled = false;
+    async function run() {
+      if (!q) {
+        setResults([]);
+        return;
+      }
       setLoading(true);
       try {
-        if (!term) {
-          setCustomers([]);
-          setSites([]);
-          setContacts([]);
-          setInventories([]);
-          setDriveFiles([]);
-          setDriveFolders([]);
-          setMaintenancePlans([]);
-          return;
-        }
-
-        // IMPORTANT:
-        // Don't call endpoints the user can't access.
-        // The API layer shows a global toast on 403.
-        if (!canCustomers) setCustomers([]);
-        if (!canSites) setSites([]);
-        if (!canContacts) setContacts([]);
-        if (!canInventories) setInventories([]);
-        if (!canDriveFiles) setDriveFiles([]);
-        if (!canDriveFolders) setDriveFolders([]);
-        if (!canMaintenancePlans) setMaintenancePlans([]);
-
-        const params = { search: term, page: 1, page_size: 10 };
-
-        const reqs = [
-          {
-            enabled: canCustomers,
-            call: () => apiGet<ApiPage<any>>("/customers/", { params }),
-            set: (data: unknown) => setCustomers(extractResults<any>(data)),
-          },
-          {
-            enabled: canSites,
-            call: () => apiGet<ApiPage<any>>("/sites/", { params }),
-            set: (data: unknown) => setSites(extractResults<any>(data)),
-          },
-          {
-            enabled: canContacts,
-            call: () => apiGet<ApiPage<any>>("/contacts/", { params }),
-            set: (data: unknown) => setContacts(extractResults<any>(data)),
-          },
-          {
-            enabled: canInventories,
-            call: () => apiGet<ApiPage<any>>("/inventories/", { params }),
-            set: (data: unknown) => setInventories(extractResults<any>(data)),
-          },
-          {
-            enabled: canDriveFiles,
-            call: () => apiGet<ApiPage<any>>("/drive-files/", { params }),
-            set: (data: unknown) => setDriveFiles(extractResults<any>(data)),
-          },
-          {
-            enabled: canDriveFolders,
-            call: () => apiGet<ApiPage<any>>("/drive-folders/", { params }),
-            set: (data: unknown) => setDriveFolders(extractResults<any>(data)),
-          },
-          {
-            enabled: canMaintenancePlans,
-            call: () => apiGet<ApiPage<any>>("/maintenance-plans/", { params }),
-            set: (data: unknown) => setMaintenancePlans(extractResults<any>(data)),
-          },
-        ] as const;
-
-        const enabled = reqs.filter((r) => r.enabled);
-        const settled = await Promise.allSettled(enabled.map((r) => r.call()));
-
-        let hadNonAuthErrors = false;
-        settled.forEach((s, idx) => {
-          const r = enabled[idx];
-          if (s.status === "fulfilled") {
-            r.set(s.value);
-            return;
-          }
-
-          // 401/403 are already handled globally by the API layer.
-          const status = s.reason?.response?.status as number | undefined;
-          if (status === 401 || status === 403) {
-            r.set(null);
-            return;
-          }
-
-          hadNonAuthErrors = true;
-          r.set(null);
-        });
-
-        if (hadNonAuthErrors) {
-          toast.error("Ricerca parziale: alcune sezioni non sono disponibili.");
-        }
+        const resp = await api.get<SearchResponse>("/search/", { params: { q } });
+        if (!cancelled) setResults(resp.data.results ?? []);
       } catch (e) {
-        toast.error(errMsg(e));
+        if (!cancelled) toast.error(apiErrorToMessage(e));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    },
-    [
-      canContacts,
-      canCustomers,
-      canDriveFiles,
-      canDriveFolders,
-      canInventories,
-      canMaintenancePlans,
-      canSites,
-      toast,
-    ]
-  );
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [q, toast]);
 
-  // auto-run when qParam changes
-  React.useEffect(() => {
-    runSearch(qParam);
-  }, [qParam, runSearch]);
+  const groups = React.useMemo(() => groupByKind(results), [results]);
 
-  const submit = React.useCallback(() => {
-    const term = q.trim();
+  const openInModule = (r: SearchResult) => {
+    const encodedReturn = encodeURIComponent(returnTo);
 
-    setSp(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (term) {
-          next.set("search", term);
-          next.delete("q"); // legacy
-        } else {
-          next.delete("search");
-          next.delete("q");
-        }
-        return next;
-      },
-      { replace: true }
-    );
-  }, [q, setSp]);
+    if (r.kind === "inventory") {
+      navigate(`/inventory?search=${encodeURIComponent(q)}&open=${r.id}&return=${encodedReturn}`);
+      return;
+    }
+    if (r.kind === "customer") {
+      navigate(`/customers?search=${encodeURIComponent(q)}&open=${r.id}&return=${encodedReturn}`);
+      return;
+    }
+    if (r.kind === "site") {
+      navigate(`/sites?search=${encodeURIComponent(q)}&open=${r.id}&return=${encodedReturn}`);
+      return;
+    }
+    if (r.kind === "contact") {
+      navigate(`/contacts?search=${encodeURIComponent(q)}&open=${r.id}&return=${encodedReturn}`);
+      return;
+    }
+
+    // For the other modules we don't have drawer deep-links yet.
+    // Keep behavior simple for now.
+    toast.error("Deep-link drawer non ancora attivo per questo tipo di risultato.");
+  };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 0.5 }}>
-        Ricerca
-      </Typography>
-      <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Cerca in clienti, siti, contatti, inventari, Drive e manutenzione.
-      </Typography>
+    <Box sx={{ p: 2 }}>
+      <Stack spacing={2}>
+        <Typography variant="h5" fontWeight={700}>Ricerca</Typography>
 
-      <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <TextField
-            fullWidth
-            placeholder="Cerca…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-                backgroundColor: "background.paper",
-              },
-            }}
-          />
+        <TextField
+          label="Cerca"
+          value={q}
+          onChange={(e) => {
+            const next = e.target.value;
+            const nextParams = new URLSearchParams(sp);
+            nextParams.set("q", next);
+            nextParams.delete("search");
+            setSp(nextParams, { replace: true });
+          }}
+          placeholder="Cliente, sito, inventario…"
+          size="small"
+        />
 
-          <Button variant="contained" onClick={submit} disabled={loading}>
-            Cerca
-          </Button>
-
-          <Button
-            variant="text"
-            onClick={() => {
-              setQ("");
-              setSp(
-                (prev) => {
-                  const next = new URLSearchParams(prev);
-                  next.delete("q");
-                  next.delete("search");
-                  return next;
-                },
-                { replace: true }
-              );
-            }}
-            disabled={loading}
-          >
-            Reimposta
-          </Button>
-        </Stack>
-      </Paper>
-
-      {!hasAnySection ? (
-        <Paper sx={{ p: 2, borderRadius: 2 }}>
-          <Typography color="text.secondary">
-            Non hai permessi sufficienti per effettuare la ricerca.
-          </Typography>
-        </Paper>
-      ) : loading ? (
-        <Paper sx={{ p: 4, borderRadius: 2 }}>
-          <Stack direction="row" justifyContent="center">
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
             <CircularProgress />
+          </Box>
+        ) : (
+          <Stack spacing={2}>
+            {q && results.length === 0 ? (
+              <Typography color="text.secondary">Nessun risultato per “{q}”.</Typography>
+            ) : null}
+
+            {Object.entries(KIND_LABEL).map(([kind, label]) => {
+              const items = groups[kind] ?? [];
+              if (!items.length) return null;
+              return (
+                <Card key={kind} variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+                      {label}
+                    </Typography>
+                    <Divider sx={{ mb: 1 }} />
+                    <List dense disablePadding>
+                      {items.map((r) => (
+                        <ListItemButton
+                          key={`${r.kind}-${r.id}`}
+                          onClick={() => openInModule(r)}
+                          sx={{ borderRadius: 1 }}
+                        >
+                          <ListItemText
+                            primary={r.title}
+                            secondary={r.subtitle ?? undefined}
+                            primaryTypographyProps={{ fontWeight: 600 }}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </Stack>
-        </Paper>
-      ) : (
-        <Stack spacing={2}>
-          {canCustomers ? (
-            <Section
-              title="Clienti"
-              items={customers}
-              onOpen={(id) => nav(`/customers?open=${id}`)}
-              onViewAll={() =>
-                nav(
-                  qParam
-                    ? `/customers?search=${encodeURIComponent(qParam)}`
-                    : "/customers"
-                )
-              }
-              getPrimary={(x) =>
-                `${x.code ? `${x.code} — ` : ""}${x.name || "Cliente"}`
-              }
-              getSecondary={(x) =>
-                x.status_label ? `Stato: ${x.status_label}` : ""
-              }
-            />
-          ) : null}
-
-          {canSites ? (
-            <Section
-              title="Siti"
-              items={sites}
-              onOpen={(id) => nav(`/sites?open=${id}`)}
-              onViewAll={() =>
-                nav(qParam ? `/sites?search=${encodeURIComponent(qParam)}` : "/sites")
-              }
-              getPrimary={(x) => x.display_name || x.name || "Sito"}
-              getSecondary={(x) => [x.city, x.address].filter(Boolean).join(" • ")}
-            />
-          ) : null}
-
-          {canContacts ? (
-            <Section
-              title="Contatti"
-              items={contacts}
-              onOpen={(id) => nav(`/contacts?open=${id}`)}
-              onViewAll={() =>
-                nav(
-                  qParam
-                    ? `/contacts?search=${encodeURIComponent(qParam)}`
-                    : "/contacts"
-                )
-              }
-              getPrimary={(x) =>
-                x.name ||
-                [x.first_name, x.last_name].filter(Boolean).join(" ") ||
-                "Contatto"
-              }
-              getSecondary={(x) => [x.email, x.phone].filter(Boolean).join(" • ")}
-            />
-          ) : null}
-
-          {canInventories ? (
-            <Section
-              title="Inventari"
-              items={inventories}
-              onOpen={(id) => nav(`/inventory?open=${id}`)}
-              onViewAll={() =>
-                nav(
-                  qParam
-                    ? `/inventory?search=${encodeURIComponent(qParam)}`
-                    : "/inventory"
-                )
-              }
-              getPrimary={(x) => x.hostname || x.name || "Inventario"}
-              getSecondary={(x) =>
-                [x.knumber, x.serial_number].filter(Boolean).join(" • ")
-              }
-            />
-          ) : null}
-
-          {canDriveFiles ? (
-            <Section
-              title="Drive: file"
-              icon={<InsertDriveFileOutlinedIcon fontSize="small" />}
-              items={driveFiles}
-              onOpen={() => nav("/drive")}
-              onViewAll={() => nav("/drive")}
-              getPrimary={(x) => x.name}
-              getSecondary={(x) =>
-                [x.size_human, x.folder_name || "Root"].filter(Boolean).join(" • ")
-              }
-            />
-          ) : null}
-
-          {canDriveFolders ? (
-            <Section
-              title="Drive: cartelle"
-              icon={<FolderIcon fontSize="small" />}
-              items={driveFolders}
-              onOpen={() => nav("/drive")}
-              onViewAll={() => nav("/drive")}
-              getPrimary={(x) => x.name}
-              getSecondary={(x) => `${x.files_count ?? 0} file`}
-            />
-          ) : null}
-
-          {canMaintenancePlans ? (
-            <Section
-              title="Manutenzione"
-              icon={<BuildOutlinedIcon fontSize="small" />}
-              items={maintenancePlans}
-              onOpen={() => nav("/maintenance")}
-              onViewAll={() => nav("/maintenance")}
-              getPrimary={(x) => x.name || x.title || `Piano #${x.id}`}
-              getSecondary={(x) =>
-                [x.customer_name, x.status_label].filter(Boolean).join(" • ")
-              }
-            />
-          ) : null}
-        </Stack>
-      )}
+        )}
+      </Stack>
     </Box>
   );
 }

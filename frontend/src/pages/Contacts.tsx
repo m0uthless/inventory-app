@@ -7,6 +7,7 @@ import {
   CircularProgress,
   Drawer,
   FormControl,
+  FormHelperText,
   FormControlLabel,
   IconButton,
   LinearProgress,
@@ -43,7 +44,7 @@ import type { ApiPage } from "../api/drf";
 import { useDrfList } from "../hooks/useDrfList";
 
 import { api } from "../api/client";
-import { apiErrorToMessage } from "../api/error";
+import { apiErrorToFieldErrors, apiErrorToMessage } from "../api/error";
 import { useAuth } from "../auth/AuthProvider";
 import { Can } from "../auth/Can";
 import { buildQuery } from "../utils/nav";
@@ -195,7 +196,14 @@ export default function Contacts() {
       return { title: "Cestino vuoto", subtitle: "Non ci sono contatti eliminati." };
     }
     if (!grid.search.trim()) {
-      return { title: "Nessun contatto", subtitle: "Crea un nuovo contatto o cambia i filtri." };
+      return { title: "Nessun contatto", subtitle: "Crea un nuovo contatto o cambia i filtri." , action: (
+        <Can perm={PERMS.crm.contact.add}>
+          <Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } } )}>
+            Crea contatto
+          </Button>
+        </Can>
+      ) };
+
     }
     return { title: "Nessun risultato", subtitle: "Prova a cambiare ricerca o filtri." };
   }, [grid.view, grid.search]);
@@ -258,6 +266,7 @@ export default function Contacts() {
   const [dlgMode, setDlgMode] = React.useState<"create" | "edit">("create");
   const [dlgSaving, setDlgSaving] = React.useState(false);
   const [dlgId, setDlgId] = React.useState<number | null>(null);
+  const [dlgErrors, setDlgErrors] = React.useState<Record<string, string>>({});
   const [form, setForm] = React.useState<ContactForm>({
     customer: "",
     site: "",
@@ -435,10 +444,16 @@ export default function Contacts() {
     return [...cols, actionsCol];
   }, [openDrawer, restoreBusy, deleteBusy, grid.view]);
 
+  // If opened from global Search, we can return back to the Search results on close.
+  const returnTo = React.useMemo(() => {
+    return new URLSearchParams(loc.search).get("return");
+  }, [loc.search]);
+
   const closeDrawer = React.useCallback(() => {
     setDrawerOpen(false);
     grid.setOpenId(null);
-  }, [grid]);
+    if (returnTo) navigate(returnTo, { replace: true });
+  }, [grid, returnTo, navigate]);
 
   const doDelete = React.useCallback(async () => {
     if (!selectedId) return;
@@ -532,6 +547,7 @@ const doRestore = React.useCallback(async () => {
     const preCustomer = customerId !== "" ? customerId : "";
     setDlgMode("create");
     setDlgId(null);
+    setDlgErrors({});
     setForm({
       customer: preCustomer,
       site: "",
@@ -558,6 +574,7 @@ const doRestore = React.useCallback(async () => {
     if (!detail) return;
     setDlgMode("edit");
     setDlgId(detail.id);
+    setDlgErrors({});
 
     const cust = (detail.customer ?? "") as any;
     setForm({
@@ -576,6 +593,7 @@ const doRestore = React.useCallback(async () => {
   };
 
   const save = async () => {
+    setDlgErrors({});
     if (form.customer === "" || !String(form.name).trim()) {
       toast.warning("Compila almeno Cliente e Nome.");
       return;
@@ -610,7 +628,13 @@ const doRestore = React.useCallback(async () => {
       reloadList();
       openDrawer(id);
     } catch (e) {
-      toast.error(apiErrorToMessage(e));
+      const fe = apiErrorToFieldErrors(e);
+      if (fe) {
+        setDlgErrors(fe);
+        toast.warning("Controlla i campi evidenziati.");
+      } else {
+        toast.error(apiErrorToMessage(e));
+      }
     } finally {
       setDlgSaving(false);
     }
@@ -927,8 +951,13 @@ const doRestore = React.useCallback(async () => {
           {dlgMode === "create" ? "Nuovo contatto" : "Modifica contatto"}
         </DialogTitle>
         <DialogContent>
+          {dlgErrors._error ? (
+            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+              {dlgErrors._error}
+            </Typography>
+          ) : null}
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <FormControl size="small" fullWidth>
+            <FormControl size="small" fullWidth error={Boolean(dlgErrors.customer)}>
               <InputLabel>Cliente</InputLabel>
               <Select
                 label="Cliente"
@@ -946,9 +975,10 @@ const doRestore = React.useCallback(async () => {
                   </MenuItem>
                 ))}
               </Select>
+              {dlgErrors.customer ? <FormHelperText>{dlgErrors.customer}</FormHelperText> : null}
             </FormControl>
 
-            <FormControl size="small" fullWidth disabled={form.customer === ""}>
+            <FormControl size="small" fullWidth disabled={form.customer === ""} error={Boolean(dlgErrors.site)}>
               <InputLabel>Sito</InputLabel>
               <Select
                 label="Sito"
@@ -962,6 +992,7 @@ const doRestore = React.useCallback(async () => {
                   </MenuItem>
                 ))}
               </Select>
+              {dlgErrors.site ? <FormHelperText>{dlgErrors.site}</FormHelperText> : null}
             </FormControl>
 
             <TextField
@@ -969,6 +1000,8 @@ const doRestore = React.useCallback(async () => {
               label="Nome"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              error={Boolean(dlgErrors.name)}
+              helperText={dlgErrors.name || ""}
               fullWidth
             />
 
@@ -978,6 +1011,8 @@ const doRestore = React.useCallback(async () => {
                 label="Email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                error={Boolean(dlgErrors.email)}
+                helperText={dlgErrors.email || ""}
                 fullWidth
               />
               <TextField
@@ -985,6 +1020,8 @@ const doRestore = React.useCallback(async () => {
                 label="Telefono"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                error={Boolean(dlgErrors.phone)}
+                helperText={dlgErrors.phone || ""}
                 fullWidth
               />
             </Stack>
@@ -994,6 +1031,8 @@ const doRestore = React.useCallback(async () => {
               label="Reparto"
               value={form.department}
               onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+              error={Boolean(dlgErrors.department)}
+              helperText={dlgErrors.department || ""}
               fullWidth
             />
 
@@ -1006,12 +1045,19 @@ const doRestore = React.useCallback(async () => {
               }
               label="Contatto primario"
             />
+            {dlgErrors.is_primary ? (
+              <Typography variant="caption" color="error">
+                {dlgErrors.is_primary}
+              </Typography>
+            ) : null}
 
             <TextField
               size="small"
               label="Note"
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              error={Boolean(dlgErrors.notes)}
+              helperText={dlgErrors.notes || ""}
               fullWidth
               multiline
               minRows={4}

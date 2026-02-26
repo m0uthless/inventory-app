@@ -28,6 +28,13 @@ class Customer(TimeStampedModel):
     class Meta:
         verbose_name = "Cliente"
         verbose_name_plural = "Clienti"
+        indexes = [
+            # Hot paths:
+            # - list views filter by deleted_at (soft delete)
+            # - ordering frequently uses updated_at
+            models.Index(fields=["deleted_at"], name="cust_deleted_at_idx"),
+            models.Index(fields=["updated_at"], name="cust_updated_at_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["code"],
@@ -79,6 +86,11 @@ class Site(TimeStampedModel):
     class Meta:
         verbose_name = "Sito"
         verbose_name_plural = "Siti"
+        indexes = [
+            models.Index(fields=["deleted_at"], name="site_deleted_at_idx"),
+            models.Index(fields=["customer", "deleted_at"], name="site_customer_del_idx"),
+            models.Index(fields=["updated_at"], name="site_updated_at_idx"),
+        ]
 
     def __str__(self):
         return f"{self.customer.code if self.customer_id else self.customer_id} - {self.name}"
@@ -98,3 +110,13 @@ class Contact(TimeStampedModel):
 
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["deleted_at"], name="contact_deleted_at_idx"),
+            models.Index(fields=["customer", "deleted_at"], name="contact_customer_del_idx"),
+            models.Index(fields=["site", "deleted_at"], name="contact_site_del_idx"),
+            models.Index(fields=["updated_at"], name="contact_updated_at_idx"),
+            # Used by primary contact enforcement: customer+site+is_primary+deleted_at
+            models.Index(fields=["customer", "site", "is_primary", "deleted_at"], name="contact_primary_idx"),
+        ]

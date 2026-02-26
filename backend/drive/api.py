@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import mimetypes
 import os
+from pathlib import PurePosixPath
 
 from django.db.models import Count, Q
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import serializers, status, viewsets
@@ -16,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import CanRestoreModelPermission, IsAuthenticatedDjangoModelPermissions
+from core.soft_delete import apply_soft_delete_filters
 
 from .models import DriveFile, DriveFolder
 
@@ -23,9 +25,6 @@ from .models import DriveFile, DriveFolder
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
-
-_TRUTHY = {"1", "true", "yes", "on"}
-
 
 def _apply_deleted_filters(qs, request, action_name: str | None = None):
     """Soft-delete filters used across the project.
@@ -50,11 +49,14 @@ def _apply_deleted_filters(qs, request, action_name: str | None = None):
     if (action_name or "") == "restore":
         include_deleted = "1"
 
-    if only_deleted in _TRUTHY:
-        return qs.filter(deleted_at__isnull=False)
-    if include_deleted in _TRUTHY:
-        return qs
-    return qs.filter(deleted_at__isnull=True)
+    # Delegate to shared logic for consistency
+    return apply_soft_delete_filters(
+        qs,
+        request=request,
+        action_name=action_name,
+        include_deleted=include_deleted,
+        only_deleted=only_deleted,
+    )
 
 
 def _user_group_ids(user) -> set[int]:
@@ -336,7 +338,36 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
         instance.deleted_at = timezone.now()
         instance.save(update_fields=["deleted_at", "updated_at"])
 
-    # ── Restore ──────────────────────────────────────────────────────────────
+    
+    # ── Children ─────────────────────────────────────────────────────────────
+    @action(detail=True, methods=["get"])
+    def children(self, request, pk=None):
+        """Return direct children (folders + files) for the given folder.
+
+        Frontend expects /drive-folders/{id}/children/.
+        """
+        folder = self.get_object()
+
+        # Folders
+        folders_qs = DriveFolder.objects.filter(parent=folder)
+        folders_qs = _apply_deleted_filters(folders_qs, request, getattr(self, "action", None))
+        folders_qs = _filter_accessible_folders(folders_qs, request.user)
+        folders_qs = folders_qs.prefetch_related("customers", "allowed_groups").order_by("name")
+
+        # Files
+        files_qs = DriveFile.objects.filter(folder=folder)
+        files_qs = _apply_deleted_filters(files_qs, request, getattr(self, "action", None))
+        files_qs = _filter_accessible_files(files_qs, request.user)
+        files_qs = files_qs.prefetch_related("customers", "allowed_groups", "folder").order_by("name")
+
+        return Response(
+            {
+                "folders": DriveFolderSerializer(folders_qs, many=True, context=self.get_serializer_context()).data,
+                "files": DriveFileSerializer(files_qs, many=True, context=self.get_serializer_context()).data,
+            }
+        )
+
+# ── Restore ──────────────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
@@ -547,13 +578,20 @@ class DriveFileViewSet(viewsets.ModelViewSet):
         if not file.file:
             return Response({"detail": "File non presente."}, status=404)
 
-        try:
-            fp = open(file.file.path, "rb")
-        except FileNotFoundError:
-            return Response({"detail": "File non trovato su disco."}, status=404)
+        # Serve via nginx X-Accel-Redirect (avoid streaming through gunicorn)
+        rel_name = (file.file.name or "").lstrip("/")
+        p = PurePosixPath(rel_name)
+        if ".." in p.parts:
+            return Response({"detail": "Percorso file non valido."}, status=400)
 
-        resp = FileResponse(fp, as_attachment=True, filename=file.name)
-        resp["Content-Type"] = file.mime_type or mimetypes.guess_type(file.file.name)[0] or "application/octet-stream"
+        accel_path = f"/protected_media/{rel_name}"
+        mime = file.mime_type or mimetypes.guess_type(rel_name)[0] or "application/octet-stream"
+
+        resp = HttpResponse(b"", content_type=mime)
+        resp["X-Accel-Redirect"] = accel_path
+        resp["Content-Disposition"] = f'attachment; filename="{file.name}"'
+        # Do not send a misleading Content-Length for the empty upstream body.
+        resp.headers.pop("Content-Length", None)
         return resp
 
     # ── Preview ──────────────────────────────────────────────────────────────
@@ -570,15 +608,19 @@ class DriveFileViewSet(viewsets.ModelViewSet):
         if not getattr(file, "is_previewable", False):
             return Response({"detail": "File non previewable."}, status=400)
 
-        try:
-            fp = open(file.file.path, "rb")
-        except FileNotFoundError:
-            return Response({"detail": "File non trovato su disco."}, status=404)
+        # Serve via nginx X-Accel-Redirect (inline preview)
+        rel_name = (file.file.name or "").lstrip("/")
+        p = PurePosixPath(rel_name)
+        if ".." in p.parts:
+            return Response({"detail": "Percorso file non valido."}, status=400)
 
-        mime = file.mime_type or mimetypes.guess_type(file.file.name)[0] or "application/octet-stream"
-        resp = FileResponse(fp, as_attachment=False)
-        resp["Content-Type"] = mime
+        accel_path = f"/protected_media/{rel_name}"
+        mime = file.mime_type or mimetypes.guess_type(rel_name)[0] or "application/octet-stream"
+
+        resp = HttpResponse(b"", content_type=mime)
+        resp["X-Accel-Redirect"] = accel_path
         resp["Content-Disposition"] = f'inline; filename="{file.name}"'
+        resp.headers.pop("Content-Length", None)
         return resp
 
 

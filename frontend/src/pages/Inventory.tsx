@@ -52,7 +52,7 @@ import { buildDrfListParams, includeDeletedParams } from "../api/drf";
 import type { ApiPage } from "../api/drf";
 import { useDrfList } from "../hooks/useDrfList";
 import { useToast } from "../ui/toast";
-import { apiErrorToMessage } from "../api/error";
+import { apiErrorToFieldErrors, apiErrorToMessage } from "../api/error";
 import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
 import ConfirmDeleteDialog from "../ui/ConfirmDeleteDialog";
@@ -205,6 +205,101 @@ const asId = (v: unknown): number | "" => {
 async function copyToClipboard(text: string) {
   if (!text) return;
   await navigator.clipboard.writeText(text);
+}
+
+function KNumberPlate(props: { knumber: string; digits?: number }) {
+  const { knumber, digits = 9 } = props;
+
+  // solo cifre, poi pad a sinistra
+  const clean = (knumber ?? "").replace(/\D/g, "");
+  const padded = clean.slice(-digits).padStart(digits, "0");
+
+  const blue = "#1e56ff";
+  const strokeW = 6;
+
+  const leftPad = 22;
+  const topPad = 18;
+  const gap = 10;
+  const boxW = 74;
+  const boxH = 74;
+
+  const rowW = digits * boxW + (digits - 1) * gap;
+  const frameW = leftPad * 2 + rowW;
+
+  // spazio sotto per logo
+const brandGap = 34;
+const brandSize = 36;
+
+// altezza solo per le caselle (cornice blu qui dentro)
+const boxesAreaH = topPad + boxH + 18;
+
+// testo sotto al bordo blu (fuori cornice)
+const brandY = boxesAreaH + brandGap;
+
+// altezza totale SVG (caselle + logo)
+const frameH = brandY + 28;
+
+  return (
+    <svg
+      width="100%"
+      viewBox={`0 0 ${frameW} ${frameH}`}
+      role="img"
+      aria-label={`K-Number ${padded}`}
+      style={{ display: "block", maxWidth: 980 }}
+    >
+{/* bordo blu SOLO attorno alle caselle */}
+<rect
+  x={strokeW / 2}
+  y={strokeW / 2}
+  width={frameW - strokeW}
+  height={boxesAreaH - strokeW}
+  rx="6"
+  fill="white"
+  stroke={blue}
+  strokeWidth={strokeW}
+/>
+      {/* boxes + digits */}
+      {Array.from({ length: digits }).map((_, i) => {
+        const x = leftPad + i * (boxW + gap);
+        const digit = padded[i] ?? " ";
+        return (
+          <g key={i}>
+            <rect
+              x={x}
+              y={topPad}
+              width={boxW}
+              height={boxH}
+              fill="white"
+              stroke="black"
+              strokeWidth="4"
+            />
+            <text
+              x={x + boxW / 2}
+              y={topPad + boxH / 2 + 18}
+              textAnchor="middle"
+              fontSize="52"
+              fontFamily="Arial, Helvetica, sans-serif"
+              fontWeight="800"
+              fill="black"
+            >
+              {digit}
+            </text>
+          </g>
+        );
+      })}
+
+      <text
+        x={leftPad}
+        y={brandY}
+        fontSize={brandSize}
+        fontFamily="Arial, Helvetica, sans-serif"
+        fontWeight="900"
+        fill={blue}
+      >
+        PHILIPS
+      </text>
+    </svg>
+  );
 }
 
 
@@ -394,7 +489,13 @@ export default function Inventory() {
       return { title: "Cestino vuoto", subtitle: "Non ci sono inventari eliminati." };
     }
     if (!grid.search.trim()) {
-      return { title: "Nessun inventario", subtitle: "Crea un nuovo inventario o cambia i filtri." };
+      return { title: "Nessun inventario", subtitle: "Crea un nuovo inventario o cambia i filtri.", action: (
+        <Can perm={PERMS.inventory.inventory.add}>
+          <Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}>
+            Crea inventario
+          </Button>
+        </Can>
+      ) };
     }
     return { title: "Nessun risultato", subtitle: "Prova a cambiare ricerca o filtri." };
   }, [grid.view, grid.search]);
@@ -483,7 +584,7 @@ export default function Inventory() {
     notes: "",
   });
 
-  const [formErrors, setFormErrors] = React.useState<{ customer?: string; status?: string; name?: string }>({});
+  const [formErrors, setFormErrors] = React.useState<Record<string, string | undefined>>({});
 
   // Campi disabilitati in base al tipo selezionato
   const selectedTypeKey = React.useMemo(
@@ -708,9 +809,15 @@ export default function Inventory() {
     return [...cols, actionsCol];
   }, [openDrawer, restoreBusy, deleteBusy, grid.view]);
 
+  // If opened from global Search, we can return back to the Search results on close.
+  const returnTo = React.useMemo(() => {
+    return new URLSearchParams(loc.search).get("return");
+  }, [loc.search]);
+
   const closeDrawer = () => {
     setDrawerOpen(false);
     grid.setOpenId(null);
+    if (returnTo) navigate(returnTo, { replace: true });
   };
 
   const openCreateOnceRef = React.useRef(false);
@@ -783,6 +890,7 @@ export default function Inventory() {
     });
 
     setDlgOpen(true);
+    setFormErrors({});
     await loadSitesForDialogCustomer(cust);
   };
 
@@ -843,7 +951,13 @@ export default function Inventory() {
       reloadList();
       openDrawer(id);
     } catch (e) {
-      toast.error(apiErrorToMessage(e));
+      const fe = apiErrorToFieldErrors(e);
+      if (fe) {
+        setFormErrors((prev) => ({ ...prev, ...fe } as any));
+        toast.error(fe._error || "Controlla i campi evidenziati.");
+      } else {
+        toast.error(apiErrorToMessage(e));
+      }
     } finally {
       setDlgSaving(false);
     }
@@ -1171,21 +1285,52 @@ const doRestore = async () => {
               <>
                 {/* Quick nav */}
                 <Stack direction="row" spacing={1} sx={{ flexWrap:"wrap" }}>
-                  <Button size="small" variant="outlined"
-                    onClick={() => navigate(`/customers${buildQuery({ customer: detail.customer })}`)}>
-                    Apri cliente
-                  </Button>
-                  {detail.site && (
-                    <Button size="small" variant="outlined"
-                      onClick={() => navigate(`/sites${buildQuery({ customer: detail.customer })}`)}>
-                      Apri sito
-                    </Button>
+<Button
+  size="small"
+  variant="outlined"
+  onClick={() =>
+    navigate(
+      `/customers${buildQuery({
+        open: detail.customer,
+        return: loc.pathname + loc.search,
+      })}`
+    )
+  }
+>
+  Apri cliente
+</Button>
+{detail.site && (
+  <Button
+    size="small"
+    variant="outlined"
+    onClick={() =>
+      navigate(
+        `/sites${buildQuery({
+          customer: detail.customer,
+          open: detail.site,
+          return: loc.pathname + loc.search,
+        })}`
+      )
+    }
+  >
+    Apri sito
+  </Button>
                   )}
                   <Button size="small" variant="outlined"
                     onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer, site: detail.site ?? "" })}`)}>
                     Lista filtrata
                   </Button>
                 </Stack>
+
+                {/* ── K-Number ── */}
+                {detail.knumber && (
+                  <Box sx={{ bgcolor:"#f8fafc", border:"1px solid", borderColor:"grey.200", borderRadius:2, p:1.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight:700, color:"text.disabled", letterSpacing:"0.08em", textTransform:"uppercase", display:"block", mb:1 }}>
+                      K-Number
+                    </Typography>
+                    <KNumberPlate knumber={detail.knumber} digits={9} />
+                  </Box>
+                )}
 
                 {/* ── Identificazione ── */}
                 {[detail.name, detail.knumber, detail.serial_number, detail.site_display_name || detail.site_name].some(Boolean) && (
@@ -1446,8 +1591,8 @@ const doRestore = async () => {
             />
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="K-number" value={form.knumber} onChange={(e) => setForm((f) => ({ ...f, knumber: e.target.value }))} fullWidth />
-              <TextField size="small" label="Seriale" value={form.serial_number} onChange={(e) => setForm((f) => ({ ...f, serial_number: e.target.value }))} fullWidth />
+              <TextField size="small" label="K-number" value={form.knumber} onChange={(e) => { setForm((f) => ({ ...f, knumber: e.target.value })); setFormErrors((er) => ({ ...er, knumber: undefined })); }} error={Boolean(formErrors.knumber)} helperText={(formErrors.knumber as any) || " "} fullWidth />
+              <TextField size="small" label="Seriale" value={form.serial_number} onChange={(e) => { setForm((f) => ({ ...f, serial_number: e.target.value })); setFormErrors((er) => ({ ...er, serial_number: undefined })); }} error={Boolean(formErrors.serial_number)} helperText={(formErrors.serial_number as any) || " "} fullWidth />
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>

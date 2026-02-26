@@ -14,25 +14,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
 from core.permissions import CanRestoreModelPermission
+from core.soft_delete import apply_soft_delete_filters
 from wiki.models import WikiCategory, WikiPage, WikiAttachment, WikiLink
-
-
-_TRUTHY = {"1", "true", "yes", "on"}
-
-
-def _apply_deleted_filters(qs, request, action_name: str | None = None):
-    include_deleted = (request.query_params.get("include_deleted") or "").lower()
-    only_deleted = (request.query_params.get("only_deleted") or "").lower()
-
-    # `restore` must be able to see soft-deleted objects
-    if (action_name or "") == "restore":
-        include_deleted = "1"
-
-    if only_deleted in _TRUTHY:
-        return qs.filter(deleted_at__isnull=False)
-    if include_deleted in _TRUTHY:
-        return qs
-    return qs.filter(deleted_at__isnull=True)
 
 
 def _sanitize_html(html: str) -> str:
@@ -184,7 +167,7 @@ class WikiCategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = WikiCategory.objects.all()
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
@@ -257,7 +240,7 @@ class WikiPageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = WikiPage.objects.select_related("category")
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     @action(detail=True, methods=["get"], url_path="render")
     def render_page(self, request, pk=None):
@@ -411,7 +394,7 @@ class WikiAttachmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = WikiAttachment.objects.select_related("page")
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
@@ -478,7 +461,7 @@ class WikiLinkViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = WikiLink.objects.select_related("page")
-        return _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()

@@ -12,6 +12,8 @@ from rest_framework.routers import DefaultRouter
 from audit.api import AuditEventViewSet
 from core.me_api import ChangePasswordView, MeAPIView
 
+from config.search_api import SearchAPIView
+
 from core.api import (
     CustomerStatusViewSet,
     SiteStatusViewSet,
@@ -74,6 +76,9 @@ urlpatterns = [
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
+
+    # Global search (aggregated)
+    path("api/search/", SearchAPIView.as_view()),
 
     # File upload (multipart)
     path("api/drive-files/upload/", DriveFileUploadView.as_view()),

@@ -6,6 +6,7 @@ import {
   CircularProgress,
   Drawer,
   FormControl,
+  FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
@@ -49,7 +50,7 @@ import { useDrfList } from "../hooks/useDrfList";
 import { useToast } from "../ui/toast";
 import { useAuth } from "../auth/AuthProvider";
 import { Can } from "../auth/Can";
-import { apiErrorToMessage } from "../api/error";
+import { apiErrorToFieldErrors, apiErrorToMessage } from "../api/error";
 import { buildQuery } from "../utils/nav";
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from "../utils/gridSelection";
 import ConfirmDeleteDialog from "../ui/ConfirmDeleteDialog";
@@ -439,7 +440,14 @@ export default function Sites() {
       return { title: "Cestino vuoto", subtitle: "Non ci sono siti eliminati." };
     }
     if (!grid.search.trim()) {
-      return { title: "Nessun sito", subtitle: "Crea un nuovo sito o cambia i filtri." };
+      return { title: "Nessun sito", subtitle: "Crea un nuovo sito o cambia i filtri." , action: (
+        <Can perm={PERMS.crm.site.add}>
+          <Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } } )}>
+            Crea sito
+          </Button>
+        </Can>
+      ) };
+
     }
     return { title: "Nessun risultato", subtitle: "Prova a cambiare ricerca o filtri." };
   }, [grid.view, grid.search]);
@@ -525,6 +533,7 @@ export default function Sites() {
   const [dlgMode, setDlgMode] = React.useState<"create" | "edit">("create");
   const [dlgSaving, setDlgSaving] = React.useState(false);
   const [dlgId, setDlgId] = React.useState<number | null>(null);
+  const [dlgErrors, setDlgErrors] = React.useState<Record<string, string>>({});
   const [form, setForm] = React.useState<SiteForm>({
     customer: "",
     status: "",
@@ -575,11 +584,17 @@ export default function Sites() {
     [toast, grid.includeDeleted]
   );
 
+  // If opened from global Search, we can return back to the Search results on close.
+  const returnTo = React.useMemo(() => {
+    return new URLSearchParams(loc.search).get("return");
+  }, [loc.search]);
+
   const closeDrawer = React.useCallback(() => {
     setDrawerOpen(false);
     setInvCount(null); setContactCount(null);
     grid.setOpenId(null);
-  }, [grid]);
+    if (returnTo) navigate(returnTo, { replace: true });
+  }, [grid, returnTo, navigate]);
 
   const doDelete = React.useCallback(async () => {
     if (!selectedId) return;
@@ -778,6 +793,7 @@ const doRestore = React.useCallback(async () => {
   const openCreate = () => {
     setDlgMode("create");
     setDlgId(null);
+    setDlgErrors({});
     setForm({
       customer: customerId !== "" ? customerId : "",
       status: "",
@@ -806,6 +822,7 @@ const doRestore = React.useCallback(async () => {
     if (!detail) return;
     setDlgMode("edit");
     setDlgId(detail.id);
+    setDlgErrors({});
     setForm({
       customer: (detail.customer ?? "") as any,
       status: (detail.status ?? "") as any,
@@ -823,6 +840,7 @@ const doRestore = React.useCallback(async () => {
   };
 
   const save = async () => {
+    setDlgErrors({});
     if (form.customer === "" || form.status === "" || !String(form.name).trim()) {
       toast.warning("Compila almeno Cliente, Stato e Nome.");
       return;
@@ -859,7 +877,13 @@ const doRestore = React.useCallback(async () => {
       reloadList();
       openDrawer(id);
     } catch (e) {
-      toast.error(apiErrorToMessage(e));
+      const fe = apiErrorToFieldErrors(e);
+      if (fe) {
+        setDlgErrors(fe);
+        toast.warning("Controlla i campi evidenziati.");
+      } else {
+        toast.error(apiErrorToMessage(e));
+      }
     } finally {
       setDlgSaving(false);
     }
@@ -1189,8 +1213,13 @@ const doRestore = React.useCallback(async () => {
       <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{dlgMode === "create" ? "Nuovo sito" : "Modifica sito"}</DialogTitle>
         <DialogContent>
+          {dlgErrors._error ? (
+            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+              {dlgErrors._error}
+            </Typography>
+          ) : null}
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <FormControl size="small" fullWidth>
+            <FormControl size="small" fullWidth error={Boolean(dlgErrors.customer)}>
               <InputLabel>Cliente</InputLabel>
               <Select
                 label="Cliente"
@@ -1204,9 +1233,10 @@ const doRestore = React.useCallback(async () => {
                   </MenuItem>
                 ))}
               </Select>
+              {dlgErrors.customer ? <FormHelperText>{dlgErrors.customer}</FormHelperText> : null}
             </FormControl>
 
-            <FormControl size="small" fullWidth>
+            <FormControl size="small" fullWidth error={Boolean(dlgErrors.status)}>
               <InputLabel>Stato</InputLabel>
               <Select
                 label="Stato"
@@ -1220,15 +1250,25 @@ const doRestore = React.useCallback(async () => {
                   </MenuItem>
                 ))}
               </Select>
+              {dlgErrors.status ? <FormHelperText>{dlgErrors.status}</FormHelperText> : null}
             </FormControl>
 
-            <TextField size="small" label="Nome" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} fullWidth />
+            <TextField
+              size="small"
+              label="Nome"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              error={Boolean(dlgErrors.name)}
+              helperText={dlgErrors.name || ""}
+              fullWidth
+            />
             <TextField
               size="small"
               label="Nome visualizzato"
               value={form.display_name}
               onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-              helperText="Se vuoto, verrà usato Nome."
+              error={Boolean(dlgErrors.display_name)}
+              helperText={dlgErrors.display_name || "Se vuoto, verrà usato Nome."}
               fullWidth
             />
 
@@ -1237,23 +1277,51 @@ const doRestore = React.useCallback(async () => {
               label="Indirizzo"
               value={form.address_line1}
               onChange={(e) => setForm((f) => ({ ...f, address_line1: e.target.value }))}
+              error={Boolean(dlgErrors.address_line1)}
+              helperText={dlgErrors.address_line1 || ""}
               fullWidth
             />
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="Città" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} fullWidth />
+              <TextField
+                size="small"
+                label="Città"
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                error={Boolean(dlgErrors.city)}
+                helperText={dlgErrors.city || ""}
+                fullWidth
+              />
               <TextField
                 size="small"
                 label="CAP"
                 value={form.postal_code}
                 onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))}
+                error={Boolean(dlgErrors.postal_code)}
+                helperText={dlgErrors.postal_code || ""}
                 fullWidth
               />
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-              <TextField size="small" label="Provincia" value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} fullWidth />
-              <TextField size="small" label="Paese" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} fullWidth />
+              <TextField
+                size="small"
+                label="Provincia"
+                value={form.province}
+                onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))}
+                error={Boolean(dlgErrors.province)}
+                helperText={dlgErrors.province || ""}
+                fullWidth
+              />
+              <TextField
+                size="small"
+                label="Paese"
+                value={form.country}
+                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+                error={Boolean(dlgErrors.country)}
+                helperText={dlgErrors.country || ""}
+                fullWidth
+              />
             </Stack>
 
             <CustomFieldsEditor
@@ -1262,8 +1330,23 @@ const doRestore = React.useCallback(async () => {
               onChange={(v) => setForm((f) => ({ ...f, custom_fields: v }))}
               mode="accordion"
             />
+            {dlgErrors.custom_fields ? (
+              <Typography variant="caption" color="error">
+                {dlgErrors.custom_fields}
+              </Typography>
+            ) : null}
 
-            <TextField size="small" label="Note" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} fullWidth multiline minRows={4} />
+            <TextField
+              size="small"
+              label="Note"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              error={Boolean(dlgErrors.notes)}
+              helperText={dlgErrors.notes || ""}
+              fullWidth
+              multiline
+              minRows={4}
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

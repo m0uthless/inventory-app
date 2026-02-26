@@ -6,6 +6,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+AUDIT_STRICT = os.getenv("AUDIT_STRICT", "0") == "1"
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -38,6 +40,13 @@ INSTALLED_APPS = [
 # In LAN/dev può essere comodo disattivare *solo* la verifica Origin/Referer
 # mantenendo comunque il token CSRF attivo (admin e form continuano a funzionare).
 CSRF_ALLOW_ALL_ORIGINS = os.getenv("CSRF_ALLOW_ALL_ORIGINS", "0") == "1"
+
+# Guard-rail: questa opzione è SOLO per dev/LAN. In produzione (DEBUG=0) è pericolosa.
+if CSRF_ALLOW_ALL_ORIGINS and not DEBUG:
+    raise RuntimeError(
+        "CSRF_ALLOW_ALL_ORIGINS=1 è consentito solo in dev (DJANGO_DEBUG=1). "
+        "Disattivalo e usa CSRF_TRUSTED_ORIGINS per gli origin autorizzati."
+    )
 CSRF_MIDDLEWARE = (
     "core.middleware.CsrfAllowAllOriginsMiddleware"
     if CSRF_ALLOW_ALL_ORIGINS

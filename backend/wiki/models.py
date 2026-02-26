@@ -26,6 +26,7 @@ class WikiPage(TimeStampedModel):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     category = models.ForeignKey(WikiCategory, on_delete=models.PROTECT, null=True, blank=True, related_name="pages")
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="children")
 
     summary = models.TextField(null=True, blank=True)
     tags = ArrayField(models.TextField(), null=True, blank=True)

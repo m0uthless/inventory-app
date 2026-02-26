@@ -6,6 +6,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 
 from custom_fields.models import CustomFieldDefinition
+from core.soft_delete import TRUTHY, apply_soft_delete_filters
 
 
 class CustomFieldDefinitionSerializer(serializers.ModelSerializer):
@@ -75,22 +76,11 @@ class CustomFieldDefinitionViewSet(viewsets.ModelViewSet):
         if entity:
             qs = qs.filter(entity=entity)
 
-        truthy = {"1", "true", "yes", "on"}
         active = (self.request.query_params.get("is_active") or "").lower()
-        if active in truthy:
+        if active in TRUTHY:
             qs = qs.filter(is_active=True)
 
-        include_deleted = (self.request.query_params.get("include_deleted") or "").lower()
-        only_deleted = (self.request.query_params.get("only_deleted") or "").lower()
-
-        if getattr(self, "action", "") == "restore":
-            include_deleted = "1"
-
-        if only_deleted in truthy:
-            return qs.filter(deleted_at__isnull=False)
-        if include_deleted in truthy:
-            return qs
-        return qs.filter(deleted_at__isnull=True)
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
         # soft-delete, to be consistent with the rest of the app

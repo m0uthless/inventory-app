@@ -32,10 +32,7 @@ export default function Login() {
         <CardContent>
           <Stack spacing={2}>
             <Box>
-              <Typography variant="h5">Login</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Accedi con utente Django (session).
-              </Typography>
+              <Typography variant="h5" align="center">Login</Typography>
             </Box>
 
             <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />

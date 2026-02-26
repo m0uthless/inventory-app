@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import logging
 from typing import Any
 
+
+logger = logging.getLogger(__name__)
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from rest_framework.request import Request
@@ -154,6 +158,7 @@ def log_event(
     changes: dict[str, Any] | None = None,
     request: Request | None = None,
     metadata: dict[str, Any] | None = None,
+    subject: str | None = None,
 ):
     """Create an AuditEvent row.
 
@@ -166,22 +171,33 @@ def log_event(
     if metadata:
         meta.update(metadata)
 
-    AuditEvent.objects.create(
-        actor=actor if getattr(actor, "is_authenticated", False) else None,
-        action=action,
-        content_type=ct,
-        object_id=str(getattr(instance, "pk", "")) if instance is not None else "",
-        object_repr=str(instance) if instance is not None else "",
-        changes=changes or {},
-        metadata=meta,
-    )
+    try:
+        AuditEvent.objects.create(
+            actor=actor if getattr(actor, "is_authenticated", False) else None,
+            action=action,
+            content_type=ct,
+            object_id=str(getattr(instance, "pk", "")) if instance is not None else "",
+            object_repr=str(instance) if instance is not None else "",
+            subject=(subject or ""),
+            changes=changes or {},
+            metadata=meta,
+        )
+    except Exception:
+        if getattr(settings, "AUDIT_STRICT", False):
+            raise
+        logger.exception("Audit log_event failed", extra={"action": action, "object_id": str(getattr(instance, "pk", "")) if instance is not None else ""})
 
 
 def log_auth_attempt(username: str, success: bool, request: Request | None = None):
     meta = _request_metadata(request)
-    AuthAttempt.objects.create(
-        username=username,
-        success=success,
-        ip=meta.get("ip"),
-        user_agent=meta.get("user_agent"),
-    )
+    try:
+        AuthAttempt.objects.create(
+            username=username,
+            success=success,
+            ip=meta.get("ip"),
+            user_agent=meta.get("user_agent"),
+        )
+    except Exception:
+        if getattr(settings, "AUDIT_STRICT", False):
+            raise
+        logger.exception("Audit log_auth_attempt failed", extra={"username": username, "success": success})
