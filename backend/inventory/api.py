@@ -1,21 +1,25 @@
 from django.utils import timezone
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import Exists, F, OuterRef
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import serializers, status, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
 from crm.models import Site
 from inventory.models import Inventory
-from audit.utils import log_event, to_change_value_for_field, to_primitive
-from custom_fields.validation import normalize_and_validate_custom_fields
+from audit.utils import log_event, to_change_value_for_field
+from issues.models import Issue, IssueStatus
 from core.soft_delete import apply_soft_delete_filters
 from core.crypto import decrypt
 from core.integrity import raise_integrity_error_as_validation
+from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
+from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin
+from core.purge_policy import try_purge_instance
+from core.restore_policy import get_restore_block_reason, split_restorable
 
 
 class DecryptedSecretField(serializers.CharField):
@@ -35,6 +39,19 @@ class SecretsPermissionMixin:
 
     _secret_fields = ("os_pwd", "app_pwd", "vnc_pwd")
 
+    def _secret_fields_present_in_input(self):
+        incoming = getattr(self, "initial_data", None)
+        if not incoming or not hasattr(incoming, "keys"):
+            return []
+        return [field for field in self._secret_fields if field in incoming]
+
+    def enforce_secret_write_permission(self) -> None:
+        secret_fields_attempted = self._secret_fields_present_in_input()
+        if secret_fields_attempted and not self._can_view_secrets():
+            raise PermissionDenied(
+                f"Non hai i permessi per modificare campi sensibili: {', '.join(secret_fields_attempted)}."
+            )
+
     def _can_view_secrets(self) -> bool:
         request = self.context.get("request") if hasattr(self, "context") else None
         user = getattr(request, "user", None)
@@ -50,10 +67,14 @@ class SecretsPermissionMixin:
 
 
 class InventoryListSerializer(serializers.ModelSerializer):
+    customer = serializers.IntegerField(source="customer_id", read_only=True)
     customer_code = serializers.CharField(source="customer.code", read_only=True)
+    has_active_issue = serializers.BooleanField(read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
 
+    site = serializers.IntegerField(source="site_id", read_only=True)
     site_name = serializers.CharField(source="site.name", read_only=True)
+    site_display_name = serializers.CharField(source="site.display_name", read_only=True)
 
     status_label = serializers.CharField(source="status.label", read_only=True)
 
@@ -64,9 +85,13 @@ class InventoryListSerializer(serializers.ModelSerializer):
         model = Inventory
         fields = [
             "id",
+            "customer",
             "customer_code",
             "customer_name",
+            "site",
             "site_name",
+            "site_display_name",
+            "name",
             "hostname",
             "knumber",
             "serial_number",
@@ -77,11 +102,14 @@ class InventoryListSerializer(serializers.ModelSerializer):
             "srsa_ip",
             "updated_at",
             "deleted_at",
+            "has_active_issue",
         ]
 
 
-class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSerializer):
+class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMixin, serializers.ModelSerializer):
+    custom_fields_entity = "inventory"
     customer_code = serializers.CharField(source="customer.code", read_only=True)
+    has_active_issue = serializers.BooleanField(read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
 
     site_name = serializers.CharField(source="site.name", read_only=True)
@@ -144,6 +172,7 @@ class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSeriali
             "created_at",
             "updated_at",
             "deleted_at",
+            "has_active_issue",
         ]
         extra_kwargs = {
             # REQUIRED via API
@@ -153,6 +182,8 @@ class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSeriali
 
     def validate(self, attrs):
         """Required fields + consistency + custom_fields validation."""
+        self.enforce_secret_write_permission()
+
         # Normalize common "empty string" inputs coming from forms/CSV/imports.
         # These fields are nullable and have conditional unique constraints; keeping
         # them as "" would accidentally trigger uniqueness violations.
@@ -198,26 +229,8 @@ class InventoryDetailSerializer(SecretsPermissionMixin, serializers.ModelSeriali
             if qs.exists():
                 raise serializers.ValidationError({"knumber": "K-number già presente su un inventario attivo."})
 
-        # Validate / normalize custom_fields based on definitions
-        if self.instance is None:
-            incoming_cf = attrs.get("custom_fields", {})
-            normalized_cf = normalize_and_validate_custom_fields(
-                entity="inventory",
-                incoming=incoming_cf if incoming_cf is not None else {},
-                existing=None,
-                partial=False,
-            )
-            attrs["custom_fields"] = normalized_cf
-        elif "custom_fields" in attrs:
-            incoming_cf = attrs.get("custom_fields")
-            normalized_cf = normalize_and_validate_custom_fields(
-                entity="inventory",
-                incoming=incoming_cf if incoming_cf is not None else {},
-                existing=getattr(self.instance, "custom_fields", None) or {},
-                partial=bool(getattr(self, "partial", False)),
-            )
-            attrs["custom_fields"] = normalized_cf
-
+        # custom_fields: delegato a CustomFieldsValidationMixin.validate()
+        attrs = super().validate(attrs)
         return attrs
 
 
@@ -232,16 +245,7 @@ class InventoryWriteSerializer(InventoryDetailSerializer):
         }
 
 
-class CanRestoreInventory(BasePermission):
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.has_perm("inventory.change_inventory")
-        )
-
-
-class InventoryViewSet(viewsets.ModelViewSet):
+class InventoryViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = InventoryWriteSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -283,6 +287,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
         "status__label",
     ]
     ordering = ["hostname"]
+    purge_permission = "inventory.delete_inventory"
 
     def get_serializer_class(self):
         # list: lightweight (no secrets), retrieve: full (includes secrets), write: secrets write-only
@@ -321,69 +326,32 @@ class InventoryViewSet(viewsets.ModelViewSet):
             )
 
 
-    def _changes_from_validated(self, instance, validated):
-        changes = {}
-        for k, v in (validated or {}).items():
-            before_raw = getattr(instance, k, None)
-            after_raw = v
-            if to_primitive(before_raw) != to_primitive(after_raw):
-                changes[k] = {
-                    "from": to_change_value_for_field(k, before_raw),
-                    "to": to_change_value_for_field(k, after_raw),
-                }
-        return changes
-
-    def perform_create(self, serializer):
-        instance = serializer.save(created_by=self.request.user, updated_by=self.request.user)
-        changes = {
-            k: {"from": None, "to": to_change_value_for_field(k, v)}
-            for k, v in (serializer.validated_data or {}).items()
-        }
-        log_event(actor=self.request.user, action="create", instance=instance, changes=changes, request=self.request)
-
-    def perform_update(self, serializer):
-        instance_before = serializer.instance
-        changes = self._changes_from_validated(instance_before, serializer.validated_data)
-        instance = serializer.save(updated_by=self.request.user)
-        log_event(actor=self.request.user, action="update", instance=instance, changes=changes or None, request=self.request)
-
-
     def get_queryset(self):
         qs = Inventory.objects.select_related("customer", "site", "status", "type")
 
         # Aliases for frontend ordering fields
+        active_issue_qs = Issue.objects.filter(
+            inventory_id=OuterRef("pk"),
+            deleted_at__isnull=True,
+            status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS],
+        )
+
         qs = qs.annotate(
             customer_name=F("customer__name"),
             site_name=F("site__name"),
             type_label=F("type__label"),
             status_label=F("status__label"),
+            has_active_issue=Exists(active_issue_qs),
         )
 
-        qs = apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
-        # filtro customer via querystring
-        customer = self.request.query_params.get("customer")
-        if customer:
-            qs = qs.filter(customer_id=customer)
-
-        return qs
-
-    def perform_destroy(self, instance):
-        before = getattr(instance, 'deleted_at', None)
-        instance.deleted_at = timezone.now()
-        instance.updated_by = self.request.user
-        instance.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-        changes = {
-            'deleted_at': {
-                'from': to_change_value_for_field('deleted_at', before),
-                'to': to_change_value_for_field('deleted_at', instance.deleted_at),
-            }
-        }
-        log_event(actor=self.request.user, action='delete', instance=instance, changes=changes, request=self.request)
-
-    @action(detail=True, methods=['post'], permission_classes=[CanRestoreInventory])
+    @action(detail=True, methods=['post'], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         inv = self.get_object()
+        reason = get_restore_block_reason(inv)
+        if reason:
+            return Response({'detail': reason}, status=status.HTTP_409_CONFLICT)
         before = getattr(inv, 'deleted_at', None)
         inv.deleted_at = None
         inv.updated_by = request.user
@@ -396,7 +364,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
         }
         log_event(actor=request.user, action='restore', instance=inv, changes=changes, request=request)
         return Response(status=status.HTTP_204_NO_CONTENT)
-    @action(detail=False, methods=['post'], permission_classes=[CanRestoreInventory])
+    @action(detail=False, methods=['post'], permission_classes=[CanRestoreModelPermission])
     def bulk_restore(self, request):
         """Restore multiple soft-deleted inventory records.
         Body: {"ids": [1,2,3]} (or a raw list).
@@ -406,21 +374,66 @@ class InventoryViewSet(viewsets.ModelViewSet):
         if not isinstance(ids, list) or not ids:
             return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = Inventory.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored = []
-        for inv in qs:
-            before = getattr(inv, 'deleted_at', None)
-            inv.deleted_at = None
-            inv.updated_by = request.user
-            inv.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-            changes = {
-                'deleted_at': {
-                    'from': to_change_value_for_field('deleted_at', before),
-                    'to': None,
-                }
-            }
-            log_event(actor=request.user, action='restore', instance=inv, changes=changes, request=request)
-            restored.append(inv.id)
+        qs = list(Inventory.objects.select_related('customer', 'site').filter(id__in=ids, deleted_at__isnull=False))
+        restorable, blocked = split_restorable(qs)
+        restored_ids = [obj.id for obj in restorable]
+        if restored_ids:
+            now = timezone.now()
+            Inventory.objects.filter(id__in=restored_ids).update(
+                deleted_at=None,
+                updated_by=request.user,
+                updated_at=now,
+            )
 
-        return Response({'restored': restored, 'count': len(restored)}, status=status.HTTP_200_OK)
+        # Log a single audit event (content_type is nullable by design when instance=None).
+        log_event(
+            actor=request.user,
+            action='restore',
+            instance=None,
+            changes={'ids': restored_ids},
+            request=request,
+            subject=f"bulk restore Inventory: {restored_ids}",
+        )
+
+        return Response({'restored': restored_ids, 'count': len(restored_ids), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[CanPurgeModelPermission])
+    def purge(self, request, pk=None):
+        inv = Inventory.objects.filter(pk=pk, deleted_at__isnull=False).first()
+        if inv is None:
+            return Response({'detail': 'Elemento non trovato nel cestino.'}, status=status.HTTP_404_NOT_FOUND)
+        ok, reason, blockers = try_purge_instance(inv)
+        if not ok:
+            return Response({'detail': reason, 'blocked': blockers}, status=status.HTTP_409_CONFLICT)
+        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True}, subject=f'purge Inventory #{pk}')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['post'], permission_classes=[CanPurgeModelPermission])
+    def bulk_purge(self, request):
+        payload = request.data
+        ids = payload.get('ids') if isinstance(payload, dict) else payload
+        if not isinstance(ids, list) or not ids:
+            return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        purged = []
+        blocked = []
+        for obj in Inventory.objects.filter(id__in=ids, deleted_at__isnull=False):
+            obj_id = obj.id
+            ok, reason, blockers = try_purge_instance(obj)
+            if ok:
+                purged.append(obj_id)
+            else:
+                blocked.append({'id': obj.id, 'reason': reason, 'blocked': blockers})
+
+        log_event(
+            actor=request.user,
+            action='delete',
+            instance=None,
+            changes={'ids': purged},
+            request=request,
+            metadata={'purge': True, 'blocked_count': len(blocked)},
+            subject=f'bulk purge Inventory: {purged}',
+        )
+
+        return Response({'purged': purged, 'count': len(purged), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
 

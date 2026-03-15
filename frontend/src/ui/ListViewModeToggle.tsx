@@ -1,88 +1,65 @@
-import {
-  Box,
-  ToggleButton,
-  ToggleButtonGroup,
-  type SxProps,
-  type Theme,
-} from "@mui/material";
+import { ToggleButton, ToggleButtonGroup, type SxProps, type Theme } from '@mui/material'
 
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 
-import type { ListViewMode } from "../hooks/useServerGrid";
+import type { ListViewMode } from '../hooks/useServerGrid'
 
 type Props = {
-  value: ListViewMode;
-  onChange: (v: ListViewMode) => void;
-  sx?: SxProps<Theme>;
-};
+  value: ListViewMode
+  onChange: (v: ListViewMode) => void
+  sx?: SxProps<Theme>
+  compact?: boolean
+}
 
-/**
- * Shared list view mode selector:
- * - Attivi / Tutti / Cestino
- */
-export default function ListViewModeToggle({ value, onChange, sx }: Props) {
+export default function ListViewModeToggle({ value, onChange, sx, compact = false }: Props) {
+  const baseSx: SxProps<Theme> = {
+    // Altezza 32px come tutti gli altri elementi della toolbar
+    '& .MuiToggleButtonGroup-grouped': {
+      textTransform: 'none',
+      px: compact ? 1.35 : 1.25,
+      py: 0,
+      height: compact ? 40 : 32,
+      fontSize: compact ? '0.9rem' : '0.8125rem',
+      lineHeight: 1,
+      whiteSpace: 'nowrap',
+      gap: 0.75,
+    },
+    '& .MuiToggleButtonGroup-grouped:first-of-type': {
+      borderTopLeftRadius: 16,
+      borderBottomLeftRadius: 16,
+    },
+    '& .MuiToggleButtonGroup-grouped:last-of-type': {
+      borderTopRightRadius: 16,
+      borderBottomRightRadius: 16,
+    },
+  }
+
+  const mergedSx: SxProps<Theme> = sx
+    ? Array.isArray(sx) ? [baseSx, ...sx] : [baseSx, sx]
+    : baseSx
+
   return (
     <ToggleButtonGroup
       size="small"
       value={value}
       exclusive
-      onChange={(_e, v) => {
-        if (!v) return;
-        onChange(v);
-      }}
-      sx={{
-        borderRadius: 2,
-        bgcolor: "rgba(0,0,0,0.015)",
-        "& .MuiToggleButtonGroup-grouped": {
-          borderRadius: 0,
-          textTransform: "none",
-          px: 1.25,
-          // Avoid clipped glyphs on some browsers / font renderers.
-          py: 0.5,
-          minHeight: 34,
-          lineHeight: 1.1,
-        },
-        "& .MuiToggleButtonGroup-grouped:first-of-type": {
-          borderTopLeftRadius: 16,
-          borderBottomLeftRadius: 16,
-        },
-        "& .MuiToggleButtonGroup-grouped:last-of-type": {
-          borderTopRightRadius: 16,
-          borderBottomRightRadius: 16,
-        },
-        "& .MuiToggleButton-root": {
-          gap: 0.75,
-          whiteSpace: "nowrap",
-        },
-        ...((sx as any) || {}),
-      }}
+      onChange={(_e, v) => { if (!v) return; onChange(v) }}
+      sx={mergedSx}
     >
       <ToggleButton value="active">
-        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-          <CheckCircleOutlineIcon fontSize="small" />
-          <Box component="span" sx={{ lineHeight: 1.1 }}>
-            Attivi
-          </Box>
-        </Box>
+        <CheckCircleOutlineIcon sx={{ fontSize: 15 }} />
+        Attivi
       </ToggleButton>
       <ToggleButton value="all">
-        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-          <ViewListOutlinedIcon fontSize="small" />
-          <Box component="span" sx={{ lineHeight: 1.1 }}>
-            Tutti
-          </Box>
-        </Box>
+        <ViewListOutlinedIcon sx={{ fontSize: 15 }} />
+        Tutti
       </ToggleButton>
       <ToggleButton value="deleted">
-        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-          <DeleteOutlineIcon fontSize="small" />
-          <Box component="span" sx={{ lineHeight: 1.1 }}>
-            Cestino
-          </Box>
-        </Box>
+        <DeleteOutlineIcon sx={{ fontSize: 15 }} />
+        Cestino
       </ToggleButton>
     </ToggleButtonGroup>
-  );
+  )
 }

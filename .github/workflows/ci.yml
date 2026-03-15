@@ -6,6 +6,36 @@ on:
   pull_request:
 
 jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Frontend unit tests (Vitest)
+        run: npm run test:run
+
+      - name: Frontend build
+        run: npm run build
+
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -16,6 +46,9 @@ jobs:
 
       - name: Build images
         run: docker compose build
+
+      - name: Static type check (mypy)
+        run: docker compose run --rm backend python -m mypy --config-file mypy.ini .
 
       - name: Start database
         run: docker compose up -d db
@@ -37,6 +70,11 @@ jobs:
           docker compose run --rm backend python manage.py check
           docker compose run --rm backend python manage.py makemigrations --check --dry-run
           docker compose run --rm backend python manage.py migrate --plan
+
+      - name: Run backend tests (pytest)
+        run: |
+          docker compose run --rm backend python manage.py migrate
+          docker compose run --rm backend pytest -q
 
       - name: Tear down
         if: always()

@@ -19,5 +19,13 @@ else
   echo "[entrypoint] Skipping collectstatic (RUN_COLLECTSTATIC!=1)."
 fi
 
+# Production deploy checks (security/settings sanity)
+if [ "${DJANGO_RUN_DEPLOY_CHECK:-0}" = "1" ]; then
+  echo "[entrypoint] Running django deploy checks..."
+  python manage.py check --deploy --fail-level WARNING
+else
+  echo "[entrypoint] Skipping deploy checks (DJANGO_RUN_DEPLOY_CHECK!=1)."
+fi
+
 # Start app server
 exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers "${GUNICORN_WORKERS:-4}" --timeout "${GUNICORN_TIMEOUT:-120}"

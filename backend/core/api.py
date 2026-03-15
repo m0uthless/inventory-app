@@ -1,6 +1,30 @@
 from rest_framework import serializers, viewsets
+from django.contrib.auth import get_user_model
 
 from core.models import CustomerStatus, SiteStatus, InventoryStatus, InventoryType
+
+User = get_user_model()
+
+
+# ─── Users (read-only, per dropdown assegnazione) ────────────────────────────
+
+class UserListSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+
+    class Meta:
+        model  = User
+        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active"]
+
+
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = UserListSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return User.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
 
 
 class CustomerStatusLookupSerializer(serializers.ModelSerializer):

@@ -1,4 +1,4 @@
-import * as React from "react";
+import * as React from 'react'
 import {
   Box,
   CircularProgress,
@@ -8,53 +8,53 @@ import {
   ListItemText,
   Stack,
   Typography,
-} from "@mui/material";
-import { useNavigate } from "react-router-dom";
+} from '@mui/material'
+import { useNavigate } from 'react-router-dom'
 
-import { buildDrfListParams } from "../api/drf";
-import { apiErrorToMessage } from "../api/error";
-import { useDrfList } from "../hooks/useDrfList";
-import { buildQuery } from "../utils/nav";
-import { useToast } from "./toast";
-import AuditActionChip from "./AuditActionChip";
-import type { AuditEventRow } from "../types/audit";
+import { buildDrfListParams } from '../api/drf'
+import { apiErrorToMessage } from '../api/error'
+import { useDrfList } from '../hooks/useDrfList'
+import { buildQuery } from '../utils/nav'
+import { useToast } from './toast'
+import AuditActionChip from './AuditActionChip'
+import type { AuditEventRow } from '../types/audit'
 
 function fmt(ts?: string | null) {
-  if (!ts) return "—";
-  const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return ts;
-  return d.toLocaleString();
+  if (!ts) return '—'
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return ts
+  return d.toLocaleString()
 }
 
 export default function AuditEventsMiniList(props: {
-  appLabel: string;
-  model: string;
-  objectId: number | string;
-  limit?: number;
-  emptyLabel?: string;
+  appLabel: string
+  model: string
+  objectId: number | string
+  limit?: number
+  emptyLabel?: string
 }) {
-  const { appLabel, model, objectId, limit = 15, emptyLabel = "Nessuna attività" } = props;
-  const toast = useToast();
-  const nav = useNavigate();
+  const { appLabel, model, objectId, limit = 15, emptyLabel = 'Nessuna attività' } = props
+  const toast = useToast()
+  const nav = useNavigate()
 
   const params = React.useMemo(
     () =>
       buildDrfListParams({
         page0: 0,
         pageSize: limit,
-        ordering: "-created_at",
+        ordering: '-created_at',
         extra: {
           app_label: appLabel,
           model,
           object_id: String(objectId),
         },
       }),
-    [appLabel, model, objectId, limit]
-  );
+    [appLabel, model, objectId, limit],
+  )
 
-  const { rows, loading } = useDrfList<AuditEventRow>("/audit-events/", params, (e: unknown) =>
-    toast.error(apiErrorToMessage(e))
-  );
+  const { rows, loading } = useDrfList<AuditEventRow>('/audit-events/', params, (e: unknown) =>
+    toast.error(apiErrorToMessage(e)),
+  )
 
   if (loading) {
     return (
@@ -64,7 +64,7 @@ export default function AuditEventsMiniList(props: {
           Caricamento…
         </Typography>
       </Stack>
-    );
+    )
   }
 
   if (!rows.length) {
@@ -72,18 +72,18 @@ export default function AuditEventsMiniList(props: {
       <Typography variant="body2" sx={{ opacity: 0.7, py: 0.5 }}>
         {emptyLabel}
       </Typography>
-    );
+    )
   }
 
   return (
     <List
       dense
       disablePadding
-      sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}
+      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
     >
       {rows.map((ev, idx) => {
-        const primary = ev.subject || ev.object_repr || `#${ev.object_id ?? ""}`;
-        const secondary = [fmt(ev.created_at), ev.actor_username || ""].filter(Boolean).join(" • ");
+        const primary = ev.subject || ev.object_repr || `#${ev.object_id ?? ''}`
+        const secondary = [fmt(ev.created_at), ev.actor_username || ''].filter(Boolean).join(' • ')
         return (
           <ListItem key={ev.id} disablePadding divider={idx < rows.length - 1}>
             <ListItemButton
@@ -94,7 +94,7 @@ export default function AuditEventsMiniList(props: {
                     model,
                     object_id: String(objectId),
                     open: ev.id,
-                  })}`
+                  })}`,
                 )
               }
               sx={{ py: 1 }}
@@ -115,8 +115,8 @@ export default function AuditEventsMiniList(props: {
               />
             </ListItemButton>
           </ListItem>
-        );
+        )
       })}
     </List>
-  );
+  )
 }

@@ -17,6 +17,7 @@ In production you should configure `CSRF_TRUSTED_ORIGINS` properly instead.
 from __future__ import annotations
 
 from django.conf import settings
+from django.http import HttpRequest
 from django.middleware.csrf import CsrfViewMiddleware
 
 
@@ -29,12 +30,12 @@ class CsrfAllowAllOriginsMiddleware(CsrfViewMiddleware):
             and getattr(settings, "CSRF_ALLOW_ALL_ORIGINS", False)
         )
 
-    def _origin_verified(self, request) -> bool:  # type: ignore[override]
+    def _origin_verified(self, request: HttpRequest) -> bool:
         if self._should_relax():
             return True
         return super()._origin_verified(request)
 
-    def _check_referer(self, request) -> None:  # type: ignore[override]
+    def _check_referer(self, request: HttpRequest) -> None:
         if self._should_relax():
-            return None
-        return super()._check_referer(request)
+            return
+        super()._check_referer(request)

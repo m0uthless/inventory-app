@@ -1,17 +1,17 @@
-import { Box, Divider, Link, Stack, Typography } from "@mui/material";
+import { Box, Divider, Link, Stack, Typography } from '@mui/material'
 
 export default function AppFooter() {
-  const year = new Date().getFullYear();
-  const version = import.meta.env.VITE_APP_VERSION ?? "dev";
+  const year = new Date().getFullYear()
+  const version = import.meta.env.VITE_APP_VERSION ?? 'dev'
 
   return (
     <Box component="footer" sx={{ mt: 2 }}>
       <Divider />
       <Box sx={{ py: 1.25, px: { xs: 2, md: 3 } }}>
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          direction={{ xs: 'column', sm: 'row' }}
           spacing={{ xs: 0.5, sm: 2 }}
-          alignItems={{ sm: "center" }}
+          alignItems={{ sm: 'center' }}
           justifyContent="space-between"
         >
           <Typography variant="caption" color="text.secondary">
@@ -34,5 +34,5 @@ export default function AppFooter() {
         </Stack>
       </Box>
     </Box>
-  );
+  )
 }

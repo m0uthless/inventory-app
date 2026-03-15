@@ -6,7 +6,9 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 
 from custom_fields.models import CustomFieldDefinition
+from audit.utils import log_event, to_change_value_for_field
 from core.soft_delete import TRUTHY, apply_soft_delete_filters
+from core.restore_actions import SoftDeleteRestoreActionsMixin
 
 
 class CustomFieldDefinitionSerializer(serializers.ModelSerializer):
@@ -55,16 +57,8 @@ class CustomFieldDefinitionPermission(BasePermission):
         return False
 
 
-class CanRestoreCustomFieldDefinition(BasePermission):
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.has_perm("custom_fields.change_customfielddefinition")
-        )
-
-
-class CustomFieldDefinitionViewSet(viewsets.ModelViewSet):
+class CustomFieldDefinitionViewSet(SoftDeleteRestoreActionsMixin, viewsets.ModelViewSet):
+    restore_permission = "custom_fields.change_customfielddefinition"
     queryset = CustomFieldDefinition.objects.all()
     serializer_class = CustomFieldDefinitionSerializer
     permission_classes = [CustomFieldDefinitionPermission]
@@ -83,32 +77,19 @@ class CustomFieldDefinitionViewSet(viewsets.ModelViewSet):
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_destroy(self, instance):
-        # soft-delete, to be consistent with the rest of the app
+        before = instance.deleted_at
         instance.deleted_at = timezone.now()
         instance.save(update_fields=["deleted_at", "updated_at"])
-
-    @action(detail=True, methods=["post"], permission_classes=[CanRestoreCustomFieldDefinition])
-    def restore(self, request, pk=None):
-        obj = self.get_object()
-        obj.deleted_at = None
-        obj.save(update_fields=["deleted_at", "updated_at"])
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    @action(detail=False, methods=["post"], permission_classes=[CanRestoreCustomFieldDefinition])
-    def bulk_restore(self, request):
-        """Restore multiple soft-deleted custom field definitions.
-        Body: {"ids": [1,2,3]} (or a raw list).
-        """
-        payload = request.data
-        ids = payload.get("ids") if isinstance(payload, dict) else payload
-        if not isinstance(ids, list) or not ids:
-            return Response({"detail": "ids must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
-
-        qs = CustomFieldDefinition.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-
-        return Response({"restored": restored, "count": len(restored)}, status=status.HTTP_200_OK)
+        log_event(
+            actor=self.request.user,
+            action="delete",
+            instance=instance,
+            changes={
+                "deleted_at": {
+                    "from": to_change_value_for_field("deleted_at", before),
+                    "to":   to_change_value_for_field("deleted_at", instance.deleted_at),
+                }
+            },
+            request=self.request,
+        )
 

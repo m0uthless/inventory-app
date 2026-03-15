@@ -1,18 +1,24 @@
+# mypy: disable-error-code=annotation-unchecked
 import calendar
 from datetime import date, timedelta
 
+from django.db.models import OuterRef, Subquery, Count
 from django.utils import timezone
 
 from rest_framework import serializers, viewsets
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
 from core.models import InventoryType
-from core.permissions import CanRestoreModelPermission
+from core.permissions import CanRestoreModelPermission, CanPurgeModelPermission
+from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin
 from core.soft_delete import apply_soft_delete_filters
+from core.purge_policy import try_purge_instance
+from core.restore_policy import get_restore_block_reason, split_restorable
+from audit.utils import log_event
 from maintenance.models import (
     Tech,
     MaintenancePlan,
@@ -92,7 +98,7 @@ class TechSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}".strip()
 
 
-class TechViewSet(viewsets.ModelViewSet):
+class TechViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = TechSerializer
     filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -101,20 +107,35 @@ class TechViewSet(viewsets.ModelViewSet):
     ordering_fields   = ["last_name", "first_name", "updated_at", "created_at", "deleted_at"]
     ordering          = ["last_name", "first_name"]
 
+    # Tech non ha created_by/updated_by sul modello: override per non passarli.
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
+
     def get_queryset(self):
         return apply_soft_delete_filters(
             Tech.objects.all(), request=self.request, action_name=getattr(self, "action", "")
         )
 
-    def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=["deleted_at"])
+    # MaintenanceNotification non ha created_by/updated_by: override senza userstamp.
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
 
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
         obj.deleted_at = None
-        obj.save(update_fields=["deleted_at"])
+        obj.save(update_fields=["deleted_at", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
@@ -123,20 +144,26 @@ class TechViewSet(viewsets.ModelViewSet):
         ids = payload.get("ids") if isinstance(payload, dict) else payload
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
-        qs = Tech.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-        return Response({"restored": restored, "count": len(restored)}, status=200)
+        now = timezone.now()
+        restored_ids = list(
+            Tech.objects.filter(id__in=ids, deleted_at__isnull=False)
+            .values_list("id", flat=True)
+        )
+        Tech.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore Tech: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Plans
 # ─────────────────────────────────────────────────────────────────────────────
 
-class MaintenancePlanSerializer(serializers.ModelSerializer):
+class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
+    custom_fields_entity = "maintenance_plan"
     customer_code = serializers.CharField(source="customer.code",    read_only=True)
     customer_name = serializers.CharField(source="customer.name",    read_only=True)
 
@@ -147,21 +174,16 @@ class MaintenancePlanSerializer(serializers.ModelSerializer):
     )
     inventory_type_labels = serializers.SerializerMethodField()
 
-    # Quanti inventory attivi del cliente sono coperti da questo piano
-    covered_count = serializers.SerializerMethodField()
+    # Quanti inventory attivi del cliente sono coperti da questo piano.
+    # Valore annotato in get_queryset() — zero query aggiuntive per riga.
+    covered_count = serializers.IntegerField(read_only=True)
 
-    # Data dell'ultimo rapportino eseguito (derivata dagli eventi)
-    last_done_date = serializers.SerializerMethodField()
+    # Data dell'ultimo rapportino eseguito (derivata dagli eventi).
+    # Valore annotato in get_queryset() — zero query aggiuntive per riga.
+    last_done_date = serializers.DateField(read_only=True, allow_null=True)
 
     def get_inventory_type_labels(self, obj):
         return list(obj.inventory_types.values_list("label", flat=True))
-
-    def get_covered_count(self, obj):
-        return obj.covered_inventories().count()
-
-    def get_last_done_date(self, obj):
-        last = obj.events.filter(deleted_at__isnull=True).order_by("-performed_at").first()
-        return str(last.performed_at) if last else None
 
     class Meta:
         model  = MaintenancePlan
@@ -191,7 +213,7 @@ class MaintenancePlanSerializer(serializers.ModelSerializer):
         ]
 
 
-class MaintenancePlanViewSet(viewsets.ModelViewSet):
+class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = MaintenancePlanSerializer
     filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -205,10 +227,39 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
     ordering         = ["next_due_date", "title"]
 
     def get_queryset(self):
+        from inventory.models import Inventory
+
+        # Subquery: data dell'ultimo MaintenanceEvent per piano (ordine desc performed_at).
+        last_event_sq = (
+            MaintenanceEvent.objects
+            .filter(plan=OuterRef("pk"), deleted_at__isnull=True)
+            .order_by("-performed_at")
+            .values("performed_at")[:1]
+        )
+
+        # Subquery: conteggio inventory attivi coperti dal piano.
+        # covered_inventories() usa inventory_types M2M; lo riscriviamo come
+        # annotazione scalare per evitare N+1 (una query per piano nella lista).
+        covered_sq = (
+            Inventory.objects
+            .filter(
+                customer=OuterRef("customer"),
+                type__in=OuterRef("inventory_types"),
+                deleted_at__isnull=True,
+            )
+            .values("customer")          # raggruppa per evitare duplicati M2M
+            .annotate(n=Count("id"))
+            .values("n")[:1]
+        )
+
         qs = (
             MaintenancePlan.objects
             .select_related("customer")
             .prefetch_related("inventory_types")
+            .annotate(
+                last_done_date=Subquery(last_event_sq),
+                covered_count=Subquery(covered_sq),
+            )
         )
 
         # Filtro per tipo inventario (multi: ?inventory_type=1&inventory_type=2)
@@ -228,15 +279,24 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
-    def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=["deleted_at"])
+    # MaintenancePlan non ha created_by/updated_by sul modello: override senza userstamp.
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
 
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
+        reason = get_restore_block_reason(obj)
+        if reason:
+            return Response({"detail": reason}, status=409)
         obj.deleted_at = None
-        obj.save(update_fields=["deleted_at"])
+        obj.save(update_fields=["deleted_at", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
@@ -245,13 +305,50 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
         ids = payload.get("ids") if isinstance(payload, dict) else payload
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
-        qs = MaintenancePlan.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-        return Response({"restored": restored, "count": len(restored)}, status=200)
+        qs = list(
+            MaintenancePlan.objects.select_related("customer")
+            .filter(id__in=ids, deleted_at__isnull=False)
+        )
+        restorable, blocked = split_restorable(qs)
+        restored_ids = [obj.id for obj in restorable]
+        if restored_ids:
+            now = timezone.now()
+            MaintenancePlan.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore MaintenancePlan: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids), "blocked": blocked, "blocked_count": len(blocked)}, status=200)
+
+    @action(detail=True, methods=["post"], permission_classes=[CanPurgeModelPermission])
+    def purge(self, request, pk=None):
+        obj = MaintenancePlan.objects.filter(pk=pk, deleted_at__isnull=False).first()
+        if obj is None:
+            return Response({"detail": "Elemento non trovato nel cestino."}, status=404)
+        ok, reason, blockers = try_purge_instance(obj)
+        if not ok:
+            return Response({"detail": reason, "blocked": blockers}, status=409)
+        log_event(actor=request.user, action="delete", instance=None, request=request, metadata={"purge": True}, subject=f"purge MaintenancePlan #{pk}")
+        return Response(status=204)
+
+    @action(detail=False, methods=["post"], permission_classes=[CanPurgeModelPermission])
+    def bulk_purge(self, request):
+        payload = request.data
+        ids = payload.get("ids") if isinstance(payload, dict) else payload
+        if not isinstance(ids, list) or not ids:
+            return Response({"detail": "ids must be a non-empty list"}, status=400)
+        purged = []
+        blocked = []
+        for obj in MaintenancePlan.objects.filter(id__in=ids, deleted_at__isnull=False):
+            obj_id = obj.id
+            ok, reason, blockers = try_purge_instance(obj)
+            if ok:
+                purged.append(obj_id)
+            else:
+                blocked.append({"id": obj.id, "reason": reason, "blocked": blockers})
+        log_event(actor=request.user, action="delete", instance=None, changes={"ids": purged}, request=request, metadata={"purge": True, "blocked_count": len(blocked)}, subject=f"bulk purge MaintenancePlan: {purged}")
+        return Response({"purged": purged, "count": len(purged), "blocked": blocked, "blocked_count": len(blocked)}, status=200)
 
     @action(detail=False, methods=["get"], url_path="compute-due-date")
     def compute_due_date(self, request):
@@ -288,52 +385,80 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
         Ritorna una riga per ogni (piano, inventory) con next_due_date valorizzata.
         Le righe sono ordinate per next_due_date, cliente, sito.
         Filtri: ?customer=ID  ?site=ID
+
+        Ottimizzazione: una sola query per tutti gli inventory invece di N query
+        (una per piano). Il join avviene in Python dopo aver caricato i dati.
         """
+        from inventory.models import Inventory
+
         plans = (
             MaintenancePlan.objects
             .filter(deleted_at__isnull=True, is_active=True, next_due_date__isnull=False)
             .select_related("customer")
             .prefetch_related("inventory_types")
         )
-        customer = request.query_params.get("customer")
-        if customer:
-            plans = plans.filter(customer_id=customer)
+        customer_param = request.query_params.get("customer")
+        site_param     = request.query_params.get("site")
+        if customer_param:
+            plans = plans.filter(customer_id=customer_param)
 
-        from inventory.models import Inventory
-        rows = []
-        for plan in plans:
-            invs = (
-                Inventory.objects
-                .filter(
-                    customer=plan.customer,
-                    type_id__in=plan.inventory_types.values_list("id", flat=True),
-                    deleted_at__isnull=True,
-                )
-                .select_related("site", "type")
+        # Materializza i piani una volta sola
+        plans_list = list(plans)
+        if not plans_list:
+            return Response([])
+
+        # Raccoglie customer_id → lista di (plan, frozenset(type_ids))
+        # per filtrare gli inventory con una sola query
+        customer_ids = {p.customer_id for p in plans_list}
+        all_type_ids = {
+            t_id
+            for p in plans_list
+            for t_id in p.inventory_types.values_list("id", flat=True)
+        }
+
+        inv_qs = (
+            Inventory.objects
+            .filter(
+                customer_id__in=customer_ids,
+                type_id__in=all_type_ids,
+                deleted_at__isnull=True,
             )
-            site = request.query_params.get("site")
-            if site:
-                invs = invs.filter(site_id=site)
-            for inv in invs:
-                rows.append({
-                    "plan_id":       plan.id,
-                    "plan_title":    plan.title,
-                    "inventory_id":  inv.id,
-                    "customer_id":   plan.customer_id,
-                    "customer_code": plan.customer.code,
-                    "customer_name": plan.customer.name,
-                    "site_id":       inv.site_id,
-                    "site_name":     (inv.site.display_name or inv.site.name) if inv.site else None,
-                    "type_label":    inv.type.label if inv.type_id else None,
-                    "knumber":       inv.knumber,
-                    "hostname":      inv.hostname,
-                    "next_due_date": str(plan.next_due_date),
-                    "schedule_type":  plan.schedule_type,
-                    "interval_value": plan.interval_value,
-                    "interval_unit":  plan.interval_unit,
-                    "fixed_month":    plan.fixed_month,
-                    "fixed_day":      plan.fixed_day,
-                })
+            .select_related("site", "type", "customer")
+        )
+        if site_param:
+            inv_qs = inv_qs.filter(site_id=site_param)
+
+        # Indice: (customer_id, type_id) → lista di inventory
+        from collections import defaultdict
+        inv_index: dict = defaultdict(list)
+        for inv in inv_qs:
+            inv_index[(inv.customer_id, inv.type_id)].append(inv)
+
+        rows = []
+        for plan in plans_list:
+            type_ids = set(plan.inventory_types.values_list("id", flat=True))
+            for type_id in type_ids:
+                for inv in inv_index.get((plan.customer_id, type_id), []):
+                    rows.append({
+                        "plan_id":        plan.id,
+                        "plan_title":     plan.title,
+                        "inventory_id":   inv.id,
+                        "customer_id":    plan.customer_id,
+                        "customer_code":  plan.customer.code,
+                        "customer_name":  plan.customer.name,
+                        "site_id":        inv.site_id,
+                        "site_name":      (inv.site.display_name or inv.site.name) if inv.site else None,
+                        "type_label":     inv.type.label if inv.type_id else None,
+                        "knumber":        inv.knumber,
+                        "hostname":       inv.hostname,
+                        "next_due_date":  str(plan.next_due_date),
+                        "schedule_type":  plan.schedule_type,
+                        "interval_value": plan.interval_value,
+                        "interval_unit":  plan.interval_unit,
+                        "fixed_month":    plan.fixed_month,
+                        "fixed_day":      plan.fixed_day,
+                    })
+
         rows.sort(key=lambda r: (
             r["next_due_date"] or "",
             r["customer_name"] or "",
@@ -357,9 +482,16 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
 
     plan_title = serializers.CharField(source="plan.title",    read_only=True)
     tech_name  = serializers.CharField(source="tech.__str__",  read_only=True)
+    pdf_url    = serializers.SerializerMethodField()
 
     def get_site_name(self, obj):
         return obj.inventory.site.name if obj.inventory.site_id and obj.inventory.site else None
+
+    def get_pdf_url(self, obj):
+        if not obj.pdf_file:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.pdf_file.url) if request else obj.pdf_file.url
 
     class Meta:
         model  = MaintenanceEvent
@@ -377,17 +509,17 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
             "tech",
             "tech_name",
             "notes",
-            "pdf_file",
+            "pdf_url",
             "created_at",
             "updated_at",
             "deleted_at",
         ]
 
 
-class MaintenanceEventViewSet(viewsets.ModelViewSet):
+class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class  = MaintenanceEventSerializer
     filter_backends   = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    parser_classes    = [MultiPartParser, FormParser]
+    parser_classes    = [MultiPartParser, FormParser, JSONParser]
 
     filterset_fields = ["inventory", "plan", "tech", "result"]
     search_fields    = [
@@ -422,29 +554,43 @@ class MaintenanceEventViewSet(viewsets.ModelViewSet):
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
-    def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=["deleted_at"])
-
     def perform_create(self, serializer):
         """Salva l'evento e ricalcola automaticamente next_due_date del piano."""
         event = serializer.save()
         self._recalculate_plan_due_date(event)
+        log_event(actor=self.request.user, action="create", instance=event, request=self.request)
+
+    def perform_update(self, serializer):
+        event = serializer.save()
+        log_event(actor=self.request.user, action="update", instance=event, request=self.request)
 
     def _recalculate_plan_due_date(self, event):
         """
         Dopo la creazione di un rapportino, avanza next_due_date del piano
-        al prossimo ciclo basandosi su performed_at.
+        alla prossima scadenza FUTURA rispetto a performed_at.
+
+        Strategia: prova a calcolare la data partendo dall'anno di performed_at;
+        se il risultato è <= performed_at, prova l'anno successivo, e così via
+        fino a trovare una data strettamente futura (max 5 anni avanti per sicurezza).
+        Questo è corretto anche per intervalli sub-annuali (es. semestrale).
         """
         plan = event.plan
-        next_date = compute_next_due_date(
-            plan.schedule_type,
-            plan.interval_value,
-            plan.interval_unit,
-            plan.fixed_month,
-            plan.fixed_day,
-            reference_year=event.performed_at.year + 1,
-        )
+        ref_year = event.performed_at.year
+        next_date = None
+
+        for year_offset in range(6):  # prova anno+0, anno+1, … anno+5
+            candidate = compute_next_due_date(
+                plan.schedule_type,
+                plan.interval_value,
+                plan.interval_unit,
+                plan.fixed_month,
+                plan.fixed_day,
+                reference_year=ref_year + year_offset,
+            )
+            if candidate and candidate > event.performed_at:
+                next_date = candidate
+                break
+
         if next_date and next_date > plan.next_due_date:
             plan.next_due_date = next_date
             plan.save(update_fields=["next_due_date", "updated_at"])
@@ -453,7 +599,8 @@ class MaintenanceEventViewSet(viewsets.ModelViewSet):
     def restore(self, request, pk=None):
         obj = self.get_object()
         obj.deleted_at = None
-        obj.save(update_fields=["deleted_at"])
+        obj.save(update_fields=["deleted_at", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
@@ -462,13 +609,18 @@ class MaintenanceEventViewSet(viewsets.ModelViewSet):
         ids = payload.get("ids") if isinstance(payload, dict) else payload
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
-        qs = MaintenanceEvent.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-        return Response({"restored": restored, "count": len(restored)}, status=200)
+        now = timezone.now()
+        restored_ids = list(
+            MaintenanceEvent.objects.filter(id__in=ids, deleted_at__isnull=False)
+            .values_list("id", flat=True)
+        )
+        MaintenanceEvent.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore MaintenanceEvent: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -480,6 +632,14 @@ class MaintenanceNotificationSerializer(serializers.ModelSerializer):
     customer_code      = serializers.CharField(source="plan.customer.code", read_only=True)
     customer_name      = serializers.CharField(source="plan.customer.name", read_only=True)
     inventory_hostname = serializers.CharField(source="inventory.hostname", read_only=True)
+
+    def run_validators(self, value):
+        # UniqueTogetherValidator condizionale su `deleted_at` cerca il campo in attrs,
+        # ma nei PATCH parziali i campi non inviati non sono presenti. Iniettalo
+        # dall'istanza esistente (o None se è un create) prima di delegare ai validatori.
+        if "deleted_at" not in value and self.instance is not None:
+            value["deleted_at"] = self.instance.deleted_at
+        super().run_validators(value)
 
     class Meta:
         model  = MaintenanceNotification
@@ -503,7 +663,7 @@ class MaintenanceNotificationSerializer(serializers.ModelSerializer):
         ]
 
 
-class MaintenanceNotificationViewSet(viewsets.ModelViewSet):
+class MaintenanceNotificationViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = MaintenanceNotificationSerializer
     filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -537,15 +697,12 @@ class MaintenanceNotificationViewSet(viewsets.ModelViewSet):
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
-    def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=["deleted_at"])
-
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
         obj.deleted_at = None
-        obj.save(update_fields=["deleted_at"])
+        obj.save(update_fields=["deleted_at", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
@@ -554,10 +711,15 @@ class MaintenanceNotificationViewSet(viewsets.ModelViewSet):
         ids = payload.get("ids") if isinstance(payload, dict) else payload
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
-        qs = MaintenanceNotification.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-        return Response({"restored": restored, "count": len(restored)}, status=200)
+        now = timezone.now()
+        restored_ids = list(
+            MaintenanceNotification.objects.filter(id__in=ids, deleted_at__isnull=False)
+            .values_list("id", flat=True)
+        )
+        MaintenanceNotification.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore MaintenanceNotification: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)

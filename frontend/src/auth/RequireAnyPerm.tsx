@@ -1,21 +1,21 @@
-import * as React from "react";
-import { Navigate } from "react-router-dom";
-import { Box, Typography } from "@mui/material";
-import { useAuth } from "./AuthProvider";
+import * as React from 'react'
+import { Navigate } from 'react-router-dom'
+import { Box, Typography } from '@mui/material'
+import { useAuth } from './AuthProvider'
 
 export function RequireAnyPerm({
   perms,
   children,
 }: {
-  perms: string[];
-  children: React.ReactNode;
+  perms: string[]
+  children: React.ReactNode
 }) {
-  const { me, loading, hasPerm } = useAuth();
+  const { me, loading, hasPerm } = useAuth()
 
-  if (loading) return null;
-  if (!me) return <Navigate to="/login" replace />;
+  if (loading) return null
+  if (!me) return <Navigate to="/login" replace />
 
-  const ok = perms.some((p) => hasPerm(p));
+  const ok = perms.some((p) => hasPerm(p))
   if (!ok) {
     return (
       <Box sx={{ p: 3 }}>
@@ -26,8 +26,8 @@ export function RequireAnyPerm({
           Non hai i permessi per accedere a questa pagina.
         </Typography>
       </Box>
-    );
+    )
   }
 
-  return <>{children}</>;
+  return <>{children}</>
 }

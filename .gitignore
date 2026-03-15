@@ -18,9 +18,18 @@ node_modules/
 dist/
 dist-ssr/
 
-#Backup Files
+# Backup / patch artifacts
 .bak
 *.bak
+*.orig
+*.rej
+*.save
+*~
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
 
 # frontend
 frontend/node_modules/

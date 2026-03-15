@@ -1,4 +1,4 @@
-import * as React from "react";
+import * as React from 'react'
 import {
   Box,
   CircularProgress,
@@ -7,69 +7,82 @@ import {
   Stack,
   Tooltip,
   Typography,
-} from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { useToast } from "./toast";
+} from '@mui/material'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import { useToast } from './toast'
 import {
   type CustomFieldEntity,
   normalizeKey,
   useCustomFieldDefinitions,
-} from "../hooks/useCustomFieldDefinitions";
+} from '../hooks/useCustomFieldDefinitions'
+
+const EMPTY_CF: Record<string, unknown> = {}
 
 async function copyToClipboard(text: string) {
-  if (!text) return;
+  if (!text) return
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(text)
   } catch {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
   }
 }
 
 export default function CustomFieldsDisplay(props: {
-  entity: CustomFieldEntity;
-  value: Record<string, any> | null | undefined;
-  title?: string;
+  entity: CustomFieldEntity
+  value: Record<string, unknown> | null | undefined
+  title?: string
 }) {
-  const { entity, value, title } = props;
-  const toast = useToast();
-  const { defs, loading } = useCustomFieldDefinitions(entity);
+  const { entity, value, title } = props
+  const toast = useToast()
+  const { defs, loading } = useCustomFieldDefinitions(entity)
 
-  const cf = (value ?? {}) as Record<string, any>;
+  // IMPORTANT: avoid `value ?? {}` because `{}` would be a new object every render,
+  // which would make memo deps unstable.
+  const cf = React.useMemo(() => (value ?? EMPTY_CF) as Record<string, unknown>, [value])
 
   const rows = React.useMemo(() => {
-    const usedKeys = new Set<string>();
-    const items: { label: string; value: string }[] = [];
+    const usedKeys = new Set<string>()
+    const items: { label: string; value: string }[] = []
+
+    const formatValue = (v: unknown, fieldType?: string, options?: unknown) => {
+      if (fieldType === 'boolean') return Boolean(v) ? 'Sì' : 'No'
+      if (fieldType === 'select' && v != null && options && typeof options === 'object' && !Array.isArray(options)) {
+        const mapped = (options as Record<string, unknown>)[String(v)]
+        if (mapped != null) return String(mapped)
+      }
+      return typeof v === 'string' ? v : JSON.stringify(v)
+    }
 
     for (const d of defs ?? []) {
-      const wanted = new Set<string>([normalizeKey(d.key)]);
-      for (const a of d.aliases ?? []) wanted.add(normalizeKey(String(a)));
+      const wanted = new Set<string>([normalizeKey(d.key)])
+      for (const a of d.aliases ?? []) wanted.add(normalizeKey(String(a)))
 
       for (const [k, v] of Object.entries(cf)) {
         if (wanted.has(normalizeKey(k))) {
-          usedKeys.add(k);
-          if (v === null || v === undefined || (typeof v === "string" && !v.trim())) continue;
-          items.push({ label: d.label, value: typeof v === "string" ? v : JSON.stringify(v) });
-          break;
+          usedKeys.add(k)
+          if (v === null || v === undefined || (typeof v === 'string' && !v.trim())) continue
+          items.push({ label: d.label, value: formatValue(v, d.field_type, d.options) })
+          break
         }
       }
     }
 
     // append unknown keys
     for (const [k, v] of Object.entries(cf)) {
-      if (usedKeys.has(k)) continue;
-      if (v === null || v === undefined || (typeof v === "string" && !v.trim())) continue;
-      items.push({ label: k, value: typeof v === "string" ? v : JSON.stringify(v) });
+      if (usedKeys.has(k)) continue
+      if (v === null || v === undefined || (typeof v === 'string' && !v.trim())) continue
+      items.push({ label: k, value: typeof v === 'string' ? v : JSON.stringify(v) })
     }
 
-    return items;
-  }, [cf, defs]);
+    return items
+  }, [cf, defs])
 
   if (loading && rows.length === 0) {
     return (
@@ -79,14 +92,14 @@ export default function CustomFieldsDisplay(props: {
           Caricamento campi custom…
         </Typography>
       </Stack>
-    );
+    )
   }
 
   return (
     <Box>
       <Divider sx={{ my: 1.5 }} />
       <Typography variant="subtitle2" sx={{ mt: 0.5, opacity: 0.75 }}>
-        {title ?? "Campi custom"}
+        {title ?? 'Campi custom'}
       </Typography>
 
       {rows.length ? (
@@ -96,7 +109,7 @@ export default function CustomFieldsDisplay(props: {
               <Typography variant="body2" sx={{ minWidth: 140, opacity: 0.8 }}>
                 {r.label}
               </Typography>
-              <Typography variant="body2" sx={{ wordBreak: "break-word", flex: 1 }}>
+              <Typography variant="body2" sx={{ wordBreak: 'break-word', flex: 1 }}>
                 {r.value}
               </Typography>
               {r.value.trim() ? (
@@ -104,8 +117,8 @@ export default function CustomFieldsDisplay(props: {
                   <IconButton
                     size="small"
                     onClick={async () => {
-                      await copyToClipboard(r.value);
-                      toast.success("Copiato ✅");
+                      await copyToClipboard(r.value)
+                      toast.success('Copiato ✅')
                     }}
                   >
                     <ContentCopyIcon fontSize="inherit" />
@@ -121,5 +134,5 @@ export default function CustomFieldsDisplay(props: {
         </Typography>
       )}
     </Box>
-  );
+  )
 }

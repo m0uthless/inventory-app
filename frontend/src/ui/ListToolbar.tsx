@@ -1,36 +1,40 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react'
 
-import { Box, Button, Stack, TextField } from "@mui/material";
+import { Box, Button, InputAdornment, Stack, TextField } from '@mui/material'
+import SearchIcon from '@mui/icons-material/Search'
+import RestartAltIcon from '@mui/icons-material/RestartAlt'
 
-import type { ListViewMode } from "../hooks/useServerGrid";
+import type { ListViewMode } from '../hooks/useServerGrid'
 
-import ListViewModeToggle from "./ListViewModeToggle";
+import ListViewModeToggle from './ListViewModeToggle'
+import { compactResetButtonSx } from './toolbarStyles'
 
 type Props = {
-  q: string;
-  onQChange: (v: string) => void;
+  compact?: boolean
+  q: string
+  onQChange: (v: string) => void
 
-  /**
-   * Optional: when provided, a segmented control (Attivi/Tutti/Cestino) is rendered
-   * on the right side of the toolbar.
-   */
-  viewMode?: ListViewMode;
-  onViewModeChange?: (v: ListViewMode) => void;
+  viewMode?: ListViewMode
+  onViewModeChange?: (v: ListViewMode) => void
 
   /** Optional. If omitted, the "Reimposta" button is hidden. */
-  onReset?: () => void;
+  onReset?: () => void
 
-  children?: ReactNode;
-  createButton?: ReactNode;
+  children?: ReactNode
+  createButton?: ReactNode
 
-  /** Right-side extra actions (e.g. bulk restore button) */
-  rightActions?: ReactNode;
+  /** Right-side extra actions (e.g. export button) */
+  rightActions?: ReactNode
 
-  searchLabel?: string;
-  resetLabel?: string;
-};
+  searchLabel?: string
+  resetLabel?: string
+}
 
-export type ListToolbarProps = Props;
+export type ListToolbarProps = Props
+
+// Altezza comune per tutti gli elementi della toolbar
+const H = 32
+const HC = 40
 
 export default function ListToolbar(props: Props) {
   const {
@@ -42,73 +46,119 @@ export default function ListToolbar(props: Props) {
     children,
     createButton,
     rightActions,
-    searchLabel = "Cerca",
-    resetLabel = "Reimposta",
-  } = props;
+    searchLabel = 'Cerca',
+    resetLabel = 'Reimposta',
+    compact = false,
+  } = props
 
   return (
     <Stack
-      direction={{ xs: "column", md: "row" }}
+      direction={{ xs: 'column', md: 'row' }}
       spacing={1}
-      sx={{ flexWrap: { md: "wrap" } }}
-      alignItems="center"
+      alignItems={{ xs: 'stretch', md: 'center' }}
+      sx={{
+        flexWrap: { md: 'nowrap' },
+        rowGap: 1,
+        columnGap: 1,
+        minHeight: compact ? HC : H,
+        '& .MuiButton-root': { height: compact ? HC : H, fontSize: '0.8125rem' },
+        '& .MuiToggleButton-root': { height: compact ? HC : H, fontSize: '0.8125rem' },
+        ...(compact
+          ? {
+              '& > *': { flexShrink: 0 },
+            }
+          : {}),
+      }}
     >
-      {createButton ? (
-        <Box sx={{ width: { xs: "100%", md: "auto" } }}>{createButton}</Box>
-      ) : null}
-
       <TextField
         size="small"
-        label={searchLabel}
         placeholder={searchLabel}
         value={q}
         onChange={(e) => onQChange(e.target.value)}
-        InputLabelProps={{ shrink: true }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: compact ? 18 : 16, color: 'text.disabled' }} />
+              </InputAdornment>
+            ),
+          },
+        }}
         sx={{
-          width: { xs: "100%", md: 240 },
-          "& .MuiInputLabel-root": { fontSize: 12 },
-          "& .MuiInputBase-input": { fontSize: 12, py: "6px" },
+          width: { xs: '100%', md: compact ? 340 : 220 },
+          flexShrink: 0,
+          '& .MuiInputBase-root': {
+            height: compact ? HC : H,
+            fontSize: compact ? '0.95rem' : '0.8125rem',
+            borderRadius: compact ? 1.5 : undefined,
+            bgcolor: 'transparent',
+          },
+          '& .MuiInputBase-input': { py: 0 },
         }}
       />
 
-      {children}
-
       <Box
         sx={{
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           gap: 1,
-          width: { xs: "100%", md: "auto" },
-          ml: { md: "auto" },
-          justifyContent: { xs: "stretch", md: "flex-end" },
-          flexWrap: "wrap",
+          width: { xs: '100%', md: 'auto' },
+          ml: { md: compact ? 0 : 'auto' },
+          justifyContent: { xs: 'flex-start', md: 'flex-start' },
+          flexWrap: 'wrap',
+          flexDirection: 'row',
+          rowGap: 1,
+          columnGap: 1,
         }}
       >
-        {viewMode !== undefined && typeof onViewModeChange === "function" ? (
+        {children}
+
+        {createButton ? <Box sx={{ width: 'auto', display: 'flex' }}>{createButton}</Box> : null}
+
+        {viewMode !== undefined && typeof onViewModeChange === 'function' ? (
           <ListViewModeToggle
             value={viewMode}
             onChange={onViewModeChange}
-            sx={{ width: { xs: "100%", md: "auto" } }}
+            compact={compact}
+            sx={{ width: { xs: 'auto', md: 'auto' } }}
           />
         ) : null}
 
         {rightActions ? (
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              flexDirection: 'row',
+              rowGap: 1,
+              columnGap: 1,
+              '& > *': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              },
+            }}
+          >
             {rightActions}
           </Box>
         ) : null}
 
-        {typeof onReset === "function" ? (
+        {typeof onReset === 'function' ? (
           <Button
             size="small"
-            variant="outlined"
+            variant={compact ? 'contained' : 'outlined'}
             onClick={onReset}
-            sx={{ width: { xs: "100%", md: "auto" } }}
+            startIcon={compact ? <RestartAltIcon /> : undefined}
+            aria-label={resetLabel}
+            sx={compact ? compactResetButtonSx : { width: 'auto' }}
           >
-            {resetLabel}
+            {compact ? '' : resetLabel}
           </Button>
         ) : null}
       </Box>
     </Stack>
-  );
+  )
 }

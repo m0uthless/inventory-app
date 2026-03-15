@@ -1,8 +1,15 @@
+# mypy: disable-error-code=annotation-unchecked
 from __future__ import annotations
 
 import mimetypes
 import os
 from pathlib import PurePosixPath
+
+try:
+    import magic as _magic
+    _MAGIC_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _MAGIC_AVAILABLE = False
 
 from django.db.models import Count, Q
 from django.http import FileResponse, HttpResponse
@@ -17,8 +24,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import CanRestoreModelPermission, IsAuthenticatedDjangoModelPermissions
+from core.mixins import SoftDeleteAuditMixin
 from core.soft_delete import apply_soft_delete_filters
+from audit.utils import log_event
 
+from .access import filter_accessible_files, filter_accessible_folders, has_file_access, has_folder_access
 from .models import DriveFile, DriveFolder
 
 
@@ -56,70 +66,6 @@ def _apply_deleted_filters(qs, request, action_name: str | None = None):
         action_name=action_name,
         include_deleted=include_deleted,
         only_deleted=only_deleted,
-    )
-
-
-def _user_group_ids(user) -> set[int]:
-    return set(user.groups.values_list("id", flat=True))
-
-
-def _groups_allow_access(user, groups_qs) -> bool:
-    """Access rule:
-
-    - superuser: always
-    - allowed_groups empty: open to all authenticated users
-    - otherwise: user must be in at least one allowed group
-    """
-
-    if getattr(user, "is_superuser", False):
-        return True
-
-    allowed_ids = list(groups_qs.values_list("id", flat=True))
-    if not allowed_ids:
-        return True
-
-    return bool(_user_group_ids(user) & set(allowed_ids))
-
-
-def _has_folder_access(user, folder: DriveFolder) -> bool:
-    return _groups_allow_access(user, folder.allowed_groups.all())
-
-
-def _has_file_access(user, file: DriveFile) -> bool:
-    if not _groups_allow_access(user, file.allowed_groups.all()):
-        return False
-
-    # Folder-level groups (if any)
-    if getattr(file, "folder_id", None):
-        folder = getattr(file, "folder", None)
-        if folder and not _groups_allow_access(user, folder.allowed_groups.all()):
-            return False
-
-    return True
-
-
-def _filter_accessible_folders(qs, user):
-    if getattr(user, "is_superuser", False):
-        return qs
-    user_groups = user.groups.all()
-    return qs.filter(Q(allowed_groups__isnull=True) | Q(allowed_groups__in=user_groups)).distinct()
-
-
-def _filter_accessible_files(qs, user):
-    if getattr(user, "is_superuser", False):
-        return qs
-
-    user_groups = user.groups.all()
-
-    return (
-        qs.filter(
-            # file groups
-            (Q(allowed_groups__isnull=True) | Q(allowed_groups__in=user_groups))
-            &
-            # folder groups (if folder is NULL, this condition passes)
-            (Q(folder__allowed_groups__isnull=True) | Q(folder__allowed_groups__in=user_groups))
-        )
-        .distinct()
     )
 
 
@@ -172,6 +118,7 @@ class DriveFolderSerializer(serializers.ModelSerializer):
     files_count = serializers.IntegerField(source="files_count_db", read_only=True)
     full_path = serializers.CharField(read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = DriveFolder
@@ -186,17 +133,27 @@ class DriveFolderSerializer(serializers.ModelSerializer):
             "files_count",
             "created_by",
             "created_by_name",
+            "updated_by",
+            "updated_by_name",
             "notes",
             "created_at",
             "updated_at",
             "deleted_at",
         ]
-        read_only_fields = ["created_by", "created_at", "updated_at"]
+        read_only_fields = ["created_by", "updated_by", "created_at", "updated_at"]
 
     def get_created_by_name(self, obj):
         if not getattr(obj, "created_by", None):
             return None
         u = obj.created_by
+        full = f"{u.first_name} {u.last_name}".strip()
+        return full or u.username
+
+
+    def get_updated_by_name(self, obj):
+        if not getattr(obj, "updated_by", None):
+            return None
+        u = obj.updated_by
         full = f"{u.first_name} {u.last_name}".strip()
         return full or u.username
 
@@ -219,6 +176,7 @@ class DriveFileSerializer(serializers.ModelSerializer):
     is_image = serializers.BooleanField(read_only=True)
     is_pdf = serializers.BooleanField(read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
     folder_name = serializers.CharField(source="folder.name", read_only=True)
 
     # Write-only to avoid leaking direct media URLs.
@@ -243,12 +201,14 @@ class DriveFileSerializer(serializers.ModelSerializer):
             "allowed_groups",
             "created_by",
             "created_by_name",
+            "updated_by",
+            "updated_by_name",
             "notes",
             "created_at",
             "updated_at",
             "deleted_at",
         ]
-        read_only_fields = ["created_by", "mime_type", "size", "created_at", "updated_at"]
+        read_only_fields = ["created_by", "updated_by", "mime_type", "size", "created_at", "updated_at"]
 
     def get_size_human(self, obj):
         return fmt_size(getattr(obj, "size", 0) or 0)
@@ -257,6 +217,13 @@ class DriveFileSerializer(serializers.ModelSerializer):
         if not getattr(obj, "created_by", None):
             return None
         u = obj.created_by
+        full = f"{u.first_name} {u.last_name}".strip()
+        return full or u.username
+
+    def get_updated_by_name(self, obj):
+        if not getattr(obj, "updated_by", None):
+            return None
+        u = obj.updated_by
         full = f"{u.first_name} {u.last_name}".strip()
         return full or u.username
 
@@ -273,6 +240,38 @@ class DriveFileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Il tipo di file '.{ext_clean}' non è consentito per motivi di sicurezza."
             )
+
+        # Verifica MIME type reale del contenuto (non solo l'estensione).
+        # Previene il bypass via rinomina (es. script.php → script.txt).
+        if _MAGIC_AVAILABLE:
+            header = value.read(2048)
+            value.seek(0)
+            try:
+                real_mime = _magic.from_buffer(header, mime=True) or ""
+            except Exception:
+                real_mime = ""
+            # Lista di MIME type bloccati indipendentemente dall'estensione dichiarata.
+            BLOCKED_MIMES = {
+                "application/x-sh",
+                "application/x-shellscript",
+                "text/x-shellscript",
+                "application/x-php",
+                "application/x-httpd-php",
+                "text/x-php",
+                "application/x-python",
+                "text/x-python",
+                "application/x-ruby",
+                "application/x-perl",
+                "application/x-msdos-program",
+                "application/x-msdownload",
+                "application/x-dosexec",
+                "application/java-archive",
+                "application/x-java-archive",
+            }
+            if real_mime in BLOCKED_MIMES:
+                raise serializers.ValidationError(
+                    f"Il contenuto del file è di un tipo non consentito ({real_mime}). Rinominare l'estensione non aggira questo controllo."
+                )
 
         return value
 
@@ -293,7 +292,7 @@ class DriveFileSerializer(serializers.ModelSerializer):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class DriveFolderViewSet(viewsets.ModelViewSet):
+class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = DriveFolderSerializer
     permission_classes = [IsAuthenticatedDjangoModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -320,7 +319,7 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
         )
 
         qs = _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
-        qs = _filter_accessible_folders(qs, self.request.user)
+        qs = filter_accessible_folders(qs, self.request.user)
 
         customer = self.request.query_params.get("customer")
         if customer:
@@ -332,47 +331,21 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        instance = serializer.save(created_by=self.request.user)
+        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+    def perform_update(self, serializer):
+        instance = serializer.save(updated_by=self.request.user)
+        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
 
-    def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=["deleted_at", "updated_at"])
-
-    
-    # ── Children ─────────────────────────────────────────────────────────────
-    @action(detail=True, methods=["get"])
-    def children(self, request, pk=None):
-        """Return direct children (folders + files) for the given folder.
-
-        Frontend expects /drive-folders/{id}/children/.
-        """
-        folder = self.get_object()
-
-        # Folders
-        folders_qs = DriveFolder.objects.filter(parent=folder)
-        folders_qs = _apply_deleted_filters(folders_qs, request, getattr(self, "action", None))
-        folders_qs = _filter_accessible_folders(folders_qs, request.user)
-        folders_qs = folders_qs.prefetch_related("customers", "allowed_groups").order_by("name")
-
-        # Files
-        files_qs = DriveFile.objects.filter(folder=folder)
-        files_qs = _apply_deleted_filters(files_qs, request, getattr(self, "action", None))
-        files_qs = _filter_accessible_files(files_qs, request.user)
-        files_qs = files_qs.prefetch_related("customers", "allowed_groups", "folder").order_by("name")
-
-        return Response(
-            {
-                "folders": DriveFolderSerializer(folders_qs, many=True, context=self.get_serializer_context()).data,
-                "files": DriveFileSerializer(files_qs, many=True, context=self.get_serializer_context()).data,
-            }
-        )
 
 # ── Restore ──────────────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
         obj.deleted_at = None
-        obj.save(update_fields=["deleted_at", "updated_at"])
+        obj.updated_by = request.user
+        obj.save(update_fields=["deleted_at", "updated_by", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
@@ -382,30 +355,34 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
 
-        qs = DriveFolder.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored: list[int] = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-
-        return Response({"restored": restored, "count": len(restored)}, status=200)
+        now = timezone.now()
+        restored_ids = list(
+            DriveFolder.objects.filter(id__in=ids, deleted_at__isnull=False)
+            .values_list("id", flat=True)
+        )
+        DriveFolder.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_by=request.user, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore DriveFolder: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)
 
     # ── Children (folder contents) ───────────────────────────────────────────
     @action(detail=True, methods=["get"], url_path="children")
     def children(self, request, pk=None):
         folder = self.get_object()
 
-        if not _has_folder_access(request.user, folder):
+        if not has_folder_access(request.user, folder):
             return Response({"detail": "Permesso negato."}, status=403)
 
         sub_qs = DriveFolder.objects.filter(parent=folder)
         sub_qs = _apply_deleted_filters(sub_qs, request)
-        sub_qs = _filter_accessible_folders(sub_qs, request.user)
+        sub_qs = filter_accessible_folders(sub_qs, request.user)
 
         file_qs = DriveFile.objects.filter(folder=folder)
         file_qs = _apply_deleted_filters(file_qs, request)
-        file_qs = _filter_accessible_files(file_qs, request.user)
+        file_qs = filter_accessible_files(file_qs, request.user)
 
         return Response(
             {
@@ -423,7 +400,7 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
         crumbs: list[dict[str, int | str]] = []
         node = folder
         while node:
-            if not _has_folder_access(request.user, node):
+            if not has_folder_access(request.user, node):
                 break
             crumbs.append({"id": node.id, "name": node.name})
             node = node.parent
@@ -441,7 +418,7 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
 
         folder = self.get_object()
 
-        if not _has_folder_access(request.user, folder):
+        if not has_folder_access(request.user, folder):
             return Response({"detail": "Permesso negato."}, status=403)
 
         parent_id = request.data.get("parent", None)
@@ -473,7 +450,7 @@ class DriveFolderViewSet(viewsets.ModelViewSet):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class DriveFileViewSet(viewsets.ModelViewSet):
+class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = DriveFileSerializer
     permission_classes = [IsAuthenticatedDjangoModelPermissions]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -491,7 +468,7 @@ class DriveFileViewSet(viewsets.ModelViewSet):
         )
 
         qs = _apply_deleted_filters(qs, self.request, getattr(self, "action", None))
-        qs = _filter_accessible_files(qs, self.request.user)
+        qs = filter_accessible_files(qs, self.request.user)
 
         customer = self.request.query_params.get("customer")
         if customer:
@@ -511,16 +488,20 @@ class DriveFileViewSet(viewsets.ModelViewSet):
             instance.mime_type = guessed_mime or "application/octet-stream"
             instance.save(update_fields=["size", "mime_type", "updated_at"])
 
-    def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=["deleted_at", "updated_at"])
+        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+
+    def perform_update(self, serializer):
+        instance = serializer.save(updated_by=self.request.user)
+        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
 
     # ── Restore ──────────────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
         obj.deleted_at = None
-        obj.save(update_fields=["deleted_at", "updated_at"])
+        obj.updated_by = request.user
+        obj.save(update_fields=["deleted_at", "updated_by", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
@@ -530,14 +511,18 @@ class DriveFileViewSet(viewsets.ModelViewSet):
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
 
-        qs = DriveFile.objects.filter(id__in=ids, deleted_at__isnull=False)
-        restored: list[int] = []
-        for obj in qs:
-            obj.deleted_at = None
-            obj.save(update_fields=["deleted_at", "updated_at"])
-            restored.append(obj.id)
-
-        return Response({"restored": restored, "count": len(restored)}, status=200)
+        now = timezone.now()
+        restored_ids = list(
+            DriveFile.objects.filter(id__in=ids, deleted_at__isnull=False)
+            .values_list("id", flat=True)
+        )
+        DriveFile.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_by=request.user, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore DriveFile: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)
 
     # ── Move ────────────────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], url_path="move")
@@ -548,7 +533,7 @@ class DriveFileViewSet(viewsets.ModelViewSet):
         """
 
         file = self.get_object()
-        if not _has_file_access(request.user, file):
+        if not has_file_access(request.user, file):
             return Response({"detail": "Permesso negato."}, status=403)
 
         folder_id = request.data.get("folder", None)
@@ -556,7 +541,7 @@ class DriveFileViewSet(viewsets.ModelViewSet):
         if folder_id not in (None, "", 0, "0"):
             folder_qs = DriveFolder.objects.all()
             folder_qs = folder_qs.filter(deleted_at__isnull=True)
-            folder_qs = _filter_accessible_folders(folder_qs, request.user)
+            folder_qs = filter_accessible_folders(folder_qs, request.user)
 
             try:
                 new_folder = folder_qs.get(pk=folder_id)
@@ -572,7 +557,7 @@ class DriveFileViewSet(viewsets.ModelViewSet):
     def download(self, request, pk=None):
         file = self.get_object()
 
-        if not _has_file_access(request.user, file):
+        if not has_file_access(request.user, file):
             return Response({"detail": "Permesso negato."}, status=403)
 
         if not file.file:
@@ -599,7 +584,7 @@ class DriveFileViewSet(viewsets.ModelViewSet):
     def preview(self, request, pk=None):
         file = self.get_object()
 
-        if not _has_file_access(request.user, file):
+        if not has_file_access(request.user, file):
             return Response({"detail": "Permesso negato."}, status=403)
 
         if not file.file:

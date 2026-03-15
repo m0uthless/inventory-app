@@ -160,8 +160,6 @@ def normalize_and_validate_custom_fields(
     normalized.update(base)
 
     for raw_key, raw_val in incoming_dict.items():
-        if raw_key is None:
-            continue
         key_str = str(raw_key)
         norm = _norm_key(key_str)
         canonical_key = maps.alias_to_key.get(norm)

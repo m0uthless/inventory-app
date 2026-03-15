@@ -25,9 +25,14 @@ class AuditEvent(models.Model):
 
     action = models.CharField(max_length=16, choices=Action.choices)
 
-    # Generic target
-    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
-    object_id = models.CharField(max_length=64)
+    # Generic target (nullable: eventi di sistema come login/logout non hanno un'istanza)
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    object_id = models.CharField(max_length=64, blank=True, default="")
     object_repr = models.CharField(max_length=255, blank=True, default="")
     subject = models.CharField(max_length=512, blank=True, default="")
 
@@ -50,7 +55,11 @@ class AuditEvent(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.created_at:%Y-%m-%d %H:%M} {self.action} {self.content_type.app_label}.{self.content_type.model}#{self.object_id}"
+        if self.content_type_id:
+            target = f"{self.content_type.app_label}.{self.content_type.model}#{self.object_id}"
+        else:
+            target = self.object_id or "-"
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.action} {target}"
 
 
 class AuthAttempt(models.Model):

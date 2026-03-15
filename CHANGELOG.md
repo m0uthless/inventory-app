@@ -7,24 +7,127 @@ Le date sono in timezone Europe/Rome.
 
 ---
 
+## [0.5.0] - 2026-03-13
+
+### Changed
+- Promossa la baseline consolidata a `0.5.0` dopo i pass di stabilizzazione, release prep e polish UI/UX.
+- Allineata la versione applicativa a `0.5.0` tra backend, frontend, env, documentazione e test dei public status endpoint.
+
+### Fixed
+- Nessun fix funzionale aggiuntivo in questa release: il bump di versione fotografa lo stato stabile raggiunto con la suite verde.
+
+---
+
+## [0.4.2] - 2026-03-13
+
+### Added
+- Documentazione di baseline `docs/contracts-and-policies.md` con i contratti applicativi consolidati per restore policy, custom fields, secrets Inventory ed endpoint pubblici.
+- Note esplicite di retrocompatibilita sulle route legacy di restore (`/api/inventory/...`, `/api/custom-fields/...`) in attesa di futura rimozione controllata.
+
+### Changed
+- Allineata la versione applicativa a `0.4.2` tra backend, frontend, env e test dei public status endpoint.
+- Aggiornate README, regression checklist e release checklist per riflettere la baseline chiusa dopo le patch 34-36 e la smoke suite effettiva.
+
+### Fixed
+- Formalizzato in documentazione il contratto di restore bloccato (`409`) e il payload di bulk restore con `count`, `blocked` e `blocked_count`, cosi da evitare ambiguita tra UI, test e client legacy.
+
+---
+
+## [0.4.1] - 2026-03-12
+
+### Added
+- Endpoint pubblico `GET /api/health/` per readiness/liveness check backend con stato database e versione.
+- Endpoint frontend `GET /healthz` servito da nginx per healthcheck del container UI.
+- `make health` e documentazione `docs/release-checklist.md` per controlli rapidi di rilascio.
+
+### Fixed
+- Collegato finalmente `GET /api/system-stats/`, gia usato dalla login page ma non esposto nelle URL Django.
+- Allineato il fallback versione nella login page a `VITE_APP_VERSION`, eliminando il residuo `0.4.0-alpha`.
+- In `docker-compose.prod.yml` impostato `RUN_COLLECTSTATIC=0` coerentemente con il deploy controllato gia documentato.
+
+### Changed
+- Aggiunti healthcheck Docker Compose per `backend`, `backend_nginx` e `frontend` per avere stato container piu affidabile in `docker compose ps`.
+
+---
+
+## [0.4.0] - 2026-03-06
+
+### Added
+
+- **Wiki / Knowledge Base** (modulo completo):
+  - Modello `WikiPage` con versioning automatico tramite `WikiPageRevision` (snapshot ad ogni salvataggio).
+  - Categorie con emoji e colore personalizzabile.
+  - Editor rich-text con autosave via localStorage.
+  - Slug deduplication e codice univoco generato automaticamente (formato `KB0000001`).
+  - Tracciamento view count per pagina.
+  - Wiki page linking (link interni tra pagine) e allegati (`WikiAttachment`).
+  - Statistiche KB (dashboard conteggi per categoria, pagine più viste).
+- **CI/CD** (`.github/workflows/ci.yml`): pipeline GitHub Actions con step build Docker, mypy, `manage.py check`, `makemigrations --check`, pytest.
+- **Type checking** (`mypy`): configurazione `mypy.ini` scoped ai moduli del progetto, escluse migrazioni.
+- **OpenAPI TypeScript** (`frontend/scripts/gen-api-types.mjs`): generazione automatica dei tipi TypeScript dallo schema OpenAPI via `openapi-typescript`.
+- **Code splitting** frontend: tutte le route lazy-loaded con `React.lazy` + `Suspense`.
+- **ErrorBoundary** globale (`frontend/src/ui/ErrorBoundary.tsx`): cattura errori React non gestiti con UI di fallback (Dashboard + Reload), stack trace in `DEV`.
+- **Column preferences** per-user/per-page: visibilita e ordine colonne persistito in localStorage su cinque pagine DataGrid principali.
+- **Design system** (`docs/ui-standards.md`): standard UI progressivi documentati (ActionIconButton, DetailDrawerHeader, form pattern, spacing tokens).
+- **Spacing tokens** (`frontend/src/theme/tokens.ts`): costanti `xs/sm/md/lg/xl` con valori MUI e CSS.
+- **Separazione ambienti**: `.env.dev` (sviluppo) e `.env.prod` (produzione) con `docker-compose.prod.yml` che punta a `.env.prod`.
+
+### Changed
+
+- **Audit log** — copertura completata su tutti i moduli:
+  - `AuditEvent.content_type` ora nullable (migrazione `0007`); `log_event()` gestisce `instance=None`.
+  - Campi `path`, `method`, `ip_address`, `user_agent` popolati nelle colonne dedicate e in `metadata`.
+  - Aggiunto audit su create/update per: `TechViewSet`, `MaintenancePlanViewSet`, `MaintenanceEventViewSet`, `MaintenanceNotificationViewSet`, `WikiAttachmentViewSet.upload`.
+- **`WikiPage.restore()`**: ora aggiorna `updated_by=request.user` al ripristino.
+- **`WikiPageRevisionViewSet.restore`**: aggiunto `permission_classes=[CanRestoreModelPermission]`.
+- **Versione OpenAPI** aggiornata a `"0.4.0"` in `SPECTACULAR_SETTINGS`.
+- **Route WIP rimosse** da `App.tsx` (`InventoryWip`, `MaintenanceWip` non piu esposte in produzione).
+- **`ActionIconButton`** adottato uniformemente in tutti i drawer (Contacts, Drive, Audit, Inventory, Sites, Maintenance).
+- **`DetailDrawerHeader`** adottato nei drawer di `Drive.PreviewDrawer` e `Contacts`.
+- **`ServerDataGrid`**: pulsante reset colonne migrato ad `ActionIconButton`.
+- **`scripts/check.sh`**: orchestrazione controlli backend + frontend.
+
+### Fixed
+
+- **N+1 query `bulk_restore`**: `SiteViewSet` e `ContactViewSet` ora usano `QuerySet.update()`; `_enforce_primary` eseguito solo sui contatti `is_primary=True` ripristinati.
+- **`SECRET_KEY`**: sostituita chiave di 9 caratteri con chiave JWT-safe da 90+ caratteri.
+- **Permessi restore Issues**: `@action` restore ora dichiara `permission_classes=[CanRestoreModelPermission]`.
+- **Email aziendale in `.env`**: rimosso indirizzo reale, sostituito con placeholder.
+
+### Security
+
+- `SECRET_KEY` di produzione ruotata.
+- `WikiPageRevisionViewSet.restore` protetto da `CanRestoreModelPermission` — in precedenza qualsiasi utente con permesso view poteva sovrascrivere il contenuto di una pagina wiki.
+- `DJANGO_ALLOWED_HOSTS` separato tra dev (`*`) e prod (IP esplicito) tramite `.env.prod`.
+- `.env.prod` escluso da git; aggiunto `.env.example` con istruzioni di generazione chiavi.
+
+### Technical Debt
+
+- `ContactViewSet.bulk_restore`: loop residuo su `_enforce_primary` intenzionale, limitato ai soli contatti `is_primary=True`; documentato nel codice.
+- Drawer `Contacts` e `Drive`: uniformati al design system in questa versione (sviluppati prima della standardizzazione).
+
+---
+
 ## [0.3.0] - 2026-02-25
 
 ### Added
-- (TBD) Hardening prod: security headers, rate limiting login, audit retention config.
+- Modulo **Wiki** (alpha): struttura base modelli, API e UI — completato e stabilizzato in v0.4.0.
+- **ActionIconButton** (`frontend/src/ui/ActionIconButton.tsx`): primo wrapper a11y per `IconButton`.
+- **DetailDrawerHeader** (`frontend/src/ui/DetailDrawerHeader.tsx`): header standardizzato per drawer di dettaglio.
 
 ### Changed
-- (TBD) Consolidamento endpoint Search (unificato) + ottimizzazione query.
+- Consolidamento endpoint Search e ottimizzazione query N+1 su moduli CRM e Inventory.
+- Allineamento versione OpenAPI a `"0.3.0"`.
 
 ### Fixed
-- (TBD) Bugfix selezionati dalla review (vedi sezione “Roadmap 0.3.0 stabile”).
+- Bugfix selezionati dalla code review: notifiche, JSON parser PATCH, URL PDF serializer, filtri client-side.
 
 ### Security
-- (TBD) Riduzione superficie: rimozione opzioni “allow all origins” per CSRF in ambienti non-dev.
+- Riduzione superficie CSRF: `CSRF_ALLOW_ALL_ORIGINS=1` ora fa fallire l'avvio se `DJANGO_DEBUG=0`.
 
 ### Technical Debt
-- (TBD) Refactor mixin soft-delete/queryset + riduzione duplicazioni.
+- Alcune logiche soft-delete/restore replicate tra viewset (affrontate sistematicamente in v0.4.0).
 
----
 
 ## [0.3.0-alpha.1] - 2026-02-24
 

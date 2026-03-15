@@ -13,14 +13,16 @@ from audit.api import AuditEventViewSet
 from core.me_api import ChangePasswordView, MeAPIView
 
 from config.search_api import SearchAPIView
+from config.system_stats_api import HealthAPIView, SystemStatsView
 
 from core.api import (
     CustomerStatusViewSet,
     SiteStatusViewSet,
     InventoryStatusViewSet,
     InventoryTypeViewSet,
+    UserViewSet,
 )
-from core.permissions import IsStaffOrAdminGroup
+from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
 from drive.api import DriveFileUploadView, DriveFileViewSet, DriveFolderViewSet
@@ -31,7 +33,9 @@ from maintenance.api import (
     MaintenancePlanViewSet,
     TechViewSet,
 )
-from wiki.api import WikiPageViewSet
+from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView
+from issues.api import IssueViewSet, IssueCategoryViewSet
+from feedback.api import ReportRequestViewSet
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customer")
@@ -52,15 +56,33 @@ router.register(
     basename="maintenance-notification",
 )
 router.register(r"techs", TechViewSet, basename="tech")
+router.register(r"wiki-categories", WikiCategoryViewSet, basename="wiki-category")
 router.register(r"wiki-pages", WikiPageViewSet, basename="wiki-page")
+router.register(r"wiki-attachments", WikiAttachmentViewSet, basename="wiki-attachment")
+router.register(r"wiki-links", WikiLinkViewSet, basename="wiki-link")
+router.register(r"wiki-revisions", WikiPageRevisionViewSet, basename="wiki-revision")
 router.register(r"drive-folders", DriveFolderViewSet, basename="drive-folder")
 router.register(r"drive-files", DriveFileViewSet, basename="drive-file")
+
+# Issues
+router.register(r"issues",           IssueViewSet,         basename="issue")
+router.register(r"issue-categories", IssueCategoryViewSet, basename="issue-category")
+router.register(r"feedback-items", ReportRequestViewSet, basename="feedback-item")
 
 # Lookups (core)
 router.register(r"customer-statuses", CustomerStatusViewSet, basename="customer-status")
 router.register(r"site-statuses", SiteStatusViewSet, basename="site-status")
 router.register(r"inventory-statuses", InventoryStatusViewSet, basename="inventory-status")
 router.register(r"inventory-types", InventoryTypeViewSet, basename="inventory-type")
+router.register(r"users", UserViewSet, basename="user")
+
+
+def legacy_restore_alias(pattern: str, viewset, action: str):
+    """Temporary shim for older clients/tests using pre-router restore paths."""
+    return path(
+        pattern,
+        viewset.as_view({"post": action}, permission_classes=[CanRestoreModelPermission]),
+    )
 
 # Schema/Docs permissions:
 # - DEBUG: public (dev convenience)
@@ -77,11 +99,33 @@ urlpatterns = [
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
 
+    # Public status endpoints
+    path("api/health/", HealthAPIView.as_view()),
+    path("api/system-stats/", SystemStatsView.as_view()),
+
     # Global search (aggregated)
     path("api/search/", SearchAPIView.as_view()),
 
+    path("api/wiki-stats/", WikiStatsView.as_view()),
+
     # File upload (multipart)
     path("api/drive-files/upload/", DriveFileUploadView.as_view()),
+
+    # Backward-compatible restore aliases used by older tests/clients.
+    # Keep them only as temporary shims; canonical endpoints remain the router ones
+    # (`/api/inventories/...`, `/api/custom-field-definitions/...`).
+    legacy_restore_alias("api/inventory/bulk_restore/", InventoryViewSet, "bulk_restore"),
+    legacy_restore_alias("api/inventory/<int:pk>/restore/", InventoryViewSet, "restore"),
+    legacy_restore_alias(
+        "api/custom-fields/bulk_restore/",
+        CustomFieldDefinitionViewSet,
+        "bulk_restore",
+    ),
+    legacy_restore_alias(
+        "api/custom-fields/<int:pk>/restore/",
+        CustomFieldDefinitionViewSet,
+        "restore",
+    ),
 
     # API router
     path("api/", include(router.urls)),

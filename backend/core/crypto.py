@@ -14,7 +14,7 @@ from typing import Optional
 from django.conf import settings
 
 try:
-    from cryptography.fernet import Fernet, InvalidToken  # type: ignore
+    from cryptography.fernet import Fernet, InvalidToken
 except Exception as exc:  # pragma: no cover
     # Import errors will surface early during app boot; keep message clear.
     raise
@@ -51,7 +51,9 @@ def get_fernet() -> Fernet:
 
 
 def is_encrypted(value: Optional[str]) -> bool:
-    return bool(value) and value.startswith(PREFIX)
+    if value is None or value == "":
+        return False
+    return value.startswith(PREFIX)
 
 
 def encrypt(value: Optional[str]) -> Optional[str]:

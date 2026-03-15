@@ -30,6 +30,13 @@ rebuild: ## Rebuild images and recreate containers
 ps: ## Show service status
 	$(COMPOSE) ps
 
+.PHONY: health
+health: ## Check backend and frontend health endpoints
+	@echo "[health] backend"
+	@curl -fsS http://localhost:6382/api/health/ && echo
+	@echo "[health] frontend"
+	@curl -fsS http://localhost:6383/healthz && echo
+
 .PHONY: logs
 logs: ## Tail logs for all services
 	$(COMPOSE) logs -f --tail=200
@@ -74,6 +81,14 @@ test-core: ## Run core smoke tests
 test: ## Run all backend tests
 	$(COMPOSE) exec backend python manage.py test
 
+.PHONY: test-backend-pytest
+test-backend-pytest: ## Run all backend pytest tests
+	$(COMPOSE) exec backend pytest -q
+
+.PHONY: test-frontend
+test-frontend: ## Run frontend unit tests (Vitest)
+	cd frontend && npm ci && npm run test:run
+
 .PHONY: check
 check: ## Run Django system checks
 	$(COMPOSE) exec backend python manage.py check
@@ -91,6 +106,15 @@ ci: ## Practical CI: check + migrations check + migration plan
 	@$(MAKE) check
 	@$(MAKE) check-migrations
 	@$(MAKE) migrate-plan
+
+
+.PHONY: smoke
+smoke: ## Run the full post-patch smoke suite
+	./scripts/smoke.sh full
+
+.PHONY: smoke-quick
+smoke-quick: ## Run the quick backend smoke suite
+	./scripts/smoke.sh quick
 
 .PHONY: collectstatic
 collectstatic: ## Collect static files

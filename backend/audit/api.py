@@ -9,6 +9,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from audit.models import AuditEvent
+from config.ui_paths import build_entity_path
 
 
 class AuditEventSerializer(serializers.ModelSerializer):
@@ -16,6 +17,9 @@ class AuditEventSerializer(serializers.ModelSerializer):
     actor_email = serializers.CharField(source="actor.email", read_only=True)
     content_type_app = serializers.CharField(source="content_type.app_label", read_only=True)
     content_type_model = serializers.CharField(source="content_type.model", read_only=True)
+    changes = serializers.SerializerMethodField()
+    entity_path = serializers.SerializerMethodField()
+    metadata_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = AuditEvent
@@ -33,11 +37,54 @@ class AuditEventSerializer(serializers.ModelSerializer):
             "object_repr",
             "subject",
             "changes",
+            "entity_path",
+            "metadata_summary",
             "path",
             "method",
             "ip_address",
             "user_agent",
         ]
+
+    def get_changes(self, obj):
+        raw = obj.changes or {}
+        if not isinstance(raw, dict):
+            return raw
+
+        normalized = {}
+        for field, change in raw.items():
+            if not isinstance(change, dict):
+                normalized[field] = change
+                continue
+            if "from" in change or "to" in change:
+                normalized[field] = {
+                    "from": change.get("from"),
+                    "to": change.get("to"),
+                }
+                continue
+            normalized[field] = {
+                "from": change.get("before"),
+                "to": change.get("after"),
+            }
+        return normalized
+
+    def get_entity_path(self, obj):
+        return build_entity_path(
+            getattr(obj.content_type, "app_label", None),
+            getattr(obj.content_type, "model", None),
+            obj.object_id,
+        )
+
+    def get_metadata_summary(self, obj):
+        raw = obj.metadata or {}
+        if not isinstance(raw, dict):
+            return None
+
+        summary = {
+            k: v
+            for k, v in raw.items()
+            if k not in {"path", "method", "ip", "user_agent", "x_forwarded_for"}
+        }
+        return summary or None
 
 
 class AuditEventFilter(filters.FilterSet):

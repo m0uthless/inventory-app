@@ -1,52 +1,55 @@
-import * as React from "react";
+import CloseIcon from '@mui/icons-material/Close'
+import { Box, Divider, Stack, Typography } from '@mui/material'
+import * as React from 'react'
 
-import { Box, Divider, IconButton, Stack, Typography } from "@mui/material";
-import type { TypographyProps } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { ActionIconButton } from './ActionIconButton'
 
-type Props = {
-  title: React.ReactNode;
-  subtitle?: React.ReactNode;
-  actions?: React.ReactNode;
-  divider?: boolean;
-  titleVariant?: TypographyProps["variant"];
-  titleSx?: any;
-  subtitleSx?: any;
-  onClose: () => void;
-};
+export type DetailDrawerHeaderProps = {
+  title: string
+  subtitle?: string
+  onClose: () => void
+  actions?: React.ReactNode
+  /**
+   * Whether to render the Divider below the header. Defaults to true.
+   * Some pages (e.g. WIP) pass divider={false}.
+   */
+  divider?: boolean
+}
 
-export default function DetailDrawerHeader({
+export function DetailDrawerHeader({
   title,
   subtitle,
+  onClose,
   actions,
   divider = true,
-  titleVariant = "h6",
-  titleSx,
-  subtitleSx,
-  onClose,
-}: Props) {
+}: DetailDrawerHeaderProps) {
   return (
     <>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant={titleVariant} sx={{ ...(titleSx || {}) }} noWrap>
-            {title}
-          </Typography>
-          {subtitle ? (
-            <Typography variant="body2" sx={{ opacity: 0.7, ...(subtitleSx || {}) }} noWrap>
-              {subtitle}
+      <Box sx={{ px: 2, pt: 2, pb: 1 }}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" sx={{ lineHeight: 1.2 }} noWrap>
+              {title}
             </Typography>
-          ) : null}
-        </Box>
+            {subtitle ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} noWrap>
+                {subtitle}
+              </Typography>
+            ) : null}
+          </Box>
 
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          {actions}
-          <IconButton onClick={onClose} aria-label="Chiudi">
-            <CloseIcon />
-          </IconButton>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            {actions}
+            <ActionIconButton label="Chiudi" onClick={onClose}>
+              <CloseIcon />
+            </ActionIconButton>
+          </Stack>
         </Stack>
-      </Stack>
+      </Box>
+
       {divider ? <Divider /> : null}
     </>
-  );
+  )
 }
+
+export default DetailDrawerHeader

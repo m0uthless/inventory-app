@@ -1,0 +1,6 @@
+node_modules
+/dist
+/build
+/coverage
+src/types/api.ts
+src/types/api.d.ts

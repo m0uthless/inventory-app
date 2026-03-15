@@ -1,67 +1,133 @@
-import * as React from "react";
+import * as React from 'react'
 
-import { Box, Card, CardContent } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import type { GridValidRowModel } from "@mui/x-data-grid";
+import { Box, Button, Card, CardContent, Tooltip } from '@mui/material'
+import { alpha, type SxProps, type Theme } from '@mui/material/styles'
+import type { GridValidRowModel } from '@mui/x-data-grid'
+import ViewColumnIcon from '@mui/icons-material/ViewColumn'
 
-import ListToolbar, { type ListToolbarProps } from "./ListToolbar";
-import ServerDataGrid, { type ServerDataGridProps } from "./ServerDataGrid";
+import ListToolbar, { type ListToolbarProps } from './ListToolbar'
+import ServerDataGrid, { type ServerDataGridProps } from './ServerDataGrid'
+import ColumnCustomizerPanel from './ColumnCustomizerPanel'
+import { type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
+import { compactColumnsButtonSx } from './toolbarStyles'
 
 type Props<R extends GridValidRowModel> = {
-  toolbar: ListToolbarProps;
-  children?: React.ReactNode;
-  grid: ServerDataGridProps<R>;
-  /** Optional Card props via sx (useful for per-page tweaks) */
-  sx?: any;
+  toolbar: ListToolbarProps
+  children?: React.ReactNode
+  belowToolbar?: React.ReactNode
+  grid: ServerDataGridProps<R>
+  sx?: SxProps<Theme>
+  stickyToolbar?: boolean
+}
 
-  /** Keep the toolbar visible while scrolling (sticks under the AppBar). */
-  stickyToolbar?: boolean;
-};
-
-/**
- * Standard list container:
- * - Card + CardContent
- * - shared ListToolbar
- * - shared ServerDataGrid
- */
 export default function EntityListCard<R extends GridValidRowModel>(props: Props<R>) {
-  const { toolbar, children, grid, sx, stickyToolbar = false } = props;
+  const { toolbar, children, belowToolbar, grid, sx, stickyToolbar = false } = props
+
+  const persistEnabled = Boolean(grid.pageKey)
+
+  // Ref che ServerDataGrid popola con la sua istanza di useColumnPrefs
+  const colPrefsRef = React.useRef<UseColumnPrefsReturn | null>(null)
+
+  // State per l'anchor del pannello colonne
+  const [colPanelAnchor, setColPanelAnchor] = React.useState<HTMLElement | null>(null)
+
+  // Stato locale sincronizzato con colPrefs per forzare re-render quando serve
+  const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
 
   return (
-    <Card sx={sx}>
+    <Card variant="outlined" sx={[{ borderRadius: 2.5, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden' }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
       <CardContent
         sx={{
-          // Default CardContent padding feels a bit “airy” for list pages.
-          // Tighten it up so the toolbar sits closer to the top.
-          pt: 1.5,
+          pt: toolbar.compact ? 1.25 : 1.5,
           pb: 2,
-          "&:last-child": { pb: 2 },
+          '&:last-child': { pb: 2 },
         }}
       >
         <Box
           sx={
             stickyToolbar
               ? {
-                  position: "sticky",
-                  // A tiny breathing space under the AppBar feels nicer than “glued”.
+                  position: 'sticky',
                   top: { xs: 56 + 8, sm: 64 + 8 },
                   zIndex: 2,
                   bgcolor: (theme) => alpha(theme.palette.background.paper, 0.92),
-                  backdropFilter: "blur(8px)",
+                  backdropFilter: 'blur(8px)',
                   borderRadius: 2,
-                  boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-                  // No outline/border: keep it clean.
+                  boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
                   px: 1,
                   py: 0.75,
                   mb: 1.5,
                 }
-              : { mb: 1.5 }
+              : {
+                  mb: toolbar.compact ? 1 : 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                }
           }
         >
-          <ListToolbar {...toolbar}>{children}</ListToolbar>
+          <ListToolbar {...toolbar}>
+            {/* Pulsante "Colonne" iniettato come primo children */}
+            {persistEnabled && (
+              <Tooltip title="Colonne" arrow>
+                <Button
+                  size="small"
+                  aria-label="Colonne"
+                  startIcon={<ViewColumnIcon sx={{ fontSize: toolbar.compact ? '18px !important' : '15px !important' }} />}
+                  onClick={(e) => {
+                    setColPanelAnchor(e.currentTarget)
+                    forceUpdate()
+                  }}
+                  sx={
+                    toolbar.compact
+                      ? compactColumnsButtonSx
+                      : {
+                          fontSize: '0.8125rem',
+                          color: 'text.secondary',
+                          textTransform: 'none',
+                          px: 1.25,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1.5,
+                          '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
+                        }
+                  }
+                >
+                  {toolbar.compact ? '' : 'Colonne'}
+                </Button>
+              </Tooltip>
+            )}
+            {children}
+          </ListToolbar>
+
+          {belowToolbar ? <Box sx={{ mt: 1 }}>{belowToolbar}</Box> : null}
         </Box>
-        <ServerDataGrid {...(grid as any)} />
+
+        <ServerDataGrid {...grid} colPrefsRef={colPrefsRef} />
+
+        {/* Pannello drag & drop colonne */}
+        {persistEnabled && colPrefsRef.current && (
+          <ColumnCustomizerPanel
+            anchorEl={colPanelAnchor}
+            onClose={() => setColPanelAnchor(null)}
+            columns={grid.columns}
+            columnOrder={colPrefsRef.current.columnOrder}
+            columnVisibility={colPrefsRef.current.columnVisibilityModel}
+            onOrderChange={(order) => {
+              colPrefsRef.current?.saveOrder(order)
+              forceUpdate()
+            }}
+            onVisibilityChange={(model) => {
+              colPrefsRef.current?.onColumnVisibilityModelChange(model)
+              forceUpdate()
+            }}
+            onReset={() => {
+              colPrefsRef.current?.resetPrefs()
+              forceUpdate()
+            }}
+            hasPrefs={colPrefsRef.current.hasPrefs}
+          />
+        )}
       </CardContent>
     </Card>
-  );
+  )
 }

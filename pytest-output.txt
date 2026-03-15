@@ -1,0 +1,463 @@
+.......F.................FFFFFF.................................FF.F.... [ 63%]
+..F.......................FF.............                                [100%]
+=================================== FAILURES ===================================
+_______________ test_successful_login_resets_rate_limit_counter ________________
+
+superuser = <User: admin>
+
+    @pytest.mark.django_db
+    @override_settings(
+        AUTH_LOGIN_FAILURE_LIMIT=2,
+        AUTH_LOGIN_IP_FAILURE_LIMIT=10,
+        AUTH_LOGIN_WINDOW_SECONDS=60,
+    )
+    def test_successful_login_resets_rate_limit_counter(superuser):
+        client = Client(enforce_csrf_checks=True)
+        client.get('/api/auth/csrf/')
+        csrftoken = client.cookies['csrftoken'].value
+        headers = {'content_type': 'application/json', 'HTTP_X_CSRFTOKEN': csrftoken}
+    
+        bad_payload = json.dumps({'username': superuser.username, 'password': 'wrong-password'})
+        good_payload = json.dumps({'username': superuser.username, 'password': 'admin'})
+    
+        assert client.post('/api/auth/login/', bad_payload, **headers).status_code == 401
+        assert client.post('/api/auth/login/', good_payload, **headers).status_code == 200
+>       assert client.post('/api/auth/login/', bad_payload, **headers).status_code == 401
+E       assert 403 == 401
+E        +  where 403 = <HttpResponseForbidden status_code=403, "text/html; charset=utf-8">.status_code
+E        +    where <HttpResponseForbidden status_code=403, "text/html; charset=utf-8"> = post('/api/auth/login/', '{"username": "admin", "password": "wrong-password"}', **{'HTTP_X_CSRFTOKEN': 'O93MNFmFoEgjV3zgTVHI9RAgGrMHLOFJ', 'content_type': 'application/json'})
+E        +      where post = <django.test.client.Client object at 0x7c90e5032300>.post
+
+config/tests/test_auth_hardening.py:58: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  django.request:log.py:253 Unauthorized: /api/auth/login/
+WARNING  django.security.csrf:log.py:253 Forbidden (CSRF token from the 'X-Csrftoken' HTTP header incorrect.): /api/auth/login/
+___________ test_inventory_bulk_restore_updates_updated_by_and_count ___________
+
+    def test_inventory_bulk_restore_updates_updated_by_and_count():
+        owner = _user()
+        actor = _user()
+        actor.user_permissions.add(Permission.objects.get(codename="change_inventory"))
+    
+        cs = CustomerStatus.objects.get_or_create(key="mix_cust", defaults={"label": "Active"})[0]
+        ss = SiteStatus.objects.get_or_create(key="mix_site", defaults={"label": "Active"})[0]
+        ist = InventoryStatus.objects.get_or_create(key="mix_inv_status", defaults={"label": "Active"})[0]
+        it = InventoryType.objects.get_or_create(key="mix_type", defaults={"label": "Server"})[0]
+    
+        customer = Customer.objects.create(name="ACME", status=cs, created_by=owner, updated_by=owner)
+        site = Site.objects.create(customer=customer, name="HQ", status=ss, created_by=owner, updated_by=owner)
+        inv = Inventory.objects.create(
+            customer=customer, site=site, name="INV", status=ist, type=it,
+            created_by=owner, updated_by=owner, deleted_at=timezone.now()
+        )
+    
+        r = _client(actor).post("/api/inventory/bulk_restore/", {"ids": [inv.id]}, format="json")
+>       assert r.status_code == 200, r.data
+                                     ^^^^^^
+E       AttributeError: 'HttpResponseNotFound' object has no attribute 'data'
+
+core/tests/test_restore_actions_mixin.py:64: AttributeError
+------------------------------ Captured log call -------------------------------
+WARNING  django.request:log.py:253 Not Found: /api/inventory/bulk_restore/
+________ test_custom_field_bulk_restore_uses_generic_restore_permission ________
+
+    def test_custom_field_bulk_restore_uses_generic_restore_permission():
+        actor = _user()
+        actor.user_permissions.add(Permission.objects.get(codename="change_customfielddefinition"))
+        field = CustomFieldDefinition.objects.create(
+            entity="customer", key=f"k_{uuid.uuid4().hex[:4]}", label="L", field_type="text", deleted_at=timezone.now()
+        )
+    
+        r = _client(actor).post("/api/custom-fields/bulk_restore/", {"ids": [field.id]}, format="json")
+>       assert r.status_code == 200, r.data
+                                     ^^^^^^
+E       AttributeError: 'HttpResponseNotFound' object has no attribute 'data'
+
+core/tests/test_restore_actions_mixin.py:79: AttributeError
+------------------------------ Captured log call -------------------------------
+WARNING  django.request:log.py:253 Not Found: /api/custom-fields/bulk_restore/
+_ TestRestoreDependencyPolicy.test_site_restore_is_blocked_if_customer_still_deleted _
+
+self = <core.tests.test_restore_dependency_policy.TestRestoreDependencyPolicy object at 0x7c90e583a9c0>
+api_client = <rest_framework.test.APIClient object at 0x7c90e52cfad0>
+superuser = <User: admin>
+active_lookups = (<CustomerStatus: Active>, <SiteStatus: Active>, <InventoryStatus: Active>, <InventoryType: Server>)
+
+    def test_site_restore_is_blocked_if_customer_still_deleted(self, api_client, superuser, active_lookups):
+        customer_status, site_status, _, _ = active_lookups
+        customer = Customer.objects.create(name="Deleted Customer", status=customer_status, deleted_at=timezone.now())
+        site = Site.objects.create(customer=customer, name="Deleted Site", status=site_status, deleted_at=timezone.now())
+    
+        api_client.force_authenticate(user=superuser)
+        res = api_client.post(f"/api/sites/{site.id}/restore/")
+    
+>       assert res.status_code == 409
+E       assert 204 == 409
+E        +  where 204 = <Response status_code=204>.status_code
+
+core/tests/test_restore_dependency_policy.py:36: AssertionError
+__ TestRestoreDependencyPolicy.test_contact_bulk_restore_reports_blocked_rows __
+
+self = <core.tests.test_restore_dependency_policy.TestRestoreDependencyPolicy object at 0x7c90e58397f0>
+api_client = <rest_framework.test.APIClient object at 0x7c90e52cde80>
+superuser = <User: admin>
+active_lookups = (<CustomerStatus: Active>, <SiteStatus: Active>, <InventoryStatus: Active>, <InventoryType: Server>)
+
+    def test_contact_bulk_restore_reports_blocked_rows(self, api_client, superuser, active_lookups):
+        customer_status, site_status, _, _ = active_lookups
+        customer = Customer.objects.create(name="Deleted Customer", status=customer_status, deleted_at=timezone.now())
+        site = Site.objects.create(customer=customer, name="Deleted Site", status=site_status, deleted_at=timezone.now())
+        contact = Contact.objects.create(
+            customer=customer,
+            site=site,
+            name="Mario Rossi",
+            deleted_at=timezone.now(),
+        )
+    
+        api_client.force_authenticate(user=superuser)
+        res = api_client.post("/api/contacts/bulk_restore/", {"ids": [contact.id]}, format="json")
+    
+        assert res.status_code == 200
+        body = res.json()
+>       assert body["count"] == 0
+E       assert 1 == 0
+
+core/tests/test_restore_dependency_policy.py:57: AssertionError
+_ TestRestoreDependencyPolicy.test_inventory_bulk_restore_only_restores_records_with_active_parents _
+
+self = <core.tests.test_restore_dependency_policy.TestRestoreDependencyPolicy object at 0x7c90e5839310>
+api_client = <rest_framework.test.APIClient object at 0x7c90e58bf590>
+superuser = <User: admin>
+active_lookups = (<CustomerStatus: Active>, <SiteStatus: Active>, <InventoryStatus: Active>, <InventoryType: Server>)
+
+    def test_inventory_bulk_restore_only_restores_records_with_active_parents(self, api_client, superuser, active_lookups):
+        customer_status, site_status, inventory_status, inventory_type = active_lookups
+        customer_ok = Customer.objects.create(name="Customer OK", status=customer_status)
+        site_ok = Site.objects.create(customer=customer_ok, name="HQ", status=site_status)
+        inv_ok = Inventory.objects.create(
+            customer=customer_ok,
+            site=site_ok,
+            name="Server OK",
+            status=inventory_status,
+            type=inventory_type,
+            deleted_at=timezone.now(),
+        )
+    
+        customer_deleted = Customer.objects.create(name="Customer Deleted", status=customer_status, deleted_at=timezone.now())
+        site_deleted = Site.objects.create(customer=customer_deleted, name="Old HQ", status=site_status, deleted_at=timezone.now())
+        inv_blocked = Inventory.objects.create(
+            customer=customer_deleted,
+            site=site_deleted,
+            name="Server Blocked",
+            status=inventory_status,
+            type=inventory_type,
+            deleted_at=timezone.now(),
+        )
+    
+        api_client.force_authenticate(user=superuser)
+        res = api_client.post(
+            "/api/inventories/bulk_restore/",
+            {"ids": [inv_ok.id, inv_blocked.id]},
+            format="json",
+        )
+    
+        assert res.status_code == 200
+        body = res.json()
+>       assert body["count"] == 1
+E       assert 2 == 1
+
+core/tests/test_restore_dependency_policy.py:96: AssertionError
+_ TestRestoreDependencyPolicy.test_maintenance_plan_restore_is_blocked_if_customer_deleted _
+
+self = <core.tests.test_restore_dependency_policy.TestRestoreDependencyPolicy object at 0x7c90e5839c70>
+api_client = <rest_framework.test.APIClient object at 0x7c90e52a3f50>
+superuser = <User: admin>
+active_lookups = (<CustomerStatus: Active>, <SiteStatus: Active>, <InventoryStatus: Active>, <InventoryType: Server>)
+
+    def test_maintenance_plan_restore_is_blocked_if_customer_deleted(self, api_client, superuser, active_lookups):
+        customer_status, _, _, inventory_type = active_lookups
+        customer = Customer.objects.create(name="Deleted Customer", status=customer_status, deleted_at=timezone.now())
+        plan = MaintenancePlan.objects.create(
+            customer=customer,
+            title="Annual Check",
+            schedule_type="interval",
+            interval_unit="months",
+            interval_value=12,
+            next_due_date=timezone.localdate(),
+            deleted_at=timezone.now(),
+        )
+        plan.inventory_types.add(inventory_type)
+    
+        api_client.force_authenticate(user=superuser)
+        res = api_client.post(f"/api/maintenance-plans/{plan.id}/restore/")
+    
+>       assert res.status_code == 409
+E       assert 200 == 409
+E        +  where 200 = <Response status_code=200, "application/json">.status_code
+
+core/tests/test_restore_dependency_policy.py:122: AssertionError
+___________ test_contact_create_rejects_site_from_different_customer ___________
+
+    def test_contact_create_rejects_site_from_different_customer():
+        user = _make_user()
+        customer_a = _make_customer(user, "a")
+        customer_b = _make_customer(user, "b")
+        site_b = _make_site(user, customer_b, "b")
+    
+        client = _auth_client(user)
+        response = client.post(
+            "/api/contacts/",
+            {
+                "customer": customer_a.id,
+                "site": site_b.id,
+                "name": "Mario Rossi",
+                "email": "mario@example.com",
+            },
+            format="json",
+        )
+    
+>       assert response.status_code == 400, response.data
+E       AssertionError: {'id': 15, 'customer': 40, 'customer_code': 'C-000040', 'customer_name': 'Customer_a', 'site': 18, 'site_name': 'Site_...'created_at': '2026-03-13T12:21:07.062215+01:00', 'updated_at': '2026-03-13T12:21:07.062220+01:00', 'deleted_at': None}
+E       assert 201 == 400
+E        +  where 201 = <Response status_code=201, "application/json">.status_code
+
+crm/tests/test_contact_integrity.py:71: AssertionError
+_______ test_contact_partial_update_rejects_site_from_different_customer _______
+
+    def test_contact_partial_update_rejects_site_from_different_customer():
+        user = _make_user()
+        customer_a = _make_customer(user, "c")
+        customer_b = _make_customer(user, "d")
+        site_a = _make_site(user, customer_a, "c")
+        site_b = _make_site(user, customer_b, "d")
+    
+        client = _auth_client(user)
+        create_response = client.post(
+            "/api/contacts/",
+            {
+                "customer": customer_a.id,
+                "site": site_a.id,
+                "name": "Giulia Bianchi",
+            },
+            format="json",
+        )
+        assert create_response.status_code == 201, create_response.data
+    
+        contact_id = create_response.data["id"]
+        response = client.patch(
+            f"/api/contacts/{contact_id}/",
+            {"site": site_b.id},
+            format="json",
+        )
+    
+>       assert response.status_code == 400, response.data
+E       AssertionError: {'id': 16, 'customer': 42, 'customer_code': 'C-000042', 'customer_name': 'Customer_c', 'site': 20, 'site_name': 'Site_...'created_at': '2026-03-13T12:21:07.190350+01:00', 'updated_at': '2026-03-13T12:21:07.195682+01:00', 'deleted_at': None}
+E       assert 200 == 400
+E        +  where 200 = <Response status_code=200, "application/json">.status_code
+
+crm/tests/test_contact_integrity.py:103: AssertionError
+________________ test_site_detail_includes_province_and_country ________________
+
+api_client = <rest_framework.test.APIClient object at 0x7c90e5448fe0>
+superuser = <User: admin>
+
+    @pytest.mark.django_db
+    def test_site_detail_includes_province_and_country(api_client, superuser):
+        customer_status = CustomerStatus.objects.create(key="active", label="Attivo")
+        site_status = SiteStatus.objects.create(key="active", label="Attivo")
+        customer = Customer.objects.create(name="ACME", status=customer_status)
+        site = Site.objects.create(
+            customer=customer,
+            name="HQ Milano",
+            status=site_status,
+            city="Milano",
+            province="MI",
+            country="IT",
+        )
+    
+        api_client.force_authenticate(user=superuser)
+        resp = api_client.get(f"/api/sites/{site.id}/")
+    
+        assert resp.status_code == 200
+>       assert resp.data["province"] == "MI"
+               ^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'province'
+
+crm/tests/test_site_contracts.py:25: KeyError
+________________ test_inventory_list_includes_navigation_fields ________________
+
+api_client = <rest_framework.test.APIClient object at 0x7c90e5449160>
+superuser = <User: admin>, customer_status = <CustomerStatus: Active>
+site_status = <SiteStatus: Active>, inventory_status = <InventoryStatus: Active>
+inventory_type = <InventoryType: Server>
+
+    @pytest.mark.django_db
+    def test_inventory_list_includes_navigation_fields(
+        api_client,
+        superuser,
+        customer_status,
+        site_status,
+        inventory_status,
+        inventory_type,
+    ):
+        api_client.force_authenticate(user=superuser)
+    
+        customer = Customer.objects.create(name="Acme Corp", status=customer_status)
+        site = Site.objects.create(
+            customer=customer,
+            name="Primary DC",
+            display_name="Milano DC",
+            status=site_status,
+        )
+>       inventory = Inventory.objects.create(
+            customer=customer,
+            site=site,
+            name="DB Server 01",
+            hostname="db-01",
+            knumber="K-100",
+            serial_number="SN-100",
+            status=inventory_status,
+            type=inventory_type,
+            os_pwd="top-secret",
+        )
+
+inventory/tests/test_list_contracts.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.12/site-packages/django/db/models/manager.py:87: in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/django/db/models/query.py:665: in create
+    obj.save(force_insert=True, using=self.db)
+inventory/models.py:84: in save
+    setattr(self, field, encrypt(val))
+                         ^^^^^^^^^^^^
+core/crypto.py:64: in encrypt
+    f = get_fernet()
+        ^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def get_fernet() -> Fernet:
+        key = getattr(settings, "FIELD_ENCRYPTION_KEY", None)
+        if key:
+            if isinstance(key, str):
+                key_b = key.encode("utf-8")
+            else:
+                key_b = key
+            return Fernet(key_b)
+    
+        # No key configured
+        if getattr(settings, "DEBUG", False):
+            # Dev-only fallback: derive from SECRET_KEY so local dev works
+            return Fernet(_derive_dev_key(settings.SECRET_KEY))
+    
+>       raise RuntimeError(
+            "FIELD_ENCRYPTION_KEY is required when DEBUG=False to encrypt/decrypt secrets."
+        )
+E       RuntimeError: FIELD_ENCRYPTION_KEY is required when DEBUG=False to encrypt/decrypt secrets.
+
+core/crypto.py:48: RuntimeError
+_________ test_maintenance_plan_custom_fields_invalid_type_returns_400 _________
+
+api_client = <rest_framework.test.APIClient object at 0x7c90e5277ec0>
+superuser = <User: admin>
+
+    @pytest.mark.django_db
+    def test_maintenance_plan_custom_fields_invalid_type_returns_400(api_client, superuser):
+        CustomFieldDefinition.objects.create(
+            entity=CustomFieldDefinition.Entity.MAINTENANCE_PLAN,
+            key="visit_count",
+            label="Numero visite",
+            field_type=CustomFieldDefinition.FieldType.NUMBER,
+            required=False,
+        )
+    
+        customer_status = CustomerStatus.objects.create(key="active", label="Attivo")
+        site_status = SiteStatus.objects.create(key="active", label="Attivo")
+        inventory_status = InventoryStatus.objects.create(key="active", label="Attivo")
+        inventory_type = InventoryType.objects.create(key="server", label="Server")
+    
+        customer = Customer.objects.create(name="MaintCo", status=customer_status)
+        site = Site.objects.create(customer=customer, name="HQ", status=site_status)
+        Inventory.objects.create(
+            customer=customer,
+            site=site,
+            name="Srv-1",
+            status=inventory_status,
+            type=inventory_type,
+        )
+    
+        api_client.force_authenticate(user=superuser)
+        payload = {
+            "customer": customer.id,
+            "inventory_types": [inventory_type.id],
+            "title": "Piano trimestrale",
+            "schedule_type": "interval",
+            "interval_unit": "months",
+            "interval_value": 3,
+            "next_due_date": "2026-04-01",
+            "custom_fields": {"visit_count": "NOT_A_NUMBER"},
+        }
+        resp = api_client.post("/api/maintenance-plans/", payload, format="json")
+>       assert resp.status_code == 400
+E       assert 201 == 400
+E        +  where 201 = <Response status_code=201, "application/json">.status_code
+
+maintenance/tests/test_custom_fields_validation.py:46: AssertionError
+__________ test_maintenance_plan_custom_fields_alias_is_canonicalized __________
+
+api_client = <rest_framework.test.APIClient object at 0x7c90e50fa270>
+superuser = <User: admin>
+
+    @pytest.mark.django_db
+    def test_maintenance_plan_custom_fields_alias_is_canonicalized(api_client, superuser):
+        CustomFieldDefinition.objects.create(
+            entity=CustomFieldDefinition.Entity.MAINTENANCE_PLAN,
+            key="service_window",
+            label="Finestra servizio",
+            field_type=CustomFieldDefinition.FieldType.TEXT,
+            required=False,
+            aliases=["finestra servizio"],
+        )
+    
+        customer_status = CustomerStatus.objects.create(key="active", label="Attivo")
+        inventory_type = InventoryType.objects.create(key="server", label="Server")
+        customer = Customer.objects.create(name="MaintCo", status=customer_status)
+    
+        api_client.force_authenticate(user=superuser)
+        payload = {
+            "customer": customer.id,
+            "inventory_types": [inventory_type.id],
+            "title": "Piano annuale",
+            "schedule_type": "interval",
+            "interval_unit": "years",
+            "interval_value": 1,
+            "next_due_date": "2026-12-31",
+            "custom_fields": {"finestra servizio": "Weekend"},
+        }
+        resp = api_client.post("/api/maintenance-plans/", payload, format="json")
+        assert resp.status_code == 201
+>       assert resp.data["custom_fields"] == {"service_window": "Weekend"}
+E       AssertionError: assert {'finestra se...o': 'Weekend'} == {'service_window': 'Weekend'}
+E         
+E         Left contains 1 more item:
+E         {'finestra servizio': 'Weekend'}
+E         Right contains 1 more item:
+E         {'service_window': 'Weekend'}
+E         Use -v to get more diff
+
+maintenance/tests/test_custom_fields_validation.py:79: AssertionError
+=========================== short test summary info ============================
+FAILED config/tests/test_auth_hardening.py::test_successful_login_resets_rate_limit_counter
+FAILED core/tests/test_restore_actions_mixin.py::test_inventory_bulk_restore_updates_updated_by_and_count
+FAILED core/tests/test_restore_actions_mixin.py::test_custom_field_bulk_restore_uses_generic_restore_permission
+FAILED core/tests/test_restore_dependency_policy.py::TestRestoreDependencyPolicy::test_site_restore_is_blocked_if_customer_still_deleted
+FAILED core/tests/test_restore_dependency_policy.py::TestRestoreDependencyPolicy::test_contact_bulk_restore_reports_blocked_rows
+FAILED core/tests/test_restore_dependency_policy.py::TestRestoreDependencyPolicy::test_inventory_bulk_restore_only_restores_records_with_active_parents
+FAILED core/tests/test_restore_dependency_policy.py::TestRestoreDependencyPolicy::test_maintenance_plan_restore_is_blocked_if_customer_deleted
+FAILED crm/tests/test_contact_integrity.py::test_contact_create_rejects_site_from_different_customer
+FAILED crm/tests/test_contact_integrity.py::test_contact_partial_update_rejects_site_from_different_customer
+FAILED crm/tests/test_site_contracts.py::test_site_detail_includes_province_and_country
+FAILED inventory/tests/test_list_contracts.py::test_inventory_list_includes_navigation_fields
+FAILED maintenance/tests/test_custom_fields_validation.py::test_maintenance_plan_custom_fields_invalid_type_returns_400
+FAILED maintenance/tests/test_custom_fields_validation.py::test_maintenance_plan_custom_fields_alias_is_canonicalized
+13 failed, 100 passed in 18.16s

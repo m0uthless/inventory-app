@@ -42,6 +42,13 @@ class DriveFolder(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="created_drive_folders",
     )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_drive_folders",
+    )
     notes = models.TextField(null=True, blank=True)
 
     class Meta:
@@ -105,6 +112,13 @@ class DriveFile(TimeStampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="created_drive_files",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_drive_files",
     )
     notes = models.TextField(null=True, blank=True)
 

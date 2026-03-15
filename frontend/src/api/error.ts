@@ -1,81 +1,163 @@
-import type { AxiosError } from "axios";
+import type { AxiosError } from 'axios'
 
-function isObject(x: unknown): x is Record<string, any> {
-  return typeof x === "object" && x !== null && !Array.isArray(x);
+type UnknownRecord = Record<string, unknown>
+
+export type ApiFormFeedback = {
+  fieldErrors: Record<string, string>
+  message: string
+  hasFieldErrors: boolean
+  status?: number
 }
 
-function flattenFieldErrors(obj: Record<string, any>): string[] {
-  const out: string[] = [];
-  for (const [k, v] of Object.entries(obj)) {
-    if (k === "detail" && typeof v === "string") out.push(v);
-    else if (Array.isArray(v)) out.push(`${k}: ${v.join(", ")}`);
-    else if (typeof v === "string") out.push(`${k}: ${v}`);
-    else if (isObject(v)) out.push(`${k}: ${flattenFieldErrors(v).join(" | ")}`);
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === 'object' && v !== null
+}
+
+function isAxiosError(v: unknown): v is AxiosError {
+  return isRecord(v) && (v as UnknownRecord).isAxiosError === true
+}
+
+function coerceString(v: unknown): string | undefined {
+  if (typeof v === 'string') return v
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  return undefined
+}
+
+function statusFallback(status?: number): string | undefined {
+  switch (status) {
+    case 400:
+      return 'Dati non validi.'
+    case 401:
+      return "Sessione non valida. Effettua di nuovo l'accesso."
+    case 403:
+      return 'Non hai i permessi per questa operazione.'
+    case 404:
+      return 'Risorsa non trovata.'
+    case 409:
+      return 'Operazione non consentita nello stato attuale.'
+    case 429:
+      return 'Troppe richieste. Riprova tra poco.'
+    default:
+      if (status && status >= 500) return 'Errore interno del server.'
+      return undefined
   }
-  return out;
 }
 
+function firstMessageFromArray(v: unknown): string | undefined {
+  if (!Array.isArray(v)) return undefined
+  for (const item of v) {
+    const s = coerceString(item)
+    if (s) return s
+  }
+  return undefined
+}
+
+function firstFieldMessage(errors: Record<string, string>): string | undefined {
+  for (const key of Object.keys(errors)) {
+    if (key === '_error' || key === 'non_field_errors') continue
+    const s = errors[key]
+    if (s) return s
+  }
+  return undefined
+}
+
+function flattenFieldErrors(data: unknown, prefix = '', out: Record<string, string> = {}): Record<string, string> {
+  if (!isRecord(data)) return out
+
+  for (const [rawKey, value] of Object.entries(data)) {
+    if (rawKey === 'detail' || rawKey === 'message') continue
+
+    const key = rawKey === 'non_field_errors' ? '_error' : rawKey
+    const path = prefix ? `${prefix}.${key}` : key
+
+    if (Array.isArray(value)) {
+      const first = firstMessageFromArray(value)
+      if (first) {
+        out[path] = first
+        if (key === '_error') out.non_field_errors = first
+      }
+      continue
+    }
+
+    if (isRecord(value)) {
+      flattenFieldErrors(value, path, out)
+      continue
+    }
+
+    const s = coerceString(value)
+    if (s) {
+      out[path] = s
+      if (key === '_error') out.non_field_errors = s
+    }
+  }
+
+  return out
+}
+
+/**
+ * Extract field errors from a DRF validation response.
+ * Nested objects are flattened using dot notation.
+ */
+export function getApiErrorFieldErrors(err: unknown): Record<string, string> {
+  if (!isAxiosError(err)) return {}
+  return flattenFieldErrors(err.response?.data)
+}
+
+/**
+ * Extract a user-friendly message from an API error (Axios or generic).
+ */
+export function getApiErrorMessage(err: unknown): string {
+  if (isAxiosError(err)) {
+    const data = err.response?.data
+    const status = err.response?.status
+
+    if (isRecord(data)) {
+      const detail = coerceString(data.detail)
+      if (detail) return detail
+
+      const nonField = firstMessageFromArray(data.non_field_errors)
+      if (nonField) return nonField
+
+      const message = coerceString(data.message)
+      if (message) return message
+
+      const firstField = firstFieldMessage(flattenFieldErrors(data))
+      if (firstField) return firstField
+    }
+
+    return statusFallback(status) || err.message || 'Errore di rete'
+  }
+
+  if (err instanceof Error) return err.message
+  return 'Errore inatteso'
+}
+
+export function getApiFormFeedback(err: unknown, defaultValidationMessage = 'Controlla i campi evidenziati.'): ApiFormFeedback {
+  const fieldErrors = getApiErrorFieldErrors(err)
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0
+  const message = hasFieldErrors
+    ? fieldErrors._error || fieldErrors.non_field_errors || firstFieldMessage(fieldErrors) || defaultValidationMessage
+    : getApiErrorMessage(err)
+
+  return {
+    fieldErrors,
+    hasFieldErrors,
+    message,
+    status: isAxiosError(err) ? err.response?.status : undefined,
+  }
+}
+
+/**
+ * Backwards-compatible aliases (older code imports these names).
+ */
 export function apiErrorToMessage(err: unknown): string {
-  const e = err as AxiosError<any>;
-
-  // Axios network / timeout
-  if ((e as any)?.code === "ECONNABORTED") return "Timeout: il server non risponde.";
-  if (!e?.response) return "Errore di rete: controlla connessione / proxy / backend.";
-
-  const data = e.response.data;
-
-  if (typeof data === "string") return data;
-
-  if (isObject(data)) {
-    if (typeof data.detail === "string") return data.detail;
-    const parts = flattenFieldErrors(data);
-    if (parts.length) return parts.join(" • ");
-  }
-
-  const status = e.response.status;
-  return `Errore (${status}).`;
+  return getApiErrorMessage(err)
 }
 
+export function apiErrorToFieldErrors(err: unknown): Record<string, string> {
+  return getApiErrorFieldErrors(err)
+}
 
-export function apiErrorToFieldErrors(err: unknown): Record<string, string> | null {
-  const e = err as AxiosError<any>;
-  if (!e?.response) return null;
-  if (e.response.status !== 400) return null;
-
-  const data = e.response.data;
-  if (!isObject(data)) return null;
-
-  const out: Record<string, string> = {};
-
-  const add = (k: string, v: unknown) => {
-    if (!k || k === "detail") return;
-    if (Array.isArray(v)) {
-      const first = v.find((x) => typeof x === "string") as any;
-      if (typeof first === "string" && first.trim()) out[k] = first;
-      else if (v.length) out[k] = String(v[0]);
-      return;
-    }
-    if (typeof v === "string" && v.trim()) out[k] = v;
-  };
-
-  for (const [k, v] of Object.entries(data)) {
-    if (k === "detail") continue;
-
-    // DRF convention for form-level errors
-    if (k === "non_field_errors") {
-      if (Array.isArray(v) && v.length) out["_error"] = String(v[0]);
-      else if (typeof v === "string") out["_error"] = v;
-      continue;
-    }
-
-    if (isObject(v)) {
-      // Flatten 1-level nested errors (e.g. custom_fields.xxx)
-      for (const [k2, v2] of Object.entries(v)) add(`${k}.${k2}`, v2);
-      continue;
-    }
-
-    add(k, v);
-  }
-
-  return Object.keys(out).length ? out : null;
+export function apiErrorToFormFeedback(err: unknown, defaultValidationMessage?: string): ApiFormFeedback {
+  return getApiFormFeedback(err, defaultValidationMessage)
 }

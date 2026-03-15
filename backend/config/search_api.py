@@ -10,12 +10,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from crm.models import Contact, Customer, Site
+from drive.access import filter_accessible_files, filter_accessible_folders
 from drive.models import DriveFile, DriveFolder
 from inventory.models import Inventory
 from maintenance.models import MaintenancePlan
 from wiki.models import WikiPage
 
-# Sentinella per date non parsabili: finiscono in fondo al sort per recency
+from .ui_paths import (
+    contact_path,
+    customer_path,
+    drive_root_path,
+    inventory_path,
+    maintenance_plan_path,
+    site_path,
+    wiki_page_path,
+)
+
 _EPOCH = datetime.min.replace(tzinfo=timezone.utc)
 
 
@@ -24,12 +34,6 @@ def _safe_str(v: Any) -> str:
 
 
 def _parse_dt(s: str) -> datetime:
-    """Parse ISO8601 datetime for robust sorting.
-
-    Fallback to epoch (datetime.min) if empty or not parseable so sorting
-    never breaks.
-    """
-
     if not s:
         return _EPOCH
     try:
@@ -47,23 +51,14 @@ def _model_has_field(model, field_name: str) -> bool:
 
 
 def _or_icontains(model, q: str, fields: list[str]) -> Q:
-    """Build an OR Q(icontains) across fields that actually exist on the model."""
     q_obj = Q()
     for f in fields:
         if _model_has_field(model, f):
             q_obj |= Q(**{f"{f}__icontains": q})
     return q_obj
 
+
 class SearchAPIView(APIView):
-    """Global search API.
-
-    GET /api/search/?q=...&limit=50
-
-    Returns a flat list of results with a 'kind' and a suggested UI path.
-    NOTE: This view is not a ModelViewSet, therefore it must NOT use
-    IsAuthenticatedDjangoModelPermissions.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request):
@@ -104,9 +99,6 @@ class SearchAPIView(APIView):
         per_small = max(1, limit // 5)
         per_mid = max(1, limit // 3)
 
-        # ------------------------------------------------------------------
-        # CRM
-        # ------------------------------------------------------------------
         if user.has_perm("crm.view_customer"):
             for c in (
                 Customer.objects.select_related("status")
@@ -127,12 +119,11 @@ class SearchAPIView(APIView):
                     f"{c.code} — {c.display_name}",
                     subtitle or "Customer",
                     c.updated_at,
-                    "/customers",
+                    customer_path(c.id),
                     {"code": c.code},
                 )
 
         if user.has_perm("crm.view_site"):
-            # IMPORTANT: Site does NOT have a 'code' field.
             for s in (
                 Site.objects.select_related("customer", "status")
                 .filter(deleted_at__isnull=True)
@@ -152,7 +143,7 @@ class SearchAPIView(APIView):
                     subtitle = f"{s.customer.code} — {s.customer.name}"
                 if s.city:
                     subtitle = (subtitle + " • " if subtitle else "") + s.city
-                add("site", s.id, s.display_name or s.name, subtitle or "Site", s.updated_at, "/sites")
+                add("site", s.id, s.display_name or s.name, subtitle or "Site", s.updated_at, site_path(s.id))
 
         if user.has_perm("crm.view_contact"):
             for ct in (
@@ -175,11 +166,8 @@ class SearchAPIView(APIView):
                 extra = " / ".join([s for s in [_safe_str(ct.email), _safe_str(ct.phone)] if s])
                 if extra:
                     subtitle = (subtitle + " • " if subtitle else "") + extra
-                add("contact", ct.id, ct.name, subtitle or "Contact", ct.updated_at, "/contacts")
+                add("contact", ct.id, ct.name, subtitle or "Contact", ct.updated_at, contact_path(ct.id))
 
-        # ------------------------------------------------------------------
-        # Inventory
-        # ------------------------------------------------------------------
         if user.has_perm("inventory.view_inventory"):
             for inv in (
                 Inventory.objects.select_related("site", "site__customer", "status", "type")
@@ -207,11 +195,8 @@ class SearchAPIView(APIView):
                     subtitle += f" • {inv.type.label}"
                 if inv.status_id:
                     subtitle += f" • {inv.status.label}"
-                add("inventory", inv.id, title, subtitle, inv.updated_at, "/inventory")
+                add("inventory", inv.id, title, subtitle, inv.updated_at, inventory_path(inv.id))
 
-        # ------------------------------------------------------------------
-        # Maintenance
-        # ------------------------------------------------------------------
         if user.has_perm("maintenance.view_maintenanceplan"):
             for p in (
                 MaintenancePlan.objects.select_related("customer")
@@ -228,49 +213,47 @@ class SearchAPIView(APIView):
                 .order_by("next_due_date")[:per_small]
             ):
                 cust = p.customer
-                type_labels = ", ".join(p.inventory_types.values_list("label", flat=True))
+                type_labels = ", ".join(t.label for t in p.inventory_types.all())
                 subtitle = f"{cust.code} — {cust.name}"
                 if type_labels:
                     subtitle += f" • {type_labels}"
                 if p.next_due_date:
                     subtitle += f" • scad. {p.next_due_date}"
-                add("maintenance_plan", p.id, p.title, subtitle, p.updated_at, "/maintenance")
+                add("maintenance_plan", p.id, p.title, subtitle, p.updated_at, maintenance_plan_path(p.id))
 
-        # ------------------------------------------------------------------
-        # Drive
-        # ------------------------------------------------------------------
         if user.has_perm("drive.view_drivefolder"):
             for f in (
-                DriveFolder.objects.select_related("parent")
-                .filter(deleted_at__isnull=True)
-                .filter(_or_icontains(DriveFolder, q, ['name', 'notes', 'description']))
+                filter_accessible_folders(
+                    DriveFolder.objects.select_related("parent").filter(deleted_at__isnull=True),
+                    user,
+                )
+                .filter(_or_icontains(DriveFolder, q, ["name", "notes"]))
                 .order_by("name")[:per_small]
             ):
                 subtitle = "Cartella"
                 if f.parent_id and f.parent:
                     subtitle = f"In {f.parent.name}"
-                add("drive_folder", f.id, f.name, subtitle, f.updated_at, "/drive")
+                add("drive_folder", f.id, f.name, subtitle, f.updated_at, drive_root_path())
 
         if user.has_perm("drive.view_drivefile"):
             for df in (
-                DriveFile.objects.select_related("folder")
-                .filter(deleted_at__isnull=True)
-                .filter(_or_icontains(DriveFile, q, ['original_filename', 'notes', 'description']))
+                filter_accessible_files(
+                    DriveFile.objects.select_related("folder").filter(deleted_at__isnull=True),
+                    user,
+                )
+                .filter(_or_icontains(DriveFile, q, ["name", "notes"]))
                 .order_by("-created_at")[:per_small]
             ):
                 subtitle = "File"
                 if df.folder_id and df.folder:
                     subtitle = f"In {df.folder.name}"
-                add("drive_file", df.id, df.original_filename, subtitle, df.updated_at, "/drive")
+                add("drive_file", df.id, df.name, subtitle, df.updated_at, drive_root_path())
 
-        # ------------------------------------------------------------------
-        # Wiki (published only)
-        # ------------------------------------------------------------------
-        if user.has_perm("wiki.view_wikipage"):
-            wiki_qs = WikiPage.objects.select_related("category").filter(deleted_at__isnull=True, is_published=True)
-        else:
-            wiki_qs = WikiPage.objects.none()
-
+        wiki_qs = (
+            WikiPage.objects.select_related("category").filter(deleted_at__isnull=True, is_published=True)
+            if user.has_perm("wiki.view_wikipage")
+            else WikiPage.objects.none()
+        )
         for wp in (
             wiki_qs.filter(
                 Q(title__icontains=q)
@@ -282,7 +265,7 @@ class SearchAPIView(APIView):
         ):
             cat = wp.category.name if wp.category_id else "Wiki"
             subtitle = f"{cat} • {wp.slug}"
-            add("wiki_page", wp.id, wp.title, subtitle, wp.updated_at, "/wiki")
+            add("wiki_page", wp.id, wp.title, subtitle, wp.updated_at, wiki_page_path(wp.id))
 
         results.sort(key=lambda r: _parse_dt(_safe_str(r.get("updated_at"))), reverse=True)
         return Response({"q": q, "results": results[:limit]})

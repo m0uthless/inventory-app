@@ -52,3 +52,39 @@ class IsStaffOrAdminGroup(BasePermission):
             return True
 
         return bool(user.groups.filter(name=self.admin_group_name).exists())
+
+
+class CanPurgeModelPermission(BasePermission):
+    """Generic permission helper for `purge` actions (hard delete).
+
+    By default it requires the `delete` permission for the view's model.
+    A view can override this by defining `purge_permission`.
+    """
+
+    def has_permission(self, request, view) -> bool:
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+
+        explicit = getattr(view, "purge_permission", None)
+        if explicit:
+            return bool(user.has_perm(explicit))
+
+        try:
+            model = view.get_queryset().model
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+            return bool(user.has_perm(f"{app_label}.delete_{model_name}"))
+        except Exception:
+            return False
+
+
+
+def user_has_model_perm(user, model, action: str) -> bool:
+    """Return whether user has the Django model permission for the given action."""
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    app_label = model._meta.app_label
+    model_name = model._meta.model_name
+    return bool(user.has_perm(f"{app_label}.{action}_{model_name}"))

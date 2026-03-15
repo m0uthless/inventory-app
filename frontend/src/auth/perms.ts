@@ -4,100 +4,111 @@
 export const PERMS = {
   crm: {
     customer: {
-      view: "crm.view_customer",
-      add: "crm.add_customer",
-      change: "crm.change_customer",
-      delete: "crm.delete_customer",
+      view: 'crm.view_customer',
+      add: 'crm.add_customer',
+      change: 'crm.change_customer',
+      delete: 'crm.delete_customer',
     },
     site: {
-      view: "crm.view_site",
-      add: "crm.add_site",
-      change: "crm.change_site",
-      delete: "crm.delete_site",
+      view: 'crm.view_site',
+      add: 'crm.add_site',
+      change: 'crm.change_site',
+      delete: 'crm.delete_site',
     },
     contact: {
-      view: "crm.view_contact",
-      add: "crm.add_contact",
-      change: "crm.change_contact",
-      delete: "crm.delete_contact",
+      view: 'crm.view_contact',
+      add: 'crm.add_contact',
+      change: 'crm.change_contact',
+      delete: 'crm.delete_contact',
     },
   },
 
   inventory: {
     inventory: {
-      view: "inventory.view_inventory",
-      view_secrets: "inventory.view_secrets",
-      add: "inventory.add_inventory",
-      change: "inventory.change_inventory",
-      delete: "inventory.delete_inventory",
+      view: 'inventory.view_inventory',
+      view_secrets: 'inventory.view_secrets',
+      add: 'inventory.add_inventory',
+      change: 'inventory.change_inventory',
+      delete: 'inventory.delete_inventory',
     },
   },
 
   audit: {
-    view: "audit.view_auditevent",
+    view: 'audit.view_auditevent',
   },
 
   maintenance: {
     plan: {
-      view:   "maintenance.view_maintenanceplan",
-      add:    "maintenance.add_maintenanceplan",
-      change: "maintenance.change_maintenanceplan",
-      delete: "maintenance.delete_maintenanceplan",
+      view: 'maintenance.view_maintenanceplan',
+      add: 'maintenance.add_maintenanceplan',
+      change: 'maintenance.change_maintenanceplan',
+      delete: 'maintenance.delete_maintenanceplan',
     },
     event: {
-      view:   "maintenance.view_maintenanceevent",
-      add:    "maintenance.add_maintenanceevent",
-      change: "maintenance.change_maintenanceevent",
-      delete: "maintenance.delete_maintenanceevent",
+      view: 'maintenance.view_maintenanceevent',
+      add: 'maintenance.add_maintenanceevent',
+      change: 'maintenance.change_maintenanceevent',
+      delete: 'maintenance.delete_maintenanceevent',
     },
     template: {
-      view:   "maintenance.view_maintenancetemplate",
-      add:    "maintenance.add_maintenancetemplate",
-      change: "maintenance.change_maintenancetemplate",
-      delete: "maintenance.delete_maintenancetemplate",
+      view: 'maintenance.view_maintenancetemplate',
+      add: 'maintenance.add_maintenancetemplate',
+      change: 'maintenance.change_maintenancetemplate',
+      delete: 'maintenance.delete_maintenancetemplate',
     },
     notification: {
-      view: "maintenance.view_maintenancenotification",
+      view: 'maintenance.view_maintenancenotification',
     },
     tech: {
-      view:   "maintenance.view_tech",
-      add:    "maintenance.add_tech",
-      change: "maintenance.change_tech",
-      delete: "maintenance.delete_tech",
+      view: 'maintenance.view_tech',
+      add: 'maintenance.add_tech',
+      change: 'maintenance.change_tech',
+      delete: 'maintenance.delete_tech',
     },
   },
 
   wiki: {
-    page: { view: "wiki.view_wikipage" },
+    page: {
+      view: 'wiki.view_wikipage',
+      add: 'wiki.add_wikipage',
+      change: 'wiki.change_wikipage',
+      delete: 'wiki.delete_wikipage',
+    },
   },
 
   drive: {
     folder: {
-      view:   "drive.view_drivefolder",
-      add:    "drive.add_drivefolder",
-      change: "drive.change_drivefolder",
-      delete: "drive.delete_drivefolder",
+      view: 'drive.view_drivefolder',
+      add: 'drive.add_drivefolder',
+      change: 'drive.change_drivefolder',
+      delete: 'drive.delete_drivefolder',
     },
     file: {
-      view:   "drive.view_drivefile",
-      add:    "drive.add_drivefile",
-      change: "drive.change_drivefile",
-      delete: "drive.delete_drivefile",
+      view: 'drive.view_drivefile',
+      add: 'drive.add_drivefile',
+      change: 'drive.change_drivefile',
+      delete: 'drive.delete_drivefile',
     },
   },
-} as const;
+
+  issues: {
+    issue: {
+      view: 'issues.view_issue',
+      add: 'issues.add_issue',
+      change: 'issues.change_issue',
+      delete: 'issues.delete_issue',
+    },
+  },
+} as const
 
 export const TRASH_VIEW_ANY = [
   PERMS.crm.customer.view,
   PERMS.crm.site.view,
   PERMS.crm.contact.view,
   PERMS.inventory.inventory.view,
-] as const;
+] as const
 
-export const DRIVE_VIEW_ANY = [
-  PERMS.drive.folder.view,
-  PERMS.drive.file.view,
-] as const;
+export const DRIVE_VIEW_ANY = [PERMS.drive.folder.view, PERMS.drive.file.view] as const
 
 export const MAINTENANCE_VIEW_ANY = [
   PERMS.maintenance.plan.view,
@@ -105,4 +116,4 @@ export const MAINTENANCE_VIEW_ANY = [
   PERMS.maintenance.tech.view,
   PERMS.maintenance.template.view,
   PERMS.maintenance.notification.view,
-] as const;
+] as const

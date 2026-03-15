@@ -1,5 +1,5 @@
-import * as React from "react";
-import type { ButtonProps } from "@mui/material";
+import * as React from 'react'
+import type { ButtonProps } from '@mui/material'
 import {
   Button,
   CircularProgress,
@@ -8,19 +8,19 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-} from "@mui/material";
+} from '@mui/material'
 
 type Props = {
-  open: boolean;
-  title: string;
-  description?: string;
-  busy?: boolean;
-  confirmText?: string;
-  confirmColor?: ButtonProps["color"];
-  confirmStartIcon?: React.ReactNode;
-  onClose: () => void;
-  onConfirm: () => void;
-};
+  open: boolean
+  title: string
+  description?: string
+  busy?: boolean
+  confirmText?: string
+  confirmColor?: ButtonProps['color']
+  confirmStartIcon?: React.ReactNode
+  onClose: () => void
+  onConfirm: () => void
+}
 
 export default function ConfirmActionDialog(props: Props) {
   const {
@@ -28,17 +28,17 @@ export default function ConfirmActionDialog(props: Props) {
     title,
     description,
     busy = false,
-    confirmText = "Conferma",
-    confirmColor = "primary",
+    confirmText = 'Conferma',
+    confirmColor = 'primary',
     confirmStartIcon,
     onClose,
     onConfirm,
-  } = props;
+  } = props
 
   const handleClose = () => {
-    if (busy) return;
-    onClose();
-  };
+    if (busy) return
+    onClose()
+  }
 
   return (
     <Dialog
@@ -48,16 +48,14 @@ export default function ConfirmActionDialog(props: Props) {
       maxWidth="xs"
       aria-labelledby="confirm-action-title"
     >
-      <DialogTitle id="confirm-action-title">
-        {title}
-      </DialogTitle>
+      <DialogTitle id="confirm-action-title">{title}</DialogTitle>
       {description ? (
         <DialogContent>
-          <DialogContentText sx={{ whiteSpace: "pre-line" }}>{description}</DialogContentText>
+          <DialogContentText sx={{ whiteSpace: 'pre-line' }}>{description}</DialogContentText>
         </DialogContent>
       ) : null}
       <DialogActions>
-        <Button onClick={handleClose} disabled={busy}>
+        <Button onClick={handleClose} disabled={busy} autoFocus>
           Annulla
         </Button>
         <Button
@@ -71,5 +69,5 @@ export default function ConfirmActionDialog(props: Props) {
         </Button>
       </DialogActions>
     </Dialog>
-  );
+  )
 }
