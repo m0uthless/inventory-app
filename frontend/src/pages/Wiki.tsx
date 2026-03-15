@@ -1,615 +1,758 @@
-import * as React from "react";
+import * as React from 'react'
 import {
   Box,
   Button,
   Card,
-  CardContent,
   Chip,
   CircularProgress,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemText,
-  Collapse,
-  Drawer,
   FormControl,
-  IconButton,
+  InputAdornment,
   InputLabel,
   MenuItem,
+  Rating,
   Select,
   Stack,
-  Tab,
-  Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
-} from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
+} from '@mui/material'
+import SearchIcon from '@mui/icons-material/Search'
+import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined'
+import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined'
+import ReorderIcon from '@mui/icons-material/Reorder'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined'
+import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined'
+import { useLocation, useNavigate } from 'react-router-dom'
 
-import { DataGrid, GridToolbar } from "@mui/x-data-grid";
-import type { GridColDef } from "@mui/x-data-grid";
+import { api } from '../api/client'
+import { useToast } from '../ui/toast'
+import { apiErrorToMessage } from '../api/error'
+import { compactResetButtonSx } from '../ui/toolbarStyles'
+import FilterChip from '../ui/FilterChip'
+import { useAuth } from '../auth/AuthProvider'
+import WikiCategoryManager from '../ui/WikiCategoryManager'
 
-import { api } from "../api/client";
-
-type ApiPage<T> = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-};
-
-type Category = { id: number; name: string };
+type Category = { id: number; name: string; sort_order: number; emoji?: string; color?: string }
 
 type PageRow = {
-  id: number;
-  title: string;
-  slug: string;
-  category?: number | null;
-  category_name?: string | null;
-  is_published: boolean;
-  tags?: string[] | null;
-  updated_at?: string | null;
-};
-
-type PageDetail = PageRow & {
-  summary?: string | null;
-  content_markdown: string;
-  pdf_template_key: string;
-  pdf_options?: any;
-  created_at?: string | null;
-  notes?: string | null;
-};
-
-
-type TreeNode = {
-  id: number;
-  title: string;
-  slug: string;
-  category?: number | null;
-  category_name?: string | null;
-  parent?: number | null;
-  is_published: boolean;
-  updated_at?: string | null;
-  children: TreeNode[];
-};
-
-type TreeCategory = { id: number | null; name: string; pages: TreeNode[] };
-
-
-async function copyToClipboard(text: string) {
-  if (!text) return;
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-  }
+  id: number
+  title: string
+  slug: string
+  category?: number | null
+  category_name?: string | null
+  category_emoji?: string | null
+  category_color?: string | null
+  summary?: string | null
+  tags?: string[] | null
+  is_published: boolean
+  average_rating?: number | null
+  rating_count?: number
+  attachment_count?: number
+  view_count?: number
+  created_by_username?: string | null
+  updated_by_username?: string | null
+  updated_at?: string | null
 }
 
-function FieldRow(props: { label: string; value?: string | null; mono?: boolean }) {
-  const { label, value, mono } = props;
-  const v = value ?? "";
-  return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
-      </Box>
+type ApiPage<T> = { count: number; results: T[] }
 
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+type ViewMode = 'grid' | 'list'
+type SortValue = 'title' | '-updated_at' | '-average_rating' | '-view_count' | '-created_at'
+
+const ACCENTS = ['#0f766e', '#3b82f6', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#10b981', '#f97316']
+const SORT_OPTIONS: { value: SortValue; label: string }[] = [
+  { value: 'title', label: 'Titolo A-Z' },
+  { value: '-updated_at', label: 'Aggiornate di recente' },
+  { value: '-average_rating', label: 'Più votate' },
+  { value: '-view_count', label: 'Più viste' },
+  { value: '-created_at', label: 'Più recenti' },
+]
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+}
+
+function ratingText(page: PageRow): string {
+  if ((page.rating_count ?? 0) <= 0) return 'Ancora nessun voto'
+  return `${(page.average_rating ?? 0).toLocaleString('it-IT', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} · ${page.rating_count} vot${(page.rating_count ?? 0) === 1 ? 'o' : 'i'}`
+}
+
+function resultLabel(count: number): string {
+  return `${count} pagin${count === 1 ? 'a' : 'e'}`
+}
+
+function statText(value?: number | null): string {
+  return (value ?? 0).toLocaleString('it-IT')
+}
+
+function WikiCard({
+  page,
+  categoryMap,
+  onClick,
+}: {
+  page: PageRow
+  categoryMap: Record<number, Category>
+  onClick: () => void
+}) {
+  const cat = page.category ? categoryMap[page.category] : null
+  const accent = cat?.color ?? ACCENTS[(page.category ?? 0) % ACCENTS.length]
+  const emoji = cat?.emoji ?? '📄'
+  const tags = (page.tags ?? []).slice(0, 3)
+
+  return (
+    <Card
+      onClick={onClick}
+      variant="outlined"
+      sx={{
+        cursor: 'pointer',
+        borderRadius: 1.5,
+        borderColor: 'grey.200',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.15s',
+        '&:hover': {
+          boxShadow: `0 10px 24px ${accent}18`,
+          borderColor: accent,
+          transform: 'translateY(-2px)',
+        },
+      }}
+    >
+      <Box sx={{ height: 3, bgcolor: accent, flexShrink: 0 }} />
+
+      <Stack sx={{ p: 1.75, flex: 1 }} spacing={1.15}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap">
+            <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{emoji}</Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: accent,
+                bgcolor: `${accent}16`,
+                px: 0.75,
+                py: 0.3,
+                borderRadius: 0.75,
+                letterSpacing: '0.03em',
+                fontSize: 10.5,
+              }}
+            >
+              {page.category_name ?? 'Senza categoria'}
+            </Typography>
+          </Stack>
+          {!page.is_published && (
+            <Chip
+              label="Bozza"
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: 10,
+                fontWeight: 700,
+                borderRadius: 0.75,
+                bgcolor: '#fef9c3',
+                color: '#854d0e',
+              }}
+            />
+          )}
+        </Stack>
+
         <Typography
-          variant="body2"
+          variant="subtitle2"
           sx={{
-            fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : undefined,
-            wordBreak: "break-word",
+            fontWeight: 700,
+            color: 'text.primary',
+            lineHeight: 1.35,
+            letterSpacing: '-0.01em',
+            minHeight: 38,
           }}
         >
-          {v || "—"}
+          {page.title}
         </Typography>
-      </Box>
 
-      {v ? (
-        <Tooltip title="Copia">
-          <IconButton size="small" onClick={() => copyToClipboard(v)}>
-            <ContentCopyIcon fontSize="inherit" />
-          </IconButton>
-        </Tooltip>
-      ) : (
-        <Box sx={{ width: 34 }} />
-      )}
-    </Stack>
-  );
-}
-
-const asId = (v: unknown): number | "" => {
-  const s = String(v);
-  return s === "" ? "" : Number(s);
-};
-
-const cols: GridColDef<PageRow>[] = [
-  { field: "title", headerName: "Title", flex: 1, minWidth: 320 },
-  { field: "slug", headerName: "Slug", width: 220 },
-  { field: "category_name", headerName: "Category", width: 200 },
-  {
-    field: "is_published",
-    headerName: "Published",
-    width: 130,
-    valueGetter: (v, row) => { void v; return row.is_published ? "Yes" : "No"; },
-  },
-  {
-    field: "tags",
-    headerName: "Tags",
-    width: 120,
-    valueGetter: (v, row) => { void v; return row.tags ? String(row.tags.length) : "0"; },
-  },
-  { field: "updated_at", headerName: "Updated", width: 180 },
-];
-
-export default function Wiki() {
-  const [rows, setRows] = React.useState<PageRow[]>([]);
-  const [loading, setLoading] = React.useState(false);
-
-  const [q, setQ] = React.useState("");
-  const [search, setSearch] = React.useState("");
-
-  const [categoryId, setCategoryId] = React.useState<number | "">("");
-  const [published, setPublished] = React.useState<"" | "true" | "false">("");
-
-  const [categories, setCategories] = React.useState<Category[]>([]);
-
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState<number | null>(null);
-  const [detail, setDetail] = React.useState<PageDetail | null>(null);
-  const [detailLoading, setDetailLoading] = React.useState(false);
-
-  const [viewMode, setViewMode] = React.useState<"preview" | "markdown">("preview");
-  const [renderHtml, setRenderHtml] = React.useState<string>("");
-  const [renderLoading, setRenderLoading] = React.useState(false);
-
-const [layout, setLayout] = React.useState<"list" | "tree">("tree");
-const [tree, setTree] = React.useState<TreeCategory[]>([]);
-const [expanded, setExpanded] = React.useState<Record<number, boolean>>({});
-
-
-  const loadCategories = React.useCallback(async () => {
-    const res = await api.get<ApiPage<Category>>("/wiki-categories/", { params: { ordering: "sort_order,name", page_size: 200 } });
-    setCategories(res.data.results ?? []);
-  }, []);
-
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: any = {};
-      if (search) params.search = search;
-      if (categoryId !== "") params.category = categoryId;
-      if (published !== "") params.is_published = published;
-      const res = await api.get<ApiPage<PageRow>>("/wiki-pages/", { params });
-      setRows(res.data.results ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, categoryId, published]);
-
-const loadTree = React.useCallback(async () => {
-  setLoading(true);
-  try {
-    const params: any = {};
-    if (search) params.search = search;
-    if (categoryId !== "") params.category = categoryId;
-    if (published !== "") params.is_published = published;
-    const res = await api.get<TreeCategory[]>("/wiki-pages/tree/", { params });
-    setTree(res.data ?? []);
-  } finally {
-    setLoading(false);
-  }
-}, [search, categoryId, published]);
-
-
-
-  const loadDetail = React.useCallback(async (id: number) => {
-    setDetailLoading(true);
-    setRenderLoading(true);
-    setDetail(null);
-    setRenderHtml("");
-    setViewMode("preview");
-    try {
-      const [d, r] = await Promise.all([
-        api.get<PageDetail>(`/wiki-pages/${id}/`),
-        api.get<{ html: string }>(`/wiki-pages/${id}/render/`),
-      ]);
-      setDetail(d.data);
-      setRenderHtml(r.data?.html ?? "");
-    } catch {
-      // fallback: detail loader will surface errors in console; keep UI usable
-    } finally {
-      setDetailLoading(false);
-      setRenderLoading(false);
-    }
-  }, []);
-
-  const exportPdf = React.useCallback(async () => {
-    if (!selectedId) return;
-    const slug = detail?.slug || `wiki-page-${selectedId}`;
-    const res = await api.get(`/wiki-pages/${selectedId}/export-pdf/`, { responseType: "blob" });
-    const blob = new Blob([res.data], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, [selectedId, detail?.slug]);
-
-  React.useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
-
-  React.useEffect(() => {
-    if (layout === "tree") loadTree();
-    else load();
-  }, [load, loadTree, layout]);
-
-  
-const toggleExpanded = (id: number) => {
-  setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-};
-
-const renderNode = (node: TreeNode, depth: number) => {
-  const hasChildren = (node.children?.length ?? 0) > 0;
-  const isOpen = !!expanded[node.id];
-
-  return (
-    <React.Fragment key={node.id}>
-      <ListItemButton
-        dense
-        sx={{ pl: 1 + depth * 2 }}
-        onClick={() => {
-          setSelectedId(node.id);
-          setDrawerOpen(true);
-          loadDetail(node.id);
-        }}
-      >
-        {hasChildren ? (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleExpanded(node.id);
+        {page.summary ? (
+          <Typography
+            variant="body2"
+            sx={{
+              color: 'text.secondary',
+              fontSize: 12.5,
+              lineHeight: 1.55,
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              minHeight: 58,
             }}
-            sx={{ mr: 0.5 }}
           >
-            {isOpen ? <ExpandMoreIcon fontSize="inherit" /> : <ChevronRightIcon fontSize="inherit" />}
-          </IconButton>
+            {page.summary}
+          </Typography>
         ) : (
-          <Box sx={{ width: 34 }} />
+          <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12.5, minHeight: 58 }}>
+            Nessun riepilogo disponibile.
+          </Typography>
         )}
 
-        <ListItemText
-          primaryTypographyProps={{ variant: "body2", noWrap: true }}
-          primary={node.title}
-          secondary={node.slug}
-          secondaryTypographyProps={{ variant: "caption", noWrap: true, sx: { opacity: 0.7 } }}
-        />
-      </ListItemButton>
-
-      {hasChildren ? (
-        <Collapse in={isOpen} timeout="auto" unmountOnExit>
-          <List disablePadding>
-            {node.children.map((c) => renderNode(c, depth + 1))}
-          </List>
-        </Collapse>
-      ) : null}
-    </React.Fragment>
-  );
-};
-
-return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="h5">
-          Wiki
-        </Typography>
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Pagine wiki: click su una riga per aprire contenuto.
-        </Typography>
-      </Box>
-
-      <Card>
-        <CardContent>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }} alignItems="center">
-            <TextField
-              size="small"
-              label="Search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") setSearch(q);
-              }}
-              sx={{ width: { xs: "100%", md: 340 } }}
-            />
-
-            <FormControl size="small" sx={{ minWidth: 220, width: { xs: "100%", md: 260 } }}>
-              <InputLabel>Category</InputLabel>
-              <Select label="Category" value={categoryId} onChange={(e) => setCategoryId(asId(e.target.value))}>
-                <MenuItem value="">All</MenuItem>
-                {categories.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" sx={{ minWidth: 160, width: { xs: "100%", md: 180 } }}>
-              <InputLabel>Published</InputLabel>
-              <Select label="Published" value={published} onChange={(e) => setPublished(String(e.target.value) as any)}>
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="true">Published</MenuItem>
-                <MenuItem value="false">Draft</MenuItem>
-              </Select>
-            </FormControl>
-
-
-<FormControl size="small" sx={{ minWidth: 160, width: { xs: "100%", md: 180 } }}>
-  <InputLabel>View</InputLabel>
-  <Select label="View" value={layout} onChange={(e) => setLayout(e.target.value as any)}>
-    <MenuItem value="tree">Tree</MenuItem>
-    <MenuItem value="list">List</MenuItem>
-  </Select>
-</FormControl>
-
-            <Button
-              variant="outlined"
-              onClick={() => {
-                setQ("");
-                setSearch("");
-                setCategoryId("");
-                setPublished("");
-              }}
-              sx={{ width: { xs: "100%", md: "auto" } }}
-            >
-              Reset
-            </Button>
-          </Stack>
-
-          
-{layout === "tree" ? (
-  <Card variant="outlined" sx={{ height: 640, overflow: "auto" }}>
-    <CardContent sx={{ py: 1 }}>
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Stack spacing={1}>
-          {tree.map((c) => (
-            <Box key={String(c.id ?? "uncat")}>
-              <Typography variant="subtitle2" sx={{ px: 1, py: 0.5, opacity: 0.8 }}>
-                {c.name}
-              </Typography>
-              <List dense disablePadding>
-                {c.pages.map((p) => renderNode(p, 0))}
-              </List>
-              <Divider sx={{ my: 1 }} />
-            </Box>
-          ))}
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          <Rating
+            value={page.average_rating ?? 0}
+            precision={0.1}
+            readOnly
+            size="small"
+            sx={{
+              '& .MuiRating-iconFilled': { color: '#f59e0b' },
+              '& .MuiRating-iconEmpty': { color: '#fcd34d' },
+              fontSize: 16,
+            }}
+          />
+          <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+            {ratingText(page)}
+          </Typography>
         </Stack>
-      )}
-    </CardContent>
-  </Card>
-) : (
-  <Box sx={{ height: 640 }}>
-    <DataGrid
-      rows={rows}
-      columns={cols}
-      loading={loading}
-      disableRowSelectionOnClick
-      slots={{ toolbar: GridToolbar }}
-      slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } }}
-      initialState={{ pagination: { paginationModel: { pageSize: 25, page: 0 } } }}
-      pageSizeOptions={[10, 25, 50, 100]}
-      onRowClick={(params) => {
-        const rowId = Number(params.row.id);
-        setSelectedId(rowId);
-        setDrawerOpen(true);
-        loadDetail(rowId);
-      }}
-    />
-  </Box>
-)}
 
-        </CardContent>
-      </Card>
-
-      <Drawer
-        anchor="right"
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 520 } } }}
-      >
-        <Stack sx={{ p: 2 }} spacing={1.5}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h6">
-                {detail?.title || (selectedId ? `Page #${selectedId}` : "Page")}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                {detail?.category_name ? `${detail.category_name} • ${detail.slug}` : detail?.slug || " "}
-              </Typography>
-            </Box>
-
-            <IconButton onClick={() => setDrawerOpen(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Stack>
-
-          <Divider />
-
-          {detailLoading ? (
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-              <CircularProgress size={18} />
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Caricamento…
-              </Typography>
-            </Stack>
-          ) : detail ? (
-            <>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {detail.is_published ? <Chip size="small" label="Published" /> : <Chip size="small" label="Draft" />}
-                {detail.tags?.slice(0, 6).map((t) => (
-                  <Chip key={t} size="small" label={t} />
-                ))}
-                {detail.tags && detail.tags.length > 6 ? <Chip size="small" label={`+${detail.tags.length - 6}`} /> : null}
-              </Stack>
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Metadata
-              </Typography>
-              <FieldRow label="Slug" value={detail.slug} mono />
-              <FieldRow label="Category" value={detail.category_name ?? ""} />
-              <FieldRow label="Template" value={detail.pdf_template_key} mono />
-
-              <Divider />
-
-              <Typography variant="subtitle2" sx={{ mt: 1, opacity: 0.75 }}>
-                Summary
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {detail.summary || "—"}
-              </Typography>
-
-              <Divider />
-
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
-                <Tabs
-                  value={viewMode}
-                  onChange={(_, v) => setViewMode(v)}
-                  sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, textTransform: "none", fontWeight: 700 } }}
-                >
-                  <Tab value="preview" label="Preview" />
-                  <Tab value="markdown" label="Markdown" />
-                </Tabs>
-
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => copyToClipboard(detail.content_markdown)}
-                    startIcon={<ContentCopyIcon />}
-                  >
-                    Copy
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={exportPdf}
-                    startIcon={<PictureAsPdfRoundedIcon />}
-                  >
-                    Export PDF
-                  </Button>
-                </Stack>
-              </Stack>
-
-              <Box
-                sx={{
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  p: 1,
-                  mt: 1,
-                  maxHeight: 380,
-                  overflow: "auto",
-                  bgcolor: "background.paper",
-                }}
-              >
-                {viewMode === "preview" ? (
-                  renderLoading ? (
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-                      <CircularProgress size={18} />
-                      <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                        Rendering…
-                      </Typography>
-                    </Stack>
-                  ) : (
-                    <Box
-                      sx={{
-                        "& h1": { fontSize: 22, fontWeight: 900, mt: 1.5, mb: 1 },
-                        "& h2": { fontSize: 18, fontWeight: 900, mt: 1.5, mb: 1 },
-                        "& h3": { fontSize: 16, fontWeight: 900, mt: 1.25, mb: 0.75 },
-                        "& p": { my: 1, lineHeight: 1.7 },
-                        "& ul": { pl: 3, my: 1 },
-                        "& ol": { pl: 3, my: 1 },
-                        "& li": { my: 0.5 },
-                        "& code": {
-                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                          fontSize: 13,
-                          bgcolor: "action.hover",
-                          px: 0.5,
-                          borderRadius: 1,
-                        },
-                        "& pre": {
-                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                          fontSize: 13,
-                          bgcolor: "action.hover",
-                          p: 1,
-                          borderRadius: 2,
-                          overflow: "auto",
-                        },
-                        "& blockquote": {
-                          borderLeft: "4px solid",
-                          borderColor: "divider",
-                          pl: 2,
-                          ml: 0,
-                          opacity: 0.9,
-                        },
-                        "& table": {
-                          width: "100%",
-                          borderCollapse: "collapse",
-                          my: 1,
-                        },
-                        "& th, & td": {
-                          border: "1px solid",
-                          borderColor: "divider",
-                          p: 0.75,
-                          fontSize: 13,
-                        },
-                        "& th": { bgcolor: "action.hover", fontWeight: 900 },
-                      }}
-                      dangerouslySetInnerHTML={{ __html: renderHtml || "<em>—</em>" }}
-                    />
-                  )
-                ) : (
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {detail.content_markdown || ""}
-                  </Typography>
-                )}
-              </Box>
-            </>
-          ) : (
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Nessun dettaglio disponibile.
+        <Stack direction="row" spacing={0.5} flexWrap="wrap">
+          {tags.map((t) => (
+            <Typography
+              key={t}
+              variant="caption"
+              sx={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                color: 'text.disabled',
+                bgcolor: 'grey.50',
+                px: 0.75,
+                py: 0.25,
+                borderRadius: 0.75,
+              }}
+            >
+              {t}
+            </Typography>
+          ))}
+          {(page.tags?.length ?? 0) > 3 && (
+            <Typography variant="caption" sx={{ fontSize: 10.5, color: 'text.disabled' }}>
+              +{page.tags!.length - 3}
             </Typography>
           )}
         </Stack>
-      </Drawer>
+
+        <Stack spacing={0.75} sx={{ pt: 1, borderTop: '1px solid', borderColor: 'grey.100' }}>
+          <Stack direction="row" alignItems="center" spacing={1.2} flexWrap="wrap">
+            <Stack direction="row" alignItems="center" spacing={0.45}>
+              <VisibilityOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                {statText(page.view_count)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.45}>
+              <AttachFileOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                {statText(page.attachment_count)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.45}>
+              <ScheduleOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                {fmtDate(page.updated_at) || '—'}
+              </Typography>
+            </Stack>
+          </Stack>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <PersonOutlineOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+            <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }} noWrap>
+              {page.updated_by_username || page.created_by_username || 'Autore non disponibile'}
+            </Typography>
+          </Stack>
+        </Stack>
+      </Stack>
+    </Card>
+  )
+}
+
+function WikiListRow({
+  page,
+  categoryMap,
+  onClick,
+}: {
+  page: PageRow
+  categoryMap: Record<number, Category>
+  onClick: () => void
+}) {
+  const cat = page.category ? categoryMap[page.category] : null
+  const accent = cat?.color ?? ACCENTS[(page.category ?? 0) % ACCENTS.length]
+  const emoji = cat?.emoji ?? '📄'
+  const tags = (page.tags ?? []).slice(0, 4)
+
+  return (
+    <Card
+      onClick={onClick}
+      variant="outlined"
+      sx={{
+        cursor: 'pointer',
+        borderRadius: 1.5,
+        borderColor: 'grey.200',
+        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.15s',
+        '&:hover': {
+          boxShadow: `0 8px 20px ${accent}18`,
+          borderColor: accent,
+          transform: 'translateY(-1px)',
+        },
+      }}
+    >
+      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5} justifyContent="space-between" sx={{ px: 1.75, py: 1.5 }}>
+        <Stack spacing={0.95} sx={{ minWidth: 0, flex: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap">
+            <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{emoji}</Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: accent,
+                bgcolor: `${accent}16`,
+                px: 0.75,
+                py: 0.25,
+                borderRadius: 0.75,
+                letterSpacing: '0.03em',
+                fontSize: 10.5,
+              }}
+            >
+              {page.category_name ?? 'Senza categoria'}
+            </Typography>
+            {!page.is_published && (
+              <Chip
+                label="Bozza"
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: 0.75,
+                  bgcolor: '#fef9c3',
+                  color: '#854d0e',
+                }}
+              />
+            )}
+          </Stack>
+
+          <Typography
+            variant="subtitle2"
+            sx={{
+              fontWeight: 700,
+              color: 'text.primary',
+              lineHeight: 1.3,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {page.title}
+          </Typography>
+
+          {page.summary ? (
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'text.secondary',
+                fontSize: 12.5,
+                lineHeight: 1.55,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {page.summary}
+            </Typography>
+          ) : (
+            <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12.5 }}>
+              Nessun riepilogo disponibile.
+            </Typography>
+          )}
+
+          {!!tags.length && (
+            <Stack direction="row" spacing={0.5} flexWrap="wrap">
+              {tags.map((t) => (
+                <Typography
+                  key={t}
+                  variant="caption"
+                  sx={{
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    color: 'text.disabled',
+                    bgcolor: 'grey.50',
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: 0.75,
+                  }}
+                >
+                  {t}
+                </Typography>
+              ))}
+              {(page.tags?.length ?? 0) > 4 && (
+                <Typography variant="caption" sx={{ fontSize: 10.5, color: 'text.disabled' }}>
+                  +{page.tags!.length - 4}
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </Stack>
+
+        <Stack
+          spacing={0.9}
+          alignItems={{ xs: 'flex-start', lg: 'flex-end' }}
+          justifyContent="space-between"
+          sx={{ minWidth: { xs: 0, lg: 240 }, flexShrink: 0 }}
+        >
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            <Rating
+              value={page.average_rating ?? 0}
+              precision={0.1}
+              readOnly
+              size="small"
+              sx={{
+                '& .MuiRating-iconFilled': { color: '#f59e0b' },
+                '& .MuiRating-iconEmpty': { color: '#fcd34d' },
+                fontSize: 16,
+              }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+              {ratingText(page)}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={1.15} flexWrap="wrap" justifyContent={{ xs: 'flex-start', lg: 'flex-end' }}>
+            <Stack direction="row" alignItems="center" spacing={0.4}>
+              <VisibilityOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                {statText(page.view_count)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.4}>
+              <AttachFileOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                {statText(page.attachment_count)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.4}>
+              <ScheduleOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
+                {fmtDate(page.updated_at) || '—'}
+              </Typography>
+            </Stack>
+          </Stack>
+
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <PersonOutlineOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+            <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }} noWrap>
+              {page.updated_by_username || page.created_by_username || 'Autore non disponibile'}
+            </Typography>
+          </Stack>
+        </Stack>
+      </Stack>
+    </Card>
+  )
+}
+
+export default function Wiki() {
+  const toast = useToast()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { hasPerm } = useAuth()
+  const canManageCategories =
+    hasPerm('wiki.add_wikicategory') || hasPerm('wiki.change_wikicategory') || hasPerm('wiki.delete_wikicategory')
+
+  const [pages, setPages] = React.useState<PageRow[]>([])
+  const [catManagerOpen, setCatManagerOpen] = React.useState(false)
+  const [categories, setCategories] = React.useState<Category[]>([])
+  const [categoryMap, setCategoryMap] = React.useState<Record<number, Category>>({})
+  const [loading, setLoading] = React.useState(false)
+
+  const [q, setQ] = React.useState('')
+  const [search, setSearch] = React.useState('')
+  const [categoryId, setCategoryId] = React.useState<number | ''>('')
+  const [published, setPublished] = React.useState<'' | 'true' | 'false'>('')
+  const [viewMode, setViewMode] = React.useState<ViewMode>(() =>
+    window.localStorage.getItem('wiki_view_mode') === 'list' ? 'list' : 'grid',
+  )
+  const [sortBy, setSortBy] = React.useState<SortValue>(() => {
+    const raw = window.localStorage.getItem('wiki_sort_mode')
+    return SORT_OPTIONS.some((opt) => opt.value === raw) ? (raw as SortValue) : '-updated_at'
+  })
+
+  React.useEffect(() => {
+    window.localStorage.setItem('wiki_view_mode', viewMode)
+  }, [viewMode])
+
+  React.useEffect(() => {
+    window.localStorage.setItem('wiki_sort_mode', sortBy)
+  }, [sortBy])
+
+  const loadCategories = React.useCallback(async () => {
+    try {
+      const res = await api.get<ApiPage<Category>>('/wiki-categories/', {
+        params: { ordering: 'sort_order,name', page_size: 200 },
+      })
+      const cats = res.data.results ?? []
+      setCategories(cats)
+      setCategoryMap(Object.fromEntries(cats.map((c) => [c.id, c])))
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }, [toast])
+
+  const load = React.useCallback(async () => {
+    setLoading(true)
+    try {
+      const params: Record<string, unknown> = { page_size: 500, ordering: sortBy }
+      if (search) params.search = search
+      if (categoryId !== '') params.category = categoryId
+      if (published !== '') params.is_published = published
+      const res = await api.get<ApiPage<PageRow>>('/wiki-pages/', { params })
+      setPages(res.data.results ?? [])
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [search, categoryId, published, sortBy, toast])
+
+  React.useEffect(() => {
+    loadCategories()
+  }, [loadCategories])
+
+  React.useEffect(() => {
+    load()
+  }, [load])
+
+  React.useEffect(() => {
+    const state = location.state as { openCategoryManager?: boolean } | null
+    if (canManageCategories && state?.openCategoryManager) {
+      setCatManagerOpen(true)
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [canManageCategories, location.pathname, location.search, location.state, navigate])
+
+
+  const reset = React.useCallback(() => {
+    setQ('')
+    setSearch('')
+    setCategoryId('')
+    setPublished('')
+    setSortBy('-updated_at')
+  }, [])
+
+  const activeFilterCount = (categoryId !== '' ? 1 : 0) + (published !== '' ? 1 : 0)
+  const selectedSortLabel = SORT_OPTIONS.find((opt) => opt.value === sortBy)?.label ?? 'Aggiornate di recente'
+
+  return (
+    <Stack spacing={2}>
+      <Card variant="outlined" sx={{ borderRadius: 1.5, p: 1.25 }}>
+        <Stack spacing={1.15}>
+          <Stack
+            direction={{ xs: 'column', lg: 'row' }}
+            spacing={1}
+            alignItems={{ xs: 'stretch', lg: 'center' }}
+            sx={{
+              flexWrap: { lg: 'nowrap' },
+              '& .MuiButton-root': { height: 40 },
+              '& .MuiToggleButton-root': { height: 40 },
+            }}
+          >
+            <TextField
+              size="small"
+              placeholder="Cerca"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setSearch(q)
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                width: { xs: '100%', lg: 360 },
+                flexShrink: 0,
+                '& .MuiInputBase-root': {
+                  height: 40,
+                  fontSize: '0.95rem',
+                  borderRadius: 1.5,
+                  bgcolor: 'transparent',
+                },
+                '& .MuiInputBase-input': { py: 0 },
+              }}
+            />
+
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                width: { xs: '100%', lg: 'auto' },
+                flexWrap: 'wrap',
+              }}
+            >
+              <FilterChip
+                compact
+                activeCount={activeFilterCount}
+                onReset={() => {
+                  setCategoryId('')
+                  setPublished('')
+                }}
+              >
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Categoria</InputLabel>
+                  <Select
+                    label="Categoria"
+                    value={categoryId === '' ? '' : String(categoryId)}
+                    onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
+                  >
+                    <MenuItem value="">Tutte</MenuItem>
+                    {categories.map((c) => (
+                      <MenuItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Stato</InputLabel>
+                  <Select
+                    label="Stato"
+                    value={published}
+                    onChange={(e) => setPublished(e.target.value as '' | 'true' | 'false')}
+                  >
+                    <MenuItem value="">Tutti</MenuItem>
+                    <MenuItem value="true">Pubblicato</MenuItem>
+                    <MenuItem value="false">Bozza</MenuItem>
+                  </Select>
+                </FormControl>
+              </FilterChip>
+
+              <FormControl size="small" sx={{ minWidth: 190 }}>
+                <InputLabel>Ordina</InputLabel>
+                <Select label="Ordina" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortValue)}>
+                  {SORT_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={viewMode}
+                onChange={(_e, value: ViewMode | null) => {
+                  if (!value) return
+                  setViewMode(value)
+                }}
+                sx={{
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  overflow: 'hidden',
+                  '& .MuiToggleButtonGroup-grouped': {
+                    px: 1.1,
+                    py: 0,
+                    border: 0,
+                    borderRadius: '0 !important',
+                    color: 'text.secondary',
+                  },
+                  '& .MuiToggleButton-root.Mui-selected': {
+                    bgcolor: 'primary.main',
+                    color: '#fff',
+                    '&:hover': { bgcolor: 'primary.dark' },
+                  },
+                  '& .MuiToggleButton-root:not(.Mui-selected):hover': { bgcolor: 'grey.100' },
+                }}
+              >
+                <ToggleButton value="grid" aria-label="Vista griglia">
+                  <Tooltip title="Griglia">
+                    <GridViewOutlinedIcon sx={{ fontSize: 18 }} />
+                  </Tooltip>
+                </ToggleButton>
+                <ToggleButton value="list" aria-label="Vista elenco">
+                  <Tooltip title="Elenco">
+                    <ReorderIcon sx={{ fontSize: 18 }} />
+                  </Tooltip>
+                </ToggleButton>
+              </ToggleButtonGroup>
+
+              <Tooltip title="Reimposta" arrow>
+                <Button size="small" variant="contained" onClick={reset} aria-label="Reimposta" sx={compactResetButtonSx}>
+                  <RestartAltIcon />
+                </Button>
+              </Tooltip>
+            </Box>
+          </Stack>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} justifyContent="space-between">
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 12 }}>
+              {resultLabel(pages.length)} · ordinamento: {selectedSortLabel}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 12 }}>
+              Vista {viewMode === 'grid' ? 'griglia' : 'elenco'}
+            </Typography>
+          </Stack>
+        </Stack>
+      </Card>
+
+      {loading ? (
+        <Stack alignItems="center" py={6}>
+          <CircularProgress size={28} />
+        </Stack>
+      ) : pages.length === 0 ? (
+        <Stack alignItems="center" py={8} spacing={1}>
+          <ArticleOutlinedIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+          <Typography color="text.secondary">Nessuna pagina trovata.</Typography>
+          {(search || categoryId !== '' || published !== '') && (
+            <Button size="small" onClick={reset}>
+              Azzera filtri
+            </Button>
+          )}
+        </Stack>
+      ) : viewMode === 'grid' ? (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(245px, 1fr))',
+            gap: 1.5,
+          }}
+        >
+          {pages.map((p) => (
+            <WikiCard key={p.id} page={p} categoryMap={categoryMap} onClick={() => navigate(`/wiki/${p.id}`)} />
+          ))}
+        </Box>
+      ) : (
+        <Stack spacing={1.25}>
+          {pages.map((p) => (
+            <WikiListRow key={p.id} page={p} categoryMap={categoryMap} onClick={() => navigate(`/wiki/${p.id}`)} />
+          ))}
+        </Stack>
+      )}
+
+      {canManageCategories && (
+        <WikiCategoryManager
+          open={catManagerOpen}
+          onClose={() => setCatManagerOpen(false)}
+          onChanged={() => {
+            loadCategories()
+            load()
+          }}
+        />
+      )}
     </Stack>
-  );
+  )
 }
