@@ -1,8 +1,22 @@
 services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend_nginx:
+        condition: service_healthy
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    # Nessuna porta esposta all'esterno: accessibile solo nella rete Docker.
     expose:
       - "6379"
     healthcheck:
@@ -15,33 +29,20 @@ services:
 
   db:
     image: postgres:16
-    environment:
-      POSTGRES_DB: inventory_app
-      POSTGRES_USER: inventory_app
-      POSTGRES_PASSWORD: inventory_app
-    # Security: do not expose Postgres outside the Docker network by default.
-    # If you need psql from the host in dev, prefer `docker compose exec db psql ...`
+    restart: unless-stopped
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U inventory_app"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   backend:
     build: ./backend
-    env_file:
-      - ./.env
+    restart: unless-stopped
     environment:
-      # Dev convenience: run migrations automatically at container start.
-      # In production, set RUN_MIGRATIONS=0 and run migrations as a controlled deploy step.
-      RUN_MIGRATIONS: "1"
-    volumes:
-      - ./backend:/app
-      - ./data:/app/data
-      - staticfiles:/app/staticfiles
-      - media:/app/media
+      RUN_MIGRATIONS: "0"
     expose:
       - "8000"
     depends_on:
@@ -55,11 +56,16 @@ services:
       timeout: 5s
       retries: 10
       start_period: 25s
+    volumes:
+      - datafiles:/app/data
+      - staticfiles:/app/staticfiles
+      - media:/app/media
 
   backend_nginx:
     image: nginx:1.27-alpine
-    ports:
-      - "6382:80"
+    restart: unless-stopped
+    expose:
+      - "80"
     depends_on:
       backend:
         condition: service_healthy
@@ -78,8 +84,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "6383:80"
+    restart: unless-stopped
+    expose:
+      - "80"
     depends_on:
       backend_nginx:
         condition: service_healthy
@@ -91,7 +98,10 @@ services:
       start_period: 10s
 
 volumes:
+  caddy_data:
+  caddy_config:
   pgdata:
   redisdata:
+  datafiles:
   staticfiles:
   media:

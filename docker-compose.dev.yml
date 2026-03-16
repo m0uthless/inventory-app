@@ -1,0 +1,12 @@
+services:
+  caddy:
+    volumes:
+      - ./deploy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+
+  db:
+    env_file:
+      - ./.env.dev
+
+  backend:
+    env_file:
+      - ./.env.dev
