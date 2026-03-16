@@ -437,7 +437,14 @@ export function AppLayout() {
     setSiteRepositoryFlyoutAnchor(null)
     setWikiFlyoutAnchor(null)
     setBugFeatureFlyoutAnchor(null)
-  }, [loc.pathname])
+
+    // Chiudi automaticamente i gruppi che non contengono la rotta corrente.
+    // Questo evita che più gruppi rimangano aperti contemporaneamente
+    // quando l'utente naviga verso una sezione esterna al gruppo.
+    if (!siteRepositorySectionActive) setSiteRepositoryOpen(false)
+    if (!wikiSectionActive)           setWikiOpen(false)
+    if (!bugFeatureSectionActive)     setBugFeatureOpen(false)
+  }, [loc.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!mini) {
