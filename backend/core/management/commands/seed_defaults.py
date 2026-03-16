@@ -7,10 +7,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         customer_statuses = [
-            ("prospect", "Prospect", 10),
-            ("active", "Attivo", 20),
-            ("on_hold", "In pausa", 30),
-            ("archived", "Archiviato", 40),
+            ("biotron", "Biotron", 10),
+            ("philips", "Philips", 20),
+            ("mi", "Medial Imaging", 30),
+            ("dismissed", "Dismesso", 40),
         ]
         for key, label, sort_order in customer_statuses:
             CustomerStatus.objects.update_or_create(
@@ -40,13 +40,23 @@ class Command(BaseCommand):
             )
 
         inventory_types = [
-            "management", "host1", "host2", "host3", "host4", "wfm", "vue_motion", "orthoview", "speech",
-            "pc_robot", "robot", "storage", "load_balancer1", "load_balancer2", "workstation", "service_pc"
+            ("management", "Management", 10),
+            ("host", "Host", 20),
+            ("wfm", "PACS", 30),
+            ("csap", "CSAP", 40),
+            ("vue_motion", "Vue Motion", 50),
+            ("orthoview", "Orthoview", 60),
+            ("speech", "Speech", 70),
+            ("pc_robot", "Robot PC", 80),
+            ("robot", "Robot", 90),
+            ("storage", "Storage", 100),
+            ("load_balancer", "Load Balancer", 110),
+            ("workstation", "Workstation", 120),
+            ("service_pc", "Service PC", 130),
         ]
-        sort_order = 10
-        for key in inventory_types:
+        for key, label, sort_order in inventory_types:
             InventoryType.objects.update_or_create(
-                key=key, defaults={"label": key, "sort_order": sort_order, "is_active": True, "deleted_at": None}
+                key=key, defaults={"label": label, "sort_order": sort_order, "is_active": True, "deleted_at": None}
             )
             sort_order += 10
 
