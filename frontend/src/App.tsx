@@ -18,6 +18,7 @@ const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Wiki = lazy(() => import('./pages/Wiki'))
 const WikiPage = lazy(() => import('./pages/WikiPage'))
 const WikiStats = lazy(() => import('./pages/WikiStats'))
+const WikiQueries = lazy(() => import('./pages/WikiQueries'))
 const Search = lazy(() => import('./pages/Search'))
 const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
@@ -130,6 +131,10 @@ const router = createBrowserRouter([
       {
         path: 'wiki/stats',
         element: <RequirePerm perm="wiki.view_wikipage">{lazyEl(<WikiStats />)}</RequirePerm>,
+      },
+      {
+        path: 'wiki/queries',
+        element: <RequirePerm perm="wiki.view_wikiquery">{lazyEl(<WikiQueries />)}</RequirePerm>,
       },
       {
         path: 'wiki/:id',

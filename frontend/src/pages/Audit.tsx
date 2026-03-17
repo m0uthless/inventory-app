@@ -93,6 +93,8 @@ const ENTITY_LABELS: Record<string, string> = {
   'wiki.wikicategory': 'Categorie wiki',
   'wiki.wikiattachment': 'Allegati wiki',
   'wiki.wikilink': 'Link wiki',
+  'wiki.wikiquery': 'Query',
+  'feedback.reportrequest': 'Feedback',
   'drive.drivefolder': 'Cartelle drive',
   'drive.drivefile': 'File drive',
   'custom_fields.customfielddefinition': 'Definizioni campi custom',

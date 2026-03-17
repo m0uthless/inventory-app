@@ -51,6 +51,7 @@ import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
+import TerminalIcon from '@mui/icons-material/TerminalOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -85,7 +86,8 @@ const SITE_REPOSITORY_CHILDREN: NavItem[] = [
 ]
 
 const WIKI_CHILDREN: NavItem[] = [
-  { label: 'Pagine', path: '/wiki', icon: <MenuBookIcon />, perm: 'wiki.view_wikipage' },
+  { label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, perm: 'wiki.view_wikipage' },
+  { label: 'Query', path: '/wiki/queries', icon: <TerminalIcon />, perm: 'wiki.view_wikiquery' },
   { label: 'Statistiche', path: '/wiki/stats', icon: <BarChartOutlinedIcon />, perm: 'wiki.view_wikipage' },
 ]
 
@@ -107,7 +109,6 @@ const NAV: NavItem[] = [
   },
 
   { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
-  { label: 'Bug / Feature', path: '/bug-feature', icon: <FeedbackOutlinedIcon />, section: 'principale' },
 
   {
     label: 'Manutenzione',
@@ -130,7 +131,7 @@ const NAV: NavItem[] = [
     section: 'strumenti',
     permAny: ['drive.view_drivefolder', 'drive.view_drivefile'],
   },
-  { label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, section: 'strumenti', perm: 'wiki.view_wikipage' },
+  { label: 'Knowledge', path: '/wiki', icon: <MenuBookIcon />, section: 'strumenti', perm: 'wiki.view_wikipage' },
 
   // ── Sistema ──────────────────────────────────────────────────────────────────
   { label: 'Audit', path: '/audit', icon: <HistoryIcon />, section: 'sistema', perm: 'audit.view_auditevent' },
@@ -142,6 +143,8 @@ const NAV: NavItem[] = [
     section: 'sistema',
     permAny: ['crm.view_customer', 'crm.view_site', 'crm.view_contact', 'inventory.view_inventory'],
   },
+
+  { label: 'Bug / Feature', path: '/bug-feature', icon: <FeedbackOutlinedIcon />, section: 'sistema' },
 ]
 
 function isSelected(currentPath: string, itemPath: string) {
@@ -162,6 +165,14 @@ type FeedbackSummary = {
   feature_open_count: number
   bug_resolved_count: number
   feature_resolved_count: number
+}
+
+type IssueSummary = {
+  open_count: number
+  in_progress_count: number
+  resolved_count: number
+  closed_count: number
+  active_count: number
 }
 
 export function AppLayout() {
@@ -334,6 +345,24 @@ export function AppLayout() {
     }
   }, [loc.pathname])
 
+  const [issueSummary, setIssueSummary] = React.useState<IssueSummary | null>(null)
+
+  React.useEffect(() => {
+    if (!hasPerm('issues.view_issue')) return
+    let active = true
+    ;(async () => {
+      try {
+        const { data } = await api.get<IssueSummary>('/issues/summary/')
+        if (active) setIssueSummary(data)
+      } catch {
+        if (active) setIssueSummary(null)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [loc.pathname, hasPerm])
+
   const siteRepositorySectionActive = React.useMemo(
     () =>
       ['/site-repository', '/inventory', '/customers', '/sites', '/contacts'].some((path) =>
@@ -349,7 +378,7 @@ export function AppLayout() {
   const [siteRepositoryFlyoutAnchor, setSiteRepositoryFlyoutAnchor] = React.useState<null | HTMLElement>(null)
   const siteRepositoryFlyoutOpen = Boolean(siteRepositoryFlyoutAnchor)
   const wikiSectionActive = React.useMemo(
-    () => ['/wiki', '/wiki/stats'].some((path) => isSelected(loc.pathname, path)),
+    () => ['/wiki', '/wiki/stats', '/wiki/queries'].some((path) => isSelected(loc.pathname, path)),
     [loc.pathname],
   )
   const [wikiOpen, setWikiOpen] = React.useState(() => {
@@ -438,8 +467,9 @@ export function AppLayout() {
     if (path === '/search' || path.startsWith('/search/')) return 'RICERCA'
     if (path === '/profile' || path.startsWith('/profile/')) return 'PROFILO'
     if (path === '/wiki' || path.startsWith('/wiki/')) {
-      if (path === '/wiki/stats' || path.startsWith('/wiki/stats/')) return 'STATISTICHE WIKI'
-      return 'WIKI'
+      if (path === '/wiki/stats' || path.startsWith('/wiki/stats/')) return 'KNOWLEDGE · STATISTICHE'
+      if (path === '/wiki/queries' || path.startsWith('/wiki/queries/')) return 'KNOWLEDGE · QUERY'
+      return 'KNOWLEDGE · WIKI'
     }
     return ''
   }, [loc.pathname])
@@ -450,6 +480,10 @@ export function AppLayout() {
   )
   const isWikiStatsSelected = React.useMemo(
     () => loc.pathname === '/wiki/stats' || loc.pathname.startsWith('/wiki/stats/'),
+    [loc.pathname],
+  )
+  const isWikiQueriesSelected = React.useMemo(
+    () => loc.pathname === '/wiki/queries' || loc.pathname.startsWith('/wiki/queries/'),
     [loc.pathname],
   )
   const isBugFeatureOpenSelected = React.useMemo(
@@ -476,6 +510,27 @@ export function AppLayout() {
           bgcolor: tone === 'open' ? SIDEBAR.selectedBgHover : SIDEBAR.chipBg,
           border: '1px solid',
           borderColor: tone === 'open' ? SIDEBAR.chipBorderOpen : SIDEBAR.chipBorder,
+          '& .MuiChip-label': { px: 0.9 },
+        }}
+      />
+    )
+  }, [])
+
+  const renderIssueCount = React.useCallback((count?: number | null) => {
+    if (!count) return null
+    return (
+      <Chip
+        size="small"
+        label={count > 99 ? '99+' : count}
+        sx={{
+          height: 20,
+          fontSize: '0.72rem',
+          fontWeight: 800,
+          borderRadius: 1.25,
+          color: SIDEBAR.accentBright,
+          bgcolor: SIDEBAR.selectedBgHover,
+          border: '1px solid',
+          borderColor: SIDEBAR.chipBorderOpen,
           '& .MuiChip-label': { px: 0.9 },
         }}
       />
@@ -744,7 +799,13 @@ export function AppLayout() {
               const isBugFeatureGroup = it.path === '/bug-feature'
 
               if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup) {
-                return <React.Fragment key={it.path}>{renderNavItem(it, isMini)}</React.Fragment>
+                const issueEndAdornment =
+                  it.path === '/issues' ? renderIssueCount(issueSummary?.active_count) : null
+                return (
+                  <React.Fragment key={it.path}>
+                    {renderNavItem(it, isMini, issueEndAdornment ? { endAdornment: issueEndAdornment } : undefined)}
+                  </React.Fragment>
+                )
               }
 
               const children = isSiteRepositoryGroup
@@ -760,7 +821,7 @@ export function AppLayout() {
               const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : bugFeatureOpen
               const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : setBugFeatureOpen
               const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : setBugFeatureFlyoutAnchor
-              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Wiki' : 'Bug / Feature'
+              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Knowledge' : 'Bug / Feature'
               const canExpand = !isMini && children.length > 0
 
               return (
@@ -821,11 +882,13 @@ export function AppLayout() {
                               ? isWikiPagesSelected
                               : child.path === '/wiki/stats'
                                 ? isWikiStatsSelected
-                                : child.path === '/bug-feature'
-                                  ? isBugFeatureOpenSelected
-                                  : child.path === '/bug-feature/resolved'
-                                    ? isBugFeatureResolvedSelected
-                                    : undefined
+                                : child.path === '/wiki/queries'
+                                  ? isWikiQueriesSelected
+                                  : child.path === '/bug-feature'
+                                    ? isBugFeatureOpenSelected
+                                    : child.path === '/bug-feature/resolved'
+                                      ? isBugFeatureResolvedSelected
+                                      : undefined
 
                             return (
                               <React.Fragment key={child.path}>
@@ -1102,7 +1165,7 @@ export function AppLayout() {
               <React.Fragment key={`wiki-flyout-${child.path}`}>
                 {renderNavItem(child, false, {
                   nested: true,
-                  selected: child.path === '/wiki' ? isWikiPagesSelected : isWikiStatsSelected,
+                  selected: child.path === '/wiki' ? isWikiPagesSelected : child.path === '/wiki/queries' ? isWikiQueriesSelected : isWikiStatsSelected,
                   onClick: () => {
                     setWikiFlyoutAnchor(null)
                     nav(child.path)

@@ -494,7 +494,7 @@ function fmtTs(ts?: string | null) {
 }
 
 export default function Sites() {
-  const { hasPerm, me } = useAuth()
+  const { me } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
@@ -1072,21 +1072,6 @@ export default function Sites() {
               </Tooltip>
             </Box>
           ),
-
-          createButton: hasPerm(PERMS.crm.site.add) ? (
-            <Tooltip title="Nuovo" arrow>
-              <span>
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={openCreate}
-                  sx={compactCreateButtonSx}
-                >
-                  <AddIcon />
-                </Button>
-              </span>
-            </Tooltip>
-          ) : null,
         }}
         grid={{
           pageKey: 'sites',
@@ -1148,6 +1133,16 @@ export default function Sites() {
             </Select>
           </FormControl>
         </FilterChip>
+
+        <Can perm={PERMS.crm.site.add}>
+          <Tooltip title="Nuovo" arrow>
+            <span>
+              <Button size="small" variant="contained" onClick={openCreate} sx={compactCreateButtonSx}>
+                <AddIcon />
+              </Button>
+            </span>
+          </Tooltip>
+        </Can>
       </EntityListCard>
 
       <RowContextMenu

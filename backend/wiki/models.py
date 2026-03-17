@@ -183,3 +183,83 @@ class WikiLink(TimeStampedModel):
 
     def __str__(self):
         return f"{self.page_id} -> {self.entity_type}:{self.entity_id}"
+
+
+class WikiQueryLanguage(TimeStampedModel):
+    """
+    Lookup table per i linguaggi disponibili nelle Query Wiki.
+    Gestibile dall'admin senza toccare il codice.
+    Eredita da TimeStampedModel (con soft-delete) come tutte le lookup dell'app.
+    """
+    key = models.CharField(max_length=64, verbose_name="Chiave")
+    label = models.CharField(max_length=128, verbose_name="Label")
+    color = models.CharField(
+        max_length=32,
+        default="#e2e8f0",
+        verbose_name="Colore sfondo chip (hex)",
+        help_text="Colore pastello HEX usato nel chip nella UI (es. #d1fae5).",
+    )
+    text_color = models.CharField(
+        max_length=32,
+        default="#0f172a",
+        verbose_name="Colore testo chip (hex)",
+    )
+    sort_order = models.IntegerField(default=0, verbose_name="Ordinamento")
+    is_active = models.BooleanField(default=True, verbose_name="Attivo")
+
+    class Meta:
+        verbose_name = "Linguaggio query"
+        verbose_name_plural = "Linguaggi query"
+        ordering = ["sort_order", "label"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["key"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="ux_wiki_query_language_key_active",
+            )
+        ]
+
+    def __str__(self):
+        return self.label
+
+
+class WikiQuery(TimeStampedModel):
+    """
+    Raccolta di query utili (SQL, PowerShell, ecc.) da eseguire sui sistemi.
+    """
+    title = models.CharField(max_length=255, verbose_name="Titolo")
+    language = models.ForeignKey(
+        WikiQueryLanguage,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="queries",
+        verbose_name="Linguaggio",
+    )
+    body = models.TextField(verbose_name="Query")
+    description = models.TextField(null=True, blank=True, verbose_name="Descrizione")
+    tags = ArrayField(models.TextField(), null=True, blank=True, verbose_name="Tag")
+
+    use_count = models.PositiveIntegerField(default=0, verbose_name="Utilizzi")
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        verbose_name = "Query"
+        verbose_name_plural = "Query"
+        ordering = ["title"]
+
+    def __str__(self):
+        lang = self.language.label if self.language else "?"
+        return f"[{lang}] {self.title}"

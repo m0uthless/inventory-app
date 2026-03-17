@@ -1147,3 +1147,135 @@ class WikiStatsView(APIView):
                     "error": str(e),
                 })
             return Response(payload, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+# ─── WikiQuery ────────────────────────────────────────────────────────────────
+
+from wiki.models import WikiQuery, WikiQueryLanguage
+
+
+class WikiQueryLanguageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WikiQueryLanguage
+        fields = [
+            "id", "key", "label", "color", "text_color",
+            "sort_order", "is_active", "deleted_at",
+        ]
+        read_only_fields = ["id", "deleted_at"]
+
+
+class WikiQueryLanguageViewSet(viewsets.ModelViewSet):
+    """
+    CRUD per i linguaggi delle query Wiki.
+    Endpoint: /wiki-query-languages/
+    """
+    serializer_class = WikiQueryLanguageSerializer
+    pagination_class = None  # lista corta, paginazione non necessaria
+
+    def get_queryset(self):
+        qs = WikiQueryLanguage.objects.filter(deleted_at__isnull=True)
+        # ?all=1 include anche gli inattivi (per l'admin)
+        if self.request.query_params.get("all") == "1":
+            qs = WikiQueryLanguage.objects.all()
+        return qs.order_by("sort_order", "label")
+
+
+class WikiQuerySerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+    updated_by_username = serializers.CharField(source="updated_by.username", read_only=True)
+    # Campi denormalizzati dal linguaggio — comodi per il frontend senza join
+    language_key   = serializers.CharField(source="language.key",        read_only=True, allow_null=True)
+    language_label = serializers.CharField(source="language.label",      read_only=True, allow_null=True)
+    language_color = serializers.CharField(source="language.color",      read_only=True, allow_null=True)
+    language_text_color = serializers.CharField(source="language.text_color", read_only=True, allow_null=True)
+
+    class Meta:
+        model = WikiQuery
+        fields = [
+            "id",
+            "title",
+            "language",        # FK id (writable)
+            "language_key",
+            "language_label",
+            "language_color",
+            "language_text_color",
+            "body",
+            "description",
+            "tags",
+            "use_count",
+            "created_by",
+            "created_by_username",
+            "updated_by",
+            "updated_by_username",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+        ]
+        read_only_fields = [
+            "id", "use_count",
+            "created_by", "created_by_username",
+            "updated_by", "updated_by_username",
+            "language_key", "language_label", "language_color", "language_text_color",
+            "created_at", "updated_at", "deleted_at",
+        ]
+
+
+class WikiQueryViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
+    serializer_class = WikiQuerySerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["language"]
+    search_fields = ["title", "description", "body", "tags"]
+    ordering_fields = ["title", "language__label", "use_count", "updated_at", "created_at"]
+    ordering = ["title"]
+
+    def get_queryset(self):
+        return apply_soft_delete_filters(
+            WikiQuery.objects.select_related(
+                "language", "created_by", "updated_by"
+            ),
+            request=self.request,
+            action_name=getattr(self, "action", ""),
+        )
+
+    def perform_create(self, serializer):
+        instance = serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+
+    def perform_update(self, serializer):
+        instance = serializer.save(updated_by=self.request.user)
+        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
+
+    @action(detail=True, methods=["post"], url_path="use")
+    def use(self, request, pk=None):
+        """Incrementa use_count quando un utente copia la query."""
+        WikiQuery.objects.filter(pk=pk).update(use_count=django_models.F("use_count") + 1)
+        return Response({"ok": True})
+
+    @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
+    def restore(self, request, pk=None):
+        obj = self.get_object()
+        obj.deleted_at = None
+        obj.save(update_fields=["deleted_at", "updated_at"])
+        log_event(actor=request.user, action="restore", instance=obj, request=request)
+        return Response(self.get_serializer(obj).data)
+
+    @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
+    def bulk_restore(self, request):
+        payload = request.data
+        ids = payload.get("ids") if isinstance(payload, dict) else payload
+        if not isinstance(ids, list) or not ids:
+            return Response({"detail": "ids must be a non-empty list"}, status=400)
+        from django.utils import timezone as tz
+        now = tz.now()
+        restored_ids = list(
+            WikiQuery.objects.filter(id__in=ids, deleted_at__isnull=False)
+            .values_list("id", flat=True)
+        )
+        WikiQuery.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_at=now)
+        log_event(
+            actor=request.user, action="restore", instance=None,
+            changes={"ids": restored_ids}, request=request,
+            subject=f"bulk restore WikiQuery: {restored_ids}",
+        )
+        return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)

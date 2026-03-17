@@ -74,6 +74,12 @@ export const PERMS = {
       change: 'wiki.change_wikipage',
       delete: 'wiki.delete_wikipage',
     },
+    query: {
+      view: 'wiki.view_wikiquery',
+      add: 'wiki.add_wikiquery',
+      change: 'wiki.change_wikiquery',
+      delete: 'wiki.delete_wikiquery',
+    },
   },
 
   drive: {

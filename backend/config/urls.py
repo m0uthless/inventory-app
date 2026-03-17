@@ -33,7 +33,7 @@ from maintenance.api import (
     MaintenancePlanViewSet,
     TechViewSet,
 )
-from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView
+from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView, WikiQueryViewSet, WikiQueryLanguageViewSet
 from issues.api import IssueViewSet, IssueCategoryViewSet
 from feedback.api import ReportRequestViewSet
 
@@ -61,6 +61,8 @@ router.register(r"wiki-pages", WikiPageViewSet, basename="wiki-page")
 router.register(r"wiki-attachments", WikiAttachmentViewSet, basename="wiki-attachment")
 router.register(r"wiki-links", WikiLinkViewSet, basename="wiki-link")
 router.register(r"wiki-revisions", WikiPageRevisionViewSet, basename="wiki-revision")
+router.register(r"wiki-queries", WikiQueryViewSet, basename="wiki-query")
+router.register(r"wiki-query-languages", WikiQueryLanguageViewSet, basename="wiki-query-language")
 router.register(r"drive-folders", DriveFolderViewSet, basename="drive-folder")
 router.register(r"drive-files", DriveFileViewSet, basename="drive-file")
 
