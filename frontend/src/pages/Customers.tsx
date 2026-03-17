@@ -1102,6 +1102,57 @@ export default function Customers() {
           compact: true,
           rightActions: (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FilterChip
+                        compact
+                        activeCount={(statusId !== '' ? 1 : 0) + (city.trim() ? 1 : 0)}
+                        onReset={() => {
+                          setStatusId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                          setCity('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                        }}
+                      >
+                        <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
+                          <InputLabel>Stato</InputLabel>
+                          <Select
+                            label="Stato"
+                            value={statusId === '' ? '' : String(statusId)}
+                            onChange={(e: SelectChangeEvent) => {
+                              const v = asId(e.target.value)
+                              setStatusId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {statuses.map((s) => (
+                              <MenuItem key={s.id} value={String(s.id)}>
+                                {s.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+              
+                        <TextField
+                          size="small"
+                          label="Città"
+                          value={city}
+                          onChange={(e) =>
+                            setCity(e.target.value, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                          }
+                          fullWidth
+                        />
+                      </FilterChip>
+
+              <Tooltip title="Reimposta" arrow>
+                <span>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => grid.reset(['status', 'city'])}
+                    sx={compactResetButtonSx}
+                  >
+                    <RestartAltIcon />
+                  </Button>
+                </span>
+              </Tooltip>
+
               <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
                 <span>
                   <Button
@@ -1130,19 +1181,6 @@ export default function Customers() {
                     sx={compactExportButtonSx}
                   >
                     <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => grid.reset(['status', 'city'])}
-                    sx={compactResetButtonSx}
-                  >
-                    <RestartAltIcon />
                   </Button>
                 </span>
               </Tooltip>
@@ -1194,43 +1232,6 @@ export default function Customers() {
           </Tooltip>
         </Can>
 
-        <FilterChip
-          compact
-          activeCount={(statusId !== '' ? 1 : 0) + (city.trim() ? 1 : 0)}
-          onReset={() => {
-            setStatusId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-            setCity('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-          }}
-        >
-          <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
-            <InputLabel>Stato</InputLabel>
-            <Select
-              label="Stato"
-              value={statusId === '' ? '' : String(statusId)}
-              onChange={(e: SelectChangeEvent) => {
-                const v = asId(e.target.value)
-                setStatusId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {statuses.map((s) => (
-                <MenuItem key={s.id} value={String(s.id)}>
-                  {s.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <TextField
-            size="small"
-            label="Città"
-            value={city}
-            onChange={(e) =>
-              setCity(e.target.value, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-            }
-            fullWidth
-          />
-        </FilterChip>
       </EntityListCard>
 
       <RowContextMenu

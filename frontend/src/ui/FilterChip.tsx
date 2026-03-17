@@ -115,9 +115,11 @@ export default function FilterChip({ activeCount, onReset, children, compact = f
             flex: compact ? '0 0 40px' : undefined,
             borderRadius: compact ? 1 : undefined,
             fontWeight: hasActive ? 700 : 400,
+            // compact: teal filled come tutti gli altri bottoni toolbar
             bgcolor: compact ? 'primary.main' : hasActive ? 'primary.main' : undefined,
             color: compact ? 'primary.contrastText' : hasActive ? 'primary.contrastText' : undefined,
             borderColor: compact ? 'primary.main' : hasActive ? 'primary.main' : 'divider',
+            border: compact ? 0 : undefined,
             display: compact ? 'inline-flex' : undefined,
             alignItems: compact ? 'center' : undefined,
             justifyContent: compact ? 'center' : undefined,
@@ -134,7 +136,7 @@ export default function FilterChip({ activeCount, onReset, children, compact = f
               ? { outline: '2px solid rgba(15, 118, 110, 0.34)', outlineOffset: 1 }
               : undefined,
             transition: compact
-              ? 'background-color 140ms ease, transform 140ms ease'
+              ? 'background-color 140ms ease'
               : 'all 180ms ease',
             '& .MuiChip-label': { display: compact ? 'none' : 'inline' },
             '& .MuiChip-icon': {

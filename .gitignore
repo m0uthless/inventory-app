@@ -28,6 +28,7 @@ dist-ssr/
 *~
 
 # OS/editor noise
+nightly-push.sh
 .DS_Store
 .idea/
 .vscode/

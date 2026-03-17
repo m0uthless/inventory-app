@@ -699,6 +699,61 @@ export default function Contacts() {
           onQChange: grid.setQ,
           rightActions: (
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <FilterChip
+                        compact
+                        activeCount={(customerId !== '' ? 1 : 0) + (siteId !== '' ? 1 : 0)}
+                        onReset={() => {
+                          setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                          setSiteId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                        }}
+                      >
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Cliente</InputLabel>
+                          <Select
+                            label="Cliente"
+                            value={customerId}
+                            onChange={(e) => {
+                              const v = asId(e.target.value)
+                              setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {customers.map((c) => (
+                              <MenuItem key={c.id} value={c.id}>
+                                {c.display_name || c.name || c.code || `Cliente #${c.id}`}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+              
+                        <FormControl size="small" fullWidth disabled={customerId === ''}>
+                          <InputLabel>Sito</InputLabel>
+                          <Select
+                            label="Sito"
+                            value={siteId}
+                            onChange={(e) => {
+                              const v = asId(e.target.value)
+                              setSiteId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {sites.map((s) => (
+                              <MenuItem key={s.id} value={s.id}>
+                                {s.display_name || s.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </FilterChip>
+
+              <Tooltip title="Reimposta" arrow>
+                <span>
+                  <Button size="small" variant="contained" onClick={() => grid.reset(['customer', 'site'])} sx={compactResetButtonSx}>
+                    <RestartAltIcon />
+                  </Button>
+                </span>
+              </Tooltip>
+
               <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
                 <span>
                   <Button
@@ -729,14 +784,6 @@ export default function Contacts() {
                     sx={compactExportButtonSx}
                   >
                     <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={() => grid.reset(['customer', 'site'])} sx={compactResetButtonSx}>
-                    <RestartAltIcon />
                   </Button>
                 </span>
               </Tooltip>
@@ -786,52 +833,6 @@ export default function Contacts() {
           },
         }}
       >
-        <FilterChip
-          compact
-          activeCount={(customerId !== '' ? 1 : 0) + (siteId !== '' ? 1 : 0)}
-          onReset={() => {
-            setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-            setSiteId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-          }}
-        >
-          <FormControl size="small" fullWidth>
-            <InputLabel>Cliente</InputLabel>
-            <Select
-              label="Cliente"
-              value={customerId}
-              onChange={(e) => {
-                const v = asId(e.target.value)
-                setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" fullWidth disabled={customerId === ''}>
-            <InputLabel>Sito</InputLabel>
-            <Select
-              label="Sito"
-              value={siteId}
-              onChange={(e) => {
-                const v = asId(e.target.value)
-                setSiteId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {sites.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.display_name || s.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </FilterChip>
       </EntityListCard>
 
       <RowContextMenu

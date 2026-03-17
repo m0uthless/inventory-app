@@ -1184,6 +1184,82 @@ export default function Inventory() {
           onQChange: grid.setQ,
           rightActions: (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FilterChip
+                        compact
+                        activeCount={
+                          (customerId !== '' ? 1 : 0) + (siteId !== '' ? 1 : 0) + (typeId !== '' ? 1 : 0)
+                        }
+                        onReset={() => {
+                          setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                          setSiteId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                          setTypeId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                        }}
+                      >
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Cliente</InputLabel>
+                          <Select
+                            label="Cliente"
+                            value={customerId}
+                            onChange={(e) => {
+                              const v = asId(e.target.value)
+                              setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {customers.map((c) => (
+                              <MenuItem key={c.id} value={c.id}>
+                                {c.code} — {c.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+              
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Sito</InputLabel>
+                          <Select
+                            label="Sito"
+                            value={siteId}
+                            onChange={(e) => {
+                              const v = asId(e.target.value)
+                              setSiteId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {filterSites.map((s) => (
+                              <MenuItem key={s.id} value={s.id}>
+                                {s.display_name || s.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+              
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Tipo</InputLabel>
+                          <Select
+                            label="Tipo"
+                            value={typeId}
+                            onChange={(e) => {
+                              const v = asId(e.target.value)
+                              setTypeId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {types.map((t) => (
+                              <MenuItem key={t.id} value={t.id}>
+                                {t.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </FilterChip>
+
+              <Tooltip title="Reimposta" arrow>
+                <span>
+                  <Button size="small" variant="contained" onClick={() => grid.reset(['customer', 'site', 'type'])} sx={compactResetButtonSx}>
+                    <RestartAltIcon />
+                  </Button>
+                </span>
+              </Tooltip>
               <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
                 <span>
                   <Button
@@ -1217,13 +1293,6 @@ export default function Inventory() {
                     sx={compactExportButtonSx}
                   >
                     <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={() => grid.reset(['customer', 'site', 'type'])} sx={compactResetButtonSx}>
-                    <RestartAltIcon />
                   </Button>
                 </span>
               </Tooltip>
@@ -1274,74 +1343,6 @@ export default function Inventory() {
           },
         }}
       >
-        <FilterChip
-          compact
-          activeCount={
-            (customerId !== '' ? 1 : 0) + (siteId !== '' ? 1 : 0) + (typeId !== '' ? 1 : 0)
-          }
-          onReset={() => {
-            setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-            setSiteId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-            setTypeId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-          }}
-        >
-          <FormControl size="small" fullWidth>
-            <InputLabel>Cliente</InputLabel>
-            <Select
-              label="Cliente"
-              value={customerId}
-              onChange={(e) => {
-                const v = asId(e.target.value)
-                setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.code} — {c.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" fullWidth>
-            <InputLabel>Sito</InputLabel>
-            <Select
-              label="Sito"
-              value={siteId}
-              onChange={(e) => {
-                const v = asId(e.target.value)
-                setSiteId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {filterSites.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.display_name || s.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" fullWidth>
-            <InputLabel>Tipo</InputLabel>
-            <Select
-              label="Tipo"
-              value={typeId}
-              onChange={(e) => {
-                const v = asId(e.target.value)
-                setTypeId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {types.map((t) => (
-                <MenuItem key={t.id} value={t.id}>
-                  {t.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </FilterChip>
       </EntityListCard>
 
       <RowContextMenu

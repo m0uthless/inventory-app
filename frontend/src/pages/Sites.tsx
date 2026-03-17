@@ -1025,6 +1025,46 @@ export default function Sites() {
           onQChange: grid.setQ,
           rightActions: (
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <FilterChip
+                        compact
+                        activeCount={customerId !== '' ? 1 : 0}
+                        onReset={() => {
+                          setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                        }}
+                      >
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Cliente</InputLabel>
+                          <Select
+                            label="Cliente"
+                            value={customerId}
+                            onChange={(e) => {
+                              const v = asId(e.target.value)
+                              setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+                            }}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {customers.map((c) => (
+                              <MenuItem key={c.id} value={c.id}>
+                                {c.display_name || c.name || c.code || `Cliente #${c.id}`}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </FilterChip>
+
+              <Tooltip title="Reimposta" arrow>
+                <span>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => grid.reset(['customer'])}
+                    sx={compactResetButtonSx}
+                  >
+                    <RestartAltIcon />
+                  </Button>
+                </span>
+              </Tooltip>
+
               <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
                 <span>
                   <Button
@@ -1054,19 +1094,6 @@ export default function Sites() {
                     sx={compactExportButtonSx}
                   >
                     <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => grid.reset(['customer'])}
-                    sx={compactResetButtonSx}
-                  >
-                    <RestartAltIcon />
                   </Button>
                 </span>
               </Tooltip>
@@ -1107,32 +1134,6 @@ export default function Sites() {
           },
         }}
       >
-        <FilterChip
-          compact
-          activeCount={customerId !== '' ? 1 : 0}
-          onReset={() => {
-            setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-          }}
-        >
-          <FormControl size="small" fullWidth>
-            <InputLabel>Cliente</InputLabel>
-            <Select
-              label="Cliente"
-              value={customerId}
-              onChange={(e) => {
-                const v = asId(e.target.value)
-                setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </FilterChip>
 
         <Can perm={PERMS.crm.site.add}>
           <Tooltip title="Nuovo" arrow>

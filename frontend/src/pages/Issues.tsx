@@ -987,6 +987,89 @@ export default function Issues() {
           onQChange: grid.setQ,
           rightActions: (
             <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+              <FilterChip
+                        compact
+                        activeCount={activeFilterCount}
+                        onReset={activeFilterCount > 0 ? resetFilters : undefined}
+                      >
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Stato</InputLabel>
+                          <Select
+                            value={filterStatus}
+                            label="Stato"
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                          >
+                            <MenuItem value="">Tutti</MenuItem>
+                            {Object.entries(STATUS_META).map(([k, v]) => (
+                              <MenuItem key={k} value={k}>
+                                {v.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+              
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>Priorità</InputLabel>
+                          <Select
+                            value={filterPriority}
+                            label="Priorità"
+                            onChange={(e) => setFilterPriority(e.target.value)}
+                          >
+                            <MenuItem value="">Tutte</MenuItem>
+                            {Object.entries(PRIORITY_META).map(([k, v]) => (
+                              <MenuItem key={k} value={k}>
+                                {v.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+              
+                        <Autocomplete
+                          size="small"
+                          fullWidth
+                          value={filterCustomer}
+                          inputValue={custFilterInput}
+                          onInputChange={(_, v) => setCustFilterInput(v)}
+                          onChange={(_, v) => setFilterCustomer(v)}
+                          options={custFilterOptions}
+                          isOptionEqualToValue={(a, b) => a.id === b.id}
+                          renderInput={(p) => <TextField {...p} label="Cliente" />}
+                        />
+              
+                        <Autocomplete
+                          size="small"
+                          fullWidth
+                          value={filterAssigned}
+                          onChange={(_, v) => {
+                            setFilterAssigned(v)
+                            if (onlyMyIssues) {
+                              previousAssignedFilterRef.current = v
+                              setOnlyMyIssues(false)
+                            }
+                          }}
+                          options={users}
+                          disabled={onlyMyIssues}
+                          isOptionEqualToValue={(a, b) => a.id === b.id}
+                          renderInput={(p) => <TextField {...p} label="Assegnato a" />}
+                        />
+                      </FilterChip>
+
+              <Tooltip title="Reimposta" arrow>
+                <span>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => {
+                      grid.reset()
+                      resetFilters()
+                    }}
+                    sx={compactResetButtonSx}
+                  >
+                    <RestartAltIcon />
+                  </Button>
+                </span>
+              </Tooltip>
+
               <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
                 <span>
                   <Button
@@ -1017,22 +1100,6 @@ export default function Issues() {
                     sx={compactExportButtonSx}
                   >
                     <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => {
-                      grid.reset()
-                      resetFilters()
-                    }}
-                    sx={compactResetButtonSx}
-                  >
-                    <RestartAltIcon />
                   </Button>
                 </span>
               </Tooltip>
@@ -1133,72 +1200,6 @@ export default function Issues() {
           },
         }}
       >
-        <FilterChip
-          compact
-          activeCount={activeFilterCount}
-          onReset={activeFilterCount > 0 ? resetFilters : undefined}
-        >
-          <FormControl size="small" fullWidth>
-            <InputLabel>Stato</InputLabel>
-            <Select
-              value={filterStatus}
-              label="Stato"
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {Object.entries(STATUS_META).map(([k, v]) => (
-                <MenuItem key={k} value={k}>
-                  {v.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" fullWidth>
-            <InputLabel>Priorità</InputLabel>
-            <Select
-              value={filterPriority}
-              label="Priorità"
-              onChange={(e) => setFilterPriority(e.target.value)}
-            >
-              <MenuItem value="">Tutte</MenuItem>
-              {Object.entries(PRIORITY_META).map(([k, v]) => (
-                <MenuItem key={k} value={k}>
-                  {v.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Autocomplete
-            size="small"
-            fullWidth
-            value={filterCustomer}
-            inputValue={custFilterInput}
-            onInputChange={(_, v) => setCustFilterInput(v)}
-            onChange={(_, v) => setFilterCustomer(v)}
-            options={custFilterOptions}
-            isOptionEqualToValue={(a, b) => a.id === b.id}
-            renderInput={(p) => <TextField {...p} label="Cliente" />}
-          />
-
-          <Autocomplete
-            size="small"
-            fullWidth
-            value={filterAssigned}
-            onChange={(_, v) => {
-              setFilterAssigned(v)
-              if (onlyMyIssues) {
-                previousAssignedFilterRef.current = v
-                setOnlyMyIssues(false)
-              }
-            }}
-            options={users}
-            disabled={onlyMyIssues}
-            isOptionEqualToValue={(a, b) => a.id === b.id}
-            renderInput={(p) => <TextField {...p} label="Assegnato a" />}
-          />
-        </FilterChip>
       </EntityListCard>
       <IssueDialog
         open={formOpen}
