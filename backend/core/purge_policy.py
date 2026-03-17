@@ -6,23 +6,63 @@ from django.db.models.deletion import ProtectedError
 
 
 def _append_blocker(blockers: list[dict[str, Any]], label: str, rel) -> None:
+    """Count ONLY active (non-soft-deleted) rows as blockers.
+
+    Soft-deleted dependents are not a real semantic constraint — they are already
+    logically removed and will be cascade-hard-deleted by _purge_soft_deleted_children
+    before the parent is hard-deleted. Only active rows represent real data that
+    would be orphaned and must block the purge.
+
+    Note: DB-level PROTECT still fires on ANY row (active or soft-deleted), so
+    try_purge_instance must call _purge_soft_deleted_children before obj.delete().
+    """
     try:
-        count = rel.count()
+        active_rel = rel.filter(deleted_at__isnull=True)
+        count = active_rel.count()
     except Exception:
+        # Fallback for relations that don't support .filter() (e.g. M2M without deleted_at)
         try:
-            count = rel.all().count()
+            count = rel.count()
         except Exception:
             count = 0
     if count:
         blockers.append({"label": label, "count": int(count)})
 
 
+def _purge_soft_deleted_children(obj: Any) -> None:
+    """Hard-delete all soft-deleted (deleted_at__isnull=False) dependent rows
+    that would otherwise trigger a DB-level ProtectedError when the parent is purged.
+
+    This is safe because:
+    - The children are already logically deleted (deleted_at is set).
+    - The parent is also soft-deleted (it's in the trash).
+    - We only reach this function after confirming zero active children.
+    """
+    from maintenance.models import MaintenancePlan, Tech
+    from inventory.models import Inventory
+
+    if isinstance(obj, MaintenancePlan):
+        obj.events.filter(deleted_at__isnull=False).delete()
+        obj.notifications.filter(deleted_at__isnull=False).delete()
+        return
+
+    if isinstance(obj, Tech):
+        obj.events.filter(deleted_at__isnull=False).delete()
+        return
+
+    if isinstance(obj, Inventory):
+        if hasattr(obj, "maintenance_events"):
+            obj.maintenance_events.filter(deleted_at__isnull=False).delete()
+        if hasattr(obj, "notifications"):
+            obj.notifications.filter(deleted_at__isnull=False).delete()
+        return
+
 
 def get_purge_blockers(obj: Any) -> list[dict[str, Any]]:
     """Return dependency blockers for a hard-delete purge.
 
-    We intentionally count *all* dependent rows, including already soft-deleted
-    ones, because DB-level PROTECT still blocks hard deletion in those cases.
+    Only counts ACTIVE (non-soft-deleted) dependent rows. Soft-deleted children
+    are handled transparently by _purge_soft_deleted_children inside try_purge_instance.
     """
 
     from crm.models import Customer, Site, Contact
@@ -67,22 +107,24 @@ def get_purge_blockers(obj: Any) -> list[dict[str, Any]]:
     return blockers
 
 
-
 def build_purge_blocked_reason(blockers: list[dict[str, Any]]) -> str:
     if not blockers:
         return ""
     bits = ", ".join(f"{b['count']} {b['label']}" for b in blockers)
     return (
-        "Impossibile eliminare definitivamente: sono presenti dipendenze collegate "
+        "Impossibile eliminare definitivamente: sono presenti dipendenze attive collegate "
         f"({bits}). Elimina prima gli elementi dipendenti."
     )
 
 
-
 def try_purge_instance(obj: Any) -> tuple[bool, str | None, list[dict[str, Any]]]:
+    # Check for active (non-soft-deleted) blockers only.
     blockers = get_purge_blockers(obj)
     if blockers:
         return False, build_purge_blocked_reason(blockers), blockers
+
+    # Cascade-hard-delete soft-deleted children so DB PROTECT doesn't fire.
+    _purge_soft_deleted_children(obj)
 
     try:
         obj.delete()

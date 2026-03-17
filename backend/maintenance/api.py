@@ -107,21 +107,12 @@ class TechViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     ordering_fields   = ["last_name", "first_name", "updated_at", "created_at", "deleted_at"]
     ordering          = ["last_name", "first_name"]
 
-    # Tech non ha created_by/updated_by sul modello: override per non passarli.
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
-
     def get_queryset(self):
         return apply_soft_delete_filters(
             Tech.objects.all(), request=self.request, action_name=getattr(self, "action", "")
         )
 
-    # MaintenanceNotification non ha created_by/updated_by: override senza userstamp.
+    # Tech non ha created_by/updated_by sul modello: override per non passarli.
     def perform_create(self, serializer):
         instance = serializer.save()
         log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
@@ -156,6 +147,45 @@ class TechViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             subject=f"bulk restore Tech: {restored_ids}",
         )
         return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)
+
+    @action(detail=True, methods=["post"], permission_classes=[CanPurgeModelPermission])
+    def purge(self, request, pk=None):
+        obj = Tech.objects.filter(pk=pk, deleted_at__isnull=False).first()
+        if obj is None:
+            return Response({"detail": "Elemento non trovato nel cestino."}, status=404)
+        ok, reason, blockers = try_purge_instance(obj)
+        if not ok:
+            return Response({"detail": reason, "blocked": blockers}, status=409)
+        log_event(
+            actor=request.user, action="delete", instance=None, request=request,
+            metadata={"purge": True}, subject=f"purge Tech #{pk}",
+        )
+        return Response(status=204)
+
+    @action(detail=False, methods=["post"], permission_classes=[CanPurgeModelPermission])
+    def bulk_purge(self, request):
+        payload = request.data
+        ids = payload.get("ids") if isinstance(payload, dict) else payload
+        if not isinstance(ids, list) or not ids:
+            return Response({"detail": "ids must be a non-empty list"}, status=400)
+        purged = []
+        blocked = []
+        for obj in Tech.objects.filter(id__in=ids, deleted_at__isnull=False):
+            obj_id = obj.id
+            ok, reason, blockers = try_purge_instance(obj)
+            if ok:
+                purged.append(obj_id)
+            else:
+                blocked.append({"id": obj.id, "reason": reason, "blocked": blockers})
+        log_event(
+            actor=request.user, action="delete", instance=None, changes={"ids": purged},
+            request=request, metadata={"purge": True, "blocked_count": len(blocked)},
+            subject=f"bulk purge Tech: {purged}",
+        )
+        return Response(
+            {"purged": purged, "count": len(purged), "blocked": blocked, "blocked_count": len(blocked)},
+            status=200,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

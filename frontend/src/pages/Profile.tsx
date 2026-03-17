@@ -32,7 +32,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 
 import { useNavigate } from 'react-router-dom'
-import type { SxProps, Theme } from '@mui/material/styles'
+import { type SxProps, type Theme } from '@mui/material/styles'
 import { api } from '../api/client'
 import { apiErrorToMessage } from '../api/error'
 import { useAuth } from '../auth/AuthProvider'
@@ -43,10 +43,12 @@ import { useDrfList } from '../hooks/useDrfList'
 import { buildDrfListParams } from '../api/drf'
 import { isRecord } from '../utils/guards'
 
-// ─── Costanti palette ─────────────────────────────────────────────────────────
-const TEAL = '#0f766e'
-const TEAL_LIGHT = '#14b8a6'
-const TEAL_DARK = '#0a4f4a'
+// ─── Costanti palette (derivate da theme.palette.primary — aggiornare insieme) ─
+// Usate nei sub-componenti statici (SectionTitle, SezionePermessi, ecc.) che non
+// possono chiamare useTheme direttamente. ProfileContent usa useTheme per coerenza.
+const TEAL = '#0f766e'       // = theme.palette.primary.main
+const TEAL_LIGHT = '#14b8a6' // = theme.palette.primary.light
+const TEAL_DARK = '#0a4f4a'  // = theme.palette.primary.dark
 
 // Stile compatto per TextField (allineato al campo "Cerca" in ListToolbar)
 const COMPACT_TEXTFIELD_SX: SxProps<Theme> = {

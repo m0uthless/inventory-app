@@ -99,6 +99,8 @@ const router = createBrowserRouter([
               'crm.view_site',
               'crm.view_contact',
               'inventory.view_inventory',
+              'maintenance.view_maintenanceplan',
+              'maintenance.view_tech',
             ]}
           >
             {lazyEl(<Trash />)}

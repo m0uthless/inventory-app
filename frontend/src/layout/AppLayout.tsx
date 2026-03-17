@@ -33,7 +33,6 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import PersonIcon from '@mui/icons-material/Person'
-import AddIcon from '@mui/icons-material/Add'
 
 import FolderIcon from '@mui/icons-material/FolderOutlined'
 import DashboardIcon from '@mui/icons-material/DashboardOutlined'
@@ -72,6 +71,10 @@ type NavItem = {
   icon: React.ReactNode
   perm?: string
   permAny?: string[]
+  /** Sezione di appartenenza nella sidebar — usata per i label di gruppo */
+  section?: 'principale' | 'strumenti' | 'sistema'
+  /** Mostra un badge "WIP" accanto al label */
+  wip?: boolean
 }
 
 const SITE_REPOSITORY_CHILDREN: NavItem[] = [
@@ -92,31 +95,26 @@ const BUG_FEATURE_CHILDREN: NavItem[] = [
 ]
 
 const NAV: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
+  // ── Principale ──────────────────────────────────────────────────────────────
+  { label: 'Dashboard', path: '/', icon: <DashboardIcon />, section: 'principale', wip: true },
 
   {
     label: 'Site Repository',
     path: '/site-repository',
     icon: <LayersIcon />,
+    section: 'principale',
     permAny: ['inventory.view_inventory', 'crm.view_customer', 'crm.view_site', 'crm.view_contact'],
   },
 
-  { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, perm: 'issues.view_issue' },
-  { label: 'Bug / Feature', path: '/bug-feature', icon: <FeedbackOutlinedIcon /> },
-
-  { label: 'Audit', path: '/audit', icon: <HistoryIcon />, perm: 'audit.view_auditevent' },
-
-  {
-    label: 'Cestino',
-    path: '/trash',
-    icon: <DeleteSweepIcon />,
-    permAny: ['crm.view_customer', 'crm.view_site', 'crm.view_contact', 'inventory.view_inventory'],
-  },
+  { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
+  { label: 'Bug / Feature', path: '/bug-feature', icon: <FeedbackOutlinedIcon />, section: 'principale' },
 
   {
     label: 'Manutenzione',
     path: '/maintenance',
     icon: <HandymanIcon />,
+    section: 'principale',
+    wip: true,
     permAny: [
       'maintenance.view_maintenanceplan',
       'maintenance.view_maintenanceevent',
@@ -124,13 +122,26 @@ const NAV: NavItem[] = [
     ],
   },
 
+  // ── Strumenti ────────────────────────────────────────────────────────────────
   {
     label: 'Drive',
     path: '/drive',
     icon: <FolderIcon />,
+    section: 'strumenti',
     permAny: ['drive.view_drivefolder', 'drive.view_drivefile'],
   },
-  { label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, perm: 'wiki.view_wikipage' },
+  { label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, section: 'strumenti', perm: 'wiki.view_wikipage' },
+
+  // ── Sistema ──────────────────────────────────────────────────────────────────
+  { label: 'Audit', path: '/audit', icon: <HistoryIcon />, section: 'sistema', perm: 'audit.view_auditevent' },
+
+  {
+    label: 'Cestino',
+    path: '/trash',
+    icon: <DeleteSweepIcon />,
+    section: 'sistema',
+    permAny: ['crm.view_customer', 'crm.view_site', 'crm.view_contact', 'inventory.view_inventory'],
+  },
 ]
 
 function isSelected(currentPath: string, itemPath: string) {
@@ -138,12 +149,6 @@ function isSelected(currentPath: string, itemPath: string) {
   return currentPath.startsWith(itemPath)
 }
 
-type CreateAction = {
-  label: string
-  to: string
-  perm?: string
-  icon: React.ReactNode
-}
 
 type FeedbackSummary = {
   total_count: number
@@ -329,45 +334,6 @@ export function AppLayout() {
     }
   }, [loc.pathname])
 
-  // Quick Create (+)
-  const [createAnchorEl, setCreateAnchorEl] = React.useState<null | HTMLElement>(null)
-  const createMenuOpen = Boolean(createAnchorEl)
-
-  const createActions: CreateAction[] = React.useMemo(
-    () => [
-      {
-        label: 'Nuovo cliente',
-        to: '/customers',
-        perm: 'crm.add_customer',
-        icon: <PeopleIcon fontSize="small" />,
-      },
-      {
-        label: 'Nuovo sito',
-        to: '/sites',
-        perm: 'crm.add_site',
-        icon: <BusinessIcon fontSize="small" />,
-      },
-      {
-        label: 'Nuovo contatto',
-        to: '/contacts',
-        perm: 'crm.add_contact',
-        icon: <ContactsIcon fontSize="small" />,
-      },
-      {
-        label: 'Nuovo inventario',
-        to: '/inventory',
-        perm: 'inventory.add_inventory',
-        icon: <Inventory2Icon fontSize="small" />,
-      },
-    ],
-    [],
-  )
-
-  const visibleCreateActions = React.useMemo(
-    () => createActions.filter((a) => !a.perm || hasPerm(a.perm)),
-    [createActions, hasPerm],
-  )
-
   const siteRepositorySectionActive = React.useMemo(
     () =>
       ['/site-repository', '/inventory', '/customers', '/sites', '/contacts'].some((path) =>
@@ -516,11 +482,6 @@ export function AppLayout() {
     )
   }, [])
 
-  const goCreate = (to: string) => {
-    setCreateAnchorEl(null)
-    // state.openCreate verrà letto dalla pagina di destinazione per aprire il drawer/modal
-    nav(to, { state: { openCreate: true } })
-  }
 
   const renderNavItem = (
     it: NavItem,
@@ -618,11 +579,38 @@ export function AppLayout() {
         <ListItemIcon sx={{ minWidth: isMini ? 'auto' : 38 }}>{it.icon}</ListItemIcon>
 
         <ListItemText
-          primary={it.label}
+          primary={
+            !isMini && it.wip ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Box component="span" sx={{ fontWeight: selected ? 700 : 500, fontSize: 'inherit' }}>
+                  {it.label}
+                </Box>
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    px: 0.6,
+                    py: 0.15,
+                    borderRadius: 0.75,
+                    bgcolor: 'rgba(245,158,11,0.18)',
+                    color: '#f59e0b',
+                    border: '1px solid rgba(245,158,11,0.28)',
+                    lineHeight: 1.6,
+                    flexShrink: 0,
+                  }}
+                >
+                  WIP
+                </Box>
+              </Box>
+            ) : it.label
+          }
           primaryTypographyProps={{
             fontWeight: selected ? 700 : nested ? 500 : 500,
             noWrap: true,
             fontSize: nested ? '0.92rem' : undefined,
+            component: 'div',
           }}
           sx={{
             ml: 0.25,
@@ -711,115 +699,158 @@ export function AppLayout() {
       <Divider sx={{ borderColor: SIDEBAR.hoverBg }} />
 
       <List sx={{ px: isMini ? 0.75 : 1, py: 1 }}>
-        {visibleNav.map((it) => {
-          const isSiteRepositoryGroup = it.path === '/site-repository'
-          const isWikiGroup = it.path === '/wiki'
-          const isBugFeatureGroup = it.path === '/bug-feature'
+        {(() => {
+          // Raggruppa le voci per sezione e intercala i label di gruppo
+          const SECTIONS: Array<{ key: NavItem['section']; label: string }> = [
+            { key: 'principale', label: 'Principale' },
+            { key: 'strumenti', label: 'Strumenti' },
+            { key: 'sistema', label: 'Sistema' },
+          ]
 
-          if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup) {
-            return <React.Fragment key={it.path}>{renderNavItem(it, isMini)}</React.Fragment>
-          }
+          return SECTIONS.flatMap(({ key, label }) => {
+            const sectionItems = visibleNav.filter((it) => it.section === key)
+            if (!sectionItems.length) return []
 
-          const children = isSiteRepositoryGroup
-            ? visibleSiteRepositoryChildren
-            : isWikiGroup
-              ? visibleWikiChildren
-              : visibleBugFeatureChildren
-          const parentSelected = isSiteRepositoryGroup
-            ? siteRepositorySectionActive
-            : isWikiGroup
-              ? wikiSectionActive
-              : bugFeatureSectionActive
-          const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : bugFeatureOpen
-          const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : setBugFeatureOpen
-          const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : setBugFeatureFlyoutAnchor
-          const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Wiki' : 'Bug / Feature'
-          const canExpand = !isMini && children.length > 0
+            const sectionLabel = !isMini ? (
+              <Typography
+                key={`section-label-${key}`}
+                sx={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.09em',
+                  textTransform: 'uppercase',
+                  color: SIDEBAR.textMuted,
+                  px: 1.25,
+                  pt: key === 'principale' ? 0.5 : 1.5,
+                  pb: 0.5,
+                  display: 'block',
+                  opacity: 0.7,
+                }}
+              >
+                {label}
+              </Typography>
+            ) : (
+              key !== 'principale' ? (
+                <Divider
+                  key={`section-divider-${key}`}
+                  sx={{ borderColor: SIDEBAR.divider, my: 0.75 }}
+                />
+              ) : null
+            )
 
-          return (
-            <React.Fragment key={it.path}>
-              {renderNavItem(it, isMini, {
-                selected: parentSelected,
-                variant: 'group-parent',
-                onClick: isMini
-                  ? (event) => {
-                      if (!children.length) {
-                        nav(it.path)
-                        setMobileOpen(false)
-                        return
-                      }
-                      setFlyoutAnchor((current) => (current === event.currentTarget ? null : event.currentTarget))
-                    }
-                  : undefined,
-                endAdornment: canExpand ? (
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    {isBugFeatureGroup ? renderFeedbackCount(feedbackSummary?.open_count, 'open') : null}
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setGroupOpen((open) => !open)
-                      }}
-                      sx={{
-                        color: parentSelected ? SIDEBAR.accentLight : SIDEBAR.textMuted,
-                        '&:hover': { backgroundColor: SIDEBAR.hoverBg },
-                      }}
-                      aria-label={groupOpen ? `Chiudi sottomenu ${flyoutLabel}` : `Apri sottomenu ${flyoutLabel}`}
-                    >
-                      {groupOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                    </IconButton>
-                  </Stack>
-                ) : null,
-              })}
+            const items = sectionItems.map((it) => {
+              const isSiteRepositoryGroup = it.path === '/site-repository'
+              const isWikiGroup = it.path === '/wiki'
+              const isBugFeatureGroup = it.path === '/bug-feature'
 
-              {!isMini && children.length > 0 ? (
-                <Collapse in={groupOpen} timeout="auto" unmountOnExit>
-                  <Box
-                    sx={{
-                      mt: 0.25,
-                      ml: 1,
-                      mr: 0.25,
-                      mb: 0.5,
-                      px: 0.75,
-                      py: 0.75,
-                      borderRadius: 2,
-                      backgroundColor: 'rgba(94,234,212,0.08)',
-                      boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.1)',
-                    }}
-                  >
-                    <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-                      {children.map((child) => {
-                        const nestedSelected = child.path === '/wiki'
-                          ? isWikiPagesSelected
-                          : child.path === '/wiki/stats'
-                            ? isWikiStatsSelected
-                            : child.path === '/bug-feature'
-                              ? isBugFeatureOpenSelected
-                              : child.path === '/bug-feature/resolved'
-                                ? isBugFeatureResolvedSelected
-                                : undefined
+              if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup) {
+                return <React.Fragment key={it.path}>{renderNavItem(it, isMini)}</React.Fragment>
+              }
 
-                        return (
-                          <React.Fragment key={child.path}>
-                            {renderNavItem(child, isMini, {
-                              nested: true,
-                              selected: nestedSelected,
-                              endAdornment:
-                                child.path === '/bug-feature'
-                                  ? renderFeedbackCount(feedbackSummary?.open_count, 'open')
-                                  : undefined,
-                            })}
-                          </React.Fragment>
-                        )
-                      })}
-                    </List>
-                  </Box>
-                </Collapse>
-              ) : null}
-            </React.Fragment>
-          )
-        })}
+              const children = isSiteRepositoryGroup
+                ? visibleSiteRepositoryChildren
+                : isWikiGroup
+                  ? visibleWikiChildren
+                  : visibleBugFeatureChildren
+              const parentSelected = isSiteRepositoryGroup
+                ? siteRepositorySectionActive
+                : isWikiGroup
+                  ? wikiSectionActive
+                  : bugFeatureSectionActive
+              const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : bugFeatureOpen
+              const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : setBugFeatureOpen
+              const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : setBugFeatureFlyoutAnchor
+              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Wiki' : 'Bug / Feature'
+              const canExpand = !isMini && children.length > 0
+
+              return (
+                <React.Fragment key={it.path}>
+                  {renderNavItem(it, isMini, {
+                    selected: parentSelected,
+                    variant: 'group-parent',
+                    onClick: isMini
+                      ? (event) => {
+                          if (!children.length) {
+                            nav(it.path)
+                            setMobileOpen(false)
+                            return
+                          }
+                          setFlyoutAnchor((current) => (current === event.currentTarget ? null : event.currentTarget))
+                        }
+                      : undefined,
+                    endAdornment: canExpand ? (
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        {isBugFeatureGroup ? renderFeedbackCount(feedbackSummary?.open_count, 'open') : null}
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setGroupOpen((open) => !open)
+                          }}
+                          sx={{
+                            color: parentSelected ? SIDEBAR.accentLight : SIDEBAR.textMuted,
+                            '&:hover': { backgroundColor: SIDEBAR.hoverBg },
+                          }}
+                          aria-label={groupOpen ? `Chiudi sottomenu ${flyoutLabel}` : `Apri sottomenu ${flyoutLabel}`}
+                        >
+                          {groupOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                        </IconButton>
+                      </Stack>
+                    ) : null,
+                  })}
+
+                  {!isMini && children.length > 0 ? (
+                    <Collapse in={groupOpen} timeout="auto" unmountOnExit>
+                      <Box
+                        sx={{
+                          mt: 0.25,
+                          ml: 1,
+                          mr: 0.25,
+                          mb: 0.5,
+                          px: 0.75,
+                          py: 0.75,
+                          borderRadius: 2,
+                          backgroundColor: 'rgba(94,234,212,0.08)',
+                          boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.1)',
+                        }}
+                      >
+                        <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
+                          {children.map((child) => {
+                            const nestedSelected = child.path === '/wiki'
+                              ? isWikiPagesSelected
+                              : child.path === '/wiki/stats'
+                                ? isWikiStatsSelected
+                                : child.path === '/bug-feature'
+                                  ? isBugFeatureOpenSelected
+                                  : child.path === '/bug-feature/resolved'
+                                    ? isBugFeatureResolvedSelected
+                                    : undefined
+
+                            return (
+                              <React.Fragment key={child.path}>
+                                {renderNavItem(child, isMini, {
+                                  nested: true,
+                                  selected: nestedSelected,
+                                  endAdornment:
+                                    child.path === '/bug-feature'
+                                      ? renderFeedbackCount(feedbackSummary?.open_count, 'open')
+                                      : undefined,
+                                })}
+                              </React.Fragment>
+                            )
+                          })}
+                        </List>
+                      </Box>
+                    </Collapse>
+                  ) : null}
+                </React.Fragment>
+              )
+            })
+
+            return [sectionLabel, ...items].filter(Boolean)
+          })
+        })()}
       </List>
 
       <Box sx={{ flex: 1 }} />
@@ -933,18 +964,6 @@ export function AppLayout() {
             >
               <SearchIcon />
             </IconButton>
-
-            {/* ✅ Quick Create (+) */}
-            {visibleCreateActions.length > 0 && (
-              <Tooltip title="Crea nuovo">
-                <IconButton
-                  onClick={(e) => setCreateAnchorEl(e.currentTarget)}
-                  aria-label="Crea nuovo"
-                >
-                  <AddIcon />
-                </IconButton>
-              </Tooltip>
-            )}
 
             {/* Maintenance notification bell */}
             <Tooltip
@@ -1229,38 +1248,6 @@ export function AppLayout() {
           </ListItemButton>
         </Box>
       </Popover>
-
-      {/* Quick Create menu */}
-      <Menu
-        anchorEl={createAnchorEl}
-        open={createMenuOpen}
-        onClose={() => setCreateAnchorEl(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{
-          paper: {
-            sx: {
-              minWidth: 180,
-              boxShadow: '0 4px 16px rgba(15,23,42,0.10)',
-              borderRadius: 1.5,
-              border: '1px solid',
-              borderColor: 'divider',
-            },
-          },
-          list: { dense: true, sx: { py: 0.5 } },
-        }}
-      >
-        {visibleCreateActions.map((a) => (
-          <MenuItem
-            key={a.label}
-            onClick={() => goCreate(a.to)}
-            sx={{ fontSize: 13, py: 0.6, px: 1.5, minHeight: 0 }}
-          >
-            <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 16 } }}>{a.icon}</ListItemIcon>
-            {a.label}
-          </MenuItem>
-        ))}
-      </Menu>
 
       {/* User menu */}
       <Menu

@@ -2,6 +2,9 @@ import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { Box, Button, CircularProgress, InputBase, Typography, Link } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { useAuth } from '../auth/AuthProvider'
 import { isRecord } from '../utils/guards'
 
@@ -11,10 +14,7 @@ interface SystemStats {
   version: string
 }
 
-// ─── Palette locale (ripete le costanti del theme) ───────────────────────────
-const TEAL = '#0f766e'
-const TEAL_LIGHT = '#14b8a6'
-const TEAL_DARK = '#0a4f4a'
+// ─── Costanti di stile non-tematizzate (solo per il layout specifico della login) ───
 const BG = '#e8edeb'
 const TEXT_DARK = '#1a2a28'
 const TEXT_MUTED = '#5a7572'
@@ -92,6 +92,8 @@ function Field({
   endAdornment?: React.ReactNode
 }) {
   const [focused, setFocused] = React.useState(false)
+  const theme = useTheme()
+  const TEAL = theme.palette.primary.main
 
   return (
     <Box>
@@ -150,6 +152,10 @@ function Field({
 export default function Login() {
   const { login } = useAuth()
   const nav = useNavigate()
+  const theme = useTheme()
+  const TEAL = theme.palette.primary.main
+  const TEAL_LIGHT = theme.palette.primary.light
+  const TEAL_DARK = theme.palette.primary.dark
 
   const [username, setUsername] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -1116,34 +1122,25 @@ export default function Login() {
                   endAdornment={
                     <Box
                       onClick={() => setShowPwd((p) => !p)}
+                      aria-label={showPwd ? 'Nascondi password' : 'Mostra password'}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && setShowPwd((p) => !p)}
                       sx={{
                         cursor: 'pointer',
                         color: TEXT_MUTED,
-                        fontSize: '0.8rem',
-                        userSelect: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
                         ml: 1,
-                        opacity: 0.7,
+                        opacity: 0.6,
                         '&:hover': { opacity: 1 },
+                        '& .MuiSvgIcon-root': { fontSize: 18 },
                       }}
                     >
-                      {showPwd ? '🙈' : '👁'}
+                      {showPwd ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </Box>
                   }
                 />
-                <Box sx={{ textAlign: 'right', mt: 0.75 }}>
-                  <Link
-                    href="#"
-                    underline="none"
-                    sx={{
-                      fontSize: '0.75rem',
-                      color: TEAL,
-                      fontWeight: 600,
-                      '&:hover': { color: TEAL_LIGHT },
-                    }}
-                  >
-                    Password dimenticata?
-                  </Link>
-                </Box>
               </Box>
 
               {/* Errore */}

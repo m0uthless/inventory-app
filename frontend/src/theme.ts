@@ -75,10 +75,12 @@ export const theme = createTheme(
       MuiAppBar: {
         styleOverrides: {
           root: {
-            background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 55%, #0891b2 100%)',
+            // Flat primary: evita la competizione visiva con il gradiente verticale
+            // della sidebar. Un solo gradiente per schermata (sidebar) è più raffinato.
+            background: '#0f766e',
             color: '#ffffff',
             borderBottom: 'none',
-            boxShadow: '0 2px 16px rgba(15, 118, 110, 0.30)',
+            boxShadow: '0 1px 0 rgba(0,0,0,0.12), 0 2px 8px rgba(15,118,110,0.20)',
           },
         },
       },
