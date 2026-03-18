@@ -437,7 +437,7 @@ export default function Issues() {
       .catch(() => {})
   }, [form.customer])
 
-  const openCreate = () => {
+  const openCreate = React.useCallback(() => {
     setEditIssue(null)
     setForm(createEmptyForm(me?.id))
     setCustFormInput('')
@@ -447,7 +447,7 @@ export default function Issues() {
     setPendingInventory(null)
     setLinkInventoryOpen(false)
     setFormOpen(true)
-  }
+  }, [me?.id])
 
   const openCreateOnceRef = React.useRef(false)
 
@@ -689,7 +689,7 @@ export default function Issues() {
       loc.pathname + (newSearch.toString() ? `?${newSearch.toString()}` : ''),
       { replace: true, state: loc.state }
     )
-  }, [loc.search]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loc.search, rows, loc.pathname, loc.state, navigate])
 
   React.useEffect(() => {
     if (!detailIssue) return
@@ -699,8 +699,7 @@ export default function Issues() {
       .then((r) => setComments(r.data ?? []))
       .catch(() => toast.error('Errore caricamento commenti.'))
       .finally(() => setCommentsLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detailIssue?.id])
+    }, [detailIssue?.id, toast])
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !detailIssue) return

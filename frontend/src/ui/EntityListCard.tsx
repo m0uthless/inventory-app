@@ -34,6 +34,8 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
   // Stato locale sincronizzato con colPrefs per forzare re-render quando serve
   const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
 
+  const colPrefs = colPrefsRef.current
+
   return (
     <Card variant="outlined" sx={[{ borderRadius: 2.5, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden' }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
       <CardContent
@@ -105,26 +107,26 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
         <ServerDataGrid {...grid} colPrefsRef={colPrefsRef} />
 
         {/* Pannello drag & drop colonne */}
-        {persistEnabled && colPrefsRef.current && (
+        {persistEnabled && colPrefs && (
           <ColumnCustomizerPanel
             anchorEl={colPanelAnchor}
             onClose={() => setColPanelAnchor(null)}
             columns={grid.columns}
-            columnOrder={colPrefsRef.current.columnOrder}
-            columnVisibility={colPrefsRef.current.columnVisibilityModel}
+            columnOrder={colPrefs.columnOrder}
+            columnVisibility={colPrefs.columnVisibilityModel}
             onOrderChange={(order) => {
-              colPrefsRef.current?.saveOrder(order)
+              colPrefs?.saveOrder(order)
               forceUpdate()
             }}
             onVisibilityChange={(model) => {
-              colPrefsRef.current?.onColumnVisibilityModelChange(model)
+              colPrefs?.onColumnVisibilityModelChange(model)
               forceUpdate()
             }}
             onReset={() => {
-              colPrefsRef.current?.resetPrefs()
+              colPrefs?.resetPrefs()
               forceUpdate()
             }}
-            hasPrefs={colPrefsRef.current.hasPrefs}
+            hasPrefs={colPrefs.hasPrefs}
           />
         )}
       </CardContent>

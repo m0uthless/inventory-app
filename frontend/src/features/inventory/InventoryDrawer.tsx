@@ -225,6 +225,7 @@ export default function InventoryDrawer({
   const navigate = useNavigate()
   const loc = useLocation()
   const toast = useToast()
+  const TypeIcon = React.useMemo(() => getInventoryTypeIcon(detail?.type_key), [detail?.type_key])
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}>
@@ -348,27 +349,22 @@ export default function InventoryDrawer({
           <Box sx={{ position: 'relative', zIndex: 1 }}>
             {detail?.deleted_at ? <Chip size="small" color="error" label="Eliminato" sx={{ mb: 0.75, height: 20, fontSize: 10 }} /> : null}
             <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
-              {(() => {
-                const TypeIcon = getInventoryTypeIcon(detail?.type_key)
-                return (
-                  <Box
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 2,
-                      flexShrink: 0,
-                      bgcolor: 'rgba(255,255,255,0.15)',
-                      backdropFilter: 'blur(4px)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <TypeIcon sx={{ fontSize: 26, color: 'rgba(255,255,255,0.9)' }} />
-                  </Box>
-                )
-              })()}
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  flexShrink: 0,
+                  bgcolor: 'rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(4px)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <TypeIcon sx={{ fontSize: 26, color: 'rgba(255,255,255,0.9)' }} />
+              </Box>
               <Typography sx={{ color: '#fff', fontSize: 24, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
                 {detail?.hostname || detail?.name || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : 'Inventario')}
               </Typography>
