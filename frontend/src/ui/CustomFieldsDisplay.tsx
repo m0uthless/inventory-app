@@ -52,7 +52,7 @@ export default function CustomFieldsDisplay(props: {
     const items: { label: string; value: string }[] = []
 
     const formatValue = (v: unknown, fieldType?: string, options?: unknown) => {
-      if (fieldType === 'boolean') return Boolean(v) ? 'Sì' : 'No'
+      if (fieldType === 'boolean') return v ? 'Sì' : 'No'
       if (fieldType === 'select' && v != null && options && typeof options === 'object' && !Array.isArray(options)) {
         const mapped = (options as Record<string, unknown>)[String(v)]
         if (mapped != null) return String(mapped)
