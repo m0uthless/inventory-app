@@ -205,6 +205,12 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
   )
 }
 
+
+function InventoryTypeBadgeIcon(props: { typeKey?: string | null }) {
+  const Icon = getInventoryTypeIcon(props.typeKey)
+  return <Icon sx={{ fontSize: 26, color: 'rgba(255,255,255,0.9)' }} />
+}
+
 export default function InventoryDrawer({
   open,
   detail,
@@ -225,7 +231,6 @@ export default function InventoryDrawer({
   const navigate = useNavigate()
   const loc = useLocation()
   const toast = useToast()
-  const TypeIcon = React.useMemo(() => getInventoryTypeIcon(detail?.type_key), [detail?.type_key])
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}>
@@ -363,7 +368,7 @@ export default function InventoryDrawer({
                   justifyContent: 'center',
                 }}
               >
-                <TypeIcon sx={{ fontSize: 26, color: 'rgba(255,255,255,0.9)' }} />
+                <InventoryTypeBadgeIcon typeKey={detail?.type_key} />
               </Box>
               <Typography sx={{ color: '#fff', fontSize: 24, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
                 {detail?.hostname || detail?.name || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : 'Inventario')}

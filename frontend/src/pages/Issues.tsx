@@ -490,7 +490,7 @@ export default function Issues() {
     }
 
     navigate(loc.pathname + loc.search, { replace: true, state: {} })
-  }, [loc, navigate, me?.id])
+  }, [loc, navigate, me?.id, openCreate])
 
   const openEdit = (row: IssueRow) => {
     setEditIssue(row)
@@ -689,7 +689,7 @@ export default function Issues() {
       loc.pathname + (newSearch.toString() ? `?${newSearch.toString()}` : ''),
       { replace: true, state: loc.state }
     )
-  }, [loc.search, rows, loc.pathname, loc.state, navigate])
+  }, [loc.search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!detailIssue) return
@@ -699,7 +699,8 @@ export default function Issues() {
       .then((r) => setComments(r.data ?? []))
       .catch(() => toast.error('Errore caricamento commenti.'))
       .finally(() => setCommentsLoading(false))
-    }, [detailIssue?.id, toast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailIssue, toast])
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !detailIssue) return

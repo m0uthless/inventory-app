@@ -30,11 +30,14 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
 
   // State per l'anchor del pannello colonne
   const [colPanelAnchor, setColPanelAnchor] = React.useState<HTMLElement | null>(null)
+  const [colPanelSnapshot, setColPanelSnapshot] = React.useState<{
+    columnOrder: string[]
+    columnVisibility: Record<string, boolean>
+    hasPrefs: boolean
+  } | null>(null)
 
   // Stato locale sincronizzato con colPrefs per forzare re-render quando serve
   const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
-
-  const colPrefs = colPrefsRef.current
 
   return (
     <Card variant="outlined" sx={[{ borderRadius: 2.5, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden' }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
@@ -76,7 +79,17 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
                   aria-label="Colonne"
                   startIcon={<ViewColumnIcon sx={{ fontSize: toolbar.compact ? '18px !important' : '15px !important' }} />}
                   onClick={(e) => {
+                    const prefs = colPrefsRef.current
                     setColPanelAnchor(e.currentTarget)
+                    setColPanelSnapshot(
+                      prefs
+                        ? {
+                            columnOrder: prefs.columnOrder,
+                            columnVisibility: prefs.columnVisibilityModel,
+                            hasPrefs: prefs.hasPrefs,
+                          }
+                        : null,
+                    )
                     forceUpdate()
                   }}
                   sx={
@@ -107,26 +120,45 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
         <ServerDataGrid {...grid} colPrefsRef={colPrefsRef} />
 
         {/* Pannello drag & drop colonne */}
-        {persistEnabled && colPrefs && (
+        {persistEnabled && colPanelSnapshot && (
           <ColumnCustomizerPanel
             anchorEl={colPanelAnchor}
-            onClose={() => setColPanelAnchor(null)}
+            onClose={() => {
+              setColPanelAnchor(null)
+              setColPanelSnapshot(null)
+            }}
             columns={grid.columns}
-            columnOrder={colPrefs.columnOrder}
-            columnVisibility={colPrefs.columnVisibilityModel}
+            columnOrder={colPanelSnapshot.columnOrder}
+            columnVisibility={colPanelSnapshot.columnVisibility}
             onOrderChange={(order) => {
-              colPrefs?.saveOrder(order)
+              colPrefsRef.current?.saveOrder(order)
+              setColPanelSnapshot((prev) =>
+                prev ? { ...prev, columnOrder: order, hasPrefs: true } : prev,
+              )
               forceUpdate()
             }}
             onVisibilityChange={(model) => {
-              colPrefs?.onColumnVisibilityModelChange(model)
+              colPrefsRef.current?.onColumnVisibilityModelChange(model)
+              setColPanelSnapshot((prev) =>
+                prev ? { ...prev, columnVisibility: model, hasPrefs: true } : prev,
+              )
               forceUpdate()
             }}
             onReset={() => {
-              colPrefs?.resetPrefs()
+              colPrefsRef.current?.resetPrefs()
+              const prefs = colPrefsRef.current
+              setColPanelSnapshot(
+                prefs
+                  ? {
+                      columnOrder: prefs.columnOrder,
+                      columnVisibility: prefs.columnVisibilityModel,
+                      hasPrefs: prefs.hasPrefs,
+                    }
+                  : null,
+              )
               forceUpdate()
             }}
-            hasPrefs={colPrefs.hasPrefs}
+            hasPrefs={colPanelSnapshot.hasPrefs}
           />
         )}
       </CardContent>
