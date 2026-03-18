@@ -70,6 +70,7 @@ class InventoryListSerializer(serializers.ModelSerializer):
     customer = serializers.IntegerField(source="customer_id", read_only=True)
     customer_code = serializers.CharField(source="customer.code", read_only=True)
     has_active_issue = serializers.BooleanField(read_only=True)
+    active_issue_priority = serializers.CharField(read_only=True, allow_null=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
 
     site = serializers.IntegerField(source="site_id", read_only=True)
@@ -103,6 +104,7 @@ class InventoryListSerializer(serializers.ModelSerializer):
             "updated_at",
             "deleted_at",
             "has_active_issue",
+            "active_issue_priority",
         ]
 
 
@@ -110,6 +112,7 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
     custom_fields_entity = "inventory"
     customer_code = serializers.CharField(source="customer.code", read_only=True)
     has_active_issue = serializers.BooleanField(read_only=True)
+    active_issue_priority = serializers.CharField(read_only=True, allow_null=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
 
     site_name = serializers.CharField(source="site.name", read_only=True)
@@ -173,6 +176,7 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
             "updated_at",
             "deleted_at",
             "has_active_issue",
+            "active_issue_priority",
         ]
         extra_kwargs = {
             # REQUIRED via API
@@ -336,12 +340,36 @@ class InventoryViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS],
         )
 
+        # Priority ordering: critical > high > medium > low
+        from django.db.models import Case, Value, When, IntegerField
+        priority_order = Case(
+            When(priority="critical", then=Value(4)),
+            When(priority="high",     then=Value(3)),
+            When(priority="medium",   then=Value(2)),
+            When(priority="low",      then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+
+        from django.db.models import Subquery, CharField as DjCharField
+        top_priority_qs = (
+            Issue.objects.filter(
+                inventory_id=OuterRef("pk"),
+                deleted_at__isnull=True,
+                status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS],
+            )
+            .annotate(prio_order=priority_order)
+            .order_by("-prio_order")
+            .values("priority")[:1]
+        )
+
         qs = qs.annotate(
             customer_name=F("customer__name"),
             site_name=F("site__name"),
             type_label=F("type__label"),
             status_label=F("status__label"),
             has_active_issue=Exists(active_issue_qs),
+            active_issue_priority=Subquery(top_priority_qs, output_field=DjCharField()),
         )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))

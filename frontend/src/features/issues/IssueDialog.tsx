@@ -26,6 +26,7 @@ import {
   type IssueFormData,
   type IssueRow,
   type UserOption,
+  type InventoryOption,
 } from './types'
 
 type SiteOption = { id: number; label: string }
@@ -42,6 +43,7 @@ type IssueDialogProps = {
   siteOptions: SiteOption[]
   categories: CategoryOption[]
   users: UserOption[]
+  pendingInventory?: InventoryOption | null
   onClose: () => void
   onSave: () => void
   onOpenLinkInventory: () => void
@@ -61,6 +63,7 @@ export default function IssueDialog({
   siteOptions,
   categories,
   users,
+  pendingInventory,
   onClose,
   onSave,
   onOpenLinkInventory,
@@ -252,6 +255,13 @@ export default function IssueDialog({
               {editIssue.inventory
                 ? `Inventory collegato: ${issueInventoryLabel(editIssue)}`
                 : 'Questa issue non è ancora collegata a un inventory.'}
+            </Alert>
+          ) : pendingInventory ? (
+            <Alert severity="info" icon={false} sx={{ py: 0.5 }}>
+              <strong>Inventory:</strong>{' '}
+              {[pendingInventory.name, pendingInventory.knumber, pendingInventory.hostname]
+                .filter(Boolean)
+                .join(' · ')}
             </Alert>
           ) : null}
 

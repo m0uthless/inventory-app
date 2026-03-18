@@ -16,6 +16,8 @@ type UseServerGridArgs = {
   defaultOrdering: string
   /** Allowed fields for ordering (without '-') */
   allowedOrderingFields: readonly string[]
+  /** Maps grid column field names to backend ordering field names when they differ */
+  columnOrderingMap?: Record<string, string>
   /** Default page size (default: 25) */
   defaultPageSize?: number
   /** Debounce in ms for search (default: 350) */
@@ -56,15 +58,22 @@ function sanitizeOrdering(orderingRaw: string | null, args: UseServerGridArgs) {
 function orderingToSortModel(ordering: string, args: UseServerGridArgs): GridSortModel {
   const safe = sanitizeOrdering(ordering, args)
   const desc = safe.startsWith('-')
-  const field = desc ? safe.slice(1) : safe
-  return [{ field, sort: desc ? 'desc' : 'asc' }]
+  const backendField = desc ? safe.slice(1) : safe
+  // Reverse-map backend field name to grid column field name
+  const reverseMap = args.columnOrderingMap
+    ? Object.fromEntries(Object.entries(args.columnOrderingMap).map(([k, v]) => [v, k]))
+    : {}
+  const gridField = reverseMap[backendField] ?? backendField
+  return [{ field: gridField, sort: desc ? 'desc' : 'asc' }]
 }
 
 function sortModelToOrdering(model: GridSortModel, args: UseServerGridArgs) {
   const m = model?.[0]
   if (!m?.field || !m?.sort) return args.defaultOrdering
   const allowed = new Set(args.allowedOrderingFields)
-  const safeField = allowed.has(m.field) ? m.field : args.defaultOrdering.replace(/^-/g, '')
+  // Map grid field name to backend ordering field if a mapping exists
+  const backendField = args.columnOrderingMap?.[m.field] ?? m.field
+  const safeField = allowed.has(backendField) ? backendField : args.defaultOrdering.replace(/^-/g, '')
   return m.sort === 'desc' ? `-${safeField}` : safeField
 }
 

@@ -159,27 +159,8 @@ const cols: GridColDef<ContactRow>[] = [
         <Chip size="small" variant="outlined" label="No" />
       ),
   },
-  {
-    field: 'deleted_at',
-    headerName: 'Eliminato il',
-    width: 190,
-    sortable: true,
-    renderCell: (p) => <span>{fmtTs(p.value as string | null | undefined)}</span>,
-  },
 ]
 
-function fmtTs(ts?: string | null) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts)
-  return d.toLocaleString('it-IT', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 // prettier-ignore
 export default function Contacts() {
@@ -197,7 +178,6 @@ export default function Contacts() {
       'customer_display_name',
       'site_display_name',
       'is_primary',
-      'deleted_at',
     ],
     defaultPageSize: 25,
   })
@@ -804,8 +784,6 @@ export default function Contacts() {
           username: me?.username,
 
           emptyState,
-          columnVisibilityModel: { deleted_at: grid.view === 'deleted' },
-
           rows,
           columns: columns,
           loading,

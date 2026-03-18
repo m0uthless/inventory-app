@@ -67,8 +67,37 @@ export const theme = createTheme(
     components: {
       MuiCssBaseline: {
         styleOverrides: `
-        * { font-feature-settings: "cv02","cv03","cv04","cv11"; }
-        body { scrollbar-gutter: stable; }
+        * { 
+          font-feature-settings: "cv02","cv03","cv04","cv11";
+          scrollbar-width: thin;
+          scrollbar-color: #45a59d transparent;
+        }
+
+        html {
+          scrollbar-gutter: stable;
+        }
+
+        body {
+          scrollbar-gutter: stable;
+        }
+
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background-color: #45a59d;
+          border-radius: 999px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background-color: #0f766e;
+        }
       `,
       },
 

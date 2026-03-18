@@ -56,7 +56,6 @@ import { useDrfList } from '../hooks/useDrfList'
 import { useServerGrid } from '../hooks/useServerGrid'
 import { useToast } from '../ui/toast'
 import EntityListCard from '../ui/EntityListCard'
-import ActiveFilterSummaryBar, { type ActiveFilterSummaryItem } from '../ui/ActiveFilterSummaryBar'
 import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import FilterChip from '../ui/FilterChip'
 import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
@@ -64,7 +63,21 @@ import { useExportCsv } from '../ui/useExportCsv'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import { isRecord } from '../utils/guards'
 
-type OpenCreateState = { openCreate?: boolean }
+type CreateFromInventoryState = {
+  inventoryId: number
+  inventoryName: string
+  inventoryKnumber: string | null
+  inventorySerialNumber: string | null
+  inventoryHostname: string | null
+  customerId: number
+  customerName: string
+  siteId: number | null
+}
+
+type OpenCreateState = {
+  openCreate?: boolean
+  createFromInventory?: CreateFromInventoryState
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -191,7 +204,17 @@ export default function Issues() {
   // ── Grid ──────────────────────────────────────────────────────────────────
   const grid = useServerGrid({
     defaultOrdering: '-created_at',
-    allowedOrderingFields: ['created_at', 'updated_at', 'due_date', 'closed_at', 'priority', 'status', 'title'],
+    allowedOrderingFields: [
+      'created_at', 'updated_at', 'due_date', 'closed_at',
+      'priority', 'status', 'title', 'servicenow_id', 'opened_at',
+      'customer__name', 'category__label', 'assigned_to__last_name',
+      'comments_count',
+    ],
+    columnOrderingMap: {
+      customer_name:          'customer__name',
+      category_label:         'category__label',
+      assigned_to_full_name:  'assigned_to__last_name',
+    },
   })
 
   // ── Filtri extra ──────────────────────────────────────────────────────────
@@ -384,6 +407,8 @@ export default function Issues() {
   const [linkInventorySaving, setLinkInventorySaving] = React.useState(false)
   const [inventoryOptions, setInventoryOptions] = React.useState<InventoryOption[]>([])
   const [selectedInventory, setSelectedInventory] = React.useState<InventoryOption | null>(null)
+  // inventory pre-selezionato quando si arriva da Inventory → "Apri issue"
+  const [pendingInventory, setPendingInventory] = React.useState<InventoryOption | null>(null)
 
   const syncIssueState = React.useCallback((next: IssueRow) => {
     setEditIssue(next)
@@ -419,6 +444,7 @@ export default function Issues() {
     setFormErrors({})
     setInventoryOptions([])
     setSelectedInventory(null)
+    setPendingInventory(null)
     setLinkInventoryOpen(false)
     setFormOpen(true)
   }
@@ -427,15 +453,44 @@ export default function Issues() {
 
   React.useEffect(() => {
     const st = loc.state as OpenCreateState | null
-    if (!st?.openCreate) {
+    const hasOpenCreate = st?.openCreate || st?.createFromInventory
+    if (!hasOpenCreate) {
       openCreateOnceRef.current = false
       return
     }
     if (openCreateOnceRef.current) return
     openCreateOnceRef.current = true
-    openCreate()
+
+    const cfi = st?.createFromInventory
+    if (cfi) {
+      // Pre-compila il form con i dati dell'inventory
+      const custOpt = { id: cfi.customerId, label: cfi.customerName }
+      const invOpt: InventoryOption = {
+        id: cfi.inventoryId,
+        name: cfi.inventoryName,
+        knumber: cfi.inventoryKnumber,
+        serial_number: cfi.inventorySerialNumber,
+        hostname: cfi.inventoryHostname,
+      }
+      setEditIssue(null)
+      setForm({
+        ...createEmptyForm(me?.id),
+        customer: custOpt,
+        site_id: cfi.siteId ?? '',
+      })
+      setCustFormInput(cfi.customerName)
+      setFormErrors({})
+      setInventoryOptions([invOpt])
+      setSelectedInventory(invOpt)
+      setPendingInventory(invOpt)
+      setLinkInventoryOpen(false)
+      setFormOpen(true)
+    } else {
+      openCreate()
+    }
+
     navigate(loc.pathname + loc.search, { replace: true, state: {} })
-  }, [loc, navigate])
+  }, [loc, navigate, me?.id])
 
   const openEdit = (row: IssueRow) => {
     setEditIssue(row)
@@ -543,6 +598,11 @@ export default function Issues() {
       due_date: form.due_date || null,
     }
 
+    // Se c'è un inventory pre-selezionato (da "Apri issue" in Inventory) lo includiamo subito
+    if (!editIssue && pendingInventory) {
+      payload.inventory = pendingInventory.id
+    }
+
     try {
       if (editIssue) {
         const r = await api.patch<IssueRow>(`/issues/${editIssue.id}/`, payload)
@@ -552,8 +612,13 @@ export default function Issues() {
       } else {
         const r = await api.post<IssueRow>('/issues/', payload)
         syncIssueState(r.data)
-        setSelectedInventory(null)
-        toast.success('Issue creata. Ora puoi collegarla a un inventory.')
+        setSelectedInventory(pendingInventory)
+        setPendingInventory(null)
+        toast.success(
+          pendingInventory
+            ? `Issue creata e collegata a ${pendingInventory.name || pendingInventory.knumber || 'inventory'}.`
+            : 'Issue creata. Ora puoi collegarla a un inventory.',
+        )
       }
       reload()
     } catch (e: unknown) {
@@ -593,6 +658,38 @@ export default function Issues() {
     setDetailTab(tab)
     setNewComment('')
   }
+
+  // Gestisce ?open=<id> — apre il drawer della issue specificata nell'URL
+  // (usato dal link "vai alla issue" nel drawer di Inventory)
+  const openParamHandledRef = React.useRef(false)
+  React.useEffect(() => {
+    const params = new URLSearchParams(loc.search)
+    const openId = params.get('open')
+    if (!openId) {
+      openParamHandledRef.current = false
+      return
+    }
+    if (openParamHandledRef.current) return
+    const id = Number(openId)
+    if (!Number.isFinite(id) || id <= 0) return
+    openParamHandledRef.current = true
+    // Cerca prima nelle righe già caricate, altrimenti fetch diretto
+    const existing = (rows as IssueRow[]).find((r) => r.id === id)
+    if (existing) {
+      openDetail(existing)
+    } else {
+      api.get<IssueRow>(`/issues/${id}/`).then((r) => {
+        openDetail(r.data)
+      }).catch(() => {})
+    }
+    // Pulisce il param dall'URL senza reload
+    const newSearch = new URLSearchParams(loc.search)
+    newSearch.delete('open')
+    navigate(
+      loc.pathname + (newSearch.toString() ? `?${newSearch.toString()}` : ''),
+      { replace: true, state: loc.state }
+    )
+  }, [loc.search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!detailIssue) return
@@ -673,58 +770,6 @@ export default function Issues() {
       ) : undefined,
     }
   }, [activeFilterCount, grid, openCreate])
-
-  const issueActiveFilterItems = React.useMemo<ActiveFilterSummaryItem[]>(() => {
-    const items: ActiveFilterSummaryItem[] = []
-
-    if (filterStatus) {
-      items.push({
-        key: 'status',
-        label: `Stato: ${STATUS_META[filterStatus]?.label ?? filterStatus}`,
-        onDelete: () => setFilterStatus(''),
-      })
-    }
-
-    if (filterPriority) {
-      items.push({
-        key: 'priority',
-        label: `Priorità: ${PRIORITY_META[filterPriority]?.label ?? filterPriority}`,
-        onDelete: () => setFilterPriority(''),
-      })
-    }
-
-    if (filterCustomer) {
-      items.push({
-        key: 'customer',
-        label: `Cliente: ${filterCustomer.label}`,
-        onDelete: () => setFilterCustomer(null),
-      })
-    }
-
-    if (onlyMyIssues) {
-      items.push({
-        key: 'only_mine',
-        label: 'Solo mie issues',
-        onDelete: () => handleOnlyMyIssuesChange(false),
-      })
-    } else if (filterAssigned) {
-      items.push({
-        key: 'assigned',
-        label: `Assegnato a: ${filterAssigned.label}`,
-        onDelete: () => setFilterAssigned(null),
-      })
-    }
-
-    if (hideClosedCases) {
-      items.push({
-        key: 'hide_closed',
-        label: 'Nascondi casi chiusi',
-        onDelete: () => setHideClosedCases(false),
-      })
-    }
-
-    return items
-  }, [filterAssigned, filterCustomer, filterPriority, filterStatus, handleOnlyMyIssuesChange, hideClosedCases, onlyMyIssues])
 
   const columns: GridColDef<IssueRow>[] = [
     {
@@ -868,7 +913,6 @@ export default function Issues() {
       field: 'comments_count',
       headerName: 'Commenti',
       width: 110,
-      sortable: false,
       renderCell: ({ row }) => (
         <Box
           onClick={(e) => {
@@ -1156,12 +1200,6 @@ export default function Issues() {
             </Tooltip>
           ),
         }}
-        belowToolbar={
-          <ActiveFilterSummaryBar
-            items={issueActiveFilterItems}
-            onClearAll={issueActiveFilterItems.length > 0 ? resetFilters : undefined}
-          />
-        }
         grid={{
           pageKey: 'issues',
           username: me?.username,
@@ -1213,6 +1251,7 @@ export default function Issues() {
         siteOptions={siteOptions}
         categories={categories}
         users={users}
+        pendingInventory={pendingInventory}
         onClose={() => setFormOpen(false)}
         onSave={handleFormSave}
         onOpenLinkInventory={openLinkInventoryPicker}

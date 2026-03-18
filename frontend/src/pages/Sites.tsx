@@ -471,27 +471,8 @@ const cols: GridColDef<SiteRow>[] = [
       />
     ),
   },
-  {
-    field: 'deleted_at',
-    headerName: 'Eliminato il',
-    width: 190,
-    sortable: true,
-    renderCell: (p) => <span>{fmtTs(typeof p.value === 'string' ? p.value : null)}</span>,
-  },
 ]
 
-function fmtTs(ts?: string | null) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts)
-  return d.toLocaleString('it-IT', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 export default function Sites() {
   const { me } = useAuth()
@@ -507,7 +488,6 @@ export default function Sites() {
       'city',
       'postal_code',
       'status_label',
-      'deleted_at',
     ],
     defaultPageSize: 25,
   })
@@ -1105,8 +1085,6 @@ export default function Sites() {
           username: me?.username,
 
           emptyState,
-          columnVisibilityModel: { deleted_at: grid.view === 'deleted' },
-
           rows,
           columns: columns,
           loading,

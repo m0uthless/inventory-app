@@ -1612,6 +1612,32 @@ export default function Drive() {
 
   return (
     <Stack spacing={2}>
+      {/* OneDrive disclaimer */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.25,
+          px: 1.5,
+          py: 1,
+          borderRadius: 1.5,
+          bgcolor: '#e8f0fe',
+          border: '1px solid #c2d4f8',
+        }}
+      >
+        {/* OneDrive logo SVG inline */}
+        <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+          <svg width="22" height="16" viewBox="0 0 22 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8.5 13.5H18.5C19.88 13.5 21 12.38 21 11C21 9.74 20.09 8.69 18.89 8.52C18.96 8.18 19 7.84 19 7.5C19 5.01 16.99 3 14.5 3C13.23 3 12.08 3.52 11.26 4.36C10.7 3.53 9.76 3 8.7 3C7.04 3 5.66 4.21 5.44 5.8C4.06 6.16 3 7.42 3 8.9C3 10.63 4.37 12 6.1 12H8.5V13.5Z" fill="#0078D4"/>
+            <path d="M13.5 13.5H18.5C19.88 13.5 21 12.38 21 11C21 9.74 20.09 8.69 18.89 8.52C18.96 8.18 19 7.84 19 7.5C19 5.01 16.99 3 14.5 3C13.23 3 12.08 3.52 11.26 4.36L13.5 13.5Z" fill="#1490DF"/>
+          </svg>
+        </Box>
+        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#1a3a6e', lineHeight: 1.4 }}>
+          Si ricorda che per condividere file di grosse dimensioni la piattaforma corretta è{' '}
+          <Box component="span" sx={{ fontWeight: 700 }}>OneDrive</Box>.
+        </Typography>
+      </Box>
+
       {/* Topbar: breadcrumb + search + actions */}
       <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
         {/* Breadcrumb */}

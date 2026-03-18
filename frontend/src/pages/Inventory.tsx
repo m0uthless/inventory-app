@@ -59,7 +59,7 @@ import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
 import { useToast } from '../ui/toast'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '../api/error'
-import { buildQuery } from '../utils/nav'
+
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '../utils/gridSelection'
 import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
@@ -74,6 +74,15 @@ import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 import FilterChip from '../ui/FilterChip'
 
 type LookupItem = { id: number; label: string; key?: string }
+
+type ActiveIssueRow = {
+  id: number
+  title: string
+  priority: string
+  priority_label: string
+  status: string
+  status_label: string
+}
 
 const INVENTORIES_PATH = '/inventories/' as const satisfies CollectionPath
 
@@ -101,6 +110,7 @@ type InventoryRow = {
   updated_at?: string | null
   deleted_at?: string | null
   has_active_issue?: boolean
+  active_issue_priority?: string | null
 }
 
 type InventoryDetail = {
@@ -149,6 +159,7 @@ type InventoryDetail = {
   updated_at?: string | null
   deleted_at?: string | null
   has_active_issue?: boolean
+  active_issue_priority?: string | null
 }
 
 type InventoryForm = {
@@ -234,12 +245,22 @@ async function copyToClipboard(text: string) {
   await navigator.clipboard.writeText(text)
 }
 
-const ACTIVE_ISSUE_TOOLTIP = "C'è almeno una issue collegata aperta o in lavorazione."
+const ISSUE_PRIORITY_COLOR: Record<string, string> = {
+  critical: '#dc2626', // red
+  high:     '#f97316', // orange
+  medium:   '#f59e0b', // amber
+  low:      '#64748b', // slate
+}
 
-function ActiveIssueWarningIcon() {
+function ActiveIssueWarningIcon({ priority }: { priority?: string | null }) {
+  const color = ISSUE_PRIORITY_COLOR[priority ?? ''] ?? ISSUE_PRIORITY_COLOR.medium
+  const label = priority === 'critical' ? 'Issue critica aperta'
+    : priority === 'high' ? 'Issue alta priorità aperta'
+    : priority === 'low' ? 'Issue a bassa priorità aperta'
+    : "C'è almeno una issue collegata aperta o in lavorazione."
   return (
-    <Tooltip title={ACTIVE_ISSUE_TOOLTIP}>
-      <WarningAmberRoundedIcon sx={{ color: 'warning.main', fontSize: 18, flexShrink: 0 }} />
+    <Tooltip title={label}>
+      <WarningAmberRoundedIcon sx={{ color, fontSize: 18, flexShrink: 0 }} />
     </Tooltip>
   )
 }
@@ -485,11 +506,12 @@ const cols: GridColDef<InventoryRow>[] = [
             {label || '—'}
           </Typography>
 
-          {p.row?.has_active_issue ? <ActiveIssueWarningIcon /> : null}
+          {p.row?.has_active_issue ? <ActiveIssueWarningIcon priority={p.row.active_issue_priority} /> : null}
         </Box>
       )
     },
   },
+  { field: 'name', headerName: 'Nome', width: 200 },
   { field: 'customer_name', headerName: 'Cliente', width: 220 },
   { field: 'site_name', headerName: 'Sito', width: 180 },
 
@@ -500,27 +522,8 @@ const cols: GridColDef<InventoryRow>[] = [
   { field: 'status_label', headerName: 'Stato', width: 160 },
   { field: 'local_ip', headerName: 'IP locale', width: 160 },
   { field: 'srsa_ip', headerName: 'IP SRSA', width: 160 },
-  {
-    field: 'deleted_at',
-    headerName: 'Eliminato il',
-    width: 190,
-    sortable: true,
-    renderCell: (p) => <span>{fmtTs(typeof p.value === 'string' ? p.value : null)}</span>,
-  },
 ]
 
-function fmtTs(ts?: string | null) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts)
-  return d.toLocaleString('it-IT', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 // prettier-ignore
 export default function Inventory() {
@@ -543,7 +546,6 @@ export default function Inventory() {
       'status_label',
       'local_ip',
       'srsa_ip',
-      'deleted_at',
     ],
     defaultPageSize: 25,
   })
@@ -639,6 +641,8 @@ export default function Inventory() {
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<InventoryDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
+  const [activeIssues, setActiveIssues] = React.useState<ActiveIssueRow[]>([])
+  const [activeIssuesLoading, setActiveIssuesLoading] = React.useState(false)
 
   // delete/restore
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
@@ -747,6 +751,7 @@ export default function Inventory() {
     async (id: number, forceIncludeDeleted?: boolean) => {
       setDetailLoading(true)
       setDetail(null)
+      setActiveIssues([])
       try {
         const inc = forceIncludeDeleted ?? grid.includeDeleted
         const incParams = includeDeletedParams(inc)
@@ -755,6 +760,20 @@ export default function Inventory() {
           incParams ? { params: incParams } : undefined,
         )
         setDetail(res.data)
+        // Fetch active issues for this inventory in parallel
+        if (res.data.has_active_issue) {
+          setActiveIssuesLoading(true)
+          api
+            .get('/issues/', {
+              params: { inventory: id, hide_closed: true, page_size: 10, ordering: '-created_at' },
+            })
+            .then((r) => {
+              const results = (r.data as { results?: ActiveIssueRow[] }).results ?? []
+              setActiveIssues(results)
+            })
+            .catch(() => {})
+            .finally(() => setActiveIssuesLoading(false))
+        }
       } catch (e) {
         toast.error(apiErrorToMessage(e))
       } finally {
@@ -1315,8 +1334,6 @@ export default function Inventory() {
           username: me?.username,
 
           emptyState,
-          columnVisibilityModel: { deleted_at: grid.view === 'deleted' },
-
           rows,
           columns: columns,
           loading,
@@ -1558,14 +1575,7 @@ export default function Inventory() {
                   .filter(Boolean)
                   .join(' · ') || ' '}
               </Typography>
-              {detail?.type_label && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: 'rgba(255,255,255,0.45)', display: 'block', mt: 0.25 }}
-                >
-                  {detail.type_label}
-                </Typography>
-              )}
+
             </Box>
           </Box>
 
@@ -1603,70 +1613,93 @@ export default function Inventory() {
                 </Stack>
               ) : detail ? (
                 <>
-                  {/* Quick nav */}
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() =>
-                        navigate(
-                          `/customers${buildQuery({
-                            open: detail.customer,
-                            return: loc.pathname + loc.search,
-                          })}`,
-                        )
-                      }
-                    >
-                      Apri cliente
-                    </Button>
-                    {detail.site && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() =>
-                          navigate(
-                            `/sites${buildQuery({
-                              customer: detail.customer,
-                              open: detail.site,
-                              return: loc.pathname + loc.search,
-                            })}`,
-                          )
-                        }
-                      >
-                        Apri sito
-                      </Button>
-                    )}
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() =>
-                        navigate(
-                          `/inventory${buildQuery({ customer: detail.customer, site: detail.site ?? '' })}`,
-                        )
-                      }
-                    >
-                      Lista filtrata
-                    </Button>
-                  </Stack>
-
                   {detail.has_active_issue && (
                     <Box
                       sx={{
-                        bgcolor: 'rgba(239, 68, 68, 0.10)',
+                        bgcolor: 'rgba(239, 68, 68, 0.06)',
                         border: '1px solid',
-                        borderColor: 'rgba(239, 68, 68, 0.28)',
+                        borderColor: 'rgba(239, 68, 68, 0.22)',
                         borderRadius: 2,
-                        p: 1.75,
+                        overflow: 'hidden',
                       }}
                     >
-                      <Stack direction="row" spacing={1} alignItems="flex-start">
-                        <WarningAmberRoundedIcon sx={{ color: 'error.main', mt: '2px' }} />
-                        <Box>
-                          <Typography sx={{ fontWeight: 800, color: 'error.main', lineHeight: 1.2 }}>
-                            Attenzione! C'è una issue collegata al sistema attualmente aperta.
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ px: 1.5, py: 1, borderBottom: '1px solid rgba(239,68,68,0.15)' }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <WarningAmberRoundedIcon sx={{ color: 'error.main', fontSize: 16 }} />
+                          <Typography sx={{ fontWeight: 700, color: 'error.main', fontSize: '0.8rem' }}>
+                            Issue aperte
                           </Typography>
-                        </Box>
+                        </Stack>
+
                       </Stack>
+                      {activeIssuesLoading ? (
+                        <Stack alignItems="center" py={1.5}>
+                          <CircularProgress size={16} sx={{ color: 'error.main' }} />
+                        </Stack>
+                      ) : (
+                        <Stack divider={<Box sx={{ borderBottom: '1px solid rgba(239,68,68,0.10)' }} />}>
+                          {activeIssues.map((issue) => {
+                            const pColor = ISSUE_PRIORITY_COLOR[issue.priority] ?? ISSUE_PRIORITY_COLOR.medium
+                            return (
+                              <Box
+                                key={issue.id}
+                                onClick={() => navigate(`/issues?open=${issue.id}`)}
+                                sx={{
+                                  px: 1.5,
+                                  py: 0.9,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  '&:hover': { bgcolor: 'rgba(239,68,68,0.06)' },
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    bgcolor: pColor,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <Typography
+                                  sx={{
+                                    fontSize: '0.8rem',
+                                    fontWeight: 500,
+                                    flex: 1,
+                                    minWidth: 0,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    color: 'text.primary',
+                                  }}
+                                >
+                                  {issue.title}
+                                </Typography>
+                                <Chip
+                                  label={issue.status_label}
+                                  size="small"
+                                  sx={{
+                                    height: 18,
+                                    fontSize: '0.68rem',
+                                    fontWeight: 600,
+                                    borderRadius: 0.75,
+                                    bgcolor: 'rgba(239,68,68,0.10)',
+                                    color: 'error.dark',
+                                    '& .MuiChip-label': { px: 0.75 },
+                                  }}
+                                />
+                              </Box>
+                            )
+                          })}
+                        </Stack>
+                      )}
                     </Box>
                   )}
 
@@ -2194,7 +2227,7 @@ export default function Inventory() {
                         Tag
                       </Typography>
                       <Stack direction="row" flexWrap="wrap" spacing={0.5}>
-                        {detail.tags.map((t) => (
+                        {detail.tags.map((t: string) => (
                           <Chip key={t} label={t} size="small" variant="outlined" />
                         ))}
                       </Stack>

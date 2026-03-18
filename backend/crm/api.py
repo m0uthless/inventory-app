@@ -304,6 +304,11 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
     status_key = serializers.CharField(source="status.key", read_only=True)
     status_label = serializers.CharField(source="status.label", read_only=True)
 
+    primary_contact_id    = serializers.IntegerField(read_only=True, allow_null=True)
+    primary_contact_name  = serializers.CharField(read_only=True, allow_null=True)
+    primary_contact_email = serializers.CharField(read_only=True, allow_null=True)
+    primary_contact_phone = serializers.CharField(read_only=True, allow_null=True)
+
     class Meta:
         model = Site
         fields = [
@@ -321,6 +326,10 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
             "status",
             "status_key",
             "status_label",
+            "primary_contact_id",
+            "primary_contact_name",
+            "primary_contact_email",
+            "primary_contact_phone",
             "notes",
             "custom_fields",
             "created_at",
@@ -357,9 +366,20 @@ class SiteViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Site.objects.select_related("customer", "status")
 
+        # Primary contact for this site (site FK matches, is_primary=True)
+        primary_contact_qs = Contact.objects.filter(
+            site_id=OuterRef("pk"),
+            is_primary=True,
+            deleted_at__isnull=True,
+        ).order_by("-updated_at", "id")
+
         qs = qs.annotate(
             customer_display_name=Coalesce(F("customer__display_name"), F("customer__name")),
             status_label=F("status__label"),
+            primary_contact_id=Subquery(primary_contact_qs.values("id")[:1]),
+            primary_contact_name=Subquery(primary_contact_qs.values("name")[:1]),
+            primary_contact_email=Subquery(primary_contact_qs.values("email")[:1]),
+            primary_contact_phone=Subquery(primary_contact_qs.values("phone")[:1]),
         )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))

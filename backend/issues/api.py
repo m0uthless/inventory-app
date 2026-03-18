@@ -184,6 +184,7 @@ class IssueFilter(filters.FilterSet):
     priority    = filters.MultipleChoiceFilter(choices=Issue.priority.field.choices)
     customer    = filters.NumberFilter(field_name="customer_id")
     site        = filters.NumberFilter(field_name="site_id")
+    inventory   = filters.NumberFilter(field_name="inventory_id")
     category    = filters.NumberFilter(field_name="category_id")
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
     due_before  = filters.DateFilter(field_name="due_date", lookup_expr="lte")
@@ -193,7 +194,7 @@ class IssueFilter(filters.FilterSet):
 
     class Meta:
         model  = Issue
-        fields = ["status", "priority", "customer", "site", "category", "assigned_to", "hide_closed"]
+        fields = ["status", "priority", "customer", "site", "inventory", "category", "assigned_to", "hide_closed"]
 
     def filter_deleted(self, queryset, name, value):
         if value:
@@ -216,7 +217,12 @@ class IssueViewSet(viewsets.ModelViewSet):
         "title", "description", "servicenow_id", "customer__name",
         "inventory__name", "inventory__knumber", "inventory__serial_number", "inventory__hostname",
     ]
-    ordering_fields     = ["created_at", "updated_at", "due_date", "closed_at", "priority", "status"]
+    ordering_fields     = [
+        "created_at", "updated_at", "due_date", "closed_at",
+        "priority", "status", "title", "servicenow_id",
+        "opened_at", "customer__name", "category__label",
+        "assigned_to__last_name", "comments_count",
+    ]
     ordering            = ["-created_at"]
 
     def get_queryset(self):
@@ -256,6 +262,29 @@ class IssueViewSet(viewsets.ModelViewSet):
         issue.soft_delete()
         log_event(request.user, action="delete", instance=issue, request=request)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """
+        Ritorna i conteggi delle issue per stato.
+        Usato dalla sidebar per mostrare il badge delle issue aperte.
+        """
+        from django.db.models import Count, Q
+
+        qs = Issue.objects.filter(deleted_at__isnull=True)
+
+        counts = qs.aggregate(
+            open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
+            in_progress_count=Count("id", filter=Q(status=IssueStatus.IN_PROGRESS)),
+            resolved_count=Count("id", filter=Q(status=IssueStatus.RESOLVED)),
+            closed_count=Count("id", filter=Q(status=IssueStatus.CLOSED)),
+        )
+
+        counts["active_count"] = (
+            (counts["open_count"] or 0) + (counts["in_progress_count"] or 0)
+        )
+
+        return Response(counts)
 
     @action(detail=True, methods=["post"], url_path="restore", permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
