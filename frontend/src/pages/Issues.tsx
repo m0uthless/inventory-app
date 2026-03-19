@@ -659,6 +659,12 @@ export default function Issues() {
     setNewComment('')
   }
 
+  // Ref che mantiene sempre le righe correnti senza finire nelle dep dell'effect
+  const rowsRef = React.useRef<IssueRow[]>(rows)
+  React.useEffect(() => {
+    rowsRef.current = rows
+  })
+
   // Gestisce ?open=<id> — apre il drawer della issue specificata nell'URL
   // (usato dal link "vai alla issue" nel drawer di Inventory)
   const openParamHandledRef = React.useRef(false)
@@ -673,8 +679,8 @@ export default function Issues() {
     const id = Number(openId)
     if (!Number.isFinite(id) || id <= 0) return
     openParamHandledRef.current = true
-    // Cerca prima nelle righe già caricate, altrimenti fetch diretto
-    const existing = (rows as IssueRow[]).find((r) => r.id === id)
+    // Cerca prima nelle righe già caricate (via ref, sempre aggiornato), altrimenti fetch diretto
+    const existing = rowsRef.current.find((r) => r.id === id)
     if (existing) {
       openDetail(existing)
     } else {
@@ -689,7 +695,7 @@ export default function Issues() {
       loc.pathname + (newSearch.toString() ? `?${newSearch.toString()}` : ''),
       { replace: true, state: loc.state }
     )
-  }, [loc.search]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loc.search, navigate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!detailIssue) return
