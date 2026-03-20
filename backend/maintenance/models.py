@@ -88,9 +88,10 @@ class MaintenancePlan(TimeStampedModel):
 
 
 class MaintenanceResult(models.TextChoices):
-    OK      = "ok",      "OK"
-    KO      = "ko",      "KO"
-    PARTIAL = "partial", "Partial"
+    OK          = "ok",          "OK"
+    KO          = "ko",          "KO"
+    PARTIAL     = "partial",     "Partial"
+    NOT_PLANNED = "not_planned", "Non prevista"
 
 
 class MaintenanceEvent(TimeStampedModel):
@@ -103,7 +104,8 @@ class MaintenanceEvent(TimeStampedModel):
     performed_at = models.DateField()
     result       = models.CharField(max_length=16, choices=MaintenanceResult.choices)
 
-    tech     = models.ForeignKey(Tech, on_delete=models.PROTECT, related_name="events")
+    tech       = models.ForeignKey(Tech, on_delete=models.PROTECT, related_name="events", null=True, blank=True)
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_events_created")
     notes    = models.TextField(null=True, blank=True)
     pdf_file = models.FileField(upload_to="maintenance_events/", null=True, blank=True)
 

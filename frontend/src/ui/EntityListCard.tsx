@@ -40,12 +40,16 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
   const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
 
   return (
-    <Card variant="outlined" sx={[{ borderRadius: 2.5, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden' }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
+    <Card variant="outlined" sx={[{ borderRadius: 2.5, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
       <CardContent
         sx={{
           pt: toolbar.compact ? 1.25 : 1.5,
           pb: 2,
           '&:last-child': { pb: 2 },
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
         }}
       >
         <Box

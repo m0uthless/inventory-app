@@ -15,6 +15,8 @@ const Contacts = lazy(() => import('./pages/Contacts'))
 const Inventory = lazy(() => import('./pages/Inventory'))
 const Audit = lazy(() => import('./pages/Audit'))
 const Maintenance = lazy(() => import('./pages/Maintenance'))
+const MaintenancePlans = lazy(() => import('./pages/MaintenancePlans'))
+const Rapportini = lazy(() => import('./pages/Rapportini'))
 const Wiki = lazy(() => import('./pages/Wiki'))
 const WikiPage = lazy(() => import('./pages/WikiPage'))
 const WikiStats = lazy(() => import('./pages/WikiStats'))
@@ -120,6 +122,22 @@ const router = createBrowserRouter([
             ]}
           >
             {lazyEl(<Maintenance />)}
+          </RequireAnyPerm>
+        ),
+      },
+      {
+        path: 'maintenance/plans',
+        element: (
+          <RequireAnyPerm perms={['maintenance.view_maintenanceplan']}>
+            {lazyEl(<MaintenancePlans />)}
+          </RequireAnyPerm>
+        ),
+      },
+      {
+        path: 'maintenance/rapportini',
+        element: (
+          <RequireAnyPerm perms={['maintenance.view_maintenanceevent']}>
+            {lazyEl(<Rapportini />)}
           </RequireAnyPerm>
         ),
       },

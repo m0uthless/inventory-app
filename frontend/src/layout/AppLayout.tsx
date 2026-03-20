@@ -51,6 +51,7 @@ import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import TerminalIcon from '@mui/icons-material/TerminalOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '../api/client'
@@ -85,6 +86,12 @@ const SITE_REPOSITORY_CHILDREN: NavItem[] = [
   { label: 'Contatti', path: '/contacts', icon: <ContactsIcon />, perm: 'crm.view_contact' },
 ]
 
+const MAINTENANCE_CHILDREN: NavItem[] = [
+  { label: 'Scadenze', path: '/maintenance', icon: <HandymanIcon />, permAny: ['maintenance.view_maintenanceplan'] },
+  { label: 'Piani', path: '/maintenance/plans', icon: <BuildOutlinedIcon />, perm: 'maintenance.view_maintenanceplan' },
+  { label: 'Rapportini', path: '/maintenance/rapportini', icon: <CheckCircleOutlineIcon />, perm: 'maintenance.view_maintenanceevent' },
+]
+
 const WIKI_CHILDREN: NavItem[] = [
   { label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, perm: 'wiki.view_wikipage' },
   { label: 'Query', path: '/wiki/queries', icon: <TerminalIcon />, perm: 'wiki.view_wikiquery' },
@@ -115,11 +122,9 @@ const NAV: NavItem[] = [
     path: '/maintenance',
     icon: <HandymanIcon />,
     section: 'principale',
-    wip: true,
     permAny: [
       'maintenance.view_maintenanceplan',
       'maintenance.view_maintenanceevent',
-      'maintenance.view_tech',
     ],
   },
 
@@ -327,6 +332,10 @@ export function AppLayout() {
     () => BUG_FEATURE_CHILDREN.filter(canAccessNavItem),
     [canAccessNavItem],
   )
+  const visibleMaintenanceChildren = React.useMemo(
+    () => MAINTENANCE_CHILDREN.filter(canAccessNavItem),
+    [canAccessNavItem],
+  )
 
   const [feedbackSummary, setFeedbackSummary] = React.useState<FeedbackSummary | null>(null)
 
@@ -398,6 +407,17 @@ export function AppLayout() {
   const [bugFeatureFlyoutAnchor, setBugFeatureFlyoutAnchor] = React.useState<null | HTMLElement>(null)
   const bugFeatureFlyoutOpen = Boolean(bugFeatureFlyoutAnchor)
 
+  const maintenanceSectionActive = React.useMemo(
+    () => ['/maintenance', '/maintenance/plans', '/maintenance/rapportini'].some((path) => isSelected(loc.pathname, path)),
+    [loc.pathname],
+  )
+  const [maintenanceOpen, setMaintenanceOpen] = React.useState(() => {
+    const v = localStorage.getItem('maintenance_nav_open')
+    return v ? v === '1' : true
+  })
+  const [maintenanceFlyoutAnchor, setMaintenanceFlyoutAnchor] = React.useState<null | HTMLElement>(null)
+  const maintenanceFlyoutOpen = Boolean(maintenanceFlyoutAnchor)
+
   React.useEffect(() => {
     localStorage.setItem('site_repository_nav_open', siteRepositoryOpen ? '1' : '0')
   }, [siteRepositoryOpen])
@@ -409,6 +429,10 @@ export function AppLayout() {
   React.useEffect(() => {
     localStorage.setItem('bug_feature_nav_open', bugFeatureOpen ? '1' : '0')
   }, [bugFeatureOpen])
+
+  React.useEffect(() => {
+    localStorage.setItem('maintenance_nav_open', maintenanceOpen ? '1' : '0')
+  }, [maintenanceOpen])
 
   React.useEffect(() => {
     if (siteRepositorySectionActive) {
@@ -429,9 +453,16 @@ export function AppLayout() {
   }, [bugFeatureSectionActive])
 
   React.useEffect(() => {
+    if (maintenanceSectionActive) {
+      setMaintenanceOpen(true)
+    }
+  }, [maintenanceSectionActive])
+
+  React.useEffect(() => {
     setSiteRepositoryFlyoutAnchor(null)
     setWikiFlyoutAnchor(null)
     setBugFeatureFlyoutAnchor(null)
+    setMaintenanceFlyoutAnchor(null)
 
     // Chiudi automaticamente i gruppi che non contengono la rotta corrente.
     // Questo evita che più gruppi rimangano aperti contemporaneamente
@@ -439,6 +470,7 @@ export function AppLayout() {
     if (!siteRepositorySectionActive) setSiteRepositoryOpen(false)
     if (!wikiSectionActive)           setWikiOpen(false)
     if (!bugFeatureSectionActive)     setBugFeatureOpen(false)
+    if (!maintenanceSectionActive)    setMaintenanceOpen(false)
   }, [loc.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
@@ -463,6 +495,8 @@ export function AppLayout() {
     if (path === '/bug-feature' || path.startsWith('/bug-feature/')) return 'BUG / FEATURE'
     if (path === '/audit' || path.startsWith('/audit/')) return 'AUDIT'
     if (path === '/drive' || path.startsWith('/drive/')) return 'DRIVE'
+    if (path === '/maintenance/plans') return 'MANUTENZIONE · PIANI'
+    if (path === '/maintenance/rapportini') return 'MANUTENZIONE · RAPPORTINI'
     if (path === '/maintenance' || path.startsWith('/maintenance/')) return 'MANUTENZIONE'
     if (path === '/search' || path.startsWith('/search/')) return 'RICERCA'
     if (path === '/profile' || path.startsWith('/profile/')) return 'PROFILO'
@@ -797,8 +831,9 @@ export function AppLayout() {
               const isSiteRepositoryGroup = it.path === '/site-repository'
               const isWikiGroup = it.path === '/wiki'
               const isBugFeatureGroup = it.path === '/bug-feature'
+              const isMaintenanceGroup = it.path === '/maintenance'
 
-              if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup) {
+              if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup && !isMaintenanceGroup) {
                 const issueEndAdornment =
                   it.path === '/issues' ? renderIssueCount(issueSummary?.active_count) : null
                 return (
@@ -812,16 +847,20 @@ export function AppLayout() {
                 ? visibleSiteRepositoryChildren
                 : isWikiGroup
                   ? visibleWikiChildren
-                  : visibleBugFeatureChildren
+                  : isMaintenanceGroup
+                    ? visibleMaintenanceChildren
+                    : visibleBugFeatureChildren
               const parentSelected = isSiteRepositoryGroup
                 ? siteRepositorySectionActive
                 : isWikiGroup
                   ? wikiSectionActive
-                  : bugFeatureSectionActive
-              const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : bugFeatureOpen
-              const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : setBugFeatureOpen
-              const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : setBugFeatureFlyoutAnchor
-              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Knowledge' : 'Bug / Feature'
+                  : isMaintenanceGroup
+                    ? maintenanceSectionActive
+                    : bugFeatureSectionActive
+              const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : isMaintenanceGroup ? maintenanceOpen : bugFeatureOpen
+              const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : isMaintenanceGroup ? setMaintenanceOpen : setBugFeatureOpen
+              const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : isMaintenanceGroup ? setMaintenanceFlyoutAnchor : setBugFeatureFlyoutAnchor
+              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Knowledge' : isMaintenanceGroup ? 'Manutenzione' : 'Bug / Feature'
               const canExpand = !isMini && children.length > 0
 
               return (
@@ -888,7 +927,9 @@ export function AppLayout() {
                                     ? isBugFeatureOpenSelected
                                     : child.path === '/bug-feature/resolved'
                                       ? isBugFeatureResolvedSelected
-                                      : undefined
+                                      : child.path === '/maintenance'
+                                        ? loc.pathname === '/maintenance'
+                                        : isSelected(loc.pathname, child.path)
 
                             return (
                               <React.Fragment key={child.path}>
@@ -1224,6 +1265,60 @@ export function AppLayout() {
                       : undefined,
                   onClick: () => {
                     setBugFeatureFlyoutAnchor(null)
+                    nav(child.path)
+                  },
+                })}
+              </React.Fragment>
+            ))}
+          </List>
+        </Box>
+      </Popover>
+
+      {/* Maintenance group flyout (mini sidebar) */}
+      <Popover
+        open={maintenanceFlyoutOpen}
+        anchorEl={maintenanceFlyoutAnchor}
+        onClose={() => setMaintenanceFlyoutAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{
+          sx: {
+            ml: 1,
+            mt: -0.25,
+            minWidth: 248,
+            borderRadius: 2,
+            overflow: 'hidden',
+            background: SIDEBAR.bgGradient,
+            color: '#ffffff',
+            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
+            border: '1px solid rgba(94,234,212,0.12)',
+          },
+        }}
+      >
+        <Box sx={{ px: 1.25, py: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              px: 1,
+              pb: 0.75,
+              color: SIDEBAR.textMuted,
+              letterSpacing: '0.16em',
+              fontWeight: 800,
+            }}
+          >
+            MANUTENZIONE
+          </Typography>
+          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
+            {visibleMaintenanceChildren.map((child) => (
+              <React.Fragment key={`maintenance-flyout-${child.path}`}>
+                {renderNavItem(child, false, {
+                  nested: true,
+                  selected: child.path === '/maintenance'
+                    ? loc.pathname === '/maintenance'
+                    : isSelected(loc.pathname, child.path),
+                  onClick: () => {
+                    setMaintenanceFlyoutAnchor(null)
                     nav(child.path)
                   },
                 })}

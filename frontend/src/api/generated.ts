@@ -2016,6 +2016,7 @@ export interface components {
       label: string
       sort_order?: number
       is_active?: boolean
+      is_hw?: boolean
     }
     /** @description Mixin per nascondere i campi sensibili (password) se l'utente non ha permesso. */
     InventoryWrite: {

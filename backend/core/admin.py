@@ -26,8 +26,9 @@ class InventoryStatusAdmin(ImportExportModelAdmin):
 
 @admin.register(InventoryType)
 class InventoryTypeAdmin(ImportExportModelAdmin):
-    list_display = ("id", "key", "label", "sort_order", "is_active", "deleted_at", "updated_at")
-    list_filter = ("is_active", "deleted_at")
+    list_display = ("id", "key", "label", "sort_order", "is_active", "is_hw", "deleted_at", "updated_at")
+    list_filter = ("is_active", "is_hw", "deleted_at")
+    list_editable = ("is_hw",)
     search_fields = ("key", "label")
 
 @admin.register(AppSetting)

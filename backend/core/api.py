@@ -1,4 +1,6 @@
 from rest_framework import serializers, viewsets
+from rest_framework.filters import OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
 from core.models import CustomerStatus, SiteStatus, InventoryStatus, InventoryType
@@ -48,7 +50,7 @@ class InventoryStatusLookupSerializer(serializers.ModelSerializer):
 class InventoryTypeLookupSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryType
-        fields = ["id", "key", "label", "sort_order", "is_active"]
+        fields = ["id", "key", "label", "sort_order", "is_active", "is_hw"]
 
 
 class InventoryStatusViewSet(viewsets.ReadOnlyModelViewSet):
@@ -62,6 +64,10 @@ class InventoryStatusViewSet(viewsets.ReadOnlyModelViewSet):
 class InventoryTypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InventoryTypeLookupSerializer
     pagination_class = None
+    filter_backends  = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["is_active", "is_hw"]
+    ordering_fields  = ["sort_order", "label"]
+    ordering         = ["sort_order", "label"]
 
     def get_queryset(self):
         return InventoryType.objects.filter(is_active=True, deleted_at__isnull=True).order_by("sort_order", "label")

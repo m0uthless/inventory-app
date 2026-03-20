@@ -120,7 +120,6 @@ class TechViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
-
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
@@ -205,15 +204,36 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
     inventory_type_labels = serializers.SerializerMethodField()
 
     # Quanti inventory attivi del cliente sono coperti da questo piano.
-    # Valore annotato in get_queryset() — zero query aggiuntive per riga.
-    covered_count = serializers.IntegerField(read_only=True)
+    # Calcolata nel serializer: conta gli inventory attivi del cliente coperti dal piano.
+    covered_count = serializers.SerializerMethodField()
 
-    # Data dell'ultimo rapportino eseguito (derivata dagli eventi).
-    # Valore annotato in get_queryset() — zero query aggiuntive per riga.
+    # Quanti rapportini ok/ko sono stati eseguiti nel ciclo corrente — annotato su list.
+    completed_count = serializers.IntegerField(read_only=True, allow_null=True, default=None)
+
+    # Data dell'ultimo rapportino eseguito — annotata su list, None su retrieve.
     last_done_date = serializers.DateField(read_only=True, allow_null=True)
 
     def get_inventory_type_labels(self, obj):
         return list(obj.inventory_types.values_list("label", flat=True))
+
+    def get_covered_count(self, obj):
+        from inventory.models import Inventory
+        from core.models import InventoryStatus
+        type_ids = list(obj.inventory_types.values_list("id", flat=True))
+        if not type_ids:
+            return 0
+        active_status_ids = list(
+            InventoryStatus.objects.filter(
+                key__in=("in_use", "maintenance", "repair"),
+                deleted_at__isnull=True,
+            ).values_list("id", flat=True)
+        )
+        return Inventory.objects.filter(
+            customer_id=obj.customer_id,
+            type_id__in=type_ids,
+            status_id__in=active_status_ids,
+            deleted_at__isnull=True,
+        ).count()
 
     class Meta:
         model  = MaintenancePlan
@@ -225,6 +245,7 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
             "inventory_types",
             "inventory_type_labels",
             "covered_count",
+            "completed_count",
             "title",
             "schedule_type",
             "interval_unit",
@@ -257,40 +278,42 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     ordering         = ["next_due_date", "title"]
 
     def get_queryset(self):
-        from inventory.models import Inventory
-
-        # Subquery: data dell'ultimo MaintenanceEvent per piano (ordine desc performed_at).
-        last_event_sq = (
-            MaintenanceEvent.objects
-            .filter(plan=OuterRef("pk"), deleted_at__isnull=True)
-            .order_by("-performed_at")
-            .values("performed_at")[:1]
-        )
-
-        # Subquery: conteggio inventory attivi coperti dal piano.
-        # covered_inventories() usa inventory_types M2M; lo riscriviamo come
-        # annotazione scalare per evitare N+1 (una query per piano nella lista).
-        covered_sq = (
-            Inventory.objects
-            .filter(
-                customer=OuterRef("customer"),
-                type__in=OuterRef("inventory_types"),
-                deleted_at__isnull=True,
-            )
-            .values("customer")          # raggruppa per evitare duplicati M2M
-            .annotate(n=Count("id"))
-            .values("n")[:1]
-        )
-
         qs = (
             MaintenancePlan.objects
             .select_related("customer")
             .prefetch_related("inventory_types")
-            .annotate(
-                last_done_date=Subquery(last_event_sq),
-                covered_count=Subquery(covered_sq),
-            )
         )
+
+        # last_done_date: annotata solo su list per evitare query extra su retrieve/destroy.
+        # covered_count: calcolata nel serializer via SerializerMethodField (nessun OuterRef M2M).
+        action = getattr(self, "action", "list")
+        if action == "list":
+            last_event_sq = (
+                MaintenanceEvent.objects
+                .filter(plan=OuterRef("pk"), deleted_at__isnull=True)
+                .order_by("-performed_at")
+                .values("performed_at")[:1]
+            )
+            # completed_count: numero di rapportini ok/ko/partial nel ciclo corrente.
+            # Il ciclo corrente va da (next_due_date - 1 anno) a next_due_date.
+            # Approssimazione annuale: safe per intervalli <= 1 anno; per piani pluriennali
+            # potrebbe sovrastimare, ma è comunque indicativa e coerente con il frontend.
+            completed_count_sq = (
+                MaintenanceEvent.objects
+                .filter(
+                    plan=OuterRef("pk"),
+                    result__in=("ok", "ko", "partial"),
+                    deleted_at__isnull=True,
+                    performed_at__year=OuterRef("next_due_date__year"),
+                )
+                .values("plan")
+                .annotate(cnt=Count("id"))
+                .values("cnt")[:1]
+            )
+            qs = qs.annotate(
+                last_done_date=Subquery(last_event_sq),
+                completed_count=Subquery(completed_count_sq),
+            )
 
         # Filtro per tipo inventario (multi: ?inventory_type=1&inventory_type=2)
         inv_types = self.request.query_params.getlist("inventory_type")
@@ -429,8 +452,11 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         )
         customer_param = request.query_params.get("customer")
         site_param     = request.query_params.get("site")
+        plan_param     = request.query_params.get("plan")
         if customer_param:
             plans = plans.filter(customer_id=customer_param)
+        if plan_param:
+            plans = plans.filter(id=plan_param)
 
         # Materializza i piani una volta sola
         plans_list = list(plans)
@@ -446,11 +472,19 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             for t_id in p.inventory_types.values_list("id", flat=True)
         }
 
+        from core.models import InventoryStatus as _InvStatus
+        active_status_ids = list(
+            _InvStatus.objects.filter(
+                key__in=("in_use", "maintenance", "repair"),
+                deleted_at__isnull=True,
+            ).values_list("id", flat=True)
+        )
         inv_qs = (
             Inventory.objects
             .filter(
                 customer_id__in=customer_ids,
                 type_id__in=all_type_ids,
+                status_id__in=active_status_ids,
                 deleted_at__isnull=True,
             )
             .select_related("site", "type", "customer")
@@ -470,31 +504,137 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             for type_id in type_ids:
                 for inv in inv_index.get((plan.customer_id, type_id), []):
                     rows.append({
-                        "plan_id":        plan.id,
-                        "plan_title":     plan.title,
-                        "inventory_id":   inv.id,
-                        "customer_id":    plan.customer_id,
-                        "customer_code":  plan.customer.code,
-                        "customer_name":  plan.customer.name,
-                        "site_id":        inv.site_id,
-                        "site_name":      (inv.site.display_name or inv.site.name) if inv.site else None,
-                        "type_label":     inv.type.label if inv.type_id else None,
-                        "knumber":        inv.knumber,
-                        "hostname":       inv.hostname,
-                        "next_due_date":  str(plan.next_due_date),
-                        "schedule_type":  plan.schedule_type,
-                        "interval_value": plan.interval_value,
-                        "interval_unit":  plan.interval_unit,
-                        "fixed_month":    plan.fixed_month,
-                        "fixed_day":      plan.fixed_day,
+                        "plan_id":               plan.id,
+                        "plan_title":            plan.title,
+                        "plan_alert_days_before": plan.alert_days_before,
+                        "inventory_id":          inv.id,
+                        "inventory_name":        inv.name,
+                        "customer_id":           plan.customer_id,
+                        "customer_code":         plan.customer.code,
+                        "customer_name":         plan.customer.name,
+                        "site_id":               inv.site_id,
+                        "site_name":             (inv.site.display_name or inv.site.name) if inv.site else None,
+                        "type_label":            inv.type.label if inv.type_id else None,
+                        "knumber":               inv.knumber,
+                        "hostname":              inv.hostname,
+                        "next_due_date":         str(plan.next_due_date),
+                        "schedule_type":         plan.schedule_type,
+                        "interval_value":        plan.interval_value,
+                        "interval_unit":         plan.interval_unit,
+                        "fixed_month":           plan.fixed_month,
+                        "fixed_day":             plan.fixed_day,
                     })
 
-        rows.sort(key=lambda r: (
-            r["next_due_date"] or "",
-            r["customer_name"] or "",
-            r["site_name"] or "",
-        ))
-        return Response(rows)
+        # Escludi le coppie (plan, inventory) già completate (ok/ko) nel ciclo corrente.
+        # Le righe con result='partial' rimangono visibili.
+        # Il "ciclo corrente" è [subtract_cycle(next_due_date), next_due_date].
+        import calendar
+        from datetime import date as date_cls
+        from maintenance.models import MaintenanceEvent as MEvent
+
+        def subtract_cycle(ndd, plan):
+            """Ritorna la data di inizio del ciclo corrente (stdlib puro, no dateutil)."""
+            if plan.schedule_type == "interval" and plan.interval_value and plan.interval_unit:
+                val  = plan.interval_value
+                unit = plan.interval_unit
+                if unit == "days":
+                    return ndd - timedelta(days=val)
+                if unit == "weeks":
+                    return ndd - timedelta(weeks=val)
+                if unit == "months":
+                    total_months = ndd.month - (val % 12)
+                    year = ndd.year - (val // 12)
+                    if total_months <= 0:
+                        total_months += 12
+                        year -= 1
+                    day = min(ndd.day, calendar.monthrange(year, total_months)[1])
+                    return date_cls(year, total_months, day)
+                if unit == "years":
+                    try:
+                        return date_cls(ndd.year - val, ndd.month, ndd.day)
+                    except ValueError:
+                        return date_cls(ndd.year - val, ndd.month, 28)
+            # fixed_date o fallback → ciclo annuale
+            try:
+                return date_cls(ndd.year - 1, ndd.month, ndd.day)
+            except ValueError:
+                return date_cls(ndd.year - 1, ndd.month, 28)
+
+        today_date = date_cls.today()
+        two_years_ago = date_cls(today_date.year - 2, today_date.month, today_date.day)
+        plan_map = {p.id: p for p in plans_list}
+
+        recent_ok_ko = (
+            MEvent.objects
+            .filter(
+                plan_id__in=[r["plan_id"] for r in rows],
+                result__in=("ok", "ko", "not_planned"),
+                performed_at__gte=two_years_ago,
+                deleted_at__isnull=True,
+            )
+            .values("plan_id", "inventory_id", "performed_at")
+        )
+
+        completed_pairs: set = set()
+        for ev in recent_ok_ko:
+            plan = plan_map.get(ev["plan_id"])
+            if not plan or not plan.next_due_date:
+                continue
+            ndd         = plan.next_due_date
+            cycle_start = subtract_cycle(ndd, plan)
+            if cycle_start <= ev["performed_at"] <= ndd:
+                completed_pairs.add((ev["plan_id"], ev["inventory_id"]))
+
+        rows = [r for r in rows if (r["plan_id"], r["inventory_id"]) not in completed_pairs]
+
+        # ── Due date filters ──────────────────────────────────────────────────
+        due_before = request.query_params.get("due_before")
+        due_from   = request.query_params.get("due_from")
+        due_to     = request.query_params.get("due_to")
+        year_param = request.query_params.get("year")
+        if due_before:
+            rows = [r for r in rows if (r["next_due_date"] or "") < due_before]
+        if due_from and due_to:
+            rows = [r for r in rows if due_from <= (r["next_due_date"] or "") <= due_to]
+        if year_param and year_param.isdigit() and len(year_param) == 4:
+            rows = [r for r in rows if (r["next_due_date"] or "").startswith(year_param)]
+
+        # ── Search ────────────────────────────────────────────────────────────
+        search = request.query_params.get("search", "").strip().lower()
+        if search:
+            rows = [
+                r for r in rows
+                if search in (r["customer_name"] or "").lower()
+                or search in (r["plan_title"] or "").lower()
+                or search in (r["inventory_name"] or "").lower()
+                or search in (r["hostname"] or "").lower()
+                or search in (r["knumber"] or "").lower()
+                or search in (r["site_name"] or "").lower()
+            ]
+
+        # ── Ordering ──────────────────────────────────────────────────────────
+        ordering = request.query_params.get("ordering", "next_due_date")
+        reverse  = ordering.startswith("-")
+        field    = ordering.lstrip("-")
+        SORT_KEY = {
+            "next_due_date": lambda r: (r["next_due_date"] or "", r["customer_name"] or ""),
+            "customer_name": lambda r: (r["customer_name"] or "", r["next_due_date"] or ""),
+        }
+        rows.sort(key=SORT_KEY.get(field, SORT_KEY["next_due_date"]), reverse=reverse)
+
+        # ── Pagination ────────────────────────────────────────────────────────
+        from django.core.paginator import Paginator
+        page_size = min(int(request.query_params.get("page_size", 25)), 200)
+        page_num  = max(int(request.query_params.get("page", 1)), 1)
+        paginator = Paginator(rows, page_size)
+        page_obj  = paginator.get_page(page_num)
+
+        return Response({
+            "count":    paginator.count,
+            "next":     None,
+            "previous": None,
+            "results":  list(page_obj),
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -507,12 +647,23 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="plan.customer.name", read_only=True)
 
     # Da inventory (nullable site)
-    site_name         = serializers.SerializerMethodField()
-    inventory_hostname = serializers.CharField(source="inventory.hostname", read_only=True)
+    site_name          = serializers.SerializerMethodField()
+    inventory_hostname = serializers.CharField(source="inventory.hostname", read_only=True, allow_null=True)
+    inventory_knumber  = serializers.CharField(source="inventory.knumber",  read_only=True, allow_null=True)
+    inventory_name     = serializers.CharField(source="inventory.name",     read_only=True)
 
-    plan_title = serializers.CharField(source="plan.title",    read_only=True)
-    tech_name  = serializers.CharField(source="tech.__str__",  read_only=True)
+    plan_title         = serializers.CharField(source="plan.title",            read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username",  read_only=True, allow_null=True)
+    tech_name  = serializers.SerializerMethodField()
+
+    def get_tech_name(self, obj):
+        if obj.tech_id is None:
+            return None
+        return str(obj.tech)
     pdf_url    = serializers.SerializerMethodField()
+    # Campo scrivibile per il caricamento diretto del PDF durante create/update.
+    # Separato da pdf_url (read-only, URL assoluto) per evitare ambiguità.
+    pdf_file   = serializers.FileField(required=False, allow_null=True, write_only=False)
 
     def get_site_name(self, obj):
         return obj.inventory.site.name if obj.inventory.site_id and obj.inventory.site else None
@@ -523,6 +674,14 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         return request.build_absolute_uri(obj.pdf_file.url) if request else obj.pdf_file.url
 
+    def validate(self, attrs):
+        # tech è obbligatorio per tutti i result tranne not_planned
+        result = attrs.get("result", getattr(self.instance, "result", None))
+        tech   = attrs.get("tech",   getattr(self.instance, "tech",   None))
+        if result != "not_planned" and not tech:
+            raise serializers.ValidationError({"tech": "Il tecnico è obbligatorio."})
+        return attrs
+
     class Meta:
         model  = MaintenanceEvent
         fields = [
@@ -530,15 +689,20 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
             "plan",
             "plan_title",
             "inventory",
+            "inventory_name",
+            "inventory_hostname",
+            "inventory_knumber",
             "customer_code",
             "customer_name",
             "site_name",
-            "inventory_hostname",
             "performed_at",
             "result",
             "tech",
             "tech_name",
+            "created_by",
+            "created_by_username",
             "notes",
+            "pdf_file",
             "pdf_url",
             "created_at",
             "updated_at",
@@ -551,7 +715,7 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     filter_backends   = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     parser_classes    = [MultiPartParser, FormParser, JSONParser]
 
-    filterset_fields = ["inventory", "plan", "tech", "result"]
+    filterset_fields = ["inventory", "plan", "tech", "result", "plan__customer"]
     search_fields    = [
         "notes",
         "inventory__hostname",
@@ -575,6 +739,7 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
                 "inventory",
                 "inventory__site",
                 "tech",
+                "created_by",
             )
         )
 
@@ -582,12 +747,18 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if customer:
             qs = qs.filter(plan__customer_id=customer)
 
+        year = self.request.query_params.get("performed_at__year")
+        if year and year.isdigit() and len(year) == 4:
+            qs = qs.filter(performed_at__year=int(year))
+
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_create(self, serializer):
-        """Salva l'evento e ricalcola automaticamente next_due_date del piano."""
-        event = serializer.save()
-        self._recalculate_plan_due_date(event)
+        """Salva l'evento e ricalcola automaticamente next_due_date del piano.
+        Per result=not_planned non si avanza la data: la manutenzione non è stata eseguita."""
+        event = serializer.save(created_by=self.request.user)
+        if event.result != "not_planned":
+            self._recalculate_plan_due_date(event)
         log_event(actor=self.request.user, action="create", instance=event, request=self.request)
 
     def perform_update(self, serializer):
@@ -624,6 +795,68 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if next_date and next_date > plan.next_due_date:
             plan.next_due_date = next_date
             plan.save(update_fields=["next_due_date", "updated_at"])
+
+
+    @action(detail=True, methods=["post"], url_path="upload-pdf",
+            parser_classes=[MultiPartParser, FormParser])
+    def upload_pdf(self, request, pk=None):
+        """Carica o sostituisce il PDF allegato senza toccare gli altri campi."""
+        event = self.get_object()
+        pdf_file = request.FILES.get("pdf_file")
+        if not pdf_file:
+            return Response({"detail": "Nessun file inviato."}, status=400)
+        # Rimuovi vecchio file se presente
+        if event.pdf_file:
+            event.pdf_file.delete(save=False)
+        event.pdf_file = pdf_file
+        event.save(update_fields=["pdf_file", "updated_at"])
+        log_event(actor=request.user, action="update", instance=event, request=request,
+                  changes={"pdf_file": pdf_file.name})
+        return Response(self.get_serializer(event).data)
+
+    @action(detail=True, methods=["delete"], url_path="delete-pdf")
+    def delete_pdf(self, request, pk=None):
+        event = self.get_object()
+        if not event.pdf_file:
+            return Response({"detail": "Nessun PDF allegato."}, status=400)
+        if not (request.user.is_superuser or event.created_by_id == request.user.id):
+            return Response({"detail": "Non sei autorizzato a eliminare questo PDF."}, status=403)
+        old_name = str(event.pdf_file)
+        event.pdf_file.delete(save=True)
+        log_event(actor=request.user, action="update", instance=event, request=request,
+                  changes={"pdf_file": [old_name, None]})
+        return Response({"detail": "PDF eliminato."})
+
+    @action(detail=True, methods=["patch"], url_path="set-not-planned")
+    def set_not_planned(self, request, pk=None):
+        event = self.get_object()
+        if event.pdf_file:
+            event.pdf_file.delete(save=False)
+        event.result = "not_planned"
+        event.tech = None
+        event.pdf_file = None
+        event.save(update_fields=["result", "tech", "pdf_file", "updated_at"])
+        log_event(actor=request.user, action="update", instance=event, request=request,
+                  changes={"result": "not_planned"})
+        return Response(self.get_serializer(event).data)
+
+    @action(detail=True, methods=["post"], url_path="reset",
+            permission_classes=[CanPurgeModelPermission])
+    def reset_maintenance(self, request, pk=None):
+        """Hard-delete del rapportino (+ PDF se presente).
+        L'inventory torna nella lista scadenze poiché non esiste più un evento
+        ok/ko/not_planned che lo esclude dal todo.
+        """
+        event = self.get_object()
+        if event.pdf_file:
+            event.pdf_file.delete(save=False)
+        log_event(
+            actor=request.user, action="delete", instance=event, request=request,
+            metadata={"hard_delete": True},
+            subject=f"reset maintenance event {event.id}",
+        )
+        event.delete()  # hard delete — rimuove definitivamente il record
+        return Response(status=204)
 
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):

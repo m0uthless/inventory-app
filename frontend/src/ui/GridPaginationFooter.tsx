@@ -22,8 +22,6 @@ export default function GridPaginationFooter({
       sx={{
         px: { xs: 1.5, sm: 2 },
         py: 1.25,
-        mt: 0.25,
-        borderTop: (theme) => `1px solid ${theme.palette.divider}`,
         display: 'grid',
         gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) auto minmax(0, 1fr)' },
         alignItems: 'center',

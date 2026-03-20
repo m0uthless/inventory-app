@@ -75,6 +75,12 @@ class InventoryStatus(LookupBase):
         ]
 
 class InventoryType(LookupBase):
+    is_hw = models.BooleanField(
+        default=False,
+        verbose_name="Hardware",
+        help_text="Indica se questo tipo di inventory è un dispositivo hardware (Y) o software/altro (N).",
+    )
+
     class Meta:
         verbose_name = "Inventory type"
         verbose_name_plural = "Inventory types"
