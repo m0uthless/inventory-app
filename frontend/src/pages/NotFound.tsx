@@ -59,14 +59,14 @@ export default function NotFound() {
         <Button
           variant="outlined"
           onClick={() => nav(-1)}
-          sx={{ textTransform: 'none', borderRadius: 2 }}
+          sx={{ textTransform: 'none', borderRadius: 1 }}
         >
           Torna indietro
         </Button>
         <Button
           variant="contained"
           onClick={() => nav('/')}
-          sx={{ textTransform: 'none', borderRadius: 2 }}
+          sx={{ textTransform: 'none', borderRadius: 1 }}
         >
           Vai alla home
         </Button>

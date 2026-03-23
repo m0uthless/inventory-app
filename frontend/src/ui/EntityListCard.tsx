@@ -40,11 +40,12 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
   const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
 
   return (
-    <Card variant="outlined" sx={[{ borderRadius: 2.5, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
+    <Card variant="outlined" sx={[{ borderRadius: 1, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
       <CardContent
         sx={{
-          pt: toolbar.compact ? 1.25 : 1.5,
+          pt: toolbar.compact ? 1.75 : 2,
           pb: 2,
+          px: 2,
           '&:last-child': { pb: 2 },
           display: 'flex',
           flexDirection: 'column',
@@ -61,7 +62,7 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
                   zIndex: 2,
                   bgcolor: (theme) => alpha(theme.palette.background.paper, 0.92),
                   backdropFilter: 'blur(8px)',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
                   px: 1,
                   py: 0.75,
@@ -81,7 +82,7 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
                 <Button
                   size="small"
                   aria-label="Colonne"
-                  startIcon={<ViewColumnIcon sx={{ fontSize: toolbar.compact ? '18px !important' : '15px !important' }} />}
+                  startIcon={<ViewColumnIcon sx={{ fontSize: toolbar.compact ? '14px !important' : '12px !important' }} />}
                   onClick={(e) => {
                     const prefs = colPrefsRef.current
                     setColPanelAnchor(e.currentTarget)
@@ -100,7 +101,7 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
                     toolbar.compact
                       ? compactColumnsButtonSx
                       : {
-                          fontSize: '0.8125rem',
+                          fontSize: '0.75rem',
                           color: 'text.secondary',
                           textTransform: 'none',
                           px: 1.25,

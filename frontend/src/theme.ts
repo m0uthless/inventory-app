@@ -47,9 +47,11 @@ export const theme = createTheme(
       divider: '#e2e8f0', // Slate-200 per bordi quasi invisibili
     },
 
-    shape: { borderRadius: 10 }, 
+    shape: { borderRadius: 8 },
+    spacing: (factor: number) => `${factor * 6.4}px`,
 
     typography: {
+      fontSize: 11.2,
       fontFamily: [
         'Inter',
         'system-ui',
@@ -101,11 +103,17 @@ export const theme = createTheme(
       `,
       },
 
+      MuiToolbar: {
+        styleOverrides: {
+          root: {
+            minHeight: '64px !important',
+            '@media (min-width:600px)': { minHeight: '64px !important' },
+          },
+        },
+      },
       MuiAppBar: {
         styleOverrides: {
           root: {
-            // Flat primary: evita la competizione visiva con il gradiente verticale
-            // della sidebar. Un solo gradiente per schermata (sidebar) è più raffinato.
             background: '#0f766e',
             color: '#ffffff',
             borderBottom: 'none',
@@ -130,7 +138,7 @@ export const theme = createTheme(
             border: '1px solid #e2e8f0',
             boxShadow:
               '0 0 0 1px rgba(15,118,110,0.04), 0 4px 6px -2px rgba(0,0,0,0.05), 0 12px 24px -8px rgba(0,0,0,0.08)',
-            borderRadius: 12,
+            borderRadius: 8,
           },
         },
       },
@@ -223,7 +231,7 @@ export const theme = createTheme(
       MuiAlert: {
         styleOverrides: {
           root: {
-            borderRadius: 10,
+            borderRadius: 8,
             border: '1px solid',
           },
           standardSuccess: { borderColor: '#d1fae5' },

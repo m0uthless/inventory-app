@@ -53,7 +53,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '../hooks/useServerGrid'
 import { useUrlNumberParam } from '../hooks/useUrlParam'
 import { api } from '../api/client'
-import { collectionActionPath, itemActionPath, itemPath, type CollectionPath } from '../api/entityPaths'
+import { collectionActionPath, itemActionPath, itemPath, type CollectionPath } from '../api/apiPaths'
 import { buildDrfListParams, includeDeletedParams } from '../api/drf'
 import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
@@ -103,6 +103,7 @@ type InventoryRow = {
   serial_number?: string | null
   type_key?: string | null
   type_label?: string | null
+  status_key?: string | null
   status_label?: string | null
   local_ip?: string | null
   srsa_ip?: string | null
@@ -483,29 +484,32 @@ const cols: GridColDef<InventoryRow>[] = [
   {
     field: 'type_label',
     headerName: 'Tipo',
-    width: 200,
+    width: 180,
     sortable: true,
     renderCell: (p) => {
       const Icon = getInventoryTypeIcon(p.row?.type_key)
       const label = p.value == null ? '—' : typeof p.value === 'string' ? p.value : String(p.value)
       return (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, height: '100%' }}>
-          <Box
-            sx={{
-              width: 22,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Icon sx={{ color: INVENTORY_TYPE_ICON_COLOR, fontSize: 20, display: 'block' }} />
-          </Box>
-
-          <Typography variant="body2" noWrap sx={{ lineHeight: 1.2, minWidth: 0 }}>
-            {label || '—'}
-          </Typography>
-
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, height: '100%' }}>
+          {label && label !== '—' ? (
+            <Chip
+              size="small"
+              icon={<Icon sx={{ color: `${INVENTORY_TYPE_ICON_COLOR} !important`, fontSize: '14px !important' }} />}
+              label={label}
+              sx={{
+                height: 22,
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                bgcolor: 'rgba(15,118,110,0.08)',
+                color: 'text.primary',
+                border: '1px solid rgba(15,118,110,0.18)',
+                '& .MuiChip-label': { px: 0.75 },
+                maxWidth: '100%',
+              }}
+            />
+          ) : (
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+          )}
           {p.row?.has_active_issue ? <ActiveIssueWarningIcon priority={p.row.active_issue_priority} /> : null}
         </Box>
       )
@@ -519,7 +523,43 @@ const cols: GridColDef<InventoryRow>[] = [
   { field: 'knumber', headerName: 'K#', width: 140 },
   { field: 'serial_number', headerName: 'Seriale', width: 180 },
 
-  { field: 'status_label', headerName: 'Stato', width: 160 },
+  {
+    field: 'status_label',
+    headerName: 'Stato',
+    width: 140,
+    renderCell: (p) => {
+      const label  = p.value as string | null
+      const key    = p.row?.status_key ?? ''
+      if (!label) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+      // Mappa key → colore chip
+      const COLOR: Record<string, { bg: string; fg: string; border: string }> = {
+        in_use:      { bg: 'rgba(16,185,129,0.10)',  fg: '#065f46', border: 'rgba(16,185,129,0.28)' },
+        maintenance: { bg: 'rgba(245,158,11,0.10)',  fg: '#92400e', border: 'rgba(245,158,11,0.28)' },
+        repair:      { bg: 'rgba(239,68,68,0.10)',   fg: '#991b1b', border: 'rgba(239,68,68,0.28)'  },
+        spare:       { bg: 'rgba(99,102,241,0.10)',  fg: '#3730a3', border: 'rgba(99,102,241,0.28)' },
+        retired:     { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
+        storage:     { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
+      }
+      const c = COLOR[key] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <Chip
+            size="small"
+            label={label}
+            sx={{
+              height: 22,
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              bgcolor: c.bg,
+              color: c.fg,
+              border: `1px solid ${c.border}`,
+              '& .MuiChip-label': { px: 0.75 },
+            }}
+          />
+        </Box>
+      )
+    },
+  },
   { field: 'local_ip', headerName: 'IP locale', width: 160 },
   { field: 'srsa_ip', headerName: 'IP SRSA', width: 160 },
 ]
@@ -1345,8 +1385,8 @@ export default function Inventory() {
           onRowClick: openDrawer,
           onRowContextMenu: handleRowContextMenu,
           sx: {
-            '--DataGrid-rowHeight': '36px',
-            '--DataGrid-headerHeight': '44px',
+            '--DataGrid-rowHeight': '24px',
+            '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
             '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -1375,7 +1415,7 @@ export default function Inventory() {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
       >
         <Stack sx={{ height: '100%', overflow: 'hidden' }}>
           {/* ── HERO BANNER ── */}
@@ -1535,7 +1575,7 @@ export default function Inventory() {
                       sx={{
                         width: 44,
                         height: 44,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         flexShrink: 0,
                         bgcolor: 'rgba(255,255,255,0.15)',
                         backdropFilter: 'blur(4px)',
@@ -1619,7 +1659,7 @@ export default function Inventory() {
                         bgcolor: 'rgba(239, 68, 68, 0.06)',
                         border: '1px solid',
                         borderColor: 'rgba(239, 68, 68, 0.22)',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         overflow: 'hidden',
                       }}
                     >
@@ -1710,7 +1750,7 @@ export default function Inventory() {
                         bgcolor: '#f8fafc',
                         border: '1px solid',
                         borderColor: 'grey.200',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -1743,7 +1783,7 @@ export default function Inventory() {
                         bgcolor: '#f8fafc',
                         border: '1px solid',
                         borderColor: 'grey.200',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -1831,7 +1871,7 @@ export default function Inventory() {
                         bgcolor: '#f8fafc',
                         border: '1px solid',
                         borderColor: 'grey.200',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -1916,7 +1956,7 @@ export default function Inventory() {
                         bgcolor: '#f8fafc',
                         border: '1px solid',
                         borderColor: 'grey.200',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -2074,7 +2114,7 @@ export default function Inventory() {
                         bgcolor: '#f8fafc',
                         border: '1px solid',
                         borderColor: 'grey.200',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -2173,7 +2213,7 @@ export default function Inventory() {
                         bgcolor: '#fafafa',
                         border: '1px solid',
                         borderColor: 'grey.100',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -2209,7 +2249,7 @@ export default function Inventory() {
                         bgcolor: '#fafafa',
                         border: '1px solid',
                         borderColor: 'grey.100',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >

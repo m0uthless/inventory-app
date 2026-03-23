@@ -41,7 +41,9 @@ function shouldToast403(): boolean {
 }
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    return res
+  },
   (err) => {
     const status = (err as { response?: { status?: number } })?.response?.status
     const url = String((err as { config?: { url?: unknown } })?.config?.url || '')

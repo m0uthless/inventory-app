@@ -95,36 +95,45 @@ export function useColumnPrefs(
     setPrefs(loadPrefs(username, pageKey) ?? { visibility: {}, order: [], widths: {} })
   }, [username, pageKey])
 
-  const hasPrefs =
-    Object.keys(prefs.visibility).length > 0 ||
-    prefs.order.length > 0 ||
-    Object.keys(prefs.widths).length > 0
+  const hasPrefs = React.useMemo(
+    () =>
+      Object.keys(prefs.visibility).length > 0 ||
+      prefs.order.length > 0 ||
+      Object.keys(prefs.widths).length > 0,
+    [prefs],
+  )
 
   const onColumnVisibilityModelChange = React.useCallback(
     (visibility: GridColumnVisibilityModel) => {
-      const next = { ...prefs, visibility }
-      setPrefs(next)
-      save(username, pageKey, next)
+      setPrefs((prev) => {
+        const next = { ...prev, visibility }
+        save(username, pageKey, next)
+        return next
+      })
     },
-    [prefs, username, pageKey],
+    [username, pageKey],
   )
 
   const saveOrder = React.useCallback(
     (order: string[]) => {
-      const next = { ...prefs, order }
-      setPrefs(next)
-      save(username, pageKey, next)
+      setPrefs((prev) => {
+        const next = { ...prev, order }
+        save(username, pageKey, next)
+        return next
+      })
     },
-    [prefs, username, pageKey],
+    [username, pageKey],
   )
 
   const saveWidth = React.useCallback(
     (field: string, width: number) => {
-      const next = { ...prefs, widths: { ...prefs.widths, [field]: width } }
-      setPrefs(next)
-      save(username, pageKey, next)
+      setPrefs((prev) => {
+        const next = { ...prev, widths: { ...prev.widths, [field]: width } }
+        save(username, pageKey, next)
+        return next
+      })
     },
-    [prefs, username, pageKey],
+    [username, pageKey],
   )
 
   const resetPrefs = React.useCallback(() => {

@@ -108,11 +108,11 @@ export default function FilterChip({ activeCount, onReset, children, compact = f
           variant={hasActive ? 'filled' : 'outlined'}
           size="medium"
           sx={{
-            minWidth: compact ? 40 : undefined,
-            width: compact ? 40 : undefined,
-            height: compact ? 40 : undefined,
+            minWidth: compact ? 32 : undefined,
+            width: compact ? 32 : undefined,
+            height: compact ? 32 : undefined,
             px: compact ? 0 : undefined,
-            flex: compact ? '0 0 40px' : undefined,
+            flex: compact ? '0 0 32px' : undefined,
             borderRadius: compact ? 1 : undefined,
             fontWeight: hasActive ? 700 : 400,
             // compact: teal filled come tutti gli altri bottoni toolbar

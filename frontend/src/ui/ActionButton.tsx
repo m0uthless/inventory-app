@@ -32,7 +32,7 @@ export default function ActionButton(props: ActionButtonProps) {
       sx={{
         textTransform: 'none',
         fontWeight: 500, // <-- qui: 400/500/600 come preferisci
-        borderRadius: 2,
+        borderRadius: 1,
         justifyContent: 'flex-start',
         ...(compact ? { height: 34, px: 1.25 } : {}),
         ...baseSx,

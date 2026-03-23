@@ -138,7 +138,7 @@ export default function ColumnCustomizerPanel({
         paper: {
           sx: {
             width: 280,
-            borderRadius: 2,
+            borderRadius: 1,
             border: '1px solid',
             borderColor: 'divider',
             boxShadow: '0 8px 24px rgba(0,0,0,0.12)',

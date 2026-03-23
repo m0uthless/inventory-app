@@ -77,7 +77,7 @@ export default function CustomerDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+      PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
     >
       <Stack sx={{ height: '100%', overflow: 'hidden' }}>
         <Box
@@ -266,7 +266,7 @@ export default function CustomerDrawer({
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -316,7 +316,7 @@ export default function CustomerDrawer({
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -384,7 +384,7 @@ export default function CustomerDrawer({
                 <Box
                   sx={{
                     bgcolor: '#fff',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     border: '1px solid',
                     borderColor: 'grey.200',
                     overflow: 'hidden',
@@ -422,7 +422,7 @@ export default function CustomerDrawer({
                   bgcolor: '#fafafa',
                   border: '1px solid',
                   borderColor: 'grey.100',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >

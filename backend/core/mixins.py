@@ -4,42 +4,41 @@ core/mixins.py — Mixin riutilizzabili per i ViewSet dell'applicazione.
 SoftDeleteAuditMixin
     Centralizza perform_destroy (soft-delete + audit log) e i metodi
     perform_create / perform_update con tracking dei cambiamenti.
-    Sostituisce le copie identiche presenti in crm, inventory e altri moduli.
+
+RestoreActionMixin
+    Fornisce le action DRF `restore` e `bulk_restore` standard.
+    Configurabile tramite attributi di classe:
+
+        restore_use_block_check = True   # chiama get_restore_block_reason()
+        restore_has_updated_by  = True   # imposta updated_by al restore
+        restore_response_204    = True   # 204 vs serializer nella risposta
+        restore_use_split       = True   # usa split_restorable() nel bulk
+
+PurgeActionMixin
+    Fornisce le action DRF `purge` e `bulk_purge` standard.
 
 CustomFieldsValidationMixin
     Centralizza la validazione/normalizzazione di custom_fields nei serializer.
-    Richiede di impostare l'attributo di classe `custom_fields_entity`.
 """
 from __future__ import annotations
 
 from django.utils import timezone
-from rest_framework import serializers
+from rest_framework import serializers, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from audit.utils import log_event, to_change_value_for_field, to_primitive
+from core.permissions import CanRestoreModelPermission, CanPurgeModelPermission
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ViewSet mixin
+# ViewSet mixin — soft delete + audit
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SoftDeleteAuditMixin:
-    """Mixin per ViewSet con soft-delete e audit logging.
-
-    Fornisce:
-    - perform_destroy: soft-delete (deleted_at + updated_by) + log audit
-    - perform_create:  salva con created_by/updated_by + log audit con changes
-    - perform_update:  salva con updated_by + log audit con diff changes
-    - _changes_from_validated: calcola il diff prima/dopo tra instance e validated_data
-
-    ViewSet con logica extra (es. ContactViewSet._enforce_primary) devono
-    sovrascrivere solo il metodo che necessitano e chiamare super() se vogliono
-    mantenere il comportamento base.
-    """
-
-    # ── helpers ───────────────────────────────────────────────────────────────
+    """Mixin per ViewSet con soft-delete e audit logging."""
 
     def _changes_from_validated(self, instance, validated: dict) -> dict:
-        """Calcola il diff {campo: {from, to}} tra l'istanza corrente e i dati validati."""
         changes = {}
         for k, v in (validated or {}).items():
             before_raw = getattr(instance, k, None)
@@ -51,21 +50,14 @@ class SoftDeleteAuditMixin:
                 }
         return changes
 
-    # ── DRF hooks ─────────────────────────────────────────────────────────────
-
     def perform_destroy(self, instance):
-        """Soft-delete: imposta deleted_at, aggiorna updated_by e logga l'evento."""
         before = getattr(instance, "deleted_at", None)
         instance.deleted_at = timezone.now()
-
-        # updated_by è presente su tutti i modelli CRM/inventory/maintenance.
-        # Su modelli che non ce l'hanno (es. custom fields) il setattr è no-op.
         if hasattr(instance, "updated_by_id") or hasattr(instance, "updated_by"):
             instance.updated_by = self.request.user  # type: ignore[attr-defined]
             instance.save(update_fields=["deleted_at", "updated_by", "updated_at"])
         else:
             instance.save(update_fields=["deleted_at", "updated_at"])
-
         changes = {
             "deleted_at": {
                 "from": to_change_value_for_field("deleted_at", before),
@@ -81,14 +73,13 @@ class SoftDeleteAuditMixin:
         )
 
     def perform_create(self, serializer):
-        """Salva con userstamp (se presenti sul modello) + logga creazione."""
-        # Passa created_by/updated_by solo se il modello li supporta.
-        # I modelli senza questi campi (es. Tech, MaintenancePlan, WikiCategory)
-        # devono sovrascrivere perform_create con serializer.save() senza kwargs.
-        model = getattr(getattr(serializer, 'Meta', None), 'model', None) or                 (serializer.child.Meta.model if hasattr(serializer, 'child') else None)
+        model = getattr(getattr(serializer, 'Meta', None), 'model', None) or \
+                (serializer.child.Meta.model if hasattr(serializer, 'child') else None)
         has_userstamps = model is not None and (
-            hasattr(model, 'created_by') or hasattr(model._meta, 'get_field') and
-            any(f.name == 'created_by' for f in model._meta.get_fields())
+            hasattr(model, 'created_by') or (
+                hasattr(model._meta, 'get_field') and
+                any(f.name == 'created_by' for f in model._meta.get_fields())
+            )
         )
         save_kwargs = {}
         if has_userstamps:
@@ -110,7 +101,6 @@ class SoftDeleteAuditMixin:
         )
 
     def perform_update(self, serializer):
-        """Salva con userstamp (se presente sul modello) + logga i campi cambiati."""
         instance_before = serializer.instance
         changes = self._changes_from_validated(instance_before, serializer.validated_data)
         save_kwargs = {}
@@ -127,6 +117,160 @@ class SoftDeleteAuditMixin:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ViewSet mixin — restore actions
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RestoreActionMixin:
+    """Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+
+    Attributi configurabili (tutti con default):
+
+        restore_use_block_check = True
+        restore_has_updated_by  = True
+        restore_response_204    = True
+        restore_use_split       = True
+
+    Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+
+        class WikiCategoryViewSet(RestoreActionMixin, ...):
+            restore_has_updated_by = False
+            restore_response_204   = False
+            restore_use_split      = False
+    """
+
+    restore_use_block_check: bool = True
+    restore_has_updated_by: bool = True
+    restore_response_204: bool = True
+    restore_use_split: bool = True
+
+    def _restore_obj(self, obj, request):
+        before = getattr(obj, "deleted_at", None)
+        obj.deleted_at = None
+        if self.restore_has_updated_by:
+            obj.updated_by = request.user
+            obj.save(update_fields=["deleted_at", "updated_by", "updated_at"])
+        else:
+            obj.save(update_fields=["deleted_at", "updated_at"])
+        log_event(
+            actor=request.user,
+            action="restore",
+            instance=obj,
+            changes={"deleted_at": {"from": to_change_value_for_field("deleted_at", before), "to": None}},
+            request=request,
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
+    def restore(self, request, pk=None):
+        obj = self.get_object()  # type: ignore[attr-defined]
+
+        if self.restore_use_block_check:
+            from core.restore_policy import get_restore_block_reason
+            reason = get_restore_block_reason(obj)
+            if reason:
+                return Response({"detail": reason}, status=status.HTTP_409_CONFLICT)
+
+        self._restore_obj(obj, request)
+
+        if self.restore_response_204:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(self.get_serializer(obj).data)  # type: ignore[attr-defined]
+
+    @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
+    def bulk_restore(self, request):
+        """Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta."""
+        payload = request.data
+        ids = payload.get("ids") if isinstance(payload, dict) else payload
+        if not isinstance(ids, list) or not ids:
+            return Response({"detail": "ids must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
+
+        model = self.get_queryset().model  # type: ignore[attr-defined]
+        model_name = model.__name__
+        qs = list(model.objects.filter(id__in=ids, deleted_at__isnull=False))
+        blocked: list = []
+
+        if self.restore_use_split:
+            from core.restore_policy import split_restorable
+            qs, blocked = split_restorable(qs)
+
+        restored_ids = [obj.id for obj in qs]
+        if restored_ids:
+            now = timezone.now()
+            update_kwargs: dict = {"deleted_at": None, "updated_at": now}
+            if self.restore_has_updated_by:
+                update_kwargs["updated_by"] = request.user
+            model.objects.filter(id__in=restored_ids).update(**update_kwargs)
+
+        log_event(
+            actor=request.user,
+            action="restore",
+            instance=None,
+            changes={"ids": restored_ids},
+            request=request,
+            subject=f"bulk restore {model_name}: {restored_ids}",
+        )
+        return Response(
+            {"restored": restored_ids, "count": len(restored_ids),
+             "blocked": blocked, "blocked_count": len(blocked)},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ViewSet mixin — purge actions
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PurgeActionMixin:
+    """Mixin che aggiunge `purge` e `bulk_purge` a un ViewSet."""
+
+    @action(detail=True, methods=["post"], permission_classes=[CanPurgeModelPermission])
+    def purge(self, request, pk=None):
+        from core.purge_policy import try_purge_instance
+        model = self.get_queryset().model  # type: ignore[attr-defined]
+        obj = model.objects.filter(pk=pk, deleted_at__isnull=False).first()
+        if obj is None:
+            return Response({"detail": "Elemento non trovato nel cestino."}, status=status.HTTP_404_NOT_FOUND)
+        ok, reason, blockers = try_purge_instance(obj)
+        if not ok:
+            return Response({"detail": reason, "blocked": blockers}, status=status.HTTP_409_CONFLICT)
+        log_event(
+            actor=request.user, action="delete", instance=None, request=request,
+            metadata={"purge": True}, subject=f"purge {model.__name__} #{pk}",
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["post"], permission_classes=[CanPurgeModelPermission])
+    def bulk_purge(self, request):
+        from core.purge_policy import try_purge_instance
+        payload = request.data
+        ids = payload.get("ids") if isinstance(payload, dict) else payload
+        if not isinstance(ids, list) or not ids:
+            return Response({"detail": "ids must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
+
+        model = self.get_queryset().model  # type: ignore[attr-defined]
+        model_name = model.__name__
+        purged: list = []
+        blocked: list = []
+
+        for obj in model.objects.filter(id__in=ids, deleted_at__isnull=False):
+            ok, reason, blockers = try_purge_instance(obj)
+            if ok:
+                purged.append(obj.id)
+            else:
+                blocked.append({"id": obj.id, "reason": reason, "blocked": blockers})
+
+        log_event(
+            actor=request.user, action="delete", instance=None,
+            changes={"ids": purged}, request=request,
+            metadata={"purge": True, "blocked_count": len(blocked)},
+            subject=f"bulk purge {model_name}: {purged}",
+        )
+        return Response(
+            {"purged": purged, "count": len(purged), "blocked": blocked, "blocked_count": len(blocked)},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Serializer mixin
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -135,10 +279,6 @@ class CustomFieldsValidationMixin:
 
     Richiede di dichiarare nella sottoclasse:
         custom_fields_entity: str  # es. "customer", "site", "inventory"
-
-    Implementa validate() che normalizza e valida custom_fields.
-    Se il serializer ha logica aggiuntiva, sovrascrivere validate() e
-    chiamare super().validate(attrs) prima di aggiungere i propri check.
     """
 
     custom_fields_entity: str = ""

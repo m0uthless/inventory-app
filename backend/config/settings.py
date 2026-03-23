@@ -195,7 +195,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.5.0",
+    "VERSION": "0.5.1",
 }
 
 REST_FRAMEWORK = {
@@ -212,6 +212,35 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
     "PAGE_SIZE_QUERY_PARAM": "page_size",
     "MAX_PAGE_SIZE": 200,
+    # ── Throttling ────────────────────────────────────────────────────────────
+    # Protezione generica sugli endpoint API (oltre al rate-limiting sul login
+    # già implementato in auth_views.py con contatori Redis dedicati).
+    # I limiti sono volutamente generosi per un'app intranet a bassa scala;
+    # abbassarli se si espone l'API su Internet.
+    # Valori sovrascrivibili via env: API_THROTTLE_ANON / API_THROTTLE_USER.
+    #
+    # Throttle per-endpoint specifici (configurabili via env):
+    #   CHANGE_PASSWORD_THROTTLE_RATE  (default: 5/minute)  — me_api.py
+    #   DRIVE_UPLOAD_THROTTLE_RATE     (default: 30/minute) — drive/api.py
+    #   WIKI_ATTACHMENT_MAX_MB         (default: 10 MB)     — wiki/api/attachments.py
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.getenv("API_THROTTLE_ANON", "60/minute"),
+        "user": os.getenv("API_THROTTLE_USER", "600/minute"),
+        # Cambio password: 5 tentativi/minuto per utente.
+        # Previene brute-force su old_password (non coperta dal rate-limiting del login).
+        # ChangePasswordView in core/me_api.py dichiara già throttle_classes=[ChangePasswordThrottle].
+        "change_password": os.getenv("CHANGE_PASSWORD_THROTTLE_RATE", "5/minute"),
+        # Upload file: 30 upload/minuto per utente (Drive, wiki attachments).
+        # Limita abuse da script automatizzati senza penalizzare l'uso normale.
+        "file_upload": os.getenv("FILE_UPLOAD_THROTTLE_RATE", "30/minute"),
+        # Drive upload: scope dedicato per DriveUploadThrottle (sovrascrive file_upload).
+        # DriveFileViewSet dichiara già throttle_classes=[DriveUploadThrottle].
+        "drive_upload": os.getenv("DRIVE_UPLOAD_THROTTLE_RATE", "30/minute"),
+    },
 }
 # Se fai chiamate cross-origin (es. Vite 5173 -> 6382) e vuoi cookie session:
 CORS_ALLOW_CREDENTIALS = True
@@ -265,3 +294,19 @@ if SECURE_HSTS_SECONDS and not CSRF_COOKIE_SECURE:
     )
 
 DJANGO_RUN_DEPLOY_CHECK = _env_bool("DJANGO_RUN_DEPLOY_CHECK", default=not DEBUG)
+
+# ── Field-level encryption ────────────────────────────────────────────────────
+# Chiave Fernet per cifrare i campi sensibili dell'inventario (os_pwd, app_pwd, vnc_pwd).
+# Genera con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# OBBLIGATORIA in produzione. In dev viene derivata da SECRET_KEY come fallback (solo DEBUG=True).
+FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY", "")
+
+# Guard-rail: in produzione la chiave DEVE essere impostata esplicitamente.
+# Senza di essa, i secrets dell'inventario non possono essere decifrati
+# e le nuove password non vengono cifrate correttamente.
+if not DEBUG and not FIELD_ENCRYPTION_KEY:
+    raise RuntimeError(
+        "FIELD_ENCRYPTION_KEY non impostata in produzione (DJANGO_DEBUG=0). "
+        "Genera una chiave con: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
+        "e impostala come variabile d'ambiente FIELD_ENCRYPTION_KEY."
+    )

@@ -190,7 +190,7 @@ function CustomerChip({
       sx={{
         border: '1px solid',
         borderColor: 'grey.200',
-        borderRadius: 2,
+        borderRadius: 1,
         px: 1.5,
         py: 0.75,
         bgcolor: 'background.paper',
@@ -1096,7 +1096,7 @@ export default function WikiPage() {
         <Stack spacing={2}>
           {/* Metadati view */}
           {mode === 'view' && detail && (
-            <Card variant="outlined" sx={{ borderRadius: 3, p: 2 }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, p: 2 }}>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap">
                 <Box sx={{ minWidth: 140 }}>
                   <Typography
@@ -1294,7 +1294,7 @@ export default function WikiPage() {
 
           {/* Form edit / new */}
           {mode === 'edit' && (
-            <Card variant="outlined" sx={{ borderRadius: 3, p: 2 }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, p: 2 }}>
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
                   <TextField
@@ -1408,7 +1408,7 @@ export default function WikiPage() {
               />
             </Box>
           ) : (
-            <Card variant="outlined" sx={{ borderRadius: 3, p: 3 }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, p: 3 }}>
               {renderHtml ? (
                 <Box dangerouslySetInnerHTML={{ __html: renderHtml }} sx={PROSE_SX} />
               ) : (
@@ -1445,7 +1445,7 @@ export default function WikiPage() {
           </Stack>
 
           {links.length === 0 ? (
-            <Card variant="outlined" sx={{ borderRadius: 3, p: 4, textAlign: 'center' }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, p: 4, textAlign: 'center' }}>
               <BusinessIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
               <Typography color="text.disabled" fontSize={13}>
                 Collega questa pagina wiki ai clienti pertinenti.
@@ -1524,7 +1524,7 @@ export default function WikiPage() {
                       sx={{
                         width: 120,
                         height: 90,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         overflow: 'hidden',
                         border: '1px solid',
                         borderColor: 'grey.200',
@@ -1631,7 +1631,7 @@ export default function WikiPage() {
           )}
 
           {attachments.length === 0 && (
-            <Card variant="outlined" sx={{ borderRadius: 3, p: 4, textAlign: 'center' }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, p: 4, textAlign: 'center' }}>
               <AttachFileIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
               <Typography color="text.disabled" fontSize={13}>
                 Nessun allegato. Carica file tramite il pulsante sopra, oppure inserisci immagini
@@ -1658,7 +1658,7 @@ export default function WikiPage() {
           </Stack>
 
           {revisions.length === 0 ? (
-            <Card variant="outlined" sx={{ borderRadius: 3, p: 4, textAlign: 'center' }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, p: 4, textAlign: 'center' }}>
               <HistoryIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
               <Typography color="text.disabled" fontSize={13}>
                 Le revisioni vengono create automaticamente ad ogni salvataggio della pagina.
@@ -1881,7 +1881,7 @@ const PROSE_SX = {
     bgcolor: '#1a2421',
     color: '#a7f3d0',
     p: 2,
-    borderRadius: 2,
+    borderRadius: 1,
     overflow: 'auto',
     my: 1.5,
   },

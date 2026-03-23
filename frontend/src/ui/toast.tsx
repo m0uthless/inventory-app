@@ -59,7 +59,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           onClose={() => setState((s) => ({ ...s, open: false }))}
           severity={state.severity}
           variant="filled"
-          sx={{ borderRadius: 2, alignItems: 'center' }}
+          sx={{ borderRadius: 1, alignItems: 'center' }}
         >
           {state.message}
         </Alert>

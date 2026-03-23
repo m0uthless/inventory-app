@@ -136,7 +136,7 @@ function computeGridHeight(visibleRows: number) {
   if (visibleRows <= 0) return 240
   const header = 45
   const footer = 62
-  const rowHeight = 38
+  const rowHeight = 30
   const frame = 10
   return Math.min(760, header + footer + visibleRows * rowHeight + frame)
 }
@@ -542,8 +542,8 @@ export default function BugFeaturePage() {
   }, [baseColumns, isResolvedPage])
 
   const sharedGridSx = {
-    '--DataGrid-rowHeight': '36px',
-    '--DataGrid-headerHeight': '44px',
+    '--DataGrid-rowHeight': '24px',
+    '--DataGrid-headerHeight': '35px',
     '& .MuiDataGrid-cell': {
       py: 0.25,
       display: 'flex',
@@ -795,7 +795,7 @@ export default function BugFeaturePage() {
         anchor="right"
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 520 } } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 416 } } }}
       >
         {selected ? (
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -841,7 +841,7 @@ export default function BugFeaturePage() {
 
             <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: 'background.default', p: 2.5 }}>
               <Stack spacing={2}>
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
                   <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
                     Descrizione
                   </Typography>
@@ -850,7 +850,7 @@ export default function BugFeaturePage() {
                   </Typography>
                 </Box>
 
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
                   <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
                     Dettagli
                   </Typography>
@@ -881,7 +881,7 @@ export default function BugFeaturePage() {
                   </Box>
                 </Box>
 
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
                   <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
                     Stato
                   </Typography>
@@ -914,7 +914,7 @@ export default function BugFeaturePage() {
                   </Stack>
                 </Box>
 
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
                   <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
                     Timeline
                   </Typography>
@@ -927,7 +927,7 @@ export default function BugFeaturePage() {
                   </Stack>
                 </Box>
 
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
                   <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
                     Allegati
                   </Typography>

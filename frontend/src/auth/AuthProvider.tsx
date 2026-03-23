@@ -27,6 +27,9 @@ type AuthCtx = {
   logout: () => Promise<void>
   hasPerm: (perm: string) => boolean
   inGroup: (group: string) => boolean
+  locked: boolean
+  lock: () => void
+  unlock: () => void
 }
 
 const AuthContext = React.createContext<AuthCtx | null>(null)
@@ -41,6 +44,10 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = React.useState<Me | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [locked, setLocked] = React.useState(false)
+
+  const lock   = React.useCallback(() => setLocked(true),  [])
+  const unlock = React.useCallback(() => setLocked(false), [])
   React.useEffect(() => {
     setUnauthorizedHandler(() => {
       setMe(null)
@@ -101,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <AuthContext.Provider value={{ me, loading, refreshMe, login, logout, hasPerm, inGroup }}>
+    <AuthContext.Provider value={{ me, loading, refreshMe, login, logout, hasPerm, inGroup, locked, lock, unlock }}>
       {children}
     </AuthContext.Provider>
   )

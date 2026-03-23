@@ -82,7 +82,7 @@ export default function IssueDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: { xs: '100%', sm: 480 } } }}
+      PaperProps={{ sx: { width: { xs: '100%', sm: 384 } } }}
     >
       <Stack sx={{ height: '100%', overflow: 'hidden' }}>
         <Box
@@ -264,7 +264,7 @@ export default function IssueDrawer({
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -293,7 +293,7 @@ export default function IssueDrawer({
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -382,7 +382,7 @@ export default function IssueDrawer({
                     bgcolor: '#f8fafc',
                     border: '1px solid',
                     borderColor: 'grey.200',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 1.75,
                     cursor: 'pointer',
                     '&:hover': { borderColor: 'primary.light' },

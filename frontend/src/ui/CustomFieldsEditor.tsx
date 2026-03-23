@@ -241,9 +241,9 @@ export default function CustomFieldsEditor(props: {
         disableGutters
         elevation={0}
         defaultExpanded={defaultExpanded}
-        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}
       >
-        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 1.5, minHeight: 44 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 1.5, minHeight: 35 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, opacity: 0.85 }}>
             {title ?? 'Campi custom'}
           </Typography>

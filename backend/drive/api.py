@@ -303,7 +303,15 @@ class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = (
-            DriveFolder.objects.prefetch_related("customers", "allowed_groups")
+            DriveFolder.objects.select_related(
+                # Carica la catena parent fino a 5 livelli in un'unica query JOIN
+                # invece di N query separate in breadcrumb/move.
+                "parent",
+                "parent__parent",
+                "parent__parent__parent",
+                "parent__parent__parent__parent",
+                "parent__parent__parent__parent__parent",
+            ).prefetch_related("customers", "allowed_groups")
             .annotate(
                 children_count_db=Count(
                     "children",
@@ -399,11 +407,14 @@ class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
         crumbs: list[dict[str, int | str]] = []
         node = folder
-        while node:
+        MAX_DEPTH = 50  # protezione contro cicli nel grafo parent
+        depth = 0
+        while node and depth < MAX_DEPTH:
             if not has_folder_access(request.user, node):
                 break
             crumbs.append({"id": node.id, "name": node.name})
             node = node.parent
+            depth += 1
 
         crumbs.reverse()
         return Response(crumbs)
@@ -433,15 +444,34 @@ class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if new_parent and new_parent.id == folder.id:
             return Response({"detail": "Una cartella non può essere parent di se stessa."}, status=400)
 
-        # Prevent cycles (walk up)
+        # Prevent cycles (walk up the parent chain with depth limit)
         node = new_parent
-        while node is not None:
+        depth = 0
+        MAX_DEPTH = 50
+        while node is not None and depth < MAX_DEPTH:
             if node.id == folder.id:
                 return Response({"detail": "Move non valido: creerebbe un ciclo."}, status=400)
             node = node.parent
+            depth += 1
+
+        old_parent_id = folder.parent_id  # cattura PRIMA della modifica
 
         folder.parent = new_parent
-        folder.save(update_fields=["parent", "updated_at"])
+        folder.updated_by = request.user
+        folder.save(update_fields=["parent", "updated_by", "updated_at"])
+        log_event(
+            actor=request.user,
+            action="update",
+            instance=folder,
+            changes={
+                "parent": {
+                    "from": old_parent_id,
+                    "to": new_parent.id if new_parent else None,
+                }
+            },
+            request=request,
+            subject=f"move folder '{folder.name}' → '{new_parent.name if new_parent else 'root'}'",
+        )
         return Response(self.get_serializer(folder).data)
 
 
@@ -548,8 +578,24 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             except DriveFolder.DoesNotExist:
                 return Response({"detail": "Cartella di destinazione non trovata."}, status=404)
 
+        old_folder_id = file.folder_id  # cattura PRIMA della modifica
+
         file.folder = new_folder
-        file.save(update_fields=["folder", "updated_at"])
+        file.updated_by = request.user
+        file.save(update_fields=["folder", "updated_by", "updated_at"])
+        log_event(
+            actor=request.user,
+            action="update",
+            instance=file,
+            changes={
+                "folder": {
+                    "from": old_folder_id,
+                    "to": new_folder.id if new_folder else None,
+                }
+            },
+            request=request,
+            subject=f"move file '{file.name}' → '{new_folder.name if new_folder else 'root'}'",
+        )
         return Response(self.get_serializer(file).data)
 
     # ── Download ─────────────────────────────────────────────────────────────
@@ -574,7 +620,14 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
         resp = HttpResponse(b"", content_type=mime)
         resp["X-Accel-Redirect"] = accel_path
-        resp["Content-Disposition"] = f'attachment; filename="{file.name}"'
+        # RFC 6266: filename* con encoding UTF-8 per nomi non-ASCII o con caratteri speciali.
+        # Il fallback ASCII (filename=) mantiene la compatibilità con client datati.
+        from urllib.parse import quote
+        ascii_name = file.name.encode("ascii", errors="replace").decode("ascii")
+        utf8_name = quote(file.name, safe="")
+        resp["Content-Disposition"] = (
+            f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+        )
         # Do not send a misleading Content-Length for the empty upstream body.
         resp.headers.pop("Content-Length", None)
         return resp
@@ -604,7 +657,12 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
         resp = HttpResponse(b"", content_type=mime)
         resp["X-Accel-Redirect"] = accel_path
-        resp["Content-Disposition"] = f'inline; filename="{file.name}"'
+        from urllib.parse import quote
+        ascii_name = file.name.encode("ascii", errors="replace").decode("ascii")
+        utf8_name = quote(file.name, safe="")
+        resp["Content-Disposition"] = (
+            f'inline; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+        )
         resp.headers.pop("Content-Length", None)
         return resp
 

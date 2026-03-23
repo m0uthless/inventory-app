@@ -59,13 +59,15 @@ import { useAuth } from '../auth/AuthProvider'
 import AppFooter from './AppFooter'
 import AppSpeedDial from './AppSpeedDial'
 import { SIDEBAR } from '../theme/tokens'
+import { useIdleTimer } from '../hooks/useIdleTimer'
+import LockScreen from '../ui/LockScreen'
 
 const ProfileDialog = React.lazy(() =>
   import('../pages/Profile').then((m) => ({ default: m.ProfileDialog })),
 )
 
-const drawerWidth = 260
-const collapsedWidth = 72
+const drawerWidth = 208
+const collapsedWidth = 58
 
 type NavItem = {
   label: string
@@ -105,7 +107,7 @@ const BUG_FEATURE_CHILDREN: NavItem[] = [
 
 const NAV: NavItem[] = [
   // ── Principale ──────────────────────────────────────────────────────────────
-  { label: 'Dashboard', path: '/', icon: <DashboardIcon />, section: 'principale', wip: true },
+  { label: 'Dashboard', path: '/', icon: <DashboardIcon />, section: 'principale' },
 
   {
     label: 'Site Repository',
@@ -181,7 +183,26 @@ type IssueSummary = {
 }
 
 export function AppLayout() {
-  const { me, logout, hasPerm } = useAuth()
+  const { me, logout, hasPerm, locked, lock, unlock } = useAuth()
+
+  const { resetAfterUnlock } = useIdleTimer({
+    lockAfterMs:   15 * 60 * 1000, // 15 minuti → lock screen
+    logoutAfterMs: 60 * 60 * 1000, // 60 minuti → logout automatico
+    enabled: Boolean(me),
+    onLock: lock,
+    onLogout: async () => {
+      try {
+        const { api } = await import('../api/client')
+        await api.post('/auth/logout/')
+      } catch { /* ignora errori di rete */ }
+      window.location.assign('/login')
+    },
+  })
+
+  const handleUnlock = React.useCallback(() => {
+    unlock()
+    resetAfterUnlock()
+  }, [unlock, resetAfterUnlock])
   const nav = useNavigate()
   const loc = useLocation()
 
@@ -359,16 +380,22 @@ export function AppLayout() {
   React.useEffect(() => {
     if (!hasPerm('issues.view_issue')) return
     let active = true
-    ;(async () => {
+
+    const fetchSummary = async () => {
       try {
         const { data } = await api.get<IssueSummary>('/issues/summary/')
         if (active) setIssueSummary(data)
       } catch {
         if (active) setIssueSummary(null)
       }
-    })()
+    }
+
+    void fetchSummary()
+    const interval = setInterval(fetchSummary, 60_000) // aggiorna il badge ogni 60s
+
     return () => {
       active = false
+      clearInterval(interval)
     }
   }, [loc.pathname, hasPerm])
 
@@ -609,18 +636,10 @@ export function AppLayout() {
           ml: isMini ? 0 : nested ? 0.25 : 0,
           justifyContent: isMini ? 'center' : 'flex-start',
           transition: 'all 200ms ease',
-          color: nested
-            ? SIDEBAR.textDefault
-            : isGroupParent
-              ? SIDEBAR.textDefault
-              : SIDEBAR.textMuted,
+          color: SIDEBAR.textDefault,
           '& .MuiListItemIcon-root': {
             minWidth: isMini ? 'auto' : 38,
-            color: nested
-              ? 'rgba(255,255,255,0.58)'
-              : isGroupParent
-                ? SIDEBAR.textDefault
-                : SIDEBAR.textMuted,
+            color: SIDEBAR.textDefault,
             justifyContent: 'center',
           },
           '&:hover': {
@@ -698,7 +717,7 @@ export function AppLayout() {
           primaryTypographyProps={{
             fontWeight: selected ? 700 : nested ? 500 : 500,
             noWrap: true,
-            fontSize: nested ? '0.92rem' : undefined,
+            fontSize: nested ? '0.78rem' : '0.84rem',
             component: 'div',
           }}
           sx={{
@@ -726,7 +745,7 @@ export function AppLayout() {
   }
 
   const drawer = (isMini: boolean) => (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Toolbar anche qui => divider allineato con la topbar */}
       <Toolbar
         sx={{
@@ -743,19 +762,17 @@ export function AppLayout() {
               flex: 1,
               minWidth: 0,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
               overflow: 'hidden',
-              pt: 1,
             }}
           >
             <Typography
-              variant="h6"
+              variant="h5"
               sx={{
                 fontWeight: 900,
-                letterSpacing: '0.22em',
+                letterSpacing: '0.28em',
                 background: 'linear-gradient(135deg, #5eead4, #a7f3d0)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -765,9 +782,6 @@ export function AppLayout() {
               noWrap
             >
               ARCHIE
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem', mt: 0.5 }} noWrap>
-              {me ? `Loggato come @${me.username}` : ''}
             </Typography>
           </Box>
         ) : (
@@ -785,7 +799,7 @@ export function AppLayout() {
         </Tooltip>
       </Toolbar>
 
-      <Divider sx={{ borderColor: SIDEBAR.hoverBg }} />
+
 
       <List sx={{ px: isMini ? 0.75 : 1, py: 1 }}>
         {(() => {
@@ -910,7 +924,7 @@ export function AppLayout() {
                           mb: 0.5,
                           px: 0.75,
                           py: 0.75,
-                          borderRadius: 2,
+                          borderRadius: 1,
                           backgroundColor: 'rgba(94,234,212,0.08)',
                           boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.1)',
                         }}
@@ -972,12 +986,13 @@ export function AppLayout() {
         sx={{
           width: '100%',
           left: 0,
+          right: 0,
           '& .MuiIconButton-root': { color: SIDEBAR.textStrong },
           '& .MuiIconButton-root:hover': { color: '#ffffff', backgroundColor: 'rgba(255,255,255,0.12)' },
           '& .MuiInputBase-root': { color: '#ffffff' },
         }}
       >
-        <Toolbar sx={{ px: 2, gap: 1, position: 'relative' }}>
+        <Toolbar sx={{ pl: 2, pr: 0, gap: 1, position: 'relative' }}>
           {/* spacer: allinea contenuti dopo la sidebar su desktop */}
           <Box sx={{ display: { xs: 'none', md: 'block' }, width: sidebarWidth, flexShrink: 0 }} />
 
@@ -1012,7 +1027,7 @@ export function AppLayout() {
           {/* RIGHT */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
             {/* Global search (desktop) */}
-            <Box sx={{ display: { xs: 'none', sm: 'flex' }, width: { sm: 270, md: 390 } }}>
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, width: { sm: 216, md: 312 } }}>
               <TextField
                 fullWidth
                 size="small"
@@ -1047,7 +1062,7 @@ export function AppLayout() {
                 }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
+                    borderRadius: 1,
                     backgroundColor: SIDEBAR.chipBg,
                     color: '#fff',
                     '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
@@ -1089,10 +1104,10 @@ export function AppLayout() {
 
             {/* User avatar dopo search/+ */}
             <Tooltip title={displayName}>
-              <IconButton onClick={(e) => setUserAnchorEl(e.currentTarget)} aria-label="User menu">
+              <IconButton onClick={(e) => setUserAnchorEl(e.currentTarget)} aria-label="User menu" sx={{ mr: 0.5 }}>
                 <Avatar
                   src={me?.profile?.avatar || undefined}
-                  sx={{ width: 34, height: 34, fontWeight: 800, border: SIDEBAR.activeBorder }}
+                  sx={{ width: 28, height: 28, fontWeight: 800, border: SIDEBAR.activeBorder }}
                 >
                   {initials}
                 </Avatar>
@@ -1113,7 +1128,7 @@ export function AppLayout() {
             ml: 1,
             mt: -0.25,
             minWidth: 248,
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: 'hidden',
             background: SIDEBAR.bgGradient,
             color: '#ffffff',
@@ -1177,7 +1192,7 @@ export function AppLayout() {
             ml: 1,
             mt: -0.25,
             minWidth: 248,
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: 'hidden',
             background: SIDEBAR.bgGradient,
             color: '#ffffff',
@@ -1229,7 +1244,7 @@ export function AppLayout() {
             ml: 1,
             mt: -0.25,
             minWidth: 248,
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: 'hidden',
             background: SIDEBAR.bgGradient,
             color: '#ffffff',
@@ -1286,7 +1301,7 @@ export function AppLayout() {
             ml: 1,
             mt: -0.25,
             minWidth: 248,
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: 'hidden',
             background: SIDEBAR.bgGradient,
             color: '#ffffff',
@@ -1335,7 +1350,7 @@ export function AppLayout() {
         onClose={() => setNotifAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{ sx: { width: 340, borderRadius: 2.5, mt: 0.5 } }}
+        PaperProps={{ sx: { width: 340, borderRadius: 1, mt: 0.5 } }}
       >
         <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -1474,7 +1489,7 @@ export function AppLayout() {
           style: {
             background: SIDEBAR.bgGradient,
             borderRight: 'none',
-            overflowX: 'hidden',
+            overflow: 'hidden',
             width: sidebarWidth,
             transition: 'width 200ms ease',
             boxSizing: 'border-box',
@@ -1533,6 +1548,7 @@ export function AppLayout() {
         <AppFooter />
       </Box>
       <AppSpeedDial />
+      <LockScreen open={locked} onUnlock={handleUnlock} />
       <Backdrop
         open={eggOpen}
         onClick={() => setEggOpen(false)}
@@ -1548,11 +1564,11 @@ export function AppLayout() {
               <Box
                 sx={{
                   position: 'relative',
-                  borderRadius: 3,
+                  borderRadius: 1,
                   overflow: 'hidden',
                   boxShadow: 24,
                   transform: 'rotate(-1deg)',
-                  width: { xs: '85vw', sm: 520 },
+                  width: { xs: '85vw', sm: 416 },
                   maxWidth: 720,
                   '@keyframes eggPop': {
                     '0%': { transform: 'scale(0.92) rotate(-2deg)' },
@@ -1601,11 +1617,11 @@ export function AppLayout() {
               <Box
                 sx={{
                   position: 'relative',
-                  borderRadius: 3,
+                  borderRadius: 1,
                   overflow: 'hidden',
                   boxShadow: 24,
                   transform: 'rotate(-1deg)',
-                  width: { xs: '85vw', sm: 520 },
+                  width: { xs: '85vw', sm: 416 },
                   maxWidth: 720,
                   '@keyframes eggPop': {
                     '0%': { transform: 'scale(0.92) rotate(-2deg)' },

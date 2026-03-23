@@ -240,7 +240,7 @@ function SiteContactsTab(props: {
         <List
           dense
           disablePadding
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}
         >
           {rows.map((c, idx) => {
             const label = c.name || c.email || c.phone || `Contatto #${c.id}`
@@ -355,7 +355,7 @@ function SiteInventoriesTab(props: {
         <List
           dense
           disablePadding
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}
         >
           {rows.map((inv, idx) => {
             const primary =
@@ -1097,8 +1097,8 @@ export default function Sites() {
           onRowContextMenu: handleRowContextMenu,
           slotProps: { toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } },
           sx: {
-            '--DataGrid-rowHeight': '36px',
-            '--DataGrid-headerHeight': '44px',
+            '--DataGrid-rowHeight': '24px',
+            '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
             '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -1137,7 +1137,7 @@ export default function Sites() {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
       >
         <Stack sx={{ height: '100%', overflow: 'hidden' }}>
           {/* ── HERO BANNER ── */}
@@ -1358,7 +1358,7 @@ export default function Sites() {
                         bgcolor: '#f8fafc',
                         border: '1px solid',
                         borderColor: 'grey.200',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.75,
                       }}
                     >
@@ -1429,7 +1429,7 @@ export default function Sites() {
                       <Box
                         sx={{
                           bgcolor: '#fff',
-                          borderRadius: 2,
+                          borderRadius: 1,
                           border: '1px solid',
                           borderColor: 'grey.200',
                           overflow: 'hidden',
@@ -1472,7 +1472,7 @@ export default function Sites() {
                           bgcolor: '#fafafa',
                           border: '1px solid',
                           borderColor: 'grey.100',
-                          borderRadius: 2,
+                          borderRadius: 1,
                           p: 1.75,
                         }}
                       >

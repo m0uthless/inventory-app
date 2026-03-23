@@ -121,3 +121,48 @@ class UserProfile(models.Model):
 def ensure_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.get_or_create(user=instance)
+
+
+class Announcement(models.Model):
+    CATEGORY_CHOICES = [
+        ('news',        'News'),
+        ('warning',     'Avviso'),
+        ('maintenance', 'Manutenzione'),
+    ]
+    title       = models.CharField(max_length=255, verbose_name='Titolo')
+    body        = models.TextField(verbose_name='Testo')
+    category    = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='news', verbose_name='Categoria')
+    created_by  = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='announcements',
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Comunicazione'
+        verbose_name_plural = 'Comunicazioni'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+
+class UserTask(models.Model):
+    user       = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='tasks',
+    )
+    text       = models.CharField(max_length=500, verbose_name='Testo')
+    done       = models.BooleanField(default=False, verbose_name='Completato')
+    created_at = models.DateTimeField(auto_now_add=True)
+    done_at    = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Task'
+        verbose_name_plural = 'Task'
+        ordering = ['done', '-created_at']
+
+    def __str__(self):
+        return f"{self.user} — {self.text[:40]}"

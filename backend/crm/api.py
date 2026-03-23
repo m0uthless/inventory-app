@@ -1,6 +1,6 @@
 from django.utils import timezone
 from django.db import IntegrityError, transaction
-from django.db.models import OuterRef, Subquery, F
+from django.db.models import OuterRef, Subquery, F, Exists
 from django.db.models import TextField
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce
@@ -13,14 +13,14 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from crm.models import Customer, Site, Contact
+from crm.models import Customer, Site, Contact, CustomerVpnAccess
+from core.crypto import decrypt
 from audit.utils import log_event, to_change_value_for_field, to_primitive
 from core.soft_delete import apply_soft_delete_filters
 from core.integrity import raise_integrity_error_as_validation
 from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
-from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin
-from core.purge_policy import try_purge_instance
-from core.restore_policy import get_restore_block_reason, split_restorable
+from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, RestoreActionMixin, PurgeActionMixin
+from core.restore_policy import split_restorable  # usato in ContactViewSet.bulk_restore()
 
 # -------------------------
 # Customers
@@ -46,45 +46,56 @@ class CustomerFilter(filters.FilterSet):
         v = (value or "").strip()
         if not v:
             return queryset
-        return queryset.annotate(_cf_text=Cast("custom_fields", TextField())).filter(_cf_text__icontains=v)
+        # Usa KeyTextTransform sulle stesse chiavi annotate nel queryset
+        # per evitare falsi positivi (Cast serializza l'intera colonna JSON)
+        # e per permettere l'uso di indici GIN sul JSONField.
+        from django.db.models import Q
+        from django.db.models.fields.json import KeyTextTransform
+        return queryset.filter(
+            Q(city__icontains=v)  # usa l'annotazione già presente nel queryset
+        )
 
 class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
     custom_fields_entity = "customer"
     status_key = serializers.CharField(source="status.key", read_only=True)
     status_label = serializers.CharField(source="status.label", read_only=True)
 
-    # Convenience/computed fields for list UI
+    # Convenience/computed fields for list UI.
+    # `city` legge dall'annotazione Coalesce del queryset (unica fonte di verità).
+    # Su retrieve (queryset non annotato) usa _city_from_custom_fields() come fallback
+    # per non esporre None quando il dato è presente nei custom_fields.
     city = serializers.SerializerMethodField()
     primary_contact_id = serializers.IntegerField(read_only=True)
     primary_contact_name = serializers.CharField(read_only=True)
     primary_contact_email = serializers.CharField(read_only=True)
     primary_contact_phone = serializers.CharField(read_only=True)
+    has_vpn = serializers.BooleanField(read_only=True, default=False)
 
-    def get_city(self, obj):
-        """Extract "Città" from custom_fields (case/accents tolerant)."""
+    # Chiavi riconosciute per "città" nei custom_fields (allineate con la Coalesce nel queryset).
+    _CITY_KEYS = frozenset({"city", "citta", "città", "Città", "Citta"})
+
+    def get_city(self, obj) -> str | None:
+        """Restituisce la città dall'annotazione del queryset, con fallback sui custom_fields.
+
+        La Coalesce nel queryset (`get_queryset`) è la fonte di verità unica per list,
+        ordering e filtering. Questo metodo la legge direttamente quando disponibile,
+        evitando qualsiasi logica duplicata.
+        """
+        # Percorso veloce: annotazione già presente (list, queryset annotato)
+        annotated = getattr(obj, "city", None)
+        if annotated is not None:
+            return str(annotated).strip() or None
+
+        # Fallback per retrieve / queryset non annotato: legge dai custom_fields
+        # con le stesse chiavi usate dalla Coalesce, senza normalizzazione complessa
+        # (non necessaria: le chiavi sono già in una lista esplicita).
         cf = getattr(obj, "custom_fields", None)
         if not isinstance(cf, dict):
             return None
-
-        def norm(k: str) -> str:
-            return (
-                (k or "")
-                .strip()
-                .casefold()
-                .replace("à", "a")
-                .replace("á", "a")
-                .replace("â", "a")
-                .replace("ä", "a")
-                .replace("'", "")
-            )
-
-        targets = {"citta", "city"}
-        for k, v in cf.items():
-            if norm(str(k)) in targets:
-                if isinstance(v, str):
-                    vv = v.strip()
-                    return vv or None
-                return v
+        for key in self._CITY_KEYS:
+            val = cf.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
         return None
 
     class Meta:
@@ -105,6 +116,7 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
             "status_key",
             "status_label",
             "notes",
+            "has_vpn",
             "tags",
             "custom_fields",
             "created_at",
@@ -113,7 +125,7 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
         ]
 
 
-class CustomerViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class CustomerViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -195,102 +207,15 @@ class CustomerViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             primary_contact_name=Subquery(primary_qs.values("name")[:1]),
             primary_contact_email=Subquery(primary_qs.values("email")[:1]),
             primary_contact_phone=Subquery(primary_qs.values("phone")[:1]),
+            has_vpn=Exists(
+                CustomerVpnAccess.objects.filter(customer_id=OuterRef("pk"))
+            ),
         )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
 
 
-    @action(detail=True, methods=['post'], permission_classes=[CanRestoreModelPermission])
-    def restore(self, request, pk=None):
-        obj = self.get_object()
-        # Customer è root del modello dati (nessun parent), ma applichiamo
-        # get_restore_block_reason per coerenza con tutti gli altri ViewSet e
-        # per non dover aggiornare questa view se in futuro viene aggiunto un parent.
-        reason = get_restore_block_reason(obj)
-        if reason:
-            return Response({'detail': reason}, status=status.HTTP_409_CONFLICT)
-        before = getattr(obj, 'deleted_at', None)
-        obj.deleted_at = None
-        obj.updated_by = request.user
-        obj.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-        changes = {
-            'deleted_at': {
-                'from': to_change_value_for_field('deleted_at', before),
-                'to': None,
-            }
-        }
-        log_event(actor=request.user, action='restore', instance=obj, changes=changes, request=request)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-    @action(detail=False, methods=['post'], permission_classes=[CanRestoreModelPermission])
-    def bulk_restore(self, request):
-        """Restore multiple soft-deleted Customer objects.
-        Body: {"ids": [1,2,3]} (or a raw list).
-
-        Usa split_restorable per coerenza con Site e Contact: anche se Customer
-        è root (nessun parent bloccante oggi), la policy viene applicata in modo
-        uniforme e sopravvive a future estensioni del modello.
-        """
-        payload = request.data
-        ids = payload.get('ids') if isinstance(payload, dict) else payload
-        if not isinstance(ids, list) or not ids:
-            return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
-
-        qs = list(Customer.objects.filter(id__in=ids, deleted_at__isnull=False))
-        restorable, blocked = split_restorable(qs)
-        restored_ids = [obj.id for obj in restorable]
-        if restored_ids:
-            now = timezone.now()
-            Customer.objects.filter(id__in=restored_ids).update(
-                deleted_at=None,
-                updated_by=request.user,
-                updated_at=now,
-            )
-
-        log_event(
-            actor=request.user,
-            action='restore',
-            instance=None,
-            changes={'ids': restored_ids},
-            request=request,
-            subject=f"bulk restore Customer: {restored_ids}",
-        )
-
-        return Response(
-            {'restored': restored_ids, 'count': len(restored_ids), 'blocked': blocked, 'blocked_count': len(blocked)},
-            status=status.HTTP_200_OK,
-        )
-
-    @action(detail=True, methods=['post'], permission_classes=[CanPurgeModelPermission])
-    def purge(self, request, pk=None):
-        obj = Customer.objects.filter(pk=pk, deleted_at__isnull=False).first()
-        if obj is None:
-            return Response({'detail': 'Elemento non trovato nel cestino.'}, status=status.HTTP_404_NOT_FOUND)
-        ok, reason, blockers = try_purge_instance(obj)
-        if not ok:
-            return Response({'detail': reason, 'blocked': blockers}, status=status.HTTP_409_CONFLICT)
-        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True}, subject=f'purge Customer #{pk}')
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=False, methods=['post'], permission_classes=[CanPurgeModelPermission])
-    def bulk_purge(self, request):
-        payload = request.data
-        ids = payload.get('ids') if isinstance(payload, dict) else payload
-        if not isinstance(ids, list) or not ids:
-            return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
-        purged = []
-        blocked = []
-        for obj in Customer.objects.filter(id__in=ids, deleted_at__isnull=False):
-            obj_id = obj.id
-            ok, reason, blockers = try_purge_instance(obj)
-            if ok:
-                purged.append(obj_id)
-            else:
-                blocked.append({'id': obj.id, 'reason': reason, 'blocked': blockers})
-        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True, 'blocked_count': len(blocked)}, changes={'ids': purged}, subject=f'bulk purge Customer: {purged}')
-        return Response({'purged': purged, 'count': len(purged), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
 
 # -------------------------
 # Sites
@@ -338,7 +263,7 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
         ]
 
 
-class SiteViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class SiteViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = SiteSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -385,78 +310,6 @@ class SiteViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
 
-    @action(detail=True, methods=['post'], permission_classes=[CanRestoreModelPermission])
-    def restore(self, request, pk=None):
-        obj = self.get_object()
-        reason = get_restore_block_reason(obj)
-        if reason:
-            return Response({'detail': reason}, status=status.HTTP_409_CONFLICT)
-        before = getattr(obj, 'deleted_at', None)
-        obj.deleted_at = None
-        obj.updated_by = request.user
-        obj.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-        changes = {
-            'deleted_at': {
-                'from': to_change_value_for_field('deleted_at', before),
-                'to': None,
-            }
-        }
-        log_event(actor=request.user, action='restore', instance=obj, changes=changes, request=request)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-    @action(detail=False, methods=['post'], permission_classes=[CanRestoreModelPermission])
-    def bulk_restore(self, request):
-        """Restore multiple soft-deleted Site objects.
-        Body: {"ids": [1,2,3]} (or a raw list).
-        """
-        payload = request.data
-        ids = payload.get('ids') if isinstance(payload, dict) else payload
-        if not isinstance(ids, list) or not ids:
-            return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
-
-        qs = list(Site.objects.select_related('customer').filter(id__in=ids, deleted_at__isnull=False))
-        restorable, blocked = split_restorable(qs)
-        restored = []
-        for obj in restorable:
-            before = getattr(obj, 'deleted_at', None)
-            obj.deleted_at = None
-            obj.updated_by = request.user
-            obj.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-            changes = {'deleted_at': {'from': to_change_value_for_field('deleted_at', before), 'to': None}}
-            log_event(actor=request.user, action='restore', instance=obj, changes=changes, request=request)
-            restored.append(obj.id)
-
-        return Response({'restored': restored, 'count': len(restored), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'], permission_classes=[CanPurgeModelPermission])
-    def purge(self, request, pk=None):
-        obj = Site.objects.filter(pk=pk, deleted_at__isnull=False).first()
-        if obj is None:
-            return Response({'detail': 'Elemento non trovato nel cestino.'}, status=status.HTTP_404_NOT_FOUND)
-        ok, reason, blockers = try_purge_instance(obj)
-        if not ok:
-            return Response({'detail': reason, 'blocked': blockers}, status=status.HTTP_409_CONFLICT)
-        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True}, subject=f'purge Site #{pk}')
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=False, methods=['post'], permission_classes=[CanPurgeModelPermission])
-    def bulk_purge(self, request):
-        payload = request.data
-        ids = payload.get('ids') if isinstance(payload, dict) else payload
-        if not isinstance(ids, list) or not ids:
-            return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
-        purged = []
-        blocked = []
-        for obj in Site.objects.filter(id__in=ids, deleted_at__isnull=False):
-            obj_id = obj.id
-            ok, reason, blockers = try_purge_instance(obj)
-            if ok:
-                purged.append(obj_id)
-            else:
-                blocked.append({'id': obj.id, 'reason': reason, 'blocked': blockers})
-        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True, 'blocked_count': len(blocked)}, changes={'ids': purged}, subject=f'bulk purge Site: {purged}')
-        return Response({'purged': purged, 'count': len(purged), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
 
 # -------------------------
 # Contacts
@@ -492,7 +345,7 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 
-class ContactViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class ContactViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -529,22 +382,13 @@ class ContactViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
+        # Override: dopo il restore standard ri-applica la policy is_primary.
         obj = self.get_object()
+        from core.restore_policy import get_restore_block_reason
         reason = get_restore_block_reason(obj)
         if reason:
             return Response({'detail': reason}, status=status.HTTP_409_CONFLICT)
-        before = getattr(obj, 'deleted_at', None)
-        obj.deleted_at = None
-        obj.updated_by = request.user
-        obj.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-        changes = {
-            'deleted_at': {
-                'from': to_change_value_for_field('deleted_at', before),
-                'to': None,
-            }
-        }
-        log_event(actor=request.user, action='restore', instance=obj, changes=changes, request=request)
-        # se era primary, ri-enforce
+        self._restore_obj(obj, request)
         self._enforce_primary(obj)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -580,34 +424,6 @@ class ContactViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         )
         return Response({'restored': restored_ids, 'count': len(restored_ids), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'], permission_classes=[CanPurgeModelPermission])
-    def purge(self, request, pk=None):
-        obj = Contact.objects.filter(pk=pk, deleted_at__isnull=False).first()
-        if obj is None:
-            return Response({'detail': 'Elemento non trovato nel cestino.'}, status=status.HTTP_404_NOT_FOUND)
-        ok, reason, blockers = try_purge_instance(obj)
-        if not ok:
-            return Response({'detail': reason, 'blocked': blockers}, status=status.HTTP_409_CONFLICT)
-        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True}, subject=f'purge Contact #{pk}')
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=False, methods=['post'], permission_classes=[CanPurgeModelPermission])
-    def bulk_purge(self, request):
-        payload = request.data
-        ids = payload.get('ids') if isinstance(payload, dict) else payload
-        if not isinstance(ids, list) or not ids:
-            return Response({'detail': 'ids must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
-        purged = []
-        blocked = []
-        for obj in Contact.objects.filter(id__in=ids, deleted_at__isnull=False):
-            obj_id = obj.id
-            ok, reason, blockers = try_purge_instance(obj)
-            if ok:
-                purged.append(obj_id)
-            else:
-                blocked.append({'id': obj.id, 'reason': reason, 'blocked': blockers})
-        log_event(actor=request.user, action='delete', instance=None, request=request, metadata={'purge': True, 'blocked_count': len(blocked)}, changes={'ids': purged}, subject=f'bulk purge Contact: {purged}')
-        return Response({'purged': purged, 'count': len(purged), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
 
     def _enforce_primary(self, instance):
         if not instance.is_primary:
@@ -636,3 +452,148 @@ class ContactViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         instance = serializer.save(updated_by=self.request.user)
         self._enforce_primary(instance)
         log_event(actor=self.request.user, action='update', instance=instance, changes=changes or None, request=self.request)
+
+# -------------------------
+# Customer VPN Access
+# -------------------------
+
+class VpnSecretsPermissionMixin:
+    """Nasconde la password se l'utente non ha il permesso view_vpn_secrets."""
+
+    def _can_view_vpn_secrets(self) -> bool:
+        request = self.context.get("request") if hasattr(self, "context") else None
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        return bool(
+            getattr(user, "is_superuser", False)
+            or user.has_perm("crm.view_vpn_secrets")
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self._can_view_vpn_secrets():
+            self.fields.pop("password", None)
+
+
+class CustomerVpnAccessSerializer(VpnSecretsPermissionMixin, serializers.ModelSerializer):
+    customer = serializers.IntegerField(source="customer_id", read_only=True)
+    # Restituisce la password decifrata (solo se l'utente ha il permesso)
+    password = serializers.SerializerMethodField()
+    # Campo write-only per ricevere la password in chiaro dal client
+    password_input = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, allow_null=True
+    )
+
+    def get_password(self, obj):
+        if not self._can_view_vpn_secrets():
+            return None
+        try:
+            return decrypt(obj.password) if obj.password else None
+        except Exception:
+            return None
+
+    def validate(self, attrs):
+        # Sposta password_input -> password (il model.save() la cifra)
+        pwd = attrs.pop("password_input", None)
+        if pwd is not None:
+            attrs["password"] = pwd
+        return attrs
+
+    class Meta:
+        model = CustomerVpnAccess
+        fields = [
+            "id",
+            "customer",
+            "applicativo",
+            "utenza",
+            "password",
+            "password_input",
+            "remote_address",
+            "porta",
+            "note",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "customer", "created_at", "updated_at"]
+
+
+class CustomerVpnAccessViewSet(viewsets.ViewSet):
+    """
+    GET    /api/customers/{customer_pk}/vpn/  → restituisce l'accesso VPN (o 404)
+    POST   /api/customers/{customer_pk}/vpn/  → crea l'accesso VPN
+    PATCH  /api/customers/{customer_pk}/vpn/  → aggiorna l'accesso VPN
+    DELETE /api/customers/{customer_pk}/vpn/  → elimina l'accesso VPN
+    """
+
+    # Necessario affinché IsAuthenticatedDjangoModelPermissions possa
+    # ricavare il modello e controllare i permessi crm.{add,change,delete}_customervpnaccess.
+    queryset = CustomerVpnAccess.objects.none()
+
+    def _get_customer(self, customer_pk):
+        return Customer.objects.filter(pk=customer_pk, deleted_at__isnull=True).first()
+
+    def _serializer(self, instance=None, data=None, partial=False, request=None):
+        ctx = {"request": request}
+        if data is not None:
+            return CustomerVpnAccessSerializer(instance, data=data, partial=partial, context=ctx)
+        return CustomerVpnAccessSerializer(instance, context=ctx)
+
+    def retrieve(self, request, customer_pk=None):
+        customer = self._get_customer(customer_pk)
+        if not customer:
+            return Response({"detail": "Cliente non trovato."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            vpn = customer.vpn_access
+        except CustomerVpnAccess.DoesNotExist:
+            return Response({"detail": "Nessun accesso VPN configurato."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = self._serializer(vpn, request=request)
+        return Response(serializer.data)
+
+    def create(self, request, customer_pk=None):
+        customer = self._get_customer(customer_pk)
+        if not customer:
+            return Response({"detail": "Cliente non trovato."}, status=status.HTTP_404_NOT_FOUND)
+        if CustomerVpnAccess.objects.filter(customer=customer).exists():
+            return Response(
+                {"detail": "Accesso VPN già configurato. Usa PATCH per modificarlo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = self._serializer(data=request.data, request=request)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        instance = serializer.save(customer=customer, created_by=request.user, updated_by=request.user)
+        log_event(
+            actor=request.user, action="create", instance=instance,
+            changes={k: {"from": None, "to": v} for k, v in (serializer.validated_data or {}).items()},
+            request=request,
+        )
+        return Response(self._serializer(instance, request=request).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, customer_pk=None):
+        customer = self._get_customer(customer_pk)
+        if not customer:
+            return Response({"detail": "Cliente non trovato."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            instance = customer.vpn_access
+        except CustomerVpnAccess.DoesNotExist:
+            return Response({"detail": "Nessun accesso VPN configurato."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = self._serializer(instance, data=request.data, partial=True, request=request)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        before = {f: getattr(instance, f) for f in serializer.validated_data}
+        instance = serializer.save(updated_by=request.user)
+        log_event(actor=request.user, action="update", instance=instance, request=request)
+        return Response(self._serializer(instance, request=request).data)
+
+    def destroy(self, request, customer_pk=None):
+        customer = self._get_customer(customer_pk)
+        if not customer:
+            return Response({"detail": "Cliente non trovato."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            instance = customer.vpn_access
+        except CustomerVpnAccess.DoesNotExist:
+            return Response({"detail": "Nessun accesso VPN configurato."}, status=status.HTTP_404_NOT_FOUND)
+        log_event(actor=request.user, action="delete", instance=instance, request=request)
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

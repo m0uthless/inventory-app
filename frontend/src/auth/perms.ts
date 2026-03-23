@@ -21,6 +21,13 @@ export const PERMS = {
       change: 'crm.change_contact',
       delete: 'crm.delete_contact',
     },
+    vpn: {
+      view: 'crm.view_customervpnaccess',
+      add: 'crm.add_customervpnaccess',
+      change: 'crm.change_customervpnaccess',
+      delete: 'crm.delete_customervpnaccess',
+      view_secrets: 'crm.view_vpn_secrets',
+    },
   },
 
   inventory: {

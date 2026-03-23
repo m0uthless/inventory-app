@@ -82,7 +82,7 @@ export default function ContactDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+      PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
     >
       <Stack sx={{ height: '100%', overflow: 'hidden' }}>
         <Box
@@ -298,7 +298,7 @@ export default function ContactDrawer({
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -369,7 +369,7 @@ export default function ContactDrawer({
                     bgcolor: '#fafafa',
                     border: '1px solid',
                     borderColor: 'grey.100',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 1.75,
                   }}
                 >

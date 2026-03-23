@@ -181,7 +181,7 @@ function UploadZone({ onFiles }: { onFiles: (files: FileList) => void }) {
       sx={{
         border: '2px dashed',
         borderColor: over ? 'primary.main' : 'grey.200',
-        borderRadius: 3,
+        borderRadius: 1,
         py: 2,
         px: 3,
         display: 'flex',
@@ -308,7 +308,7 @@ function PreviewDrawer({
     bgcolor: '#fff',
     border: '1px solid',
     borderColor: 'grey.200',
-    borderRadius: 2,
+    borderRadius: 1,
     p: 1.75,
   } as const
 
@@ -318,7 +318,7 @@ function PreviewDrawer({
         anchor="right"
         open={!!item}
         onClose={onClose}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
       >
         <Stack sx={{ height: '100%', overflow: 'hidden' }}>
           <Box
@@ -598,7 +598,7 @@ function PreviewDrawer({
                       placeholder={assigned.length ? '' : 'Aggiungi cliente…'}
                       size="small"
                       sx={{
-                        '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                        '& .MuiOutlinedInput-root': { borderRadius: 1 },
                         '& .MuiInputBase-input': { fontSize: 13 },
                       }}
                     />
@@ -635,7 +635,7 @@ function PreviewDrawer({
               width: '90vw',
               height: '92vh',
               maxWidth: 'none',
-              borderRadius: 3,
+              borderRadius: 1,
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
@@ -719,7 +719,7 @@ function FolderCard({
         bgcolor: '#fff',
         border: '1px solid',
         borderColor: 'grey.200',
-        borderRadius: 2.5,
+        borderRadius: 1,
         p: 1.5,
         cursor: 'pointer',
         transition: 'all 0.13s',
@@ -864,7 +864,7 @@ function FileCard({
         bgcolor: selected ? 'rgba(15,118,110,0.07)' : '#fff',
         border: '1px solid',
         borderColor: selected ? 'primary.main' : 'grey.200',
-        borderRadius: 2.5,
+        borderRadius: 1,
         p: 1.5,
         cursor: 'pointer',
         transition: 'all 0.13s',
@@ -1692,7 +1692,7 @@ export default function Drive() {
               {...params}
               placeholder="Filtra per cliente…"
               size="small"
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#fff' }, width: 210 }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, bgcolor: '#fff' }, width: 210 }}
             />
           )}
           noOptionsText="Nessun cliente"
@@ -1789,7 +1789,7 @@ export default function Drive() {
             bgcolor: '#f0fdf9',
             border: '1px solid',
             borderColor: 'primary.light',
-            borderRadius: 2.5,
+            borderRadius: 1,
             px: 2,
             py: 1.5,
           }}
@@ -1826,7 +1826,7 @@ export default function Drive() {
                 sx={{
                   height: 6,
                   bgcolor: 'rgba(15,118,110,0.15)',
-                  borderRadius: 3,
+                  borderRadius: 1,
                   overflow: 'hidden',
                 }}
               >
@@ -1835,7 +1835,7 @@ export default function Drive() {
                     height: '100%',
                     width: `${uploadProgress.overallProgress}%`,
                     bgcolor: 'primary.main',
-                    borderRadius: 3,
+                    borderRadius: 1,
                     transition: 'width 0.2s ease',
                   }}
                 />
@@ -1846,7 +1846,7 @@ export default function Drive() {
                   sx={{
                     height: 3,
                     bgcolor: 'rgba(15,118,110,0.1)',
-                    borderRadius: 3,
+                    borderRadius: 1,
                     overflow: 'hidden',
                     mt: 0.5,
                   }}
@@ -1856,7 +1856,7 @@ export default function Drive() {
                       height: '100%',
                       width: `${uploadProgress.fileProgress}%`,
                       bgcolor: 'rgba(15,118,110,0.5)',
-                      borderRadius: 3,
+                      borderRadius: 1,
                       transition: 'width 0.15s ease',
                     }}
                   />
@@ -1905,7 +1905,7 @@ export default function Drive() {
             bgcolor: '#f0fdf9',
             border: '1px solid',
             borderColor: 'primary.light',
-            borderRadius: 2.5,
+            borderRadius: 1,
           }}
         >
           <CheckBoxIcon sx={{ color: 'primary.main', fontSize: 18 }} />
@@ -1977,7 +1977,7 @@ export default function Drive() {
                 sx={{
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2.5,
+                  borderRadius: 1,
                   p: 1.5,
                   cursor: 'pointer',
                   bgcolor: '#fff',
@@ -2025,7 +2025,7 @@ export default function Drive() {
             sx={{
               border: '1px solid',
               borderColor: 'grey.200',
-              borderRadius: 2.5,
+              borderRadius: 1,
               overflow: 'hidden',
               bgcolor: '#fff',
             }}
@@ -2116,7 +2116,7 @@ export default function Drive() {
               sx={{
                 border: '1px solid',
                 borderColor: 'grey.200',
-                borderRadius: 2.5,
+                borderRadius: 1,
                 overflow: 'hidden',
                 bgcolor: '#fff',
                 mb: 2,

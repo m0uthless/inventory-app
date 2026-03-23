@@ -1,9 +1,11 @@
+from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_METHODS
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
-from core.models import CustomerStatus, SiteStatus, InventoryStatus, InventoryType
+from core.models import Announcement, CustomerStatus, SiteStatus, InventoryStatus, InventoryType, UserTask
 
 User = get_user_model()
 
@@ -87,3 +89,75 @@ class SiteStatusViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return SiteStatus.objects.filter(is_active=True, deleted_at__isnull=True).order_by("sort_order", "label")
+
+
+# ─── Announcements ────────────────────────────────────────────────────────────
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Announcement
+        fields = [
+            'id', 'title', 'body', 'category',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_by_name', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+class IsStaffOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return request.user and request.user.is_authenticated
+        return request.user and (request.user.is_staff or request.user.is_superuser)
+
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    """
+    CRUD comunicazioni bacheca.
+    Lettura: tutti gli utenti autenticati.
+    Scrittura: solo is_staff / superuser.
+    """
+    queryset           = Announcement.objects.select_related('created_by').all()
+    serializer_class   = AnnouncementSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrReadOnly]
+    ordering           = ['-created_at']
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+# ─── UserTask ─────────────────────────────────────────────────────────────────
+
+class UserTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = UserTask
+        fields = ['id', 'text', 'done', 'created_at', 'done_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class UserTaskViewSet(viewsets.ModelViewSet):
+    """
+    Task personali dell'utente loggato.
+    Ogni utente vede e gestisce solo i propri task.
+    """
+    serializer_class   = UserTaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return UserTask.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        done = serializer.validated_data.get('done', instance.done)
+        done_at = timezone.now() if done and not instance.done else (None if not done else instance.done_at)
+        serializer.save(done_at=done_at)

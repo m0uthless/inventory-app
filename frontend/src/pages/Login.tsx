@@ -117,7 +117,7 @@ function Field({
           alignItems: 'center',
           background: '#fff',
           border: `1.5px solid ${focused ? TEAL : '#d4dbd9'}`,
-          borderRadius: '10px',
+          borderRadius: '8px',
           boxShadow: focused ? `0 0 0 4px rgba(15,118,110,0.1)` : 'none',
           transition: 'border-color 0.18s, box-shadow 0.18s',
           px: 2,
@@ -1062,7 +1062,7 @@ export default function Login() {
                   sx={{
                     width: 38,
                     height: 38,
-                    borderRadius: '10px',
+                    borderRadius: '8px',
                     bgcolor: TEAL,
                     display: 'flex',
                     alignItems: 'center',
@@ -1152,7 +1152,7 @@ export default function Login() {
                     gap: 1,
                     px: 2,
                     py: 1.25,
-                    borderRadius: '10px',
+                    borderRadius: '8px',
                     bgcolor: 'rgba(220,38,38,0.07)',
                     border: '1px solid rgba(220,38,38,0.18)',
                   }}
@@ -1170,7 +1170,7 @@ export default function Login() {
                 sx={{
                   mt: 0.5,
                   py: 1.6,
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   fontSize: '0.9375rem',
                   fontWeight: 600,
                   letterSpacing: '0.025em',

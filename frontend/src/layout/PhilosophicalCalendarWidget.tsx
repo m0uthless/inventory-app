@@ -84,7 +84,7 @@ export default function PhilosophicalCalendarWidget() {
         sx={{
           px: 1.75,
           py: 1,
-          borderRadius: 2,
+          borderRadius: 1,
           bgcolor: 'background.paper',
           display: 'flex',
           flexDirection: 'column',

@@ -21,9 +21,11 @@ from core.api import (
     InventoryStatusViewSet,
     InventoryTypeViewSet,
     UserViewSet,
+    AnnouncementViewSet,
+    UserTaskViewSet,
 )
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
-from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet
+from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
 from drive.api import DriveFileUploadView, DriveFileViewSet, DriveFolderViewSet
 from inventory.api import InventoryViewSet
@@ -64,6 +66,8 @@ router.register(r"wiki-revisions", WikiPageRevisionViewSet, basename="wiki-revis
 router.register(r"wiki-queries", WikiQueryViewSet, basename="wiki-query")
 router.register(r"wiki-query-languages", WikiQueryLanguageViewSet, basename="wiki-query-language")
 router.register(r"drive-folders", DriveFolderViewSet, basename="drive-folder")
+router.register(r"announcements", AnnouncementViewSet, basename="announcement")
+router.register(r"user-tasks", UserTaskViewSet, basename="user-task")
 router.register(r"drive-files", DriveFileViewSet, basename="drive-file")
 
 # Issues
@@ -131,6 +135,14 @@ urlpatterns = [
 
     # API router
     path("api/", include(router.urls)),
+
+    # VPN access nested under customers
+    path("api/customers/<int:customer_pk>/vpn/", CustomerVpnAccessViewSet.as_view({
+        "get": "retrieve",
+        "post": "create",
+        "patch": "partial_update",
+        "delete": "destroy",
+    })),
 
     # Schema + Docs
     path(

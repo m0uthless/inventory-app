@@ -124,7 +124,7 @@ export default function AuditEventsTab({
         <List
           dense
           disablePadding
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}
         >
           {rows.map((ev, idx) => {
             const who = ev.actor_username || ev.actor_email || '—'

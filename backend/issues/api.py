@@ -9,8 +9,10 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
-from audit.utils import log_event
+from audit.utils import log_event, to_change_value_for_field
 from core.permissions import CanRestoreModelPermission
+from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
+from core.soft_delete import apply_soft_delete_filters
 from issues.models import Issue, IssueCategory, IssueComment, IssueStatus
 
 User = get_user_model()
@@ -52,30 +54,23 @@ class IssueCommentSerializer(serializers.ModelSerializer):
 
 
 class IssueSerializer(serializers.ModelSerializer):
-    # Readable denormalized fields
-    customer_name       = serializers.CharField(source="customer.name",           read_only=True)
-    customer_code       = serializers.CharField(source="customer.code",           read_only=True)
-    site_name           = serializers.CharField(source="site.name",               read_only=True)
-    inventory_name      = serializers.CharField(source="inventory.name",          read_only=True)
-    inventory_knumber   = serializers.CharField(source="inventory.knumber",       read_only=True)
-    inventory_serial_number = serializers.CharField(source="inventory.serial_number", read_only=True)
-    inventory_hostname  = serializers.CharField(source="inventory.hostname",      read_only=True)
-    category_label      = serializers.CharField(source="category.label",          read_only=True)
-    assigned_to_username    = serializers.CharField(source="assigned_to.username",    read_only=True)
+    customer_name           = serializers.CharField(source="customer.name",              read_only=True)
+    customer_code           = serializers.CharField(source="customer.code",              read_only=True)
+    site_name               = serializers.CharField(source="site.name",                  read_only=True)
+    inventory_name          = serializers.CharField(source="inventory.name",             read_only=True)
+    inventory_knumber       = serializers.CharField(source="inventory.knumber",          read_only=True)
+    inventory_serial_number = serializers.CharField(source="inventory.serial_number",    read_only=True)
+    inventory_hostname      = serializers.CharField(source="inventory.hostname",         read_only=True)
+    category_label          = serializers.CharField(source="category.label",             read_only=True)
+    assigned_to_username    = serializers.CharField(source="assigned_to.username",       read_only=True)
     assigned_to_full_name   = serializers.SerializerMethodField()
     assigned_to_avatar      = serializers.SerializerMethodField()
-    created_by_username     = serializers.CharField(source="created_by.username",     read_only=True)
+    created_by_username     = serializers.CharField(source="created_by.username",        read_only=True)
     created_by_full_name    = serializers.SerializerMethodField()
-
-    # Human-readable choices
-    priority_label      = serializers.CharField(source="get_priority_display", read_only=True)
-    status_label        = serializers.CharField(source="get_status_display",   read_only=True)
-
-    # Comment count for list view
-    comments_count      = serializers.SerializerMethodField()
-
-    # Computed: giorni passati dalla data apertura
-    days_open           = serializers.SerializerMethodField()
+    priority_label          = serializers.CharField(source="get_priority_display",       read_only=True)
+    status_label            = serializers.CharField(source="get_status_display",         read_only=True)
+    comments_count          = serializers.SerializerMethodField()
+    days_open               = serializers.SerializerMethodField()
 
     def get_assigned_to_full_name(self, obj):
         u = obj.assigned_to
@@ -99,13 +94,14 @@ class IssueSerializer(serializers.ModelSerializer):
 
     def get_created_by_full_name(self, obj):
         u = obj.created_by
+        if not u:
+            return None
         return f"{u.first_name} {u.last_name}".strip() or u.username
 
     def get_assigned_to_avatar(self, obj):
         return self._get_user_avatar(obj.assigned_to)
 
     def get_comments_count(self, obj):
-        # Annotated by the viewset queryset
         return getattr(obj, "comments_count", 0)
 
     def get_days_open(self, obj):
@@ -129,8 +125,8 @@ class IssueSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def validate(self, attrs):
-        customer = attrs.get("customer") if "customer" in attrs else getattr(self.instance, "customer", None)
-        site = attrs.get("site") if "site" in attrs else getattr(self.instance, "site", None)
+        customer  = attrs.get("customer")  if "customer"  in attrs else getattr(self.instance, "customer",  None)
+        site      = attrs.get("site")      if "site"      in attrs else getattr(self.instance, "site",      None)
         inventory = attrs.get("inventory") if "inventory" in attrs else getattr(self.instance, "inventory", None)
 
         errors = {}
@@ -189,17 +185,11 @@ class IssueFilter(filters.FilterSet):
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
     due_before  = filters.DateFilter(field_name="due_date", lookup_expr="lte")
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
-    deleted     = filters.BooleanFilter(method="filter_deleted")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
 
     class Meta:
         model  = Issue
         fields = ["status", "priority", "customer", "site", "inventory", "category", "assigned_to", "hide_closed"]
-
-    def filter_deleted(self, queryset, name, value):
-        if value:
-            return queryset.filter(deleted_at__isnull=False)
-        return queryset.filter(deleted_at__isnull=True)
 
     def filter_hide_closed(self, queryset, name, value):
         if value:
@@ -209,7 +199,30 @@ class IssueFilter(filters.FilterSet):
 
 # ─── ViewSet ─────────────────────────────────────────────────────────────────
 
-class IssueViewSet(viewsets.ModelViewSet):
+class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+    """ViewSet per Issue.
+
+    Eredita da:
+    - RestoreActionMixin  → action `restore` standard (response con serializer)
+    - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+
+    Override specifici:
+    - perform_create: passa solo created_by (Issue non ha updated_by); audit
+      changes include title per la leggibilità nel log.
+    - perform_update: audit diff limitato a status/priority (i campi chiave
+      che interessano nelle notifiche e nei report).
+    - get_queryset: usa apply_soft_delete_filters standard + annotazione
+      comments_count.
+    """
+
+    # RestoreActionMixin config:
+    # Issue non ha updated_by → no userstamp al restore.
+    # Risponde con il serializer dell'oggetto ripristinato (coerente con CRM).
+    restore_has_updated_by  = False
+    restore_response_204    = False
+    restore_use_split       = False
+    restore_use_block_check = False
+
     serializer_class    = IssueSerializer
     filter_backends     = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class     = IssueFilter
@@ -222,79 +235,67 @@ class IssueViewSet(viewsets.ModelViewSet):
         "priority", "status", "title", "servicenow_id",
         "opened_at", "customer__name", "category__label",
         "assigned_to__last_name", "comments_count",
+        "deleted_at",
     ]
-    ordering            = ["-created_at"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         from django.db.models import Count
         qs = Issue.objects.select_related(
-            "customer", "site", "inventory", "category", "assigned_to", "assigned_to__profile", "created_by"
+            "customer", "site", "inventory", "category",
+            "assigned_to", "assigned_to__profile", "created_by",
         ).annotate(
             comments_count=Count("comments")
         )
-        # Default: only non-deleted
-        if self.request.query_params.get("deleted") != "true":
-            qs = qs.filter(deleted_at__isnull=True)
-        return qs
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    # ── perform_create override ───────────────────────────────────────────────
 
     def perform_create(self, serializer):
+        """Issue ha solo created_by, non updated_by: override minimo del mixin."""
         issue = serializer.save(created_by=self.request.user)
         log_event(
             self.request.user,
             action="create",
             instance=issue,
-            changes={"title": [None, issue.title]},
+            changes={"title": {"from": None, "to": to_change_value_for_field("title", issue.title)}},
             request=self.request,
         )
 
+    # ── perform_update override ───────────────────────────────────────────────
+
     def perform_update(self, serializer):
-        old = self.get_object()
+        """Audit diff limitato a status e priority — i campi chiave per i report."""
+        old = serializer.instance
         old_status   = old.status
         old_priority = old.priority
         issue = serializer.save()
         changes = {}
-        if old_status   != issue.status:   changes["status"]   = [old_status,   issue.status]
-        if old_priority != issue.priority: changes["priority"] = [old_priority, issue.priority]
-        log_event(self.request.user, action="update", instance=issue, changes=changes or None, request=self.request)
+        if old_status   != issue.status:   changes["status"]   = {"from": old_status,   "to": issue.status}
+        if old_priority != issue.priority: changes["priority"] = {"from": old_priority, "to": issue.priority}
+        log_event(
+            self.request.user,
+            action="update",
+            instance=issue,
+            changes=changes or None,
+            request=self.request,
+        )
 
-    def destroy(self, request, *args, **kwargs):
-        issue = self.get_object()
-        issue.soft_delete()
-        log_event(request.user, action="delete", instance=issue, request=request)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    # ── summary ──────────────────────────────────────────────────────────────
 
     @action(detail=False, methods=["get"], url_path="summary")
     def summary(self, request):
-        """
-        Ritorna i conteggi delle issue per stato.
-        Usato dalla sidebar per mostrare il badge delle issue aperte.
-        """
+        """Conteggi per stato — usato dalla sidebar per il badge issue aperte."""
         from django.db.models import Count, Q
-
         qs = Issue.objects.filter(deleted_at__isnull=True)
-
         counts = qs.aggregate(
             open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
             in_progress_count=Count("id", filter=Q(status=IssueStatus.IN_PROGRESS)),
             resolved_count=Count("id", filter=Q(status=IssueStatus.RESOLVED)),
             closed_count=Count("id", filter=Q(status=IssueStatus.CLOSED)),
         )
-
-        counts["active_count"] = (
-            (counts["open_count"] or 0) + (counts["in_progress_count"] or 0)
-        )
-
+        counts["active_count"] = (counts["open_count"] or 0) + (counts["in_progress_count"] or 0)
         return Response(counts)
-
-    @action(detail=True, methods=["post"], url_path="restore", permission_classes=[CanRestoreModelPermission])
-    def restore(self, request, pk=None):
-        issue = Issue.objects.filter(pk=pk, deleted_at__isnull=False).first()
-        if not issue:
-            return Response({"detail": "Issue non trovata o già attiva."}, status=404)
-        issue.deleted_at = None
-        issue.save(update_fields=["deleted_at", "updated_at"])
-        log_event(request.user, action="restore", instance=issue, request=request)
-        return Response(IssueSerializer(issue).data)
 
     # ── Comments nested endpoint ──────────────────────────────────────────────
 
@@ -304,10 +305,8 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         if request.method == "GET":
             qs = issue.comments.select_related("author").order_by("created_at")
-            serializer = IssueCommentSerializer(qs, many=True)
-            return Response(serializer.data)
+            return Response(IssueCommentSerializer(qs, many=True).data)
 
-        # POST — create comment
         serializer = IssueCommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         comment = serializer.save(issue=issue, author=request.user)
@@ -315,7 +314,7 @@ class IssueViewSet(viewsets.ModelViewSet):
             request.user,
             action="update",
             instance=issue,
-            changes={"comment_added": [None, comment.id]},
+            changes={"comment_added": {"from": None, "to": comment.id}},
             request=request,
         )
         return Response(IssueCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
@@ -328,7 +327,6 @@ class IssueViewSet(viewsets.ModelViewSet):
         except IssueComment.DoesNotExist:
             return Response({"detail": "Commento non trovato."}, status=404)
 
-        # Solo l'autore o uno staff può modificare/eliminare
         if comment.author != request.user and not request.user.is_staff:
             return Response({"detail": "Non autorizzato."}, status=403)
 
@@ -336,7 +334,6 @@ class IssueViewSet(viewsets.ModelViewSet):
             comment.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-        # PATCH
         serializer = IssueCommentSerializer(comment, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()

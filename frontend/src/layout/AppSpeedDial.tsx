@@ -186,7 +186,7 @@ export default function AppSpeedDial() {
         sx={{
           position: 'fixed',
           right: { xs: 16, md: 24 },
-          bottom: { xs: 80, md: 88 },
+          bottom: { xs: 16, md: 20 },
           zIndex: (t) => t.zIndex.appBar - 1,
           display: 'flex',
           flexDirection: 'column',
@@ -201,7 +201,7 @@ export default function AppSpeedDial() {
                 key={action.key}
                 elevation={0}
                 sx={{
-                  borderRadius: 3,
+                  borderRadius: 1,
                   border: `1px solid ${alpha(theme.palette.primary.main, 0.14)}`,
                   boxShadow: '0 14px 24px -18px rgba(15, 118, 110, 0.50)',
                   overflow: 'hidden',
@@ -216,7 +216,7 @@ export default function AppSpeedDial() {
                     px: 1.75,
                     py: 1.1,
                     height: 46,
-                    borderRadius: 3,
+                    borderRadius: 1,
                     bgcolor: actionBg,
                     color: theme.palette.primary.dark,
                     fontSize: '0.82rem',

@@ -79,7 +79,7 @@ export default function AuditEventsMiniList(props: {
     <List
       dense
       disablePadding
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}
     >
       {rows.map((ev, idx) => {
         const primary = ev.subject || ev.object_repr || `#${ev.object_id ?? ''}`

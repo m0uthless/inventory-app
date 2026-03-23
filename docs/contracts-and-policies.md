@@ -1,4 +1,4 @@
-# Contracts and policies baseline (0.5.0)
+# Contracts and policies baseline (0.5.1)
 
 Questo documento raccoglie i contratti applicativi che, dopo le patch 28-36, sono considerati baseline del progetto. Se cambi uno di questi comportamenti, aggiorna anche test, UI e changelog.
 
@@ -100,7 +100,7 @@ Shape minima `GET /api/health/`:
 {
   "status": "ok",
   "database": "ok",
-  "version": "0.5.0"
+  "version": "0.5.1"
 }
 ```
 
@@ -110,7 +110,7 @@ Shape minima `GET /api/system-stats/`:
 {
   "inventory_count": 142,
   "uptime": "3d 4h",
-  "version": "0.5.0"
+  "version": "0.5.1"
 }
 ```
 

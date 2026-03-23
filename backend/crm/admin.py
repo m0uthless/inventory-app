@@ -19,3 +19,10 @@ class ContactAdmin(ImportExportModelAdmin):
     list_display = ("id", "customer", "site", "name", "email", "phone", "is_primary", "deleted_at", "updated_at")
     search_fields = ("name", "email", "phone", "role_department")
     list_filter = ("is_primary", "deleted_at")
+
+from .models import CustomerVpnAccess
+
+@admin.register(CustomerVpnAccess)
+class CustomerVpnAccessAdmin(admin.ModelAdmin):
+    list_display = ("id", "customer", "applicativo", "utenza", "remote_address", "porta", "updated_at")
+    search_fields = ("customer__name", "customer__code", "applicativo", "utenza", "remote_address")

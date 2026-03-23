@@ -704,8 +704,8 @@ export default function Audit() {
               }
               sx={
                 {
-                  '--DataGrid-rowHeight': '36px',
-                  '--DataGrid-headerHeight': '44px',
+                  '--DataGrid-rowHeight': '24px',
+                  '--DataGrid-headerHeight': '35px',
                   '& .MuiDataGrid-cell': { py: 0.25 },
                   '& .MuiDataGrid-columnHeader': { py: 0.75 },
                   '& .MuiDataGrid-row:nth-of-type(even)': {
@@ -855,7 +855,7 @@ export default function Audit() {
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -916,7 +916,7 @@ export default function Audit() {
                   bgcolor: '#f8fafc',
                   border: '1px solid',
                   borderColor: 'grey.200',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.75,
                 }}
               >
@@ -968,7 +968,7 @@ export default function Audit() {
                 <Box
                   sx={{
                     bgcolor: '#fff',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     border: '1px solid',
                     borderColor: 'grey.200',
                     overflow: 'hidden',
@@ -1015,7 +1015,7 @@ export default function Audit() {
                 <Box
                   sx={{
                     bgcolor: '#fff',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     border: '1px solid',
                     borderColor: 'grey.200',
                     overflow: 'hidden',

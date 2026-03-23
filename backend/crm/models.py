@@ -2,7 +2,9 @@ from django.conf import settings
 from django.db import models
 from django.core.validators import RegexValidator
 from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
 from core.models import TimeStampedModel, CustomerStatus, SiteStatus
+from core.crypto import encrypt
 
 phone_validator = RegexValidator(
     regex=r"^[0-9+ ()\-\.]{5,30}$",
@@ -34,6 +36,10 @@ class Customer(TimeStampedModel):
             # - ordering frequently uses updated_at
             models.Index(fields=["deleted_at"], name="cust_deleted_at_idx"),
             models.Index(fields=["updated_at"], name="cust_updated_at_idx"),
+            # GIN index su custom_fields: rende efficienti i filtri JSON
+            # usati da CustomerFilter.filter_city e dalle ricerche full-text
+            # sul campo (es. KeyTextTransform, __icontains su Cast).
+            GinIndex(fields=["custom_fields"], name="cust_custom_fields_gin"),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -120,3 +126,45 @@ class Contact(TimeStampedModel):
             # Used by primary contact enforcement: customer+site+is_primary+deleted_at
             models.Index(fields=["customer", "site", "is_primary", "deleted_at"], name="contact_primary_idx"),
         ]
+
+
+class CustomerVpnAccess(TimeStampedModel):
+    """Credenziali VPN dedicate per un cliente. La password è cifrata a riposo."""
+
+    customer = models.OneToOneField(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="vpn_access",
+        verbose_name="Cliente",
+    )
+
+    applicativo = models.CharField(max_length=128, null=True, blank=True)
+    utenza = models.CharField(max_length=255, null=True, blank=True)
+    password = models.CharField(max_length=512, null=True, blank=True)  # stored encrypted
+    remote_address = models.CharField(max_length=255, null=True, blank=True)
+    porta = models.CharField(max_length=16, null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="+",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="+",
+    )
+
+    class Meta:
+        verbose_name = "Accesso VPN Cliente"
+        verbose_name_plural = "Accessi VPN Clienti"
+        permissions = [
+            ("view_vpn_secrets", "Can view VPN secrets (password)"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.password:
+            self.password = encrypt(self.password)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"VPN {self.customer}"

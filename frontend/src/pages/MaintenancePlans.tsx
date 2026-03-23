@@ -39,6 +39,7 @@ import type { PlanRow } from './maintenanceTypes'
 import { buildDrfListParams } from '../api/drf'
 import { apiErrorToFieldErrors, apiErrorToMessage } from '../api/error'
 import { Can } from '../auth/Can'
+import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
 import { useDrfList } from '../hooks/useDrfList'
 import { useServerGrid } from '../hooks/useServerGrid'
@@ -96,8 +97,8 @@ function DueBadge({ dateStr }: { dateStr: string }) {
 }
 
 const GRID_SX = {
-  '--DataGrid-rowHeight': '36px',
-  '--DataGrid-headerHeight': '44px',
+  '--DataGrid-rowHeight': '24px',
+  '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
   '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -122,6 +123,7 @@ const PLAN0: PlanForm = { customer: '', inventory_types: [], title: '', schedule
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function MaintenancePlans() {
+  const { me } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const { exporting, exportCsv } = useExportCsv()
@@ -606,6 +608,7 @@ export default function MaintenancePlans() {
         }}
         grid={{
           pageKey: 'maintenance-plans',
+          username: me?.username,
           rows, columns, loading, rowCount,
           paginationModel: grid.paginationModel, onPaginationModelChange: grid.onPaginationModelChange,
           sortModel: grid.sortModel, onSortModelChange: grid.onSortModelChange,

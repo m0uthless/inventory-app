@@ -10,17 +10,15 @@ import {
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined'
+import CodeRoundedIcon from '@mui/icons-material/CodeRounded'
 import StarRoundedIcon from '@mui/icons-material/StarRounded'
 import VisibilityIcon from '@mui/icons-material/Visibility'
-import SentimentSatisfiedAltRoundedIcon from '@mui/icons-material/SentimentSatisfiedAltRounded'
-import StarBorderRoundedIcon from '@mui/icons-material/StarBorderRounded'
-import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
-import FolderOpenRoundedIcon from '@mui/icons-material/FolderOpenRounded'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useToast } from '../ui/toast'
 import { apiErrorToMessage } from '../api/error'
+import ContributorCard, { type ContributorData } from '../ui/ContributorCard'
 
 type Totals = {
   total: number
@@ -47,6 +45,18 @@ type PageStat = {
 }
 type TopAuthor = { user_id: number; name: string; edits: number }
 
+// ContributorData è definito in ui/ContributorCard.tsx ed esportato come tipo
+type MonthlyContributor = ContributorData
+
+type TopQuery = {
+  id: number
+  title: string
+  use_count: number
+  language: string | null
+  lang_color: string
+  lang_text_color: string
+}
+
 type Stats = {
   totals: Totals
   by_category: CategoryStat[]
@@ -57,6 +67,9 @@ type Stats = {
   unrated_pages: PageStat[]
   most_viewed_pages: PageStat[]
   rating_distribution: RatingDistributionRow[]
+  monthly_contributor: MonthlyContributor | null
+  top_queries: TopQuery[]
+  total_queries: number
 }
 
 const FALLBACK_COLORS = ['#0f766e', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#16a34a', '#64748b']
@@ -98,7 +111,7 @@ function StatKpiCard({
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        borderRadius: 3,
+        borderRadius: 1,
         minHeight: 176,
         color: theme.palette.common.white,
         backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.72)} 0%, ${alpha(accent, 0.96)} 100%)`,
@@ -162,7 +175,7 @@ function StatKpiCard({
             sx={{
               width: 42,
               height: 42,
-              borderRadius: 2.5,
+              borderRadius: 1,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -196,7 +209,7 @@ function SectionCard({ title, helper, action, children }: {
   children: React.ReactNode
 }) {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', height: '100%' }}>
+    <Card variant="outlined" sx={{ borderRadius: 1, overflow: 'hidden', height: '100%' }}>
       <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1.5}>
           <Box sx={{ minWidth: 0 }}>
@@ -339,6 +352,76 @@ function PageListCard({
   )
 }
 
+function TopQueriesCard({ queries, navigate }: { queries: TopQuery[]; navigate: (path: string) => void }) {
+  const maxCount = queries[0]?.use_count ?? 1
+  return (
+    <SectionCard title="Query più usate" helper="Le query con più utilizzi registrati">
+      <Stack divider={<Divider />}>
+        {queries.length === 0 ? (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography color="text.disabled" fontSize={13}>
+              Nessun utilizzo registrato ancora
+            </Typography>
+          </Box>
+        ) : (
+          queries.map((q, index) => (
+            <Stack
+              key={q.id}
+              spacing={0.75}
+              sx={{ px: 2.25, py: 1.25, cursor: 'pointer', '&:hover': { bgcolor: 'grey.50' } }}
+              onClick={() => navigate(`/wiki/queries`)}
+            >
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                <Box
+                  sx={{
+                    width: 22, height: 22, borderRadius: 999,
+                    display: 'grid', placeItems: 'center',
+                    bgcolor: 'rgba(15,118,110,0.1)', color: 'primary.main',
+                    fontWeight: 800, fontSize: 11, flexShrink: 0,
+                  }}
+                >
+                  {index + 1}
+                </Box>
+                <Typography variant="body2" fontWeight={600} noWrap sx={{ flex: 1 }}>
+                  {q.title}
+                </Typography>
+                {q.language && (
+                  <Box
+                    sx={{
+                      px: 0.75, py: 0.2, borderRadius: 999,
+                      bgcolor: q.lang_color, color: q.lang_text_color,
+                      fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {q.language}
+                  </Box>
+                )}
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ flexShrink: 0 }}>
+                  {q.use_count}×
+                </Typography>
+              </Stack>
+              <Box sx={{ height: 4, borderRadius: 999, bgcolor: 'grey.100', overflow: 'hidden' }}>
+                <Box
+                  sx={{
+                    height: '100%',
+                    width: `${Math.round((q.use_count / maxCount) * 100)}%`,
+                    bgcolor: 'primary.main',
+                    borderRadius: 999,
+                    transition: 'width 0.5s ease',
+                    opacity: 0.7,
+                  }}
+                />
+              </Box>
+            </Stack>
+          ))
+        )}
+      </Stack>
+    </SectionCard>
+  )
+}
+
+
 export default function WikiStats() {
   const theme = useTheme()
   const toast = useToast()
@@ -369,111 +452,104 @@ export default function WikiStats() {
 
   if (!stats) return null
 
-  const { totals, by_category, recent, top_authors, top_rated_pages, low_rated_pages, unrated_pages, most_viewed_pages, rating_distribution } = stats
-  const totalDistribution = rating_distribution.reduce((acc, row) => acc + row.count, 0)
+  const { totals, by_category, recent, top_authors, top_rated_pages, monthly_contributor, top_queries, total_queries } = stats
 
   return (
     <Stack spacing={2.5} sx={{ width: '100%' }}>
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(1, minmax(0, 1fr))',
-            sm: 'repeat(2, minmax(0, 1fr))',
-            xl: 'repeat(3, minmax(0, 1fr))',
-          },
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
           gap: 2,
         }}
       >
-        <StatKpiCard icon={<ArticleOutlinedIcon sx={{ fontSize: 22 }} />} label="Totale pagine" value={totals.total.toLocaleString('it-IT')} helper={`${totals.published} pubblicate · ${totals.drafts} bozze`} accent="#0f766e" />
+        <StatKpiCard icon={<ArticleOutlinedIcon sx={{ fontSize: 22 }} />} label="Totale pagine" value={totals.total.toLocaleString('it-IT')} helper={`${totals.published} pubblicate · ${totals.drafts} bozze`} accent="#ea580c" />
         <StatKpiCard icon={<VisibilityIcon sx={{ fontSize: 22 }} />} label="Visualizzazioni" value={totals.total_views.toLocaleString('it-IT')} helper="Somma delle aperture registrate sulle pagine Wiki" accent="#0284c7" />
-        <StatKpiCard icon={<StarRoundedIcon sx={{ fontSize: 22 }} />} label="Media voto" value={totals.total_votes ? fmtRating(totals.average_rating) : '—'} helper={totals.total_votes ? `${totals.total_votes} voti raccolti` : 'Nessun voto registrato'} accent="#f59e0b" />
-        <StatKpiCard icon={<SentimentSatisfiedAltRoundedIcon sx={{ fontSize: 22 }} />} label="Pagine votate" value={totals.rated_pages.toLocaleString('it-IT')} helper="Pagine che hanno ricevuto almeno una valutazione" accent="#7c3aed" />
-        <StatKpiCard icon={<StarBorderRoundedIcon sx={{ fontSize: 22 }} />} label="Senza voti" value={totals.unrated_pages.toLocaleString('it-IT')} helper="Pagine ancora da valutare dagli utenti" accent="#ea580c" />
-        <StatKpiCard icon={<FolderOpenRoundedIcon sx={{ fontSize: 22 }} />} label="Categorie attive" value={by_category.length.toLocaleString('it-IT')} helper="Categorie con almeno una pagina presente nella knowledge base" accent="#14b8a6" />
+        <StatKpiCard icon={<CodeRoundedIcon sx={{ fontSize: 22 }} />} label="Totale query" value={total_queries.toLocaleString('it-IT')} helper="Query salvate nella libreria Wiki" accent="#7c3aed" />
       </Box>
 
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.7fr) minmax(340px, 0.95fr)' },
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
           gap: 2,
           alignItems: 'stretch',
         }}
       >
-        <SectionCard title="Pagine per categoria" helper="Distribuzione delle pagine pubblicate e in bozza nelle categorie Wiki">
-          <Box sx={{ p: 2.5, pt: 2 }}>
-            {by_category.length === 0 ? (
-              <Typography color="text.disabled" fontSize={13}>
-                Nessuna categoria configurata
-              </Typography>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={by_category} margin={{ top: 0, right: 8, left: -20, bottom: 40 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-32} textAnchor="end" interval={0} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
-                  <Tooltip formatter={(v) => [v, 'Pagine']} contentStyle={{ borderRadius: 10, fontSize: 12 }} />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+        <SectionCard title="Pagine per categoria" helper="Distribuzione delle pagine nelle categorie Wiki">
+          {by_category.length === 0 ? (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <Typography color="text.disabled" fontSize={13}>Nessuna categoria configurata</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, px: 2, pb: 2, pt: 1 }}>
+              {/* Donut chart */}
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={by_category}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={82}
+                    innerRadius={52}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
                     {by_category.map((entry, index) => (
-                      <Cell key={entry.name} fill={entry.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]} />
+                      <Cell
+                        key={entry.name}
+                        fill={entry.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]}
+                        opacity={0.92}
+                      />
                     ))}
-                  </Bar>
-                </BarChart>
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: number, name: string) => [`${v} pagine`, name]}
+                    contentStyle={{
+                      borderRadius: 8,
+                      fontSize: 12,
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      padding: '6px 12px',
+                    }}
+                    itemStyle={{ fontWeight: 600 }}
+                    cursor={false}
+                  />
+                </PieChart>
               </ResponsiveContainer>
-            )}
-          </Box>
+
+              {/* Legenda custom */}
+              <Stack spacing={0.6}>
+                {by_category.map((entry, index) => {
+                  const total = by_category.reduce((s, c) => s + c.count, 0)
+                  const pct = total > 0 ? Math.round((entry.count / total) * 100) : 0
+                  const color = entry.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+                  return (
+                    <Stack key={entry.name} direction="row" alignItems="center" spacing={1}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
+                      <Typography variant="caption" sx={{ flex: 1, fontWeight: 500, color: 'text.secondary', fontSize: '0.72rem' }} noWrap>
+                        {entry.emoji ? `${entry.emoji} ` : ''}{entry.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color, fontSize: '0.72rem', flexShrink: 0 }}>
+                        {entry.count}
+                      </Typography>
+                      <Box sx={{ width: 40, height: 4, borderRadius: 999, bgcolor: 'grey.100', overflow: 'hidden', flexShrink: 0 }}>
+                        <Box sx={{ height: '100%', width: `${pct}%`, bgcolor: color, borderRadius: 999 }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.68rem', width: 26, textAlign: 'right', flexShrink: 0 }}>
+                        {pct}%
+                      </Typography>
+                    </Stack>
+                  )
+                })}
+              </Stack>
+            </Box>
+          )}
         </SectionCard>
 
-        <SectionCard
-          title="Distribuzione voti"
-          helper="Numero di valutazioni 1–5 stelle raccolte sulle pagine Wiki"
-          action={<Chip size="small" icon={<InsightsRoundedIcon sx={{ fontSize: '0.9rem !important' }} />} label={`${totalDistribution} voti`} sx={{ height: 22, fontSize: 10, fontWeight: 700 }} />}
-        >
-          <Box sx={{ p: 2.5, pt: 2 }}>
-            {totalDistribution === 0 ? (
-              <Typography color="text.disabled" fontSize={13}>
-                Nessun voto disponibile ancora
-              </Typography>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={rating_distribution} margin={{ top: 0, right: 8, left: -12, bottom: 0 }}>
-                  <XAxis dataKey="stars" tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={(value) => `${value}★`} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
-                  <Tooltip formatter={(v) => [v, 'Voti']} labelFormatter={(value) => `${value} stelle`} contentStyle={{ borderRadius: 10, fontSize: 12 }} />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {rating_distribution.map((row) => (
-                      <Cell key={row.stars} fill={row.stars >= 4 ? '#16a34a' : row.stars === 3 ? '#f59e0b' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </Box>
-        </SectionCard>
-      </Box>
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, minmax(0, 1fr))' },
-          gap: 2,
-          alignItems: 'stretch',
-        }}
-      >
-        <PageListCard title="Wiki più votate" helper="Ordinate per media voto e numero di valutazioni" pages={top_rated_pages} emptyLabel="Nessun voto disponibile ancora" accent={theme.palette.warning.main} navigate={navigate} mode="rating" />
-        <PageListCard title="Wiki meno votate" helper="Pagine da rivedere perché hanno raccolto feedback più basso" pages={low_rated_pages} emptyLabel="Nessuna pagina con voti disponibili" accent={theme.palette.error.main} navigate={navigate} mode="rating" />
-        <PageListCard title="Wiki più viste" helper="Contenuti più consultati dagli utenti" pages={most_viewed_pages} emptyLabel="Nessuna pagina disponibile" accent={theme.palette.info.main} navigate={navigate} mode="views" />
-      </Box>
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.25fr) minmax(0, 0.95fr) minmax(0, 0.95fr)' },
-          gap: 2,
-          alignItems: 'stretch',
-        }}
-      >
-        <PageListCard title="Pagine modificate di recente" helper="Ultime pagine aggiornate, utili per controllare attività e freschezza contenuti" pages={recent} emptyLabel="Nessuna pagina ancora" accent={theme.palette.primary.main} navigate={navigate} mode="recent" />
+        <ContributorCard contributor={monthly_contributor} />
 
         <SectionCard title="Top autori" helper="Utenti con più revisioni registrate nelle Wiki">
           <Box sx={{ p: 2.25 }}>
@@ -507,8 +583,21 @@ export default function WikiStats() {
             )}
           </Box>
         </SectionCard>
+      </Box>
 
-        <PageListCard title="Ancora senza voti" helper="Pagine da promuovere o far validare per raccogliere feedback" pages={unrated_pages} emptyLabel="Ottimo: tutte le pagine hanno almeno un voto" accent={theme.palette.secondary.main} navigate={navigate} mode="unrated" />
+
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)' },
+          gap: 2,
+          alignItems: 'stretch',
+        }}
+      >
+        <PageListCard title="Pagine modificate di recente" helper="Ultime pagine aggiornate, utili per controllare attività e freschezza contenuti" pages={recent} emptyLabel="Nessuna pagina ancora" accent={theme.palette.primary.main} navigate={navigate} mode="recent" />
+        <PageListCard title="Wiki più votate" helper="Ordinate per media voto e numero di valutazioni" pages={top_rated_pages} emptyLabel="Nessun voto disponibile ancora" accent={theme.palette.warning.main} navigate={navigate} mode="rating" />
+        <TopQueriesCard queries={top_queries} navigate={navigate} />
       </Box>
     </Stack>
   )

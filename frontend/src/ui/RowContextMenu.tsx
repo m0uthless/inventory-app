@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ListItemIcon, ListItemText, Menu, MenuItem, type MenuProps } from '@mui/material'
+import { Box, ListItemIcon, ListItemText, Menu, MenuItem, type MenuProps } from '@mui/material'
 
 export type RowContextMenuItem = {
   key: string
@@ -9,6 +9,8 @@ export type RowContextMenuItem = {
   disabled?: boolean
   hidden?: boolean
   tone?: 'default' | 'danger'
+  badge?: string
+  badgeTone?: 'success' | 'neutral'
 }
 
 type Props = {
@@ -30,11 +32,11 @@ export default function RowContextMenu({ open, anchorPosition, onClose, items }:
       PaperProps={{
         elevation: 6,
         sx: {
-          minWidth: 220,
-          borderRadius: 2,
+          minWidth: 176,
+          borderRadius: 1,
           '& .MuiMenuItem-root': {
-            minHeight: 38,
-            fontSize: '0.9rem',
+            minHeight: 30,
+            fontSize: '0.8rem',
           },
           '& .MuiListItemIcon-root': {
             minWidth: 30,
@@ -56,10 +58,30 @@ export default function RowContextMenu({ open, anchorPosition, onClose, items }:
           <ListItemText
             primary={item.label}
             primaryTypographyProps={{
-              fontSize: '0.9rem',
+              fontSize: '0.8rem',
               fontWeight: 500,
             }}
           />
+          {item.badge && (
+            <Box
+              component="span"
+              sx={{
+                ml: 1,
+                fontSize: '0.65rem',
+                fontWeight: 600,
+                px: 0.75,
+                py: 0.2,
+                borderRadius: 0.75,
+                bgcolor: item.badgeTone === 'success' ? 'success.50' : 'action.hover',
+                color: item.badgeTone === 'success' ? 'success.700' : 'text.secondary',
+                border: '0.5px solid',
+                borderColor: item.badgeTone === 'success' ? 'success.200' : 'divider',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {item.badge}
+            </Box>
+          )}
         </MenuItem>
       ))}
     </Menu>

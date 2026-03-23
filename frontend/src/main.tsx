@@ -12,6 +12,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <ThemeProvider theme={theme}>
         <CssBaseline />
+
         <ToastProvider>
           <AuthProvider>
             <App />

@@ -36,3 +36,11 @@ class AppSettingAdmin(ImportExportModelAdmin):
     list_display = ("key", "value", "deleted_at", "updated_at")
     list_filter = ("deleted_at",)
     search_fields = ("key", "value")
+
+from core.models import Announcement
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display  = ['title', 'category', 'created_by', 'created_at']
+    list_filter   = ['category']
+    search_fields = ['title', 'body']

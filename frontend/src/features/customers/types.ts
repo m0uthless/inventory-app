@@ -15,6 +15,7 @@ export type CustomerRow = {
   status?: number | null
   status_label?: string | null
   notes?: string | null
+  has_vpn?: boolean | null
   created_at?: string | null
   updated_at?: string | null
   deleted_at?: string | null

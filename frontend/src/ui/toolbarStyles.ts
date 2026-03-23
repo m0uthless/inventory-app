@@ -2,13 +2,13 @@ import { alpha, type Theme } from '@mui/material/styles'
 import type { SxProps } from '@mui/system'
 
 export const compactToolbarButtonBaseSx = {
-  minWidth: 40,
-  width: 40,
-  height: 40,
+  minWidth: 32,
+  width: 32,
+  height: 32,
   p: 0,
   borderRadius: 1,
   boxShadow: 'none',
-  flex: '0 0 40px',
+  flex: '0 0 32px',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -18,7 +18,7 @@ export const compactToolbarButtonBaseSx = {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  '& .MuiSvgIcon-root': { fontSize: 18 },
+  '& .MuiSvgIcon-root': { fontSize: 16 },
 } as const
 
 const compactUnifiedButtonSx = (theme: Theme) => ({

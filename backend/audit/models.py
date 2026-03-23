@@ -12,6 +12,7 @@ class AuditEvent(models.Model):
         LOGIN = "login", "Login"
         LOGIN_FAILED = "login_failed", "Login Failed"
         LOGOUT = "logout", "Logout"
+        RATE = "rate", "Rate"
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -23,7 +24,7 @@ class AuditEvent(models.Model):
         related_name="+",
     )
 
-    action = models.CharField(max_length=16, choices=Action.choices)
+    action = models.CharField(max_length=32, choices=Action.choices)
 
     # Generic target (nullable: eventi di sistema come login/logout non hanno un'istanza)
     content_type = models.ForeignKey(

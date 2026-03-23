@@ -70,6 +70,8 @@ import LeafletMap from '../ui/LeafletMap'
 import FilterChip from '../ui/FilterChip'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
+import VpnModal from '../features/customers/VpnModal'
+import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -92,6 +94,7 @@ type CustomerRow = {
   status_label?: string | null
 
   notes?: string | null
+  has_vpn?: boolean | null
   created_at?: string | null
   updated_at?: string | null
   deleted_at?: string | null
@@ -211,7 +214,7 @@ function CustomerSitesTab(props: {
         <List
           dense
           disablePadding
-          sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
+          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
         >
           {rows.map((s, idx) => {
             const label = s.display_name || s.name || `Sito #${s.id}`
@@ -324,7 +327,7 @@ function CustomerInventoriesTab(props: {
         <List
           dense
           disablePadding
-          sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
+          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
         >
           {rows.map((inv, idx) => {
             const name = inv.hostname || inv.knumber || inv.serial_number || `#${inv.id}`
@@ -486,7 +489,7 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
         <List
           dense
           disablePadding
-          sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
+          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
         >
           {items.map((item, idx) => (
             <ListItem
@@ -536,8 +539,50 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
   )
 }
 
+// Module-level ref so the cols renderCell (outside the component) can call openVpnModal
+const vpnBadgeClickRef: React.MutableRefObject<((row: CustomerRow) => void) | null> = { current: null }
+
 const cols: GridColDef<CustomerRow>[] = [
-  { field: 'display_name', headerName: 'Cliente', flex: 1, minWidth: 260 },
+  {
+    field: 'display_name',
+    headerName: 'Cliente',
+    flex: 1,
+    minWidth: 260,
+    renderCell: (p) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {p.value as string}
+        </span>
+        {p.row.has_vpn && (
+          <Box
+            component="span"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation()
+              vpnBadgeClickRef.current?.(p.row)
+            }}
+            sx={{
+              flexShrink: 0,
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+              px: 0.6,
+              py: 0.15,
+              borderRadius: 0.75,
+              bgcolor: 'success.50',
+              color: 'success.800',
+              border: '0.5px solid',
+              borderColor: 'success.200',
+              lineHeight: 1.6,
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'success.100' },
+            }}
+          >
+            VPN
+          </Box>
+        )}
+      </Box>
+    ),
+  },
   {
     field: 'status_label',
     headerName: 'Stato',
@@ -829,6 +874,20 @@ export default function Customers() {
     mouseY: number
   } | null>(null)
 
+  // VPN modal
+  const [vpnModalOpen, setVpnModalOpen] = React.useState(false)
+  const [vpnModalRow, setVpnModalRow] = React.useState<CustomerRow | null>(null)
+
+  const openVpnModal = React.useCallback((row: CustomerRow) => {
+    setVpnModalRow(row)
+    setVpnModalOpen(true)
+  }, [])
+
+  // Keep module-level ref in sync so the cols renderCell can call openVpnModal
+  React.useEffect(() => {
+    vpnBadgeClickRef.current = openVpnModal
+  }, [openVpnModal])
+
   const openEditFromRow = React.useCallback(
     (id: number) => {
       pendingEditIdRef.current = id
@@ -924,6 +983,14 @@ export default function Customers() {
         onClick: () => openEditFromRow(row.id),
       },
       {
+        key: 'vpn',
+        label: row.has_vpn ? 'VPN' : 'VPN',
+        icon: <LanOutlinedIcon fontSize="small" sx={{ color: 'primary.main' }} />,
+        onClick: () => openVpnModal(row),
+        badge: row.has_vpn ? 'configurata' : 'non configurata',
+        badgeTone: row.has_vpn ? 'success' : 'neutral',
+      },
+      {
         key: 'delete',
         label: 'Elimina',
         icon: <DeleteOutlineIcon fontSize="small" />,
@@ -932,7 +999,7 @@ export default function Customers() {
         tone: 'danger',
       },
     ]
-  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, restoreBusy, restoreFromRow])
+  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openVpnModal, restoreBusy, restoreFromRow])
 
   const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
     return cols
@@ -1207,8 +1274,8 @@ export default function Customers() {
 
           sx: {
             // compact-ish density + zebra soft (no prop changes needed)
-            '--DataGrid-rowHeight': '36px',
-            '--DataGrid-headerHeight': '44px',
+            '--DataGrid-rowHeight': '24px',
+            '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
             '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -1243,11 +1310,23 @@ export default function Customers() {
         items={contextMenuItems}
       />
 
+      {vpnModalRow && (
+        <VpnModal
+          open={vpnModalOpen}
+          onClose={() => {
+            setVpnModalOpen(false)
+            reloadList()
+          }}
+          customerId={vpnModalRow.id}
+          customerName={vpnModalRow.display_name || vpnModalRow.name}
+        />
+      )}
+
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
       >
         <Stack sx={{ height: '100%', overflow: 'hidden' }}>
           {/* ── HERO BANNER ── */}
@@ -1469,7 +1548,7 @@ export default function Customers() {
                     bgcolor: '#f8fafc',
                     border: '1px solid',
                     borderColor: 'grey.200',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 1.75,
                   }}
                 >
@@ -1526,7 +1605,7 @@ export default function Customers() {
                     bgcolor: '#f8fafc',
                     border: '1px solid',
                     borderColor: 'grey.200',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 1.75,
                   }}
                 >
@@ -1611,7 +1690,7 @@ export default function Customers() {
                   <Box
                     sx={{
                       bgcolor: '#fff',
-                      borderRadius: 2,
+                      borderRadius: 1,
                       border: '1px solid',
                       borderColor: 'grey.200',
                       overflow: 'hidden',
@@ -1650,7 +1729,7 @@ export default function Customers() {
                     bgcolor: '#fafafa',
                     border: '1px solid',
                     borderColor: 'grey.100',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 1.75,
                   }}
                 >

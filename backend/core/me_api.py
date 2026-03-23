@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.conf import settings
 from django.db import transaction
 
@@ -9,10 +11,20 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.throttling import UserRateThrottle
 
 from audit.utils import log_event
 from core.models import UserProfile
 from crm.models import Customer
+
+
+class ChangePasswordThrottle(UserRateThrottle):
+    """Throttle dedicato per il cambio password: 5 tentativi/minuto per utente.
+
+    Previene brute-force su old_password. Il rate è configurabile via env:
+    CHANGE_PASSWORD_THROTTLE_RATE (default impostato in settings.py).
+    """
+    scope = "change_password"
 
 
 def _validate_avatar_upload(uploaded_file):
@@ -138,22 +150,24 @@ class MeAPIView(APIView):
         user = request.user
         data = request.data
 
-        # user fields
-        if "email" in data:
-            user.email = data.get("email") or ""
-        if "first_name" in data:
-            user.first_name = data.get("first_name") or ""
-        if "last_name" in data:
-            user.last_name = data.get("last_name") or ""
-        user.save()
+        # ── Fase 1: validazione completa PRIMA di qualsiasi save() ──────────
+        # @transaction.atomic fa rollback SOLO su eccezioni non gestite, non su
+        # `return Response(400)`. Validiamo tutto qui prima di toccare il DB,
+        # così un errore su preferred_customer o avatar non causa commit parziale
+        # dei campi email/first_name/last_name già modificati.
 
-        profile, _ = UserProfile.objects.select_related("preferred_customer").get_or_create(user=user)
+        new_email      = (data.get("email")      or "") if "email"      in data else None
+        new_first_name = (data.get("first_name") or "") if "first_name" in data else None
+        new_last_name  = (data.get("last_name")  or "") if "last_name"  in data else None
 
-        # preferred customer: allow null/empty to clear
+        _UNSET = object()
+
+        # preferred_customer: validazione anticipata
+        new_preferred_customer = _UNSET
         if "preferred_customer" in data:
             raw = data.get("preferred_customer")
             if raw in ("", None):
-                profile.preferred_customer = None
+                new_preferred_customer = None
             else:
                 try:
                     cid = int(raw)
@@ -162,26 +176,43 @@ class MeAPIView(APIView):
                         {"preferred_customer": "Valore non valido."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-
                 try:
-                    cust = Customer.objects.get(id=cid, deleted_at__isnull=True)
+                    new_preferred_customer = Customer.objects.get(id=cid, deleted_at__isnull=True)
                 except Customer.DoesNotExist:
                     return Response(
                         {"preferred_customer": "Customer non valido o eliminato."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                profile.preferred_customer = cust
 
-        # avatar: multipart file or allow empty string to clear
+        # avatar: validazione anticipata
+        new_avatar = _UNSET
         if "avatar" in data:
             raw = data.get("avatar")
             if raw in ("", None):
-                profile.avatar = None
+                new_avatar = None
             else:
                 err = _validate_avatar_upload(raw)
                 if err:
                     return Response({"avatar": err}, status=status.HTTP_400_BAD_REQUEST)
-                profile.avatar = raw
+                new_avatar = raw
+
+        # ── Fase 2: tutte le validazioni passate → salvataggio atomico ──────
+
+        if new_email is not None:
+            user.email = new_email
+        if new_first_name is not None:
+            user.first_name = new_first_name
+        if new_last_name is not None:
+            user.last_name = new_last_name
+        user.save()
+
+        profile, _ = UserProfile.objects.select_related("preferred_customer").get_or_create(user=user)
+
+        if new_preferred_customer is not _UNSET:
+            profile.preferred_customer = new_preferred_customer
+
+        if new_avatar is not _UNSET:
+            profile.avatar = new_avatar
 
         profile.save()
 
@@ -208,6 +239,7 @@ class ChangePasswordView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ChangePasswordThrottle]
 
     def post(self, request):
         user = request.user
@@ -228,10 +260,15 @@ class ChangePasswordView(APIView):
         # Validazione nuova password
         if not new_password:
             errors["new_password"] = "La nuova password è obbligatoria."
-        elif len(new_password) < 8:
-            errors["new_password"] = "La nuova password deve avere almeno 8 caratteri."
         elif new_password == old_password:
             errors["new_password"] = "La nuova password deve essere diversa da quella attuale."
+        else:
+            # Applica i validator Django configurati in AUTH_PASSWORD_VALIDATORS
+            # (MinimumLengthValidator, CommonPasswordValidator, ecc.)
+            try:
+                validate_password(new_password, user=user)
+            except DjangoValidationError as e:
+                errors["new_password"] = " ".join(e.messages)
 
         # Conferma
         if new_password and not new_password2:

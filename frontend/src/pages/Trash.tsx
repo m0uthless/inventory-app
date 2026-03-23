@@ -19,7 +19,7 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
 import { api } from '../api/client'
-import { collectionActionPath, type CollectionPath } from '../api/entityPaths'
+import { collectionActionPath, type CollectionPath } from '../api/apiPaths'
 import { buildDrfListParams } from '../api/drf'
 import { apiErrorToMessage } from '../api/error'
 import { useServerGrid } from '../hooks/useServerGrid'

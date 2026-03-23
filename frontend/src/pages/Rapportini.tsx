@@ -62,8 +62,8 @@ const RESULT_LABEL: Record<string, string> = {
 }
 
 const GRID_SX = {
-  '--DataGrid-rowHeight': '36px',
-  '--DataGrid-headerHeight': '44px',
+  '--DataGrid-rowHeight': '24px',
+  '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
   '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -636,6 +636,7 @@ export default function Rapportini() {
         }}
         grid={{
           pageKey: 'maintenance-events',
+          username: me?.username,
           rows,
           columns,
           loading,

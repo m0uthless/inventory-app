@@ -62,6 +62,7 @@ import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } fr
 import { useExportCsv } from '../ui/useExportCsv'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import { isRecord } from '../utils/guards'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
 type CreateFromInventoryState = {
   inventoryId: number
@@ -190,6 +191,160 @@ function IssueStatusChip({ status }: { status: string }) {
     />
   )
 }
+
+// ─── Widget riepilogo ────────────────────────────────────────────────────────
+
+type Granularity = 'day' | 'week' | 'month'
+
+function buildChartData(rows: IssueRow[], granularity: Granularity) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const buckets: { key: string; label: string; count: number }[] = []
+
+  if (granularity === 'day') {
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      buckets.push({ key: d.toISOString().slice(0, 10), label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
+    }
+    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]))
+    for (const r of rows) {
+      const k = (r.opened_at ?? r.created_at)?.slice(0, 10)
+      if (k && byKey[k]) byKey[k].count += 1
+    }
+  } else if (granularity === 'week') {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i * 7)
+      const ws = new Date(d)
+      ws.setDate(d.getDate() - d.getDay() + 1)
+      buckets.push({ key: ws.toISOString().slice(0, 10), label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
+    }
+    for (const r of rows) {
+      const raw = r.opened_at ?? r.created_at
+      if (!raw) continue
+      const d = new Date(raw); d.setHours(0, 0, 0, 0)
+      const ws = new Date(d); ws.setDate(d.getDate() - d.getDay() + 1)
+      const b = buckets.find((x) => x.key === ws.toISOString().slice(0, 10))
+      if (b) b.count += 1
+    }
+  } else {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), count: 0 })
+    }
+    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]))
+    for (const r of rows) {
+      const raw = r.opened_at ?? r.created_at
+      if (!raw) continue
+      const k = raw.slice(0, 7)
+      if (byKey[k]) byKey[k].count += 1
+    }
+  }
+  return buckets
+}
+
+function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boolean }) {
+  const [granularity, setGranularity] = React.useState<Granularity>('day')
+
+  const open     = rows.filter((r) => r.status === 'open').length
+  const inProg   = rows.filter((r) => r.status === 'in_progress').length
+  const critical = rows.filter((r) => r.priority === 'critical' && (r.status === 'open' || r.status === 'in_progress')).length
+  const closedRows = rows.filter((r) => (r.status === 'resolved' || r.status === 'closed') && r.days_open != null)
+  const avgDays = closedRows.length > 0
+    ? (closedRows.reduce((s, r) => s + (r.days_open ?? 0), 0) / closedRows.length).toFixed(1)
+    : null
+
+  const chartData = React.useMemo(() => buildChartData(rows, granularity), [rows, granularity])
+
+  const cardSx = { bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 2, p: '1rem 1.25rem', opacity: loading ? 0.6 : 1, transition: 'opacity .2s' }
+  const metricSx = { bgcolor: 'background.default', borderRadius: 1.5, p: '12px 14px', border: '0.5px solid', borderColor: 'divider' }
+
+  const kpis = [
+    { label: 'Aperte',          value: open,     color: open > 0     ? 'error.main'   : 'text.primary', sub: `su ${rows.length} totali` },
+    { label: 'In lavorazione',  value: inProg,   color: inProg > 0   ? 'warning.main' : 'text.primary', sub: 'in corso' },
+    { label: 'Critiche aperte', value: critical, color: critical > 0 ? 'error.main'   : 'text.primary', sub: 'richiedono attenzione' },
+    { label: 'Tempo medio',     value: avgDays != null ? `${avgDays} gg` : '—', color: 'text.primary', sub: 'giorni per chiusura' },
+  ]
+
+  const granularityOptions: { key: Granularity; label: string }[] = [
+    { key: 'day',   label: 'Giornaliero' },
+    { key: 'week',  label: 'Settimanale' },
+    { key: 'month', label: 'Mensile' },
+  ]
+
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <Box sx={cardSx}>
+        <Typography sx={{ fontSize: '11px', fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: 'text.disabled', mb: '14px' }}>
+          Riepilogo
+        </Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {kpis.map((m) => (
+            <Box key={m.label} sx={metricSx}>
+              <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontWeight: 500, mb: '4px' }}>{m.label}</Typography>
+              <Typography sx={{ fontSize: '26px', fontWeight: 500, color: m.color, lineHeight: 1 }}>{m.value}</Typography>
+              <Typography sx={{ fontSize: '11px', color: 'text.disabled', mt: '3px' }}>{m.sub}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <Box sx={cardSx}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '12px' }}>
+          <Typography sx={{ fontSize: '11px', fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: 'text.disabled' }}>
+            Andamento issue aperte
+          </Typography>
+          <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: 1, p: '2px', gap: '2px' }}>
+            {granularityOptions.map((o) => (
+              <Box
+                key={o.key}
+                onClick={() => setGranularity(o.key)}
+                sx={{
+                  px: 1, py: '3px', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
+                  cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', transition: 'all .15s',
+                  color: granularity === o.key ? 'text.primary' : 'text.secondary',
+                  bgcolor: granularity === o.key ? 'background.paper' : 'transparent',
+                  border: '0.5px solid',
+                  borderColor: granularity === o.key ? 'divider' : 'transparent',
+                }}
+              >
+                {o.label}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+        <IssueAreaChart data={chartData} granularity={granularity} />
+      </Box>
+    </Box>
+  )
+}
+
+function IssueAreaChart({ data, granularity }: { data: { label: string; count: number }[]; granularity: Granularity }) {
+  const interval = granularity === 'day' ? 6 : 2
+  return (
+    <ResponsiveContainer width="100%" height={148}>
+      <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <defs>
+          <linearGradient id="issueAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor="#E24B4A" stopOpacity={0.25} />
+            <stop offset="95%" stopColor="#E24B4A" stopOpacity={0.03} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#888' }} tickLine={false} axisLine={false} interval={interval} />
+        <YAxis tick={{ fontSize: 10, fill: '#888' }} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+        <RechartsTooltip
+          wrapperStyle={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 8, fontSize: 12, padding: '6px 10px' }}
+          formatter={(value: number) => [value, 'Issue aperte'] as [number, string]}
+          labelStyle={{ color: '#888', marginBottom: 2 }}
+        />
+        <Area type="monotone" dataKey="count" stroke="#E24B4A" strokeWidth={2} fill="url(#issueAreaGrad)" dot={false} activeDot={{ r: 4, fill: '#E24B4A', strokeWidth: 0 }} />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
 
 // ─── Componente principale ────────────────────────────────────────────────────
 
@@ -1030,6 +1185,7 @@ export default function Issues() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Stack spacing={2}>
+      <IssuesSummaryWidget rows={rows} loading={loading} />
       <EntityListCard
         toolbar={{
           compact: true,

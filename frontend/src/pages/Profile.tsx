@@ -311,7 +311,7 @@ function SezioneProfico({
           gap: 2,
           p: 1.5,
           mb: 2.5,
-          borderRadius: 2,
+          borderRadius: 1,
           bgcolor: 'rgba(15,118,110,0.04)',
           border: '1px solid rgba(15,118,110,0.1)',
         }}
@@ -552,7 +552,7 @@ function SezioneSicurezza() {
         sx={{
           p: 2,
           mb: 3,
-          borderRadius: 2,
+          borderRadius: 1,
           bgcolor: 'rgba(15,118,110,0.04)',
           border: '1px solid rgba(15,118,110,0.1)',
         }}
@@ -881,7 +881,7 @@ function SezioneAttivita({ me }: { me: NonNullable<ReturnType<typeof useAuth>['m
         <List
           dense
           disablePadding
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}
         >
           {rows.slice(0, 10).map((ev, idx) => {
             const model = ev.content_type_model || ''
@@ -984,7 +984,7 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: 1,
           overflow: 'hidden',
           maxHeight: '88vh',
         },

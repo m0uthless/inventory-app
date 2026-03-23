@@ -796,8 +796,8 @@ export default function Contacts() {
           onRowContextMenu: handleRowContextMenu,
           slotProps: { toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } },
           sx: {
-            '--DataGrid-rowHeight': '36px',
-            '--DataGrid-headerHeight': '44px',
+            '--DataGrid-rowHeight': '24px',
+            '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
             '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -826,7 +826,7 @@ export default function Contacts() {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
       >
         <Stack sx={{ height: '100%', overflow: 'hidden' }}>
           {/* ── HERO BANNER ── */}
@@ -1055,7 +1055,7 @@ export default function Contacts() {
                     bgcolor: '#f8fafc',
                     border: '1px solid',
                     borderColor: 'grey.200',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 1.75,
                   }}
                 >
@@ -1128,7 +1128,7 @@ export default function Contacts() {
                       bgcolor: '#fafafa',
                       border: '1px solid',
                       borderColor: 'grey.100',
-                      borderRadius: 2,
+                      borderRadius: 1,
                       p: 1.75,
                     }}
                   >

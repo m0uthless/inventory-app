@@ -192,7 +192,7 @@ export default function SiteRepository() {
 
   if (!availableSections.length) {
     return (
-      <Alert severity="warning" sx={{ borderRadius: 3 }}>
+      <Alert severity="warning">
         Non hai permessi disponibili per visualizzare il Site Repository.
       </Alert>
     )
@@ -201,7 +201,7 @@ export default function SiteRepository() {
   return (
     <Stack spacing={2.5}>
       {loadError ? (
-        <Alert severity="info" sx={{ borderRadius: 3 }}>
+        <Alert severity="info">
           {loadError}
         </Alert>
       ) : null}
@@ -210,11 +210,10 @@ export default function SiteRepository() {
         sx={{
           display: 'grid',
           gridTemplateColumns: {
-            xs: 'repeat(1, minmax(0, 1fr))',
-            sm: 'repeat(2, minmax(0, 1fr))',
+            xs: 'repeat(4, minmax(0, 1fr))',
             xl: 'repeat(4, minmax(0, 1fr))',
           },
-          gap: 2,
+          gap: { xs: 1, sm: 2 },
         }}
       >
         {availableSections.map((section) => {
@@ -232,8 +231,8 @@ export default function SiteRepository() {
               sx={{
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 3,
-                minHeight: 192,
+                borderRadius: '8px',
+                minHeight: { xs: 'auto', sm: 130 },
                 color: theme.palette.common.white,
                 backgroundImage: `linear-gradient(135deg, ${alpha(section.accent, selected ? 0.72 : 0.62)} 0%, ${alpha(section.accent, selected ? 0.96 : 0.86)} 100%)`,
                 border: `1px solid ${alpha(section.accent, selected ? 0.3 : 0.18)}`,
@@ -245,21 +244,21 @@ export default function SiteRepository() {
                 '&::before': {
                   content: '""',
                   position: 'absolute',
-                  width: 140,
-                  height: 140,
+                  width: 100,
+                  height: 100,
                   borderRadius: '50%',
-                  right: -34,
-                  top: -26,
+                  right: -24,
+                  top: -18,
                   backgroundColor: alpha(theme.palette.common.white, 0.14),
                 },
                 '&::after': {
                   content: '""',
                   position: 'absolute',
-                  width: 164,
-                  height: 164,
+                  width: 120,
+                  height: 120,
                   borderRadius: '50%',
-                  right: 34,
-                  bottom: -88,
+                  right: 24,
+                  bottom: -64,
                   backgroundColor: alpha(theme.palette.common.white, 0.12),
                 },
               }}
@@ -279,8 +278,8 @@ export default function SiteRepository() {
                     position: 'relative',
                     zIndex: 1,
                     height: '100%',
-                    px: 2.5,
-                    py: 2.25,
+                    px: { xs: 1, sm: 2 },
+                    py: { xs: 1, sm: 1.5 },
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -289,32 +288,19 @@ export default function SiteRepository() {
                   <Box
                     sx={{
                       display: 'flex',
-                      alignItems: 'flex-start',
-                      justifyContent: 'space-between',
-                      gap: 2,
+                      alignItems: 'center',
+                      justifyContent: { xs: 'center', sm: 'space-between' },
+                      gap: 1.5,
                     }}
                   >
-                    <Box>
+                    <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
                       <Typography
-                        variant="overline"
+                        variant="body1"
                         sx={{
-                          display: 'block',
-                          color: alpha(theme.palette.common.white, 0.92),
-                          letterSpacing: 0.4,
-                          fontSize: 12,
+                          mt: 0.25,
                           fontWeight: 700,
                           lineHeight: 1.2,
-                          textTransform: 'none',
-                        }}
-                      >
-                        Site Repository
-                      </Typography>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          mt: 0.75,
-                          fontWeight: 700,
-                          lineHeight: 1.15,
+                          fontSize: '0.88rem',
                           color: theme.palette.common.white,
                         }}
                       >
@@ -324,9 +310,9 @@ export default function SiteRepository() {
 
                     <Box
                       sx={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 2.5,
+                        width: { xs: 28, sm: 32 },
+                        height: { xs: 28, sm: 32 },
+                        borderRadius: 1,
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -336,11 +322,11 @@ export default function SiteRepository() {
                         boxShadow: `0 10px 20px ${alpha(theme.palette.common.black, 0.08)}`,
                       }}
                     >
-                      <Icon sx={{ fontSize: 24, color: theme.palette.common.white }} />
+                      <Icon sx={{ fontSize: { xs: 16, sm: 18 }, color: theme.palette.common.white }} />
                     </Box>
                   </Box>
 
-                  <Box sx={{ mt: 3.5, minHeight: 68 }}>
+                  <Box sx={{ mt: { xs: 0.75, sm: 1.5 }, minHeight: { xs: 0, sm: 40 } }}>
                     {countState?.loading ? (
                       <CircularProgress
                         size={28}
@@ -349,13 +335,15 @@ export default function SiteRepository() {
                       />
                     ) : (
                       <Typography
-                        variant="h3"
+                        variant="h4"
                         sx={{
                           fontWeight: 800,
                           lineHeight: 1,
-                          letterSpacing: -1.6,
+                          letterSpacing: -1,
+                          fontSize: { xs: '1.25rem', sm: undefined },
                           color: theme.palette.common.white,
                           textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}`,
+                          textAlign: { xs: 'center', sm: 'left' },
                         }}
                       >
                         {countState?.value != null ? countState.value.toLocaleString('it-IT') : '—'}
@@ -363,20 +351,38 @@ export default function SiteRepository() {
                     )}
                   </Box>
 
+                  {/* Label visibile solo su mobile sotto il numero */}
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: { xs: 'block', sm: 'none' },
+                      color: alpha(theme.palette.common.white, 0.85),
+                      fontWeight: 700,
+                      fontSize: '0.62rem',
+                      textAlign: 'center',
+                      mt: 0.5,
+                      lineHeight: 1.2,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    {section.label}
+                  </Typography>
+
                   <Box
                     sx={{
-                      mt: 2.25,
-                      display: 'flex',
+                      mt: 1.25,
+                      display: { xs: 'none', sm: 'flex' },
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: 1.5,
                     }}
                   >
                     <Typography
-                      variant="body2"
+                      variant="caption"
                       sx={{
                         color: alpha(theme.palette.common.white, 0.9),
                         fontWeight: 600,
+                        fontSize: '0.72rem',
                       }}
                     >
                       {section.helperText}
@@ -401,11 +407,11 @@ export default function SiteRepository() {
                   <Box
                     sx={{
                       position: 'absolute',
-                      width: 108,
-                      height: 108,
+                      width: 80,
+                      height: 80,
                       borderRadius: '50%',
-                      left: -26,
-                      bottom: -58,
+                      left: -20,
+                      bottom: -42,
                       backgroundColor: alpha(theme.palette.common.white, 0.08),
                     }}
                   />

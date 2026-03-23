@@ -33,8 +33,8 @@ type Props = {
 export type ListToolbarProps = Props
 
 // Altezza comune per tutti gli elementi della toolbar
-const H = 32
-const HC = 40
+const H = 26
+const HC = 32
 
 export default function ListToolbar(props: Props) {
   const {
@@ -61,8 +61,8 @@ export default function ListToolbar(props: Props) {
         rowGap: 1,
         columnGap: 1,
         minHeight: compact ? HC : H,
-        '& .MuiButton-root': { height: compact ? HC : H, fontSize: '0.8125rem' },
-        '& .MuiToggleButton-root': { height: compact ? HC : H, fontSize: '0.8125rem' },
+        '& .MuiButton-root': { height: compact ? HC : H, fontSize: '0.75rem' },
+        '& .MuiToggleButton-root': { height: compact ? HC : H, fontSize: '0.75rem' },
         ...(compact
           ? {
               '& > *': { flexShrink: 0 },
@@ -85,7 +85,7 @@ export default function ListToolbar(props: Props) {
           },
         }}
         sx={{
-          width: { xs: '100%', md: compact ? 340 : 220 },
+          width: { xs: '100%', md: compact ? 272 : 176 },
           flexShrink: 0,
           '& .MuiInputBase-root': {
             height: compact ? HC : H,

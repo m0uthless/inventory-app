@@ -72,7 +72,7 @@ export default function GridPaginationFooter({
             gap: 0.25,
           },
           '& .MuiPaginationItem-root': {
-            minWidth: 34,
+            minWidth: 27,
             height: 34,
             borderRadius: '999px',
             border: (theme) => `1px solid ${theme.palette.divider}`,
@@ -81,7 +81,7 @@ export default function GridPaginationFooter({
             transition: 'all 0.15s ease',
           },
           '& .MuiPaginationItem-root.Mui-selected': {
-            minWidth: 38,
+            minWidth: 30,
             height: 38,
             bgcolor: '#0f766e !important',
             borderColor: '#0f766e !important',

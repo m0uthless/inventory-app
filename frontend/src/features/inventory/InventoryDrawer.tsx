@@ -233,7 +233,7 @@ export default function InventoryDrawer({
   const toast = useToast()
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 460 } } }}>
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}>
       <Stack sx={{ height: '100%', overflow: 'hidden' }}>
         <Box
           sx={{
@@ -358,7 +358,7 @@ export default function InventoryDrawer({
                 sx={{
                   width: 44,
                   height: 44,
-                  borderRadius: 2,
+                  borderRadius: 1,
                   flexShrink: 0,
                   bgcolor: 'rgba(255,255,255,0.15)',
                   backdropFilter: 'blur(4px)',
@@ -447,7 +447,7 @@ export default function InventoryDrawer({
                 </Stack>
 
                 {detail.has_active_issue ? (
-                  <Box sx={{ bgcolor: 'rgba(239, 68, 68, 0.10)', border: '1px solid', borderColor: 'rgba(239, 68, 68, 0.28)', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: 'rgba(239, 68, 68, 0.10)', border: '1px solid', borderColor: 'rgba(239, 68, 68, 0.28)', borderRadius: 1, p: 1.75 }}>
                     <Stack direction="row" spacing={1} alignItems="flex-start">
                       <WarningAmberRoundedIcon sx={{ color: 'error.main', mt: '2px' }} />
                       <Box>
@@ -460,7 +460,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {detail.knumber ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 1 }}>
                       K-Number
                     </Typography>
@@ -469,7 +469,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {[detail.name, detail.knumber, detail.serial_number, detail.site_display_name || detail.site_name].some(Boolean) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                       <FingerprintIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                       Identificazione
@@ -513,7 +513,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {[detail.hostname, detail.local_ip, detail.srsa_ip].some(Boolean) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                       <WifiOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                       Rete
@@ -554,7 +554,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {(canViewSecrets ? [detail.os_user, detail.os_pwd, detail.app_usr, detail.app_pwd, detail.vnc_pwd] : [detail.os_user, detail.app_usr]).some(Boolean) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                       <LockOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                       Credenziali
@@ -659,7 +659,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {[detail.manufacturer, detail.model, detail.warranty_end_date, ...Object.values(detail.custom_fields ?? {})].some((value) => value !== '' && value !== null && value !== undefined) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
                       <MemoryOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                       Hardware
@@ -700,7 +700,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {detail.notes ? (
-                  <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
                       <NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                       Note
@@ -712,7 +712,7 @@ export default function InventoryDrawer({
                 ) : null}
 
                 {detail.tags && detail.tags.length > 0 ? (
-                  <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 2, p: 1.75 }}>
+                  <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
                       Tag
                     </Typography>

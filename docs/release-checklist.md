@@ -9,7 +9,7 @@ cp .env.dev .env
 ```
 
 Verificare almeno questi valori prima del deploy:
-- `APP_VERSION=0.5.0`
+- `APP_VERSION=0.5.1`
 - `DJANGO_DEBUG=0` in produzione
 - `DJANGO_ALLOWED_HOSTS` valorizzato con host/IP reali
 - `DJANGO_CORS_ORIGINS` e `CSRF_TRUSTED_ORIGINS` coerenti con il reverse proxy

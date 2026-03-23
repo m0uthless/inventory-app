@@ -355,7 +355,7 @@ function CategoryFormDialog({
           <Box
             sx={{
               p: 2,
-              borderRadius: 2,
+              borderRadius: 1,
               bgcolor: `${form.color}12`,
               border: '1.5px solid',
               borderColor: `${form.color}40`,
@@ -368,7 +368,7 @@ function CategoryFormDialog({
               sx={{
                 width: 42,
                 height: 42,
-                borderRadius: 2,
+                borderRadius: 1,
                 bgcolor: form.color,
                 display: 'flex',
                 alignItems: 'center',
@@ -648,7 +648,7 @@ export default function WikiCategoryManager({ open, onClose, onChanged }: Props)
           ) : (
             <Card
               variant="outlined"
-              sx={{ mx: 2, mb: 2, mt: 1, borderRadius: 2, overflow: 'hidden' }}
+              sx={{ mx: 2, mb: 2, mt: 1, borderRadius: 1, overflow: 'hidden' }}
             >
               <Stack divider={<Divider />}>
                 {categories.map((cat) => (

@@ -108,7 +108,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
   // Espone colPrefs verso EntityListCard tramite ref
   React.useEffect(() => {
     if (colPrefsRef) colPrefsRef.current = colPrefs
-  })
+  }, [colPrefsRef, colPrefs])
 
   // Merge: preferenze utente + override esterno (es. cestino forzato)
   const mergedVisibility: GridColumnVisibilityModel = {
@@ -397,7 +397,8 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         columns={sizedColumns}
         loading={loading}
         density={density}
-        columnHeaderHeight={44}
+        columnHeaderHeight={32}
+        rowHeight={36}
         disableColumnMenu
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}

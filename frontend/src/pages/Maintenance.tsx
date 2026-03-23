@@ -46,6 +46,7 @@ import { alpha, useTheme } from '@mui/material/styles'
 import { api } from '../api/client'
 import { apiErrorToMessage } from '../api/error'
 import { Can } from '../auth/Can'
+import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
 import { useDrfList } from '../hooks/useDrfList'
 import { useServerGrid } from '../hooks/useServerGrid'
@@ -105,8 +106,8 @@ const RESULT_COLOR: Record<string, 'success' | 'error' | 'warning' | 'default'> 
 const RESULT_LABEL: Record<string, string> = { ok: 'OK', ko: 'KO', partial: 'Parziale', not_planned: 'Non prevista' }
 
 const GRID_SX = {
-  '--DataGrid-rowHeight': '36px',
-  '--DataGrid-headerHeight': '44px',
+  '--DataGrid-rowHeight': '24px',
+  '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
   '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
@@ -117,7 +118,7 @@ const GRID_SX = {
   '& .row-overdue:hover': { bgcolor: 'rgba(239,68,68,0.08) !important' },
 } as const
 
-const DW = { xs: '100%', sm: 520 } as const
+const DW = { xs: '100%', sm: 416 } as const
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ function StatCard({ value, label, sublabel, accent, icon: Icon }: {
       sx={{
         flex: '1 1 0', minWidth: 0,
         position: 'relative', overflow: 'hidden',
-        borderRadius: 3,
+        borderRadius: 1,
         color: theme.palette.common.white,
         backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.72)} 0%, ${alpha(accent, 0.94)} 100%)`,
         border: `1px solid ${alpha(accent, 0.22)}`,
@@ -162,7 +163,7 @@ function StatCard({ value, label, sublabel, accent, icon: Icon }: {
               {label}
             </Typography>
           </Box>
-          <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(theme.palette.common.white, 0.16), border: `1px solid ${alpha(theme.palette.common.white, 0.22)}` }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(theme.palette.common.white, 0.16), border: `1px solid ${alpha(theme.palette.common.white, 0.22)}` }}>
             <Icon sx={{ fontSize: 22, color: theme.palette.common.white }} />
           </Box>
         </Box>
@@ -610,6 +611,7 @@ export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function Maintenance() {
+  const { me } = useAuth()
   const toast = useToast()
   const { exporting, exportCsv } = useExportCsv()
   const { rows: allTechs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
@@ -992,6 +994,7 @@ export default function Maintenance() {
         }}
         grid={{
           pageKey: 'maintenance-todo',
+          username: me?.username,
           emptyState: {
             title: 'Hai finito tutte le manutenzioni programmate! 🎉',
             subtitle: 'Nessuna scadenza in lista. Ottimo lavoro!',

@@ -7,6 +7,225 @@ Le date sono in timezone Europe/Rome.
 
 ---
 
+## [0.5.2] - 2026-03-23
+
+### Fixed
+
+- **`issues/api.py` — NullPointerError in `IssueSerializer.get_created_by_full_name`** (PC-01):
+  il metodo accedeva a `obj.created_by.first_name` senza null-check. Con `on_delete=SET_NULL`,
+  l'eliminazione di un utente imposta `created_by=NULL` su tutte le sue issue, causando
+  `AttributeError: 'NoneType' object has no attribute 'first_name'` su ogni chiamata a
+  `GET /api/issues/`. Aggiunto `if not u: return None` in testa al metodo.
+
+- **`audit/models.py` — `AuditEvent.action="rate"` fuori dalla enum `Action`** (PC-02):
+  `WikiPageViewSet.rate_page()` scriveva `action="rate"` in un campo con `choices` che non
+  includeva tale valore, causando inconsistenze nei log di audit e impossibilità di filtrare
+  per tipo. Aggiunto `RATE = "rate", "Rate"` alla enum `Action`. `max_length` aumentato da
+  16 a 32 per supportare futuri valori senza migration aggiuntiva.
+
+- **`wiki/api/pages.py` + `wiki/api/revisions.py` — race condition su `WikiPageRevision.revision_number`** (PC-03):
+  il calcolo del prossimo `revision_number` avveniva con SELECT + INSERT non atomici
+  (pattern check-then-act). Sotto carico concorrente, due richieste PATCH sullo stesso
+  `WikiPage` potevano generare revisioni con lo stesso `revision_number`. Stesso problema
+  nel metodo `restore()`. Entrambi i blocchi avvolti in `transaction.atomic()` con
+  `select_for_update()` sulla query di ricerca dell'ultima revisione.
+
+- **`maintenance/api/plans.py` — N+1 query in `get_covered_count()` e `get_inventory_type_labels()`** (PC-04):
+  `get_covered_count()` eseguiva 3 query per piano nella lista; `get_inventory_type_labels()`
+  bypassava il `prefetch_related` chiamando `.values_list()`. Sostituiti con: annotazione
+  `_covered_count` nel queryset tramite Subquery annidata sulla through table M2M;
+  `get_inventory_type_labels()` ora legge dalla cache del prefetch (`obj.inventory_types.all()`).
+
+- **`config/settings.py` — `FIELD_ENCRYPTION_KEY` senza guard-rail in produzione** (PC-05):
+  a differenza di `SECRET_KEY` e `DB_PASSWORD`, la chiave Fernet non aveva alcun controllo
+  all'avvio. Aggiunto guard-rail: `if not DEBUG and not FIELD_ENCRYPTION_KEY: raise RuntimeError(...)`.
+
+- **`crm/api.py` — `CustomerFilter.filter_city` con falsi positivi e full table scan** (PC-06):
+  il filtro usava `Cast("custom_fields", TextField()).__icontains=v`, che serializzava
+  l'intera colonna JSON. Un cliente con `{"city": "Roma", "indirizzo": "Via Bologna 1"}`
+  matchava per ricerca "bologna". Sostituito con `Q(city__icontains=v)` sull'annotazione
+  `city` già presente nel queryset (Coalesce di `KeyTextTransform`).
+
+- **`core/mixins.py` — precedenza operatori booleani errata in `has_userstamps`**:
+  `hasattr(...) or hasattr(...) and any(...)` valutava `and` prima di `or`.
+  Aggiunto parentesizzazione esplicita.
+
+- **`wiki/api/revisions.py` — import duplicato di `DjangoFilterBackend`**: rimosso.
+
+- **`frontend/src/ui/ContributorCard_orig.tsx`**: file di backup eliminato.
+
+### Added
+
+- **`inventory/management/commands/encrypt_rotate.py` — rotazione chiave Fernet**:
+  nuovo management command per ruotare `FIELD_ENCRYPTION_KEY` senza downtime.
+  Modalità: rotazione chiave (`OLD_FIELD_ENCRYPTION_KEY` → `FIELD_ENCRYPTION_KEY`),
+  prima cifratura di campi plaintext legacy, verifica integrità (`--check`).
+  Supporta `--dry-run`, `--batch-size`, `--force`.
+
+- **`.env.example`**: template documentato con tutte le variabili d'ambiente,
+  placeholder `CHANGEME_*` e istruzioni per generare `SECRET_KEY` e `FIELD_ENCRYPTION_KEY`.
+
+- **Test** — 46 test nuovi in 5 file:
+  - `wiki/tests/test_revision_integrity.py` (7): fix race condition PC-03 con thread reali.
+  - `maintenance/tests/test_plan_list_no_n1.py` (6): fix N+1 PC-04 + PC-01 Issues null user.
+  - `wiki/tests/test_export_and_audit_action.py` (12): `export_pdf` e `AuditEvent.Action.RATE`.
+  - `crm/tests/test_city_filter.py` (11): fix PC-06 filtro città, serializer, canario allineamento.
+  - `inventory/tests/test_encrypt_rotate.py` (10): `encrypt_rotate` dry-run, cifratura, rotazione.
+
+### Changed
+
+- **`crm/api.py` — `CustomerSerializer.get_city` unificato con la logica del queryset**:
+  eliminata la logica di normalizzazione `.casefold()` + strip accenti, divergente rispetto
+  alla `Coalesce(KeyTextTransform(...))` del queryset. `get_city` ora legge prima
+  dall'annotazione `obj.city` e cade in fallback sui `custom_fields` con le stesse chiavi
+  dichiarate in `_CITY_KEYS = frozenset({...})`, allineate con la Coalesce.
+
+- **`frontend/src/hooks/useColumnPrefs.ts` — eliminata stale closure nelle callback**:
+  `onColumnVisibilityModelChange`, `saveOrder` e `saveWidth` catturavano `prefs` nella
+  closure, ricreandosi ad ogni cambio di stato e propagando re-render inutili ai componenti
+  figli. Convertiti alla forma funzionale `setPrefs((prev) => ...)`: `prefs` rimosso
+  dalle deps di `useCallback`. `hasPrefs` stabilizzato con `useMemo`.
+
+- **`docker-compose.prod.yml`**: aggiunto commento sulle variabili obbligatorie in produzione
+  (`DJANGO_SECRET_KEY`, `DB_PASSWORD`, `FIELD_ENCRYPTION_KEY`, `REDIS_URL`).
+
+### Security
+
+- `FIELD_ENCRYPTION_KEY` ora richiesta esplicitamente all'avvio in produzione
+  (`RuntimeError` se assente con `DJANGO_DEBUG=0`), allineata alle guardie già presenti
+  per `SECRET_KEY` e `DB_PASSWORD`.
+
+### Migrations
+
+- `audit/0008_auditevent_action_rate_maxlength32`: `AuditEvent.action` —
+  aggiunto valore `rate` alle `choices`; `max_length` portato da 16 a 32.
+
+---
+
+## [0.5.1] - 2026-03-22
+
+### Fixed
+
+- **`wiki/api.py` — NameError `WikiQuery` a runtime** (`WikiStatsView.get()`):
+  l'import di `WikiQuery`/`WikiQueryLanguage` era posizionato dopo la definizione
+  di `WikiStatsView` (riga 1214), causando un potenziale `NameError` all'endpoint
+  `GET /api/wiki-stats/`. Import spostato in cima al file con gli altri import del
+  modulo wiki.
+
+- **`inventory/api.py` — campo `status_key` duplicato** in `InventoryDetailSerializer`:
+  due assegnazioni identiche su righe consecutive; la prima veniva silenziosamente
+  sovrascritta da Python. Rimossa la riga duplicata.
+
+- **`wiki/api.py` — race condition rating** (`WikiPageViewSet.rate_page()`):
+  il pattern check-then-act (`filter().exists()` → `create()`) permetteva a due
+  richieste concorrenti dello stesso utente di creare due `WikiPageRating` distinti.
+  Sostituito con `get_or_create(page, user, defaults={rating})`.
+
+- **`wiki/models.py` — `WikiPageRating` senza vincolo unicità a DB**:
+  aggiunto `UniqueConstraint(fields=["page", "user"], name="ux_wiki_page_rating_page_user")`
+  come guardia definitiva contro la race condition. Migrazione `0012` resa idempotente
+  con `SeparateDatabaseAndState` + `DO $$ IF NOT EXISTS $$` per ambienti dove il
+  constraint era già presente.
+
+- **`crm/api.py` — N+1 queries in `SiteViewSet.bulk_restore()`**:
+  il loop `for obj in restorable: obj.save(...)` eseguiva 1 UPDATE per sito.
+  Sostituito con `Site.objects.filter(id__in=restored_ids).update(...)` identico
+  a `CustomerViewSet` e `InventoryViewSet`.
+
+- **`issues/api.py` — `perform_update()` con doppio `get_object()`**:
+  il metodo chiamava `self.get_object()` ridondantemente invece di usare
+  `serializer.instance` già caricato da DRF, causando una query extra.
+
+- **`drive/api.py` — loop infinito potenziale in `breadcrumb()` e `move()`**:
+  i cicli `while node:` e `while node is not None:` non avevano limite di profondità.
+  Aggiunto `MAX_DEPTH = 50` con contatore in entrambe le funzioni come protezione
+  contro cicli nel grafo parent di `DriveFolder`.
+
+- **`frontend/src/App.tsx` — rotte `/bug-feature` senza `RequireAuth`**:
+  le rotte `/bug-feature` e `/bug-feature/resolved` erano accessibili senza
+  autenticazione. Aggiunte con `<RequireAuth>`.
+
+- **`frontend/src/ui/ServerDataGrid.tsx` — `useEffect` senza dependency array**:
+  l'effect che espone `colPrefs` tramite `colPrefsRef` veniva rieseguito ad ogni
+  render. Aggiunto `[colPrefsRef, colPrefs]` come dependency array.
+
+- **`frontend/src/ui/ContributorCard_orig.tsx`**: file di backup del componente
+  originale rimasto in `src/ui/` ed incluso nel build TypeScript. Eliminato.
+
+### Added
+
+- **`core/mixins.py` — `RestoreActionMixin`**: centralizza le action DRF `restore`
+  e `bulk_restore` (prima replicate in ogni ViewSet). Configurabile via attributi
+  di classe: `restore_use_block_check`, `restore_has_updated_by`,
+  `restore_response_204`, `restore_use_split`. Elimina ~250 righe di boilerplate
+  identico tra `crm`, `inventory`, `wiki`, `drive`, `issues`.
+
+- **`core/mixins.py` — `PurgeActionMixin`**: centralizza le action DRF `purge`
+  e `bulk_purge` (prima replicate in `crm`, `inventory`, `maintenance`).
+  Riconosce automaticamente il modello dalla queryset senza configurazione.
+
+- **`.env.dev.example`**: template di configurazione con placeholder `CHANGEME_*`
+  per onboarding e ambienti nuovi. Il `.gitignore` aggiornato con commento
+  esplicito e regole `!.env.*.example` per tenerlo nel repo.
+
+### Changed
+
+- **`wiki/api.py` → pacchetto `wiki/api/`**: il file monolitico da 1350 righe è
+  stato diviso in 7 moduli indipendenti con `__init__.py` che re-esporta tutte le
+  classi pubbliche (backward compatible con `from wiki.api import ...`):
+  `helpers.py` · `categories.py` · `pages.py` · `attachments.py` ·
+  `links.py` · `revisions.py` · `stats.py` · `queries.py`.
+
+- **`crm/api.py`**: `CustomerViewSet` e `SiteViewSet` migrati a
+  `PurgeActionMixin + RestoreActionMixin`; rimossi i 4 metodi manuali
+  (`restore`, `bulk_restore`, `purge`, `bulk_purge`) da ciascuno.
+  `ContactViewSet` usa `PurgeActionMixin` e `restore` semplificato
+  tramite `_restore_obj`.
+
+- **`inventory/api.py`**: `InventoryViewSet` migrato a
+  `PurgeActionMixin + RestoreActionMixin`; rimossi i 4 metodi manuali.
+
+- **`issues/api.py`**: `IssueViewSet` migrato a
+  `RestoreActionMixin + SoftDeleteAuditMixin`. Allineato il `get_queryset`
+  a `apply_soft_delete_filters` (standard di progetto). Rimosso `destroy()`
+  manuale (ora gestito dal mixin, che rileva l'assenza di `updated_by` su
+  `Issue`). Rimosso `IssueFilter.filter_deleted` ridondante. Formato diff
+  audit cambiato da lista `[from, to]` a dict `{from, to}` coerente con
+  gli altri ViewSet.
+
+- **`wiki/api/` ViewSet**: `WikiCategoryViewSet`, `WikiPageViewSet`,
+  `WikiAttachmentViewSet`, `WikiLinkViewSet`, `WikiQueryViewSet` migrati
+  a `RestoreActionMixin` con configurazione appropriata per ciascuno
+  (presenza/assenza `updated_by`, tipo di risposta).
+
+- **`wiki/api/stats.py` — `WikiStatsView` con cache**: la view che esegue
+  8+ query aggregate è ora cachata per 5 minuti (configurabile via
+  `settings.WIKI_STATS_CACHE_TTL`). La logica è separata in `_compute_stats()`
+  che ritorna un dict (cachabile) invece di un `Response`.
+
+- **`drive/api.py` — `select_related` catena parent**: `DriveFolderViewSet.get_queryset()`
+  carica i parent fino a 5 livelli di profondità in un unico JOIN, eliminando
+  le query N+1 in `breadcrumb()` e `move()`.
+
+- **`config/settings.py` — DRF throttle globale**: aggiunti
+  `DEFAULT_THROTTLE_CLASSES` (`AnonRateThrottle` + `UserRateThrottle`) e
+  `DEFAULT_THROTTLE_RATES` configurabili via env (`API_THROTTLE_ANON`,
+  `API_THROTTLE_USER`; default `60/min` anonimo, `600/min` autenticato).
+
+- **`crm/models.py` — indice GIN su `Customer.custom_fields`**:
+  aggiunto `GinIndex(fields=["custom_fields"], name="cust_custom_fields_gin")`
+  per rendere efficienti le ricerche JSON nel filtro città.
+
+### Migrations
+
+- `wiki/0012_wikipagerating_unique_page_user`: `UniqueConstraint` su
+  `WikiPageRating(page, user)`. Migrazione idempotente via
+  `SeparateDatabaseAndState`.
+- `crm/0007_customer_custom_fields_gin_index`: indice GIN su
+  `Customer.custom_fields`.
+
+---
+
 ## [0.5.0] - 2026-03-13
 
 ### Changed
