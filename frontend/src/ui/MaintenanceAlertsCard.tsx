@@ -8,6 +8,7 @@ import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlin
 import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useAuth } from '../auth/AuthProvider'
 import type { PlanRow } from '../pages/maintenanceTypes'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -83,34 +84,37 @@ type Tab = 'overdue' | 'next30'
 
 export default function MaintenanceAlertsCard() {
   const navigate = useNavigate()
+  const { me } = useAuth()
   const [tab, setTab] = React.useState<Tab>('overdue')
   const [plans, setPlans] = React.useState<PlanRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [overdueCount, setOverdueCount] = React.useState(0)
   const [next30Count, setNext30Count] = React.useState(0)
 
-  // Load both counts on mount (for tab badges)
+  // Load both counts once me is available (for tab badges)
   React.useEffect(() => {
+    if (!me) return
     Promise.all([
       api.get<{ count: number }>('/maintenance-plans/', {
-        params: { due: 'overdue', is_active: 'true', page_size: 1 },
+        params: { due: 'overdue', is_active: 1, page_size: 1 },
       }),
       api.get<{ count: number }>('/maintenance-plans/', {
-        params: { due: 'next30', is_active: 'true', page_size: 1 },
+        params: { due: 'next30', is_active: 1, page_size: 1 },
       }),
     ]).then(([od, n30]) => {
       setOverdueCount(od.data.count)
       setNext30Count(n30.data.count)
     }).catch(() => {})
-  }, [])
+  }, [me])
 
   // Load plans for current tab
   React.useEffect(() => {
+    if (!me) return
     setLoading(true)
     api.get<{ results: PlanRow[] }>('/maintenance-plans/', {
       params: {
         due: tab,
-        is_active: 'true',
+        is_active: 1,
         ordering: 'next_due_date,title',
         page_size: 20,
       },
@@ -119,7 +123,7 @@ export default function MaintenanceAlertsCard() {
     }).catch(() => {
       setPlans([])
     }).finally(() => setLoading(false))
-  }, [tab])
+  }, [me, tab])
 
   const groups = React.useMemo(() => groupByCustomer(plans), [plans])
 

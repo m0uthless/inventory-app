@@ -1,6 +1,8 @@
 """maintenance/api/plans.py — MaintenancePlan serializer + ViewSet."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
@@ -15,7 +17,8 @@ from core.purge_policy import try_purge_instance
 from core.restore_policy import get_restore_block_reason, split_restorable
 from audit.utils import log_event
 
-from django.db.models import OuterRef, Subquery, Count
+from django.db.models import OuterRef, Subquery, Count, DateField
+from django.db.models.functions import TruncYear
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from core.models import InventoryType
 from maintenance.models import MaintenancePlan, MaintenanceEvent, Tech
@@ -132,17 +135,17 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
                 .order_by("-performed_at")
                 .values("performed_at")[:1]
             )
-            # completed_count: numero di rapportini ok/ko/partial nel ciclo corrente.
-            # Il ciclo corrente va da (next_due_date - 1 anno) a next_due_date.
-            # Approssimazione annuale: safe per intervalli <= 1 anno; per piani pluriennali
-            # potrebbe sovrastimare, ma è comunque indicativa e coerente con il frontend.
+            # completed_count: numero di rapportini ok/ko/partial nell'anno solare
+            # di next_due_date. Usiamo un range [inizio anno, next_due_date] perché
+            # OuterRef non supporta trasformazioni __year.
             completed_count_sq = (
                 MaintenanceEvent.objects
                 .filter(
                     plan=OuterRef("pk"),
                     result__in=("ok", "ko", "partial"),
                     deleted_at__isnull=True,
-                    performed_at__year=OuterRef("next_due_date__year"),
+                    performed_at__gte=OuterRef("_year_start"),
+                    performed_at__lte=OuterRef("next_due_date"),
                 )
                 .values("plan")
                 .annotate(cnt=Count("id"))
@@ -183,6 +186,9 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
                 .values("customer_id")
                 .annotate(cnt=Count("id", distinct=True))
                 .values("cnt")[:1]
+            )
+            qs = qs.annotate(
+                _year_start=TruncYear("next_due_date", output_field=DateField()),
             )
             qs = qs.annotate(
                 last_done_date=Subquery(last_event_sq),

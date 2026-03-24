@@ -285,8 +285,12 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
 
     @action(detail=False, methods=["get"], url_path="summary")
     def summary(self, request):
-        """Conteggi per stato — usato dalla sidebar per il badge issue aperte."""
-        from django.db.models import Count, Q
+        """Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri."""
+        from django.db.models import Count, Q, Avg, F, ExpressionWrapper, fields as dj_fields
+        from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+        from django.utils.timezone import now
+        import datetime
+
         qs = Issue.objects.filter(deleted_at__isnull=True)
         counts = qs.aggregate(
             open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
@@ -295,6 +299,69 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             closed_count=Count("id", filter=Q(status=IssueStatus.CLOSED)),
         )
         counts["active_count"] = (counts["open_count"] or 0) + (counts["in_progress_count"] or 0)
+
+        # Tempo medio di chiusura
+        avg_row = (
+            Issue.objects
+            .filter(
+                deleted_at__isnull=True,
+                status__in=(IssueStatus.RESOLVED, IssueStatus.CLOSED),
+                opened_at__isnull=False,
+                closed_at__isnull=False,
+            )
+            .annotate(days=ExpressionWrapper(F("closed_at") - F("opened_at"), output_field=dj_fields.DurationField()))
+            .aggregate(avg=Avg("days"))
+        )
+        avg_duration = avg_row["avg"]
+        counts["avg_days_to_close"] = (
+            round(avg_duration.days + avg_duration.seconds / 86400, 1)
+            if avg_duration is not None else None
+        )
+
+        # Bucket grafico: usa opened_at se presente, altrimenti created_at (come il serializer)
+        granularity = (request.query_params.get("granularity") or "day").strip().lower()
+        today = now().date()
+
+        from django.db.models.functions import Coalesce, Cast
+        from django.db.models import DateField as DjDateField
+
+        # Campo data effettiva: opened_at ?? cast(created_at as date)
+        effective_date = Coalesce(
+            F("opened_at"),
+            Cast(F("created_at"), output_field=DjDateField()),
+        )
+
+        if granularity == "week":
+            trunc_fn = TruncWeek(effective_date, output_field=dj_fields.DateField())
+            # Allinea il cutoff al lunedì della settimana più vecchia (11 settimane fa)
+            oldest = today - datetime.timedelta(weeks=11)
+            cutoff = oldest - datetime.timedelta(days=oldest.weekday())  # lunedì della settimana
+        elif granularity == "month":
+            trunc_fn = TruncMonth(effective_date, output_field=dj_fields.DateField())
+            # Primo giorno del mese di 11 mesi fa
+            y, m = today.year, today.month - 11
+            if m <= 0:
+                y, m = y - 1, m + 12
+            cutoff = datetime.date(y, m, 1)
+        else:
+            trunc_fn = TruncDate(effective_date)
+            cutoff = today - datetime.timedelta(days=29)
+
+        buckets_qs = (
+            Issue.objects
+            .filter(deleted_at__isnull=True)
+            .annotate(eff_date=effective_date)
+            .filter(eff_date__gte=cutoff)
+            .annotate(period=trunc_fn)
+            .values("period")
+            .annotate(count=Count("id"))
+            .order_by("period")
+        )
+        counts["chart_buckets"] = [
+            {"date": b["period"].isoformat() if b["period"] else None, "count": b["count"]}
+            for b in buckets_qs
+        ]
+
         return Response(counts)
 
     # ── Comments nested endpoint ──────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { alpha, useTheme } from '@mui/material/styles'
 
 import {
   Alert,
@@ -196,75 +197,74 @@ function IssueStatusChip({ status }: { status: string }) {
 
 type Granularity = 'day' | 'week' | 'month'
 
-function buildChartData(rows: IssueRow[], granularity: Granularity) {
+// Riempie i buchi del calendario (periodi senza issue → count 0) e formatta le label
+function fillChartBuckets(
+  buckets: { date: string; count: number }[],
+  granularity: Granularity,
+): { label: string; count: number }[] {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const buckets: { key: string; label: string; count: number }[] = []
+  const slots: { key: string; label: string; count: number }[] = []
 
   if (granularity === 'day') {
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      buckets.push({ key: d.toISOString().slice(0, 10), label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
-    }
-    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]))
-    for (const r of rows) {
-      const k = (r.opened_at ?? r.created_at)?.slice(0, 10)
-      if (k && byKey[k]) byKey[k].count += 1
+      const d = new Date(today); d.setDate(d.getDate() - i)
+      slots.push({ key: d.toISOString().slice(0, 10), label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
     }
   } else if (granularity === 'week') {
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i * 7)
-      const ws = new Date(d)
-      ws.setDate(d.getDate() - d.getDay() + 1)
-      buckets.push({ key: ws.toISOString().slice(0, 10), label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
-    }
-    for (const r of rows) {
-      const raw = r.opened_at ?? r.created_at
-      if (!raw) continue
-      const d = new Date(raw); d.setHours(0, 0, 0, 0)
+      const d = new Date(today); d.setDate(d.getDate() - i * 7)
       const ws = new Date(d); ws.setDate(d.getDate() - d.getDay() + 1)
-      const b = buckets.find((x) => x.key === ws.toISOString().slice(0, 10))
-      if (b) b.count += 1
+      slots.push({ key: ws.toISOString().slice(0, 10), label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
     }
   } else {
     for (let i = 11; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), count: 0 })
-    }
-    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]))
-    for (const r of rows) {
-      const raw = r.opened_at ?? r.created_at
-      if (!raw) continue
-      const k = raw.slice(0, 7)
-      if (byKey[k]) byKey[k].count += 1
+      slots.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), count: 0 })
     }
   }
-  return buckets
+
+  const byKey = Object.fromEntries(slots.map((s) => [s.key, s]))
+  for (const b of buckets) {
+    // Backend restituisce date ISO — allinea alla chiave giusta
+    const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
+    if (byKey[k]) byKey[k].count = b.count
+  }
+  return slots
 }
 
 function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boolean }) {
+  const theme = useTheme()
   const [granularity, setGranularity] = React.useState<Granularity>('day')
+  const [avgDaysGlobal, setAvgDaysGlobal] = React.useState<number | null>(null)
+  const [chartData, setChartData] = React.useState<{ label: string; count: number }[]>([])
+
+  // Carica dati globali (avg + grafico) ad ogni cambio di granularità
+  React.useEffect(() => {
+    api.get<{ avg_days_to_close: number | null; chart_buckets: { date: string; count: number }[] }>(
+      '/issues/summary/',
+      { params: { granularity } },
+    ).then((r) => {
+      setAvgDaysGlobal(r.data.avg_days_to_close ?? null)
+      const buckets = r.data.chart_buckets ?? []
+      // Riempi i buchi del calendario con 0 e formatta le etichette
+      setChartData(fillChartBuckets(buckets, granularity))
+    }).catch(() => {})
+  }, [granularity])
 
   const open     = rows.filter((r) => r.status === 'open').length
   const inProg   = rows.filter((r) => r.status === 'in_progress').length
   const critical = rows.filter((r) => r.priority === 'critical' && (r.status === 'open' || r.status === 'in_progress')).length
-  const closedRows = rows.filter((r) => (r.status === 'resolved' || r.status === 'closed') && r.days_open != null)
-  const avgDays = closedRows.length > 0
-    ? (closedRows.reduce((s, r) => s + (r.days_open ?? 0), 0) / closedRows.length).toFixed(1)
-    : null
-
-  const chartData = React.useMemo(() => buildChartData(rows, granularity), [rows, granularity])
 
   const cardSx = { bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 2, p: '1rem 1.25rem', opacity: loading ? 0.6 : 1, transition: 'opacity .2s' }
-  const metricSx = { bgcolor: 'background.default', borderRadius: 1.5, p: '12px 14px', border: '0.5px solid', borderColor: 'divider' }
+
+  const avgLabel = avgDaysGlobal != null ? `${avgDaysGlobal.toFixed(1)} gg` : '—'
 
   const kpis = [
-    { label: 'Aperte',          value: open,     color: open > 0     ? 'error.main'   : 'text.primary', sub: `su ${rows.length} totali` },
-    { label: 'In lavorazione',  value: inProg,   color: inProg > 0   ? 'warning.main' : 'text.primary', sub: 'in corso' },
-    { label: 'Critiche aperte', value: critical, color: critical > 0 ? 'error.main'   : 'text.primary', sub: 'richiedono attenzione' },
-    { label: 'Tempo medio',     value: avgDays != null ? `${avgDays} gg` : '—', color: 'text.primary', sub: 'giorni per chiusura' },
+    { label: 'Aperte',          value: open,       sub: `su ${rows.length} totali`,    accent: '#e24b4a' },
+    { label: 'In lavorazione',  value: inProg,     sub: 'in corso',                    accent: '#f59e0b' },
+    { label: 'Critiche aperte', value: critical,   sub: 'richiedono attenzione',       accent: '#6366f1' },
+    { label: 'Tempo medio',     value: avgLabel,   sub: 'su tutte le issue chiuse',    accent: '#14b8a6' },
   ]
 
   const granularityOptions: { key: Granularity; label: string }[] = [
@@ -275,19 +275,46 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-      <Box sx={cardSx}>
-        <Typography sx={{ fontSize: '11px', fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: 'text.disabled', mb: '14px' }}>
-          Riepilogo
-        </Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {kpis.map((m) => (
-            <Box key={m.label} sx={metricSx}>
-              <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontWeight: 500, mb: '4px' }}>{m.label}</Typography>
-              <Typography sx={{ fontSize: '26px', fontWeight: 500, color: m.color, lineHeight: 1 }}>{m.value}</Typography>
-              <Typography sx={{ fontSize: '11px', color: 'text.disabled', mt: '3px' }}>{m.sub}</Typography>
+      {/* ── Sinistra: KPI gradient cards ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', opacity: loading ? 0.6 : 1, transition: 'opacity .2s' }}>
+        {kpis.map((m) => (
+          <Box
+            key={m.label}
+            sx={{
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: '8px',
+              p: { xs: '12px', sm: '14px 16px' },
+              backgroundImage: `linear-gradient(135deg, ${alpha(m.accent, 0.62)} 0%, ${alpha(m.accent, 0.86)} 100%)`,
+              border: `1px solid ${alpha(m.accent, 0.18)}`,
+              boxShadow: `0 10px 28px ${alpha(m.accent, 0.18)}`,
+              '&::before': {
+                content: '""', position: 'absolute',
+                width: 80, height: 80, borderRadius: '50%',
+                right: -20, top: -16,
+                backgroundColor: alpha(theme.palette.common.white, 0.14),
+              },
+              '&::after': {
+                content: '""', position: 'absolute',
+                width: 100, height: 100, borderRadius: '50%',
+                right: 16, bottom: -52,
+                backgroundColor: alpha(theme.palette.common.white, 0.10),
+              },
+            }}
+          >
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: alpha(theme.palette.common.white, 0.85), mb: '6px', lineHeight: 1.2 }}>
+                {m.label}
+              </Typography>
+              <Typography sx={{ fontSize: '1.75rem', fontWeight: 800, color: theme.palette.common.white, lineHeight: 1, letterSpacing: -0.5, textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}` }}>
+                {m.value}
+              </Typography>
+              <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: alpha(theme.palette.common.white, 0.75), mt: '4px' }}>
+                {m.sub}
+              </Typography>
             </Box>
-          ))}
-        </Box>
+          </Box>
+        ))}
       </Box>
 
       <Box sx={cardSx}>

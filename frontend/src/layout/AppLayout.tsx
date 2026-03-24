@@ -256,10 +256,10 @@ export function AppLayout() {
   // Drawer mobile
   const [mobileOpen, setMobileOpen] = React.useState(false)
 
-  // ── Maintenance notifications ─────────────────────────────────────────────
+  // ── Maintenance notifications ──────────────────────────────────────────────
   type DuePlan = {
     id: number
-    name: string
+    title: string
     customer_name?: string
     next_due_date: string
     days_left: number
@@ -268,27 +268,40 @@ export function AppLayout() {
   const [notifAnchor, setNotifAnchor] = React.useState<null | HTMLElement>(null)
 
   React.useEffect(() => {
+    if (!me) return
     const fetchDue = () => {
-      api
-        .get('/maintenance-plans/', {
-          params: { due: 'next30', page_size: 20, ordering: 'next_due_date' },
-        })
-        .then((r) => {
-          const plans = r.data?.results ?? r.data ?? []
-          const today = new Date()
-          const enriched = plans.map((p: Record<string, unknown>) => {
+      const today = new Date()
+      Promise.all([
+        api.get('/maintenance-plans/', {
+          params: { due: 'overdue', is_active: 1, page_size: 20, ordering: 'next_due_date' },
+        }),
+        api.get('/maintenance-plans/', {
+          params: { due: 'next30', is_active: 1, page_size: 20, ordering: 'next_due_date' },
+        }),
+      ])
+        .then(([overdueRes, next30Res]) => {
+          const overdue = overdueRes.data?.results ?? overdueRes.data ?? []
+          const next30  = next30Res.data?.results  ?? next30Res.data  ?? []
+          const seen = new Set<number>()
+          const all = [...overdue, ...next30].filter((p: Record<string, unknown>) => {
+            const id = p.id as number
+            if (seen.has(id)) return false
+            seen.add(id)
+            return true
+          })
+          const enriched = all.map((p: Record<string, unknown>) => {
             const due = new Date(String(p.next_due_date))
             const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-            return { ...p, days_left: diff }
+            return { ...p, days_left: diff } as DuePlan
           })
           setDuePlans(enriched)
         })
         .catch(() => {})
     }
     fetchDue()
-    const interval = setInterval(fetchDue, 5 * 60 * 1000) // refresh every 5 min
+    const interval = setInterval(fetchDue, 5 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [me])
 
   // Sidebar mini-variant (desktop) persistita
   const [desktopOpen, setDesktopOpen] = React.useState(() => {
@@ -1387,7 +1400,7 @@ export function AppLayout() {
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
-                    {p.name}
+                    {p.title}
                   </Typography>
                   {p.customer_name && (
                     <Typography variant="caption" sx={{ color: 'text.disabled' }}>
