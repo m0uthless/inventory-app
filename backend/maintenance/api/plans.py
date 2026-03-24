@@ -379,11 +379,31 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         for inv in inv_qs:
             inv_index[(inv.customer_id, inv.type_id)].append(inv)
 
+        # Pivot index: (plan_id, inventory_id) → MaintenancePlanInventory
+        # Carica tutti i record pivot attivi per i piani correnti in una sola query.
+        from maintenance.models import MaintenancePlanInventory
+        pivot_qs = (
+            MaintenancePlanInventory.objects
+            .filter(
+                plan_id__in=[p.id for p in plans_list],
+                deleted_at__isnull=True,
+            )
+            .only("id", "plan_id", "inventory_id", "due_date_override")
+        )
+        pivot_index: dict = {(piv.plan_id, piv.inventory_id): piv for piv in pivot_qs}
+
         rows = []
         for plan in plans_list:
             type_ids = set(plan.inventory_types.values_list("id", flat=True))
             for type_id in type_ids:
                 for inv in inv_index.get((plan.customer_id, type_id), []):
+                    # Usa l'override dalla pivot se esiste, altrimenti la data del piano
+                    pivot = pivot_index.get((plan.id, inv.id))
+                    effective_due_date = (
+                        str(pivot.due_date_override)
+                        if pivot and pivot.due_date_override
+                        else str(plan.next_due_date)
+                    )
                     rows.append({
                         "plan_id":               plan.id,
                         "plan_title":            plan.title,
@@ -398,7 +418,10 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
                         "type_label":            inv.type.label if inv.type_id else None,
                         "knumber":               inv.knumber,
                         "hostname":              inv.hostname,
-                        "next_due_date":         str(plan.next_due_date),
+                        "next_due_date":         effective_due_date,
+                        "due_date_override":     str(pivot.due_date_override) if pivot and pivot.due_date_override else None,
+                        "plan_next_due_date":    str(plan.next_due_date),
+                        "plan_inventory_id":     pivot.id if pivot else None,
                         "schedule_type":         plan.schedule_type,
                         "interval_value":        plan.interval_value,
                         "interval_unit":         plan.interval_unit,

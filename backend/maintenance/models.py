@@ -117,6 +117,46 @@ class MaintenanceEvent(TimeStampedModel):
         return f"{self.plan_id} / {self.inventory_id} - {self.performed_at} - {self.result}"
 
 
+class MaintenancePlanInventory(TimeStampedModel):
+    """
+    Tabella pivot esplicita tra MaintenancePlan e Inventory.
+    Ogni riga rappresenta un singolo device coperto dal piano.
+    due_date_override permette di sovrascrivere next_due_date del piano
+    per quel singolo inventory; se NULL eredita la data del piano.
+    """
+    plan = models.ForeignKey(
+        MaintenancePlan,
+        on_delete=models.CASCADE,
+        related_name="plan_inventories",
+    )
+    inventory = models.ForeignKey(
+        "inventory.Inventory",
+        on_delete=models.CASCADE,
+        related_name="plan_memberships",
+    )
+    due_date_override = models.DateField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Inventory nel piano"
+        verbose_name_plural = "Inventory nel piano"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["plan", "inventory"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="ux_plan_inventory_active",
+            )
+        ]
+
+    def __str__(self):
+        return f"Piano {self.plan_id} / Inventory {self.inventory_id}"
+
+    @property
+    def effective_due_date(self):
+        """Ritorna l'override se presente, altrimenti la data del piano."""
+        return self.due_date_override or self.plan.next_due_date
+
+
 class NotificationStatus(models.TextChoices):
     SENT   = "sent",   "Sent"
     FAILED = "failed", "Failed"

@@ -9,7 +9,7 @@ import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
-import type { PlanRow } from '../pages/maintenanceTypes'
+import type { TodoRow } from '../pages/maintenanceTypes'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,46 +37,44 @@ function getUrgency(days: number): Urgency {
 }
 
 const URGENCY: Record<Urgency, { label: string; color: string; chipColor: 'error' | 'warning' | 'info' | 'default'; barColor: string }> = {
-  overdue:  { label: 'Scaduto',  color: '#d32f2f', chipColor: 'error',   barColor: '#d32f2f' },
-  critical: { label: 'Urgente',  color: '#ed6c02', chipColor: 'warning', barColor: '#ed6c02' },
+  overdue:  { label: 'Scaduto',   color: '#d32f2f', chipColor: 'error',   barColor: '#d32f2f' },
+  critical: { label: 'Urgente',   color: '#ed6c02', chipColor: 'warning', barColor: '#ed6c02' },
   soon:     { label: 'In arrivo', color: '#0288d1', chipColor: 'info',    barColor: '#0288d1' },
   ok:       { label: 'Ok',        color: '#9e9e9e', chipColor: 'default', barColor: '#9e9e9e' },
 }
 
-// ─── Grouped plan row ─────────────────────────────────────────────────────────
+// ─── Grouped by customer ──────────────────────────────────────────────────────
+
+type EnrichedRow = TodoRow & { days: number; urgency: Urgency }
 
 type GroupedCustomer = {
   customerId: number
   customerName: string
-  plans: (PlanRow & { days: number; urgency: Urgency })[]
+  items: EnrichedRow[]
 }
 
-function groupByCustomer(plans: PlanRow[]): GroupedCustomer[] {
+function groupByCustomer(rows: TodoRow[]): GroupedCustomer[] {
   const map = new Map<number, GroupedCustomer>()
-
-  for (const plan of plans) {
-    const days = daysUntil(plan.next_due_date)
+  for (const row of rows) {
+    const days    = daysUntil(row.next_due_date)
     const urgency = getUrgency(days)
-    const entry = map.get(plan.customer)
+    const entry   = map.get(row.customer_id)
     if (entry) {
-      entry.plans.push({ ...plan, days, urgency })
+      entry.items.push({ ...row, days, urgency })
     } else {
-      map.set(plan.customer, {
-        customerId: plan.customer,
-        customerName: plan.customer_name ?? `Cliente #${plan.customer}`,
-        plans: [{ ...plan, days, urgency }],
+      map.set(row.customer_id, {
+        customerId:   row.customer_id,
+        customerName: row.customer_name,
+        items: [{ ...row, days, urgency }],
       })
     }
   }
-
-  // Sort groups: customers with most urgent plans first
-  return Array.from(map.values()).sort((a, b) => {
-    const urgencyRank = (g: GroupedCustomer) => Math.min(...g.plans.map(p => p.days))
-    return urgencyRank(a) - urgencyRank(b)
-  })
+  return Array.from(map.values()).sort((a, b) =>
+    Math.min(...a.items.map(i => i.days)) - Math.min(...b.items.map(i => i.days))
+  )
 }
 
-// ─── Summary tab type ─────────────────────────────────────────────────────────
+// ─── Tab type ─────────────────────────────────────────────────────────────────
 
 type Tab = 'overdue' | 'next30'
 
@@ -84,49 +82,48 @@ type Tab = 'overdue' | 'next30'
 
 export default function MaintenanceAlertsCard() {
   const navigate = useNavigate()
-  const { me } = useAuth()
-  const [tab, setTab] = React.useState<Tab>('overdue')
-  const [plans, setPlans] = React.useState<PlanRow[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const { me }   = useAuth()
+  const [tab, setTab]             = React.useState<Tab>('overdue')
+  const [rows, setRows]           = React.useState<TodoRow[]>([])
+  const [loading, setLoading]     = React.useState(true)
   const [overdueCount, setOverdueCount] = React.useState(0)
-  const [next30Count, setNext30Count] = React.useState(0)
+  const [next30Count,  setNext30Count]  = React.useState(0)
 
-  // Load both counts once me is available (for tab badges)
+  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const in30  = React.useMemo(() => new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10), [])
+
+  // Badge counts — chiamata leggera con page_size=1
   React.useEffect(() => {
     if (!me) return
     Promise.all([
-      api.get<{ count: number }>('/maintenance-plans/', {
-        params: { due: 'overdue', is_active: 1, page_size: 1 },
+      api.get<{ count: number }>('/maintenance-plans/todo/', {
+        params: { due_before: today, page_size: 1 },
       }),
-      api.get<{ count: number }>('/maintenance-plans/', {
-        params: { due: 'next30', is_active: 1, page_size: 1 },
+      api.get<{ count: number }>('/maintenance-plans/todo/', {
+        params: { due_from: today, due_to: in30, page_size: 1 },
       }),
     ]).then(([od, n30]) => {
-      setOverdueCount(od.data.count)
-      setNext30Count(n30.data.count)
+      setOverdueCount(od.data.count ?? 0)
+      setNext30Count(n30.data.count ?? 0)
     }).catch(() => {})
-  }, [me])
+  }, [me, today, in30])
 
-  // Load plans for current tab
+  // Righe per il tab corrente
   React.useEffect(() => {
     if (!me) return
     setLoading(true)
-    api.get<{ results: PlanRow[] }>('/maintenance-plans/', {
-      params: {
-        due: tab,
-        is_active: 1,
-        ordering: 'next_due_date,title',
-        page_size: 20,
-      },
-    }).then(r => {
-      setPlans(r.data.results)
-    }).catch(() => {
-      setPlans([])
-    }).finally(() => setLoading(false))
-  }, [me, tab])
+    const params =
+      tab === 'overdue'
+        ? { due_before: today, ordering: 'next_due_date', page_size: 50 }
+        : { due_from: today, due_to: in30, ordering: 'next_due_date', page_size: 50 }
 
-  const groups = React.useMemo(() => groupByCustomer(plans), [plans])
+    api.get<{ results: TodoRow[] }>('/maintenance-plans/todo/', { params })
+      .then(r => setRows(r.data.results ?? []))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false))
+  }, [me, tab, today, in30])
 
+  const groups     = React.useMemo(() => groupByCustomer(rows), [rows])
   const totalCount = tab === 'overdue' ? overdueCount : next30Count
 
   return (
@@ -160,8 +157,8 @@ export default function MaintenanceAlertsCard() {
       {/* Tabs */}
       <Box sx={{ display: 'flex', borderBottom: '1px solid', borderColor: 'divider' }}>
         {([
-          { key: 'overdue' as Tab, label: 'Scaduti', icon: <WarningAmberRoundedIcon sx={{ fontSize: 13 }} />, count: overdueCount },
-          { key: 'next30' as Tab, label: 'Prossimi 30gg', icon: <EventOutlinedIcon sx={{ fontSize: 13 }} />, count: next30Count },
+          { key: 'overdue' as Tab, label: 'Scaduti',       icon: <WarningAmberRoundedIcon sx={{ fontSize: 13 }} />, count: overdueCount },
+          { key: 'next30'  as Tab, label: 'Prossimi 30gg', icon: <EventOutlinedIcon       sx={{ fontSize: 13 }} />, count: next30Count  },
         ] as const).map(({ key, label, icon, count }) => (
           <Box
             key={key}
@@ -182,16 +179,14 @@ export default function MaintenanceAlertsCard() {
               {label}
             </Typography>
             {count > 0 && (
-              <Box
-                sx={{
-                  minWidth: 18, height: 18, px: 0.5,
-                  borderRadius: '999px',
-                  bgcolor: tab === key ? 'primary.main' : 'action.selected',
-                  color: tab === key ? 'primary.contrastText' : 'text.secondary',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.65rem', fontWeight: 700, lineHeight: 1,
-                }}
-              >
+              <Box sx={{
+                minWidth: 18, height: 18, px: 0.5,
+                borderRadius: '999px',
+                bgcolor: tab === key ? 'primary.main' : 'action.selected',
+                color: tab === key ? 'primary.contrastText' : 'text.secondary',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.65rem', fontWeight: 700, lineHeight: 1,
+              }}>
                 {count > 99 ? '99+' : count}
               </Box>
             )}
@@ -238,72 +233,67 @@ export default function MaintenanceAlertsCard() {
                   {group.customerName}
                 </Typography>
                 <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                  {group.plans.length} {group.plans.length === 1 ? 'piano' : 'piani'}
+                  {group.items.length} {group.items.length === 1 ? 'inventory' : 'inventory'}
                 </Typography>
               </Box>
 
-              {/* Plans */}
+              {/* Inventory rows */}
               <Stack divider={<Divider />}>
-                {group.plans.map(plan => {
-                  const urg = URGENCY[plan.urgency]
-                  const daysLabel = plan.days < 0
-                    ? `${Math.abs(plan.days)}gg fa`
-                    : plan.days === 0
-                      ? 'oggi'
-                      : `tra ${plan.days}gg`
+                {group.items.map(item => {
+                  const urg      = URGENCY[item.urgency]
+                  const daysLabel = item.days < 0
+                    ? `${Math.abs(item.days)}gg fa`
+                    : item.days === 0 ? 'oggi'
+                    : `tra ${item.days}gg`
 
                   return (
                     <Stack
-                      key={plan.id}
+                      key={`${item.plan_id}-${item.inventory_id}`}
                       direction="row"
                       alignItems="center"
                       spacing={1.25}
                       sx={{
-                        px: 2, py: 1,
+                        px: 2, py: 0.9,
                         cursor: 'pointer',
                         '&:hover': { bgcolor: 'action.hover' },
                         transition: 'background 0.15s',
                       }}
-                      onClick={() => navigate('/maintenance/plans')}
+                      onClick={() => navigate('/maintenance')}
                     >
                       {/* Barra urgenza */}
-                      <Box sx={{
-                        width: 3, height: 32, borderRadius: '999px',
-                        bgcolor: urg.barColor, flexShrink: 0,
-                      }} />
+                      <Box sx={{ width: 3, height: 32, borderRadius: '999px', bgcolor: urg.barColor, flexShrink: 0 }} />
 
                       {/* Testo */}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          noWrap
-                          sx={{ fontSize: '0.82rem' }}
-                        >
-                          {plan.title}
+                        <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: '0.82rem' }}>
+                          {item.inventory_name}
                         </Typography>
-                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.2 }}>
-                          {plan.inventory_type_labels && plan.inventory_type_labels.length > 0 && (
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.15 }}>
+                          {item.type_label && (
                             <>
-                              <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem', maxWidth: 120 }}>
-                                {plan.inventory_type_labels.join(', ')}
+                              <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem', maxWidth: 90 }}>
+                                {item.type_label}
                               </Typography>
                               <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.72rem' }}>·</Typography>
                             </>
                           )}
-                          <Tooltip title={formatDate(plan.next_due_date)} placement="top">
-                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: urg.color, fontWeight: 600 }}>
+                          {item.site_name && (
+                            <>
+                              <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem', maxWidth: 90 }}>
+                                {item.site_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.72rem' }}>·</Typography>
+                            </>
+                          )}
+                          <Tooltip title={formatDate(item.next_due_date)} placement="top">
+                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: urg.color, fontWeight: 600, cursor: 'default' }}>
                               {daysLabel}
                             </Typography>
                           </Tooltip>
-                          {plan.covered_count != null && plan.covered_count > 0 && (
-                            <>
-                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.72rem' }}>·</Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
-                                {plan.covered_count} inv.
-                              </Typography>
-                            </>
-                          )}
+                          <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.72rem' }}>·</Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem', maxWidth: 100 }}>
+                            {item.plan_title}
+                          </Typography>
                         </Stack>
                       </Box>
 
@@ -335,12 +325,12 @@ export default function MaintenanceAlertsCard() {
           cursor: 'pointer',
           '&:hover': { bgcolor: 'action.hover' },
         }}
-        onClick={() => navigate('/maintenance/plans')}
+        onClick={() => navigate('/maintenance')}
       >
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
           {totalCount > 0
-            ? `Vedi tutti i ${totalCount} piani →`
-            : 'Vai ai piani di manutenzione →'}
+            ? `Vedi tutti i ${totalCount} inventory →`
+            : 'Vai alle scadenze manutenzione →'}
         </Typography>
       </Box>
     </Card>

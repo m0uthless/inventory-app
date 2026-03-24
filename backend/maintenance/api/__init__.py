@@ -19,3 +19,7 @@ from maintenance.api.notifications import (  # noqa: F401
     MaintenanceNotificationSerializer,
     MaintenanceNotificationViewSet,
 )
+from maintenance.api.plan_inventories import (  # noqa: F401
+    MaintenancePlanInventorySerializer,
+    MaintenancePlanInventoryViewSet,
+)

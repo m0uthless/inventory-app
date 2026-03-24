@@ -80,6 +80,12 @@ export type TodoRow = {
   knumber?: string | null
   hostname?: string | null
   next_due_date: string
+  /** Data sovrascritta manualmente per questo inventory (null = eredita dal piano) */
+  due_date_override?: string | null
+  /** Data originale del piano (sempre presente quando due_date_override è valorizzato) */
+  plan_next_due_date?: string | null
+  /** ID del record MaintenancePlanInventory (pivot), null se non ancora creato */
+  plan_inventory_id?: number | null
   schedule_type: string
   interval_value?: number | null
   interval_unit?: string | null

@@ -32,7 +32,7 @@ import ClearIcon from '@mui/icons-material/Clear'
 import LogoutIcon from '@mui/icons-material/Logout'
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
-import PersonIcon from '@mui/icons-material/Person'
+import SettingsIcon from '@mui/icons-material/Settings'
 
 import FolderIcon from '@mui/icons-material/FolderOutlined'
 import DashboardIcon from '@mui/icons-material/DashboardOutlined'
@@ -257,50 +257,60 @@ export function AppLayout() {
   const [mobileOpen, setMobileOpen] = React.useState(false)
 
   // ── Maintenance notifications ──────────────────────────────────────────────
-  type DuePlan = {
-    id: number
-    title: string
-    customer_name?: string
+  type DueItem = {
+    plan_id: number
+    plan_title: string
+    inventory_id: number
+    inventory_name: string
+    customer_name: string
+    customer_code: string
+    site_name?: string | null
+    knumber?: string | null
+    hostname?: string | null
+    type_label?: string | null
     next_due_date: string
+    due_date_override?: string | null
     days_left: number
   }
-  const [duePlans, setDuePlans] = React.useState<DuePlan[]>([])
+  const [duePlans, setDuePlans] = React.useState<DueItem[]>([])
   const [notifAnchor, setNotifAnchor] = React.useState<null | HTMLElement>(null)
 
   React.useEffect(() => {
     if (!me) return
     const fetchDue = () => {
       const today = new Date()
-      Promise.all([
-        api.get('/maintenance-plans/', {
-          params: { due: 'overdue', is_active: 1, page_size: 20, ordering: 'next_due_date' },
-        }),
-        api.get('/maintenance-plans/', {
-          params: { due: 'next30', is_active: 1, page_size: 20, ordering: 'next_due_date' },
-        }),
-      ])
-        .then(([overdueRes, next30Res]) => {
-          const overdue = overdueRes.data?.results ?? overdueRes.data ?? []
-          const next30  = next30Res.data?.results  ?? next30Res.data  ?? []
-          const seen = new Set<number>()
-          const all = [...overdue, ...next30].filter((p: Record<string, unknown>) => {
-            const id = p.id as number
-            if (seen.has(id)) return false
-            seen.add(id)
-            return true
+      today.setHours(0, 0, 0, 0)
+      const in30Date = new Date(today)
+      in30Date.setDate(in30Date.getDate() + 30)
+      const in30 = in30Date.toLocaleDateString('en-CA') // YYYY-MM-DD locale-safe
+      // Usa il todo endpoint: ritorna singoli inventory (non piani aggregati)
+      // Solo inventory in scadenza nei prossimi 30 giorni (esclusi gli scaduti)
+      const todayStr = today.toLocaleDateString('en-CA')
+      api.get('/maintenance-plans/todo/', {
+        params: { due_from: todayStr, due_to: in30, ordering: 'next_due_date', page_size: 40 },
+      })
+        .then((res) => {
+          const rows = res.data?.results ?? []
+          const enriched = rows.map((r: Record<string, unknown>) => {
+            const due = new Date(String(r.next_due_date))
+            due.setHours(0, 0, 0, 0)
+            const diff = Math.round((due.getTime() - today.getTime()) / 86_400_000)
+            return { ...r, days_left: diff } as DueItem
           })
-          const enriched = all.map((p: Record<string, unknown>) => {
-            const due = new Date(String(p.next_due_date))
-            const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-            return { ...p, days_left: diff } as DuePlan
-          })
+          // Ordina: scaduti prima, poi per data
+          enriched.sort((a: DueItem, b: DueItem) => a.days_left - b.days_left)
           setDuePlans(enriched)
         })
         .catch(() => {})
     }
     fetchDue()
     const interval = setInterval(fetchDue, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    // Aggiorna la bell quando DueDateOverrideDialog salva un override
+    window.addEventListener('maintenance-due-date-changed', fetchDue)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('maintenance-due-date-changed', fetchDue)
+    }
   }, [me])
 
   // Sidebar mini-variant (desktop) persistita
@@ -330,12 +340,6 @@ export function AppLayout() {
   const displayName = React.useMemo(() => {
     const name = [me?.first_name, me?.last_name].filter(Boolean).join(' ').trim()
     return name || me?.username || 'User'
-  }, [me])
-
-  const groupsLabel = React.useMemo(() => {
-    const g = me?.groups || []
-    if (!g.length) return '—'
-    return g.join(', ')
   }, [me])
 
   const handleLogout = async () => {
@@ -1101,12 +1105,12 @@ export function AppLayout() {
             <Tooltip
               title={
                 duePlans.length
-                  ? `${duePlans.length} piani in scadenza`
+                  ? `${duePlans.length} scadenz${duePlans.length === 1 ? 'a' : 'e'} imminenti`
                   : 'Nessuna scadenza imminente'
               }
             >
               <IconButton onClick={(e) => setNotifAnchor(e.currentTarget)} size="small">
-                <Badge badgeContent={duePlans.length || null} color="warning" max={9}>
+                <Badge badgeContent={duePlans.length || null} color="warning" max={99}>
                   <NotificationsOutlinedIcon
                     fontSize="small"
                     sx={{ color: duePlans.length ? 'warning.main' : 'inherit' }}
@@ -1363,14 +1367,14 @@ export function AppLayout() {
         onClose={() => setNotifAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{ sx: { width: 340, borderRadius: 1, mt: 0.5 } }}
+        PaperProps={{ sx: { width: 360, borderRadius: 1, mt: 0.5 } }}
       >
         <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
             Scadenze manutenzione
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            Piani in scadenza entro 30 giorni
+            Inventory in scadenza entro 30 giorni
           </Typography>
         </Box>
         {duePlans.length === 0 ? (
@@ -1380,56 +1384,76 @@ export function AppLayout() {
             </Typography>
           </Box>
         ) : (
-          <Stack divider={<Divider />}>
-            {duePlans.map((p) => (
-              <ListItemButton
-                key={p.id}
-                onClick={() => {
-                  setNotifAnchor(null)
-                  nav('/maintenance')
-                }}
-                sx={{ px: 2, py: 1.25 }}
-              >
-                <BuildOutlinedIcon
-                  sx={{
-                    fontSize: 18,
-                    color: p.days_left <= 7 ? 'error.main' : 'warning.main',
-                    mr: 1.5,
-                    flexShrink: 0,
-                  }}
-                />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
-                    {p.title}
-                  </Typography>
-                  {p.customer_name && (
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      {p.customer_name}
+          <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
+            <Stack divider={<Divider />}>
+              {duePlans.map((item) => (
+                <ListItemButton
+                  key={`${item.plan_id}-${item.inventory_id}`}
+                  onClick={() => { setNotifAnchor(null); nav('/maintenance') }}
+                  sx={{ px: 2, py: 1 }}
+                >
+                  <BuildOutlinedIcon
+                    sx={{
+                      fontSize: 16,
+                      color: item.days_left < 0 ? 'error.main' : item.days_left <= 7 ? 'warning.main' : 'info.main',
+                      mr: 1.25,
+                      flexShrink: 0,
+                      mt: 0.25,
+                    }}
+                  />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                      {item.inventory_name}
                     </Typography>
-                  )}
-                </Box>
-                <Chip
-                  size="small"
-                  label={
-                    p.days_left <= 0 ? 'Scaduto' : p.days_left === 1 ? 'Domani' : `${p.days_left}gg`
-                  }
-                  color={p.days_left <= 0 ? 'error' : p.days_left <= 7 ? 'warning' : 'default'}
-                  sx={{ fontSize: 10, ml: 1, flexShrink: 0 }}
-                />
-              </ListItemButton>
-            ))}
-          </Stack>
+                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.15 }}>
+                      <Typography variant="caption" noWrap sx={{ color: 'text.secondary', fontSize: '0.7rem', maxWidth: 120 }}>
+                        {item.customer_name}
+                      </Typography>
+                      {item.type_label && (
+                        <>
+                          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>·</Typography>
+                          <Typography variant="caption" noWrap sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
+                            {item.type_label}
+                          </Typography>
+                        </>
+                      )}
+                      {(item.knumber || item.hostname) && (
+                        <>
+                          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>·</Typography>
+                          <Typography variant="caption" noWrap sx={{ color: 'text.disabled', fontSize: '0.7rem', fontFamily: 'ui-monospace,monospace' }}>
+                            {item.knumber || item.hostname}
+                          </Typography>
+                        </>
+                      )}
+                    </Stack>
+                  </Box>
+                  <Chip
+                    size="small"
+                    label={
+                      item.days_left < 0
+                        ? `${Math.abs(item.days_left)}gg fa`
+                        : item.days_left === 0
+                          ? 'Oggi'
+                          : item.days_left === 1
+                            ? 'Domani'
+                            : `${item.days_left}gg`
+                    }
+                    color={item.days_left < 0 ? 'error' : item.days_left <= 7 ? 'warning' : 'default'}
+                    variant={item.days_left < 0 ? 'filled' : 'outlined'}
+                    sx={{ fontSize: '0.68rem', ml: 1, flexShrink: 0, height: 20 }}
+                  />
+                </ListItemButton>
+              ))}
+            </Stack>
+          </Box>
         )}
         <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
           <ListItemButton
-            onClick={() => {
-              setNotifAnchor(null)
-              nav('/maintenance')
-            }}
+            onClick={() => { setNotifAnchor(null); nav('/maintenance') }}
             sx={{ borderRadius: 1.5, justifyContent: 'center' }}
           >
             <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700 }}>
-              Vai alla Manutenzione →
+              Vai alle scadenze →
             </Typography>
           </ListItemButton>
         </Box>
@@ -1445,52 +1469,36 @@ export function AppLayout() {
         slotProps={{
           paper: {
             sx: {
-              minWidth: 190,
+              minWidth: 160,
               boxShadow: '0 4px 16px rgba(15,23,42,0.10)',
               borderRadius: 1.5,
               border: '1px solid',
               borderColor: 'divider',
+              py: 0.5,
             },
           },
-          list: { dense: true, sx: { py: 0.5 } },
+          list: { dense: true, sx: { py: 0 } },
         }}
       >
-        <Box sx={{ px: 1.5, pt: 1, pb: 0.75 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: 13, lineHeight: 1.3 }}>
-            {displayName}
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.6, fontSize: 11 }}>
-            {me?.username} • {groupsLabel}
-          </Typography>
-        </Box>
-
-        <Divider sx={{ my: 0.5 }} />
-
         <MenuItem
           onClick={() => {
             setUserAnchorEl(null)
             setProfileOpen(true)
           }}
-          sx={{ fontSize: 13, py: 0.6, px: 1.5, minHeight: 0 }}
+          sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
         >
-          <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 16 } }}>
-            <PersonIcon fontSize="small" />
-          </ListItemIcon>
-          Profilo
+          <SettingsIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          Impostazioni
         </MenuItem>
-
-        <Divider sx={{ my: 0.5 }} />
 
         <MenuItem
           onClick={async () => {
             setUserAnchorEl(null)
             await handleLogout()
           }}
-          sx={{ fontSize: 13, py: 0.6, px: 1.5, minHeight: 0 }}
+          sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
         >
-          <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 16 } }}>
-            <LogoutIcon fontSize="small" />
-          </ListItemIcon>
+          <LogoutIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
           Logout
         </MenuItem>
       </Menu>

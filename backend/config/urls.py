@@ -33,6 +33,7 @@ from maintenance.api import (
     MaintenanceEventViewSet,
     MaintenanceNotificationViewSet,
     MaintenancePlanViewSet,
+    MaintenancePlanInventoryViewSet,
     TechViewSet,
 )
 from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView, WikiQueryViewSet, WikiQueryLanguageViewSet
@@ -51,6 +52,7 @@ router.register(
     basename="custom-field-definition",
 )
 router.register(r"maintenance-plans", MaintenancePlanViewSet, basename="maintenance-plan")
+router.register(r"maintenance-plan-inventories", MaintenancePlanInventoryViewSet, basename="maintenance-plan-inventory")
 router.register(r"maintenance-events", MaintenanceEventViewSet, basename="maintenance-event")
 router.register(
     r"maintenance-notifications",
