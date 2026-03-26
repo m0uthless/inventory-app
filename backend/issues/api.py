@@ -114,6 +114,13 @@ class IssueSerializer(serializers.ModelSerializer):
             return current_closed_at or timezone.localdate()
         return None
 
+    def _auto_close_at(self, closed_at):
+        """Restituisce la data di auto-chiusura: 48h (2 giorni) dopo closed_at."""
+        if closed_at is None:
+            return None
+        import datetime
+        return closed_at + datetime.timedelta(hours=48)
+
     def create(self, validated_data):
         status_value = validated_data.get("status", IssueStatus.OPEN)
         validated_data["closed_at"] = self._sync_closed_at(status_value)
@@ -125,6 +132,18 @@ class IssueSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def validate(self, attrs):
+        # ── Blocca qualsiasi modifica a issue già chiuse ──────────────────────
+        if self.instance is not None and self.instance.status == IssueStatus.CLOSED:
+            raise serializers.ValidationError(
+                "Questa issue è chiusa e non può essere modificata."
+            )
+
+        # ── Blocca l'impostazione manuale dello stato 'closed' ────────────────
+        if attrs.get("status") == IssueStatus.CLOSED:
+            raise serializers.ValidationError(
+                {"status": "Lo stato «Chiusa» viene impostato automaticamente dal sistema."}
+            )
+
         customer  = attrs.get("customer")  if "customer"  in attrs else getattr(self.instance, "customer",  None)
         site      = attrs.get("site")      if "site"      in attrs else getattr(self.instance, "site",      None)
         inventory = attrs.get("inventory") if "inventory" in attrs else getattr(self.instance, "inventory", None)
@@ -360,6 +379,32 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         counts["chart_buckets"] = [
             {"date": b["period"].isoformat() if b["period"] else None, "count": b["count"]}
             for b in buckets_qs
+        ]
+
+        # Bucket issue chiuse/risolte — usa closed_at come data pivot
+        if granularity == "week":
+            closed_trunc = TruncWeek("closed_at", output_field=dj_fields.DateField())
+        elif granularity == "month":
+            closed_trunc = TruncMonth("closed_at", output_field=dj_fields.DateField())
+        else:
+            closed_trunc = TruncDate("closed_at")
+
+        closed_qs = (
+            Issue.objects
+            .filter(
+                deleted_at__isnull=True,
+                status__in=(IssueStatus.RESOLVED, IssueStatus.CLOSED),
+                closed_at__isnull=False,
+                closed_at__gte=cutoff,
+            )
+            .annotate(period=closed_trunc)
+            .values("period")
+            .annotate(count=Count("id"))
+            .order_by("period")
+        )
+        counts["closed_buckets"] = [
+            {"date": b["period"].isoformat() if b["period"] else None, "count": b["count"]}
+            for b in closed_qs
         ]
 
         return Response(counts)

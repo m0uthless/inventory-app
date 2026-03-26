@@ -37,10 +37,6 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import FolderIcon from '@mui/icons-material/FolderOutlined'
 import DashboardIcon from '@mui/icons-material/DashboardOutlined'
 import LayersIcon from '@mui/icons-material/Layers'
-import PeopleIcon from '@mui/icons-material/People'
-import BusinessIcon from '@mui/icons-material/Business'
-import ContactsIcon from '@mui/icons-material/Contacts'
-import Inventory2Icon from '@mui/icons-material/Inventory2'
 import HistoryIcon from '@mui/icons-material/HistoryOutlined'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import HandymanIcon from '@mui/icons-material/HandymanOutlined'
@@ -62,8 +58,8 @@ import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import LockScreen from '../ui/LockScreen'
 
-const ProfileDialog = React.lazy(() =>
-  import('../pages/Profile').then((m) => ({ default: m.ProfileDialog })),
+const ProfileDrawer = React.lazy(() =>
+  import('../pages/Profile').then((m) => ({ default: m.ProfileDrawer })),
 )
 
 const drawerWidth = 208
@@ -81,12 +77,6 @@ type NavItem = {
   wip?: boolean
 }
 
-const SITE_REPOSITORY_CHILDREN: NavItem[] = [
-  { label: 'Inventari', path: '/inventory', icon: <Inventory2Icon />, perm: 'inventory.view_inventory' },
-  { label: 'Clienti', path: '/customers', icon: <PeopleIcon />, perm: 'crm.view_customer' },
-  { label: 'Siti', path: '/sites', icon: <BusinessIcon />, perm: 'crm.view_site' },
-  { label: 'Contatti', path: '/contacts', icon: <ContactsIcon />, perm: 'crm.view_contact' },
-]
 
 const MAINTENANCE_CHILDREN: NavItem[] = [
   { label: 'Scadenze', path: '/maintenance', icon: <HandymanIcon />, permAny: ['maintenance.view_maintenanceplan'] },
@@ -358,10 +348,7 @@ export function AppLayout() {
 
   const visibleNav = React.useMemo(() => NAV.filter(canAccessNavItem), [canAccessNavItem])
 
-  const visibleSiteRepositoryChildren = React.useMemo(
-    () => SITE_REPOSITORY_CHILDREN.filter(canAccessNavItem),
-    [canAccessNavItem],
-  )
+
   const visibleWikiChildren = React.useMemo(
     () => WIKI_CHILDREN.filter(canAccessNavItem),
     [canAccessNavItem],
@@ -416,20 +403,7 @@ export function AppLayout() {
     }
   }, [loc.pathname, hasPerm])
 
-  const siteRepositorySectionActive = React.useMemo(
-    () =>
-      ['/site-repository', '/inventory', '/customers', '/sites', '/contacts'].some((path) =>
-        isSelected(loc.pathname, path),
-      ),
-    [loc.pathname],
-  )
 
-  const [siteRepositoryOpen, setSiteRepositoryOpen] = React.useState(() => {
-    const v = localStorage.getItem('site_repository_nav_open')
-    return v ? v === '1' : true
-  })
-  const [siteRepositoryFlyoutAnchor, setSiteRepositoryFlyoutAnchor] = React.useState<null | HTMLElement>(null)
-  const siteRepositoryFlyoutOpen = Boolean(siteRepositoryFlyoutAnchor)
   const wikiSectionActive = React.useMemo(
     () => ['/wiki', '/wiki/stats', '/wiki/queries'].some((path) => isSelected(loc.pathname, path)),
     [loc.pathname],
@@ -462,9 +436,6 @@ export function AppLayout() {
   const [maintenanceFlyoutAnchor, setMaintenanceFlyoutAnchor] = React.useState<null | HTMLElement>(null)
   const maintenanceFlyoutOpen = Boolean(maintenanceFlyoutAnchor)
 
-  React.useEffect(() => {
-    localStorage.setItem('site_repository_nav_open', siteRepositoryOpen ? '1' : '0')
-  }, [siteRepositoryOpen])
 
   React.useEffect(() => {
     localStorage.setItem('wiki_nav_open', wikiOpen ? '1' : '0')
@@ -478,11 +449,6 @@ export function AppLayout() {
     localStorage.setItem('maintenance_nav_open', maintenanceOpen ? '1' : '0')
   }, [maintenanceOpen])
 
-  React.useEffect(() => {
-    if (siteRepositorySectionActive) {
-      setSiteRepositoryOpen(true)
-    }
-  }, [siteRepositorySectionActive])
 
   React.useEffect(() => {
     if (wikiSectionActive) {
@@ -503,15 +469,11 @@ export function AppLayout() {
   }, [maintenanceSectionActive])
 
   React.useEffect(() => {
-    setSiteRepositoryFlyoutAnchor(null)
     setWikiFlyoutAnchor(null)
     setBugFeatureFlyoutAnchor(null)
     setMaintenanceFlyoutAnchor(null)
 
     // Chiudi automaticamente i gruppi che non contengono la rotta corrente.
-    // Questo evita che più gruppi rimangano aperti contemporaneamente
-    // quando l'utente naviga verso una sezione esterna al gruppo.
-    if (!siteRepositorySectionActive) setSiteRepositoryOpen(false)
     if (!wikiSectionActive)           setWikiOpen(false)
     if (!bugFeatureSectionActive)     setBugFeatureOpen(false)
     if (!maintenanceSectionActive)    setMaintenanceOpen(false)
@@ -519,7 +481,6 @@ export function AppLayout() {
 
   React.useEffect(() => {
     if (!mini) {
-      setSiteRepositoryFlyoutAnchor(null)
       setWikiFlyoutAnchor(null)
       setBugFeatureFlyoutAnchor(null)
     }
@@ -874,24 +835,29 @@ export function AppLayout() {
                 )
               }
 
-              const children = isSiteRepositoryGroup
-                ? visibleSiteRepositoryChildren
-                : isWikiGroup
+              // Site Repository è ora un link diretto (senza sotto-elementi)
+              if (isSiteRepositoryGroup) {
+                return (
+                  <React.Fragment key={it.path}>
+                    {renderNavItem(it, isMini)}
+                  </React.Fragment>
+                )
+              }
+
+              const children = isWikiGroup
                   ? visibleWikiChildren
                   : isMaintenanceGroup
                     ? visibleMaintenanceChildren
                     : visibleBugFeatureChildren
-              const parentSelected = isSiteRepositoryGroup
-                ? siteRepositorySectionActive
-                : isWikiGroup
+              const parentSelected = isWikiGroup
                   ? wikiSectionActive
                   : isMaintenanceGroup
                     ? maintenanceSectionActive
                     : bugFeatureSectionActive
-              const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : isMaintenanceGroup ? maintenanceOpen : bugFeatureOpen
-              const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : isMaintenanceGroup ? setMaintenanceOpen : setBugFeatureOpen
-              const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : isMaintenanceGroup ? setMaintenanceFlyoutAnchor : setBugFeatureFlyoutAnchor
-              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Knowledge' : isMaintenanceGroup ? 'Manutenzione' : 'Bug / Feature'
+              const groupOpen = isWikiGroup ? wikiOpen : isMaintenanceGroup ? maintenanceOpen : bugFeatureOpen
+              const setGroupOpen = isWikiGroup ? setWikiOpen : isMaintenanceGroup ? setMaintenanceOpen : setBugFeatureOpen
+              const setFlyoutAnchor = isWikiGroup ? setWikiFlyoutAnchor : isMaintenanceGroup ? setMaintenanceFlyoutAnchor : setBugFeatureFlyoutAnchor
+              const flyoutLabel = isWikiGroup ? 'Knowledge' : isMaintenanceGroup ? 'Manutenzione' : 'Bug / Feature'
               const canExpand = !isMini && children.length > 0
 
               return (
@@ -1133,70 +1099,6 @@ export function AppLayout() {
           </Box>
         </Toolbar>
       </AppBar>
-
-      <Popover
-        open={siteRepositoryFlyoutOpen}
-        anchorEl={siteRepositoryFlyoutAnchor}
-        onClose={() => setSiteRepositoryFlyoutAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        PaperProps={{
-          sx: {
-            ml: 1,
-            mt: -0.25,
-            minWidth: 248,
-            borderRadius: 1,
-            overflow: 'hidden',
-            background: SIDEBAR.bgGradient,
-            color: '#ffffff',
-            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-            border: '1px solid rgba(94,234,212,0.12)',
-          },
-        }}
-      >
-        <Box sx={{ px: 1.25, py: 1 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              px: 1,
-              pb: 0.75,
-              color: SIDEBAR.textMuted,
-              letterSpacing: '0.16em',
-              fontWeight: 800,
-            }}
-          >
-            SITE REPOSITORY
-          </Typography>
-
-          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-            {renderNavItem(
-              { label: 'Panoramica', path: '/site-repository', icon: <LayersIcon /> },
-              false,
-              {
-                nested: true,
-                selected: isSelected(loc.pathname, '/site-repository'),
-                onClick: () => {
-                  setSiteRepositoryFlyoutAnchor(null)
-                  nav('/site-repository')
-                },
-              },
-            )}
-
-            {visibleSiteRepositoryChildren.map((child) => (
-              <React.Fragment key={`flyout-${child.path}`}>
-                {renderNavItem(child, false, {
-                  nested: true,
-                  onClick: () => {
-                    setSiteRepositoryFlyoutAnchor(null)
-                    nav(child.path)
-                  },
-                })}
-              </React.Fragment>
-            ))}
-          </List>
-        </Box>
-      </Popover>
 
       <Popover
         open={wikiFlyoutOpen}
@@ -1676,7 +1578,7 @@ export function AppLayout() {
         </Fade>
       </Backdrop>
       <React.Suspense fallback={null}>
-        <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
+        <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
       </React.Suspense>
     </Box>
   )

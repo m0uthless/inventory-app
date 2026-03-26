@@ -97,6 +97,28 @@ services:
       retries: 10
       start_period: 10s
 
+  cron:
+    build: ./backend
+    restart: unless-stopped
+    entrypoint: []
+    command: >
+      sh -c "
+        echo '[cron] Avvio scheduler close_resolved_issues (ogni ora)' &&
+        while true; do
+          python manage.py close_resolved_issues;
+          sleep 3600;
+        done
+      "
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - datafiles:/app/data
+      - media:/app/media
+
 volumes:
   caddy_data:
   caddy_config:

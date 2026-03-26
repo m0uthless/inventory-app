@@ -70,6 +70,8 @@ export default function IssueDialog({
   onCustomerInputChange,
   onFormChange,
 }: IssueDialogProps) {
+  const isClosed = editIssue?.status === 'closed'
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ pb: 1 }}>
@@ -81,7 +83,19 @@ export default function IssueDialog({
         ) : null}
       </DialogTitle>
       <DialogContent dividers>
-        <Stack spacing={2} sx={{ pt: 0.5 }}>
+        {isClosed && (
+          <Alert severity="warning" icon={false} sx={{ mb: 2 }}>
+            Questa issue è <strong>chiusa</strong> e non può essere modificata. Lo stato
+            «Chiusa» viene impostato automaticamente 48 ore dopo la risoluzione.
+          </Alert>
+        )}
+        <Stack
+          spacing={2}
+          sx={{
+            pt: 0.5,
+            ...(isClosed ? { opacity: 0.55, pointerEvents: 'none', userSelect: 'none' } : {}),
+          }}
+        >
           <TextField
             label="Titolo *"
             size="small"
@@ -163,11 +177,13 @@ export default function IssueDialog({
                 label="Stato"
                 onChange={(e) => onFormChange((f) => ({ ...f, status: e.target.value }))}
               >
-                {Object.entries(STATUS_META).map(([key, value]) => (
-                  <MenuItem key={key} value={key}>
-                    {value.label}
-                  </MenuItem>
-                ))}
+                {Object.entries(STATUS_META)
+                  .filter(([key]) => key !== 'closed')
+                  .map(([key, value]) => (
+                    <MenuItem key={key} value={key}>
+                      {value.label}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
           </Stack>
@@ -270,7 +286,7 @@ export default function IssueDialog({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        {editIssue ? (
+        {editIssue && !isClosed ? (
           <Button variant="outlined" onClick={onOpenLinkInventory} disabled={saving}>
             Collega a inventory
           </Button>
@@ -278,10 +294,12 @@ export default function IssueDialog({
         <Button variant="text" onClick={onClose} disabled={saving}>
           {editIssue ? 'Chiudi' : 'Annulla'}
         </Button>
-        <Button variant="contained" onClick={onSave} disabled={saving} sx={{ minWidth: 140 }}>
-          {saving ? <CircularProgress size={16} sx={{ mr: 1, color: 'inherit' }} /> : null}
-          {editIssue ? 'Salva modifiche' : 'Crea issue'}
-        </Button>
+        {!isClosed ? (
+          <Button variant="contained" onClick={onSave} disabled={saving} sx={{ minWidth: 140 }}>
+            {saving ? <CircularProgress size={16} sx={{ mr: 1, color: 'inherit' }} /> : null}
+            {editIssue ? 'Salva modifiche' : 'Crea issue'}
+          </Button>
+        ) : null}
       </DialogActions>
     </Dialog>
   )

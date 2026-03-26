@@ -11,7 +11,6 @@ import {
   CircularProgress,
   FormControl,
   FormControlLabel,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -30,6 +29,10 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import LinkIcon from '@mui/icons-material/Link'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 
 import type { GridColDef } from '@mui/x-data-grid'
 
@@ -197,38 +200,50 @@ function IssueStatusChip({ status }: { status: string }) {
 
 type Granularity = 'day' | 'week' | 'month'
 
-// Riempie i buchi del calendario (periodi senza issue → count 0) e formatta le label
+// Riempie i buchi del calendario e fonde due serie (aperte + risolte/chiuse)
 function fillChartBuckets(
-  buckets: { date: string; count: number }[],
+  openedBuckets: { date: string; count: number }[],
+  closedBuckets: { date: string; count: number }[],
   granularity: Granularity,
-): { label: string; count: number }[] {
+): { label: string; opened: number; closed: number }[] {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const slots: { key: string; label: string; count: number }[] = []
+
+  // Usa date locali (evita lo sfasamento UTC di toISOString con fuso +X)
+  const localISO = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const slots: { key: string; label: string; opened: number; closed: number }[] = []
 
   if (granularity === 'day') {
     for (let i = 29; i >= 0; i--) {
       const d = new Date(today); d.setDate(d.getDate() - i)
-      slots.push({ key: d.toISOString().slice(0, 10), label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
+      slots.push({ key: localISO(d), label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), opened: 0, closed: 0 })
     }
   } else if (granularity === 'week') {
+    const monday = new Date(today)
+    const dow = today.getDay()
+    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(today); d.setDate(d.getDate() - i * 7)
-      const ws = new Date(d); ws.setDate(d.getDate() - d.getDay() + 1)
-      slots.push({ key: ws.toISOString().slice(0, 10), label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), count: 0 })
+      const ws = new Date(monday)
+      ws.setDate(monday.getDate() - i * 7)
+      slots.push({ key: localISO(ws), label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), opened: 0, closed: 0 })
     }
   } else {
     for (let i = 11; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      slots.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), count: 0 })
+      slots.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), opened: 0, closed: 0 })
     }
   }
 
   const byKey = Object.fromEntries(slots.map((s) => [s.key, s]))
-  for (const b of buckets) {
-    // Backend restituisce date ISO — allinea alla chiave giusta
+  for (const b of openedBuckets) {
     const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
-    if (byKey[k]) byKey[k].count = b.count
+    if (byKey[k]) byKey[k].opened = b.count
+  }
+  for (const b of closedBuckets) {
+    const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
+    if (byKey[k]) byKey[k].closed = b.count
   }
   return slots
 }
@@ -237,18 +252,24 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
   const theme = useTheme()
   const [granularity, setGranularity] = React.useState<Granularity>('day')
   const [avgDaysGlobal, setAvgDaysGlobal] = React.useState<number | null>(null)
-  const [chartData, setChartData] = React.useState<{ label: string; count: number }[]>([])
+  const [chartData, setChartData] = React.useState<{ label: string; opened: number; closed: number }[]>([])
 
   // Carica dati globali (avg + grafico) ad ogni cambio di granularità
   React.useEffect(() => {
-    api.get<{ avg_days_to_close: number | null; chart_buckets: { date: string; count: number }[] }>(
+    api.get<{
+      avg_days_to_close: number | null
+      chart_buckets: { date: string; count: number }[]
+      closed_buckets: { date: string; count: number }[]
+    }>(
       '/issues/summary/',
       { params: { granularity } },
     ).then((r) => {
       setAvgDaysGlobal(r.data.avg_days_to_close ?? null)
-      const buckets = r.data.chart_buckets ?? []
-      // Riempi i buchi del calendario con 0 e formatta le etichette
-      setChartData(fillChartBuckets(buckets, granularity))
+      setChartData(fillChartBuckets(
+        r.data.chart_buckets ?? [],
+        r.data.closed_buckets ?? [],
+        granularity,
+      ))
     }).catch(() => {})
   }, [granularity])
 
@@ -318,10 +339,22 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
       </Box>
 
       <Box sx={cardSx}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '12px' }}>
-          <Typography sx={{ fontSize: '11px', fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: 'text.disabled' }}>
-            Andamento issue aperte
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '8px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: 'text.disabled' }}>
+              Andamento issue
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#E24B4A', flexShrink: 0 }} />
+                <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>Aperte</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#16a34a', flexShrink: 0 }} />
+                <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>Risolte/Chiuse</Typography>
+              </Box>
+            </Box>
+          </Box>
           <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: 1, p: '2px', gap: '2px' }}>
             {granularityOptions.map((o) => (
               <Box
@@ -347,26 +380,39 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
   )
 }
 
-function IssueAreaChart({ data, granularity }: { data: { label: string; count: number }[]; granularity: Granularity }) {
+function IssueAreaChart({ data, granularity }: { data: { label: string; opened: number; closed: number }[]; granularity: Granularity }) {
   const interval = granularity === 'day' ? 6 : 2
   return (
     <ResponsiveContainer width="100%" height={148}>
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
         <defs>
-          <linearGradient id="issueAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="issueAreaGradOpened" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%"  stopColor="#E24B4A" stopOpacity={0.25} />
             <stop offset="95%" stopColor="#E24B4A" stopOpacity={0.03} />
+          </linearGradient>
+          <linearGradient id="issueAreaGradClosed" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.22} />
+            <stop offset="95%" stopColor="#16a34a" stopOpacity={0.03} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
         <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#888' }} tickLine={false} axisLine={false} interval={interval} />
         <YAxis tick={{ fontSize: 10, fill: '#888' }} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
         <RechartsTooltip
-          wrapperStyle={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 8, fontSize: 12, padding: '6px 10px' }}
-          formatter={(value: number) => [value, 'Issue aperte'] as [number, string]}
+          wrapperStyle={{ outline: 'none' }}
+          contentStyle={{
+            background: '#fff',
+            border: '0.5px solid rgba(0,0,0,0.12)',
+            borderRadius: 8,
+            fontSize: 12,
+            padding: '6px 10px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          }}
+          formatter={(value: number, name: string) => [value, name === 'opened' ? 'Aperte' : 'Risolte/Chiuse'] as [number, string]}
           labelStyle={{ color: '#888', marginBottom: 2 }}
         />
-        <Area type="monotone" dataKey="count" stroke="#E24B4A" strokeWidth={2} fill="url(#issueAreaGrad)" dot={false} activeDot={{ r: 4, fill: '#E24B4A', strokeWidth: 0 }} />
+        <Area type="monotone" dataKey="opened" stroke="#E24B4A" strokeWidth={2} fill="url(#issueAreaGradOpened)" dot={false} activeDot={{ r: 4, fill: '#E24B4A', strokeWidth: 0 }} />
+        <Area type="monotone" dataKey="closed" stroke="#16a34a" strokeWidth={2} fill="url(#issueAreaGradClosed)" dot={false} activeDot={{ r: 4, fill: '#16a34a', strokeWidth: 0 }} />
       </AreaChart>
     </ResponsiveContainer>
   )
@@ -919,7 +965,91 @@ export default function Issues() {
     }
   }
 
-  // ── Columns ───────────────────────────────────────────────────────────────
+  // ── Context menu ──────────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = React.useState<{
+    row: IssueRow
+    mouseX: number
+    mouseY: number
+  } | null>(null)
+
+  const handleRowContextMenu = React.useCallback(
+    (row: IssueRow, event: React.MouseEvent<HTMLElement>) => {
+      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
+    },
+    [],
+  )
+
+  const handleResolveIssue = React.useCallback(
+    async (row: IssueRow) => {
+      try {
+        const r = await api.patch<IssueRow>(`/issues/${row.id}/`, { status: 'resolved' })
+        syncIssueState(r.data)
+        reload()
+        toast.success('Issue segnata come risolta.')
+      } catch (e) {
+        toast.error(apiErrorToMessage(e))
+      }
+    },
+    [syncIssueState, reload, toast],
+  )
+
+  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
+    const row = contextMenu?.row
+    if (!row) return []
+
+    const isClosed = row.status === 'closed'
+    const isResolved = row.status === 'resolved'
+
+    return [
+      {
+        key: 'open',
+        label: 'Apri dettaglio',
+        icon: <VisibilityOutlinedIcon fontSize="small" />,
+        onClick: () => openDetail(row, 0),
+      },
+      {
+        key: 'edit',
+        label: 'Modifica',
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => openEdit(row),
+        disabled: isClosed,
+      },
+      {
+        key: 'resolve',
+        label: 'Segna come risolta',
+        icon: <CheckCircleOutlineIcon fontSize="small" />,
+        onClick: () => handleResolveIssue(row),
+        hidden: isResolved || isClosed,
+      },
+      {
+        key: 'comment',
+        label: 'Aggiungi commento',
+        icon: <ChatBubbleOutlineIcon fontSize="small" />,
+        onClick: () => openDetail(row, 1),
+      },
+      {
+        key: 'link_inventory',
+        label: 'Collega a inventory',
+        icon: <LinkIcon fontSize="small" />,
+        onClick: () => {
+          openEdit(row)
+          // apriamo il picker dopo che il form è montato
+          window.setTimeout(() => openLinkInventoryPicker(), 120)
+        },
+        disabled: isClosed,
+      },
+      {
+        key: 'delete',
+        label: 'Elimina',
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        onClick: () => setDeleteTarget(row),
+        tone: 'danger',
+        disabled: isClosed,
+      },
+    ]
+  }, [contextMenu, handleResolveIssue, openEdit, openDetail, openLinkInventoryPicker])
+
+
   const emptyState = React.useMemo(() => {
     if (grid.view === 'deleted' && !grid.search.trim()) {
       return {
@@ -977,6 +1107,19 @@ export default function Issues() {
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           <IssueStatusChip status={row.status} />
+        </Box>
+      ),
+    },
+    {
+      field: 'id',
+      headerName: '#',
+      width: 72,
+      sortable: true,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'text.secondary', fontFamily: 'ui-monospace, monospace' }}>
+            #{row.id}
+          </Typography>
         </Box>
       ),
     },
@@ -1169,43 +1312,6 @@ export default function Issues() {
           </Box>
         )
       },
-    },
-    {
-      field: '_actions',
-      headerName: '',
-      width: 80,
-      sortable: false,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Stack direction="row" spacing={0.5} className="row-actions">
-            <Tooltip title="Modifica">
-              <IconButton
-                aria-label="Modifica"
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  openEdit(row)
-                }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Elimina">
-              <IconButton
-                aria-label="Elimina"
-                size="small"
-                color="error"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDeleteTarget(row)
-                }}
-              >
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Box>
-      ),
     },
   ]
 
@@ -1405,25 +1511,11 @@ export default function Issues() {
             const row = rows.find((r) => r.id === id)
             if (row) openDetail(row, 0)
           },
+          onRowContextMenu: handleRowContextMenu,
           sx: {
             cursor: 'pointer',
             '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
             '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .row-actions': {
-              opacity: 0,
-              pointerEvents: 'none',
-              transition: 'opacity 140ms ease',
-            },
-            '& .MuiDataGrid-row:hover .row-actions, & .MuiDataGrid-row:focus-within .row-actions': {
-              opacity: 1,
-              pointerEvents: 'auto',
-            },
-            '@media (hover: none), (pointer: coarse)': {
-              '& .row-actions': {
-                opacity: 1,
-                pointerEvents: 'auto',
-              },
-            },
           },
         }}
       >
@@ -1569,6 +1661,14 @@ export default function Issues() {
         onDetailTabChange={setDetailTab}
         onNewCommentChange={setNewComment}
         onSendComment={handleSendComment}
+      />
+
+      {/* ── Context menu ── */}
+      <RowContextMenu
+        open={Boolean(contextMenu)}
+        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
+        onClose={() => setContextMenu(null)}
+        items={contextMenuItems}
       />
 
       {/* ── Confirm delete ── */}

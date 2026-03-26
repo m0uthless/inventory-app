@@ -10,3 +10,7 @@ services:
   backend:
     env_file:
       - ./.env.dev
+
+  cron:
+    env_file:
+      - ./.env.dev
