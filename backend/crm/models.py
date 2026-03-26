@@ -117,6 +117,9 @@ class Contact(TimeStampedModel):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
 
+    def __str__(self) -> str:
+        return self.name or f"Contact #{self.pk}"
+
     class Meta:
         indexes = [
             models.Index(fields=["deleted_at"], name="contact_deleted_at_idx"),

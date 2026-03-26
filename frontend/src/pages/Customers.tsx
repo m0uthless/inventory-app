@@ -6,7 +6,6 @@ import {
   CircularProgress,
   Drawer,
   FormControl,
-  FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
@@ -15,10 +14,6 @@ import {
   TextField,
   Tooltip,
   Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Tabs,
   Tab,
   List,
@@ -45,6 +40,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { api } from '../api/client'
 import { buildDrfListParams, includeDeletedParams } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
+import { useCustomerKpis } from '../hooks/useCustomerKpis'
 import type { SelectChangeEvent } from '@mui/material/Select'
 import { useToast } from '../ui/toast'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '../api/error'
@@ -65,12 +61,12 @@ import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
 import StatusChip from '../ui/StatusChip'
-import CustomFieldsEditor from '../ui/CustomFieldsEditor'
 import LeafletMap from '../ui/LeafletMap'
 import FilterChip from '../ui/FilterChip'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 import VpnModal from '../features/customers/VpnModal'
+import CustomerDialog from '../features/customers/CustomerDialog'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 
 type LookupItem = { id: number; label: string; key?: string }
@@ -300,7 +296,7 @@ function CustomerInventoriesTab(props: {
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Clienti
+            Inventari
           </Typography>
           <Chip size="small" label={rowCount} />
         </Stack>
@@ -398,7 +394,18 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([
+    const coerce = (v: unknown, kind: DriveMini['kind']): DriveMini | null => {
+      if (!isRecord(v)) return null
+      const id = Number(v['id'])
+      if (!Number.isFinite(id)) return null
+      const name = typeof v['name'] === 'string' ? v['name'] : `#${id}`
+      const updated_at = typeof v['updated_at'] === 'string' ? v['updated_at'] : ''
+      const mime_type = typeof v['mime_type'] === 'string' ? v['mime_type'] : undefined
+      const size_human = typeof v['size_human'] === 'string' ? v['size_human'] : undefined
+      return { id, name, updated_at, mime_type, size_human, kind }
+    }
+
+    Promise.allSettled([
       api.get('/drive-folders/', {
         params: { customer: customerId, page_size: 15, ordering: 'name' },
       }),
@@ -406,21 +413,13 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
         params: { customer: customerId, page_size: 15, ordering: 'name' },
       }),
     ])
-      .then(([fRes, fiRes]) => {
+      .then(([fSettled, fiSettled]) => {
         if (cancelled) return
 
-        const coerce = (v: unknown, kind: DriveMini['kind']): DriveMini | null => {
-          if (!isRecord(v)) return null
-          const id = Number(v['id'])
-          if (!Number.isFinite(id)) return null
-          const name = typeof v['name'] === 'string' ? v['name'] : `#${id}`
-          const updated_at = typeof v['updated_at'] === 'string' ? v['updated_at'] : ''
-          const mime_type = typeof v['mime_type'] === 'string' ? v['mime_type'] : undefined
-          const size_human = typeof v['size_human'] === 'string' ? v['size_human'] : undefined
-          return { id, name, updated_at, mime_type, size_human, kind }
-        }
-        const foldersU: unknown = (fRes as unknown as { data: unknown }).data
-        const filesU: unknown = (fiRes as unknown as { data: unknown }).data
+        const foldersU: unknown =
+          fSettled.status === 'fulfilled' ? (fSettled.value as { data: unknown }).data : null
+        const filesU: unknown =
+          fiSettled.status === 'fulfilled' ? (fiSettled.value as { data: unknown }).data : null
 
         const folderList: unknown[] =
           isRecord(foldersU) && Array.isArray(foldersU['results'])
@@ -447,8 +446,14 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
 
         setItems([...folders, ...files])
         setTotal(folderCount + fileCount)
+
+        // Se almeno una delle due chiamate è fallita, mostra un toast
+        const errors = [fSettled, fiSettled].filter((r) => r.status === 'rejected')
+        if (errors.length) {
+          const first = (errors[0] as PromiseRejectedResult).reason
+          toast.error(apiErrorToMessage(first))
+        }
       })
-      .catch((e: unknown) => toast.error(apiErrorToMessage(e)))
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
@@ -539,10 +544,8 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
   )
 }
 
-// Module-level ref so the cols renderCell (outside the component) can call openVpnModal
-const vpnBadgeClickRef: React.MutableRefObject<((row: CustomerRow) => void) | null> = { current: null }
-
-const cols: GridColDef<CustomerRow>[] = [
+function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<CustomerRow>[] {
+  return [
   {
     field: 'display_name',
     headerName: 'Cliente',
@@ -558,7 +561,7 @@ const cols: GridColDef<CustomerRow>[] = [
             component="span"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation()
-              vpnBadgeClickRef.current?.(p.row)
+              onVpnClick(p.row)
             }}
             sx={{
               flexShrink: 0,
@@ -636,7 +639,8 @@ const cols: GridColDef<CustomerRow>[] = [
   { field: 'vat_number', headerName: 'P.IVA', width: 160 },
   { field: 'tax_code', headerName: 'Codice fiscale', width: 170 },
   // { field: "updated_at", headerName: "Aggiornato", width: 180 },
-]
+  ]
+}
 
 
 // prettier-ignore
@@ -739,31 +743,12 @@ export default function Customers() {
   const [detail, setDetail] = React.useState<CustomerDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
   const [drawerTab, setDrawerTab] = React.useState(0)
-  const [sitesCount, setSitesCount] = React.useState<number | null>(null)
-  const [invCount, setInvCount] = React.useState<number | null>(null)
-  const [driveCount, setDriveCount] = React.useState<number | null>(null)
-
-  // Fetch all KPI counts whenever detail changes (don't wait for tabs to render)
-  React.useEffect(() => {
-    if (!detail) return
-    let cancelled = false
-    Promise.all([
-      api.get('/sites/', { params: { customer: detail.id, page_size: 1 } }),
-      api.get('/inventories/', { params: { customer: detail.id, page_size: 1 } }),
-      api.get('/drive-files/', { params: { customer: detail.id, page_size: 1 } }),
-      api.get('/drive-folders/', { params: { customer: detail.id, page_size: 1 } }),
-    ])
-      .then(([sitesRes, invRes, filesRes, foldersRes]) => {
-        if (cancelled) return
-        setSitesCount(Number(sitesRes.data?.count ?? 0))
-        setInvCount(Number(invRes.data?.count ?? 0))
-        setDriveCount(Number(filesRes.data?.count ?? 0) + Number(foldersRes.data?.count ?? 0))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [detail])
+  const {
+    sitesCount,
+    invCount,
+    driveCount,
+    reset: resetKpis,
+  } = useCustomerKpis(detail?.id ?? null)
 
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
@@ -855,13 +840,11 @@ export default function Customers() {
       setSelectedId(id)
       setDrawerOpen(true)
       setDrawerTab(0)
-      setSitesCount(null)
-      setInvCount(null)
-      setDriveCount(null)
+      resetKpis()
       loadDetail(id)
       grid.setOpenId(id)
     },
-    [grid, loadDetail],
+    [grid, loadDetail, resetKpis],
   )
 
   // Azioni riga / menu contestuale
@@ -882,11 +865,6 @@ export default function Customers() {
     setVpnModalRow(row)
     setVpnModalOpen(true)
   }, [])
-
-  // Keep module-level ref in sync so the cols renderCell can call openVpnModal
-  React.useEffect(() => {
-    vpnBadgeClickRef.current = openVpnModal
-  }, [openVpnModal])
 
   const openEditFromRow = React.useCallback(
     (id: number) => {
@@ -1002,8 +980,8 @@ export default function Customers() {
   }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openVpnModal, restoreBusy, restoreFromRow])
 
   const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
-    return cols
-  }, [])
+    return buildColumns(openVpnModal)
+  }, [openVpnModal])
 
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
@@ -1015,6 +993,15 @@ export default function Customers() {
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
   }
+
+  // Resetta tutti i filtri in una sola scrittura URL (atomica) per evitare
+  // due setSp separati che potrebbero causare un frame di inconsistenza.
+  const resetFilters = React.useCallback(() => {
+    grid.syncUrl(
+      { status: '', city: '', search: '', page: 1, page_size: grid.paginationModel.pageSize, ordering: grid.ordering, view: '' },
+      { keepOpen: false },
+    )
+  }, [grid])
 
   const openCreateOnceRef = React.useRef(false)
 
@@ -1066,8 +1053,13 @@ export default function Customers() {
   openEditRef.current = openEdit
 
   const save = async () => {
-    if (form.status === '' || !String(form.name).trim()) {
-      toast.warning('Compila almeno Status e Name.')
+    // Validazione client-side: popola fieldErrors invece del toast generico
+    // così i campi si colorano di rosso esattamente come fanno gli errori backend.
+    const clientErrors: Record<string, string> = {}
+    if (form.status === '') clientErrors.status = 'Seleziona uno stato.'
+    if (!String(form.name).trim()) clientErrors.name = 'Il nome è obbligatorio.'
+    if (Object.keys(clientErrors).length) {
+      setFieldErrors(clientErrors)
       return
     }
 
@@ -1172,10 +1164,7 @@ export default function Customers() {
               <FilterChip
                         compact
                         activeCount={(statusId !== '' ? 1 : 0) + (city.trim() ? 1 : 0)}
-                        onReset={() => {
-                          setStatusId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                          setCity('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                        }}
+                        onReset={resetFilters}
                       >
                         <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
                           <InputLabel>Stato</InputLabel>
@@ -1212,7 +1201,7 @@ export default function Customers() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => grid.reset(['status', 'city'])}
+                    onClick={resetFilters}
                     sx={compactResetButtonSx}
                   >
                     <RestartAltIcon />
@@ -1765,7 +1754,6 @@ export default function Customers() {
                 customerId={detail.id}
                 includeDeleted={grid.includeDeleted}
                 onlyDeleted={grid.onlyDeleted}
-                onCount={setSitesCount}
               />
             )}
 
@@ -1775,7 +1763,6 @@ export default function Customers() {
                 customerId={detail.id}
                 includeDeleted={grid.includeDeleted}
                 onlyDeleted={grid.onlyDeleted}
-                onCount={setInvCount}
               />
             )}
 
@@ -1817,122 +1804,18 @@ export default function Customers() {
         onConfirm={doDelete}
       />
 
-      <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{dlgMode === 'create' ? 'Nuovo cliente' : 'Modifica cliente'}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
-              <InputLabel>Stato</InputLabel>
-              <Select
-                label="Stato"
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: asId(e.target.value) }))}
-              >
-                <MenuItem value="">Seleziona…</MenuItem>
-                {statuses.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              {fieldErrors.status ? <FormHelperText>{fieldErrors.status}</FormHelperText> : null}
-            </FormControl>
-
-            <TextField
-              size="small"
-              label="Nome"
-              value={form.name}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, name: e.target.value }))
-                setFieldErrors((er) => {
-                  const n = { ...er }
-                  delete n.name
-                  return n
-                })
-              }}
-              error={Boolean(fieldErrors.name)}
-              helperText={fieldErrors.name || ' '}
-              fullWidth
-            />
-            <TextField
-              size="small"
-              label="Nome visualizzato"
-              value={form.display_name}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, display_name: e.target.value }))
-                setFieldErrors((er) => {
-                  const n = { ...er }
-                  delete n.display_name
-                  return n
-                })
-              }}
-              error={Boolean(fieldErrors.display_name)}
-              helperText={fieldErrors.display_name || 'Se vuoto, verrà usato Nome.'}
-              fullWidth
-            />
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="P.IVA"
-                value={form.vat_number}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, vat_number: e.target.value }))
-                  setFieldErrors((er) => {
-                    const n = { ...er }
-                    delete n.vat_number
-                    return n
-                  })
-                }}
-                error={Boolean(fieldErrors.vat_number)}
-                helperText={fieldErrors.vat_number || ' '}
-                fullWidth
-              />
-              <TextField
-                size="small"
-                label="Codice fiscale"
-                value={form.tax_code}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, tax_code: e.target.value }))
-                  setFieldErrors((er) => {
-                    const n = { ...er }
-                    delete n.tax_code
-                    return n
-                  })
-                }}
-                error={Boolean(fieldErrors.tax_code)}
-                helperText={fieldErrors.tax_code || ' '}
-                fullWidth
-              />
-            </Stack>
-
-            <CustomFieldsEditor
-              entity="customer"
-              value={form.custom_fields}
-              onChange={(v) => setForm((f) => ({ ...f, custom_fields: v }))}
-              mode="accordion"
-            />
-
-            <TextField
-              size="small"
-              label="Note"
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              fullWidth
-              multiline
-              minRows={4}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDlgOpen(false)} disabled={dlgSaving}>
-            Annulla
-          </Button>
-          <Button variant="contained" onClick={save} disabled={dlgSaving}>
-            {dlgSaving ? 'Salvataggio…' : 'Salva'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CustomerDialog
+        open={dlgOpen}
+        mode={dlgMode}
+        saving={dlgSaving}
+        errors={fieldErrors}
+        statuses={statuses}
+        form={form}
+        onClose={() => setDlgOpen(false)}
+        onSave={save}
+        onFormChange={setForm}
+        onFieldErrorsChange={setFieldErrors}
+      />
     </Stack>
   )
 }

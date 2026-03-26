@@ -16,10 +16,12 @@ import {
 import { alpha, useTheme } from '@mui/material/styles'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
-import Contacts from './Contacts'
-import Customers from './Customers'
-import Inventory from './Inventory'
-import Sites from './Sites'
+import { ErrorBoundary } from '../ui/ErrorBoundary'
+
+const Contacts  = React.lazy(() => import('./Contacts'))
+const Customers = React.lazy(() => import('./Customers'))
+const Inventory = React.lazy(() => import('./Inventory'))
+const Sites     = React.lazy(() => import('./Sites'))
 
 type SectionKey = 'customers' | 'inventory' | 'sites' | 'contacts'
 
@@ -423,7 +425,17 @@ export default function SiteRepository() {
       </Box>
 
       <Box sx={{ minHeight: 320 }}>
-        {activeSection ? <SectionView key={activeSection} section={activeSection} /> : null}
+        {activeSection ? (
+          <ErrorBoundary>
+            <React.Suspense fallback={
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                <CircularProgress />
+              </Box>
+            }>
+              <SectionView key={activeSection} section={activeSection} />
+            </React.Suspense>
+          </ErrorBoundary>
+        ) : null}
       </Box>
     </Stack>
   )

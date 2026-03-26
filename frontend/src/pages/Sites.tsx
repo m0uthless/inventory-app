@@ -6,19 +6,13 @@ import {
   CircularProgress,
   Drawer,
   FormControl,
-  FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  TextField,
   Tooltip,
   Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Tabs,
   Tab,
   LinearProgress,
@@ -49,6 +43,9 @@ import { api } from '../api/client'
 import { buildDrfListParams, includeDeletedParams } from '../api/drf'
 import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
+import { useDrawerKpis } from '../hooks/useDrawerKpis'
+import SiteDialog from '../features/sites/SiteDialog'
+import type { KpiSpec } from '../hooks/useDrawerKpis'
 import { useToast } from '../ui/toast'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
@@ -65,7 +62,6 @@ import FilterChip from '../ui/FilterChip'
 import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
 import { useExportCsv } from '../ui/useExportCsv'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import CustomFieldsEditor from '../ui/CustomFieldsEditor'
 import LeafletMap from '../ui/LeafletMap'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 
@@ -474,6 +470,11 @@ const cols: GridColDef<SiteRow>[] = [
 ]
 
 
+const SITE_KPI_SPECS: KpiSpec[] = [
+  { key: 'inv',     path: '/inventories/', filterParam: 'site' },
+  { key: 'contact', path: '/contacts/',    filterParam: 'site' },
+]
+
 export default function Sites() {
   const { me } = useAuth()
   const toast = useToast()
@@ -575,35 +576,16 @@ export default function Sites() {
   const [detail, setDetail] = React.useState<SiteDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
   const [drawerTab, setDrawerTab] = React.useState(0)
-  const [invCount, setInvCount] = React.useState<number | null>(null)
-  const [contactCount, setContactCount] = React.useState<number | null>(null)
+  const { inv: invCount, contact: contactCount, reset: resetKpis } = useDrawerKpis(
+    detail?.id ?? null,
+    SITE_KPI_SPECS,
+  )
 
   // Address for map
   const siteAddress = React.useMemo(() => {
     if (!detail) return null
     const parts = [detail.address_line1?.trim(), detail.city?.trim()].filter(Boolean)
     return parts.length ? parts.join(', ') : null
-  }, [detail])
-
-  // Fetch counts when detail loads
-  React.useEffect(() => {
-    if (!detail) return
-    let cancelled = false
-    setInvCount(null)
-    setContactCount(null)
-    Promise.all([
-      api.get('/inventories/', { params: { site: detail.id, page_size: 1 } }),
-      api.get('/contacts/', { params: { site: detail.id, page_size: 1 } }),
-    ])
-      .then(([invRes, ctRes]) => {
-        if (cancelled) return
-        setInvCount(Number(invRes.data?.count ?? 0))
-        setContactCount(Number(ctRes.data?.count ?? 0))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
   }, [detail])
 
   // delete/restore
@@ -679,11 +661,10 @@ export default function Sites() {
 
   const closeDrawer = React.useCallback(() => {
     setDrawerOpen(false)
-    setInvCount(null)
-    setContactCount(null)
+    resetKpis()
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
-  }, [grid, returnTo, navigate])
+  }, [grid, returnTo, navigate, resetKpis])
 
   const doDelete = React.useCallback(async () => {
     if (!selectedId) return
@@ -942,11 +923,15 @@ export default function Sites() {
   openEditRef.current = openEdit
 
   const save = async () => {
-    setDlgErrors({})
-    if (form.customer === '' || form.status === '' || !String(form.name).trim()) {
-      toast.warning('Compila almeno Cliente, Stato e Nome.')
+    const clientErrors: Record<string, string> = {}
+    if (form.customer === '') clientErrors.customer = 'Seleziona un cliente.'
+    if (form.status === '')   clientErrors.status   = 'Seleziona uno stato.'
+    if (!String(form.name).trim()) clientErrors.name = 'Il nome è obbligatorio.'
+    if (Object.keys(clientErrors).length) {
+      setDlgErrors(clientErrors)
       return
     }
+    setDlgErrors({})
 
     const payload: Record<string, unknown> = {
       customer: Number(form.customer),
@@ -1510,7 +1495,6 @@ export default function Sites() {
                     siteId={detail.id}
                     includeDeleted={grid.includeDeleted}
                     onlyDeleted={grid.onlyDeleted}
-                    onCount={setContactCount}
                   />
                 )}
 
@@ -1521,7 +1505,6 @@ export default function Sites() {
                     siteId={detail.id}
                     includeDeleted={grid.includeDeleted}
                     onlyDeleted={grid.onlyDeleted}
-                    onCount={setInvCount}
                   />
                 )}
               </>
@@ -1557,154 +1540,18 @@ export default function Sites() {
         onConfirm={doDelete}
       />
 
-      <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{dlgMode === 'create' ? 'Nuovo sito' : 'Modifica sito'}</DialogTitle>
-        <DialogContent>
-          {dlgErrors._error ? (
-            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-              {dlgErrors._error}
-            </Typography>
-          ) : null}
-          <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <FormControl size="small" fullWidth error={Boolean(dlgErrors.customer)}>
-              <InputLabel>Cliente</InputLabel>
-              <Select
-                label="Cliente"
-                value={form.customer}
-                onChange={(e) => setForm((f) => ({ ...f, customer: asId(e.target.value) }))}
-              >
-                <MenuItem value="">Seleziona…</MenuItem>
-                {customers.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                  </MenuItem>
-                ))}
-              </Select>
-              {dlgErrors.customer ? <FormHelperText>{dlgErrors.customer}</FormHelperText> : null}
-            </FormControl>
-
-            <FormControl size="small" fullWidth error={Boolean(dlgErrors.status)}>
-              <InputLabel>Stato</InputLabel>
-              <Select
-                label="Stato"
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: asId(e.target.value) }))}
-              >
-                <MenuItem value="">Seleziona…</MenuItem>
-                {statuses.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              {dlgErrors.status ? <FormHelperText>{dlgErrors.status}</FormHelperText> : null}
-            </FormControl>
-
-            <TextField
-              size="small"
-              label="Nome"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              error={Boolean(dlgErrors.name)}
-              helperText={dlgErrors.name || ''}
-              fullWidth
-            />
-            <TextField
-              size="small"
-              label="Nome visualizzato"
-              value={form.display_name}
-              onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-              error={Boolean(dlgErrors.display_name)}
-              helperText={dlgErrors.display_name || 'Se vuoto, verrà usato Nome.'}
-              fullWidth
-            />
-
-            <TextField
-              size="small"
-              label="Indirizzo"
-              value={form.address_line1}
-              onChange={(e) => setForm((f) => ({ ...f, address_line1: e.target.value }))}
-              error={Boolean(dlgErrors.address_line1)}
-              helperText={dlgErrors.address_line1 || ''}
-              fullWidth
-            />
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Città"
-                value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                error={Boolean(dlgErrors.city)}
-                helperText={dlgErrors.city || ''}
-                fullWidth
-              />
-              <TextField
-                size="small"
-                label="CAP"
-                value={form.postal_code}
-                onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))}
-                error={Boolean(dlgErrors.postal_code)}
-                helperText={dlgErrors.postal_code || ''}
-                fullWidth
-              />
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Provincia"
-                value={form.province}
-                onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))}
-                error={Boolean(dlgErrors.province)}
-                helperText={dlgErrors.province || ''}
-                fullWidth
-              />
-              <TextField
-                size="small"
-                label="Paese"
-                value={form.country}
-                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                error={Boolean(dlgErrors.country)}
-                helperText={dlgErrors.country || ''}
-                fullWidth
-              />
-            </Stack>
-
-            <CustomFieldsEditor
-              entity="site"
-              value={form.custom_fields}
-              onChange={(v) => setForm((f) => ({ ...f, custom_fields: v }))}
-              mode="accordion"
-            />
-            {dlgErrors.custom_fields ? (
-              <Typography variant="caption" color="error">
-                {dlgErrors.custom_fields}
-              </Typography>
-            ) : null}
-
-            <TextField
-              size="small"
-              label="Note"
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              error={Boolean(dlgErrors.notes)}
-              helperText={dlgErrors.notes || ''}
-              fullWidth
-              multiline
-              minRows={4}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDlgOpen(false)} disabled={dlgSaving}>
-            Annulla
-          </Button>
-          <Button variant="contained" onClick={save} disabled={dlgSaving}>
-            {dlgSaving ? 'Salvataggio…' : 'Salva'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <SiteDialog
+        open={dlgOpen}
+        mode={dlgMode}
+        saving={dlgSaving}
+        errors={dlgErrors}
+        form={form}
+        setForm={setForm}
+        customers={customers}
+        statuses={statuses}
+        onClose={() => setDlgOpen(false)}
+        onSave={save}
+      />
     </Stack>
   )
 }

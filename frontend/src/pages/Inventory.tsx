@@ -9,19 +9,12 @@ import {
   Stack,
   Tab,
   Tabs,
-  TextField,
   Tooltip,
   Typography,
   FormControl,
-  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  InputAdornment,
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -57,6 +50,7 @@ import { collectionActionPath, itemActionPath, itemPath, type CollectionPath } f
 import { buildDrfListParams, includeDeletedParams } from '../api/drf'
 import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
+import InventoryDialog from '../features/inventory/InventoryDialog'
 import { useToast } from '../ui/toast'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '../api/error'
 
@@ -65,7 +59,6 @@ import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
-import CustomFieldsEditor from '../ui/CustomFieldsEditor'
 import { getInventoryTypeIcon, INVENTORY_TYPE_ICON_COLOR } from '../ui/inventoryTypeIcon'
 import { compactCreateButtonSx, compactResetButtonSx, compactExportButtonSx } from '../ui/toolbarStyles'
 import AuditEventsTab from '../ui/AuditEventsTab'
@@ -436,49 +429,6 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
   )
 }
 
-function PasswordField(props: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  disabled?: boolean
-  helperText?: string
-}) {
-  const { label, value, onChange, disabled, helperText } = props
-  const [show, setShow] = React.useState(false)
-
-  return (
-    <TextField
-      size="small"
-      label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      fullWidth
-      disabled={disabled}
-      helperText={helperText}
-      type={show ? 'text' : 'password'}
-      InputProps={{
-        endAdornment: (
-          <InputAdornment position="end">
-            <Tooltip title={show ? 'Nascondi' : 'Mostra'}>
-              <IconButton
-                aria-label={show ? 'Nascondi' : 'Mostra'}
-                edge="end"
-                onClick={() => setShow((s) => !s)}
-                size="small"
-              >
-                {show ? (
-                  <VisibilityOffIcon fontSize="small" />
-                ) : (
-                  <VisibilityIcon fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
-          </InputAdornment>
-        ),
-      }}
-    />
-  )
-}
 
 const cols: GridColDef<InventoryRow>[] = [
   {
@@ -1117,10 +1067,7 @@ export default function Inventory() {
     if (form.status === '') errs.status = 'Obbligatorio'
     if (!String(form.name).trim()) errs.name = 'Obbligatorio'
     setFormErrors(errs)
-    if (Object.keys(errs).length) {
-      toast.warning('Compila i campi obbligatori.')
-      return
-    }
+    if (Object.keys(errs).length) return
 
     const payload: Record<string, unknown> = {
       customer: Number(form.customer),
@@ -2291,336 +2238,27 @@ export default function Inventory() {
         </Stack>
       </Drawer>
 
-      <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>
-          {dlgMode === 'create' ? 'Nuovo inventario' : 'Modifica inventario'}
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <FormControl size="small" fullWidth required error={Boolean(formErrors.customer)}>
-                <InputLabel required>Cliente</InputLabel>
-                <Select
-                  label="Cliente"
-                  value={form.customer}
-                  onChange={async (e) => {
-                    const v = asId(e.target.value)
-                    setForm((f) => ({ ...f, customer: v, site: '' }))
-                    setFormErrors((e) => ({ ...e, customer: undefined }))
-                    await loadSitesForDialogCustomer(v)
-                  }}
-                >
-                  <MenuItem value="">Seleziona…</MenuItem>
-                  {customers.map((c) => (
-                    <MenuItem key={c.id} value={c.id}>
-                      {c.code} — {c.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {formErrors.customer ? (
-                  <FormHelperText>{formErrors.customer}</FormHelperText>
-                ) : null}
-              </FormControl>
-
-              <FormControl size="small" fullWidth disabled={form.customer === ''}>
-                <InputLabel>Sito</InputLabel>
-                <Select
-                  label="Sito"
-                  value={form.site}
-                  onChange={(e) => setForm((f) => ({ ...f, site: asId(e.target.value) }))}
-                >
-                  <MenuItem value="">(nessuno)</MenuItem>
-                  {dlgSites.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      {s.display_name || s.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <FormControl size="small" fullWidth required error={Boolean(formErrors.status)}>
-                <InputLabel required>Stato</InputLabel>
-                <Select
-                  label="Stato"
-                  value={form.status}
-                  onChange={(e) => {
-                    const v = asId(e.target.value)
-                    setForm((f) => ({ ...f, status: v }))
-                    setFormErrors((er) => ({ ...er, status: undefined }))
-                  }}
-                >
-                  <MenuItem value="">Seleziona…</MenuItem>
-                  {statuses.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      {s.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {formErrors.status ? <FormHelperText>{formErrors.status}</FormHelperText> : null}
-              </FormControl>
-
-              <FormControl size="small" fullWidth>
-                <InputLabel>Tipo</InputLabel>
-                <Select
-                  label="Tipo"
-                  value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: asId(e.target.value) }))}
-                >
-                  <MenuItem value="">(nessuno)</MenuItem>
-                  {types.map((t) => (
-                    <MenuItem key={t.id} value={t.id}>
-                      {t.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-
-            <TextField
-              size="small"
-              label="Nome / Descrizione"
-              required
-              value={form.name}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, name: e.target.value }))
-                setFormErrors((er) => ({ ...er, name: undefined }))
-              }}
-              error={Boolean(formErrors.name)}
-              helperText={
-                formErrors.name ||
-                'Breve descrizione per identificare l\'apparecchio (es. "Server principale sala CED")'
-              }
-              fullWidth
-            />
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="K-number"
-                value={form.knumber}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, knumber: e.target.value }))
-                  setFormErrors((er) => ({ ...er, knumber: undefined }))
-                }}
-                error={Boolean(formErrors.knumber)}
-                helperText={formErrors.knumber ?? ' '}
-                fullWidth
-              />
-              <TextField
-                size="small"
-                label="Seriale"
-                value={form.serial_number}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, serial_number: e.target.value }))
-                  setFormErrors((er) => ({ ...er, serial_number: undefined }))
-                }}
-                error={Boolean(formErrors.serial_number)}
-                helperText={formErrors.serial_number ?? ' '}
-                fullWidth
-              />
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Hostname"
-                value={form.hostname}
-                onChange={(e) => setForm((f) => ({ ...f, hostname: e.target.value }))}
-                fullWidth
-                disabled={df('hostname')}
-                helperText={dfHelp('hostname')}
-              />
-              <TextField
-                size="small"
-                label="IP locale"
-                value={form.local_ip}
-                onChange={(e) => setForm((f) => ({ ...f, local_ip: e.target.value }))}
-                fullWidth
-                disabled={df('local_ip')}
-                helperText={dfHelp('local_ip')}
-              />
-              <TextField
-                size="small"
-                label="SRSA IP"
-                value={form.srsa_ip}
-                onChange={(e) => setForm((f) => ({ ...f, srsa_ip: e.target.value }))}
-                fullWidth
-                disabled={df('srsa_ip')}
-                helperText={dfHelp('srsa_ip')}
-              />
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Utente OS"
-                value={form.os_user}
-                onChange={(e) => setForm((f) => ({ ...f, os_user: e.target.value }))}
-                fullWidth
-                disabled={df('os_user')}
-                helperText={dfHelp('os_user')}
-              />
-              {canViewSecrets ? (
-                <PasswordField
-                  label="Password OS"
-                  value={form.os_pwd}
-                  onChange={(v) => setForm((f) => ({ ...f, os_pwd: v }))}
-                  disabled={df('os_pwd')}
-                  helperText={dfHelp('os_pwd')}
-                />
-              ) : (
-                <TextField
-                  size="small"
-                  label="Password OS"
-                  value=""
-                  fullWidth
-                  disabled
-                  helperText="Non autorizzato"
-                />
-              )}
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Utente App"
-                value={form.app_usr}
-                onChange={(e) => setForm((f) => ({ ...f, app_usr: e.target.value }))}
-                fullWidth
-                disabled={df('app_usr')}
-                helperText={dfHelp('app_usr')}
-              />
-              {canViewSecrets ? (
-                <PasswordField
-                  label="Password App"
-                  value={form.app_pwd}
-                  onChange={(v) => setForm((f) => ({ ...f, app_pwd: v }))}
-                  disabled={df('app_pwd')}
-                  helperText={dfHelp('app_pwd')}
-                />
-              ) : (
-                <TextField
-                  size="small"
-                  label="Password App"
-                  value=""
-                  fullWidth
-                  disabled
-                  helperText="Non autorizzato"
-                />
-              )}
-              {canViewSecrets ? (
-                <PasswordField
-                  label="Password VNC"
-                  value={form.vnc_pwd}
-                  onChange={(v) => setForm((f) => ({ ...f, vnc_pwd: v }))}
-                  disabled={df('vnc_pwd')}
-                  helperText={dfHelp('vnc_pwd')}
-                />
-              ) : (
-                <TextField
-                  size="small"
-                  label="Password VNC"
-                  value=""
-                  fullWidth
-                  disabled
-                  helperText="Non autorizzato"
-                />
-              )}
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Produttore"
-                value={form.manufacturer}
-                onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))}
-                fullWidth
-                disabled={df('manufacturer')}
-                helperText={dfHelp('manufacturer')}
-              />
-              <TextField
-                size="small"
-                label="Modello"
-                value={form.model}
-                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                fullWidth
-                disabled={df('model')}
-                helperText={dfHelp('model')}
-              />
-              <TextField
-                size="small"
-                label="Fine garanzia (YYYY-MM-DD)"
-                value={form.warranty_end_date}
-                onChange={(e) => setForm((f) => ({ ...f, warranty_end_date: e.target.value }))}
-                fullWidth
-                disabled={df('warranty_end_date')}
-                helperText={dfHelp('warranty_end_date')}
-              />
-            </Stack>
-
-            <CustomFieldsEditor
-              entity="inventory"
-              value={form.custom_fields}
-              onChange={(v) => setForm((f) => ({ ...f, custom_fields: v }))}
-              mode="accordion"
-            />
-
-            <TextField
-              size="small"
-              label="Note"
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              fullWidth
-              multiline
-              minRows={4}
-            />
-
-            {/* Tags */}
-            <Box>
-              <TextField
-                size="small"
-                fullWidth
-                label="Tag (premi Invio per aggiungere)"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && tagInput.trim()) {
-                    e.preventDefault()
-                    const t = tagInput.trim().toLowerCase()
-                    if (!form.tags.includes(t)) setForm((f) => ({ ...f, tags: [...f.tags, t] }))
-                    setTagInput('')
-                  }
-                }}
-              />
-              {form.tags.length > 0 && (
-                <Stack direction="row" flexWrap="wrap" spacing={0.5} sx={{ mt: 0.75 }}>
-                  {form.tags.map((t) => (
-                    <Chip
-                      key={t}
-                      label={t}
-                      size="small"
-                      onDelete={() =>
-                        setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))
-                      }
-                    />
-                  ))}
-                </Stack>
-              )}
-            </Box>
-          </Stack>
-        </DialogContent>
-
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDlgOpen(false)} disabled={dlgSaving}>
-            Annulla
-          </Button>
-          <Button variant="contained" onClick={save} disabled={dlgSaving}>
-            {dlgSaving ? 'Salvataggio…' : 'Salva'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <InventoryDialog
+        open={dlgOpen}
+        mode={dlgMode}
+        saving={dlgSaving}
+        canViewSecrets={canViewSecrets}
+        errors={formErrors}
+        customers={customers}
+        sites={dlgSites}
+        statuses={statuses}
+        types={types}
+        form={form}
+        tagInput={tagInput}
+        onClose={() => setDlgOpen(false)}
+        onSave={save}
+        onTagInputChange={setTagInput}
+        onFormChange={setForm}
+        onErrorsChange={setFormErrors}
+        onCustomerChange={loadSitesForDialogCustomer}
+        isFieldDisabled={df}
+        fieldHelpText={dfHelp}
+      />
 
       <ConfirmActionDialog
         open={bulkRestoreDlgOpen}

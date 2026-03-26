@@ -1,4 +1,4 @@
-http://archie.biotron.it, :80 {
+archie.biotron.it {
     encode gzip zstd
 
     handle /api/* {

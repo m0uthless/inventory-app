@@ -57,7 +57,10 @@ export default function CustomerDialog({
             <Select
               label="Stato"
               value={form.status}
-              onChange={(e) => onFormChange((f) => ({ ...f, status: asId(e.target.value) }))}
+              onChange={(e) => {
+                onFormChange((f) => ({ ...f, status: asId(e.target.value) }))
+                onFieldErrorsChange((er) => { const n = { ...er }; delete n.status; return n })
+              }}
             >
               <MenuItem value="">Seleziona…</MenuItem>
               {statuses.map((s) => (
@@ -74,7 +77,13 @@ export default function CustomerDialog({
             label="Nome"
             value={form.name}
             onChange={(e) => {
-              onFormChange((f) => ({ ...f, name: e.target.value }))
+              const name = e.target.value
+              onFormChange((f) => ({
+                ...f,
+                name,
+                // Pre-popola display_name solo se l'utente non l'ha ancora modificato
+                display_name: f.display_name.trim() === '' ? name : f.display_name,
+              }))
               onFieldErrorsChange((er) => {
                 const next = { ...er }
                 delete next.name

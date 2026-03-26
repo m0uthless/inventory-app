@@ -3,14 +3,12 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   AppBar,
   Avatar,
-  Badge,
   Box,
   Chip,
   Collapse,
   Divider,
   Drawer,
   IconButton,
-  InputAdornment,
   List,
   ListItemButton,
   ListItemIcon,
@@ -19,7 +17,6 @@ import {
   MenuItem,
   Popover,
   Stack,
-  TextField,
   Toolbar,
   Tooltip,
   Typography,
@@ -27,10 +24,7 @@ import {
 
 import MenuIcon from '@mui/icons-material/Menu'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import SearchIcon from '@mui/icons-material/Search'
-import ClearIcon from '@mui/icons-material/Clear'
 import LogoutIcon from '@mui/icons-material/Logout'
-import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import SettingsIcon from '@mui/icons-material/Settings'
 
@@ -53,6 +47,8 @@ import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
 import AppFooter from './AppFooter'
+import GlobalSearch from './GlobalSearch'
+import MaintenanceNotificationBell from './MaintenanceNotificationBell'
 import AppSpeedDial from './AppSpeedDial'
 import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '../hooks/useIdleTimer'
@@ -196,7 +192,6 @@ export function AppLayout() {
   const nav = useNavigate()
   const loc = useLocation()
 
-  const EGG_TRIGGER = 'supertennis'
   const [eggOpen, setEggOpen] = React.useState(false)
   const eggTimerRef = React.useRef<number | null>(null)
 
@@ -226,82 +221,10 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [eggOpen])
 
-  // Global search
-  const [globalQ, setGlobalQ] = React.useState('')
-  const goGlobalSearch = React.useCallback(() => {
-    const q = globalQ.trim()
-    if (q.toLowerCase() === EGG_TRIGGER) {
-      openEgg()
-      setGlobalQ('') // opzionale: pulisce la barra
-      return // non naviga alla search
-    }
-    if (!q) {
-      nav('/search')
-      return
-    }
-    // Canonical query param is `search` (legacy `q` removed)
-    nav(`/search?search=${encodeURIComponent(q)}`)
-  }, [globalQ, nav, openEgg])
+
 
   // Drawer mobile
   const [mobileOpen, setMobileOpen] = React.useState(false)
-
-  // ── Maintenance notifications ──────────────────────────────────────────────
-  type DueItem = {
-    plan_id: number
-    plan_title: string
-    inventory_id: number
-    inventory_name: string
-    customer_name: string
-    customer_code: string
-    site_name?: string | null
-    knumber?: string | null
-    hostname?: string | null
-    type_label?: string | null
-    next_due_date: string
-    due_date_override?: string | null
-    days_left: number
-  }
-  const [duePlans, setDuePlans] = React.useState<DueItem[]>([])
-  const [notifAnchor, setNotifAnchor] = React.useState<null | HTMLElement>(null)
-
-  React.useEffect(() => {
-    if (!me) return
-    const fetchDue = () => {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const in30Date = new Date(today)
-      in30Date.setDate(in30Date.getDate() + 30)
-      const in30 = in30Date.toLocaleDateString('en-CA') // YYYY-MM-DD locale-safe
-      // Usa il todo endpoint: ritorna singoli inventory (non piani aggregati)
-      // Solo inventory in scadenza nei prossimi 30 giorni (esclusi gli scaduti)
-      const todayStr = today.toLocaleDateString('en-CA')
-      api.get('/maintenance-plans/todo/', {
-        params: { due_from: todayStr, due_to: in30, ordering: 'next_due_date', page_size: 40 },
-      })
-        .then((res) => {
-          const rows = res.data?.results ?? []
-          const enriched = rows.map((r: Record<string, unknown>) => {
-            const due = new Date(String(r.next_due_date))
-            due.setHours(0, 0, 0, 0)
-            const diff = Math.round((due.getTime() - today.getTime()) / 86_400_000)
-            return { ...r, days_left: diff } as DueItem
-          })
-          // Ordina: scaduti prima, poi per data
-          enriched.sort((a: DueItem, b: DueItem) => a.days_left - b.days_left)
-          setDuePlans(enriched)
-        })
-        .catch(() => {})
-    }
-    fetchDue()
-    const interval = setInterval(fetchDue, 5 * 60 * 1000)
-    // Aggiorna la bell quando DueDateOverrideDialog salva un override
-    window.addEventListener('maintenance-due-date-changed', fetchDue)
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('maintenance-due-date-changed', fetchDue)
-    }
-  }, [me])
 
   // Sidebar mini-variant (desktop) persistita
   const [desktopOpen, setDesktopOpen] = React.useState(() => {
@@ -487,30 +410,31 @@ export function AppLayout() {
   }, [mini])
 
   const pageTitle = React.useMemo(() => {
+    // Entries are checked longest-prefix-first so more-specific routes win.
+    const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
+      ['/bug-feature/resolved',   'BUG / FEATURE · RESOLVED'],
+      ['/maintenance/plans',      'MANUTENZIONE · PIANI'],
+      ['/maintenance/rapportini', 'MANUTENZIONE · RAPPORTINI'],
+      ['/wiki/stats',             'KNOWLEDGE · STATISTICHE'],
+      ['/wiki/queries',           'KNOWLEDGE · QUERY'],
+      ['/wiki',                   'KNOWLEDGE · WIKI'],
+      ['/site-repository',        'SITE REPOSITORY'],
+      ['/customers',              'CLIENTI'],
+      ['/sites',                  'SITI'],
+      ['/contacts',               'CONTATTI'],
+      ['/inventory',              'INVENTARI'],
+      ['/maintenance',            'MANUTENZIONE'],
+      ['/issues',                 'ISSUES'],
+      ['/bug-feature',            'BUG / FEATURE'],
+      ['/audit',                  'AUDIT'],
+      ['/drive',                  'DRIVE'],
+      ['/trash',                  'CESTINO'],
+      ['/search',                 'RICERCA'],
+      ['/profile',                'PROFILO'],
+      ['/',                       'DASHBOARD'],
+    ]
     const path = loc.pathname
-    if (path === '/') return 'DASHBOARD'
-    if (path === '/customers' || path.startsWith('/customers/')) return 'CLIENTI'
-    if (path === '/sites' || path.startsWith('/sites/')) return 'SITI'
-    if (path === '/contacts' || path.startsWith('/contacts/')) return 'CONTATTI'
-    if (path === '/site-repository' || path.startsWith('/site-repository/')) return 'SITE REPOSITORY'
-    if (path === '/inventory' || path.startsWith('/inventory/')) return 'INVENTARI'
-    if (path === '/trash' || path.startsWith('/trash/')) return 'CESTINO'
-    if (path === '/issues' || path.startsWith('/issues/')) return 'ISSUES'
-    if (path === '/bug-feature/resolved' || path.startsWith('/bug-feature/resolved/')) return 'BUG / FEATURE · RESOLVED'
-    if (path === '/bug-feature' || path.startsWith('/bug-feature/')) return 'BUG / FEATURE'
-    if (path === '/audit' || path.startsWith('/audit/')) return 'AUDIT'
-    if (path === '/drive' || path.startsWith('/drive/')) return 'DRIVE'
-    if (path === '/maintenance/plans') return 'MANUTENZIONE · PIANI'
-    if (path === '/maintenance/rapportini') return 'MANUTENZIONE · RAPPORTINI'
-    if (path === '/maintenance' || path.startsWith('/maintenance/')) return 'MANUTENZIONE'
-    if (path === '/search' || path.startsWith('/search/')) return 'RICERCA'
-    if (path === '/profile' || path.startsWith('/profile/')) return 'PROFILO'
-    if (path === '/wiki' || path.startsWith('/wiki/')) {
-      if (path === '/wiki/stats' || path.startsWith('/wiki/stats/')) return 'KNOWLEDGE · STATISTICHE'
-      if (path === '/wiki/queries' || path.startsWith('/wiki/queries/')) return 'KNOWLEDGE · QUERY'
-      return 'KNOWLEDGE · WIKI'
-    }
-    return ''
+    return ROUTE_TITLES.find(([prefix]) => path === prefix || path.startsWith(prefix + '/'))?.[1] ?? ''
   }, [loc.pathname])
 
   const isWikiPagesSelected = React.useMemo(
@@ -1009,81 +933,11 @@ export function AppLayout() {
 
           {/* RIGHT */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-            {/* Global search (desktop) */}
-            <Box sx={{ display: { xs: 'none', sm: 'flex' }, width: { sm: 216, md: 312 } }}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Cerca…"
-                value={globalQ}
-                onChange={(e) => setGlobalQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    goGlobalSearch()
-                  }
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: globalQ ? (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        aria-label="Cancella ricerca"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => setGlobalQ('')}
-                        edge="end"
-                      >
-                        <ClearIcon fontSize="small" />
-                      </IconButton>
-                    </InputAdornment>
-                  ) : null,
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 1,
-                    backgroundColor: SIDEBAR.chipBg,
-                    color: '#fff',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.6)' },
-                    '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.8)' },
-                    '& .MuiInputAdornment-root svg': { color: SIDEBAR.textDefault },
-                    '& input::placeholder': { color: SIDEBAR.textMuted, opacity: 1 },
-                  },
-                }}
-              />
-            </Box>
-
-            {/* Global search (mobile) */}
-            <IconButton
-              onClick={() => nav('/search')}
-              sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
-              aria-label="Ricerca"
-            >
-              <SearchIcon />
-            </IconButton>
+            {/* Global search */}
+            <GlobalSearch onEggTrigger={openEgg} />
 
             {/* Maintenance notification bell */}
-            <Tooltip
-              title={
-                duePlans.length
-                  ? `${duePlans.length} scadenz${duePlans.length === 1 ? 'a' : 'e'} imminenti`
-                  : 'Nessuna scadenza imminente'
-              }
-            >
-              <IconButton onClick={(e) => setNotifAnchor(e.currentTarget)} size="small">
-                <Badge badgeContent={duePlans.length || null} color="warning" max={99}>
-                  <NotificationsOutlinedIcon
-                    fontSize="small"
-                    sx={{ color: duePlans.length ? 'warning.main' : 'inherit' }}
-                  />
-                </Badge>
-              </IconButton>
-            </Tooltip>
+            <MaintenanceNotificationBell enabled={Boolean(me)} />
 
             {/* User avatar dopo search/+ */}
             <Tooltip title={displayName}>
@@ -1262,105 +1116,6 @@ export function AppLayout() {
         </Box>
       </Popover>
 
-      {/* Maintenance notifications popover */}
-      <Popover
-        open={Boolean(notifAnchor)}
-        anchorEl={notifAnchor}
-        onClose={() => setNotifAnchor(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{ sx: { width: 360, borderRadius: 1, mt: 0.5 } }}
-      >
-        <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Scadenze manutenzione
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            Inventory in scadenza entro 30 giorni
-          </Typography>
-        </Box>
-        {duePlans.length === 0 ? (
-          <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-              ✅ Nessuna scadenza imminente
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-            <Stack divider={<Divider />}>
-              {duePlans.map((item) => (
-                <ListItemButton
-                  key={`${item.plan_id}-${item.inventory_id}`}
-                  onClick={() => { setNotifAnchor(null); nav('/maintenance') }}
-                  sx={{ px: 2, py: 1 }}
-                >
-                  <BuildOutlinedIcon
-                    sx={{
-                      fontSize: 16,
-                      color: item.days_left < 0 ? 'error.main' : item.days_left <= 7 ? 'warning.main' : 'info.main',
-                      mr: 1.25,
-                      flexShrink: 0,
-                      mt: 0.25,
-                    }}
-                  />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                      {item.inventory_name}
-                    </Typography>
-                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.15 }}>
-                      <Typography variant="caption" noWrap sx={{ color: 'text.secondary', fontSize: '0.7rem', maxWidth: 120 }}>
-                        {item.customer_name}
-                      </Typography>
-                      {item.type_label && (
-                        <>
-                          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>·</Typography>
-                          <Typography variant="caption" noWrap sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
-                            {item.type_label}
-                          </Typography>
-                        </>
-                      )}
-                      {(item.knumber || item.hostname) && (
-                        <>
-                          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>·</Typography>
-                          <Typography variant="caption" noWrap sx={{ color: 'text.disabled', fontSize: '0.7rem', fontFamily: 'ui-monospace,monospace' }}>
-                            {item.knumber || item.hostname}
-                          </Typography>
-                        </>
-                      )}
-                    </Stack>
-                  </Box>
-                  <Chip
-                    size="small"
-                    label={
-                      item.days_left < 0
-                        ? `${Math.abs(item.days_left)}gg fa`
-                        : item.days_left === 0
-                          ? 'Oggi'
-                          : item.days_left === 1
-                            ? 'Domani'
-                            : `${item.days_left}gg`
-                    }
-                    color={item.days_left < 0 ? 'error' : item.days_left <= 7 ? 'warning' : 'default'}
-                    variant={item.days_left < 0 ? 'filled' : 'outlined'}
-                    sx={{ fontSize: '0.68rem', ml: 1, flexShrink: 0, height: 20 }}
-                  />
-                </ListItemButton>
-              ))}
-            </Stack>
-          </Box>
-        )}
-        <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-          <ListItemButton
-            onClick={() => { setNotifAnchor(null); nav('/maintenance') }}
-            sx={{ borderRadius: 1.5, justifyContent: 'center' }}
-          >
-            <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700 }}>
-              Vai alle scadenze →
-            </Typography>
-          </ListItemButton>
-        </Box>
-      </Popover>
-
       {/* User menu */}
       <Menu
         anchorEl={userAnchorEl}
@@ -1472,59 +1227,6 @@ export function AppLayout() {
       </Box>
       <AppSpeedDial />
       <LockScreen open={locked} onUnlock={handleUnlock} />
-      <Backdrop
-        open={eggOpen}
-        onClick={() => setEggOpen(false)}
-        sx={{
-          zIndex: (t) => t.zIndex.modal + 20,
-          bgcolor: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(2px)',
-        }}
-      >
-        <Fade in={eggOpen} timeout={{ enter: 250, exit: 350 }}>
-          <Box sx={{ outline: 'none' }}>
-            <Zoom in={eggOpen} timeout={{ enter: 350, exit: 200 }}>
-              <Box
-                sx={{
-                  position: 'relative',
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  boxShadow: 24,
-                  transform: 'rotate(-1deg)',
-                  width: { xs: '85vw', sm: 416 },
-                  maxWidth: 720,
-                  '@keyframes eggPop': {
-                    '0%': { transform: 'scale(0.92) rotate(-2deg)' },
-                    '40%': { transform: 'scale(1.02) rotate(1deg)' },
-                    '100%': { transform: 'scale(1.0) rotate(-1deg)' },
-                  },
-                  animation: 'eggPop 650ms ease-out',
-                }}
-                onClick={(e) => e.stopPropagation()} // evita chiusura se clicchi sull’immagine
-              >
-                <Box
-                  component="img"
-                  src="/supertennis.jpeg"
-                  alt="supertennis"
-                  sx={{ display: 'block', width: '100%' }}
-                />
-
-                {/* cornice teal “glow” */}
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    border: '2px solid rgba(14,165,164,0.75)',
-                    boxShadow: '0 0 0 2px rgba(15,118,110,0.25) inset',
-                    pointerEvents: 'none',
-                  }}
-                />
-              </Box>
-            </Zoom>
-          </Box>
-        </Fade>
-      </Backdrop>
-
       <Backdrop
         open={eggOpen}
         onClick={() => setEggOpen(false)}

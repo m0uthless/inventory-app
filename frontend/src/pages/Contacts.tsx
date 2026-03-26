@@ -7,21 +7,13 @@ import {
   CircularProgress,
   Drawer,
   FormControl,
-  FormHelperText,
-  FormControlLabel,
   LinearProgress,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  Switch,
-  TextField,
   Tooltip,
   Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from '@mui/material'
 
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
@@ -44,6 +36,7 @@ import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
 
 import { api } from '../api/client'
+import ContactDialog from '../features/contacts/ContactDialog'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '../api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
@@ -618,11 +611,14 @@ export default function Contacts() {
   openEditRef.current = openEdit
 
   const save = async () => {
-    setDlgErrors({})
-    if (form.customer === '' || !String(form.name).trim()) {
-      toast.warning('Compila almeno Cliente e Nome.')
+    const clientErrors: Record<string, string> = {}
+    if (form.customer === '') clientErrors.customer = 'Seleziona un cliente.'
+    if (!String(form.name).trim()) clientErrors.name = 'Il nome è obbligatorio.'
+    if (Object.keys(clientErrors).length) {
+      setDlgErrors(clientErrors)
       return
     }
+    setDlgErrors({})
 
     const payload: Record<string, unknown> = {
       customer: Number(form.customer),
@@ -1186,136 +1182,19 @@ export default function Contacts() {
         onConfirm={doDelete}
       />
 
-      <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{dlgMode === 'create' ? 'Nuovo contatto' : 'Modifica contatto'}</DialogTitle>
-        <DialogContent>
-          {dlgErrors._error ? (
-            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-              {dlgErrors._error}
-            </Typography>
-          ) : null}
-          <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <FormControl size="small" fullWidth error={Boolean(dlgErrors.customer)}>
-              <InputLabel>Cliente</InputLabel>
-              <Select
-                label="Cliente"
-                value={form.customer}
-                onChange={async (e) => {
-                  const v = asId(e.target.value)
-                  setForm((f) => ({ ...f, customer: v, site: '' }))
-                  await loadSitesForCustomer(v)
-                }}
-              >
-                <MenuItem value="">Seleziona…</MenuItem>
-                {customers.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                  </MenuItem>
-                ))}
-              </Select>
-              {dlgErrors.customer ? <FormHelperText>{dlgErrors.customer}</FormHelperText> : null}
-            </FormControl>
-
-            <FormControl
-              size="small"
-              fullWidth
-              disabled={form.customer === ''}
-              error={Boolean(dlgErrors.site)}
-            >
-              <InputLabel>Sito</InputLabel>
-              <Select
-                label="Sito"
-                value={form.site}
-                onChange={(e) => setForm((f) => ({ ...f, site: asId(e.target.value) }))}
-              >
-                <MenuItem value="">(nessuno)</MenuItem>
-                {sites.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.display_name || s.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              {dlgErrors.site ? <FormHelperText>{dlgErrors.site}</FormHelperText> : null}
-            </FormControl>
-
-            <TextField
-              size="small"
-              label="Nome"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              error={Boolean(dlgErrors.name)}
-              helperText={dlgErrors.name || ''}
-              fullWidth
-            />
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-              <TextField
-                size="small"
-                label="Email"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                error={Boolean(dlgErrors.email)}
-                helperText={dlgErrors.email || ''}
-                fullWidth
-              />
-              <TextField
-                size="small"
-                label="Telefono"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                error={Boolean(dlgErrors.phone)}
-                helperText={dlgErrors.phone || ''}
-                fullWidth
-              />
-            </Stack>
-
-            <TextField
-              size="small"
-              label="Reparto"
-              value={form.department}
-              onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-              error={Boolean(dlgErrors.department)}
-              helperText={dlgErrors.department || ''}
-              fullWidth
-            />
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.is_primary}
-                  onChange={(e) => setForm((f) => ({ ...f, is_primary: e.target.checked }))}
-                />
-              }
-              label="Contatto primario"
-            />
-            {dlgErrors.is_primary ? (
-              <Typography variant="caption" color="error">
-                {dlgErrors.is_primary}
-              </Typography>
-            ) : null}
-
-            <TextField
-              size="small"
-              label="Note"
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              error={Boolean(dlgErrors.notes)}
-              helperText={dlgErrors.notes || ''}
-              fullWidth
-              multiline
-              minRows={4}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDlgOpen(false)} disabled={dlgSaving}>
-            Annulla
-          </Button>
-          <Button variant="contained" onClick={save} disabled={dlgSaving}>
-            {dlgSaving ? 'Salvataggio…' : 'Salva'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ContactDialog
+        open={dlgOpen}
+        mode={dlgMode}
+        saving={dlgSaving}
+        errors={dlgErrors}
+        customers={customers}
+        sites={sites}
+        form={form}
+        onClose={() => setDlgOpen(false)}
+        onSave={save}
+        onFormChange={setForm}
+        onCustomerChange={loadSitesForCustomer}
+      />
     </Stack>
   )
 }
