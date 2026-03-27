@@ -1,15 +1,13 @@
 import * as React from 'react'
 
-import { Box, Button, Card, CardContent, Tooltip } from '@mui/material'
+import { Box, Card, CardContent } from '@mui/material'
 import { alpha, type SxProps, type Theme } from '@mui/material/styles'
 import type { GridValidRowModel } from '@mui/x-data-grid'
 
 import ListToolbar, { type ListToolbarProps } from './ListToolbar'
 import ServerDataGrid, { type ServerDataGridProps } from './ServerDataGrid'
 import ColumnCustomizerPanel from './ColumnCustomizerPanel'
-import { compactColumnsButtonSx } from './toolbarStyles'
 import { type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
-import ViewColumnIcon from '@mui/icons-material/ViewColumn'
 
 type Props<R extends GridValidRowModel> = {
   toolbar: ListToolbarProps
@@ -91,33 +89,6 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
           }
         >
           <ListToolbar {...toolbar}>
-            {/* Pulsante "Colonne" nella toolbar */}
-            {persistEnabled && (
-              <Tooltip title="Colonne" arrow>
-                <Button
-                  size="small"
-                  aria-label="Colonne"
-                  startIcon={<ViewColumnIcon sx={{ fontSize: toolbar.compact ? '14px !important' : '12px !important' }} />}
-                  onClick={(e) => openColumnPanel(e.currentTarget)}
-                  sx={
-                    toolbar.compact
-                      ? compactColumnsButtonSx
-                      : {
-                          fontSize: '0.75rem',
-                          color: 'text.secondary',
-                          textTransform: 'none',
-                          px: 1.25,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1.5,
-                          '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
-                        }
-                  }
-                >
-                  {toolbar.compact ? '' : 'Colonne'}
-                </Button>
-              </Tooltip>
-            )}
             {children}
           </ListToolbar>
 

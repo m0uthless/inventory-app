@@ -31,7 +31,6 @@ import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
@@ -45,6 +44,7 @@ import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
 import { useDrawerKpis } from '../hooks/useDrawerKpis'
 import SiteDialog from '../features/sites/SiteDialog'
+import type { ColumnFilterConfig } from '../ui/ServerDataGrid'
 import type { KpiSpec } from '../hooks/useDrawerKpis'
 import { useToast } from '../ui/toast'
 import { useAuth } from '../auth/AuthProvider'
@@ -58,10 +58,6 @@ import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
 import StatusChip from '../ui/StatusChip'
-import FilterChip from '../ui/FilterChip'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
-import { useExportCsv } from '../ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import LeafletMap from '../ui/LeafletMap'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 
@@ -121,10 +117,6 @@ type SiteForm = {
   notes: string
 }
 
-const asId = (v: unknown): number | '' => {
-  const s = String(v)
-  return s === '' ? '' : Number(s)
-}
 
 async function copyToClipboard(text: string) {
   if (!text) return
@@ -480,7 +472,6 @@ export default function Sites() {
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
-  const { exporting, exportCsv } = useExportCsv()
   const grid = useServerGrid({
     defaultOrdering: 'display_name',
     allowedOrderingFields: [
@@ -865,6 +856,28 @@ export default function Sites() {
     return cols
   }, [])
 
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    customer_display_name: {
+      value: customerId,
+      label: 'Filtra per cliente',
+      onSet: (v) => setCustomerId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
+      onReset: () => setCustomerId('', { patch: { page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth>
+          <InputLabel>Cliente</InputLabel>
+          <Select
+            label="Cliente"
+            value={customerId === '' ? '' : String(customerId)}
+            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+      ),
+    },
+  }), [customerId, setCustomerId, customers])
+
   const openCreateOnceRef = React.useRef(false)
 
   const openCreate = React.useCallback(() => {
@@ -988,86 +1001,11 @@ export default function Sites() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          rightActions: (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <FilterChip
-                        compact
-                        activeCount={customerId !== '' ? 1 : 0}
-                        onReset={() => {
-                          setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                        }}
-                      >
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Cliente</InputLabel>
-                          <Select
-                            label="Cliente"
-                            value={customerId}
-                            onChange={(e) => {
-                              const v = asId(e.target.value)
-                              setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {customers.map((c) => (
-                              <MenuItem key={c.id} value={c.id}>
-                                {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </FilterChip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => grid.reset(['customer'])}
-                    sx={compactResetButtonSx}
-                  >
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={exporting}
-                    onClick={() =>
-                      exportCsv({
-                        url: '/sites/',
-                        params: {
-                          search: grid.q,
-                          ordering: grid.ordering,
-                          ...(grid.includeDeleted ? { include_deleted: '1' } : {}),
-                        },
-                        filename: 'siti',
-                        columns: [
-                          { label: 'Nome', getValue: (r: SiteRow) => r.display_name || r.name },
-                          { label: 'Cliente', getValue: (r: SiteRow) => r.customer_name },
-                          { label: 'Città', getValue: (r: SiteRow) => r.city },
-                          { label: 'Indirizzo', getValue: (r: SiteRow) => r.address_line1 },
-                          { label: 'CAP', getValue: (r: SiteRow) => r.postal_code },
-                          { label: 'Stato', getValue: (r: SiteRow) => r.status_label },
-                          { label: 'Note', getValue: (r: SiteRow) => r.notes },
-                        ],
-                      })
-                    }
-                    sx={compactExportButtonSx}
-                  >
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-          ),
         }}
         grid={{
           pageKey: 'sites',
           username: me?.username,
+          filterConfig,
 
           emptyState,
           rows,
@@ -1098,15 +1036,6 @@ export default function Sites() {
         }}
       >
 
-        <Can perm={PERMS.crm.site.add}>
-          <Tooltip title="Nuovo" arrow>
-            <span>
-              <Button size="small" variant="contained" onClick={openCreate} sx={compactCreateButtonSx}>
-                <AddIcon />
-              </Button>
-            </span>
-          </Tooltip>
-        </Can>
       </EntityListCard>
 
       <RowContextMenu

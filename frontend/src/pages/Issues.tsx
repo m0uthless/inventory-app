@@ -9,13 +9,7 @@ import {
   Button,
   Chip,
   CircularProgress,
-  FormControl,
-  FormControlLabel,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
-  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -61,10 +55,6 @@ import { useServerGrid } from '../hooks/useServerGrid'
 import { useToast } from '../ui/toast'
 import EntityListCard from '../ui/EntityListCard'
 import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
-import FilterChip from '../ui/FilterChip'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
-import { useExportCsv } from '../ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import { isRecord } from '../utils/guards'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
@@ -427,7 +417,6 @@ export default function Issues() {
   const navigate = useNavigate()
   const { me } = useAuth()
   const toast = useToast()
-  const { exporting, exportCsv } = useExportCsv()
 
   // ── Grid ──────────────────────────────────────────────────────────────────
   const grid = useServerGrid({
@@ -514,21 +503,6 @@ export default function Issues() {
     }
   }, [me, users])
 
-  const handleOnlyMyIssuesChange = React.useCallback(
-    (checked: boolean) => {
-      if (checked) {
-        previousAssignedFilterRef.current = filterAssigned
-        setOnlyMyIssues(true)
-        setFilterAssigned(currentUserOption)
-        return
-      }
-      setOnlyMyIssues(false)
-      setFilterAssigned(previousAssignedFilterRef.current)
-      previousAssignedFilterRef.current = null
-    },
-    [filterAssigned, currentUserOption],
-  )
-
   React.useEffect(() => {
     api
       .get('/issue-categories/')
@@ -559,36 +533,6 @@ export default function Issues() {
     if (!onlyMyIssues) return
     setFilterAssigned(currentUserOption)
   }, [onlyMyIssues, currentUserOption])
-
-  // ── Customer autocomplete (filtri) ────────────────────────────────────────
-  const [custFilterInput, setCustFilterInput] = React.useState('')
-  const [custFilterOptions, setCustFilterOptions] = React.useState<CustomerOption[]>([])
-
-  React.useEffect(() => {
-    let alive = true
-    const t = setTimeout(async () => {
-      try {
-        const r = await api.get('/customers/', {
-          params: { search: custFilterInput || undefined, page_size: 25 },
-        })
-        const payloadU: unknown = (r as unknown as { data: unknown }).data
-        const list: unknown[] =
-          Array.isArray(payloadU) ? payloadU : isRecord(payloadU) && Array.isArray(payloadU['results']) ? (payloadU['results'] as unknown[]) : []
-        if (alive)
-          setCustFilterOptions(
-            list
-              .map((c: unknown) => toIdLabel(c, ['display_name', 'name']))
-              .filter((x: CustomerOption | null): x is CustomerOption => Boolean(x)),
-          )
-      } catch {
-        /* silent */
-      }
-    }, 300)
-    return () => {
-      alive = false
-      clearTimeout(t)
-    }
-  }, [custFilterInput])
 
   // ── Customer autocomplete (form) ──────────────────────────────────────────
   const [custFormInput, setCustFormInput] = React.useState('')
@@ -1324,176 +1268,6 @@ export default function Issues() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          rightActions: (
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-              <FilterChip
-                        compact
-                        activeCount={activeFilterCount}
-                        onReset={activeFilterCount > 0 ? resetFilters : undefined}
-                      >
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Stato</InputLabel>
-                          <Select
-                            value={filterStatus}
-                            label="Stato"
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {Object.entries(STATUS_META).map(([k, v]) => (
-                              <MenuItem key={k} value={k}>
-                                {v.label}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-              
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Priorità</InputLabel>
-                          <Select
-                            value={filterPriority}
-                            label="Priorità"
-                            onChange={(e) => setFilterPriority(e.target.value)}
-                          >
-                            <MenuItem value="">Tutte</MenuItem>
-                            {Object.entries(PRIORITY_META).map(([k, v]) => (
-                              <MenuItem key={k} value={k}>
-                                {v.label}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-              
-                        <Autocomplete
-                          size="small"
-                          fullWidth
-                          value={filterCustomer}
-                          inputValue={custFilterInput}
-                          onInputChange={(_, v) => setCustFilterInput(v)}
-                          onChange={(_, v) => setFilterCustomer(v)}
-                          options={custFilterOptions}
-                          isOptionEqualToValue={(a, b) => a.id === b.id}
-                          renderInput={(p) => <TextField {...p} label="Cliente" />}
-                        />
-              
-                        <Autocomplete
-                          size="small"
-                          fullWidth
-                          value={filterAssigned}
-                          onChange={(_, v) => {
-                            setFilterAssigned(v)
-                            if (onlyMyIssues) {
-                              previousAssignedFilterRef.current = v
-                              setOnlyMyIssues(false)
-                            }
-                          }}
-                          options={users}
-                          disabled={onlyMyIssues}
-                          isOptionEqualToValue={(a, b) => a.id === b.id}
-                          renderInput={(p) => <TextField {...p} label="Assegnato a" />}
-                        />
-                      </FilterChip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => {
-                      grid.reset()
-                      resetFilters()
-                    }}
-                    sx={compactResetButtonSx}
-                  >
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={exporting}
-                    onClick={() =>
-                      exportCsv({
-                        url: '/issues/',
-                        params: {
-                          search: grid.q,
-                          ordering: grid.ordering,
-                        },
-                        filename: 'issues',
-                        columns: [
-                          { label: 'ID', getValue: (r: IssueRow) => String(r.id) },
-                          { label: 'Titolo', getValue: (r: IssueRow) => r.title },
-                          { label: 'Cliente', getValue: (r: IssueRow) => r.customer_name },
-                          { label: 'Priorità', getValue: (r: IssueRow) => r.priority_label },
-                          { label: 'Stato', getValue: (r: IssueRow) => r.status_label },
-                          { label: 'Assegnato a', getValue: (r: IssueRow) => r.assigned_to_full_name || r.assigned_to_username },
-                          { label: 'Aperta il', getValue: (r: IssueRow) => r.opened_at },
-                          { label: 'Chiusa il', getValue: (r: IssueRow) => r.closed_at },
-                          { label: 'ServiceNow', getValue: (r: IssueRow) => r.servicenow_id },
-                        ],
-                      })
-                    }
-                    sx={compactExportButtonSx}
-                  >
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    size="small"
-                    checked={hideClosedCases}
-                    onChange={(e) => setHideClosedCases(e.target.checked)}
-                  />
-                }
-                label="Nascondi casi chiusi"
-                sx={{
-                  ml: 0,
-                  mr: 0,
-                  '& .MuiFormControlLabel-label': {
-                    fontSize: '0.8125rem',
-                    fontWeight: 500,
-                    color: 'text.secondary',
-                  },
-                }}
-              />
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    size="small"
-                    checked={onlyMyIssues}
-                    onChange={(e) => handleOnlyMyIssuesChange(e.target.checked)}
-                    disabled={!me}
-                  />
-                }
-                label="Solo mie issues"
-                sx={{
-                  ml: 0,
-                  mr: 0,
-                  '& .MuiFormControlLabel-label': {
-                    fontSize: '0.8125rem',
-                    fontWeight: 500,
-                    color: 'text.secondary',
-                  },
-                }}
-              />
-            </Stack>
-          ),
-          createButton: (
-            <Tooltip title="Nuova issue" arrow>
-              <span>
-                <Button size="small" variant="contained" onClick={openCreate} sx={compactCreateButtonSx}>
-                  <AddIcon />
-                </Button>
-              </span>
-            </Tooltip>
-          ),
         }}
         grid={{
           pageKey: 'issues',

@@ -57,6 +57,7 @@ export default function ListToolbar(props: Props) {
       spacing={1}
       alignItems={{ xs: 'stretch', md: 'center' }}
       sx={{
+        width: '100%',
         flexWrap: { md: 'nowrap' },
         rowGap: 1,
         columnGap: 1,
@@ -85,8 +86,8 @@ export default function ListToolbar(props: Props) {
           },
         }}
         sx={{
-          width: { xs: '100%', md: compact ? 272 : 176 },
-          flexShrink: 0,
+          width: { xs: '100%', md: compact ? 340 : 240 },
+          flexShrink: { xs: 0, md: 0 },
           '& .MuiInputBase-root': {
             height: compact ? HC : H,
             fontSize: compact ? '0.95rem' : '0.8125rem',

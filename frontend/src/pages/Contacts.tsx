@@ -12,7 +12,6 @@ import {
   MenuItem,
   Select,
   Stack,
-  Tooltip,
   Typography,
 } from '@mui/material'
 
@@ -23,7 +22,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
@@ -37,6 +35,7 @@ import { useDrfList } from '../hooks/useDrfList'
 
 import { api } from '../api/client'
 import ContactDialog from '../features/contacts/ContactDialog'
+import type { ColumnFilterConfig } from '../ui/ServerDataGrid'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '../api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
@@ -49,10 +48,6 @@ import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
-import FilterChip from '../ui/FilterChip'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
-import { useExportCsv } from '../ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 
 type CustomerItem = { id: number; code?: string; name?: string; display_name?: string | null }
@@ -98,10 +93,6 @@ type ContactForm = {
 
 type OpenCreateState = { openCreate?: boolean }
 
-const asId = (v: unknown): number | '' => {
-  const s = String(v)
-  return s === '' ? '' : Number(s)
-}
 
 async function copyToClipboard(text: string) {
   if (!text) return
@@ -157,10 +148,9 @@ const cols: GridColDef<ContactRow>[] = [
 
 // prettier-ignore
 export default function Contacts() {
-  const { hasPerm, me } = useAuth()
+  const { me } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
-  const { exporting, exportCsv } = useExportCsv()
   const loc = useLocation()
   const grid = useServerGrid({
     defaultOrdering: 'name',
@@ -457,6 +447,47 @@ export default function Contacts() {
     return cols
   }, [])
 
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    customer_display_name: {
+      value: customerId,
+      label: 'Filtra per cliente',
+      onSet: (v) => setCustomerId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
+      onReset: () => setCustomerId('', { patch: { page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth>
+          <InputLabel>Cliente</InputLabel>
+          <Select
+            label="Cliente"
+            value={customerId === '' ? '' : String(customerId)}
+            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+      ),
+    },
+    site_display_name: {
+      value: siteId,
+      label: 'Filtra per sito',
+      onSet: (v) => setSiteId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
+      onReset: () => setSiteId('', { patch: { page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth>
+          <InputLabel>Sito</InputLabel>
+          <Select
+            label="Sito"
+            value={siteId === '' ? '' : String(siteId)}
+            onChange={(e) => setSiteId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {sites.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+      ),
+    },
+  }), [customerId, siteId, setCustomerId, setSiteId, customers, sites])
+
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
     return new URLSearchParams(loc.search).get('return')
@@ -673,111 +704,11 @@ export default function Contacts() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          rightActions: (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <FilterChip
-                        compact
-                        activeCount={(customerId !== '' ? 1 : 0) + (siteId !== '' ? 1 : 0)}
-                        onReset={() => {
-                          setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                          setSiteId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                        }}
-                      >
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Cliente</InputLabel>
-                          <Select
-                            label="Cliente"
-                            value={customerId}
-                            onChange={(e) => {
-                              const v = asId(e.target.value)
-                              setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {customers.map((c) => (
-                              <MenuItem key={c.id} value={c.id}>
-                                {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-              
-                        <FormControl size="small" fullWidth disabled={customerId === ''}>
-                          <InputLabel>Sito</InputLabel>
-                          <Select
-                            label="Sito"
-                            value={siteId}
-                            onChange={(e) => {
-                              const v = asId(e.target.value)
-                              setSiteId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {sites.map((s) => (
-                              <MenuItem key={s.id} value={s.id}>
-                                {s.display_name || s.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </FilterChip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={() => grid.reset(['customer', 'site'])} sx={compactResetButtonSx}>
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={exporting}
-                    onClick={() =>
-                      exportCsv({
-                        url: '/contacts/',
-                        params: {
-                          search: grid.q,
-                          ordering: grid.ordering,
-                          ...(grid.includeDeleted ? { include_deleted: '1' } : {}),
-                        },
-                        filename: 'contatti',
-                        columns: [
-                          { label: 'Nome', getValue: (r: ContactRow) => r.name },
-                          { label: 'Cliente', getValue: (r: ContactRow) => r.customer_name },
-                          { label: 'Sito', getValue: (r: ContactRow) => r.site_display_name || r.site_name },
-                          { label: 'Email', getValue: (r: ContactRow) => r.email },
-                          { label: 'Telefono', getValue: (r: ContactRow) => r.phone },
-                          { label: 'Reparto', getValue: (r: ContactRow) => r.department },
-                          { label: 'Primario', getValue: (r: ContactRow) => r.is_primary ? 'Sì' : 'No' },
-                          { label: 'Note', getValue: (r: ContactRow) => r.notes },
-                        ],
-                      })
-                    }
-                    sx={compactExportButtonSx}
-                  >
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-          ),
-          createButton: hasPerm(PERMS.crm.contact.add) ? (
-            <Tooltip title="Nuovo" arrow>
-              <span>
-                <Button size="small" variant="contained" onClick={openCreate} sx={compactCreateButtonSx}>
-                  <AddIcon />
-                </Button>
-              </span>
-            </Tooltip>
-          ) : null,
         }}
         grid={{
           pageKey: 'contacts',
           username: me?.username,
+          filterConfig,
 
           emptyState,
           rows,

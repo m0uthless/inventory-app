@@ -697,8 +697,7 @@ export default function Audit() {
               height={680}
               pageSizeOptions={[25]}
               deletedField="__never__"
-              showGridToolbar={false}
-              footerLabel="Eventi"
+                  footerLabel="Eventi"
               emptyState={
                 grid.search.trim() || action || appLabel || model || actor || createdAfter || createdBefore
                   ? { title: 'Nessun risultato', subtitle: 'Nessun evento corrisponde ai filtri selezionati.' }

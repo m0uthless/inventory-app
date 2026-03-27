@@ -616,8 +616,7 @@ export default function BugFeaturePage() {
           pageKey: isResolvedPage ? 'bug-feature-resolved' : 'bug-feature-open',
           height: computeGridHeight(rows.length),
           sx: sharedGridSx,
-          showGridToolbar: false,
-          emptyState,
+            emptyState,
         }}
       >
         <FilterChip compact activeCount={activeFilterCount} onReset={resetFilters} tooltip="Filtra segnalazioni">

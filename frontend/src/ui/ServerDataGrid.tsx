@@ -1,14 +1,10 @@
 import * as React from 'react'
-import { Box, Divider, LinearProgress, ListItemIcon, ListItemText, MenuItem } from '@mui/material'
-import { ActionIconButton } from './ActionIconButton'
+import { Box, Divider, IconButton, LinearProgress, ListItemIcon, ListItemText, MenuItem, Popover, Tooltip } from '@mui/material'
 import {
   DataGrid,
-  GridToolbarContainer,
-  GridToolbarFilterButton,
-  GridToolbarDensitySelector,
-  GridToolbarExport,
   type DataGridProps,
   type GridColDef,
+  type GridColumnHeaderParams,
   type GridColumnMenuProps,
   type GridColumnOrderChangeParams,
   type GridColumnResizeParams,
@@ -22,8 +18,8 @@ import {
 import type { ReactNode } from 'react'
 import { alpha, type SxProps, type Theme } from '@mui/material/styles'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import FilterListIcon from '@mui/icons-material/FilterList'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import ViewColumnIcon from '@mui/icons-material/ViewColumn'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { useColumnPrefs, applyColumnOrder, applyColumnWidths, type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
@@ -54,7 +50,6 @@ type Props<R extends GridValidRowModel> = {
   deletedField?: keyof R | string
   getRowId?: DataGridProps<R>['getRowId']
   sx?: SxProps<Theme>
-  showGridToolbar?: boolean
   slots?: DataGridProps<R>['slots']
   slotProps?: DataGridProps<R>['slotProps']
   density?: DataGridProps<R>['density']
@@ -74,10 +69,29 @@ type Props<R extends GridValidRowModel> = {
   colPrefsRef?: React.MutableRefObject<UseColumnPrefsReturn | null>
   /** Callback per aprire il ColumnCustomizerPanel dall'header colonna. */
   onOpenColumnPanel?: (anchorEl: HTMLElement) => void
+  /** Mappa field → configurazione filtro URL per il kebab menu. */
+  filterConfig?: Record<string, ColumnFilterConfig>
 
 }
 
 
+
+// ─── ColumnFilterConfig ──────────────────────────────────────────────────────
+// Configurazione del filtro URL per una singola colonna.
+// Passata da ogni pagina tramite filterConfig in ServerDataGridProps.
+
+export type ColumnFilterConfig = {
+  /** Valore attivo del filtro (stringa, numero, o '' per nessun filtro) */
+  value: string | number | ''
+  /** Etichetta mostrata nel menu (es. "Filtra per stato") */
+  label?: string
+  /** Callback per impostare il valore del filtro */
+  onSet: (value: string | number | '') => void
+  /** Callback per resettare il filtro */
+  onReset: () => void
+  /** Contenuto del popover filtro (es. <Select>, <TextField>) — se omesso mostra solo Reset */
+  children?: React.ReactNode
+}
 
 // ─── CustomColumnMenu ─────────────────────────────────────────────────────────
 // Sostituisce il menu nativo di MUI con voci personalizzate:
@@ -89,6 +103,7 @@ type Props<R extends GridValidRowModel> = {
 
 type CustomColumnMenuExtraProps = {
   onOpenColumnPanel?: (anchor: HTMLElement) => void
+  filterConfig?: Record<string, ColumnFilterConfig>
   onSortModelChange: (model: import('@mui/x-data-grid').GridSortModel) => void
   sortModel: import('@mui/x-data-grid').GridSortModel
   onColumnVisibilityModelChange: (model: import('@mui/x-data-grid').GridColumnVisibilityModel) => void
@@ -104,6 +119,7 @@ function CustomColumnMenu(props: GridColumnMenuProps & CustomColumnMenuExtraProp
     sortModel,
     onColumnVisibilityModelChange,
     columnVisibilityModel,
+    filterConfig,
     open,
     id,
     labelledby,
@@ -148,6 +164,7 @@ function CustomColumnMenu(props: GridColumnMenuProps & CustomColumnMenuExtraProp
         <ListItemIcon><VisibilityOffIcon fontSize="small" /></ListItemIcon>
         <ListItemText>Nascondi colonna</ListItemText>
       </MenuItem>
+
       {onOpenColumnPanel && <>
         <Divider />
         <MenuItem dense onClick={handleOpenPanel} role="menuitem">
@@ -155,7 +172,110 @@ function CustomColumnMenu(props: GridColumnMenuProps & CustomColumnMenuExtraProp
           <ListItemText>Gestisci colonne</ListItemText>
         </MenuItem>
       </>}
+
     </Box>
+  )
+}
+
+
+// ─── ColumnHeader ─────────────────────────────────────────────────────────────
+// Layout unificato per ogni colonna:
+//   [label + freccia sort inline]  [spazio]  [imbuto?]  [gap]  [kebab tramite menu]
+//
+// pointer-events: none sul testo → il drag nativo MUI funziona.
+// L'imbuto appare solo se la colonna ha un filterConfig.
+// La freccia sort (▲▼) appare inline accanto al label se la colonna è ordinata.
+
+function ColumnHeader({
+  params,
+  fc,
+  sortDir,
+}: {
+  params: GridColumnHeaderParams
+  fc?: ColumnFilterConfig
+  sortDir?: 'asc' | 'desc' | null
+}) {
+  const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(null)
+  const filterActive = Boolean(fc && fc.value !== '' && fc.value != null)
+
+  // Numero di icone destra: imbuto (se fc) + sempre spazio per il kebab MUI
+  const rightIcons = fc ? 2 : 1      // 1 = solo kebab-gap, 2 = imbuto + kebab-gap
+  const rightPad = rightIcons * 20   // 20px per icona
+
+  return (
+    <>
+      {/* Label + freccia sort — pointer-events: none per non bloccare il drag */}
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 2,
+        fontWeight: 700,
+        letterSpacing: '-0.01em',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        flex: 1,
+        minWidth: 0,
+        paddingRight: rightPad,
+        pointerEvents: 'none',
+        userSelect: 'none',
+      }}>
+        {params.colDef.headerName ?? params.field}
+        {sortDir === 'asc'  && <ArrowUpwardIcon   sx={{ fontSize: 11, flexShrink: 0, opacity: 0.7 }} />}
+        {sortDir === 'desc' && <ArrowDownwardIcon sx={{ fontSize: 11, flexShrink: 0, opacity: 0.7 }} />}
+      </span>
+
+      {/* Imbuto filtro — posizionato a destra, prima del gap kebab */}
+      {fc && (
+        <>
+          <Tooltip title={filterActive ? `${fc.label ?? 'Filtro'}: attivo` : (fc.label ?? 'Filtra')} arrow>
+            <IconButton
+              size="small"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); setFilterAnchor(e.currentTarget) }}
+              sx={{
+                position: 'absolute',
+                right: 22,        // 2px margine + 18px spazio kebab MUI
+                top: '50%',
+                transform: 'translateY(-50%)',
+                p: 0.25,
+                color: filterActive ? '#b45309' : 'text.disabled',
+                fontWeight: filterActive ? 700 : 400,
+                opacity: filterActive ? 1 : 0,
+                zIndex: 1,
+                pointerEvents: 'auto',
+                '.MuiDataGrid-columnHeader:hover &': { opacity: 1 },
+                '&:hover': { color: 'primary.main', opacity: '1 !important' },
+              }}
+              aria-label={fc.label ?? 'Filtro'}
+            >
+              <FilterListIcon sx={{ fontSize: 13 }} />
+            </IconButton>
+          </Tooltip>
+
+          <Popover
+            open={Boolean(filterAnchor)}
+            anchorEl={filterAnchor}
+            onClose={() => setFilterAnchor(null)}
+            onClick={(e) => e.stopPropagation()}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+            PaperProps={{ sx: { p: 1.5, minWidth: 200, borderRadius: 1.5, boxShadow: '0 4px 16px rgba(15,23,42,0.12)', border: '1px solid', borderColor: 'divider' } }}
+          >
+            <Box sx={{ mb: 0.5 }}>{fc.children}</Box>
+            {filterActive && (
+              <Box
+                onClick={() => { setFilterAnchor(null); fc.onReset() }}
+                sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', color: 'text.secondary', fontSize: '0.75rem', '&:hover': { color: 'error.main' } }}
+              >
+                <FilterListIcon sx={{ fontSize: 12 }} />
+                Reset filtro
+              </Box>
+            )}
+          </Popover>
+        </>
+      )}
+    </>
   )
 }
 
@@ -178,7 +298,6 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     deletedField = 'deleted_at',
     getRowId,
     sx,
-    showGridToolbar = true,
     slots,
     slotProps,
     density,
@@ -193,6 +312,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     footerLabel,
     colPrefsRef,
     onOpenColumnPanel,
+    filterConfig,
   } = props
 
   const persistEnabled = Boolean(pageKey)
@@ -224,7 +344,22 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     enabled: persistEnabled,
   })
 
-  const columnsWithHeader = sizedColumns
+  // Inietta ColumnHeader su ogni colonna: label+freccia sort inline, imbuto se filterConfig
+  const columnsWithHeader = React.useMemo(() => {
+    if (!persistEnabled) return sizedColumns
+    const sortField = sortModel[0]?.field
+    const sortDir   = sortModel[0]?.sort ?? null
+    return sizedColumns.map((col) => {
+      const fc = filterConfig?.[col.field]
+      const colSortDir = col.field === sortField ? sortDir : null
+      return {
+        ...col,
+        renderHeader: col.renderHeader ?? ((params: GridColumnHeaderParams) => (
+          <ColumnHeader params={params} fc={fc} sortDir={colSortDir} />
+        )),
+      } as typeof col
+    })
+  }, [sizedColumns, persistEnabled, filterConfig, sortModel])
 
   // Ref per tracciare l'ordine corrente senza re-render
   const currentOrderRef = React.useRef<string[]>([])
@@ -253,28 +388,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     [persistEnabled, colPrefs],
   )
 
-  // Toolbar interna (solo filtri, densità, export — "Colonne" è in EntityListCard)
-  const CustomToolbar = React.useCallback(
-    function ToolbarImpl() {
-      return (
-        <GridToolbarContainer sx={{ gap: 0.5, px: 1, py: 0.5 }}>
-          <GridToolbarFilterButton />
-          <GridToolbarDensitySelector />
-          <GridToolbarExport />
-          {persistEnabled && colPrefs.hasPrefs && (
-            <ActionIconButton
-              label="Ripristina layout colonne predefinito"
-              icon={<RestartAltIcon fontSize="small" />}
-              size="small"
-              onClick={colPrefs.resetPrefs}
-              sx={{ ml: 0.5, color: 'text.secondary', '&:hover': { color: 'error.main' } }}
-            />
-          )}
-        </GridToolbarContainer>
-      )
-    },
-    [persistEnabled, colPrefs.hasPrefs, colPrefs.resetPrefs],
-  )
+
 
   const LoadingOverlay = () => (
     <Box sx={{ width: '100%', position: 'absolute', top: 0, left: 0 }}>
@@ -321,7 +435,6 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
   }, [footerLabel, pageKey])
 
   const resolvedSlots: DataGridProps<R>['slots'] = {
-    toolbar: showGridToolbar ? CustomToolbar : undefined,
     loadingOverlay: slots?.loadingOverlay ?? LoadingOverlay,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...(persistEnabled ? { columnMenu: CustomColumnMenu as any } : {}),
@@ -336,6 +449,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
       sortModel,
       onColumnVisibilityModelChange: colPrefs.onColumnVisibilityModelChange,
       columnVisibilityModel: colPrefs.columnVisibilityModel,
+      filterConfig,
     } as CustomColumnMenuExtraProps,
   } : {}
 
@@ -355,6 +469,11 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
       outline: (theme: Theme) => `2px solid ${alpha(theme.palette.primary.main, 0.5)}`,
       outlineOffset: '-2px',
     },
+    // Necessario per il posizionamento assoluto dell'imbuto filtro
+    '& .MuiDataGrid-columnHeader': { position: 'relative' },
+    // Nasconde la freccia sort nativa — la mostriamo inline nel renderHeader
+    '& .MuiDataGrid-sortIcon': { display: 'none' },
+    '& .MuiDataGrid-columnHeaderSortIcon': { display: 'none' },
     '& .MuiDataGrid-columnHeaderTitle': {
       fontWeight: 700,
       letterSpacing: '-0.01em',

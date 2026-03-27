@@ -35,9 +35,6 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined'
 
 import { Can } from '../auth/Can'
-import { useExportCsv } from '../ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import { useAuth } from '../auth/AuthProvider'
 
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
@@ -51,6 +48,7 @@ import { buildDrfListParams, includeDeletedParams } from '../api/drf'
 import type { ApiPage } from '../api/drf'
 import { useDrfList } from '../hooks/useDrfList'
 import InventoryDialog from '../features/inventory/InventoryDialog'
+import type { ColumnFilterConfig } from '../ui/ServerDataGrid'
 import { useToast } from '../ui/toast'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '../api/error'
 
@@ -60,11 +58,9 @@ import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
 import { getInventoryTypeIcon, INVENTORY_TYPE_ICON_COLOR } from '../ui/inventoryTypeIcon'
-import { compactCreateButtonSx, compactResetButtonSx, compactExportButtonSx } from '../ui/toolbarStyles'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import { isRecord } from '../utils/guards'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
-import FilterChip from '../ui/FilterChip'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -229,10 +225,6 @@ const TYPE_DISABLED_FIELDS: Partial<Record<string, InventoryFieldName[]>> = {
   // robot:       ["vnc_pwd", "app_usr", "app_pwd"],
 }
 
-const asId = (v: unknown): number | '' => {
-  const s = String(v)
-  return s === '' ? '' : Number(s)
-}
 
 async function copyToClipboard(text: string) {
   if (!text) return
@@ -518,7 +510,6 @@ const cols: GridColDef<InventoryRow>[] = [
 // prettier-ignore
 export default function Inventory() {
   const toast = useToast()
-  const { exporting, exportCsv } = useExportCsv()
   const { hasPerm, me } = useAuth()
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
 
@@ -969,6 +960,67 @@ export default function Inventory() {
     return cols
   }, [])
 
+  // Configurazione filtri URL per il kebab/imbuto delle colonne
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    customer_display_name: {
+      value: customerId,
+      label: 'Filtra per cliente',
+      onSet: (v) => setCustomerId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
+      onReset: () => setCustomerId('', { patch: { page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth>
+          <InputLabel>Cliente</InputLabel>
+          <Select
+            label="Cliente"
+            value={customerId === '' ? '' : String(customerId)}
+            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+      ),
+    },
+    site_display_name: {
+      value: siteId,
+      label: 'Filtra per sito',
+      onSet: (v) => setSiteId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
+      onReset: () => setSiteId('', { patch: { page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth>
+          <InputLabel>Sito</InputLabel>
+          <Select
+            label="Sito"
+            value={siteId === '' ? '' : String(siteId)}
+            onChange={(e) => setSiteId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {filterSites.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+      ),
+    },
+    type_label: {
+      value: typeId,
+      label: 'Filtra per tipo',
+      onSet: (v) => setTypeId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
+      onReset: () => setTypeId('', { patch: { page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth>
+          <InputLabel>Tipo</InputLabel>
+          <Select
+            label="Tipo"
+            value={typeId === '' ? '' : String(typeId)}
+            onChange={(e) => setTypeId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {types.map((t) => <MenuItem key={t.id} value={String(t.id)}>{t.label}</MenuItem>)}
+          </Select>
+        </FormControl>
+      ),
+    },
+  }), [customerId, siteId, typeId, setCustomerId, setSiteId, setTypeId, customers, filterSites, types])
+
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
     return new URLSearchParams(loc.search).get('return')
@@ -1188,137 +1240,11 @@ export default function Inventory() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          rightActions: (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FilterChip
-                        compact
-                        activeCount={
-                          (customerId !== '' ? 1 : 0) + (siteId !== '' ? 1 : 0) + (typeId !== '' ? 1 : 0)
-                        }
-                        onReset={() => {
-                          setCustomerId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                          setSiteId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                          setTypeId('', { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                        }}
-                      >
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Cliente</InputLabel>
-                          <Select
-                            label="Cliente"
-                            value={customerId}
-                            onChange={(e) => {
-                              const v = asId(e.target.value)
-                              setCustomerId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {customers.map((c) => (
-                              <MenuItem key={c.id} value={c.id}>
-                                {c.code} — {c.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-              
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Sito</InputLabel>
-                          <Select
-                            label="Sito"
-                            value={siteId}
-                            onChange={(e) => {
-                              const v = asId(e.target.value)
-                              setSiteId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {filterSites.map((s) => (
-                              <MenuItem key={s.id} value={s.id}>
-                                {s.display_name || s.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-              
-                        <FormControl size="small" fullWidth>
-                          <InputLabel>Tipo</InputLabel>
-                          <Select
-                            label="Tipo"
-                            value={typeId}
-                            onChange={(e) => {
-                              const v = asId(e.target.value)
-                              setTypeId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {types.map((t) => (
-                              <MenuItem key={t.id} value={t.id}>
-                                {t.label}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </FilterChip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={() => grid.reset(['customer', 'site', 'type'])} sx={compactResetButtonSx}>
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={exporting}
-                    onClick={() =>
-                      exportCsv({
-                        url: INVENTORIES_PATH,
-                        params: {
-                          search: grid.q,
-                          ordering: grid.ordering,
-                          ...includeDeletedParams(grid.includeDeleted),
-                        },
-                        filename: 'inventario',
-                        columns: [
-                          { label: 'K-Number', getValue: (r: InventoryRow) => r.knumber },
-                          { label: 'Hostname', getValue: (r: InventoryRow) => r.hostname },
-                          { label: 'Seriale', getValue: (r: InventoryRow) => r.serial_number },
-                          { label: 'Tipo', getValue: (r: InventoryRow) => r.type_label },
-                          { label: 'Stato', getValue: (r: InventoryRow) => r.status_label },
-                          { label: 'Cliente', getValue: (r: InventoryRow) => r.customer_name },
-                          {
-                            label: 'Sito',
-                            getValue: (r: InventoryRow) => r.site_display_name || r.site_name,
-                          },
-                          { label: 'Note', getValue: (r: InventoryRow) => r.notes },
-                        ],
-                      })
-                    }
-                    sx={compactExportButtonSx}
-                  >
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-          ),
-          createButton: (
-            <Can perm={PERMS.inventory.inventory.add}>
-              <Tooltip title="Nuovo" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={openCreate} sx={compactCreateButtonSx}>
-                    <AddIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Can>
-          ),
         }}
         grid={{
           pageKey: 'inventory',
           username: me?.username,
+          filterConfig,
 
           emptyState,
           rows,

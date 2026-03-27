@@ -48,21 +48,17 @@ import { buildQuery } from '../utils/nav'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '../utils/gridSelection'
 import { isRecord } from '../utils/guards'
 import ActionButton from '../ui/ActionButton'
-import { useExportCsv } from '../ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
 import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
+import type { ColumnFilterConfig } from '../ui/ServerDataGrid'
 import StatusChip from '../ui/StatusChip'
 import LeafletMap from '../ui/LeafletMap'
-import FilterChip from '../ui/FilterChip'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 import VpnModal from '../features/customers/VpnModal'
@@ -649,7 +645,6 @@ export default function Customers() {
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
-  const { exporting, exportCsv } = useExportCsv()
 
   const grid = useServerGrid({
     defaultOrdering: 'display_name',
@@ -983,6 +978,50 @@ export default function Customers() {
     return buildColumns(openVpnModal)
   }, [openVpnModal])
 
+  // Configurazione filtri URL per il kebab menu delle colonne
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    status_label: {
+      value: statusId,
+      label: 'Filtra per stato',
+      onSet: (v) => setStatusId(v as number | '', { patch: { search: grid.q, page: 1 }, keepOpen: true }),
+      onReset: () => setStatusId('', { patch: { search: grid.q, page: 1 }, keepOpen: true }),
+      children: (
+        <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
+          <InputLabel>Stato</InputLabel>
+          <Select
+            label="Stato"
+            value={statusId === '' ? '' : String(statusId)}
+            onChange={(e: SelectChangeEvent) => {
+              const v = asId(e.target.value)
+              setStatusId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
+            }}
+          >
+            <MenuItem value="">Tutti</MenuItem>
+            {statuses.map((s) => (
+              <MenuItem key={s.id} value={String(s.id)}>{s.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      ),
+    },
+    city: {
+      value: city,
+      label: 'Filtra per città',
+      onSet: (v) => setCity(String(v), { patch: { search: grid.q, page: 1 }, keepOpen: true }),
+      onReset: () => setCity('', { patch: { search: grid.q, page: 1 }, keepOpen: true }),
+      children: (
+        <TextField
+          size="small"
+          label="Città"
+          value={city}
+          onChange={(e) => setCity(e.target.value, { patch: { search: grid.q, page: 1 }, keepOpen: true })}
+          fullWidth
+          sx={{ mt: 0.5 }}
+        />
+      ),
+    },
+  }), [statusId, city, setStatusId, setCity, statuses, grid.q])
+
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
     return new URLSearchParams(loc.search).get('return')
@@ -994,14 +1033,6 @@ export default function Customers() {
     if (returnTo) navigate(returnTo, { replace: true })
   }
 
-  // Resetta tutti i filtri in una sola scrittura URL (atomica) per evitare
-  // due setSp separati che potrebbero causare un frame di inconsistenza.
-  const resetFilters = React.useCallback(() => {
-    grid.syncUrl(
-      { status: '', city: '', search: '', page: 1, page_size: grid.paginationModel.pageSize, ordering: grid.ordering, view: '' },
-      { keepOpen: false },
-    )
-  }, [grid])
 
   const openCreateOnceRef = React.useRef(false)
 
@@ -1159,93 +1190,11 @@ export default function Customers() {
           q: grid.q,
           onQChange: grid.setQ,
           compact: true,
-          rightActions: (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FilterChip
-                        compact
-                        activeCount={(statusId !== '' ? 1 : 0) + (city.trim() ? 1 : 0)}
-                        onReset={resetFilters}
-                      >
-                        <FormControl size="small" fullWidth error={Boolean(fieldErrors.status)}>
-                          <InputLabel>Stato</InputLabel>
-                          <Select
-                            label="Stato"
-                            value={statusId === '' ? '' : String(statusId)}
-                            onChange={(e: SelectChangeEvent) => {
-                              const v = asId(e.target.value)
-                              setStatusId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                            }}
-                          >
-                            <MenuItem value="">Tutti</MenuItem>
-                            {statuses.map((s) => (
-                              <MenuItem key={s.id} value={String(s.id)}>
-                                {s.label}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-              
-                        <TextField
-                          size="small"
-                          label="Città"
-                          value={city}
-                          onChange={(e) =>
-                            setCity(e.target.value, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-                          }
-                          fullWidth
-                        />
-                      </FilterChip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={resetFilters}
-                    sx={compactResetButtonSx}
-                  >
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={exporting}
-                    onClick={() =>
-                      exportCsv({
-                        url: '/customers/',
-                        params: {
-                          search: grid.q,
-                          ordering: grid.ordering,
-                          ...includeDeletedParams(grid.includeDeleted),
-                        },
-                        filename: 'clienti',
-                        columns: [
-                          { label: 'Codice', getValue: (r: CustomerRow) => r.code },
-                          { label: 'Nome', getValue: (r: CustomerRow) => r.display_name || r.name },
-                          { label: 'P.IVA', getValue: (r: CustomerRow) => r.vat_number },
-                          { label: 'Città', getValue: (r: CustomerRow) => r.city },
-                          { label: 'Stato', getValue: (r: CustomerRow) => r.status_label },
-                          { label: 'Note', getValue: (r: CustomerRow) => r.notes },
-                        ],
-                      })
-                    }
-                    sx={compactExportButtonSx}
-                  >
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-          ),
         }}
         grid={{
           pageKey: 'customers',
           username: me?.username,
+          filterConfig,
 
           emptyState,
           columnVisibilityModel: {},
@@ -1278,15 +1227,6 @@ export default function Customers() {
           },
         }}
       >
-        <Can perm={PERMS.crm.customer.add}>
-          <Tooltip title="Nuovo" arrow>
-            <span>
-              <Button size="small" variant="contained" onClick={openCreate} sx={compactCreateButtonSx}>
-                <AddIcon />
-              </Button>
-            </span>
-          </Tooltip>
-        </Can>
 
       </EntityListCard>
 

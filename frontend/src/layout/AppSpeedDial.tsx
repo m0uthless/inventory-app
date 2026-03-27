@@ -137,7 +137,7 @@ export default function AppSpeedDial() {
 
   const actionOrder = React.useMemo(() => {
     if (loc.pathname === '/' || pathStarts(loc.pathname, '/site-repository')) {
-      return ['newInventory', 'newIssue', 'newCustomer', 'newReportRequest', 'search']
+      return ['newInventory', 'newIssue', 'newCustomer', 'newSite', 'newContact', 'newReportRequest', 'search']
     }
     if (pathStarts(loc.pathname, '/inventory')) {
       return ['newInventory', 'newIssue', 'newReportRequest', 'search']
