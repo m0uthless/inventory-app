@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Box, LinearProgress } from '@mui/material'
+import { Box, Divider, LinearProgress, ListItemIcon, ListItemText, MenuItem } from '@mui/material'
 import { ActionIconButton } from './ActionIconButton'
 import {
   DataGrid,
@@ -9,6 +9,7 @@ import {
   GridToolbarExport,
   type DataGridProps,
   type GridColDef,
+  type GridColumnMenuProps,
   type GridColumnOrderChangeParams,
   type GridColumnResizeParams,
   type GridColumnVisibilityModel,
@@ -20,8 +21,13 @@ import {
 } from '@mui/x-data-grid'
 import type { ReactNode } from 'react'
 import { alpha, type SxProps, type Theme } from '@mui/material/styles'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import ViewColumnIcon from '@mui/icons-material/ViewColumn'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { useColumnPrefs, applyColumnOrder, applyColumnWidths, type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
+import { useColumnDragReorder } from '../hooks/useColumnDragReorder'
 import { isRecord } from '../utils/guards'
 import GridPaginationFooter from './GridPaginationFooter'
 import EmptyStatePanel from './EmptyStatePanel'
@@ -66,7 +72,93 @@ type Props<R extends GridValidRowModel> = {
    * per gestire il pannello colonne nella toolbar esterna.
    */
   colPrefsRef?: React.MutableRefObject<UseColumnPrefsReturn | null>
+  /** Callback per aprire il ColumnCustomizerPanel dall'header colonna. */
+  onOpenColumnPanel?: (anchorEl: HTMLElement) => void
+
 }
+
+
+
+// ─── CustomColumnMenu ─────────────────────────────────────────────────────────
+// Sostituisce il menu nativo di MUI con voci personalizzate:
+//   • Ordina A → Z / Z → A
+//   • Nascondi colonna
+//   • Gestisci colonne (apre ColumnCustomizerPanel)
+// Viene registrato nel DataGrid tramite slots.columnMenu — il drag nativo
+// delle colonne rimane completamente intatto.
+
+type CustomColumnMenuExtraProps = {
+  onOpenColumnPanel?: (anchor: HTMLElement) => void
+  onSortModelChange: (model: import('@mui/x-data-grid').GridSortModel) => void
+  sortModel: import('@mui/x-data-grid').GridSortModel
+  onColumnVisibilityModelChange: (model: import('@mui/x-data-grid').GridColumnVisibilityModel) => void
+  columnVisibilityModel: import('@mui/x-data-grid').GridColumnVisibilityModel
+}
+
+function CustomColumnMenu(props: GridColumnMenuProps & CustomColumnMenuExtraProps) {
+  const {
+    hideMenu,
+    colDef,
+    onOpenColumnPanel,
+    onSortModelChange,
+    sortModel,
+    onColumnVisibilityModelChange,
+    columnVisibilityModel,
+    open,
+    id,
+    labelledby,
+    ...rest
+  } = props
+
+  if (!open) return null
+
+  const currentSort = sortModel[0]?.field === colDef.field ? sortModel[0]?.sort : null
+
+  const handleSort = (dir: 'asc' | 'desc') => {
+    hideMenu?.({} as React.MouseEvent)
+    onSortModelChange([{ field: colDef.field, sort: dir }])
+  }
+
+  const handleHide = () => {
+    hideMenu?.({} as React.MouseEvent)
+    onColumnVisibilityModelChange({ ...columnVisibilityModel, [colDef.field]: false })
+  }
+
+  const handleOpenPanel = (e: React.MouseEvent<HTMLElement>) => {
+    hideMenu?.({} as React.MouseEvent)
+    onOpenColumnPanel?.(e.currentTarget)
+  }
+
+  return (
+    <Box id={id} role="menu" aria-labelledby={labelledby} {...(rest as object)}>
+      {colDef.sortable !== false && <>
+        <MenuItem dense onClick={() => handleSort('asc')} selected={currentSort === 'asc'}
+          role="menuitem">
+          <ListItemIcon><ArrowUpwardIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Ordina A → Z</ListItemText>
+        </MenuItem>
+        <MenuItem dense onClick={() => handleSort('desc')} selected={currentSort === 'desc'}
+          role="menuitem">
+          <ListItemIcon><ArrowDownwardIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Ordina Z → A</ListItemText>
+        </MenuItem>
+        <Divider />
+      </>}
+      <MenuItem dense onClick={handleHide} role="menuitem">
+        <ListItemIcon><VisibilityOffIcon fontSize="small" /></ListItemIcon>
+        <ListItemText>Nascondi colonna</ListItemText>
+      </MenuItem>
+      {onOpenColumnPanel && <>
+        <Divider />
+        <MenuItem dense onClick={handleOpenPanel} role="menuitem">
+          <ListItemIcon><ViewColumnIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Gestisci colonne</ListItemText>
+        </MenuItem>
+      </>}
+    </Box>
+  )
+}
+
 
 export type ServerDataGridProps<R extends GridValidRowModel> = Props<R>
 
@@ -100,10 +192,12 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     username,
     footerLabel,
     colPrefsRef,
+    onOpenColumnPanel,
   } = props
 
   const persistEnabled = Boolean(pageKey)
   const colPrefs = useColumnPrefs(pageKey ?? '__none__', username)
+  const gridRef = React.useRef<HTMLDivElement | null>(null)
 
   // Espone colPrefs verso EntityListCard tramite ref
   React.useEffect(() => {
@@ -122,10 +216,20 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     ? applyColumnWidths(orderedColumns, colPrefs.columnWidths ?? {})
     : orderedColumns
 
+  // Drag & drop manuale delle colonne (HTML5 API — compatibile con MUI X Community)
+  useColumnDragReorder({
+    gridRef,
+    columns: sizedColumns,
+    onReorder: colPrefs.saveOrder,
+    enabled: persistEnabled,
+  })
+
+  const columnsWithHeader = sizedColumns
+
   // Ref per tracciare l'ordine corrente senza re-render
   const currentOrderRef = React.useRef<string[]>([])
   React.useEffect(() => {
-    currentOrderRef.current = sizedColumns.map((c) => c.field)
+    currentOrderRef.current = columnsWithHeader.map((c) => c.field)
   })
 
   const handleColumnOrderChange = React.useCallback(
@@ -219,9 +323,21 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
   const resolvedSlots: DataGridProps<R>['slots'] = {
     toolbar: showGridToolbar ? CustomToolbar : undefined,
     loadingOverlay: slots?.loadingOverlay ?? LoadingOverlay,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(persistEnabled ? { columnMenu: CustomColumnMenu as any } : {}),
     ...(slots || {}),
     ...(NoRowsOverlay ? { noRowsOverlay: NoRowsOverlay } : {}),
   }
+
+  const columnMenuSlotProps = persistEnabled ? {
+    columnMenu: {
+      onOpenColumnPanel,
+      onSortModelChange,
+      sortModel,
+      onColumnVisibilityModelChange: colPrefs.onColumnVisibilityModelChange,
+      columnVisibilityModel: colPrefs.columnVisibilityModel,
+    } as CustomColumnMenuExtraProps,
+  } : {}
 
   const baseSx: SxProps<Theme> = {
     '& .MuiTablePagination-selectLabel': { display: 'none' },
@@ -233,6 +349,11 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     '& .MuiDataGrid-columnHeaders': {
       backgroundColor: 'rgba(15,23,42,0.022)',
       borderBottom: '1px solid rgba(15,23,42,0.08)',
+    },
+    '& .MuiDataGrid-columnHeader.col-drag-over': {
+      backgroundColor: (theme: Theme) => alpha(theme.palette.primary.main, 0.12),
+      outline: (theme: Theme) => `2px solid ${alpha(theme.palette.primary.main, 0.5)}`,
+      outlineOffset: '-2px',
     },
     '& .MuiDataGrid-columnHeaderTitle': {
       fontWeight: 700,
@@ -385,6 +506,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
 
   return (
     <Box
+      ref={gridRef}
       sx={{ height, minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}
       onContextMenu={onRowContextMenu ? handleGridContextMenu : undefined}
       onTouchStart={onRowContextMenu ? handleTouchStart : undefined}
@@ -394,18 +516,17 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     >
       <DataGrid hideFooter
         rows={rows}
-        columns={sizedColumns}
+        columns={columnsWithHeader}
         loading={loading}
         density={density}
         columnHeaderHeight={32}
         rowHeight={36}
-        disableColumnMenu
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}
         rowSelectionModel={rowSelectionModel}
         onRowSelectionModelChange={onRowSelectionModelChange}
         slots={resolvedSlots}
-        slotProps={slotProps}
+        slotProps={{ ...columnMenuSlotProps, ...slotProps } as DataGridProps<R>['slotProps']}
         rowCount={rowCount}
         paginationMode="server"
         paginationModel={paginationModel}

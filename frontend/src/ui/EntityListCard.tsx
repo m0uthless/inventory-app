@@ -3,13 +3,13 @@ import * as React from 'react'
 import { Box, Button, Card, CardContent, Tooltip } from '@mui/material'
 import { alpha, type SxProps, type Theme } from '@mui/material/styles'
 import type { GridValidRowModel } from '@mui/x-data-grid'
-import ViewColumnIcon from '@mui/icons-material/ViewColumn'
 
 import ListToolbar, { type ListToolbarProps } from './ListToolbar'
 import ServerDataGrid, { type ServerDataGridProps } from './ServerDataGrid'
 import ColumnCustomizerPanel from './ColumnCustomizerPanel'
-import { type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
 import { compactColumnsButtonSx } from './toolbarStyles'
+import { type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
+import ViewColumnIcon from '@mui/icons-material/ViewColumn'
 
 type Props<R extends GridValidRowModel> = {
   toolbar: ListToolbarProps
@@ -38,6 +38,21 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
 
   // Stato locale sincronizzato con colPrefs per forzare re-render quando serve
   const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
+
+  const openColumnPanel = React.useCallback((anchorEl: HTMLElement) => {
+    const prefs = colPrefsRef.current
+    setColPanelAnchor(anchorEl)
+    setColPanelSnapshot(
+      prefs
+        ? {
+            columnOrder: prefs.columnOrder,
+            columnVisibility: prefs.columnVisibilityModel,
+            hasPrefs: prefs.hasPrefs,
+          }
+        : null,
+    )
+    forceUpdate()
+  }, [])
 
   return (
     <Card variant="outlined" sx={[{ borderRadius: 1, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
@@ -76,27 +91,14 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
           }
         >
           <ListToolbar {...toolbar}>
-            {/* Pulsante "Colonne" iniettato come primo children */}
+            {/* Pulsante "Colonne" nella toolbar */}
             {persistEnabled && (
               <Tooltip title="Colonne" arrow>
                 <Button
                   size="small"
                   aria-label="Colonne"
                   startIcon={<ViewColumnIcon sx={{ fontSize: toolbar.compact ? '14px !important' : '12px !important' }} />}
-                  onClick={(e) => {
-                    const prefs = colPrefsRef.current
-                    setColPanelAnchor(e.currentTarget)
-                    setColPanelSnapshot(
-                      prefs
-                        ? {
-                            columnOrder: prefs.columnOrder,
-                            columnVisibility: prefs.columnVisibilityModel,
-                            hasPrefs: prefs.hasPrefs,
-                          }
-                        : null,
-                    )
-                    forceUpdate()
-                  }}
+                  onClick={(e) => openColumnPanel(e.currentTarget)}
                   sx={
                     toolbar.compact
                       ? compactColumnsButtonSx
@@ -122,7 +124,11 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
           {belowToolbar ? <Box sx={{ mt: 1 }}>{belowToolbar}</Box> : null}
         </Box>
 
-        <ServerDataGrid {...grid} colPrefsRef={colPrefsRef} />
+        <ServerDataGrid
+          {...grid}
+          colPrefsRef={colPrefsRef}
+          onOpenColumnPanel={persistEnabled ? openColumnPanel : undefined}
+        />
 
         {/* Pannello drag & drop colonne */}
         {persistEnabled && colPanelSnapshot && (
