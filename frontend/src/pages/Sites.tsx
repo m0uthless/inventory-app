@@ -26,6 +26,7 @@ import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloseIcon from '@mui/icons-material/Close'
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
@@ -57,6 +58,7 @@ import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
+import type { MobileCardRenderFn } from '../ui/MobileCardList'
 import StatusChip from '../ui/StatusChip'
 import LeafletMap from '../ui/LeafletMap'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
@@ -466,6 +468,66 @@ const SITE_KPI_SPECS: KpiSpec[] = [
   { key: 'inv',     path: '/inventories/', filterParam: 'site' },
   { key: 'contact', path: '/contacts/',    filterParam: 'site' },
 ]
+
+// ─── Mobile card renderer ────────────────────────────────────────────────────
+
+const renderSiteCard: MobileCardRenderFn<SiteRow> = ({ row, onOpen }) => {
+  const sc = row.status != null ? ({
+    1: { bg: '#E0F2FE', fg: '#0369A1', border: '#BAE6FD' },
+    2: { bg: '#DCFCE7', fg: '#166534', border: '#BBF7D0' },
+    3: { bg: '#FEF9C3', fg: '#854D0E', border: '#FDE68A' },
+    4: { bg: '#FEE2E2', fg: '#991B1B', border: '#FECACA' },
+    5: { bg: '#EDE9FE', fg: '#5B21B6', border: '#DDD6FE' },
+    6: { bg: '#FFEDD5', fg: '#9A3412', border: '#FED7AA' },
+  } as Record<number, { bg: string; fg: string; border: string }>)[row.status] ?? null : null
+
+  const meta: { label: string; value: string | null | undefined }[] = [
+    { label: 'Cliente',   value: row.customer_display_name || row.customer_name },
+    { label: 'Città',     value: row.city },
+    { label: 'Contatto',  value: row.primary_contact_name },
+    { label: 'Telefono',  value: row.primary_contact_phone },
+  ]
+
+  return (
+    <Box
+      onClick={() => onOpen(row.id)}
+      sx={{
+        bgcolor: 'background.paper',
+        border: '0.5px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+        p: 1.25,
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.75,
+        '&:active': { bgcolor: 'action.hover' },
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+          {row.display_name || row.name}
+        </Typography>
+        {sc && row.status_label && (
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.fg, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+            {row.status_label}
+          </Box>
+        )}
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+        {meta.map(({ label, value }) => (
+          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {value || '—'}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  )
+}
 
 export default function Sites() {
   const { me } = useAuth()
@@ -997,6 +1059,7 @@ export default function Sites() {
   return (
     <Stack spacing={2} sx={{ height: '100%' }}>
       <EntityListCard
+        mobileCard={renderSiteCard}
         toolbar={{
           compact: true,
           q: grid.q,
@@ -1098,7 +1161,22 @@ export default function Sites() {
               justifyContent="space-between"
               sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
             >
-              <Chip
+              <Tooltip title="Chiudi">
+                  <IconButton
+                    aria-label="Chiudi"
+                    size="small"
+                    onClick={closeDrawer}
+                    sx={{
+                      color: 'rgba(255,255,255,0.85)',
+                      bgcolor: 'rgba(255,255,255,0.12)',
+                      borderRadius: 1.5,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
+                    }}
+                  >
+                    <ArrowBackIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Chip
                 size="small"
                 label={`● ${detail?.status_label ?? '—'}`}
                 sx={{

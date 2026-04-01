@@ -24,6 +24,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloseIcon from '@mui/icons-material/Close'
 import LinearProgress from '@mui/material/LinearProgress'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
@@ -57,6 +58,7 @@ import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
+import type { MobileCardRenderFn } from '../ui/MobileCardList'
 import { getInventoryTypeIcon, INVENTORY_TYPE_ICON_COLOR } from '../ui/inventoryTypeIcon'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import { isRecord } from '../utils/guards'
@@ -507,6 +509,88 @@ const cols: GridColDef<InventoryRow>[] = [
 ]
 
 
+// ─── Mobile card renderer ────────────────────────────────────────────────────
+
+const STATUS_COLOR: Record<string, { bg: string; fg: string; border: string }> = {
+  in_use:      { bg: 'rgba(16,185,129,0.10)',  fg: '#065f46', border: 'rgba(16,185,129,0.28)' },
+  maintenance: { bg: 'rgba(245,158,11,0.10)',  fg: '#92400e', border: 'rgba(245,158,11,0.28)' },
+  repair:      { bg: 'rgba(239,68,68,0.10)',   fg: '#991b1b', border: 'rgba(239,68,68,0.28)'  },
+  spare:       { bg: 'rgba(99,102,241,0.10)',  fg: '#3730a3', border: 'rgba(99,102,241,0.28)' },
+  retired:     { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
+  storage:     { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
+}
+
+const renderInventoryCard: MobileCardRenderFn<InventoryRow> = ({ row, onOpen }) => {
+  const TypeIcon = getInventoryTypeIcon(row.type_key)
+  const sc = STATUS_COLOR[row.status_key ?? ''] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+
+  const meta: { label: string; value: string | null | undefined; mono?: boolean }[] = [
+    { label: 'Cliente',  value: row.customer_name },
+    { label: 'IP',       value: row.local_ip,  mono: true },
+    { label: 'K-Number', value: row.knumber },
+    { label: 'IP SRSA',  value: row.srsa_ip,   mono: true },
+  ]
+
+  return (
+    <Box
+      onClick={() => onOpen(row.id)}
+      sx={{
+        bgcolor: 'background.paper',
+        border: '0.5px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+        p: 1.25,
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.75,
+        '&:active': { bgcolor: 'action.hover' },
+      }}
+    >
+      {/* Header: nome + badge stato */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {row.name}
+          </Typography>
+          {row.type_label && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+              {TypeIcon && <TypeIcon sx={{ fontSize: 11, color: 'text.disabled' }} />}
+              <Typography variant="caption" color="text.secondary">{row.type_label}</Typography>
+            </Box>
+          )}
+        </Box>
+        {row.status_label && (
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.fg, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+            {row.status_label}
+          </Box>
+        )}
+      </Box>
+
+      {/* Grid 2×2 campi */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+        {meta.map(({ label, value, mono }) => (
+          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', fontFamily: mono && value ? 'monospace' : 'inherit', lineHeight: 1.3 }}>
+              {value || '—'}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+
+      {/* Footer: sito */}
+      {row.site_display_name && (
+        <Box sx={{ borderTop: '0.5px solid', borderColor: 'divider', pt: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', opacity: 0.5, flexShrink: 0 }} />
+          <Typography variant="caption" color="text.secondary">{row.site_display_name}</Typography>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+
 // prettier-ignore
 export default function Inventory() {
   const toast = useToast()
@@ -515,6 +599,8 @@ export default function Inventory() {
 
   const navigate = useNavigate()
   const loc = useLocation()
+  const defaultPageSizeRef = React.useRef(25)
+
   const grid = useServerGrid({
     defaultOrdering: 'hostname',
     allowedOrderingFields: [
@@ -528,7 +614,7 @@ export default function Inventory() {
       'local_ip',
       'srsa_ip',
     ],
-    defaultPageSize: 25,
+    defaultPageSize: defaultPageSizeRef.current,
   })
 
   const [selectionModel, setSelectionModel] =
@@ -1236,6 +1322,7 @@ export default function Inventory() {
     <Stack spacing={2} sx={{ height: '100%' }}>
 
       <EntityListCard
+        mobileCard={renderInventoryCard}
         toolbar={{
           compact: true,
           q: grid.q,
@@ -1335,7 +1422,22 @@ export default function Inventory() {
               justifyContent="space-between"
               sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
             >
-              <Chip
+              <Tooltip title="Chiudi">
+                  <IconButton
+                    aria-label="Chiudi"
+                    size="small"
+                    onClick={closeDrawer}
+                    sx={{
+                      color: 'rgba(255,255,255,0.85)',
+                      bgcolor: 'rgba(255,255,255,0.12)',
+                      borderRadius: 1.5,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
+                    }}
+                  >
+                    <ArrowBackIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Chip
                 size="small"
                 label={`● ${detail?.status_label ?? '—'}`}
                 sx={{

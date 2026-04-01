@@ -1,11 +1,12 @@
 import * as React from 'react'
 
-import { Box, Card, CardContent } from '@mui/material'
+import { Box, Card, CardContent, useMediaQuery, useTheme } from '@mui/material'
 import { alpha, type SxProps, type Theme } from '@mui/material/styles'
 import type { GridValidRowModel } from '@mui/x-data-grid'
 
 import ListToolbar, { type ListToolbarProps } from './ListToolbar'
 import ServerDataGrid, { type ServerDataGridProps } from './ServerDataGrid'
+import MobileCardList, { type MobileCardRenderFn, FilterChipBar } from './MobileCardList'
 import ColumnCustomizerPanel from './ColumnCustomizerPanel'
 import { type UseColumnPrefsReturn } from '../hooks/useColumnPrefs'
 
@@ -16,10 +17,15 @@ type Props<R extends GridValidRowModel> = {
   grid: ServerDataGridProps<R>
   sx?: SxProps<Theme>
   stickyToolbar?: boolean
+  /** Se fornito, in mobile (xs/sm) mostra una card list invece del DataGrid */
+  mobileCard?: MobileCardRenderFn<any>
 }
 
 export default function EntityListCard<R extends GridValidRowModel>(props: Props<R>) {
-  const { toolbar, children, belowToolbar, grid, sx, stickyToolbar = false } = props
+  const { toolbar, children, belowToolbar, grid, sx, stickyToolbar = false, mobileCard } = props
+
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   const persistEnabled = Boolean(grid.pageKey)
 
@@ -53,12 +59,20 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
   }, [])
 
   return (
-    <Card variant="outlined" sx={[{ borderRadius: 1, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
+    <Card
+      variant="outlined"
+      sx={[
+        isMobile && mobileCard
+          ? { borderRadius: 0, border: 'none', boxShadow: 'none', bgcolor: 'transparent', overflow: 'visible', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }
+          : { borderRadius: 1, borderColor: 'divider', boxShadow: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
+    >
       <CardContent
         sx={{
           pt: toolbar.compact ? 1.75 : 2,
           pb: 2,
-          px: 2,
+          px: isMobile && mobileCard ? 0 : 2,
           '&:last-child': { pb: 2 },
           display: 'flex',
           flexDirection: 'column',
@@ -66,40 +80,66 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
           minHeight: 0,
         }}
       >
-        <Box
-          sx={
-            stickyToolbar
-              ? {
-                  position: 'sticky',
-                  top: { xs: 56 + 8, sm: 64 + 8 },
-                  zIndex: 2,
-                  bgcolor: (theme) => alpha(theme.palette.background.paper, 0.92),
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: 1,
-                  boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-                  px: 1,
-                  py: 0.75,
-                  mb: 1.5,
-                }
-              : {
-                  mb: toolbar.compact ? 1 : 1.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                }
-          }
-        >
-          <ListToolbar {...toolbar}>
-            {children}
-          </ListToolbar>
+        {isMobile && mobileCard ? (
+          /* Mobile: searchbar + filter chips, no wrapper card */
+          <Box sx={{ mb: 0.75, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <ListToolbar {...toolbar}>
+              {children}
+            </ListToolbar>
+            {grid.filterConfig && Object.keys(grid.filterConfig).length > 0 && (
+              <FilterChipBar filterConfig={grid.filterConfig} />
+            )}
+          </Box>
+        ) : (
+          <Box
+            sx={
+              stickyToolbar
+                ? {
+                    position: 'sticky',
+                    top: { xs: 56 + 8, sm: 64 + 8 },
+                    zIndex: 2,
+                    bgcolor: (theme) => alpha(theme.palette.background.paper, 0.92),
+                    backdropFilter: 'blur(8px)',
+                    borderRadius: 1,
+                    boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+                    px: 1,
+                    py: 0.75,
+                    mb: 1.5,
+                  }
+                : {
+                    mb: toolbar.compact ? 1 : 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }
+            }
+          >
+            <ListToolbar {...toolbar}>
+              {children}
+            </ListToolbar>
+            {belowToolbar ? <Box sx={{ mt: 1 }}>{belowToolbar}</Box> : null}
+          </Box>
+        )}
 
-          {belowToolbar ? <Box sx={{ mt: 1 }}>{belowToolbar}</Box> : null}
-        </Box>
-
-        <ServerDataGrid
-          {...grid}
-          colPrefsRef={colPrefsRef}
-          onOpenColumnPanel={persistEnabled ? openColumnPanel : undefined}
-        />
+        {mobileCard && isMobile ? (
+          <MobileCardList
+            rows={grid.rows as any[]}
+            rowCount={grid.rowCount}
+            loading={grid.loading}
+            paginationModel={grid.paginationModel}
+            onPaginationModelChange={grid.onPaginationModelChange}
+            renderCard={mobileCard}
+            onRowClick={grid.onRowClick}
+            onRowContextMenu={grid.onRowContextMenu as any}
+            getRowId={grid.getRowId as any}
+            filterConfig={grid.filterConfig}
+          />
+        ) : (
+          <ServerDataGrid
+            {...grid}
+            colPrefsRef={colPrefsRef}
+            onOpenColumnPanel={persistEnabled ? openColumnPanel : undefined}
+          />
+        )}
 
         {/* Pannello drag & drop colonne */}
         {persistEnabled && colPanelSnapshot && (

@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  IconButton,
   CircularProgress,
   Drawer,
   FormControl,
@@ -12,11 +13,13 @@ import {
   MenuItem,
   Select,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material'
 
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import AddIcon from '@mui/icons-material/Add'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloseIcon from '@mui/icons-material/Close'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -48,6 +51,7 @@ import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '../ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '../ui/EntityListCard'
+import type { MobileCardRenderFn } from '../ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
 
 type CustomerItem = { id: number; code?: string; name?: string; display_name?: string | null }
@@ -144,6 +148,65 @@ const cols: GridColDef<ContactRow>[] = [
       ),
   },
 ]
+
+
+// ─── Mobile card renderer ────────────────────────────────────────────────────
+
+const renderContactCard: MobileCardRenderFn<ContactRow> = ({ row, onOpen }) => {
+  const meta: { label: string; value: string | null | undefined }[] = [
+    { label: 'Cliente',  value: row.customer_display_name || row.customer_name },
+    { label: 'Sito',     value: row.site_display_name || row.site_name },
+    { label: 'Email',    value: row.email },
+    { label: 'Telefono', value: row.phone },
+  ]
+
+  return (
+    <Box
+      onClick={() => onOpen(row.id)}
+      sx={{
+        bgcolor: 'background.paper',
+        border: '0.5px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+        p: 1.25,
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.75,
+        '&:active': { bgcolor: 'action.hover' },
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {row.name}
+          </Typography>
+          {row.department && (
+            <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', mt: 0.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {row.department}
+            </Typography>
+          )}
+        </Box>
+        {row.is_primary && (
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: 'rgba(16,185,129,0.10)', color: '#065f46', border: '0.5px solid rgba(16,185,129,0.28)', whiteSpace: 'nowrap' }}>
+            Primario
+          </Box>
+        )}
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+        {meta.map(({ label, value }) => (
+          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {value || '—'}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  )
+}
 
 
 // prettier-ignore
@@ -700,6 +763,7 @@ export default function Contacts() {
     <Stack spacing={2} sx={{ height: '100%' }}>
 
       <EntityListCard
+        mobileCard={renderContactCard}
         toolbar={{
           compact: true,
           q: grid.q,
@@ -800,7 +864,22 @@ export default function Contacts() {
               justifyContent="space-between"
               sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
             >
-              <Chip
+              <Tooltip title="Chiudi">
+                  <IconButton
+                    aria-label="Chiudi"
+                    size="small"
+                    onClick={closeDrawer}
+                    sx={{
+                      color: 'rgba(255,255,255,0.85)',
+                      bgcolor: 'rgba(255,255,255,0.12)',
+                      borderRadius: 1.5,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
+                    }}
+                  >
+                    <ArrowBackIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Chip
                 size="small"
                 label={detail?.is_primary ? '● Primario' : '● Non primario'}
                 sx={{

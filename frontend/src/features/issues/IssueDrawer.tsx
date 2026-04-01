@@ -4,6 +4,7 @@ import {
   CircularProgress,
   Divider,
   Drawer,
+  IconButton,
   LinearProgress,
   Stack,
   Tab,
@@ -17,6 +18,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import SendIcon from '@mui/icons-material/Send'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloseIcon from '@mui/icons-material/Close'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -127,7 +129,22 @@ export default function IssueDrawer({
             justifyContent="space-between"
             sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
           >
-            <Stack direction="row" spacing={0.75}>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
+              <Tooltip title="Chiudi">
+                <IconButton
+                  aria-label="Chiudi"
+                  size="small"
+                  onClick={onClose}
+                  sx={{
+                    color: 'rgba(255,255,255,0.85)',
+                    bgcolor: 'rgba(255,255,255,0.12)',
+                    borderRadius: 1.5,
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
+                  }}
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               {issue ? (
                 <Box
                   sx={{

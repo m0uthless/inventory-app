@@ -59,7 +59,7 @@ export default function ListToolbar(props: Props) {
       sx={{
         width: '100%',
         flexWrap: { md: 'nowrap' },
-        rowGap: 1,
+        rowGap: 0,
         columnGap: 1,
         minHeight: compact ? HC : H,
         '& .MuiButton-root': { height: compact ? HC : H, fontSize: '0.75rem' },
@@ -92,7 +92,7 @@ export default function ListToolbar(props: Props) {
             height: compact ? HC : H,
             fontSize: compact ? '0.95rem' : '0.8125rem',
             borderRadius: compact ? 1.5 : undefined,
-            bgcolor: 'transparent',
+            bgcolor: { xs: 'background.paper', md: 'transparent' },
           },
           '& .MuiInputBase-input': { py: 0 },
         }}

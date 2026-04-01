@@ -23,6 +23,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import SearchIcon from '@mui/icons-material/Search'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloseIcon from '@mui/icons-material/Close'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
@@ -763,6 +764,21 @@ export default function Audit() {
                 spacing={1}
                 sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
               >
+                <Tooltip title="Chiudi">
+                  <IconButton
+                    aria-label="Chiudi"
+                    size="small"
+                    onClick={closeDrawer}
+                    sx={{
+                      color: 'rgba(255,255,255,0.85)',
+                      bgcolor: 'rgba(255,255,255,0.12)',
+                      borderRadius: 1.5,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
+                    }}
+                  >
+                    <ArrowBackIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <AuditActionChip action={detail.action} size="medium" />
                 <Stack direction="row" spacing={0.75}>
                   <Tooltip title="Copia ID">
