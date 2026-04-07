@@ -17,5 +17,5 @@ services:
 
   frontend-auslbo:
     build:
-      context: ./frontend-auslbo
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend-auslbo/Dockerfile
