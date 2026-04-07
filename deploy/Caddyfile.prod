@@ -1,4 +1,4 @@
-archie.biotron.it {
+http://archie.biotron.it {
     encode gzip zstd
 
     handle /api/* {
@@ -22,7 +22,7 @@ archie.biotron.it {
     }
 }
 
-auslbo.biotron.it {
+http://auslbo.biotron.it {
     encode gzip zstd
 
     handle /api/* {
