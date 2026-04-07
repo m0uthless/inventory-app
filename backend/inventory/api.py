@@ -18,6 +18,7 @@ from core.crypto import decrypt
 from core.integrity import raise_integrity_error_as_validation
 from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, RestoreActionMixin, PurgeActionMixin
+from auslbo.mixins import AuslBoScopedMixin
 
 
 class DecryptedSecretField(serializers.CharField):
@@ -249,7 +250,7 @@ class InventoryWriteSerializer(InventoryDetailSerializer):
         }
 
 
-class InventoryViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class InventoryViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = InventoryWriteSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 

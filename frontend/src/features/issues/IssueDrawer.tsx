@@ -26,7 +26,7 @@ import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import { inventoryDrawerPath } from '../../utils/entityPaths'
-import { ActionIconButton } from '../../ui/ActionIconButton'
+import { ActionIconButton } from '@shared/ui/ActionIconButton'
 import {
   STATUS_META,
   fmtIssueDate,

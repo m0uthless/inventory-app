@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Avatar, Box, Card, Chip, Divider, Stack, Typography } from '@mui/material'
 import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 import { PRIORITY_META } from '../features/issues/types'
 import type { IssueRow } from '../features/issues/types'
 

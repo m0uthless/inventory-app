@@ -26,15 +26,15 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import LinkIcon from '@mui/icons-material/Link'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 
 import type { GridColDef } from '@mui/x-data-grid'
 
 import { useAuth } from '../auth/AuthProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
-import { apiErrorToMessage } from '../api/error'
-import { buildDrfListParams, type DrfParams } from '../api/drf'
+import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
+import { buildDrfListParams, type DrfParams } from '@shared/api/drf'
 import {
   createEmptyIssueForm as createEmptyForm,
   fmtIssueDate as fmtDate,
@@ -50,12 +50,12 @@ import {
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
 import IssueDrawer from '../features/issues/IssueDrawer'
-import { useDrfList } from '../hooks/useDrfList'
-import { useServerGrid } from '../hooks/useServerGrid'
-import { useToast } from '../ui/toast'
-import EntityListCard from '../ui/EntityListCard'
-import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
-import { isRecord } from '../utils/guards'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useToast } from '@shared/ui/toast'
+import EntityListCard from '@shared/ui/EntityListCard'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import { isRecord } from '@shared/utils/guards'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
 type CreateFromInventoryState = {
@@ -664,7 +664,7 @@ export default function Issues() {
     navigate(loc.pathname + loc.search, { replace: true, state: {} })
   }, [loc, navigate, me?.id, openCreate])
 
-  const openEdit = (row: IssueRow) => {
+  const openEdit = React.useCallback((row: IssueRow) => {
     setEditIssue(row)
     const custOpt = row.customer
       ? { id: row.customer, label: row.customer_name || String(row.customer) }
@@ -696,9 +696,9 @@ export default function Issues() {
         : null,
     )
     setFormOpen(true)
-  }
+  }, [])
 
-  const openLinkInventoryPicker = async () => {
+  const openLinkInventoryPicker = React.useCallback(async () => {
     if (!editIssue) return
 
     setLinkInventoryOpen(true)
@@ -724,7 +724,7 @@ export default function Issues() {
     } finally {
       setLinkInventoryLoading(false)
     }
-  }
+  }, [editIssue, toast])
 
   const handleLinkInventory = async (inventoryToLink: InventoryOption | null = selectedInventory) => {
     if (!editIssue) return
@@ -825,11 +825,11 @@ export default function Issues() {
   const [newComment, setNewComment] = React.useState('')
   const [sendingComment, setSendingComment] = React.useState(false)
 
-  const openDetail = (row: IssueRow, tab = 0) => {
+  const openDetail = React.useCallback((row: IssueRow, tab = 0) => {
     setDetailIssue(row)
     setDetailTab(tab)
     setNewComment('')
-  }
+  }, [])
 
   // Ref che mantiene sempre le righe correnti senza finire nelle dep dell'effect
   const rowsRef = React.useRef<IssueRow[]>(rows)
@@ -851,23 +851,33 @@ export default function Issues() {
     const id = Number(openId)
     if (!Number.isFinite(id) || id <= 0) return
     openParamHandledRef.current = true
+
+    const showIssueDetail = (row: IssueRow, tab = 0) => {
+      setDetailIssue(row)
+      setDetailTab(tab)
+      setNewComment('')
+    }
+
     // Cerca prima nelle righe già caricate (via ref, sempre aggiornato), altrimenti fetch diretto
     const existing = rowsRef.current.find((r) => r.id === id)
     if (existing) {
-      openDetail(existing)
+      showIssueDetail(existing)
     } else {
-      api.get<IssueRow>(`/issues/${id}/`).then((r) => {
-        openDetail(r.data)
-      }).catch(() => {})
+      api
+        .get<IssueRow>(`/issues/${id}/`)
+        .then((r) => {
+          showIssueDetail(r.data)
+        })
+        .catch(() => {})
     }
     // Pulisce il param dall'URL senza reload
     const newSearch = new URLSearchParams(loc.search)
     newSearch.delete('open')
     navigate(
       loc.pathname + (newSearch.toString() ? `?${newSearch.toString()}` : ''),
-      { replace: true, state: loc.state }
+      { replace: true, state: loc.state },
     )
-  }, [loc.search, navigate]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loc.pathname, loc.search, loc.state, navigate])
 
   React.useEffect(() => {
     if (!detailIssue) return
@@ -877,7 +887,6 @@ export default function Issues() {
       .then((r) => setComments(r.data ?? []))
       .catch(() => toast.error('Errore caricamento commenti.'))
       .finally(() => setCommentsLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailIssue, toast])
 
   const handleSendComment = async () => {
@@ -937,7 +946,7 @@ export default function Issues() {
     [syncIssueState, reload, toast],
   )
 
-  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
+  const contextMenuItems: RowContextMenuItem[] = (() => {
     const row = contextMenu?.row
     if (!row) return []
 
@@ -991,7 +1000,7 @@ export default function Issues() {
         disabled: isClosed,
       },
     ]
-  }, [contextMenu, handleResolveIssue, openEdit, openDetail, openLinkInventoryPicker])
+  })()
 
 
   const emptyState = React.useMemo(() => {

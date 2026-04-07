@@ -1,6 +1,8 @@
 """wiki/api/categories.py — WikiCategory serializer + ViewSet."""
 from __future__ import annotations
 
+from typing import ClassVar
+
 from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action

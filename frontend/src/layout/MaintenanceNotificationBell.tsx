@@ -14,7 +14,7 @@ import {
 } from '@mui/material'
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 
 type DueItem = {
   plan_id: number

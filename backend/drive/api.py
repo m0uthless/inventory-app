@@ -363,12 +363,10 @@ class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
 
+        scoped_qs = self.filter_queryset(self.get_queryset()).filter(deleted_at__isnull=False)
         now = timezone.now()
-        restored_ids = list(
-            DriveFolder.objects.filter(id__in=ids, deleted_at__isnull=False)
-            .values_list("id", flat=True)
-        )
-        DriveFolder.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_by=request.user, updated_at=now)
+        restored_ids = list(scoped_qs.filter(id__in=ids).values_list("id", flat=True))
+        scoped_qs.filter(id__in=restored_ids).update(deleted_at=None, updated_by=request.user, updated_at=now)
         log_event(
             actor=request.user, action="restore", instance=None,
             changes={"ids": restored_ids}, request=request,
@@ -541,12 +539,10 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=400)
 
+        scoped_qs = self.filter_queryset(self.get_queryset()).filter(deleted_at__isnull=False)
         now = timezone.now()
-        restored_ids = list(
-            DriveFile.objects.filter(id__in=ids, deleted_at__isnull=False)
-            .values_list("id", flat=True)
-        )
-        DriveFile.objects.filter(id__in=restored_ids).update(deleted_at=None, updated_by=request.user, updated_at=now)
+        restored_ids = list(scoped_qs.filter(id__in=ids).values_list("id", flat=True))
+        scoped_qs.filter(id__in=restored_ids).update(deleted_at=None, updated_by=request.user, updated_at=now)
         log_event(
             actor=request.user, action="restore", instance=None,
             changes={"ids": restored_ids}, request=request,

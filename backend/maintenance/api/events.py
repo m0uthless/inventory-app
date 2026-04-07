@@ -9,6 +9,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
 from core.permissions import CanRestoreModelPermission, CanPurgeModelPermission
+from core.uploads import validate_upload
+from core.media import build_action_url, protected_media_response
 from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, RestoreActionMixin, PurgeActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from core.purge_policy import try_purge_instance
@@ -18,6 +20,25 @@ from audit.utils import log_event
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from maintenance.models import MaintenanceEvent, MaintenancePlan, Tech
 from maintenance.api.helpers import compute_next_due_date
+
+
+PDF_MAX_BYTES = 20 * 1024 * 1024
+PDF_ALLOWED_EXTENSIONS = {"pdf"}
+PDF_ALLOWED_CONTENT_TYPES = {"application/pdf"}
+
+
+def _validate_pdf_contents(uploaded_file):
+    try:
+        uploaded_file.seek(0)
+        header = uploaded_file.read(5)
+        if header != b"%PDF-":
+            raise serializers.ValidationError("Il file caricato non è un PDF valido.")
+    finally:
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
+
 
 class MaintenanceEventSerializer(serializers.ModelSerializer):
     # Da piano → customer
@@ -43,6 +64,17 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
     # Separato da pdf_url (read-only, URL assoluto) per evitare ambiguità.
     pdf_file   = serializers.FileField(required=False, allow_null=True, write_only=False)
 
+    def validate_pdf_file(self, value):
+        return validate_upload(
+            value,
+            label="PDF",
+            max_bytes=PDF_MAX_BYTES,
+            allowed_extensions=PDF_ALLOWED_EXTENSIONS,
+            allowed_content_types=PDF_ALLOWED_CONTENT_TYPES,
+            strict_real_mime=False,
+            content_validator=_validate_pdf_contents,
+        )
+
     def get_site_name(self, obj):
         return obj.inventory.site.name if obj.inventory.site_id and obj.inventory.site else None
 
@@ -50,7 +82,7 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
         if not obj.pdf_file:
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.pdf_file.url) if request else obj.pdf_file.url
+        return build_action_url(request=request, relative_path=f"/api/maintenance-events/{obj.pk}/pdf/")
 
     def validate(self, attrs):
         # tech è obbligatorio per tutti i result tranne not_planned
@@ -183,6 +215,10 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         pdf_file = request.FILES.get("pdf_file")
         if not pdf_file:
             return Response({"detail": "Nessun file inviato."}, status=400)
+        try:
+            self.get_serializer().validate_pdf_file(pdf_file)
+        except serializers.ValidationError as exc:
+            return Response({"pdf_file": exc.detail}, status=400)
         # Rimuovi vecchio file se presente
         if event.pdf_file:
             event.pdf_file.delete(save=False)
@@ -204,6 +240,17 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         log_event(actor=request.user, action="update", instance=event, request=request,
                   changes={"pdf_file": [old_name, None]})
         return Response({"detail": "PDF eliminato."})
+
+    @action(detail=True, methods=["get"], url_path="pdf")
+    def pdf(self, request, pk=None):
+        event = self.get_object()
+        filename = event.pdf_file.name.rsplit('/', 1)[-1] if event.pdf_file else None
+        return protected_media_response(
+            file_field=event.pdf_file,
+            disposition="inline",
+            filename=filename,
+            mime_type="application/pdf",
+        )
 
     @action(detail=True, methods=["patch"], url_path="set-not-planned")
     def set_not_planned(self, request, pk=None):

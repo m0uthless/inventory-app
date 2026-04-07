@@ -14,9 +14,9 @@ import {
 } from '@mui/material'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
-import { api } from '../api/client'
-import { useToast } from '../ui/toast'
-import { apiErrorToMessage } from '../api/error'
+import { api } from '@shared/api/client'
+import { useToast } from '@shared/ui/toast'
+import { apiErrorToMessage } from '@shared/api/error'
 
 type SearchResult = {
   kind: string

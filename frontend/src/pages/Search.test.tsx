@@ -13,8 +13,8 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigate }
 })
 
-vi.mock('../api/client', () => ({ api: { get: (...args: unknown[]) => apiGet(...args) } }))
-vi.mock('../ui/toast', () => ({ useToast: () => ({ error: errorToast, success: vi.fn() }) }))
+vi.mock('@shared/api/client', () => ({ api: { get: (...args: unknown[]) => apiGet(...args) } }))
+vi.mock('@shared/ui/toast', () => ({ useToast: () => ({ error: errorToast, success: vi.fn() }) }))
 
 describe('Search page', () => {
   beforeEach(() => {

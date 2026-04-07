@@ -48,6 +48,9 @@ INSTALLED_APPS = [
     "drive",
     "issues",
     "feedback.apps.FeedbackConfig",
+    "auslbo.apps.AuslBoConfig",
+    "device.apps.DeviceConfig",
+    "vlan.apps.VlanConfig",
 ]
 
 # --- CSRF / Origin handling ---
@@ -272,6 +275,13 @@ SESSION_COOKIE_HTTPONLY = _env_bool("DJANGO_SESSION_COOKIE_HTTPONLY", default=Tr
 CSRF_COOKIE_HTTPONLY = _env_bool("DJANGO_CSRF_COOKIE_HTTPONLY", default=False)
 SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
+
+# In produzione con più sottodomini (es. archie.biotron.it + auslbo.biotron.it)
+# impostare DJANGO_SESSION_COOKIE_DOMAIN=.biotron.it per condividere la sessione.
+# In dev lasciare vuoto — stessa sessione su stesso host con porte diverse.
+_cookie_domain = os.getenv("DJANGO_SESSION_COOKIE_DOMAIN", "").strip()
+SESSION_COOKIE_DOMAIN = _cookie_domain or None
+CSRF_COOKIE_DOMAIN = _cookie_domain or None
 SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
 SECURE_CONTENT_TYPE_NOSNIFF = _env_bool("DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True)
 SECURE_REFERRER_POLICY = os.getenv("DJANGO_SECURE_REFERRER_POLICY", "same-origin")

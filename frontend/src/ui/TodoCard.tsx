@@ -3,7 +3,7 @@ import { Box, Card, Divider, IconButton, InputBase, Stack, Tooltip, Typography }
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import ChecklistRoundedIcon from '@mui/icons-material/ChecklistRounded'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 
 type Task = {
   id: number
@@ -37,7 +37,11 @@ export default function TodoCard() {
       setTasks(prev => [r.data, ...prev])
       setInput('')
       inputRef.current?.focus()
-    } catch {} finally { setSaving(false) }
+    } catch {
+      // handled by keeping the current UI state unchanged
+    } finally {
+      setSaving(false)
+    }
   }
 
   const toggleDone = async (task: Task) => {

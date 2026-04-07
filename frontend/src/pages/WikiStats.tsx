@@ -15,9 +15,9 @@ import StarRoundedIcon from '@mui/icons-material/StarRounded'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
-import { useToast } from '../ui/toast'
-import { apiErrorToMessage } from '../api/error'
+import { api } from '@shared/api/client'
+import { useToast } from '@shared/ui/toast'
+import { apiErrorToMessage } from '@shared/api/error'
 import ContributorCard, { type ContributorData } from '../ui/ContributorCard'
 
 type Totals = {

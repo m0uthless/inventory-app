@@ -49,7 +49,6 @@ jobs:
 
       - name: Static type check (mypy)
         run: docker compose run --rm backend python -m mypy --config-file mypy.ini .
-        continue-on-error: true
 
       - name: Start database
         run: docker compose up -d db

@@ -9,7 +9,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

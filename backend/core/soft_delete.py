@@ -5,8 +5,8 @@ The project uses a consistent convention:
 - ?include_deleted=1  -> include active + soft-deleted
 - ?only_deleted=1     -> only soft-deleted
 
-Additionally, the `restore` action must be able to "see" soft-deleted rows,
-so it behaves like include_deleted=1.
+Additionally, trash-related actions must be able to "see" soft-deleted rows,
+so they behave like include_deleted=1.
 
 Centralizing this logic reduces subtle inconsistencies between apps.
 """
@@ -47,8 +47,8 @@ def apply_soft_delete_filters(
     include_deleted = str(include_deleted).strip().lower()
     only_deleted = str(only_deleted).strip().lower()
 
-    # `restore` must be able to see soft-deleted objects
-    if (action_name or "") == "restore":
+    # Trash-related actions must be able to see soft-deleted objects
+    if (action_name or "") in {"restore", "bulk_restore", "purge", "bulk_purge"}:
         include_deleted = "1"
 
     if only_deleted in TRUTHY:

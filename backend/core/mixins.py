@@ -54,7 +54,7 @@ class SoftDeleteAuditMixin:
         before = getattr(instance, "deleted_at", None)
         instance.deleted_at = timezone.now()
         if hasattr(instance, "updated_by_id") or hasattr(instance, "updated_by"):
-            instance.updated_by = self.request.user  # type: ignore[attr-defined]
+            instance.updated_by = self.request.user
             instance.save(update_fields=["deleted_at", "updated_by", "updated_at"])
         else:
             instance.save(update_fields=["deleted_at", "updated_at"])
@@ -65,11 +65,11 @@ class SoftDeleteAuditMixin:
             }
         }
         log_event(
-            actor=self.request.user,  # type: ignore[attr-defined]
+            actor=self.request.user,
             action="delete",
             instance=instance,
             changes=changes,
-            request=self.request,  # type: ignore[attr-defined]
+            request=self.request,
         )
 
     def perform_create(self, serializer):
@@ -84,8 +84,8 @@ class SoftDeleteAuditMixin:
         save_kwargs = {}
         if has_userstamps:
             save_kwargs = {
-                'created_by': self.request.user,  # type: ignore[attr-defined]
-                'updated_by': self.request.user,  # type: ignore[attr-defined]
+                'created_by': self.request.user,
+                'updated_by': self.request.user,
             }
         instance = serializer.save(**save_kwargs)
         changes = {
@@ -93,11 +93,11 @@ class SoftDeleteAuditMixin:
             for k, v in (serializer.validated_data or {}).items()
         }
         log_event(
-            actor=self.request.user,  # type: ignore[attr-defined]
+            actor=self.request.user,
             action="create",
             instance=instance,
             changes=changes,
-            request=self.request,  # type: ignore[attr-defined]
+            request=self.request,
         )
 
     def perform_update(self, serializer):
@@ -105,14 +105,14 @@ class SoftDeleteAuditMixin:
         changes = self._changes_from_validated(instance_before, serializer.validated_data)
         save_kwargs = {}
         if hasattr(instance_before, 'updated_by_id') or hasattr(instance_before, 'updated_by'):
-            save_kwargs['updated_by'] = self.request.user  # type: ignore[attr-defined]
+            save_kwargs['updated_by'] = self.request.user
         instance = serializer.save(**save_kwargs)
         log_event(
-            actor=self.request.user,  # type: ignore[attr-defined]
+            actor=self.request.user,
             action="update",
             instance=instance,
             changes=changes or None,
-            request=self.request,  # type: ignore[attr-defined]
+            request=self.request,
         )
 
 
@@ -143,6 +143,10 @@ class RestoreActionMixin:
     restore_response_204: bool = True
     restore_use_split: bool = True
 
+    def _get_scoped_trash_queryset(self):
+        qs = self.filter_queryset(self.get_queryset())
+        return qs.filter(deleted_at__isnull=False)
+
     def _restore_obj(self, obj, request):
         before = getattr(obj, "deleted_at", None)
         obj.deleted_at = None
@@ -161,7 +165,7 @@ class RestoreActionMixin:
 
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
-        obj = self.get_object()  # type: ignore[attr-defined]
+        obj = self.get_object()
 
         if self.restore_use_block_check:
             from core.restore_policy import get_restore_block_reason
@@ -173,7 +177,7 @@ class RestoreActionMixin:
 
         if self.restore_response_204:
             return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(self.get_serializer(obj).data)  # type: ignore[attr-defined]
+        return Response(self.get_serializer(obj).data)
 
     @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def bulk_restore(self, request):
@@ -183,9 +187,10 @@ class RestoreActionMixin:
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
 
-        model = self.get_queryset().model  # type: ignore[attr-defined]
+        scoped_qs = self._get_scoped_trash_queryset()
+        model = scoped_qs.model
         model_name = model.__name__
-        qs = list(model.objects.filter(id__in=ids, deleted_at__isnull=False))
+        qs = list(scoped_qs.filter(id__in=ids))
         blocked: list = []
 
         if self.restore_use_split:
@@ -198,7 +203,7 @@ class RestoreActionMixin:
             update_kwargs: dict = {"deleted_at": None, "updated_at": now}
             if self.restore_has_updated_by:
                 update_kwargs["updated_by"] = request.user
-            model.objects.filter(id__in=restored_ids).update(**update_kwargs)
+            scoped_qs.filter(id__in=restored_ids).update(**update_kwargs)
 
         log_event(
             actor=request.user,
@@ -222,11 +227,16 @@ class RestoreActionMixin:
 class PurgeActionMixin:
     """Mixin che aggiunge `purge` e `bulk_purge` a un ViewSet."""
 
+    def _get_scoped_trash_queryset(self):
+        qs = self.filter_queryset(self.get_queryset())
+        return qs.filter(deleted_at__isnull=False)
+
     @action(detail=True, methods=["post"], permission_classes=[CanPurgeModelPermission])
     def purge(self, request, pk=None):
         from core.purge_policy import try_purge_instance
-        model = self.get_queryset().model  # type: ignore[attr-defined]
-        obj = model.objects.filter(pk=pk, deleted_at__isnull=False).first()
+        scoped_qs = self._get_scoped_trash_queryset()
+        model = scoped_qs.model
+        obj = scoped_qs.filter(pk=pk).first()
         if obj is None:
             return Response({"detail": "Elemento non trovato nel cestino."}, status=status.HTTP_404_NOT_FOUND)
         ok, reason, blockers = try_purge_instance(obj)
@@ -246,17 +256,19 @@ class PurgeActionMixin:
         if not isinstance(ids, list) or not ids:
             return Response({"detail": "ids must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
 
-        model = self.get_queryset().model  # type: ignore[attr-defined]
+        scoped_qs = self._get_scoped_trash_queryset()
+        model = scoped_qs.model
         model_name = model.__name__
         purged: list = []
         blocked: list = []
 
-        for obj in model.objects.filter(id__in=ids, deleted_at__isnull=False):
+        for obj in scoped_qs.filter(id__in=ids):
+            obj_id = obj.id
             ok, reason, blockers = try_purge_instance(obj)
             if ok:
-                purged.append(obj.id)
+                purged.append(obj_id)
             else:
-                blocked.append({"id": obj.id, "reason": reason, "blocked": blockers})
+                blocked.append({"id": obj_id, "reason": reason, "blocked": blockers})
 
         log_event(
             actor=request.user, action="delete", instance=None,
@@ -286,7 +298,7 @@ class CustomFieldsValidationMixin:
     def validate(self, attrs):
         from custom_fields.validation import normalize_and_validate_custom_fields
 
-        if not self.custom_fields_entity:  # type: ignore[truthy-bool]
+        if not self.custom_fields_entity:
             raise NotImplementedError(
                 f"{self.__class__.__name__} deve definire custom_fields_entity."
             )
@@ -307,7 +319,7 @@ class CustomFieldsValidationMixin:
             normalized = normalize_and_validate_custom_fields(
                 entity=self.custom_fields_entity,
                 incoming=incoming if incoming is not None else {},
-                existing=getattr(self.instance, "custom_fields", None) or {},  # type: ignore[attr-defined]
+                existing=getattr(self.instance, "custom_fields", None) or {},
                 partial=bool(getattr(self, "partial", False)),
             )
             attrs["custom_fields"] = normalized

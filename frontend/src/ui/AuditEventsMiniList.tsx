@@ -11,11 +11,11 @@ import {
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 
-import { buildDrfListParams } from '../api/drf'
-import { apiErrorToMessage } from '../api/error'
-import { useDrfList } from '../hooks/useDrfList'
-import { buildQuery } from '../utils/nav'
-import { useToast } from './toast'
+import { buildDrfListParams } from '@shared/api/drf'
+import { apiErrorToMessage } from '@shared/api/error'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { buildQuery } from '@shared/utils/nav'
+import { useToast } from '@shared/ui/toast'
 import AuditActionChip from './AuditActionChip'
 import type { AuditEventRow } from '../types/audit'
 

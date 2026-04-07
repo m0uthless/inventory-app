@@ -27,23 +27,23 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 
-import { api } from '../api/client'
-import { apiErrorToMessage } from '../api/error'
-import { buildDrfListParams } from '../api/drf'
+import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
+import { buildDrfListParams } from '@shared/api/drf'
 import { useAuth } from '../auth/AuthProvider'
-import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { Can } from '../auth/Can'
 import { PERMS } from '../auth/perms'
 import type { EventRow } from './maintenanceTypes'
-import { useDrfList } from '../hooks/useDrfList'
-import { useServerGrid } from '../hooks/useServerGrid'
-import { useUrlNumberParam, useUrlStringParam } from '../hooks/useUrlParam'
-import EntityListCard from '../ui/EntityListCard'
-import FilterChip from '../ui/FilterChip'
-import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
-import { useToast } from '../ui/toast'
-import { useExportCsv } from '../ui/useExportCsv'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
+import EntityListCard from '@shared/ui/EntityListCard'
+import FilterChip from '@shared/ui/FilterChip'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '@shared/ui/toolbarStyles'
+import { useToast } from '@shared/ui/toast'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 
 import { RapportinoDialog } from './Maintenance'
 
@@ -138,7 +138,12 @@ export default function Rapportini() {
   const selectedCount = selectedIds.size
   const allPageSelected = rows.length > 0 && rows.every(r => selectedIds.has(r.id))
   const toggleRow = React.useCallback((id: number) =>
-    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s }), [])
+    setSelectedIds(prev => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id)
+      else s.add(id)
+      return s
+    }), [])
   const togglePage = React.useCallback(() =>
     setSelectedIds(prev => {
       const s = new Set(prev)
@@ -169,7 +174,7 @@ export default function Rapportini() {
         ? rows.filter(r => curIds.has(r.id))
         : [row]
       setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6, snapshot })
-    }, [rows] // eslint-disable-line react-hooks/exhaustive-deps
+    }, [rows]
   )
 
   // Upload PDF — opens file picker, then PATCHes the event

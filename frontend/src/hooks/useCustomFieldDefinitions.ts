@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import { apiGet } from '../api/client'
+import { apiGet } from '@shared/api/client'
 
 export type CustomFieldEntity = 'customer' | 'site' | 'inventory' | 'maintenance_plan'
 export type CustomFieldType = 'text' | 'number' | 'date' | 'select' | 'boolean'

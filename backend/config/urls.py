@@ -15,6 +15,8 @@ from core.me_api import ChangePasswordView, MeAPIView
 from config.search_api import SearchAPIView
 from config.system_stats_api import HealthAPIView, SystemStatsView
 
+from auslbo.api import AuslBoMeView, AuslBoConfigView
+
 from core.api import (
     CustomerStatusViewSet,
     SiteStatusViewSet,
@@ -39,6 +41,16 @@ from maintenance.api import (
 from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView, WikiQueryViewSet, WikiQueryLanguageViewSet
 from issues.api import IssueViewSet, IssueCategoryViewSet
 from feedback.api import ReportRequestViewSet
+from device.api import (
+    DeviceViewSet,
+    DeviceManufacturerViewSet,
+    DeviceStatusViewSet,
+    DeviceTypeViewSet,
+    DeviceRispacsViewSet,
+    DeviceWifiViewSet,
+    RispacsViewSet,
+)
+from vlan.api import VlanViewSet, VlanIpRequestViewSet, CustomerRispacsViewSet
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customer")
@@ -77,6 +89,20 @@ router.register(r"issues",           IssueViewSet,         basename="issue")
 router.register(r"issue-categories", IssueCategoryViewSet, basename="issue-category")
 router.register(r"feedback-items", ReportRequestViewSet, basename="feedback-item")
 
+# Device
+router.register(r"devices", DeviceViewSet, basename="device")
+router.register(r"device-manufacturers", DeviceManufacturerViewSet, basename="device-manufacturer")
+router.register(r"device-statuses", DeviceStatusViewSet, basename="device-status")
+router.register(r"device-types", DeviceTypeViewSet, basename="device-type")
+router.register(r"device-rispacs", DeviceRispacsViewSet, basename="device-rispacs")
+router.register(r"device-wifi", DeviceWifiViewSet, basename="device-wifi")
+router.register(r"rispacs", RispacsViewSet, basename="rispacs")
+
+# VLAN
+router.register(r"vlans", VlanViewSet, basename="vlan")
+router.register(r"vlan-ip-requests", VlanIpRequestViewSet, basename="vlan-ip-request")
+router.register(r"customer-rispacs", CustomerRispacsViewSet, basename="customer-rispacs")
+
 # Lookups (core)
 router.register(r"customer-statuses", CustomerStatusViewSet, basename="customer-status")
 router.register(r"site-statuses", SiteStatusViewSet, basename="site-status")
@@ -106,6 +132,10 @@ urlpatterns = [
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
+
+    # AUSL BO
+    path("api/auslbo/me/", AuslBoMeView.as_view(), name="auslbo-me"),
+    path("api/auslbo/config/", AuslBoConfigView.as_view(), name="auslbo-config"),
 
     # Public status endpoints
     path("api/health/", HealthAPIView.as_view()),

@@ -16,6 +16,7 @@ import uuid
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import close_old_connections, connections
 
 from wiki.models import WikiCategory, WikiPage, WikiPageRevision
 
@@ -121,6 +122,7 @@ class TestConcurrentRevisionNumberUniqueness:
         errors: list[Exception] = []
 
         def patch_page(content: str):
+            close_old_connections()
             try:
                 c = APIClient()
                 c.force_authenticate(user=admin)
@@ -132,6 +134,8 @@ class TestConcurrentRevisionNumberUniqueness:
                 assert res.status_code == 200
             except Exception as e:
                 errors.append(e)
+            finally:
+                connections.close_all()
 
         t1 = threading.Thread(target=patch_page, args=("Contenuto thread 1",))
         t2 = threading.Thread(target=patch_page, args=("Contenuto thread 2",))
@@ -200,6 +204,7 @@ class TestRevisionRestore:
         errors: list[Exception] = []
 
         def do_restore():
+            close_old_connections()
             try:
                 client = APIClient()
                 client.force_authenticate(user=admin)
@@ -208,6 +213,8 @@ class TestRevisionRestore:
                 assert res.status_code in (200, 404)
             except Exception as e:
                 errors.append(e)
+            finally:
+                connections.close_all()
 
         t1 = threading.Thread(target=do_restore)
         t2 = threading.Thread(target=do_restore)

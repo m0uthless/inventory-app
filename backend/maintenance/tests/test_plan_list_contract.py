@@ -31,7 +31,9 @@ def _auth_client(user) -> APIClient:
 def _statuses():
     customer_status = CustomerStatus.objects.get_or_create(key="maint_active_t", defaults={"label": "Active"})[0]
     site_status = SiteStatus.objects.get_or_create(key="maint_active_t", defaults={"label": "Active"})[0]
-    inventory_status = InventoryStatus.objects.get_or_create(key="maint_active_t", defaults={"label": "Active"})[0]
+    # covered_count considera attivi solo gli status inventory riconosciuti
+    # (in_use / maintenance / repair). Per il test di contratto usiamo uno di questi.
+    inventory_status = InventoryStatus.objects.get_or_create(key="in_use", defaults={"label": "In use"})[0]
     inventory_type = InventoryType.objects.get_or_create(key="server_t", defaults={"label": "Server"})[0]
     return customer_status, site_status, inventory_status, inventory_type
 

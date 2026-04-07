@@ -11,10 +11,10 @@ pytestmark = pytest.mark.django_db
 
 def _mk_def(
     *,
-    entity: str = CustomFieldDefinition.Entity.CUSTOMER,
+    entity: str = str(CustomFieldDefinition.Entity.CUSTOMER),
     key: str,
     label: str,
-    field_type: str = CustomFieldDefinition.FieldType.TEXT,
+    field_type: str = str(CustomFieldDefinition.FieldType.TEXT),
     required: bool = False,
     aliases=None,
     options=None,

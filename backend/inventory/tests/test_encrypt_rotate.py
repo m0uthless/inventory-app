@@ -91,13 +91,18 @@ def _run_command(*args, env_patch=None):
 
     with override_settings(FIELD_ENCRYPTION_KEY=env.get("FIELD_ENCRYPTION_KEY", TEST_KEY_1)):
         with mock.patch.dict(os.environ, env, clear=False):
-            call_command(
-                "encrypt_rotate",
-                *args,
-                stdout=stdout,
-                stderr=stderr,
-                force=True,  # evita input() interattivo
-            )
+            try:
+                call_command(
+                    "encrypt_rotate",
+                    *args,
+                    stdout=stdout,
+                    stderr=stderr,
+                    force=True,  # evita input() interattivo
+                )
+            except SystemExit:
+                # Il comando CLI termina con exit code != 0 quando trova errori,
+                # ma nei test ci interessa poter ispezionare stdout/stderr.
+                pass
 
     return stdout.getvalue(), stderr.getvalue()
 

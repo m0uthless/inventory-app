@@ -14,3 +14,8 @@ services:
   cron:
     env_file:
       - ./.env.dev
+
+  frontend-auslbo:
+    build:
+      context: .
+      dockerfile: frontend-auslbo/Dockerfile

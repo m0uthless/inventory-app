@@ -44,20 +44,20 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import Portal from '@mui/material/Portal'
 import { alpha, useTheme } from '@mui/material/styles'
-import { api } from '../api/client'
-import { apiErrorToMessage } from '../api/error'
+import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
 import { Can } from '../auth/Can'
 import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
-import { useDrfList } from '../hooks/useDrfList'
-import { useServerGrid } from '../hooks/useServerGrid'
-import { useUrlNumberParam, useUrlStringParam } from '../hooks/useUrlParam'
-import EntityListCard from '../ui/EntityListCard'
-import FilterChip from '../ui/FilterChip'
-import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
-import { compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
-import { useToast } from '../ui/toast'
-import { useExportCsv } from '../ui/useExportCsv'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
+import EntityListCard from '@shared/ui/EntityListCard'
+import FilterChip from '@shared/ui/FilterChip'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { compactExportButtonSx, compactResetButtonSx } from '@shared/ui/toolbarStyles'
+import { useToast } from '@shared/ui/toast'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 import type { PlanRow, EventRow, TodoRow, RapportinoContext } from './maintenanceTypes'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -395,7 +395,7 @@ export function RapportinoDialog({ open, context, techs, onClose, onSaved }: {
     pdfFileRef.current = null; setPdfFileName(null)
     if (ctx) setForm({ ...EVENT0, plan: ctx.plan_id, inventory: ctx.inventory_id, performed_at: new Date().toISOString().slice(0, 10) })
     else { setForm({ ...EVENT0, performed_at: new Date().toISOString().slice(0, 10) }); setFreeCustomerId(''); setFreeSiteId('') }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open])
 
   React.useEffect(() => {
     if (!freeCustomerId) { setFreeSites([]); setFreeSiteId(''); return }
@@ -778,7 +778,7 @@ export default function Maintenance() {
     api.get<{ title: string; customer_name?: string }>(`/maintenance-plans/${planF}/`)
       .then(r => setPlanFLabel(`${r.data.title}${r.data.customer_name ? ` — ${r.data.customer_name}` : ''}`))
       .catch(() => setPlanFLabel(String(planF)))
-  }, [planF]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [planF])
 
   const { rows: customers } = useDrfList<CustomerItem>('/customers/', { ordering: 'display_name', page_size: 500 })
   const [filterSites, setFilterSites] = React.useState<SiteItem[]>([])
@@ -843,7 +843,7 @@ export default function Maintenance() {
         total,
       })
     }).catch(() => {})
-  }, [today, in30]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [today, in30])
 
   const overdueCount = kpiCounts.overdue
   const next30Count  = kpiCounts.next30
@@ -853,7 +853,12 @@ export default function Maintenance() {
   const selectedCount = selectedIds.size
   const allPageSelected = pagedRows.length > 0 && pagedRows.every(r => selectedIds.has(r.id))
   const toggleRow = React.useCallback((id: string) =>
-    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s }), [])
+    setSelectedIds(prev => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id)
+      else s.add(id)
+      return s
+    }), [])
   const togglePage = React.useCallback(() =>
     setSelectedIds(prev => {
       const s = new Set(prev)

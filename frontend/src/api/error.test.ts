@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getApiFormFeedback, getApiErrorMessage } from './error'
+import { getApiFormFeedback, getApiErrorMessage } from '@shared/api/error'
 function axiosErr(data: unknown, status = 400, message = 'Request failed') {
   return { isAxiosError: true, message, response: { data, status } }
 }

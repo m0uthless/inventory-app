@@ -9,7 +9,7 @@ import {
   Typography,
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import { useToast } from './toast'
+import { useToast } from '@shared/ui/toast'
 import {
   type CustomFieldEntity,
   normalizeKey,

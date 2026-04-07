@@ -34,26 +34,26 @@ import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 import type { PlanRow } from './maintenanceTypes'
-import { buildDrfListParams } from '../api/drf'
-import { apiErrorToFieldErrors, apiErrorToMessage } from '../api/error'
+import { buildDrfListParams } from '@shared/api/drf'
+import { apiErrorToFieldErrors, apiErrorToMessage } from '@shared/api/error'
 import { Can } from '../auth/Can'
 import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
-import { useDrfList } from '../hooks/useDrfList'
-import { useServerGrid } from '../hooks/useServerGrid'
-import { useUrlNumberParam, useUrlStringParam } from '../hooks/useUrlParam'
-import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import CustomFieldsEditor from '../ui/CustomFieldsEditor'
-import EntityListCard from '../ui/EntityListCard'
-import FilterChip from '../ui/FilterChip'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '../ui/toolbarStyles'
-import { useToast } from '../ui/toast'
-import { useExportCsv } from '../ui/useExportCsv'
+import EntityListCard from '@shared/ui/EntityListCard'
+import FilterChip from '@shared/ui/FilterChip'
+import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '@shared/ui/toolbarStyles'
+import { useToast } from '@shared/ui/toast'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 
 import { useNavigate } from 'react-router-dom'
-import RowContextMenu, { type RowContextMenuItem } from '../ui/RowContextMenu'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PlanDrawer, RapportinoDialog } from './Maintenance'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -196,14 +196,14 @@ export default function MaintenancePlans() {
     if (prevKey.current === scheduleKey) return
     prevKey.current = scheduleKey
     if (form.next_due_date_auto) void autoCompute(form)
-  }, [scheduleKey, form.next_due_date_auto, autoCompute])
+  }, [scheduleKey, form, form.next_due_date_auto, autoCompute])
 
   const openCreate = () => { setDlgMode('create'); setDlgId(null); setDlgErrors({}); setForm(PLAN0); prevKey.current = ''; setDlgOpen(true) }
-  const openEdit = (plan: PlanRow) => {
+  const openEdit = React.useCallback((plan: PlanRow) => {
     setDlgMode('edit'); setDlgId(plan.id); setDlgErrors({})
     const f: PlanForm = { customer: plan.customer ?? '', inventory_types: plan.inventory_types ?? [], title: plan.title ?? '', schedule_type: (plan.schedule_type as any) ?? 'interval', interval_value: plan.interval_value ?? '', interval_unit: (plan.interval_unit as any) ?? 'months', fixed_month: plan.fixed_month ?? '', fixed_day: plan.fixed_day ?? '', next_due_date: plan.next_due_date ?? '', next_due_date_auto: false, alert_days_before: plan.alert_days_before ?? 14, is_active: plan.is_active ?? true, notes: plan.notes ?? '', custom_fields: (plan.custom_fields as any) ?? {} }
     setForm(f); prevKey.current = `${f.schedule_type}|${f.interval_value}|${f.interval_unit}|${f.fixed_month}|${f.fixed_day}`; setDlgOpen(true)
-  }
+  }, [])
 
   const save = async () => {
     if (!form.customer) { toast.warning('Seleziona un cliente.'); return }
@@ -232,10 +232,10 @@ export default function MaintenancePlans() {
     catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDelBusy(false) }
   }
 
-  const doRestore = async (plan: PlanRow) => {
+  const doRestore = React.useCallback(async (plan: PlanRow) => {
     try { await api.post(`/maintenance-plans/${plan.id}/restore/`); toast.success('Piano ripristinato ✅'); reload() }
     catch (e) { toast.error(apiErrorToMessage(e)) }
-  }
+  }, [reload, toast])
 
   const selectedTypeLabels = invTypes.filter(t => form.inventory_types.includes(t.id)).map(t => t.label)
   const fcnt = [customerF, dueFilter, actFilter].filter(Boolean).length
@@ -487,7 +487,7 @@ export default function MaintenancePlans() {
       { key: 'missing', label: 'Vedi manutenzioni mancanti', icon: <AssignmentLateOutlinedIcon fontSize="small" />,  onClick: () => navigate(`/maintenance?m_plan=${row.id}`) },
       { key: 'pdf',     label: 'Crea report PDF',            icon: <PictureAsPdfOutlinedIcon fontSize="small" />,    onClick: () => generatePlanPdf(row) },
     ]
-  }, [contextMenu, doRestore, generatePlanPdf, navigate, openEdit]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [contextMenu, doRestore, generatePlanPdf, navigate, openEdit])
 
   const columns: GridColDef<PlanRow>[] = React.useMemo(() => [
     {

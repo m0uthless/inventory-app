@@ -16,8 +16,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 
-import { buildQuery } from '../../utils/nav'
-import { ActionIconButton } from '../../ui/ActionIconButton'
+import { buildQuery } from '@shared/utils/nav'
+import { ActionIconButton } from '@shared/ui/ActionIconButton'
 import type { ContactDetail } from './types'
 
 type ContactDrawerProps = {

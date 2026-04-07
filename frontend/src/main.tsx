@@ -3,9 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { theme } from './theme'
 import App from './App'
-import { ToastProvider } from './ui/toast'
+import { ToastProvider } from '@shared/ui/toast'
 import { AuthProvider } from './auth/AuthProvider'
-import { ErrorBoundary } from './ui/ErrorBoundary'
+import { ErrorBoundary } from '@shared/ui/ErrorBoundary'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

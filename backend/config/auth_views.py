@@ -131,6 +131,7 @@ def login_view(request: HttpRequest) -> JsonResponse:
     data = _json_body(request)
     username = data.get("username") or ""
     password = data.get("password") or ""
+    ambito = (data.get("ambito") or "").strip().lower()
     ip_address = _client_ip(request)
     lookup_user = User.objects.filter(username=username).first() if username else None
 
@@ -148,7 +149,6 @@ def login_view(request: HttpRequest) -> JsonResponse:
     user = authenticate(request, username=username, password=password)
     if user is None:
         _record_failed_attempt(username=username, ip_address=ip_address)
-        # Track failed login attempt (do not block auth flow on audit errors)
         try:
             log_auth_attempt(username=username, success=False, request=request)
         except Exception:
@@ -157,7 +157,6 @@ def login_view(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
     if not user.is_active:
         _record_failed_attempt(username=username, ip_address=ip_address)
-        # Disabled user is still a failed attempt
         try:
             log_auth_attempt(username=username, success=False, request=request)
         except Exception:
@@ -165,10 +164,37 @@ def login_view(request: HttpRequest) -> JsonResponse:
         _audit_failed_login(request, username=username, user_obj=user, reason="inactive_user")
         return JsonResponse({"detail": "User disabled"}, status=403)
 
+    # ── Verifica ambito ────────────────────────────────────────────────────
+    from auslbo.permissions import ARCHIE_GROUPS, AUSLBO_GROUPS
+    user_group_names = set(user.groups.values_list("name", flat=True))
+
+    # is_staff e is_superuser sono override di sistema: accesso a tutto
+    is_superuser = getattr(user, "is_superuser", False)
+    is_staff     = getattr(user, "is_staff", False)
+
+    can_archie = is_staff or is_superuser or bool(user_group_names & ARCHIE_GROUPS)
+    is_portal  = bool(user_group_names & AUSLBO_GROUPS) and hasattr(user, "auslbo_profile")
+
+    if ambito:
+        if ambito == "auslbo" and not is_portal:
+            _record_failed_attempt(username=username, ip_address=ip_address)
+            _audit_failed_login(request, username=username, user_obj=user, reason="ambito_not_allowed")
+            return JsonResponse(
+                {"detail": "Non sei autorizzato ad accedere al portale AUSL BO."},
+                status=403,
+            )
+        if ambito == "site-repo" and not can_archie:
+            _record_failed_attempt(username=username, ip_address=ip_address)
+            _audit_failed_login(request, username=username, user_obj=user, reason="ambito_not_allowed")
+            return JsonResponse(
+                {"detail": "Non sei autorizzato ad accedere al gestionale interno."},
+                status=403,
+            )
+    # ── Fine verifica ambito ───────────────────────────────────────────────
+
     login(request, user)
     _clear_failed_attempts(username=username, ip_address=ip_address)
 
-    # Track successful login attempt
     try:
         log_auth_attempt(
             username=username or getattr(user, "username", "") or "",
@@ -178,7 +204,14 @@ def login_view(request: HttpRequest) -> JsonResponse:
     except Exception:
         pass
 
-    return JsonResponse({"detail": "ok"})
+    # Restituisce anche l'ambito effettivo così il frontend sa dove redirigere.
+    effective_ambito = "auslbo" if (
+        is_portal
+        and not can_archie  # utente esclusivamente portal → manda su AUSL BO
+        and not ambito      # auto-detect solo se ambito non era specificato
+    ) else (ambito or "site-repo")
+
+    return JsonResponse({"detail": "ok", "ambito": effective_ambito})
 
 
 @require_POST

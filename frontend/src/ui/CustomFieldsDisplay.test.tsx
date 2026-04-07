@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import CustomFieldsDisplay from './CustomFieldsDisplay'
 
-vi.mock('./toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
+vi.mock('@shared/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../hooks/useCustomFieldDefinitions', () => ({
   useCustomFieldDefinitions: () => ({
     loading: false,

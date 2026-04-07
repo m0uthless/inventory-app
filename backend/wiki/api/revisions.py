@@ -76,12 +76,10 @@ class WikiPageRevisionViewSet(viewsets.ReadOnlyModelViewSet):
 
         from django.db import transaction
         with transaction.atomic():
-            # Snapshot dello stato attuale prima di sovrascrivere.
-            # select_for_update() previene race condition su revision_number
-            # in ambienti multi-worker.
+            # Lockiamo la pagina per serializzare i restore concorrenti.
+            WikiPage.objects.select_for_update().filter(pk=page.pk).get()
             last = (
                 WikiPageRevision.objects
-                .select_for_update()
                 .filter(page=page)
                 .order_by("-revision_number")
                 .first()

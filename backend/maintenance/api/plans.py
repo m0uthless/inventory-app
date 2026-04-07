@@ -152,48 +152,12 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
                 .values("cnt")[:1]
             )
 
-            # covered_count: inventory attivi del cliente coperti dal piano.
-            # Non si può usare OuterRef("inventory_types") direttamente su M2M;
-            # usiamo la through table implicita di Django per recuperare i type_id
-            # del piano corrente all'interno della Subquery.
-            from django.db.models import IntegerField
-            from django.db.models.functions import Coalesce
-            from inventory.models import Inventory
-            from core.models import InventoryStatus
-
-            active_status_ids = list(
-                InventoryStatus.objects.filter(
-                    key__in=("in_use", "maintenance", "repair"),
-                    deleted_at__isnull=True,
-                ).values_list("id", flat=True)
-            )
-
-            # Subquery: inventorytype_id per il piano corrente (through table)
-            plan_type_ids_sq = (
-                MaintenancePlan.inventory_types.through.objects
-                .filter(maintenanceplan_id=OuterRef(OuterRef("pk")))
-                .values("inventorytype_id")
-            )
-
-            covered_sq = (
-                Inventory.objects
-                .filter(
-                    customer_id=OuterRef("customer_id"),
-                    type_id__in=plan_type_ids_sq,
-                    status_id__in=active_status_ids,
-                    deleted_at__isnull=True,
-                )
-                .values("customer_id")
-                .annotate(cnt=Count("id", distinct=True))
-                .values("cnt")[:1]
-            )
             qs = qs.annotate(
                 _year_start=TruncYear("next_due_date", output_field=DateField()),
             )
             qs = qs.annotate(
                 last_done_date=Subquery(last_event_sq),
                 completed_count=Subquery(completed_count_sq),
-                _covered_count=Coalesce(Subquery(covered_sq, output_field=IntegerField()), 0),
             )
 
         # Filtro per tipo inventario (multi: ?inventory_type=1&inventory_type=2)
@@ -212,6 +176,61 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             qs = qs.filter(next_due_date__gte=today, next_due_date__lte=today + timedelta(days=30))
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    def _compute_covered_count_map(self, plans: list[MaintenancePlan]) -> dict[int, int]:
+        if not plans:
+            return {}
+        from inventory.models import Inventory
+        from core.models import InventoryStatus
+
+        customer_ids = {plan.customer_id for plan in plans}
+        type_ids = {inv_type.id for plan in plans for inv_type in plan.inventory_types.all()}
+        if not customer_ids or not type_ids:
+            return {plan.id: 0 for plan in plans}
+
+        active_status_ids = list(
+            InventoryStatus.objects.filter(
+                key__in=("in_use", "maintenance", "repair"),
+                deleted_at__isnull=True,
+            ).values_list("id", flat=True)
+        )
+        inventory_counts = {
+            (row["customer_id"], row["type_id"]): row["cnt"]
+            for row in (
+                Inventory.objects.filter(
+                    customer_id__in=customer_ids,
+                    type_id__in=type_ids,
+                    status_id__in=active_status_ids,
+                    deleted_at__isnull=True,
+                )
+                .values("customer_id", "type_id")
+                .annotate(cnt=Count("id"))
+            )
+        }
+
+        return {
+            plan.id: sum(inventory_counts.get((plan.customer_id, inv_type.id), 0) for inv_type in plan.inventory_types.all())
+            for plan in plans
+        }
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            plans = list(page)
+            covered_count_map = self._compute_covered_count_map(plans)
+            for plan in plans:
+                plan._covered_count = covered_count_map.get(plan.id, 0)
+            serializer = self.get_serializer(plans, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        plans = list(queryset)
+        covered_count_map = self._compute_covered_count_map(plans)
+        for plan in plans:
+            plan._covered_count = covered_count_map.get(plan.id, 0)
+        serializer = self.get_serializer(plans, many=True)
+        return Response(serializer.data)
 
     # MaintenancePlan non ha created_by/updated_by sul modello: override senza userstamp.
     def perform_create(self, serializer):

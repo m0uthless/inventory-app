@@ -42,36 +42,39 @@ def drive_file_path(obj_id: int | str) -> str:
 
 
 def build_entity_path(app_label: str | None, model: str | None, object_id: int | str | None) -> str | None:
-    if not app_label or not model or object_id in (None, ""):
+    if not app_label or not model:
+        return None
+    if object_id is None or object_id == "":
         return None
 
+    obj_id: int | str = object_id
     app = str(app_label).lower()
     mdl = str(model).lower()
 
     if app == "crm":
         if mdl == "customer":
-            return customer_path(object_id)
+            return customer_path(obj_id)
         if mdl == "site":
-            return site_path(object_id)
+            return site_path(obj_id)
         if mdl == "contact":
-            return contact_path(object_id)
+            return contact_path(obj_id)
 
     if app == "inventory" and mdl == "inventory":
-        return inventory_path(object_id)
+        return inventory_path(obj_id)
 
     if app == "maintenance" and mdl == "maintenanceplan":
-        return maintenance_plan_path(object_id)
+        return maintenance_plan_path(obj_id)
 
     if app == "issues" and mdl == "issue":
-        return issue_path(object_id)
+        return issue_path(obj_id)
 
     if app == "wiki" and mdl == "wikipage":
-        return wiki_page_path(object_id)
+        return wiki_page_path(obj_id)
 
     if app == "drive":
         if mdl == "drivefolder":
-            return drive_folder_path(object_id)
+            return drive_folder_path(obj_id)
         if mdl == "drivefile":
-            return drive_file_path(object_id)
+            return drive_file_path(obj_id)
 
     return None

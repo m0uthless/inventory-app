@@ -27,9 +27,9 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 import CloseIcon from '@mui/icons-material/Close'
 import CheckIcon from '@mui/icons-material/Check'
 
-import { api } from '../api/client'
-import { useToast } from '../ui/toast'
-import { apiErrorToMessage } from '../api/error'
+import { api } from '@shared/api/client'
+import { useToast } from '@shared/ui/toast'
+import { apiErrorToMessage } from '@shared/api/error'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

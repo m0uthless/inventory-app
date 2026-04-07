@@ -44,14 +44,14 @@ import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import TerminalIcon from '@mui/icons-material/TerminalOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import AppFooter from './AppFooter'
 import GlobalSearch from './GlobalSearch'
 import MaintenanceNotificationBell from './MaintenanceNotificationBell'
 import AppSpeedDial from './AppSpeedDial'
 import { SIDEBAR } from '../theme/tokens'
-import { useIdleTimer } from '../hooks/useIdleTimer'
+import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '../ui/LockScreen'
 
 const ProfileDrawer = React.lazy(() =>
@@ -178,7 +178,6 @@ export function AppLayout() {
     onLock: lock,
     onLogout: async () => {
       try {
-        const { api } = await import('../api/client')
         await api.post('/auth/logout/')
       } catch { /* ignora errori di rete */ }
       window.location.assign('/login')

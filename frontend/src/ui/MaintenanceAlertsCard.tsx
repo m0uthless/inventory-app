@@ -7,7 +7,7 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded'
 import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import type { TodoRow } from '../pages/maintenanceTypes'
 
@@ -89,8 +89,15 @@ export default function MaintenanceAlertsCard() {
   const [overdueCount, setOverdueCount] = React.useState(0)
   const [next30Count,  setNext30Count]  = React.useState(0)
 
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const in30  = React.useMemo(() => new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10), [])
+  const [{ today, in30 }] = React.useState(() => {
+    const base = new Date()
+    const future = new Date(base)
+    future.setDate(future.getDate() + 30)
+    return {
+      today: base.toISOString().slice(0, 10),
+      in30: future.toISOString().slice(0, 10),
+    }
+  })
 
   // Badge counts — chiamata leggera con page_size=1
   React.useEffect(() => {

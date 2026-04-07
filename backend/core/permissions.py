@@ -36,9 +36,10 @@ class CanRestoreModelPermission(BasePermission):
 
 
 class IsStaffOrAdminGroup(BasePermission):
-    """Allow access to staff/superusers OR users in the `admin` group.
+    """Allow access to superusers OR users in the `admin` group.
 
     Useful for endpoints that are not tied to a model/queryset (e.g. API docs).
+    Note: is_staff is kept as a backward-compatible override during the group migration.
     """
 
     admin_group_name = "admin"

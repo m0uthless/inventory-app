@@ -1,16 +1,10 @@
 import * as React from 'react'
 import {
-  Box,
-  Button,
-  ClickAwayListener,
-  Fab,
-  Fade,
-  Paper,
-  Stack,
-  useTheme,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
 } from '@mui/material'
-import { alpha, lighten } from '@mui/material/styles'
-import AddIcon from '@mui/icons-material/Add'
+import { alpha } from '@mui/material/styles'
 import SearchIcon from '@mui/icons-material/Search'
 import Inventory2Icon from '@mui/icons-material/Inventory2'
 import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
@@ -22,6 +16,7 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import { useTheme } from '@mui/material/styles'
 
 type QuickAction = {
   key: string
@@ -43,23 +38,14 @@ export default function AppSpeedDial() {
   const nav = useNavigate()
   const loc = useLocation()
   const theme = useTheme()
-  const [open, setOpen] = React.useState(false)
 
-  React.useEffect(() => {
-    setOpen(false)
-  }, [loc.pathname])
-
-  const actionBg = React.useMemo(
-    () => lighten(theme.palette.primary.main, 0.72),
-    [theme.palette.primary.main],
-  )
-  const actionBgHover = React.useMemo(
-    () => lighten(theme.palette.primary.main, 0.66),
-    [theme.palette.primary.main],
-  )
+  const primary = theme.palette.primary.main
+  const primaryDark = theme.palette.primary.dark
 
   const canManageWikiCategories =
-    hasPerm('wiki.add_wikicategory') || hasPerm('wiki.change_wikicategory') || hasPerm('wiki.delete_wikicategory')
+    hasPerm('wiki.add_wikicategory') ||
+    hasPerm('wiki.change_wikicategory') ||
+    hasPerm('wiki.delete_wikicategory')
 
   const allActions = React.useMemo<Record<string, QuickAction>>(
     () => ({
@@ -69,7 +55,7 @@ export default function AppSpeedDial() {
         to: '/inventory',
         perm: 'inventory.add_inventory',
         openCreate: true,
-        icon: <Inventory2Icon sx={{ fontSize: 18 }} />,
+        icon: <Inventory2Icon sx={{ fontSize: 20 }} />,
       },
       newIssue: {
         key: 'newIssue',
@@ -77,7 +63,7 @@ export default function AppSpeedDial() {
         to: '/issues',
         perm: 'issues.add_issue',
         openCreate: true,
-        icon: <BugReportOutlinedIcon sx={{ fontSize: 18 }} />,
+        icon: <BugReportOutlinedIcon sx={{ fontSize: 20 }} />,
       },
       newCustomer: {
         key: 'newCustomer',
@@ -85,7 +71,7 @@ export default function AppSpeedDial() {
         to: '/customers',
         perm: 'crm.add_customer',
         openCreate: true,
-        icon: <PeopleIcon sx={{ fontSize: 18 }} />,
+        icon: <PeopleIcon sx={{ fontSize: 20 }} />,
       },
       newSite: {
         key: 'newSite',
@@ -93,7 +79,7 @@ export default function AppSpeedDial() {
         to: '/sites',
         perm: 'crm.add_site',
         openCreate: true,
-        icon: <BusinessIcon sx={{ fontSize: 18 }} />,
+        icon: <BusinessIcon sx={{ fontSize: 20 }} />,
       },
       newContact: {
         key: 'newContact',
@@ -101,14 +87,14 @@ export default function AppSpeedDial() {
         to: '/contacts',
         perm: 'crm.add_contact',
         openCreate: true,
-        icon: <ContactsIcon sx={{ fontSize: 18 }} />,
+        icon: <ContactsIcon sx={{ fontSize: 20 }} />,
       },
       wikiCategories: {
         key: 'wikiCategories',
         label: 'Categorie wiki',
         to: '/wiki',
         state: { openCategoryManager: true },
-        icon: <CategoryOutlinedIcon sx={{ fontSize: 18 }} />,
+        icon: <CategoryOutlinedIcon sx={{ fontSize: 20 }} />,
         onlyWhen: () => canManageWikiCategories,
       },
       newWikiPage: {
@@ -116,20 +102,20 @@ export default function AppSpeedDial() {
         label: 'Nuova pagina wiki',
         to: '/wiki/new',
         perm: 'wiki.add_wikipage',
-        icon: <DescriptionOutlinedIcon sx={{ fontSize: 18 }} />,
+        icon: <DescriptionOutlinedIcon sx={{ fontSize: 20 }} />,
       },
       newReportRequest: {
         key: 'newReportRequest',
         label: 'Report / Request',
         to: '/bug-feature',
         openCreate: true,
-        icon: <FeedbackOutlinedIcon sx={{ fontSize: 18 }} />,
+        icon: <FeedbackOutlinedIcon sx={{ fontSize: 20 }} />,
       },
       search: {
         key: 'search',
         label: 'Ricerca globale',
         to: '/search',
-        icon: <SearchIcon sx={{ fontSize: 18 }} />,
+        icon: <SearchIcon sx={{ fontSize: 20 }} />,
       },
     }),
     [canManageWikiCategories],
@@ -167,101 +153,89 @@ export default function AppSpeedDial() {
     () =>
       actionOrder
         .map((key) => allActions[key])
-        .filter((action): action is QuickAction => Boolean(action))
-        .filter((action) => (!action.perm || hasPerm(action.perm)) && (!action.onlyWhen || action.onlyWhen())),
+        .filter((a): a is QuickAction => Boolean(a))
+        .filter((a) => (!a.perm || hasPerm(a.perm)) && (!a.onlyWhen || a.onlyWhen())),
     [actionOrder, allActions, hasPerm],
   )
 
   if (!actions.length) return null
 
   const handleActionClick = (action: QuickAction) => {
-    setOpen(false)
-    const state = action.openCreate ? { ...(action.state ?? {}), openCreate: true } : action.state
+    const state = action.openCreate
+      ? { ...(action.state ?? {}), openCreate: true }
+      : action.state
     nav(action.to, state ? { state } : undefined)
   }
 
   return (
-    <ClickAwayListener onClickAway={() => setOpen(false)}>
-      <Box
-        sx={{
-          position: 'fixed',
-          right: { xs: 16, md: 24 },
-          bottom: { xs: 16, md: 20 },
-          zIndex: (t) => t.zIndex.appBar - 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          gap: 1.25,
-        }}
-      >
-        <Fade in={open} timeout={{ enter: 180, exit: 120 }} unmountOnExit>
-          <Stack spacing={1.1} sx={{ alignItems: 'flex-end' }}>
-            {actions.map((action) => (
-              <Paper
-                key={action.key}
-                elevation={0}
-                sx={{
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.14)}`,
-                  boxShadow: '0 14px 24px -18px rgba(15, 118, 110, 0.50)',
-                  overflow: 'hidden',
-                  backgroundColor: 'transparent',
-                }}
-              >
-                <Button
-                  onClick={() => handleActionClick(action)}
-                  endIcon={action.icon}
-                  sx={{
-                    minWidth: 0,
-                    px: 1.75,
-                    py: 1.1,
-                    height: 46,
-                    borderRadius: 1,
-                    bgcolor: actionBg,
-                    color: theme.palette.primary.dark,
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    letterSpacing: '-0.01em',
-                    justifyContent: 'space-between',
-                    gap: 1.2,
-                    whiteSpace: 'nowrap',
-                    '& .MuiButton-endIcon': {
-                      ml: 0.9,
-                      mr: 0,
-                      color: theme.palette.primary.main,
-                    },
-                    '&:hover': {
-                      bgcolor: actionBgHover,
-                      boxShadow: 'none',
-                    },
-                  }}
-                >
-                  {action.label}
-                </Button>
-              </Paper>
-            ))}
-          </Stack>
-        </Fade>
-
-        <Fab
-          color="primary"
-          aria-label={open ? 'Chiudi azioni rapide' : 'Apri azioni rapide'}
-          onClick={() => setOpen((current) => !current)}
+    <SpeedDial
+      ariaLabel="Azioni rapide"
+      direction="up"
+      sx={{
+        position: 'fixed',
+        bottom: { xs: 16, md: 20 },
+        right: { xs: 16, md: 24 },
+        zIndex: (t) => t.zIndex.appBar - 1,
+        // FAB principale
+        '& .MuiSpeedDial-fab': {
+          width: 52,
+          height: 52,
+          bgcolor: primary,
+          boxShadow: `0 8px 24px ${alpha(primary, 0.40)}`,
+          '&:hover': {
+            bgcolor: primaryDark,
+            boxShadow: `0 12px 32px ${alpha(primary, 0.55)}`,
+          },
+        },
+        // Pill icona delle azioni
+        '& .MuiSpeedDialAction-fab': {
+          width: 40,
+          height: 40,
+          bgcolor: alpha(primary, 0.10),
+          border: `1px solid ${alpha(primary, 0.22)}`,
+          color: primary,
+          boxShadow: 'none',
+          '&:hover': {
+            bgcolor: alpha(primary, 0.18),
+            borderColor: alpha(primary, 0.38),
+            boxShadow: 'none',
+          },
+        },
+        // Label testo accanto alla pill
+        '& .MuiSpeedDialAction-staticTooltipLabel': {
+          whiteSpace: 'nowrap',
+          bgcolor: alpha(primary, 0.08),
+          color: primaryDark,
+          fontWeight: 600,
+          fontSize: 12.5,
+          letterSpacing: '-0.01em',
+          boxShadow: 'none',
+          border: `1px solid ${alpha(primary, 0.18)}`,
+          borderRadius: '8px',
+          px: 1.25,
+          py: 0.6,
+          cursor: 'pointer',
+        },
+      }}
+      icon={
+        <SpeedDialIcon
           sx={{
-            width: 58,
-            height: 58,
-            boxShadow: '0 18px 30px -18px rgba(15, 118, 110, 0.65)',
+            '& .MuiSpeedDialIcon-icon': {
+              transition: 'transform 200ms cubic-bezier(0.34,1.56,0.64,1)',
+            },
           }}
-        >
-          <AddIcon
-            sx={{
-              fontSize: 28,
-              transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
-              transition: 'transform 180ms ease',
-            }}
-          />
-        </Fab>
-      </Box>
-    </ClickAwayListener>
+        />
+      }
+    >
+      {actions.map((action) => (
+        <SpeedDialAction
+          key={action.key}
+          icon={action.icon}
+          tooltipTitle={action.label}
+          tooltipOpen
+          onClick={() => handleActionClick(action)}
+        />
+      ))}
+    </SpeedDial>
   )
 }

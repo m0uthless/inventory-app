@@ -1,4 +1,4 @@
-import { buildQuery } from './nav'
+import { buildQuery } from '@shared/utils/nav'
 
 export type SearchResultPathInput = {
   kind: string

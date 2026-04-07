@@ -2,14 +2,37 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, permissions, serializers, status, viewsets
+from PIL import Image
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from audit.utils import log_event
+from core.media import build_action_url, protected_media_response
 from core.permissions import user_has_model_perm
+from core.uploads import validate_upload
 from .models import ReportRequest, ReportStatus
+
+
+
+SCREENSHOT_MAX_BYTES = 10 * 1024 * 1024
+SCREENSHOT_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+SCREENSHOT_ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
+
+
+def _validate_screenshot_contents(uploaded_file):
+    try:
+        uploaded_file.seek(0)
+        img = Image.open(uploaded_file)
+        img.verify()
+    except Exception as exc:
+        raise serializers.ValidationError("Il file caricato non è un'immagine valida.") from exc
+    finally:
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
 
 
 class ReportRequestSerializer(serializers.ModelSerializer):
@@ -68,6 +91,17 @@ class ReportRequestSerializer(serializers.ModelSerializer):
             'can_resolve',
         ]
 
+    def validate_screenshot(self, value):
+        return validate_upload(
+            value,
+            label="screenshot",
+            max_bytes=SCREENSHOT_MAX_BYTES,
+            allowed_extensions=SCREENSHOT_ALLOWED_EXTENSIONS,
+            allowed_content_types=SCREENSHOT_ALLOWED_CONTENT_TYPES,
+            strict_real_mime=True,
+            content_validator=_validate_screenshot_contents,
+        )
+
     def get_created_by_full_name(self, obj):
         user = obj.created_by
         full_name = f"{user.first_name} {user.last_name}".strip()
@@ -83,14 +117,8 @@ class ReportRequestSerializer(serializers.ModelSerializer):
     def get_screenshot_url(self, obj):
         if not obj.screenshot:
             return None
-        try:
-            url = obj.screenshot.url
-        except Exception:
-            return None
         request = self.context.get('request')
-        if request is None:
-            return url
-        return request.build_absolute_uri(url)
+        return build_action_url(request=request, relative_path=f"/api/feedback-items/{obj.pk}/screenshot/")
 
     def _request_user(self):
         request = self.context.get('request')
@@ -179,6 +207,11 @@ class ReportRequestViewSet(
     def partial_update(self, request, *args, **kwargs):
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path='screenshot')
+    def screenshot(self, request, pk=None):
+        item = self.get_object()
+        return protected_media_response(file_field=item.screenshot, disposition='inline')
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):

@@ -228,15 +228,17 @@ class TestInventoryTypeLabelsNoPlusOne:
             assert len(row["inventory_type_labels"]) == 1
 
 
-# ─── Test: PC-01 — IssueSerializer con created_by=NULL ───────────────────────
+# ─── Test: PC-01 — IssueSerializer fallback su username autore ───────────────
 
-class TestIssueSerializerNullCreatedBy:
-    def test_issue_list_does_not_crash_when_created_by_is_null(self):
-        """Verifica il fix PC-01: get_created_by_full_name non crasha con NULL."""
-        from core.models import CustomerStatus, InventoryStatus, InventoryType
+class TestIssueSerializerCreatedByFullName:
+    def test_issue_list_uses_username_when_author_has_no_full_name(self):
+        """created_by è obbligatorio/protetto: il serializer deve fare fallback su username."""
+        from core.models import CustomerStatus
         from crm.models import Customer
         from issues.models import Issue, IssueStatus
+        from django.contrib.auth import get_user_model
 
+        User = get_user_model()
         user = _superuser()
         client = APIClient()
         client.force_authenticate(user=user)
@@ -245,25 +247,20 @@ class TestIssueSerializerNullCreatedBy:
             key=_uid("cs_"), defaults={"label": "Active"}
         )
         customer = Customer.objects.create(name=_uid("co_"), status=cs)
+        author = User.objects.create_user(username=_uid("issue_author_"), password="pw")
 
-        # Crea issue con created_by=NULL (simula utente eliminato)
         issue = Issue.objects.create(
-            title="Issue senza autore",
+            title="Issue con autore senza nome",
             customer=customer,
             status=IssueStatus.OPEN,
             priority="medium",
-            created_by=None,  # simula SET_NULL dopo eliminazione utente
+            created_by=author,
         )
 
         res = client.get("/api/issues/")
-        assert res.status_code == 200, (
-            f"GET /api/issues/ ha restituito {res.status_code} con created_by=NULL. "
-            f"Assicurati che il fix PC-01 sia applicato."
-        )
+        assert res.status_code == 200
 
         rows = res.json().get("results", res.json())
         row = next((r for r in rows if r["id"] == issue.id), None)
         assert row is not None
-        assert row["created_by_full_name"] is None, (
-            f"Atteso None per created_by_full_name, trovato: {row['created_by_full_name']}"
-        )
+        assert row["created_by_full_name"] == author.username

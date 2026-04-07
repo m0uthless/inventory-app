@@ -19,7 +19,7 @@ import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 
-import { ActionIconButton } from '../../ui/ActionIconButton'
+import { ActionIconButton } from '@shared/ui/ActionIconButton'
 import LeafletMap from '../../ui/LeafletMap'
 import type { CustomerDetail } from './types'
 

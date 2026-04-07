@@ -14,9 +14,9 @@ import {
   Typography,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
-import { ErrorBoundary } from '../ui/ErrorBoundary'
+import { ErrorBoundary } from '@shared/ui/ErrorBoundary'
 
 const Contacts  = React.lazy(() => import('./Contacts'))
 const Customers = React.lazy(() => import('./Customers'))

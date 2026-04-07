@@ -1,6 +1,5 @@
 // Tipi condivisi tra Maintenance.tsx, MaintenancePlans.tsx e Rapportini.tsx
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type PlanRow = {
   id: number
   customer: number

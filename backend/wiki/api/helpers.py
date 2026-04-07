@@ -122,7 +122,7 @@ def _markdown_to_html(md: str) -> str:
         except Exception:
             return f"<pre>{escape(md)}</pre>"
     try:
-        import markdown as mdlib
+        import markdown as mdlib  # type: ignore[import-untyped]
 
         html = mdlib.markdown(
             md,

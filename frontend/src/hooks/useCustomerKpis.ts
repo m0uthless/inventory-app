@@ -1,5 +1,5 @@
-import type { KpiSpec } from './useDrawerKpis'
-import { useDrawerKpis } from './useDrawerKpis'
+import type { KpiSpec } from '@shared/hooks/useDrawerKpis'
+import { useDrawerKpis } from '@shared/hooks/useDrawerKpis'
 
 // Stabile a livello di modulo — non viene ricreato ad ogni render
 const CUSTOMER_KPI_SPECS: KpiSpec[] = [

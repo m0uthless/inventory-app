@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import io
 import uuid
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
+from PIL import Image
 from rest_framework.test import APIClient
 
 from feedback.models import ReportRequest, ReportStatus
@@ -24,6 +26,15 @@ def _make_user(*, superuser: bool = False):
     return user
 
 
+
+
+def _png_bytes() -> bytes:
+    buf = io.BytesIO()
+    img = Image.new("RGB", (2, 2), color=(10, 20, 30))
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def _auth_client(user) -> APIClient:
     client = APIClient()
     client.force_authenticate(user=user)
@@ -39,7 +50,7 @@ def _make_item(owner, *, with_screenshot: bool = False):
         created_by=owner,
     )
     if with_screenshot:
-        item.screenshot = SimpleUploadedFile('existing.png', b'existing', content_type='image/png')
+        item.screenshot = SimpleUploadedFile('existing.png', _png_bytes(), content_type='image/png')
         item.save(update_fields=['screenshot'])
     return item
 
@@ -52,7 +63,7 @@ class TestReportRequestPermissions:
 
         res = client.patch(
             f'/api/feedback-items/{item.id}/',
-            {'screenshot': SimpleUploadedFile('screen.png', b'img', content_type='image/png')},
+            {'screenshot': SimpleUploadedFile('screen.png', _png_bytes(), content_type='image/png')},
             format='multipart',
         )
 
@@ -67,7 +78,7 @@ class TestReportRequestPermissions:
 
         res = client.patch(
             f'/api/feedback-items/{item.id}/',
-            {'screenshot': SimpleUploadedFile('replacement.png', b'img2', content_type='image/png')},
+            {'screenshot': SimpleUploadedFile('replacement.png', _png_bytes(), content_type='image/png')},
             format='multipart',
         )
 
@@ -81,7 +92,7 @@ class TestReportRequestPermissions:
 
         res = client.patch(
             f'/api/feedback-items/{item.id}/',
-            {'screenshot': SimpleUploadedFile('screen.png', b'img', content_type='image/png')},
+            {'screenshot': SimpleUploadedFile('screen.png', _png_bytes(), content_type='image/png')},
             format='multipart',
         )
 

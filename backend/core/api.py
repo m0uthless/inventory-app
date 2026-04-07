@@ -112,17 +112,23 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 
 class IsStaffOrReadOnly(BasePermission):
+    """Lettura: tutti gli autenticati. Scrittura: gruppo admin o superuser."""
+
     def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
         if request.method in SAFE_METHODS:
-            return request.user and request.user.is_authenticated
-        return request.user and (request.user.is_staff or request.user.is_superuser)
+            return True
+        if getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False):
+            return True
+        return request.user.groups.filter(name="admin").exists()
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
     """
     CRUD comunicazioni bacheca.
     Lettura: tutti gli utenti autenticati.
-    Scrittura: solo is_staff / superuser.
+    Scrittura: solo gruppo admin o superuser.
     """
     queryset           = Announcement.objects.select_related('created_by').all()
     serializer_class   = AnnouncementSerializer

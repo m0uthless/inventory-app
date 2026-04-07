@@ -33,12 +33,12 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import TerminalOutlinedIcon from '@mui/icons-material/TerminalOutlined'
 
-import { api } from '../api/client'
-import { useToast } from '../ui/toast'
-import { apiErrorToMessage } from '../api/error'
+import { api } from '@shared/api/client'
+import { useToast } from '@shared/ui/toast'
+import { apiErrorToMessage } from '@shared/api/error'
 import { useAuth } from '../auth/AuthProvider'
-import { compactResetButtonSx } from '../ui/toolbarStyles'
-import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
+import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 
 type Language = {
   id: number

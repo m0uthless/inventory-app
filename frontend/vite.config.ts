@@ -1,11 +1,9 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
-
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Inject app version (from package.json) into the build so the footer can show it.
 const here = dirname(fileURLToPath(import.meta.url))
 let appVersion = 'dev'
 try {
@@ -15,8 +13,29 @@ try {
   // keep "dev"
 }
 
+const frontendNodeModules = resolve(here, 'node_modules')
+const sharedAliases = {
+  '@shared': resolve(here, '../shared/src'),
+  react: resolve(frontendNodeModules, 'react'),
+  'react-dom': resolve(frontendNodeModules, 'react-dom'),
+  'react/jsx-runtime': resolve(frontendNodeModules, 'react/jsx-runtime.js'),
+  'react/jsx-dev-runtime': resolve(frontendNodeModules, 'react/jsx-dev-runtime.js'),
+  axios: resolve(frontendNodeModules, 'axios'),
+  'react-router-dom': resolve(frontendNodeModules, 'react-router-dom'),
+  '@mui/material': resolve(frontendNodeModules, '@mui/material'),
+  '@mui/icons-material': resolve(frontendNodeModules, '@mui/icons-material'),
+  '@mui/x-data-grid': resolve(frontendNodeModules, '@mui/x-data-grid'),
+  '@emotion/react': resolve(frontendNodeModules, '@emotion/react'),
+  '@emotion/styled': resolve(frontendNodeModules, '@emotion/styled'),
+  recharts: resolve(frontendNodeModules, 'recharts'),
+}
+
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: sharedAliases,
+    dedupe: ['react', 'react-dom', '@emotion/react'],
+  },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
   },
@@ -30,8 +49,10 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return
+          if (id.includes('/@mui/icons-material')) return 'vendor-mui-icons'
           if (id.includes('/@mui/x-data-grid') || id.includes('/@mui/x-date-pickers')) return 'vendor-mui-x'
-          if (id.includes('/@mui/') || id.includes('/@emotion/')) return 'vendor-mui'
+          if (id.includes('/@emotion/')) return 'vendor-emotion'
+          if (id.includes('/@mui/')) return 'vendor-mui'
           if (id.includes('/quill') || id.includes('/parchment') || id.includes('quill-delta')) return 'vendor-quill'
           if (id.includes('/recharts') || id.includes('recharts-scale') || id.includes('/d3-') || id.includes('/victory-')) return 'vendor-charts'
           if (id.includes('/axios/')) return 'vendor-axios'

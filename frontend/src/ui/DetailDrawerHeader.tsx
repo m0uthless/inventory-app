@@ -2,7 +2,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import { Box, Divider, Stack, Typography } from '@mui/material'
 import * as React from 'react'
 
-import { ActionIconButton } from './ActionIconButton'
+import { ActionIconButton } from '@shared/ui/ActionIconButton'
 
 export type DetailDrawerHeaderProps = {
   title: string

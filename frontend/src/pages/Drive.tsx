@@ -41,11 +41,11 @@ import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 
 import { Can } from '../auth/Can'
 import { PERMS } from '../auth/perms'
-import { api } from '../api/client'
-import { apiErrorToMessage } from '../api/error'
-import { useToast } from '../ui/toast'
-import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
-import { ActionIconButton } from '../ui/ActionIconButton'
+import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
+import { useToast } from '@shared/ui/toast'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import { ActionIconButton } from '@shared/ui/ActionIconButton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

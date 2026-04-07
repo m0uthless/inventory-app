@@ -21,3 +21,15 @@ archie.biotron.it {
         reverse_proxy frontend:80
     }
 }
+
+auslbo.biotron.it {
+    encode gzip zstd
+
+    handle /api/* {
+        reverse_proxy backend_nginx:80
+    }
+
+    handle {
+        reverse_proxy frontend-auslbo:80
+    }
+}

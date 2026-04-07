@@ -28,12 +28,12 @@ import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
-import { buildQuery } from '../../utils/nav'
-import { getInventoryTypeIcon } from '../../ui/inventoryTypeIcon'
+import { buildQuery } from '@shared/utils/nav'
+import { getInventoryTypeIcon } from '@shared/ui/inventoryTypeIcon'
 import AuditEventsTab from '../../ui/AuditEventsTab'
-import { isRecord } from '../../utils/guards'
-import { useToast } from '../../ui/toast'
-import { ActionIconButton } from '../../ui/ActionIconButton'
+import { isRecord } from '@shared/utils/guards'
+import { useToast } from '@shared/ui/toast'
+import { ActionIconButton } from '@shared/ui/ActionIconButton'
 
 import type { InventoryDetail } from './types'
 
@@ -207,8 +207,9 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
 
 
 function InventoryTypeBadgeIcon(props: { typeKey?: string | null }) {
-  const Icon = getInventoryTypeIcon(props.typeKey)
-  return <Icon sx={{ fontSize: 26, color: 'rgba(255,255,255,0.9)' }} />
+  return React.createElement(getInventoryTypeIcon(props.typeKey), {
+    sx: { fontSize: 26, color: 'rgba(255,255,255,0.9)' },
+  })
 }
 
 export default function InventoryDrawer({

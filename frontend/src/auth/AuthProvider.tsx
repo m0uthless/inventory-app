@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { api } from '../api/client'
-import { setUnauthorizedHandler } from '../api/runtime'
+import { api } from '@shared/api/client'
+import { setUnauthorizedHandler } from '@shared/api/runtime'
 
 export type Me = {
   id: number

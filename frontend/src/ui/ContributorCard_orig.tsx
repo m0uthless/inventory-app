@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Avatar, Box, Card, Skeleton, Stack, Typography } from '@mui/material'
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded'
-import { api } from '../api/client'
+import { api } from '@shared/api/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -10,4 +10,12 @@ services:
   backend:
     env_file:
       - ./.env.prod
- 
+
+  cron:
+    env_file:
+      - ./.env.prod
+
+  frontend-auslbo:
+    build:
+      context: ./frontend-auslbo
+      dockerfile: Dockerfile

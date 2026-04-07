@@ -2,28 +2,36 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FRONTEND_DIR="$ROOT_DIR/frontend"
 
-echo "[frontend] npm ci"
-cd "$FRONTEND_DIR"
-npm ci
+run_frontend_checks() {
+  local dir="$1"
+  local label="$2"
 
-# Prettier check: prefer npm script if present, otherwise run via npx
-echo "[frontend] prettier (check)"
-if npm run -s format:check >/dev/null 2>&1; then
-  npm run format:check
-else
-  npx prettier . --check
-fi
+  echo "[$label] install dependencies"
+  cd "$dir"
+  if [[ -f package-lock.json ]]; then
+    npm ci
+  else
+    npm install
+  fi
 
-echo "[frontend] eslint"
-npm run lint
+  if npm run -s format:check >/dev/null 2>&1; then
+    echo "[$label] prettier (check)"
+    npm run format:check
+  fi
 
-echo "[frontend] tsc --noEmit"
-npx tsc --noEmit
+  echo "[$label] eslint"
+  npm run lint
 
-echo "[frontend] vitest"
-npm run test:run
+  echo "[$label] tsc --noEmit"
+  npx tsc --noEmit
 
-echo "[frontend] vite build"
-npm run build
+  echo "[$label] vitest"
+  npm run test:run
+
+  echo "[$label] vite build"
+  npm run build
+}
+
+run_frontend_checks "$ROOT_DIR/frontend" "frontend"
+run_frontend_checks "$ROOT_DIR/frontend-auslbo" "frontend-auslbo"

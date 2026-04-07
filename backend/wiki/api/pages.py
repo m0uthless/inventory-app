@@ -308,13 +308,14 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
     def perform_update(self, serializer):
         instance = serializer.instance
         # Snapshot della versione corrente PRIMA di sovrascrivere.
-        # select_for_update() + atomic() prevengono race condition su revision_number
-        # in ambienti multi-worker (due PATCH concorrenti sullo stesso WikiPage).
+        # Lockiamo la riga della pagina per serializzare gli update concorrenti:
+        # se non esistono ancora revisioni, il lock sulla pagina evita comunque
+        # che due thread calcolino entrambi revision_number=1.
         from django.db import transaction
         with transaction.atomic():
+            WikiPage.objects.select_for_update().filter(pk=instance.pk).get()
             last_rev = (
                 WikiPageRevision.objects
-                .select_for_update()
                 .filter(page=instance)
                 .order_by("-revision_number")
                 .first()
@@ -329,5 +330,5 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 content_markdown=instance.content_markdown or "",
                 saved_by=self.request.user,
             )
-        updated = serializer.save(updated_by=self.request.user)
+            updated = serializer.save(updated_by=self.request.user)
         log_event(actor=self.request.user, action="update", instance=updated, request=self.request)

@@ -53,13 +53,13 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 
 import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '../api/client'
-import { useToast } from '../ui/toast'
-import { apiErrorToMessage } from '../api/error'
+import { api } from '@shared/api/client'
+import { useToast } from '@shared/ui/toast'
+import { apiErrorToMessage } from '@shared/api/error'
 import { customerDrawerPath } from '../utils/entityPaths'
 import { Can } from '../auth/Can'
 import { PERMS } from '../auth/perms'
-import ConfirmDeleteDialog from '../ui/ConfirmDeleteDialog'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import RichEditor, { type QuillInstance } from '../ui/RichEditor'
 
 // ── Types ─────────────────────────────────────────────────────────────────────

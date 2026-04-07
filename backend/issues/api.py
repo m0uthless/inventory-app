@@ -439,7 +439,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         except IssueComment.DoesNotExist:
             return Response({"detail": "Commento non trovato."}, status=404)
 
-        if comment.author != request.user and not request.user.is_staff:
+        if comment.author != request.user and not request.user.groups.filter(name="admin").exists() and not getattr(request.user, "is_superuser", False) and not getattr(request.user, "is_staff", False):
             return Response({"detail": "Non autorizzato."}, status=403)
 
         if request.method == "DELETE":

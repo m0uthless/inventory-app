@@ -21,6 +21,7 @@ from core.integrity import raise_integrity_error_as_validation
 from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, RestoreActionMixin, PurgeActionMixin
 from core.restore_policy import split_restorable  # usato in ContactViewSet.bulk_restore()
+from auslbo.mixins import AuslBoScopedMixin
 
 # -------------------------
 # Customers
@@ -125,7 +126,7 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
         ]
 
 
-class CustomerViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -263,7 +264,7 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
         ]
 
 
-class SiteViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class SiteViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = SiteSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
@@ -345,7 +346,7 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 
-class ContactViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class ContactViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
