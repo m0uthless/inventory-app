@@ -112,16 +112,16 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 
 class IsStaffOrReadOnly(BasePermission):
-    """Lettura: tutti gli autenticati. Scrittura: gruppo admin o superuser."""
+    """Lettura: tutti gli autenticati. Scrittura: superuser o permesso core.access_archie."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:
             return True
-        if getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False):
+        if getattr(request.user, "is_superuser", False):
             return True
-        return request.user.groups.filter(name="admin").exists()
+        return request.user.has_perm("core.access_archie")
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):

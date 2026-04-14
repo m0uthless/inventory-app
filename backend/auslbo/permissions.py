@@ -2,51 +2,41 @@ from __future__ import annotations
 
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-# ─── Gruppi Archie (frontend principale) ──────────────────────────────────────
-ARCHIE_GROUPS = {"admin", "editor", "user"}
 
-# ─── Gruppi AUSL BO (portal) ──────────────────────────────────────────────────
-# Include "auslbo_users" come alias legacy per compatibilità con utenti esistenti
-# finché non vengono migrati al nuovo schema.
-AUSLBO_GROUPS        = {"admin_auslbo", "editor_auslbo", "user_auslbo", "auslbo_users"}
-AUSLBO_EDITOR_GROUPS = {"admin_auslbo", "editor_auslbo"}
-AUSLBO_ADMIN_GROUPS  = {"admin_auslbo"}
-
-
-def _user_groups(user) -> set[str]:
-    try:
-        return set(user.groups.values_list("name", flat=True))
-    except Exception:
-        return set()
-
+# ─── Accesso Archie ────────────────────────────────────────────────────────────
 
 def _can_access_archie(user) -> bool:
     """True se l'utente può accedere al frontend Archie principale.
 
     Criteri (OR):
-    - is_staff o is_superuser  → override di sistema (backward-compat)
-    - gruppo admin, editor o user
+    - is_superuser  → override di sistema
+    - permesso custom `core.access_archie` assegnato tramite gruppo Django Admin
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+    if getattr(user, "is_superuser", False):
         return True
-    return bool(_user_groups(user) & ARCHIE_GROUPS)
+    return bool(user.has_perm("core.access_archie"))
 
+
+# ─── Accesso portal AUSL BO ───────────────────────────────────────────────────
 
 def _is_auslbo_user(user) -> bool:
     """True se l'utente può accedere al portal AUSL BO.
 
-    Criteri: almeno un gruppo AUSL BO E AuslBoUserProfile esistente.
-    Supporta il gruppo legacy "auslbo_users" per compatibilità.
+    Unico criterio: esiste un AuslBoUserProfile attivo.
+    Nessun controllo su gruppi: i gruppi gestiscono i permessi
+    sui singoli modelli tramite DjangoModelPermissions standard.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if not (_user_groups(user) & AUSLBO_GROUPS):
-        return False
+    if getattr(user, "is_superuser", False):
+        return True
     try:
         from auslbo.models import AuslBoUserProfile
-        return AuslBoUserProfile.objects.filter(user_id=user.pk).exists()
+        return AuslBoUserProfile.objects.filter(
+            user_id=user.pk, is_active=True
+        ).exists()
     except Exception:
         return False
 
@@ -55,22 +45,17 @@ def _can_edit_auslbo(user) -> bool:
     """True se l'utente può scrivere nel portal AUSL BO.
 
     Criteri (OR):
-    - is_staff o is_superuser  → override di sistema
-    - gruppo admin_auslbo o editor_auslbo
+    - is_superuser  → override di sistema
+    - permesso Django standard device.change_device
+
+    Usato dal frontend per mostrare/nascondere controlli di modifica.
+    Il controllo granulare per-endpoint è delegato a DjangoModelPermissions.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+    if getattr(user, "is_superuser", False):
         return True
-    return bool(_user_groups(user) & AUSLBO_EDITOR_GROUPS)
-
-
-def _can_admin_archie(user) -> bool:
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
-        return True
-    return "admin" in _user_groups(user)
+    return bool(user.has_perm("device.change_device"))
 
 
 def _get_auslbo_customer_id(user) -> int | None:
@@ -88,7 +73,10 @@ def _is_internal_user(user) -> bool:
     return _can_access_archie(user)
 
 
+# ─── Permission classes DRF ───────────────────────────────────────────────────
+
 class IsAuslBoUser(BasePermission):
+    """Accesso riservato agli utenti con AuslBoUserProfile attivo."""
     message = "Accesso riservato agli utenti del portal AUSL BO."
 
     def has_permission(self, request, view) -> bool:
@@ -96,6 +84,7 @@ class IsAuslBoUser(BasePermission):
 
 
 class IsInternalUser(BasePermission):
+    """Accesso riservato agli utenti interni (permesso core.access_archie)."""
     message = "Accesso riservato agli utenti interni."
 
     def has_permission(self, request, view) -> bool:
@@ -103,6 +92,7 @@ class IsInternalUser(BasePermission):
 
 
 class IsAuslBoUserOrInternal(BasePermission):
+    """Accesso per utenti AUSL BO o utenti interni Archie."""
     message = "Autenticazione richiesta."
 
     def has_permission(self, request, view) -> bool:
@@ -113,7 +103,12 @@ class IsAuslBoUserOrInternal(BasePermission):
 
 
 class IsAuslBoEditor(BasePermission):
-    message = "Operazione riservata agli editor AUSL BO (editor_auslbo, admin_auslbo, is_staff o superuser)."
+    """Scrittura riservata a chi ha il permesso device.change_device.
+
+    Le letture (SAFE_METHODS) passano sempre; il controllo granulare
+    per modello è demandato a DjangoModelPermissions nei singoli ViewSet.
+    """
+    message = "Operazione riservata agli editor AUSL BO."
 
     def has_permission(self, request, view) -> bool:
         if request.method in SAFE_METHODS:
@@ -122,7 +117,13 @@ class IsAuslBoEditor(BasePermission):
 
 
 class IsArchieAdmin(BasePermission):
+    """Operazioni riservate ai superuser o a chi ha permessi admin Archie."""
     message = "Operazione riservata agli amministratori di Archie."
 
     def has_permission(self, request, view) -> bool:
-        return _can_admin_archie(request.user)
+        user = request.user
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        return bool(user.has_perm("core.access_archie"))

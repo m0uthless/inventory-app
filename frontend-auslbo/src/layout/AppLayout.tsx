@@ -47,15 +47,15 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',       path: '/',          icon: <DashboardOutlinedIcon />,  section: 'panoramica' },
-  { label: 'RIS/PACS Systems', path: '/inventory', icon: <MemoryOutlinedIcon />,    section: 'inventario' },
-  { label: 'Device',          path: '/device',    icon: <RouterOutlinedIcon />,          section: 'inventario' },
-  { label: 'VLAN',           path: '/vlan',      icon: <LanOutlinedIcon />,              section: 'inventario' },
-  { label: 'Richieste',      path: '/richieste', icon: <AssignmentOutlinedIcon />,       section: 'inventario' },
-  { label: 'Scadenze',        path: '/scadenze',  icon: <AccessTimeOutlinedIcon />, section: 'inventario' },
-  { label: 'Sedi',            path: '/sites',     icon: <HomeWorkOutlinedIcon />,   section: 'struttura'  },
-  { label: 'Contatti',        path: '/contacts',  icon: <PeopleOutlinedIcon />,     section: 'struttura'  },
-  { label: 'Report',          path: '/report',    icon: <BarChartOutlinedIcon />,   section: 'dedicato'   },
+  { label: 'Dashboard',        path: '/',          icon: <DashboardOutlinedIcon />,  section: 'panoramica' },
+  { label: 'RIS/PACS Systems', path: '/inventory', icon: <MemoryOutlinedIcon />,     section: 'inventario' },
+  { label: 'Device',           path: '/device',    icon: <RouterOutlinedIcon />,     section: 'inventario' },
+  { label: 'VLAN',             path: '/vlan',      icon: <LanOutlinedIcon />,        section: 'inventario' },
+  { label: 'Richieste',        path: '/richieste', icon: <AssignmentOutlinedIcon />, section: 'inventario' },
+  { label: 'Scadenze',         path: '/scadenze',  icon: <AccessTimeOutlinedIcon />, section: 'inventario' },
+  { label: 'Sedi',             path: '/sites',     icon: <HomeWorkOutlinedIcon />,   section: 'struttura'  },
+  { label: 'Contatti',         path: '/contacts',  icon: <PeopleOutlinedIcon />,     section: 'struttura'  },
+  { label: 'Report',           path: '/report',    icon: <BarChartOutlinedIcon />,   section: 'dedicato'   },
 ]
 
 const SECTIONS: Array<{ key: NavItem['section']; label: string }> = [
@@ -68,8 +68,8 @@ const SECTIONS: Array<{ key: NavItem['section']; label: string }> = [
 const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
   ['/inventory', 'RIS/PACS SYSTEMS'],
   ['/device',    'DEVICE'],
-  ['/vlan',       'RETI VLAN'],
-  ['/richieste',  'RICHIESTE MODALITÀ'],
+  ['/vlan',      'RETI VLAN'],
+  ['/richieste', 'RICHIESTE MODALITÀ'],
   ['/scadenze',  'SCADENZE'],
   ['/sites',     'SEDI'],
   ['/contacts',  'CONTATTI'],

@@ -130,6 +130,24 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
     app_pwd = DecryptedSecretField(required=False, allow_null=True)
     vnc_pwd = DecryptedSecretField(required=False, allow_null=True)
 
+    monitors = serializers.SerializerMethodField()
+
+    def get_monitors(self, obj):
+        qs = obj.monitors.filter(deleted_at__isnull=True).order_by("produttore", "modello")
+        return [
+            {
+                "id": m.id,
+                "produttore": m.produttore,
+                "modello": m.modello,
+                "seriale": m.seriale,
+                "tipo_label": m.get_tipo_display(),
+                "stato": m.stato,
+                "stato_label": m.get_stato_display(),
+                "radinet": m.radinet,
+            }
+            for m in qs
+        ]
+
     class Meta:
         model = Inventory
         fields = [
@@ -178,6 +196,7 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
             "deleted_at",
             "has_active_issue",
             "active_issue_priority",
+            "monitors",
         ]
         extra_kwargs = {
             # REQUIRED via API
@@ -333,6 +352,12 @@ class InventoryViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, 
 
     def get_queryset(self):
         qs = Inventory.objects.select_related("customer", "site", "status", "type")
+        if getattr(self, "action", "") == "retrieve":
+            from inventory.models import Monitor as _Monitor
+            from django.db.models import Prefetch as _Prefetch
+            qs = qs.prefetch_related(
+                _Prefetch("monitors", queryset=_Monitor.objects.filter(deleted_at__isnull=True).order_by("produttore", "modello"))
+            )
 
         # Aliases for frontend ordering fields
         active_issue_qs = Issue.objects.filter(
@@ -375,3 +400,76 @@ class InventoryViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, 
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
+
+# ─── Monitor ──────────────────────────────────────────────────────────────────
+
+from inventory.models import Monitor
+
+
+class MonitorSerializer(serializers.ModelSerializer):
+    # Campi leggibili in sola lettura per il frontend
+    inventory_name = serializers.CharField(source="inventory.name", read_only=True, default=None)
+    site_name      = serializers.SerializerMethodField()
+    stato_label    = serializers.CharField(source="get_stato_display", read_only=True)
+    tipo_label     = serializers.CharField(source="get_tipo_display", read_only=True)
+
+    class Meta:
+        model  = Monitor
+        fields = [
+            "id",
+            "inventory",
+            "inventory_name",
+            "site_name",
+            "produttore",
+            "modello",
+            "seriale",
+            "stato",
+            "stato_label",
+            "tipo",
+            "tipo_label",
+            "radinet",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+        ]
+        read_only_fields = ["id", "inventory_name", "site_name", "stato_label", "tipo_label", "created_at", "updated_at", "deleted_at"]
+
+    def get_site_name(self, obj) -> str | None:
+        try:
+            return obj.inventory.site.name if obj.inventory.site else None
+        except Exception:
+            return None
+
+    def validate(self, attrs):
+        # Ricostruisce l'istanza parziale per eseguire il clean() del modello
+        instance = Monitor(**attrs)
+        instance.clean()
+        return attrs
+
+
+class MonitorViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+    """CRUD monitor. Filtrabili per inventory, stato, tipo.
+
+    Supporta soft-delete con cestino:
+      ?include_deleted=1  -> include attivi + eliminati
+      ?only_deleted=1     -> solo eliminati (cestino)
+    Endpoint extra: POST /monitors/{id}/restore/
+    """
+
+    serializer_class   = MonitorSerializer
+    filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields   = ["inventory", "stato", "tipo", "radinet"]
+    search_fields      = ["produttore", "modello", "seriale"]
+    ordering_fields    = ["produttore", "modello", "stato", "tipo", "created_at", "updated_at"]
+    ordering           = ["produttore", "modello"]
+
+    # Monitor non ha updated_by
+    restore_has_updated_by = False
+
+    def get_queryset(self):
+        qs = Monitor.objects.select_related("inventory", "inventory__site")
+        return apply_soft_delete_filters(
+            qs,
+            request=self.request,
+            action_name=self.action,
+        )

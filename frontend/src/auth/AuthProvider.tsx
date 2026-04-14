@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (username: string, password: string) => {
       // Assicura csrftoken prima del POST
       await api.get('/auth/csrf/')
-      await api.post('/auth/login/', { username, password })
+      await api.post('/auth/login/', { username, password, ambito: 'site-repo' })
       await refreshMe()
     },
     [refreshMe],

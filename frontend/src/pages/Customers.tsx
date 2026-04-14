@@ -4,9 +4,7 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Drawer,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -14,20 +12,15 @@ import {
   TextField,
   Tooltip,
   Typography,
-  Tabs,
-  Tab,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  LinearProgress,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import CloseIcon from '@mui/icons-material/Close'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
@@ -48,11 +41,6 @@ import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { isRecord } from '@shared/utils/guards'
-import ActionButton from '@shared/ui/ActionButton'
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
-import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
-import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
@@ -60,11 +48,11 @@ import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import StatusChip from '@shared/ui/StatusChip'
-import LeafletMap from '../ui/LeafletMap'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
+import CustomerDrawer from '../features/customers/CustomerDrawer'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 
 type LookupItem = { id: number; label: string; key?: string }
@@ -186,8 +174,10 @@ function CustomerSitesTab(props: {
           </Typography>
           <Chip size="small" label={rowCount} />
         </Stack>
-        <ActionButton
-          tone="secondary"
+        <Button
+          size="small"
+          variant="contained"
+          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
           onClick={() =>
             navigate(
               `/sites${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`,
@@ -195,7 +185,7 @@ function CustomerSitesTab(props: {
           }
         >
           Apri lista
-        </ActionButton>
+        </Button>
       </Stack>
 
       {loading ? (
@@ -300,8 +290,10 @@ function CustomerInventoriesTab(props: {
           </Typography>
           <Chip size="small" label={rowCount} />
         </Stack>
-        <ActionButton
-          tone="secondary"
+        <Button
+          size="small"
+          variant="contained"
+          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
           onClick={() =>
             navigate(
               `/inventory${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`,
@@ -309,7 +301,7 @@ function CustomerInventoriesTab(props: {
           }
         >
           Apri lista
-        </ActionButton>
+        </Button>
       </Stack>
 
       {loading ? (
@@ -478,9 +470,14 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
           </Typography>
           <Chip size="small" label={total} />
         </Stack>
-        <ActionButton tone="secondary" onClick={() => navigate('/drive')}>
+        <Button
+          size="small"
+          variant="contained"
+          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+          onClick={() => navigate('/drive')}
+        >
           Apri Drive
-        </ActionButton>
+        </Button>
       </Stack>
 
       {loading ? (
@@ -718,10 +715,12 @@ const renderCustomerCard: MobileCardRenderFn<CustomerRow> = ({ row, onOpen }) =>
 
 // prettier-ignore
 export default function Customers() {
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
+  const canChange = hasPerm(PERMS.crm.customer.change)
+  const canDelete = hasPerm(PERMS.crm.customer.delete)
 
   const grid = useServerGrid({
     defaultOrdering: 'display_name',
@@ -1329,486 +1328,44 @@ export default function Customers() {
         />
       )}
 
-      <Drawer
-        anchor="right"
+      <CustomerDrawer
         open={drawerOpen}
+        detail={detail}
+        detailLoading={detailLoading}
+        selectedId={selectedId}
+        drawerTab={drawerTab}
+        sitesCount={sitesCount}
+        inventoriesCount={invCount}
+        driveCount={driveCount}
+        address={address}
+        canChange={canChange}
+        canDelete={canDelete}
+        deleteBusy={deleteBusy}
+        restoreBusy={restoreBusy}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
-      >
-        <Stack sx={{ height: '100%', overflow: 'hidden' }}>
-          {/* ── HERO BANNER ── */}
-          <Box
-            sx={{
-              background: 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)',
-              px: 2.5,
-              pt: 2.25,
-              pb: 2.25,
-              position: 'relative',
-              overflow: 'hidden',
-              flexShrink: 0,
-            }}
-          >
-            {/* decorative blobs */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: -44,
-                right: -44,
-                width: 130,
-                height: 130,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.06)',
-                pointerEvents: 'none',
-              }}
-            />
-            <Box
-              sx={{
-                position: 'absolute',
-                bottom: -26,
-                left: 52,
-                width: 90,
-                height: 90,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.04)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            {/* row 1: status badge + action icons */}
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
-            >
-              <Tooltip title="Chiudi">
-                  <IconButton
-                    aria-label="Chiudi"
-                    size="small"
-                    onClick={closeDrawer}
-                    sx={{
-                      color: 'rgba(255,255,255,0.85)',
-                      bgcolor: 'rgba(255,255,255,0.12)',
-                      borderRadius: 1.5,
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                    }}
-                  >
-                    <ArrowBackIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Chip
-                size="small"
-                label={`● ${detail?.status_label ?? '—'}`}
-                sx={{
-                  bgcolor: 'rgba(20,255,180,0.18)',
-                  color: '#a7f3d0',
-                  fontWeight: 700,
-                  fontSize: 10,
-                  letterSpacing: '0.07em',
-                  border: '1px solid rgba(167,243,208,0.3)',
-                  height: 22,
-                }}
-              />
-              <Stack direction="row" spacing={0.75}>
-                <Can perm={PERMS.crm.customer.change}>
-                  {detail?.deleted_at ? (
-                    <Tooltip title="Ripristina">
-                      <span>
-                        <IconButton
-                          aria-label="Ripristina"
-                          size="small"
-                          onClick={doRestore}
-                          disabled={!detail || restoreBusy}
-                          sx={{
-                            color: 'rgba(255,255,255,0.85)',
-                            bgcolor: 'rgba(255,255,255,0.12)',
-                            borderRadius: 1.5,
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                          }}
-                        >
-                          <RestoreFromTrashIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ) : (
-                    <Tooltip title="Modifica">
-                      <span>
-                        <IconButton
-                          aria-label="Modifica"
-                          size="small"
-                          onClick={openEdit}
-                          disabled={!detail}
-                          sx={{
-                            color: 'rgba(255,255,255,0.85)',
-                            bgcolor: 'rgba(255,255,255,0.12)',
-                            borderRadius: 1.5,
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                          }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  )}
-                </Can>
-                <Can perm={PERMS.crm.customer.delete}>
-                  {!detail?.deleted_at && (
-                    <Tooltip title="Elimina">
-                      <span>
-                        <IconButton
-                          aria-label="Elimina"
-                          size="small"
-                          onClick={() => setDeleteDlgOpen(true)}
-                          disabled={!detail || deleteBusy}
-                          sx={{
-                            color: 'rgba(255,255,255,0.85)',
-                            bgcolor: 'rgba(255,255,255,0.12)',
-                            borderRadius: 1.5,
-                            '&:hover': { bgcolor: 'rgba(239,68,68,0.28)', color: '#fca5a5' },
-                          }}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  )}
-                </Can>
-                <Tooltip title="Chiudi">
-                  <IconButton
-                    aria-label="Chiudi"
-                    size="small"
-                    onClick={closeDrawer}
-                    sx={{
-                      color: 'rgba(255,255,255,0.85)',
-                      bgcolor: 'rgba(255,255,255,0.12)',
-                      borderRadius: 1.5,
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                    }}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
-            </Stack>
-
-            {/* row 2: name + city */}
-            <Box sx={{ position: 'relative', zIndex: 1, mb: 2 }}>
-              {detail?.deleted_at && (
-                <Chip
-                  size="small"
-                  color="error"
-                  label="Eliminato"
-                  sx={{ mb: 0.75, height: 20, fontSize: 10 }}
-                />
-              )}
-              <Typography
-                sx={{
-                  color: '#fff',
-                  fontSize: 26,
-                  fontWeight: 900,
-                  letterSpacing: '-0.025em',
-                  lineHeight: 1.1,
-                  mb: 0.5,
-                }}
-              >
-                {detail?.display_name || (selectedId ? `Cliente #${selectedId}` : 'Cliente')}
-              </Typography>
-              {detail?.city && (
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.58)' }}>
-                  📍 {detail.city}
-                </Typography>
-              )}
-            </Box>
-          </Box>
-
-          {/* ── TABS ── */}
-          {detailLoading ? <LinearProgress sx={{ height: 2 }} /> : null}
-
-          <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 2.5 }}>
-            <Tabs value={drawerTab} onChange={(_, v) => setDrawerTab(v)}>
-              <Tab label="Dettagli" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-              <Tab
-                label={sitesCount != null ? `Siti (${sitesCount})` : 'Siti'}
-                sx={{ fontSize: 13, minWidth: 0, px: 1.5 }}
-              />
-              <Tab
-                label={invCount != null ? `Inventari (${invCount})` : 'Inventari'}
-                sx={{ fontSize: 13, minWidth: 0, px: 1.5 }}
-              />
-              <Tab
-                label={driveCount != null ? `Drive (${driveCount})` : 'Drive'}
-                sx={{ fontSize: 13, minWidth: 0, px: 1.5 }}
-              />
-              <Tab label="Attività" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-            </Tabs>
-          </Box>
-
-          {/* ── SCROLLABLE CONTENT ── */}
-          <Box
-            sx={{
-              flex: 1,
-              overflowY: 'auto',
-              px: 2.5,
-              py: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1.5,
-            }}
-          >
-            {!detail && !detailLoading ? (
-              <Typography variant="body2" sx={{ opacity: 0.6 }}>
-                Nessun dettaglio disponibile.
-              </Typography>
-            ) : null}
-
-            {/* TAB 0 — Dettagli */}
-            {drawerTab === 0 && detail && (
-              <>
-                {/* Contatto primario */}
-                <Box
-                  sx={{
-                    bgcolor: '#f8fafc',
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    borderRadius: 1,
-                    p: 1.75,
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.disabled',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      mb: 1,
-                    }}
-                  >
-                    <PersonOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                    Contatto primario
-                  </Typography>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    spacing={1}
-                    flexWrap="wrap"
-                  >
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                        {detail.primary_contact_name || '—'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {detail.primary_contact_email || ''}
-                      </Typography>
-                    </Box>
-                    {detail.primary_contact_phone && (
-                      <Chip
-                        size="small"
-                        label={detail.primary_contact_phone}
-                        sx={{
-                          bgcolor: '#f0fdf4',
-                          color: '#0f766e',
-                          border: '1px solid #bbf7d0',
-                          fontWeight: 600,
-                          fontSize: 11,
-                        }}
-                      />
-                    )}
-                  </Stack>
-                </Box>
-
-                {/* Informazioni (P.IVA + tutti i custom fields) */}
-                <Box
-                  sx={{
-                    bgcolor: '#f8fafc',
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    borderRadius: 1,
-                    p: 1.75,
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.disabled',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      mb: 1,
-                    }}
-                  >
-                    <MonitorOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                    Informazioni
-                  </Typography>
-                  <Stack
-                    divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}
-                  >
-                    {detail.vat_number && (
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        sx={{ py: 0.75 }}
-                      >
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                          P.IVA
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12 }}
-                        >
-                          {detail.vat_number}
-                        </Typography>
-                      </Stack>
-                    )}
-                    {detail.custom_fields &&
-                      isRecord(detail.custom_fields) &&
-                      Object.entries(detail.custom_fields)
-                        .filter(
-                          ([k, v]) =>
-                            v !== '' &&
-                            v !== null &&
-                            v !== undefined &&
-                            k.trim().toLowerCase() !== 'indirizzo',
-                        )
-                        .map(([k, v]) => (
-                          <Stack
-                            key={k}
-                            direction="row"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            sx={{ py: 0.75 }}
-                          >
-                            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                              {k}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 600,
-                                maxWidth: 220,
-                                textAlign: 'right',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {String(v)}
-                            </Typography>
-                          </Stack>
-                        ))}
-                  </Stack>
-                </Box>
-
-                {/* Indirizzo + mappa */}
-                {address && (
-                  <Box
-                    sx={{
-                      bgcolor: '#fff',
-                      borderRadius: 1,
-                      border: '1px solid',
-                      borderColor: 'grey.200',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: 700,
-                          color: 'text.disabled',
-                          letterSpacing: '0.08em',
-                          textTransform: 'uppercase',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.75,
-                          mb: 0.5,
-                        }}
-                      >
-                        <LocationOnOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                        Indirizzo
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                        {address}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ borderTop: '1px solid', borderColor: 'grey.100' }}>
-                      <LeafletMap address={address} height={320} zoom={15} />
-                    </Box>
-                  </Box>
-                )}
-
-                {/* Note */}
-                <Box
-                  sx={{
-                    bgcolor: '#fafafa',
-                    border: '1px solid',
-                    borderColor: 'grey.100',
-                    borderRadius: 1,
-                    p: 1.75,
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.disabled',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      mb: 0.75,
-                    }}
-                  >
-                    <NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                    Note
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}
-                  >
-                    {detail.notes || '—'}
-                  </Typography>
-                </Box>
-              </>
-            )}
-
-            {/* TAB 1 — Siti */}
-            {drawerTab === 1 && detail && (
-              <CustomerSitesTab
-                customerId={detail.id}
-                includeDeleted={grid.includeDeleted}
-                onlyDeleted={grid.onlyDeleted}
-              />
-            )}
-
-            {/* TAB 2 — Inventari */}
-            {drawerTab === 2 && detail && (
-              <CustomerInventoriesTab
-                customerId={detail.id}
-                includeDeleted={grid.includeDeleted}
-                onlyDeleted={grid.onlyDeleted}
-              />
-            )}
-
-            {/* TAB 3 — Drive */}
-            {drawerTab === 3 && detail && <CustomerDriveTab customerId={detail.id} />}
-
-            {/* TAB 4 — Attività */}
-            {drawerTab === 4 && detail && (
-              <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
-            )}
-          </Box>
-        </Stack>
-      </Drawer>
+        onEdit={openEdit}
+        onDelete={() => setDeleteDlgOpen(true)}
+        onRestore={doRestore}
+        onTabChange={setDrawerTab}
+        sitesTabContent={detail ? (
+          <CustomerSitesTab
+            customerId={detail.id}
+            includeDeleted={grid.includeDeleted}
+            onlyDeleted={grid.onlyDeleted}
+          />
+        ) : null}
+        inventoriesTabContent={detail ? (
+          <CustomerInventoriesTab
+            customerId={detail.id}
+            includeDeleted={grid.includeDeleted}
+            onlyDeleted={grid.onlyDeleted}
+          />
+        ) : null}
+        driveTabContent={detail ? <CustomerDriveTab customerId={detail.id} /> : null}
+        activityTabContent={detail ? (
+          <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
+        ) : null}
+      />
 
       <ConfirmActionDialog
         open={bulkRestoreDlgOpen}

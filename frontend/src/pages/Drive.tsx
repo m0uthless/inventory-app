@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Drawer,
   IconButton,
   Menu,
   MenuItem,
@@ -44,6 +43,7 @@ import { PERMS } from '../auth/perms'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
+import { DrawerShell } from '@shared/ui/DrawerShell'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
 
@@ -314,106 +314,15 @@ function PreviewDrawer({
 
   return (
     <>
-      <Drawer
-        anchor="right"
+      <DrawerShell
         open={!!item}
         onClose={onClose}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}
+        gradient="teal"
+        statusLabel={`● ${kindLabel}`}
+        title={folder?.name ?? file?.name ?? ''}
+        subtitle={heroSubtitle}
       >
-        <Stack sx={{ height: '100%', overflow: 'hidden' }}>
-          <Box
-            sx={{
-              background: 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)',
-              px: 2.5,
-              pt: 2.25,
-              pb: 2.25,
-              position: 'relative',
-              overflow: 'hidden',
-              flexShrink: 0,
-            }}
-          >
-            <Box
-              sx={{
-                position: 'absolute',
-                top: -44,
-                right: -44,
-                width: 130,
-                height: 130,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.06)',
-                pointerEvents: 'none',
-              }}
-            />
-            <Box
-              sx={{
-                position: 'absolute',
-                bottom: -26,
-                left: 52,
-                width: 90,
-                height: 90,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.04)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
-            >
-              <Chip
-                size="small"
-                label={`● ${kindLabel}`}
-                sx={{
-                  bgcolor: 'rgba(20,255,180,0.18)',
-                  color: '#a7f3d0',
-                  fontWeight: 700,
-                  fontSize: 10,
-                  letterSpacing: '0.07em',
-                  border: '1px solid rgba(167,243,208,0.3)',
-                  height: 22,
-                }}
-              />
-              <Tooltip title="Chiudi">
-                <IconButton
-                  aria-label="Chiudi"
-                  size="small"
-                  onClick={onClose}
-                  sx={{
-                    color: 'rgba(255,255,255,0.85)',
-                    bgcolor: 'rgba(255,255,255,0.12)',
-                    borderRadius: 1.5,
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                  }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Typography
-                sx={{
-                  color: '#fff',
-                  fontSize: 26,
-                  fontWeight: 900,
-                  letterSpacing: '-0.025em',
-                  lineHeight: 1.1,
-                  mb: 0.5,
-                  pr: 2,
-                  wordBreak: 'break-word',
-                }}
-              >
-                {folder?.name ?? file?.name ?? ''}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                {heroSubtitle}
-              </Typography>
-            </Box>
-          </Box>
-
+        <>
           <Box
             sx={{
               flex: 1,
@@ -622,8 +531,8 @@ function PreviewDrawer({
               </Can>
             </Box>
           </Box>
-        </Stack>
-      </Drawer>
+        </>
+      </DrawerShell>
 
       {file && file.is_pdf && (
         <Dialog

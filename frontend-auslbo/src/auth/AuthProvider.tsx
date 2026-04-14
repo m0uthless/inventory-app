@@ -18,9 +18,9 @@ export type AuslBoMe = {
     code: string
   }
   auslbo: {
-    group: string
     is_active: boolean
     can_edit_devices: boolean
+    permissions: string[]
   }
 }
 

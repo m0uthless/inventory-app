@@ -4,7 +4,6 @@ from django.conf import settings
 from django.db import models
 
 
-AUSLBO_GROUP_NAME = "user_auslbo"  # gruppo base portal; editor: editor_auslbo; admin: admin_auslbo
 
 
 class AuslBoUserProfile(models.Model):
@@ -16,7 +15,7 @@ class AuslBoUserProfile(models.Model):
 
     Un utente portal vede esclusivamente i dati del cliente associato.
     La presenza di questo record NON implica automaticamente l'accesso
-    al portal: l'utente deve anche appartenere a uno dei Group auslbo (admin_auslbo, editor_auslbo, user_auslbo).
+    al portal: è sufficiente che esista un AuslBoUserProfile associato all'utente.
 
     Separare il profilo dal Group consente di:
     - pre-configurare l'associazione cliente prima di abilitare l'accesso
@@ -57,12 +56,12 @@ class AuslBoUserProfile(models.Model):
 
     @property
     def is_active(self) -> bool:
-        """True se l'utente è in almeno un gruppo AUSL BO (incluso auslbo_users legacy)
-        E il customer non è eliminato."""
+        """True se il customer non è eliminato.
+
+        L'accesso al portal è controllato dalla sola esistenza del profilo:
+        i gruppi Django gestiscono i permessi sui modelli, non il gate di accesso.
+        """
         try:
-            from auslbo.permissions import AUSLBO_GROUPS
-            in_group = self.user.groups.filter(name__in=AUSLBO_GROUPS).exists()
-            customer_active = self.customer.deleted_at is None
-            return in_group and customer_active
+            return self.customer.deleted_at is None
         except Exception:
             return False

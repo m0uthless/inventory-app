@@ -36,23 +36,20 @@ class CanRestoreModelPermission(BasePermission):
 
 
 class IsStaffOrAdminGroup(BasePermission):
-    """Allow access to superusers OR users in the `admin` group.
+    """Accesso a superuser o utenti con permesso core.access_archie.
 
-    Useful for endpoints that are not tied to a model/queryset (e.g. API docs).
-    Note: is_staff is kept as a backward-compatible override during the group migration.
+    Usato per endpoint non legati a un modello/queryset (es. API docs).
+    Il nome del gruppo non è hardcoded: il permesso viene assegnato
+    liberamente a qualsiasi gruppo tramite Django Admin.
     """
-
-    admin_group_name = "admin"
 
     def has_permission(self, request, view) -> bool:
         user = getattr(request, "user", None)
         if not user or not getattr(user, "is_authenticated", False):
             return False
-
-        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        if getattr(user, "is_superuser", False):
             return True
-
-        return bool(user.groups.filter(name=self.admin_group_name).exists())
+        return bool(user.has_perm("core.access_archie"))
 
 
 class CanPurgeModelPermission(BasePermission):

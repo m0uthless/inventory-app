@@ -367,16 +367,15 @@ class VlanIpRequestSerializer(serializers.ModelSerializer):
 
 
 class IsAdminAuslBo(IsAuslBoEditor):
-    """Solo admin_auslbo o superuser possono approvare/rifiutare richieste."""
+    """Approvazione/rifiuto richieste: superuser o permesso vlan.change_vlanIprequest."""
     message = "Solo gli amministratori AUSL BO possono approvare le richieste."
 
     def has_permission(self, request, view) -> bool:
-        from auslbo.permissions import AUSLBO_ADMIN_GROUPS, _user_groups
         if not request.user or not getattr(request.user, "is_authenticated", False):
             return False
         if getattr(request.user, "is_superuser", False):
             return True
-        return bool(_user_groups(request.user) & AUSLBO_ADMIN_GROUPS)
+        return request.user.has_perm("vlan.change_vlanIprequest")
 
 
 class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
@@ -408,7 +407,7 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="approve",
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def approve(self, request, pk=None):
-        """Approva una richiesta pendente (solo admin_auslbo)."""
+        """Approva una richiesta pendente (richiede permesso vlan.change_vlanIprequest)."""
         from django.utils import timezone
         req: VlanIpRequest = self.get_object()
         if req.stato != VlanIpRequest.Stato.PENDING:
@@ -425,7 +424,7 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="reject",
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def reject(self, request, pk=None):
-        """Rifiuta una richiesta pendente (solo admin_auslbo)."""
+        """Rifiuta una richiesta pendente (richiede permesso vlan.change_vlanIprequest)."""
         req: VlanIpRequest = self.get_object()
         if req.stato != VlanIpRequest.Stato.PENDING:
             return Response(

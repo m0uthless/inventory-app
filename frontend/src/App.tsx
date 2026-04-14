@@ -13,6 +13,7 @@ const Customers = lazy(() => import('./pages/Customers'))
 const Sites = lazy(() => import('./pages/Sites'))
 const Contacts = lazy(() => import('./pages/Contacts'))
 const Inventory = lazy(() => import('./pages/Inventory'))
+const Monitor = lazy(() => import('./pages/Monitor'))
 const Audit = lazy(() => import('./pages/Audit'))
 const Maintenance = lazy(() => import('./pages/Maintenance'))
 const MaintenancePlans = lazy(() => import('./pages/MaintenancePlans'))
@@ -86,6 +87,11 @@ const router = createBrowserRouter([
       {
         path: 'inventory',
         element: <RequirePerm perm="inventory.view_inventory">{lazyEl(<Inventory />)}</RequirePerm>,
+      },
+
+      {
+        path: 'monitors',
+        element: <RequirePerm perm="inventory.view_monitor">{lazyEl(<Monitor />)}</RequirePerm>,
       },
 
       {

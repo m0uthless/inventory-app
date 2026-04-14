@@ -187,20 +187,6 @@ export default function AppSpeedDial() {
             boxShadow: `0 12px 32px ${alpha(primary, 0.55)}`,
           },
         },
-        // Pill icona delle azioni
-        '& .MuiSpeedDialAction-fab': {
-          width: 40,
-          height: 40,
-          bgcolor: alpha(primary, 0.10),
-          border: `1px solid ${alpha(primary, 0.22)}`,
-          color: primary,
-          boxShadow: 'none',
-          '&:hover': {
-            bgcolor: alpha(primary, 0.18),
-            borderColor: alpha(primary, 0.38),
-            boxShadow: 'none',
-          },
-        },
         // Label testo accanto alla pill
         '& .MuiSpeedDialAction-staticTooltipLabel': {
           whiteSpace: 'nowrap',

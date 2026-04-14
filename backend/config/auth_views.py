@@ -50,15 +50,6 @@ def _client_ip(request: HttpRequest) -> str:
 
     Usa REMOTE_ADDR come fonte canonica — è l'IP impostato da nginx/proxy
     direttamente sulla connessione TCP e non può essere falsificato dal client.
-
-    HTTP_X_FORWARDED_FOR NON viene usato perché è un header che il client
-    può forgiare liberamente, bypassando il rate-limiting per IP.
-    Se l'app è dietro nginx (come in questo stack), REMOTE_ADDR è già
-    l'IP corretto perché nginx sovrascrive X-Real-IP e usa proxy_pass.
-
-    Se in futuro si aggiungono più livelli di proxy fidati, usare
-    django-ipware con IPWARE_TRUSTED_PROXY_LIST oppure
-    configurare nginx per impostare un header custom non sovra-scrivibile.
     """
     return (request.META.get("REMOTE_ADDR") or "unknown").strip() or "unknown"
 
@@ -165,15 +156,10 @@ def login_view(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": "User disabled"}, status=403)
 
     # ── Verifica ambito ────────────────────────────────────────────────────
-    from auslbo.permissions import ARCHIE_GROUPS, AUSLBO_GROUPS
-    user_group_names = set(user.groups.values_list("name", flat=True))
+    from auslbo.permissions import _can_access_archie, _is_auslbo_user
 
-    # is_staff e is_superuser sono override di sistema: accesso a tutto
-    is_superuser = getattr(user, "is_superuser", False)
-    is_staff     = getattr(user, "is_staff", False)
-
-    can_archie = is_staff or is_superuser or bool(user_group_names & ARCHIE_GROUPS)
-    is_portal  = bool(user_group_names & AUSLBO_GROUPS) and hasattr(user, "auslbo_profile")
+    can_archie = getattr(user, "is_superuser", False) or _can_access_archie(user)
+    is_portal  = _is_auslbo_user(user)
 
     if ambito:
         if ambito == "auslbo" and not is_portal:
@@ -217,7 +203,6 @@ def login_view(request: HttpRequest) -> JsonResponse:
 @require_POST
 @csrf_protect
 def logout_view(request: HttpRequest) -> JsonResponse:
-    # Best-effort audit event for logout (never block)
     try:
         if getattr(request, "user", None) is not None and request.user.is_authenticated:
             subject = (request.user.get_full_name() or request.user.username or str(request.user)).strip()

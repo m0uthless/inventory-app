@@ -97,8 +97,9 @@ export default function AuditEventsTab({
 
         <Button
           size="small"
-          variant="outlined"
-          startIcon={<OpenInNewIcon />}
+          variant="contained"
+          endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
           onClick={() =>
             navigate(
               `/audit${buildQuery({ app_label: appLabel, model, object_id: String(objectId) })}`,

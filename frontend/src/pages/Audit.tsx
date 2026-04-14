@@ -7,9 +7,7 @@ import {
   CardContent,
   CircularProgress,
   Divider,
-  Drawer,
   FormControl,
-  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -17,20 +15,11 @@ import {
   Stack,
   TextField,
   Tooltip,
-  Typography,
 } from '@mui/material'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import SearchIcon from '@mui/icons-material/Search'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import CloseIcon from '@mui/icons-material/Close'
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
-import HistoryEduOutlinedIcon from '@mui/icons-material/HistoryEduOutlined'
 
 import type { GridColDef } from '@mui/x-data-grid'
-import { useNavigate } from 'react-router-dom'
 
 import { api } from '@shared/api/client'
 import { buildDrfListParams } from '@shared/api/drf'
@@ -41,11 +30,10 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 import ServerDataGrid from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import AuditActionChip, { type AuditAction } from '../ui/AuditActionChip'
-import AuditDiffTable from '../ui/AuditDiffTable'
+import AuditEventDrawer from '../features/audit/AuditEventDrawer'
 import FilterChip from '@shared/ui/FilterChip'
 import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
-import { buildQuery } from '@shared/utils/nav'
-import { isRecord, isString } from '@shared/utils/guards'
+import { isString } from '@shared/utils/guards'
 
 type AuditEvent = {
   id: number
@@ -111,32 +99,6 @@ function fmt(ts?: string | null) {
   return d.toLocaleString()
 }
 
-async function copyToClipboard(text: string) {
-  if (!text) return
-  await navigator.clipboard.writeText(text)
-}
-
-function openEntityPath(ev: AuditEvent) {
-  if (ev.entity_path) return ev.entity_path
-
-  const app = (ev.content_type_app || '').toLowerCase()
-  const model = (ev.content_type_model || '').toLowerCase()
-  const oid = ev.object_id ? Number(ev.object_id) : NaN
-  if (!Number.isFinite(oid)) return null
-
-  if (app === 'crm' && model === 'customer') return `/customers${buildQuery({ open: oid })}`
-  if (app === 'crm' && model === 'site') return `/sites${buildQuery({ open: oid })}`
-  if (app === 'crm' && model === 'contact') return `/contacts${buildQuery({ open: oid })}`
-  if (app === 'inventory' && model === 'inventory') return `/inventory${buildQuery({ open: oid })}`
-  if (app === 'maintenance' && model === 'maintenanceplan') return `/maintenance${buildQuery({ tab: 'plans', open: oid })}`
-  if (app === 'maintenance' && model === 'maintenanceevent') return `/maintenance${buildQuery({ tab: 'events', open: oid })}`
-  if (app === 'maintenance' && model === 'maintenancenotification') return `/maintenance${buildQuery({ tab: 'notifications', open: oid })}`
-  if (app === 'maintenance' && model === 'tech') return `/maintenance${buildQuery({ tab: 'techs', open: oid })}`
-  if (app === 'issues' && model === 'issue') return `/issues${buildQuery({ open: oid })}`
-  if (app === 'wiki' && model === 'wikipage') return `/wiki/${oid}`
-  if (app === 'drive' && (model === 'drivefolder' || model === 'drivefile')) return '/drive'
-  return null
-}
 
 function entityKey(app?: string, model?: string): string {
   const a = (app || '').toLowerCase()
@@ -160,56 +122,6 @@ function entityLabelForEvent(ev: Pick<AuditEvent, 'content_type_app' | 'content_
 
   return 'Sistema'
 }
-function isAuditChanges(v: unknown): v is Record<string, { from: unknown; to: unknown }> {
-  if (!isRecord(v)) return false
-  const entries = Object.entries(v)
-  if (!entries.length) return false
-  // Heuristic: at least one entry contains {from,to}.
-  return entries.some(([, ch]) => isRecord(ch) && 'from' in ch && 'to' in ch)
-}
-
-function toComparableAuditValue(v: unknown): string {
-  if (v === null) return 'null'
-  if (v === undefined) return 'undefined'
-  if (v === '') return ''
-  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-    return `${typeof v}:${String(v)}`
-  }
-  if (typeof v === 'object') {
-    const obj = v as Record<string, unknown>
-    const hasId = typeof obj.id === 'number' || typeof obj.id === 'string'
-    const hasRepr = typeof obj.repr === 'string'
-    if (hasId || hasRepr) {
-      return `id:${hasId ? String(obj.id) : ''}|repr:${hasRepr ? String(obj.repr) : ''}`
-    }
-    try {
-      return `json:${JSON.stringify(v)}`
-    } catch {
-      return `obj:${String(v)}`
-    }
-  }
-  return `other:${String(v)}`
-}
-
-function hasVisibleAuditDiffs(v: unknown): boolean {
-  if (!isAuditChanges(v)) return false
-  return Object.values(v).some((ch) => toComparableAuditValue(ch?.from) !== toComparableAuditValue(ch?.to))
-}
-
-function fmtMetaValue(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—'
-  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v)
-  try {
-    return JSON.stringify(v)
-  } catch {
-    return String(v)
-  }
-}
-
-function isMetadataSummary(v: unknown): v is Record<string, unknown> {
-  return isRecord(v) && Object.keys(v).length > 0
-}
-
 
 const cols: GridColDef<AuditEvent>[] = [
   {
@@ -254,7 +166,6 @@ const cols: GridColDef<AuditEvent>[] = [
 // prettier-ignore
 export default function Audit() {
   const toast = useToast()
-  const nav = useNavigate()
 
   const grid = useServerGrid({
     defaultOrdering: '-created_at',
@@ -727,385 +638,13 @@ export default function Audit() {
         </CardContent>
       </Card>
 
-      <Drawer
-        anchor="right"
+      <AuditEventDrawer
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 }, display: 'flex', flexDirection: 'column' } }}
-      >
-        {detailLoading ? <Box sx={{ height: 2 }} /> : null}
-
-        {detail ? (
-          <>
-            <Box
-              sx={{
-                px: 2.5,
-                pt: 2.25,
-                pb: 2.1,
-                background: 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  opacity: 0.18,
-                  background:
-                    'radial-gradient(circle at top right, rgba(255,255,255,0.26), transparent 36%), radial-gradient(circle at bottom left, rgba(255,255,255,0.16), transparent 30%)',
-                }}
-              />
-
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1}
-                sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}
-              >
-                <Tooltip title="Chiudi">
-                  <IconButton
-                    aria-label="Chiudi"
-                    size="small"
-                    onClick={closeDrawer}
-                    sx={{
-                      color: 'rgba(255,255,255,0.85)',
-                      bgcolor: 'rgba(255,255,255,0.12)',
-                      borderRadius: 1.5,
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                    }}
-                  >
-                    <ArrowBackIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <AuditActionChip action={detail.action} size="medium" />
-                <Stack direction="row" spacing={0.75}>
-                  <Tooltip title="Copia ID">
-                    <span>
-                      <IconButton
-                        aria-label="Copia ID"
-                        size="small"
-                        onClick={() => copyToClipboard(String(detail.id))}
-                        sx={{
-                          color: 'rgba(255,255,255,0.85)',
-                          bgcolor: 'rgba(255,255,255,0.12)',
-                          borderRadius: 1.5,
-                          '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                        }}
-                      >
-                        <ContentCopyIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  {openEntityPath(detail) ? (
-                    <Tooltip title="Apri oggetto">
-                      <span>
-                        <IconButton
-                          aria-label="Apri oggetto"
-                          size="small"
-                          onClick={() => nav(openEntityPath(detail) as string)}
-                          sx={{
-                            color: 'rgba(255,255,255,0.85)',
-                            bgcolor: 'rgba(255,255,255,0.12)',
-                            borderRadius: 1.5,
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                          }}
-                        >
-                          <OpenInNewIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ) : null}
-                  <Tooltip title="Chiudi">
-                    <IconButton
-                      aria-label="Chiudi"
-                      size="small"
-                      onClick={closeDrawer}
-                      sx={{
-                        color: 'rgba(255,255,255,0.85)',
-                        bgcolor: 'rgba(255,255,255,0.12)',
-                        borderRadius: 1.5,
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                      }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              </Stack>
-
-              <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography
-                  sx={{
-                    color: '#fff',
-                    fontSize: 26,
-                    fontWeight: 900,
-                    letterSpacing: '-0.025em',
-                    lineHeight: 1.1,
-                    mb: 0.5,
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {detail.subject || detail.object_repr || (selectedId ? `Evento #${selectedId}` : 'Evento')}
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                  {entityLabelForEvent(detail)}
-                  {detail.created_at ? ` • ${fmt(detail.created_at)}` : ''}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box
-              sx={{
-                flex: 1,
-                overflowY: 'auto',
-                px: 2.5,
-                py: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1.5,
-              }}
-            >
-              <Box
-                sx={{
-                  bgcolor: '#f8fafc',
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                  borderRadius: 1,
-                  p: 1.75,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: 'text.disabled',
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.75,
-                    mb: 1,
-                  }}
-                >
-                  <HistoryEduOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                  Evento
-                </Typography>
-                <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      Tipo
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right' }}>
-                      {entityLabelForEvent(detail)}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      ID evento
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right' }}>
-                      {detail.id}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      Oggetto
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', maxWidth: 300, wordBreak: 'break-word' }}>
-                      {detail.subject || detail.object_repr || '—'}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      Quando
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right' }}>
-                      {fmt(detail.created_at)}
-                    </Typography>
-                  </Stack>
-                </Stack>
-              </Box>
-
-              <Box
-                sx={{
-                  bgcolor: '#f8fafc',
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                  borderRadius: 1,
-                  p: 1.75,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: 'text.disabled',
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.75,
-                    mb: 1,
-                  }}
-                >
-                  <PersonOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                  Utente
-                </Typography>
-                <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      Username
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>
-                      {detail.actor_username || '—'}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      Email
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>
-                      {detail.actor_email || '—'}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 0.75 }} spacing={2}>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      IP
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right' }}>
-                      {detail.ip_address || '—'}
-                    </Typography>
-                  </Stack>
-                </Stack>
-              </Box>
-
-              {isMetadataSummary(detail.metadata_summary) ? (
-                <Box
-                  sx={{
-                    bgcolor: '#fff',
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Box sx={{ px: 1.75, pt: 1.5, pb: 1.0 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: 700,
-                        color: 'text.disabled',
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.75,
-                      }}
-                    >
-                      <HistoryEduOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Metadati
-                    </Typography>
-                  </Box>
-                  <Box sx={{ borderTop: '1px solid', borderColor: 'grey.100', px: 1.75, py: 1.25 }}>
-                    <Stack spacing={1}>
-                      {Object.entries(detail.metadata_summary).map(([key, value]) => (
-                        <Stack key={key} direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                            {key}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 600, textAlign: 'right', maxWidth: 320, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}
-                          >
-                            {fmtMetaValue(value)}
-                          </Typography>
-                        </Stack>
-                      ))}
-                    </Stack>
-                  </Box>
-                </Box>
-              ) : null}
-
-              {detail.action === 'update' && hasVisibleAuditDiffs(detail.changes) ? (
-                <Box
-                  sx={{
-                    bgcolor: '#fff',
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Box sx={{ px: 1.75, pt: 1.5, pb: 1.0 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: 700,
-                        color: 'text.disabled',
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.75,
-                      }}
-                    >
-                      <NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Modifiche
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      borderTop: '1px solid',
-                      borderColor: 'grey.100',
-                      px: 1.75,
-                      py: 1.25,
-                      '& .MuiTableCell-root': {
-                        fontSize: 13,
-                        borderColor: 'grey.100',
-                        verticalAlign: 'top',
-                        fontFamily: 'inherit',
-                      },
-                      '& .MuiTableHead-root .MuiTableCell-root': {
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: 'text.disabled',
-                        bgcolor: '#f8fafc',
-                      },
-                      '& .MuiTableBody-root .MuiTableCell-root:first-of-type': {
-                        fontWeight: 700,
-                        color: 'text.primary',
-                      },
-                      '& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': {
-                        bgcolor: 'rgba(15,118,110,0.03)',
-                      },
-                    }}
-                  >
-                    <AuditDiffTable
-                      changes={detail.changes as Record<string, { from: unknown; to: unknown }>}
-                      emptyLabel="Nessuna differenza registrata."
-                    />
-                  </Box>
-                </Box>
-              ) : null}
-            </Box>
-          </>
-        ) : detailLoading ? (
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2, px: 2.5 }}>
-            <CircularProgress size={18} />
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Caricamento…
-            </Typography>
-          </Stack>
-        ) : (
-          <Typography variant="body2" sx={{ opacity: 0.7, px: 2.5, py: 2 }}>
-            —
-          </Typography>
-        )}
-      </Drawer>
+        detail={detail}
+        detailLoading={detailLoading}
+        selectedId={selectedId}
+      />
     </Stack>
   )
 }

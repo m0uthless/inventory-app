@@ -33,7 +33,7 @@ import {
   type RequestStato,
 } from '../api/vlanRequestApi'
 import AuslBoNewDeviceDrawer from '../ui/AuslBoNewDeviceDrawer'
-import { type NewDeviceFormState, emptyDeviceForm } from '../ui/deviceForm'
+import { type NewDeviceFormState, emptyDeviceForm } from '@shared/device/deviceTypes'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

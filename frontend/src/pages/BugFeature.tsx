@@ -9,11 +9,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Drawer,
   FormControl,
-  IconButton,
   InputLabel,
-  Link,
   MenuItem,
   Select,
   Stack,
@@ -28,12 +25,9 @@ import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
-import LaunchOutlinedIcon from '@mui/icons-material/LaunchOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import DoneAllIcon from '@mui/icons-material/DoneAll'
-import CloseIcon from '@mui/icons-material/Close'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -46,6 +40,7 @@ import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMe
 import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
 import { useToast } from '@shared/ui/toast'
 import type { SelectChangeEvent } from '@mui/material/Select'
+import BugFeatureDrawer from '../features/bugfeature/BugFeatureDrawer'
 
 const SECTION_OPTIONS = [
   { value: 'dashboard', label: 'Dashboard' },
@@ -155,23 +150,6 @@ function KindChip({ kind }: { kind: ReportKind }) {
   )
 }
 
-function StatusChip({ status }: { status: ReportStatus }) {
-  const isResolved = status === 'resolved'
-  return (
-    <Chip
-      size="small"
-      icon={isResolved ? <DoneAllIcon sx={{ fontSize: 15 }} /> : <CheckCircleOutlineIcon sx={{ fontSize: 15 }} />}
-      label={isResolved ? 'Risolta' : 'Aperta'}
-      variant={isResolved ? 'filled' : 'outlined'}
-      color={isResolved ? 'default' : 'primary'}
-      sx={
-        isResolved
-          ? { fontWeight: 700, bgcolor: 'rgba(15,23,42,0.08)', color: 'text.primary' }
-          : { fontWeight: 700 }
-      }
-    />
-  )
-}
 
 
 export default function BugFeaturePage() {
@@ -790,183 +768,13 @@ export default function BugFeaturePage() {
         </DialogActions>
       </Dialog>
 
-      <Drawer
-        anchor="right"
-        open={Boolean(selected)}
+      <BugFeatureDrawer
+        selected={selected}
         onClose={() => setSelected(null)}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 416 } } }}
-      >
-        {selected ? (
-          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box
-              sx={{
-                px: 3,
-                py: 2.5,
-                color: '#fff',
-                background:
-                  selected.kind === 'bug'
-                    ? 'linear-gradient(135deg, #b91c1c 0%, #dc2626 60%, #f97316 100%)'
-                    : 'linear-gradient(135deg, #0f766e 0%, #0d9488 55%, #0891b2 100%)',
-              }}
-            >
-              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                <Stack spacing={1} sx={{ minWidth: 0 }}>
-                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    <KindChip kind={selected.kind} />
-                    <StatusChip status={selected.status} />
-                  </Stack>
-                  <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
-                    {selected.section_label}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.82)' }}>
-                    Inserito da {selected.created_by_full_name || selected.created_by_username || '—'} · {formatDateTime(selected.created_at)}
-                  </Typography>
-                </Stack>
-                <IconButton
-                  aria-label="Chiudi"
-                  color="inherit"
-                  onClick={() => setSelected(null)}
-                  sx={{
-                    flexShrink: 0,
-                    border: '1px solid rgba(255,255,255,0.24)',
-                    bgcolor: 'rgba(255,255,255,0.08)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.16)' },
-                  }}
-                >
-                  <CloseIcon />
-                </IconButton>
-              </Stack>
-            </Box>
-
-            <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: 'background.default', p: 2.5 }}>
-              <Stack spacing={2}>
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
-                    Descrizione
-                  </Typography>
-                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
-                    {selected.description}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
-                    Dettagli
-                  </Typography>
-                  <Box
-                    sx={{
-                      mt: 1.25,
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                      gap: 1.25,
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Tipo</Typography>
-                      <Box sx={{ mt: 0.5 }}><KindChip kind={selected.kind} /></Box>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Sezione</Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 700 }}>{selected.section_label}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Creato da</Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>{selected.created_by_full_name || selected.created_by_username || '—'}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Ultimo aggiornamento</Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>{formatDateTime(selected.updated_at)}</Typography>
-                    </Box>
-                  </Box>
-                </Box>
-
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
-                    Stato
-                  </Typography>
-                  <Stack spacing={1.25} sx={{ mt: 1.25 }}>
-                    <Box>
-                      <StatusChip status={selected.status} />
-                    </Box>
-                    {selected.status === 'resolved' ? (
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Chiusa il {formatDateTime(selected.resolved_at)} da {selected.resolved_by_full_name || selected.resolved_by_username || '—'}.
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Segnalazione ancora aperta.
-                      </Typography>
-                    )}
-                    {!isResolvedPage && selected.status === 'open' && selected.can_resolve ? (
-                      <Box>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<DoneAllIcon />}
-                          onClick={() => void handleResolve(selected)}
-                          disabled={actionBusyId === selected.id}
-                        >
-                          Segna come resolved
-                        </Button>
-                      </Box>
-                    ) : null}
-                  </Stack>
-                </Box>
-
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
-                    Timeline
-                  </Typography>
-                  <Stack spacing={0.9} sx={{ mt: 1.25 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Creata il {formatDateTime(selected.created_at)}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aggiornata il {formatDateTime(selected.updated_at)}</Typography>
-                    {selected.resolved_at ? (
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Resolved il {formatDateTime(selected.resolved_at)}</Typography>
-                    ) : null}
-                  </Stack>
-                </Box>
-
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2.25, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="overline" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>
-                    Allegati
-                  </Typography>
-                  {selected.screenshot_url ? (
-                    <Stack spacing={1.5} sx={{ mt: 1.25 }}>
-                      <Box
-                        component="img"
-                        src={selected.screenshot_url}
-                        alt="Screenshot allegato"
-                        sx={{
-                          width: '100%',
-                          maxHeight: 320,
-                          objectFit: 'contain',
-                          borderRadius: 1.5,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          bgcolor: '#fff',
-                        }}
-                      />
-                      <Link
-                        href={selected.screenshot_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        underline="hover"
-                        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, width: 'fit-content' }}
-                      >
-                        Apri immagine completa <LaunchOutlinedIcon sx={{ fontSize: 16 }} />
-                      </Link>
-                    </Stack>
-                  ) : (
-                    <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                      Nessuno screenshot allegato.
-                    </Typography>
-                  )}
-                </Box>
-              </Stack>
-            </Box>
-          </Box>
-        ) : null}
-      </Drawer>
+        isResolvedPage={isResolvedPage}
+        actionBusyId={actionBusyId}
+        onResolve={(row) => void handleResolve(row as unknown as ReportRow)}
+      />
     </Stack>
   )
 }

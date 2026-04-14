@@ -13,12 +13,10 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Drawer,
   FormControl,
   FormControlLabel,
   IconButton,
   InputLabel,
-  LinearProgress,
   MenuItem,
   Select,
   Stack,
@@ -57,6 +55,8 @@ import FilterChip from '@shared/ui/FilterChip'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { compactExportButtonSx, compactResetButtonSx } from '@shared/ui/toolbarStyles'
 import { useToast } from '@shared/ui/toast'
+import { DrawerShell, HERO_ICON_BTN_SX, HERO_ICON_BTN_DELETE_SX } from '@shared/ui/DrawerShell'
+import { DrawerEmptyState } from '@shared/ui/DrawerParts'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 import type { PlanRow, EventRow, TodoRow, RapportinoContext } from './maintenanceTypes'
 
@@ -181,34 +181,7 @@ function StatCard({ value, label, sublabel, accent, icon: Icon }: {
   )
 }
 
-// ─── TealDrawerHeader ─────────────────────────────────────────────────────────
 
-function TealDrawerHeader({ title, subtitle, status, onClose, actions, children }: {
-  title: string; subtitle?: string; status?: string
-  onClose: () => void; actions?: React.ReactNode; children?: React.ReactNode
-}) {
-  return (
-    <Box sx={{ background: 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)', px: 2.5, pt: 2.25, pb: 2.25, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-      <Box sx={{ position: 'absolute', top: -44, right: -44, width: 130, height: 130, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-      <Box sx={{ position: 'absolute', bottom: -26, left: 52, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}>
-        {status ? <Chip size="small" label={status} sx={{ bgcolor: 'rgba(20,255,180,0.18)', color: '#a7f3d0', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(167,243,208,0.3)', height: 22 }} /> : <Box />}
-        <Stack direction="row" spacing={0.75}>
-          {actions}
-          <Tooltip title="Chiudi"><IconButton aria-label="Chiudi" size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}><CloseIcon fontSize="small" /></IconButton></Tooltip>
-        </Stack>
-      </Stack>
-      <Box sx={{ position: 'relative', zIndex: 1, mb: children ? 1.5 : 0 }}>
-        <Typography sx={{ color: '#fff', fontSize: 22, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.15, mb: 0.25 }}>{title}</Typography>
-        {subtitle && <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{subtitle}</Typography>}
-      </Box>
-      {children && <Box sx={{ position: 'relative', zIndex: 1 }}>{children}</Box>}
-    </Box>
-  )
-}
-
-const tealBtn = { color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }
-const tealDelBtn = { color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(239,68,68,0.28)', color: '#fca5a5' } }
 
 // ─── DueDateOverrideDialog ────────────────────────────────────────────────────
 
@@ -628,131 +601,160 @@ export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore 
   const { executedThisCycle, totalInv } = React.useMemo(() => {
     const coveredCount = detail?.covered_count ?? 0
     if (!detail?.next_due_date) return { executedThisCycle: 0, totalInv: coveredCount }
-
     const d = new Date(detail.next_due_date)
     const prev = new Date(d)
     if (detail.interval_unit === 'months' && detail.interval_value) prev.setMonth(prev.getMonth() - detail.interval_value)
     else if (detail.interval_unit === 'years' && detail.interval_value) prev.setFullYear(prev.getFullYear() - detail.interval_value)
     else prev.setFullYear(prev.getFullYear() - 1)
-
-    const inCycle = events.filter(ev => {
-      const evDate = new Date(ev.performed_at)
-      return evDate >= prev && evDate <= d
-    })
-
-    // Inventory segnati "non previsti" nel ciclo → esclusi dal denominatore
-    const notPlannedIds = new Set(
-      inCycle.filter(ev => ev.result === 'not_planned').map(ev => ev.inventory)
-    )
+    const inCycle = events.filter(ev => { const evDate = new Date(ev.performed_at); return evDate >= prev && evDate <= d })
+    const notPlannedIds = new Set(inCycle.filter(ev => ev.result === 'not_planned').map(ev => ev.inventory))
     const adjustedTotal = Math.max(0, coveredCount - notPlannedIds.size)
-
-    // Numeratore: eventi nel ciclo escluse le not_planned
     const executed = inCycle.filter(ev => ev.result !== 'not_planned').length
-
     return { executedThisCycle: executed, totalInv: adjustedTotal }
   }, [detail, events])
 
   const coveragePct = totalInv > 0 ? Math.round((executedThisCycle / totalInv) * 100) : 0
 
+  const drawerActions = (
+    <>
+      {detail?.deleted_at ? (
+        onRestore ? (
+          <Can perm={PERMS.maintenance.plan.change}>
+            <Tooltip title="Ripristina"><span>
+              <IconButton aria-label="Ripristina" size="small" onClick={() => detail && onRestore(detail)} sx={HERO_ICON_BTN_SX}>
+                <RestoreFromTrashIcon fontSize="small" />
+              </IconButton>
+            </span></Tooltip>
+          </Can>
+        ) : null
+      ) : (
+        <>
+          {onEdit ? (
+            <Can perm={PERMS.maintenance.plan.change}>
+              <Tooltip title="Modifica"><span>
+                <IconButton aria-label="Modifica" size="small" onClick={() => detail && onEdit(detail)} disabled={!detail} sx={HERO_ICON_BTN_SX}>
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </span></Tooltip>
+            </Can>
+          ) : null}
+          {onDelete ? (
+            <Can perm={PERMS.maintenance.plan.delete}>
+              <Tooltip title="Elimina"><span>
+                <IconButton aria-label="Elimina" size="small" onClick={() => detail && onDelete(detail)} disabled={!detail} sx={HERO_ICON_BTN_DELETE_SX}>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </span></Tooltip>
+            </Can>
+          ) : null}
+        </>
+      )}
+      <Tooltip title="Chiudi">
+        <IconButton aria-label="Chiudi" size="small" onClick={onClose} sx={HERO_ICON_BTN_SX}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </>
+  )
+
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: DW } }}>
-      <Stack sx={{ height: '100%', overflow: 'hidden' }}>
-        <TealDrawerHeader
-          title={detail?.title ?? (planId ? `Piano #${planId}` : 'Piano')}
-          subtitle={detail ? `${detail.customer_code} — ${detail.customer_name}` : ''}
-          status={detail?.is_active ? '● Attivo' : detail?.deleted_at ? '● Eliminato' : '● Non attivo'}
-          onClose={onClose}
-          actions={<>
-            {detail?.deleted_at ? (
-              onRestore && <Can perm={PERMS.maintenance.plan.change}><Tooltip title="Ripristina"><span><IconButton aria-label="Ripristina" size="small" onClick={() => detail && onRestore(detail)} sx={tealBtn}><RestoreFromTrashIcon fontSize="small" /></IconButton></span></Tooltip></Can>
-            ) : (<>
-              {onEdit && <Can perm={PERMS.maintenance.plan.change}><Tooltip title="Modifica"><span><IconButton aria-label="Modifica" size="small" onClick={() => detail && onEdit(detail)} disabled={!detail} sx={tealBtn}><EditIcon fontSize="small" /></IconButton></span></Tooltip></Can>}
-              {onDelete && <Can perm={PERMS.maintenance.plan.delete}><Tooltip title="Elimina"><span><IconButton aria-label="Elimina" size="small" onClick={() => detail && onDelete(detail)} disabled={!detail} sx={tealDelBtn}><DeleteOutlineIcon fontSize="small" /></IconButton></span></Tooltip></Can>}
-            </>)}
-          </>}
-        >
-          {detail && (
+    <DrawerShell
+      open={open}
+      onClose={onClose}
+      width={typeof DW === 'number' ? DW : 420}
+      gradient="teal"
+      statusLabel={detail?.is_active ? '● Attivo' : detail?.deleted_at ? '● Eliminato' : '● Non attivo'}
+      deleted={!!detail?.deleted_at}
+      actions={drawerActions}
+      title={detail?.title ?? (planId ? `Piano #${planId}` : 'Piano')}
+      subtitle={detail ? `${detail.customer_code} — ${detail.customer_name}` : undefined}
+      loading={loading}
+    >
+      {!detail && !loading ? <DrawerEmptyState label="Nessun dettaglio disponibile." /> : null}
+      {detail ? (
+        <>
+          {/* Stats nell'hero-like area */}
+          <Box sx={{ mx: -2.5, mt: -2, mb: 0, px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'rgba(15,118,110,0.04)' }}>
             <Stack direction="row" spacing={1}>
-              {[{ label: 'Prossima scad.', value: detail.next_due_date }, { label: 'Ultima eseguita', value: detail.last_done_date ?? '—' }, { label: 'Cadenza', value: formatSchedule(detail) }].map(s => (
-                <Box key={s.label} sx={{ flex: 1, bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, px: 1.25, py: 0.75 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)', display: 'block' }}>{s.label}</Typography>
-                  <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600, fontSize: '0.78rem' }}>{s.value}</Typography>
+              {[
+                { label: 'Prossima scad.', value: detail.next_due_date ?? '—' },
+                { label: 'Ultima eseguita', value: detail.last_done_date ?? '—' },
+                { label: 'Cadenza', value: formatSchedule(detail) },
+              ].map(s => (
+                <Box key={s.label} sx={{ flex: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', fontSize: '0.65rem' }}>{s.label}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.78rem' }}>{s.value}</Typography>
                 </Box>
               ))}
             </Stack>
+          </Box>
+
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+              <BuildOutlinedIcon sx={{ fontSize: 13 }} /> Copertura inventari
+            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{executedThisCycle} / {totalInv} eseguiti nel ciclo corrente</Typography>
+              {totalInv > 0 && <Chip size="small" label={`${coveragePct}%`} color={coveragePct === 100 ? 'success' : coveragePct > 50 ? 'warning' : 'error'} sx={{ height: 20, fontSize: '0.7rem' }} />}
+            </Stack>
+            <Box sx={{ height: 6, bgcolor: 'action.hover', borderRadius: 3, overflow: 'hidden' }}>
+              <Box sx={{ height: '100%', width: `${coveragePct}%`, bgcolor: coveragePct === 100 ? 'success.main' : coveragePct > 50 ? 'warning.main' : 'error.main', borderRadius: 3, transition: 'width 0.4s ease' }} />
+            </Box>
+          </Box>
+
+          {(detail.inventory_type_labels ?? []).length > 0 && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 130 }}>Tipi inventario</Typography>
+              <Typography variant="body2">{(detail.inventory_type_labels ?? []).join(', ')}</Typography>
+            </Stack>
           )}
-        </TealDrawerHeader>
-        {loading && <LinearProgress sx={{ height: 2 }} />}
-        <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {!detail && !loading && <Typography variant="body2" sx={{ opacity: 0.6 }}>Nessun dettaglio disponibile.</Typography>}
-          {detail && (
+
+          {detail.notes && (
             <>
-              <Box>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                  <BuildOutlinedIcon sx={{ fontSize: 13 }} /> Copertura inventari
-                </Typography>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>{executedThisCycle} / {totalInv} eseguiti nel ciclo corrente</Typography>
-                  {totalInv > 0 && <Chip size="small" label={`${coveragePct}%`} color={coveragePct === 100 ? 'success' : coveragePct > 50 ? 'warning' : 'error'} sx={{ height: 20, fontSize: '0.7rem' }} />}
-                </Stack>
-                <Box sx={{ height: 6, bgcolor: 'action.hover', borderRadius: 3, overflow: 'hidden' }}>
-                  <Box sx={{ height: '100%', width: `${coveragePct}%`, bgcolor: coveragePct === 100 ? 'success.main' : coveragePct > 50 ? 'warning.main' : 'error.main', borderRadius: 3, transition: 'width 0.4s ease' }} />
-                </Box>
-              </Box>
-              {(detail.inventory_type_labels ?? []).length > 0 && (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 130 }}>Tipi inventario</Typography>
-                  <Typography variant="body2">{(detail.inventory_type_labels ?? []).join(', ')}</Typography>
-                </Stack>
-              )}
-              {detail.notes && (
-                <>
-                  <Divider />
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>{detail.notes}</Typography>
-                </>
-              )}
-              {events.length > 0 && (
-                <>
-                  <Divider />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', mt: 0.5 }}>Ultimi rapportini</Typography>
-                  <Stack spacing={0.75}>
-                    {events.map(ev => (
-                      <Box key={ev.id} sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', mt: 0.6, flexShrink: 0, bgcolor: RESULT_COLOR[ev.result] === 'success' ? 'success.main' : RESULT_COLOR[ev.result] === 'error' ? 'error.main' : 'warning.main' }} />
-                        <Box sx={{ flex: 1 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Stack direction="row" spacing={0.75} alignItems="center">
-                              {(() => { const [ey, em, ed] = ev.performed_at.split('-'); return <Typography variant="body2" sx={{ fontWeight: 600 }}>{`${ed}/${em}/${ey}`}</Typography> })()}
-                              {(ev.inventory_knumber || ev.inventory_hostname) && (
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'ui-monospace,monospace', fontSize: '0.7rem' }}>{ev.inventory_knumber || ev.inventory_hostname}</Typography>
-                              )}
-                              <Chip size="small" label={RESULT_LABEL[ev.result] ?? ev.result} color={RESULT_COLOR[ev.result] ?? 'default'} sx={{ height: 18, fontSize: '0.68rem' }} />
-                              {ev.pdf_url && (
-                                <Chip
-                                  size="small"
-                                  icon={<PictureAsPdfOutlinedIcon sx={{ fontSize: '13px !important', color: 'error.main !important' }} />}
-                                  label="PDF"
-                                  variant="outlined"
-                                  clickable
-                                  onClick={e => { e.stopPropagation(); window.open(ev.pdf_url!, '_blank', 'noopener,noreferrer') }}
-                                  sx={{ height: 18, fontSize: '0.68rem', borderColor: 'error.light', color: 'error.main', cursor: 'pointer' }}
-                                />
-                              )}
-                            </Stack>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>{ev.tech_name ?? ''}</Typography>
-                          </Stack>
-                        </Box>
-                      </Box>
-                    ))}
-                  </Stack>
-                </>
-              )}
+              <Divider />
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>{detail.notes}</Typography>
             </>
           )}
-        </Box>
 
-      </Stack>
-    </Drawer>
+          {events.length > 0 && (
+            <>
+              <Divider />
+              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', mt: 0.5 }}>Ultimi rapportini</Typography>
+              <Stack spacing={0.75}>
+                {events.map(ev => (
+                  <Box key={ev.id} sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', mt: 0.6, flexShrink: 0, bgcolor: RESULT_COLOR[ev.result] === 'success' ? 'success.main' : RESULT_COLOR[ev.result] === 'error' ? 'error.main' : 'warning.main' }} />
+                    <Box sx={{ flex: 1 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Stack direction="row" spacing={0.75} alignItems="center">
+                          {(() => { const [ey, em, ed] = ev.performed_at.split('-'); return <Typography variant="body2" sx={{ fontWeight: 600 }}>{`${ed}/${em}/${ey}`}</Typography> })()}
+                          {(ev.inventory_knumber || ev.inventory_hostname) && (
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'ui-monospace,monospace', fontSize: '0.7rem' }}>{ev.inventory_knumber || ev.inventory_hostname}</Typography>
+                          )}
+                          <Chip size="small" label={RESULT_LABEL[ev.result] ?? ev.result} color={RESULT_COLOR[ev.result] ?? 'default'} sx={{ height: 18, fontSize: '0.68rem' }} />
+                          {ev.pdf_url && (
+                            <Chip
+                              size="small"
+                              icon={<PictureAsPdfOutlinedIcon sx={{ fontSize: '13px !important', color: 'error.main !important' }} />}
+                              label="PDF"
+                              variant="outlined"
+                              clickable
+                              onClick={e => { e.stopPropagation(); window.open(ev.pdf_url!, '_blank', 'noopener,noreferrer') }}
+                              sx={{ height: 18, fontSize: '0.68rem', borderColor: 'error.light', color: 'error.main', cursor: 'pointer' }}
+                            />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{ev.tech_name ?? ''}</Typography>
+                      </Stack>
+                    </Box>
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          )}
+        </>
+      ) : null}
+    </DrawerShell>
   )
 }
 

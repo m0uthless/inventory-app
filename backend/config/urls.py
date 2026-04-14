@@ -30,7 +30,7 @@ from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
 from drive.api import DriveFileUploadView, DriveFileViewSet, DriveFolderViewSet
-from inventory.api import InventoryViewSet
+from inventory.api import InventoryViewSet, MonitorViewSet
 from maintenance.api import (
     MaintenanceEventViewSet,
     MaintenanceNotificationViewSet,
@@ -57,6 +57,7 @@ router.register(r"customers", CustomerViewSet, basename="customer")
 router.register(r"sites", SiteViewSet, basename="site")
 router.register(r"contacts", ContactViewSet, basename="contact")
 router.register(r"inventories", InventoryViewSet, basename="inventory")
+router.register(r"monitors", MonitorViewSet, basename="monitor")
 router.register(r"audit-events", AuditEventViewSet, basename="audit-event")
 router.register(
     r"custom-field-definitions",

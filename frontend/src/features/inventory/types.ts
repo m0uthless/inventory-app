@@ -60,6 +60,18 @@ export type InventoryDetail = {
   updated_at?: string | null
   deleted_at?: string | null
   has_active_issue?: boolean
+  monitors?: InventoryMonitorSummary[] | null
+}
+
+export type InventoryMonitorSummary = {
+  id: number
+  produttore: string
+  modello: string | null
+  seriale: string | null
+  tipo_label: string
+  stato: string
+  stato_label: string
+  radinet: boolean
 }
 
 export type InventoryForm = {

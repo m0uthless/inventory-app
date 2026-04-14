@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Chip,
@@ -11,33 +10,12 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Drawer,
   Fab,
-  FormControlLabel,
-  IconButton,
-  LinearProgress,
-  MenuItem,
   Stack,
-  Switch,
-  Tab,
-  Tabs,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import CloseIcon from '@mui/icons-material/Close'
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
-import FingerprintIcon from '@mui/icons-material/Fingerprint'
-import WifiOutlinedIcon from '@mui/icons-material/WifiOutlined'
-import RouterOutlinedIcon from '@mui/icons-material/RouterOutlined'
-import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined'
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined'
 import AddIcon from '@mui/icons-material/Add'
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
 
 import type { GridColDef } from '@mui/x-data-grid'
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
@@ -58,14 +36,21 @@ import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useAuth } from '../auth/AuthProvider'
 import AuslBoDeviceDrawer from '../ui/AuslBoDeviceDrawer'
+import AuslBoDevicePageDrawer from '../ui/AuslBoDevicePageDrawer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type LookupItem = { id: number; name: string }
-type DeviceTypeItem = { id: number; name: string; dose_sr: boolean }
-type ManufacturerItem = { id: number; name: string; logo_url: string | null }
-type SiteItem   = { id: number; name: string; display_name: string }
-type RispacsItem = { id: number; name: string; ip: string | null; aetitle: string | null }
+import {
+  emptyDeviceForm,
+  type DeviceFormState,
+  type DeviceTypeItem,
+  type LookupItem,
+  type ManufacturerItem,
+  type RispacsItem,
+  type SiteItem,
+  type RispacsLink,
+  type WifiDetail,
+} from '@shared/device/deviceTypes'
 
 type DeviceRow = {
   id: number
@@ -98,25 +83,6 @@ type DeviceRow = {
   deleted_at: string | null
 }
 
-type RispacsLink = {
-  id: number
-  device: number
-  rispacs: number
-  rispacs_name: string | null
-  rispacs_ip: string | null
-  rispacs_port: number | null
-  rispacs_aetitle: string | null
-}
-
-type WifiDetail = {
-  id: number
-  ip: string | null
-  mac_address: string | null
-  certificato_url: string | null
-  pass_certificato: string | null
-  scad_certificato: string | null
-}
-
 type DeviceDetail = DeviceRow & {
   note: string | null
   location: string | null
@@ -124,62 +90,6 @@ type DeviceDetail = DeviceRow & {
   rispacs_links: RispacsLink[]
   wifi_detail: WifiDetail | null
 }
-
-// ─── Form state ───────────────────────────────────────────────────────────────
-
-type DeviceFormState = {
-  site: number | ''
-  type: number | ''
-  status: number | ''
-  manufacturer: number | ''
-  model: string
-  aetitle: string
-  serial_number: string
-  inventario: string
-  reparto: string
-  room: string
-  ip: string
-  vlan: boolean
-  wifi: boolean
-  rispacs: boolean
-  dose: boolean
-  note: string
-  location: string
-  // RIS/PACS links (IDs dei sistemi selezionati)
-  rispacs_ids: number[]
-  // WiFi
-  wifi_ip: string
-  wifi_mac: string
-  wifi_pass: string
-  wifi_scad: string
-  wifi_cert_file: File | null
-}
-
-const emptyForm = (): DeviceFormState => ({
-  site: '',
-  type: '',
-  status: '',
-  manufacturer: '',
-  model: '',
-  aetitle: '',
-  serial_number: '',
-  inventario: '',
-  reparto: '',
-  room: '',
-  ip: '',
-  vlan: false,
-  wifi: false,
-  rispacs: false,
-  dose: false,
-  note: '',
-  location: '',
-  rispacs_ids: [],
-  wifi_ip: '',
-  wifi_mac: '',
-  wifi_pass: '',
-  wifi_scad: '',
-  wifi_cert_file: null,
-})
 
 // ─── Status colours ───────────────────────────────────────────────────────────
 
@@ -348,448 +258,7 @@ const renderDeviceCard: MobileCardRenderFn<DeviceRow> = ({ row, onOpen }) => {
   )
 }
 
-// ─── Copy helper ──────────────────────────────────────────────────────────────
 
-async function copyToClipboard(text: string) {
-  try { await navigator.clipboard.writeText(text) } catch { /* noop */ }
-}
-
-// ─── Section card ─────────────────────────────────────────────────────────────
-
-function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-        {icon}{title}
-      </Typography>
-      <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-        {children}
-      </Stack>
-    </Box>
-  )
-}
-
-function DetailRow({ label, value, mono = false, copy = false, minW = 90 }: { label: string; value: string | null | undefined; mono?: boolean; copy?: boolean; minW?: number }) {
-  if (!value) return null
-  return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-      <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: minW }}>{label}</Typography>
-      <Stack direction="row" alignItems="center" spacing={0.5}>
-        <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: mono ? 'monospace' : undefined, fontSize: mono ? 12 : undefined }}>
-          {value}
-        </Typography>
-        {copy && (
-          <Tooltip title="Copia">
-            <IconButton aria-label="Copia" size="small" onClick={() => copyToClipboard(value)}>
-              <ContentCopyIcon sx={{ fontSize: 13 }} />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Stack>
-    </Stack>
-  )
-}
-
-// ─── Form field ───────────────────────────────────────────────────────────────
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box>
-      <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, display: 'block', mb: 0.5 }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  )
-}
-
-// ─── Hero banner ──────────────────────────────────────────────────────────────
-
-// Controlla se la scadenza certificato è entro 60 giorni
-function certExpiryAlert(scad: string | null | undefined): 'error' | 'warning' | null {
-  if (!scad) return null
-  const days = Math.ceil((new Date(scad).getTime() - Date.now()) / 86400000)
-  if (days < 0)  return 'error'
-  if (days < 60) return 'warning'
-  return null
-}
-
-function DrawerHero({
-  detail, selectedId, editMode, canEdit, onClose, onEdit,
-}: {
-  detail: DeviceDetail | null
-  selectedId: number | null
-  editMode: boolean
-  canEdit: boolean
-  onClose: () => void
-  onEdit: () => void
-}) {
-  return (
-    <>
-    <Box sx={{
-      background: 'linear-gradient(140deg, #0B3D6B 0%, #1A6BB5 55%, #4A90D9 100%)',
-      px: 2.5, pt: 2.25, pb: 2.25, position: 'relative', overflow: 'hidden', flexShrink: 0,
-    }}>
-      <Box sx={{ position: 'absolute', top: -44, right: -44, width: 130, height: 130, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-      <Box sx={{ position: 'absolute', bottom: -26, left: 52, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
-
-      {/* Row 1: back + edit + close (no status chip qui) */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}>
-        <Tooltip title="Chiudi">
-          <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
-            <ArrowBackIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-
-        <Stack direction="row" spacing={0.5}>
-          {!editMode && detail && canEdit && (
-            <Tooltip title="Modifica">
-              <IconButton size="small" onClick={onEdit} sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
-                <EditOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title="Chiudi">
-            <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Stack>
-
-      {/* Row 2: icona + titolo + status chip sotto */}
-      <Box sx={{ position: 'relative', zIndex: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
-          <Box sx={{ width: 44, height: 44, borderRadius: 1, flexShrink: 0, bgcolor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <RouterOutlinedIcon sx={{ fontSize: 26, color: 'rgba(255,255,255,0.9)' }} />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {detail?.model || detail?.type_name || (selectedId ? `Device #${selectedId}` : 'Nuovo device')}
-            </Typography>
-            {detail?.status_name && (
-              <Chip size="small" label={`● ${detail.status_name}`} sx={{ mt: 0.4, bgcolor: 'rgba(93,174,240,0.20)', color: '#93C9F8', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(147,201,248,0.3)', height: 20 }} />
-            )}
-            {certExpiryAlert(detail?.wifi_detail?.scad_certificato) && (() => {
-              const isErr = certExpiryAlert(detail?.wifi_detail?.scad_certificato) === 'error'
-              return (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', mt: 0.4,
-                  bgcolor: isErr ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)',
-                  border: `1px solid ${isErr ? 'rgba(239,68,68,0.5)' : 'rgba(245,158,11,0.5)'}`,
-                  borderRadius: 1, px: 0.75, py: 0.15 }}>
-                  <Typography sx={{ fontSize: '0.63rem', fontWeight: 700, color: isErr ? '#fca5a5' : '#fcd34d' }}>
-                    {isErr ? '⚠ Certificato scaduto' : '⚠ Cert. in scadenza'}
-                  </Typography>
-                </Box>
-              )
-            })()}
-          </Box>
-        </Stack>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.58)' }}>
-          {detail?.site_display_name || detail?.site_name || ' '}
-        </Typography>
-        {detail && (detail.vlan || detail.wifi || detail.rispacs) && (
-          <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
-            {detail.vlan    && <Chip size="small" label="VLAN"     sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', '& .MuiChip-label': { px: 0.6 } }} />}
-            {detail.wifi    && <Chip size="small" label="WiFi"     sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', '& .MuiChip-label': { px: 0.6 } }} />}
-            {detail.rispacs && <Chip size="small" label="RIS/PACS" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', '& .MuiChip-label': { px: 0.6 } }} />}
-          </Stack>
-        )}
-      </Box>
-    </Box>
-
-    {/* Logo produttore — sotto l'hero, visibile solo se presente */}
-    {detail?.manufacturer_logo_url && (
-      <Box sx={{
-        px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: 'divider',
-        bgcolor: 'background.paper', display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0,
-      }}>
-        <Box
-          component="img"
-          src={detail.manufacturer_logo_url}
-          alt={detail.manufacturer_name ?? 'Logo produttore'}
-          sx={{
-            height: 32, maxWidth: 140,
-            objectFit: 'contain', objectPosition: 'left center',
-            display: 'block',
-          }}
-        />
-      </Box>
-    )}
-    </>
-  )
-}
-
-// ─── Device form ──────────────────────────────────────────────────────────────
-
-function DeviceForm({
-  form, setForm, sites, types, statuses, manufacturers, rispacsList, saving,
-  onSave, onCancel,
-}: {
-  form: DeviceFormState
-  setForm: React.Dispatch<React.SetStateAction<DeviceFormState>>
-  sites: SiteItem[]
-  types: DeviceTypeItem[]
-  statuses: LookupItem[]
-  manufacturers: ManufacturerItem[]
-  rispacsList: RispacsItem[]
-  saving: boolean
-  onSave: () => void
-  onCancel: () => void
-}) {
-  const set = (k: keyof DeviceFormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }))
-  const setSelect = (k: keyof DeviceFormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: Number(e.target.value) || '' }))
-  const setBool = (k: keyof DeviceFormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.checked }))
-
-  const selectedRispacs = rispacsList.filter((r) => (form.rispacs_ids ?? []).includes(r.id))
-
-  const isSm = { size: 'small' as const, fullWidth: true }
-
-  return (
-    <Stack spacing={1.25} sx={{ px: 2, py: 1.75 }}>
-
-      {/* Produttore * */}
-      <FormField label="Produttore *">
-        <TextField {...isSm} select value={form.manufacturer} onChange={setSelect('manufacturer')} error={!form.manufacturer}>
-          <MenuItem value=""><em>Seleziona produttore</em></MenuItem>
-          {manufacturers.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}
-        </TextField>
-      </FormField>
-
-      {/* Tipo * | Stato * */}
-      <Stack direction="row" spacing={1}>
-        <FormField label="Tipo *">
-          <TextField {...isSm} select value={form.type} onChange={setSelect('type')} error={!form.type}>
-            <MenuItem value=""><em>Tipo</em></MenuItem>
-            {types.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-          </TextField>
-        </FormField>
-        <FormField label="Stato *">
-          <TextField {...isSm} select value={form.status} onChange={setSelect('status')} error={!form.status}>
-            <MenuItem value=""><em>Stato</em></MenuItem>
-            {statuses.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-          </TextField>
-        </FormField>
-      </Stack>
-
-      {/* Modello * */}
-      <FormField label="Modello *">
-        <TextField {...isSm} value={form.model} onChange={set('model')} placeholder="es. PowerEdge R740" />
-      </FormField>
-
-      {/* Inventario * | Serial Number */}
-      <Stack direction="row" spacing={1}>
-        <FormField label="Inventario *">
-          <TextField {...isSm} value={form.inventario} onChange={set('inventario')} error={!form.inventario} />
-        </FormField>
-        <FormField label="Serial Number">
-          <TextField {...isSm} value={form.serial_number} onChange={set('serial_number')} />
-        </FormField>
-      </Stack>
-
-      {/* Sede * */}
-      <FormField label="Sede *">
-        <TextField {...isSm} select value={form.site} onChange={setSelect('site')} error={!form.site}>
-          <MenuItem value=""><em>Seleziona sede</em></MenuItem>
-          {sites.map((s) => <MenuItem key={s.id} value={s.id}>{s.display_name || s.name}</MenuItem>)}
-        </TextField>
-      </FormField>
-
-      {/* Reparto * | Sala */}
-      <Stack direction="row" spacing={1}>
-        <FormField label="Reparto *">
-          <TextField {...isSm} value={form.reparto} onChange={set('reparto')} placeholder="es. Radiologia" error={!form.reparto} />
-        </FormField>
-        <FormField label="Sala">
-          <TextField {...isSm} value={form.room} onChange={set('room')} placeholder="es. Sala 3" />
-        </FormField>
-      </Stack>
-
-      {/* Posizione */}
-      <FormField label="Posizione">
-        <TextField {...isSm} value={form.location} onChange={set('location')} placeholder="es. Piano 2, Stanza 14" />
-      </FormField>
-
-      {/* IP */}
-      <FormField label="Indirizzo IP">
-        <TextField {...isSm} value={form.ip} onChange={set('ip')} placeholder="es. 192.168.1.10" inputProps={{ style: { fontFamily: 'monospace' } }} />
-      </FormField>
-
-      {/* AETitle */}
-      <FormField label="AE Title">
-        <TextField {...isSm} value={form.aetitle} onChange={set('aetitle')} placeholder="es. PACS_STATION_01" inputProps={{ style: { fontFamily: 'monospace' } }} />
-      </FormField>
-
-      {/* Note */}
-      <FormField label="Note">
-        <TextField {...isSm} multiline minRows={2} value={form.note} onChange={set('note')} placeholder="Note aggiuntive…" />
-      </FormField>
-
-      {/* Flag */}
-      <Box>
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, display: 'block', mb: 0.5 }}>Flag</Typography>
-        <Stack direction="row" spacing={0.5} flexWrap="wrap">
-          <FormControlLabel control={<Switch size="small" checked={form.vlan} onChange={setBool('vlan')} />} label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>VLAN</Typography>} />
-          <FormControlLabel control={<Switch size="small" checked={form.wifi} onChange={setBool('wifi')} />} label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>WiFi</Typography>} />
-          <FormControlLabel control={<Switch size="small" checked={form.rispacs} onChange={setBool('rispacs')} />} label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>PACS</Typography>} />
-          {types.find((t) => t.id === form.type)?.dose_sr && (
-            <FormControlLabel control={<Switch size="small" checked={form.dose} onChange={setBool('dose')} />} label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>DoseSR</Typography>} />
-          )}
-        </Stack>
-      </Box>
-
-      {/* RIS/PACS — visibile solo se rispacs=true */}
-      {form.rispacs && (
-        <Box sx={{ bgcolor: '#f0f7ff', border: '1px solid rgba(26,107,181,0.18)', borderRadius: 1, p: 1.5 }}>
-          <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-            <MedicalServicesOutlinedIcon sx={{ fontSize: 14 }} />Sistemi RIS/PACS
-          </Typography>
-          <Autocomplete
-            multiple
-            size="small"
-            options={rispacsList}
-            value={selectedRispacs}
-            getOptionLabel={(o) => `${o.name}${o.ip ? ` (${o.ip})` : ''}${o.aetitle ? ` — ${o.aetitle}` : ''}`}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-            onChange={(_e, val) => setForm((f) => ({ ...f, rispacs_ids: val.map((v) => v.id) }))}
-            renderInput={(params) => <TextField {...params} placeholder="Cerca sistema RIS/PACS…" />}
-            renderTags={(val, getTagProps) =>
-              val.map((opt, idx) => (
-                <Chip {...getTagProps({ index: idx })} key={opt.id} label={opt.name} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
-              ))
-            }
-            noOptionsText="Nessun sistema trovato"
-          />
-        </Box>
-      )}
-
-      {/* WiFi — visibile solo se wifi=true */}
-      {form.wifi && (
-        <Box sx={{ bgcolor: '#f0f7ff', border: '1px solid rgba(26,107,181,0.18)', borderRadius: 1, p: 1.5 }}>
-          <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-            <WifiOutlinedIcon sx={{ fontSize: 14 }} />WiFi
-          </Typography>
-          <Stack spacing={1.5}>
-            <FormField label="IP WiFi">
-              <TextField {...isSm} value={form.wifi_ip} onChange={set('wifi_ip')} placeholder="es. 192.168.1.20" inputProps={{ style: { fontFamily: 'monospace' } }} />
-            </FormField>
-            <FormField label="MAC Address">
-              <TextField {...isSm} value={form.wifi_mac} onChange={set('wifi_mac')} placeholder="es. AA:BB:CC:DD:EE:FF" inputProps={{ style: { fontFamily: 'monospace' }, maxLength: 17 }} />
-            </FormField>
-            <FormField label="Password certificato">
-              <TextField {...isSm} type="password" value={form.wifi_pass} onChange={set('wifi_pass')} autoComplete="new-password" />
-            </FormField>
-            <FormField label="Scadenza certificato">
-              <TextField {...isSm} type="date" value={form.wifi_scad} onChange={set('wifi_scad')} InputLabelProps={{ shrink: true }} />
-            </FormField>
-            <FormField label="Certificato (.p12)">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Button variant="outlined" size="small" component="label" sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {form.wifi_cert_file ? 'Cambia file' : 'Seleziona file'}
-                  <input
-                    hidden
-                    type="file"
-                    accept=".p12,.pfx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null
-                      setForm((f) => ({ ...f, wifi_cert_file: file }))
-                    }}
-                  />
-                </Button>
-                {form.wifi_cert_file ? (
-                  <Typography variant="caption" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {form.wifi_cert_file.name}
-                  </Typography>
-                ) : (
-                  <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
-                    Nessun file selezionato
-                  </Typography>
-                )}
-              </Box>
-            </FormField>
-          </Stack>
-        </Box>
-      )}
-
-      <Divider />
-
-      {/* Azioni */}
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button variant="text" size="small" onClick={onCancel} disabled={saving}>
-          Annulla
-        </Button>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveOutlinedIcon sx={{ fontSize: 16 }} />}
-          onClick={onSave}
-          disabled={saving || !form.manufacturer || !form.site || !form.type || !form.status}
-        >
-          Salva
-        </Button>
-      </Stack>
-    </Stack>
-  )
-}
-
-// ─── WiFi tab (read mode) con password toggle ────────────────────────────────
-
-function WifiTab({ wifiDetail }: { wifiDetail: WifiDetail }) {
-  const [showPass, setShowPass] = React.useState(false)
-
-  return (
-    <SectionCard icon={<WifiOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="WiFi">
-      <DetailRow label="IP WiFi"     value={wifiDetail.ip}               mono copy />
-      <DetailRow label="Scad. cert." value={wifiDetail.scad_certificato} mono />
-
-      {/* Password con toggle visibilità */}
-      {wifiDetail.pass_certificato && (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-          <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 90 }}>Password cert.</Typography>
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12, letterSpacing: showPass ? 'normal' : '0.15em' }}>
-              {showPass ? wifiDetail.pass_certificato : '••••••••'}
-            </Typography>
-            <Tooltip title={showPass ? 'Nascondi' : 'Mostra'}>
-              <IconButton size="small" onClick={() => setShowPass((v) => !v)}>
-                {showPass
-                  ? <VisibilityOffOutlinedIcon sx={{ fontSize: 14 }} />
-                  : <VisibilityOutlinedIcon    sx={{ fontSize: 14 }} />}
-              </IconButton>
-            </Tooltip>
-            {showPass && (
-              <Tooltip title="Copia">
-                <IconButton size="small" onClick={() => { void navigator.clipboard.writeText(wifiDetail.pass_certificato!) }}>
-                  <ContentCopyIcon sx={{ fontSize: 13 }} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Stack>
-        </Stack>
-      )}
-
-      {/* Certificato */}
-      {wifiDetail.certificato_url && (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-          <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 90 }}>Certificato</Typography>
-          <Typography
-            component="a"
-            href={wifiDetail.certificato_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="body2"
-            sx={{ fontWeight: 600, color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-          >
-            Scarica .p12
-          </Typography>
-        </Stack>
-      )}
-    </SectionCard>
-  )
-}
 
 // ─── WiFi Quick Dialog ────────────────────────────────────────────────────────
 
@@ -1149,7 +618,7 @@ export default function Device() {
   const [detailLoading,  setDetailLoading]  = React.useState(false)
   const [editMode,       setEditMode]       = React.useState(false)
   const [isNew,          setIsNew]          = React.useState(false)
-  const [form,           setForm]           = React.useState<DeviceFormState>(emptyForm())
+  const [form,           setForm]           = React.useState<DeviceFormState>(emptyDeviceForm())
   const [saving,         setSaving]         = React.useState(false)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1202,7 +671,7 @@ export default function Device() {
   const openCreate = React.useCallback(() => {
     setSelectedId(null)
     setDetail(null)
-    setForm(emptyForm())
+    setForm(emptyDeviceForm())
     setEditMode(true)
     setIsNew(true)
     setDrawerTab(0)
@@ -1377,9 +846,6 @@ export default function Device() {
   }, [grid.openId, openDrawer])
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
-
-  const hasRispacs = detail?.rispacs === true
-  const hasWifi    = detail?.wifi === true
 
   const columns   = React.useMemo(() => cols, [])
 
@@ -1667,153 +1133,28 @@ export default function Device() {
       />
 
       {/* Detail / Edit Drawer */}
-      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 420 } } }}>
-        <Stack sx={{ height: '100%', overflow: 'hidden' }}>
-
-          {/* Hero */}
-          <DrawerHero
-            detail={detail}
-            selectedId={selectedId}
-            editMode={editMode}
-            canEdit={canEdit}
-            onClose={closeDrawer}
-            onEdit={startEdit}
-          />
-
-          {detailLoading && <LinearProgress sx={{ height: 2 }} />}
-
-          {/* Tabs — solo in read mode */}
-          {!editMode && (
-            <Tabs value={drawerTab} onChange={(_, v: number) => setDrawerTab(v)}
-              sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0, px: 1 }}>
-              <Tab label="Dettagli" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-              {hasRispacs && <Tab label="RIS/PACS" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />}
-              {hasWifi    && <Tab label="WiFi"     sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />}
-            </Tabs>
-          )}
-
-          {/* Body */}
-          <Box sx={{ flex: 1, overflowY: 'auto' }}>
-
-            {/* ── FORM (create / edit) ── */}
-            {editMode && (
-              <DeviceForm
-                form={form}
-                setForm={setForm}
-                sites={sites}
-                types={types}
-                statuses={statuses}
-                manufacturers={manufacturers}
-                rispacsList={rispacsList}
-                saving={saving}
-                onSave={handleSave}
-                onCancel={cancelEdit}
-              />
-            )}
-
-            {/* ── READ MODE ── */}
-            {!editMode && (
-              <Box sx={{ px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {detailLoading ? (
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-                    <CircularProgress size={18} />
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>Caricamento…</Typography>
-                  </Stack>
-                ) : detail ? (
-                  <>
-                    {/* TAB 0 — Dettagli */}
-                    {drawerTab === 0 && (
-                      <>
-                        <SectionCard icon={<FingerprintIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Identificazione">
-                          <DetailRow label="AE Title"   value={detail.aetitle}       mono copy />
-                          <DetailRow label="Seriale"    value={detail.serial_number} mono copy />
-                          <DetailRow label="Inventario" value={detail.inventario}    mono copy />
-                          <DetailRow label="Reparto"    value={detail.reparto} />
-                          <DetailRow label="Stanza/Sala" value={detail.room} />
-                          <DetailRow label="Posizione"  value={detail.location} />
-                          <DetailRow label="Sede"       value={detail.site_display_name || detail.site_name} />
-                        </SectionCard>
-
-                        {detail.ip && (
-                          <SectionCard icon={<WifiOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Rete">
-                            <DetailRow label="IP cablato" value={detail.ip} mono copy />
-                          </SectionCard>
-                        )}
-
-                        {(detail.manufacturer_name || detail.model || detail.type_name) && (
-                          <SectionCard icon={<MemoryOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Hardware">
-                            <DetailRow label="Produttore" value={detail.manufacturer_name} />
-                            <DetailRow label="Modello"    value={detail.model} />
-                            <DetailRow label="Tipo"       value={detail.type_name} />
-                          </SectionCard>
-                        )}
-
-                        {detail.note && (
-                          <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
-                              Note
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{detail.note}</Typography>
-                          </Box>
-                        )}
-
-                        {detail.custom_fields && Object.entries(detail.custom_fields).filter(([, v]) => v != null && v !== '').length > 0 && (
-                          <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
-                              Informazioni aggiuntive
-                            </Typography>
-                            <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                              {Object.entries(detail.custom_fields).filter(([, v]) => v != null && v !== '').map(([k, v]) => (
-                                <Stack key={k} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                                  <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 90 }}>{k}</Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{String(v)}</Typography>
-                                </Stack>
-                              ))}
-                            </Stack>
-                          </Box>
-                        )}
-                      </>
-                    )}
-
-                    {/* TAB 1 — RIS/PACS */}
-                    {drawerTab === 1 && hasRispacs && (
-                      <Stack spacing={1.5}>
-                        {detail.rispacs_links.length === 0 && (
-                          <Typography variant="body2" sx={{ color: 'text.disabled', fontStyle: 'italic', py: 1 }}>Nessun sistema RIS/PACS collegato.</Typography>
-                        )}
-                        {detail.rispacs_links.map((r, idx) => (
-                          <Box key={r.id} sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                              <MedicalServicesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                              {r.rispacs_name || `RIS/PACS ${idx + 1}`}
-                            </Typography>
-                            <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                              <DetailRow label="Nome"     value={r.rispacs_name} />
-                              <DetailRow label="IP"       value={r.rispacs_ip}    mono copy />
-                              <DetailRow label="Porta"    value={r.rispacs_port != null ? String(r.rispacs_port) : null} mono />
-                              <DetailRow label="AE Title" value={r.rispacs_aetitle} mono copy />
-                            </Stack>
-                          </Box>
-                        ))}
-                      </Stack>
-                    )}
-
-                    {/* TAB WiFi */}
-                    {((drawerTab === 2 && hasRispacs) || (drawerTab === 1 && !hasRispacs)) && hasWifi && (
-                      detail.wifi_detail
-                        ? <WifiTab wifiDetail={detail.wifi_detail} />
-                        : <Typography variant="body2" sx={{ color: 'text.disabled', fontStyle: 'italic', py: 1 }}>Nessun dato WiFi ancora configurato.</Typography>
-                    )}
-                  </>
-                ) : (
-                  <Typography variant="body2" sx={{ opacity: 0.7 }}>Nessun dettaglio disponibile.</Typography>
-                )}
-              </Box>
-            )}
-          </Box>
-        </Stack>
-      </Drawer>
+      <AuslBoDevicePageDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        detail={detail}
+        selectedId={selectedId}
+        detailLoading={detailLoading}
+        editMode={editMode}
+        canEdit={canEdit}
+        drawerTab={drawerTab}
+        onTabChange={setDrawerTab}
+        onEdit={startEdit}
+        form={form}
+        setForm={setForm}
+        sites={sites}
+        types={types}
+        statuses={statuses}
+        manufacturers={manufacturers}
+        rispacsList={rispacsList}
+        saving={saving}
+        onSave={handleSave}
+        onCancel={cancelEdit}
+      />
     </Stack>
   )
 }

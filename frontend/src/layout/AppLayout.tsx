@@ -43,6 +43,7 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import TerminalIcon from '@mui/icons-material/TerminalOutlined'
+import MonitorIcon from '@mui/icons-material/MonitorOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -102,6 +103,8 @@ const NAV: NavItem[] = [
     section: 'principale',
     permAny: ['inventory.view_inventory', 'crm.view_customer', 'crm.view_site', 'crm.view_contact'],
   },
+
+  { label: 'Monitor', path: '/monitors', icon: <MonitorIcon />, section: 'principale', perm: 'inventory.view_monitor' },
 
   { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
 
@@ -422,6 +425,7 @@ export function AppLayout() {
       ['/sites',                  'SITI'],
       ['/contacts',               'CONTATTI'],
       ['/inventory',              'INVENTARI'],
+      ['/monitors',               'MONITOR'],
       ['/maintenance',            'MANUTENZIONE'],
       ['/issues',                 'ISSUES'],
       ['/bug-feature',            'BUG / FEATURE'],

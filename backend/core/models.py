@@ -148,6 +148,23 @@ class Announcement(models.Model):
         return self.title
 
 
+class ArchieAccess(models.Model):
+    """Modello dummy (managed=False) usato esclusivamente per registrare
+    il permesso custom `core.access_archie`.
+
+    Non crea nessuna tabella nel DB. Assegna il permesso a un gruppo via
+    Django Admin per controllare l'accesso al frontend Archie principale,
+    senza vincolarsi a nomi di gruppi hardcoded.
+    """
+
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = [
+            ("access_archie", "Può accedere al frontend Archie"),
+        ]
+
+
 class UserTask(models.Model):
     user       = models.ForeignKey(
         settings.AUTH_USER_MODEL,

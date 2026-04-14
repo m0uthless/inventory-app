@@ -4,24 +4,14 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Drawer,
-  IconButton,
-  LinearProgress,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
   Stack,
-  Tab,
-  Tabs,
   Tooltip,
   Typography,
 } from '@mui/material'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import CloseIcon from '@mui/icons-material/Close'
-import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
-import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
-import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import type { GridColDef } from '@mui/x-data-grid'
@@ -38,6 +28,7 @@ import StatusChip from '@shared/ui/StatusChip'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { buildQuery } from '@shared/utils/nav'
 import { useNavigate } from 'react-router-dom'
+import AuslBoSiteDrawer from '../ui/AuslBoSiteDrawer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -351,12 +342,6 @@ export default function Sites() {
 
   const columns = React.useMemo(() => cols, [])
 
-  const siteAddress = React.useMemo(() => {
-    if (!detail) return null
-    const parts = [detail.address_line1?.trim(), detail.city?.trim()].filter(Boolean)
-    return parts.length ? parts.join(', ') : null
-  }, [detail])
-
   const emptyState = React.useMemo(() => {
     if (!grid.search.trim()) return { title: 'Nessuna sede', subtitle: 'Non ci sono sedi associate al tuo ente.' }
     return { title: 'Nessun risultato', subtitle: 'Prova a cambiare i termini di ricerca.' }
@@ -392,128 +377,18 @@ export default function Sites() {
         }}
       />
 
-      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}>
-        <Stack sx={{ height: '100%', overflow: 'hidden' }}>
-          {/* Hero banner */}
-          <Box sx={{
-            background: 'linear-gradient(140deg, #0B3D6B 0%, #1A6BB5 55%, #4A90D9 100%)',
-            px: 2.5, pt: 2.25, pb: 2.25, position: 'relative', overflow: 'hidden', flexShrink: 0,
-          }}>
-            <Box sx={{ position: 'absolute', top: -44, right: -44, width: 130, height: 130, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-            <Box sx={{ position: 'absolute', bottom: -26, left: 52, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+      <AuslBoSiteDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        detail={detail}
+        selectedId={selectedId}
+        detailLoading={detailLoading}
+        drawerTab={drawerTab}
+        onTabChange={setDrawerTab}
+        contactsTabContent={detail ? <ContactsTab siteId={detail.id} /> : null}
+        inventoriesTabContent={detail ? <InventoriesTab siteId={detail.id} /> : null}
+      />
 
-            <Stack direction="row" alignItems="center" justifyContent="space-between"
-              sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}>
-              <Tooltip title="Chiudi">
-                <IconButton aria-label="Chiudi" size="small" onClick={closeDrawer}
-                  sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
-                  <ArrowBackIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Chip size="small" label={`● ${detail?.status_label ?? '—'}`}
-                sx={{ bgcolor: 'rgba(93,174,240,0.20)', color: '#93C9F8', fontWeight: 700,
-                  fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(147,201,248,0.3)', height: 22 }} />
-              <Tooltip title="Chiudi">
-                <IconButton aria-label="Chiudi" size="small" onClick={closeDrawer}
-                  sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Typography sx={{ color: '#fff', fontSize: 26, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, mb: 0.5 }}>
-                {detail?.display_name || detail?.name || (selectedId ? `Sede #${selectedId}` : 'Sede')}
-              </Typography>
-              {detail?.city && (
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.58)' }}>
-                  📍 {detail.city}{detail.postal_code ? ` ${detail.postal_code}` : ''}
-                </Typography>
-              )}
-            </Box>
-          </Box>
-
-          {detailLoading ? <LinearProgress sx={{ height: 2 }} /> : null}
-
-          {/* Tabs — identical to frontend */}
-          <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 2.5 }}>
-            <Tabs value={drawerTab} onChange={(_, v: number) => setDrawerTab(v)}>
-              <Tab label="Dettagli"  sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-              <Tab label="Contatti"  sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-              <Tab label="Inventari" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-            </Tabs>
-          </Box>
-
-          {/* Scrollable content */}
-          <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {detailLoading ? (
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-                <CircularProgress size={18} />
-                <Typography variant="body2" sx={{ opacity: 0.7 }}>Caricamento…</Typography>
-              </Stack>
-            ) : detail ? (
-              <>
-                {/* TAB 0 — Dettagli */}
-                {drawerTab === 0 && (
-                  <>
-                    {/* Identificazione */}
-                    <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                        <BusinessOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Identificazione
-                      </Typography>
-                      <Stack spacing={0.5}>
-                        {([
-                          { label: 'Nome',              value: detail.name },
-                          { label: 'Nome visualizzato', value: detail.display_name !== detail.name ? detail.display_name : null },
-                          { label: 'Cliente',           value: detail.customer_display_name || detail.customer_name },
-                        ] as { label: string; value?: string | null }[])
-                          .filter((r) => r.value)
-                          .map((r) => (
-                            <Stack key={r.label} direction="row" alignItems="center" justifyContent="space-between">
-                              <Typography variant="caption" sx={{ color: 'text.disabled' }}>{r.label}</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{r.value}</Typography>
-                            </Stack>
-                          ))}
-                      </Stack>
-                    </Box>
-
-                    {/* Indirizzo */}
-                    {siteAddress && (
-                      <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
-                        <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-                            <LocationOnOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Indirizzo
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>{siteAddress}</Typography>
-                        </Box>
-                      </Box>
-                    )}
-
-                    {/* Note */}
-                    {detail.notes && (
-                      <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
-                          <NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Note
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{detail.notes}</Typography>
-                      </Box>
-                    )}
-                  </>
-                )}
-
-                {/* TAB 1 — Contatti */}
-                {drawerTab === 1 && <ContactsTab siteId={detail.id} />}
-
-                {/* TAB 2 — Inventari */}
-                {drawerTab === 2 && <InventoriesTab siteId={detail.id} />}
-              </>
-            ) : (
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>Nessun dettaglio disponibile.</Typography>
-            )}
-          </Box>
-        </Stack>
-      </Drawer>
     </Stack>
   )
 }

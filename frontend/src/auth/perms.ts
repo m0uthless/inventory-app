@@ -38,6 +38,12 @@ export const PERMS = {
       change: 'inventory.change_inventory',
       delete: 'inventory.delete_inventory',
     },
+    monitor: {
+      view: 'inventory.view_monitor',
+      add: 'inventory.add_monitor',
+      change: 'inventory.change_monitor',
+      delete: 'inventory.delete_monitor',
+    },
   },
 
   audit: {

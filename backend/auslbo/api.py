@@ -16,25 +16,12 @@ class AuslBoMeView(APIView):
 
     Risposta:
     {
-        "user": {
-            "id": 42,
-            "username": "mario.rossi",
-            "email": "mario.rossi@ausl.bo.it",
-            "first_name": "Mario",
-            "last_name": "Rossi"
-        },
-        "customer": {
-            "id": 7,
-            "name": "AUSL Bologna",
-            "display_name": "AUSL Bologna — Pol. S. Orsola",
-            "code": "C-000007"
-        },
-          "auslbo": {
-            "group": next(iter(
-                    set(user.groups.values_list("name", flat=True)) &
-                    {"admin_auslbo", "editor_auslbo", "user_auslbo"}
-                ), "user_auslbo"),
-            "is_active": true
+        "user": { "id", "username", "email", "first_name", "last_name" },
+        "customer": { "id", "name", "display_name", "code" },
+        "auslbo": {
+            "is_active": true,
+            "can_edit_devices": true,
+            "permissions": ["device.add_device", ...]  // tutti i permessi Django dell'utente
         }
     }
     """
@@ -60,13 +47,10 @@ class AuslBoMeView(APIView):
                 "display_name": customer.display_name or customer.name,
                 "code": customer.code or "",
             },
-              "auslbo": {
-                "group": next(iter(
-                    set(user.groups.values_list("name", flat=True)) &
-                    {"admin_auslbo", "editor_auslbo", "user_auslbo"}
-                ), "user_auslbo"),
+            "auslbo": {
                 "is_active": profile.is_active,
                 "can_edit_devices": _can_edit_auslbo(user),
+                "permissions": sorted(user.get_all_permissions()),
             },
         }
         return Response(data, status=status.HTTP_200_OK)
