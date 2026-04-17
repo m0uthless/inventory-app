@@ -232,6 +232,8 @@ export interface DrawerShellProps {
   // ── Body ──
   loading?: boolean
   bodySx?: SxProps<Theme>
+  /** Slot fisso tra hero e body scrollabile (es. floating card in InventoryDrawer). */
+  preBody?: React.ReactNode
   /** Footer fisso dopo il body (es. input commenti in IssueDrawer). */
   bodyFooter?: React.ReactNode
   children: React.ReactNode
@@ -271,6 +273,7 @@ export function DrawerShell({
   // body
   loading,
   bodySx,
+  preBody,
   bodyFooter,
   children,
 }: DrawerShellProps) {
@@ -357,7 +360,7 @@ export function DrawerShell({
             background: resolveGradient(gradient),
             px: 2.5,
             pt: 2.25,
-            pb: hasTabs ? 1.5 : 2.25,
+            pb: hasTabs ? (preBody ? 3 : 1.5) : 2.25,
             position: 'relative',
             overflow: 'hidden',
             flexShrink: 0,
@@ -411,6 +414,9 @@ export function DrawerShell({
 
         {/* ── Loading bar ─────────────────────────────────────────────────── */}
         {loading ? <LinearProgress sx={{ height: 2 }} /> : null}
+
+        {/* ── Slot pre-body fisso (es. floating card) ──────────────────────── */}
+        {preBody ?? null}
 
         {/* ── Body scrollabile ────────────────────────────────────────────── */}
         <DrawerBody sx={bodySx}>

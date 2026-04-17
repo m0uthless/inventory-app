@@ -1,4 +1,4 @@
-http://archie.biotron.it {
+archie.biotron.it {
     encode gzip zstd
 
     handle /api/* {
@@ -22,10 +22,22 @@ http://archie.biotron.it {
     }
 }
 
-http://auslbo.biotron.it {
+auslbo.biotron.it {
     encode gzip zstd
 
     handle /api/* {
+        reverse_proxy backend_nginx:80
+    }
+
+    handle /admin/* {
+        reverse_proxy backend_nginx:80
+    }
+
+    handle /static/* {
+        reverse_proxy backend_nginx:80
+    }
+
+    handle /media/* {
         reverse_proxy backend_nginx:80
     }
 
