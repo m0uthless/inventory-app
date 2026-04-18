@@ -54,9 +54,9 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=5).getcode() == 200 else 1)"]
+      test: ["CMD", "python", "-c", "import sys, urllib.request; req = urllib.request.Request('http://127.0.0.1:8000/api/health/', headers={'X-Forwarded-Proto': 'https'}); sys.exit(0 if urllib.request.urlopen(req, timeout=10).getcode() == 200 else 1)"]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 10
       start_period: 25s
     volumes:
@@ -74,9 +74,9 @@ services:
         condition: service_healthy
         restart: true
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/api/health/ >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "wget -q --header='X-Forwarded-Proto: https' -O - http://127.0.0.1/api/health/ >/dev/null 2>&1"]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 10
       start_period: 10s
     volumes:

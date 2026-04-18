@@ -125,6 +125,7 @@ export const TRASH_VIEW_ANY = [
   PERMS.crm.site.view,
   PERMS.crm.contact.view,
   PERMS.inventory.inventory.view,
+  PERMS.inventory.monitor.view,
   PERMS.maintenance.plan.view,
   PERMS.maintenance.tech.view,
 ] as const

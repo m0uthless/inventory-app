@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ipaddress
 
+from django.utils import timezone
+
 from django.contrib.auth.models import Group
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import serializers, status, viewsets
@@ -57,15 +59,33 @@ class VlanSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def _get_used_ips(self, obj: Vlan) -> set[str]:
-        """Raccoglie tutti gli IP occupati da inventory e device nella subnet."""
-        net = obj.get_network_obj()
-        if net is None:
-            return set()
+    def _compute_pool(self, obj: Vlan) -> tuple[set[str], set[str]]:
+        """Calcola host pool e IP occupati in un'unica passata (2 query totali).
 
+        Restituisce (hosts, used) dove:
+          hosts = tutti gli IP host della subnet (esclusi network e broadcast),
+                  gateway escluso perché non è un host assegnabile.
+          used  = IP occupati da inventory o device del customer.
+
+        Questo metodo è chiamato da get_total_hosts, get_used_count e
+        get_free_count tramite _get_pool_cached() che lo memoizza per
+        istanza di serializer, evitando N×3 query su listing multi-VLAN.
+        """
+        net = obj.get_network_obj()
+        hosts: set[str] = set()
         used: set[str] = set()
 
-        # inventory.local_ip
+        if net is None:
+            return hosts, used
+
+        # IP host: esclude network, broadcast e gateway (non assegnabile)
+        gateway = obj.gateway
+        for ip_obj in net.hosts():
+            ip_str = str(ip_obj)
+            if ip_str != gateway:
+                hosts.add(ip_str)
+
+        # inventory.local_ip — 1 query
         inv_ips = (
             Inventory.objects.filter(
                 customer=obj.customer,
@@ -82,7 +102,7 @@ class VlanSerializer(serializers.ModelSerializer):
             except ValueError:
                 pass
 
-        # device.ip (campo vlan_ip nella semantica del progetto)
+        # device.ip — 1 query
         dev_ips = (
             Device.objects.filter(
                 customer=obj.customer,
@@ -98,20 +118,27 @@ class VlanSerializer(serializers.ModelSerializer):
             except ValueError:
                 pass
 
-        return used
+        return hosts, used
+
+    def _get_pool_cached(self, obj: Vlan) -> tuple[set[str], set[str]]:
+        """Memoizza _compute_pool per evitare ricalcoli multipli sullo stesso obj."""
+        cache = getattr(self, '_pool_cache', None)
+        if cache is None:
+            self._pool_cache: dict[int, tuple[set[str], set[str]]] = {}
+        if obj.pk not in self._pool_cache:
+            self._pool_cache[obj.pk] = self._compute_pool(obj)
+        return self._pool_cache[obj.pk]
 
     def get_total_hosts(self, obj: Vlan) -> int:
-        hosts = obj.iter_host_ips()
+        hosts, _ = self._get_pool_cached(obj)
         return len(hosts)
 
     def get_used_count(self, obj: Vlan) -> int:
-        hosts = set(obj.iter_host_ips())
-        used = self._get_used_ips(obj)
+        hosts, used = self._get_pool_cached(obj)
         return len(hosts & used)
 
     def get_free_count(self, obj: Vlan) -> int:
-        hosts = set(obj.iter_host_ips())
-        used = self._get_used_ips(obj)
+        hosts, used = self._get_pool_cached(obj)
         return len(hosts - used)
 
     def validate(self, attrs):
@@ -408,7 +435,6 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def approve(self, request, pk=None):
         """Approva una richiesta pendente (richiede permesso vlan.change_vlanIprequest)."""
-        from django.utils import timezone
         req: VlanIpRequest = self.get_object()
         if req.stato != VlanIpRequest.Stato.PENDING:
             return Response(
@@ -437,7 +463,8 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
             req.note = f"{prefix}\n{req.note}".strip() if req.note else prefix
         req.stato = VlanIpRequest.Stato.REJECTED
         req.approvato_da = request.user
-        req.save(update_fields=["stato", "approvato_da", "note", "updated_at"])
+        req.approvato_at = timezone.now()
+        req.save(update_fields=["stato", "approvato_da", "approvato_at", "note", "updated_at"])
         return Response(VlanIpRequestSerializer(req, context={"request": request}).data)
 
 

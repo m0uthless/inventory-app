@@ -198,7 +198,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.5.1",
+    "VERSION": "0.6",
 }
 
 REST_FRAMEWORK = {

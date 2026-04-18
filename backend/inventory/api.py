@@ -447,7 +447,7 @@ class MonitorSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class MonitorViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class MonitorViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     """CRUD monitor. Filtrabili per inventory, stato, tipo.
 
     Supporta soft-delete con cestino:
@@ -465,6 +465,7 @@ class MonitorViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVie
 
     # Monitor non ha updated_by
     restore_has_updated_by = False
+    purge_permission = "inventory.delete_monitor"
 
     def get_queryset(self):
         qs = Monitor.objects.select_related("inventory", "inventory__site")

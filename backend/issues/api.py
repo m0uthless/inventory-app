@@ -107,7 +107,7 @@ class IssueSerializer(serializers.ModelSerializer):
     def get_days_open(self, obj):
         from datetime import date
         ref = obj.opened_at or obj.created_at.date()
-        return (date.today() - ref).days
+        return max(0, (date.today() - ref).days)
 
     def _sync_closed_at(self, status_value, current_closed_at=None):
         if status_value in {IssueStatus.RESOLVED, IssueStatus.CLOSED}:

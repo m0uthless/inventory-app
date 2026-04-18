@@ -37,6 +37,7 @@ type TrashResourceKey =
   | 'sites'
   | 'contacts'
   | 'inventory'
+  | 'monitors'
   | 'maintenance-plans'
   | 'techs'
 type TrashTypeKey = 'all' | TrashResourceKey
@@ -114,6 +115,16 @@ const RESOURCES: ResourceCfg[] = [
     purgePerm: PERMS.inventory.inventory.delete,
     buildTitle: (r) =>
       `${String(r.hostname ?? r.name ?? 'Inventario')}${r.knumber ? ' · ' + String(r.knumber) : ''}`.trim(),
+  }),
+  makeResourceCfg({
+    key: 'monitors',
+    label: 'Monitor',
+    collectionPath: '/monitors/',
+    viewPerm: PERMS.inventory.monitor.view,
+    restorePerm: PERMS.inventory.monitor.change,
+    purgePerm: PERMS.inventory.monitor.delete,
+    buildTitle: (r) =>
+      `${String(r.produttore ?? 'Monitor')}${r.modello ? ' ' + String(r.modello) : ''}${r.seriale ? ' · ' + String(r.seriale) : ''}`.trim(),
   }),
   makeResourceCfg({
     key: 'maintenance-plans',
@@ -205,6 +216,7 @@ export default function Trash() {
       sites: [],
       contacts: [],
       inventory: [],
+      monitors: [],
       'maintenance-plans': [],
       techs: [],
     }

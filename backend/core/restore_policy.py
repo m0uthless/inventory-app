@@ -42,6 +42,12 @@ def get_restore_block_reason(instance) -> str | None:
             return "Il cliente collegato è ancora nel cestino. Ripristina prima il cliente."
         return None
 
+    if model_label == "inventory.monitor":
+        inventory = getattr(instance, "inventory", None)
+        if inventory is not None and getattr(inventory, "deleted_at", None) is not None:
+            return "La workstation collegata è ancora nel cestino. Ripristina prima la workstation."
+        return None
+
     return None
 
 

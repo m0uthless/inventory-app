@@ -55,6 +55,10 @@ def _purge_soft_deleted_children(obj: Any) -> None:
             obj.maintenance_events.filter(deleted_at__isnull=False).delete()
         if hasattr(obj, "notifications"):
             obj.notifications.filter(deleted_at__isnull=False).delete()
+        # Monitor con SET_NULL: null-out invece di hard-delete per preservare la storia.
+        # Questo evita che il FK non-nullable del monitor diventi un vincolo bloccante.
+        if hasattr(obj, "monitors"):
+            obj.monitors.filter(deleted_at__isnull=False).update(inventory=None)
         return
 
 

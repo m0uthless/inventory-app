@@ -7,6 +7,66 @@ Le date sono in timezone Europe/Rome.
 
 ---
 
+## [0.6] - 2026-04-18
+
+### Fixed
+
+- **Versione allineata a 0.6** in tutti i file di progetto:
+  `backend/config/settings.py` (`REST_FRAMEWORK["VERSION"]`),
+  `frontend/package.json` (letta da Vite e iniettata come `VITE_APP_VERSION`),
+  `README.md`.
+
+- **`frontend/src/ui/ContributorCard_orig.tsx`** — file di backup orfano
+  eliminato (già indicato come rimosso nel CHANGELOG 0.5.2 ma ancora presente
+  nel repository).
+
+- **`frontend/src/pages/Trash.tsx` + `backend/inventory/api.py`** — aggiunta voce
+  `monitors` alla lista `RESOURCES`, tipo `TrashResourceKey` e `selectedByType`.
+  `MonitorViewSet` ora include `PurgeActionMixin` con `purge_permission`,
+  rendendo possibile il ripristino e il purge definitivo dal cestino.
+
+- **`frontend/src/auth/perms.ts`** — aggiunto `PERMS.inventory.monitor.view`
+  in `TRASH_VIEW_ANY`.
+
+- **`backend/vlan/api.py` — N+3 query per riga nella lista VLAN** (BUG-01):
+  `get_total_hosts`, `get_used_count` e `get_free_count` ricalcolavano il pool
+  indipendentemente (fino a 5 operazioni per VLAN). Refactoring in `_compute_pool()`
+  (2 query totali) memoizzato tramite `_get_pool_cached()`.
+
+- **`backend/vlan/api.py` — conteggio host gonfiato di 1** (BUG-02):
+  `get_total_hosts` includeva il gateway nel conteggio degli host disponibili.
+  `_compute_pool` esclude ora il gateway esplicitamente.
+
+- **`backend/core/restore_policy.py` — Monitor senza controllo parent nel cestino** (BUG-03):
+  Aggiunto caso `inventory.monitor`: blocca il ripristino se la workstation
+  associata è ancora nel cestino.
+
+- **`backend/core/purge_policy.py` — Inventory non puliva i Monitor figli** (BUG-04):
+  `_purge_soft_deleted_children` non gestiva i monitor soft-deleted collegati.
+  Aggiunto null-out dei monitor prima del purge dell'inventory.
+
+- **`backend/issues/api.py` — `days_open` poteva essere negativo** (BUG-05):
+  `get_days_open` restituiva valori negativi con `opened_at` nel futuro. Aggiunto `max(0, ...)`.
+
+- **`backend/vlan/api.py` — `reject` non impostava `approvato_at`** (BUG-06):
+  L'action `reject` non salvava la data di rifiuto. Aggiunto `approvato_at = timezone.now()`
+  in `update_fields`. Import `timezone` spostato a livello di modulo.
+
+- **`backend/audit/api.py` — filtri escludevano eventi con `content_type=NULL`** (BUG-07):
+  `DjangoFilterBackend` generava INNER JOIN su `content_type__app_label` / `content_type__model`,
+  escludendo silenziosamente eventi login, bulk-restore e altri privi di content_type.
+  Sostituiti con metodi filtro espliciti. `entities` action aggiornata.
+
+- **`frontend/src/pages/Monitor.tsx` — toggle Attivi/Tutti/Cestino mancante** (BUG-10):
+  Il toolbar non passava `viewMode`/`onViewModeChange`, rendendo impossibile
+  visualizzare i monitor eliminati dalla pagina Monitor.
+
+- **`frontend/src/pages/Monitor.tsx` — `deleted_at` mancante in `ALLOWED_ORDERING`** (BUG-08):
+  In modalità Cestino `useServerGrid` non poteva ordinare per `-deleted_at`.
+  Aggiunto `'deleted_at'` all'array.
+
+---
+
 ## [0.5.2] - 2026-03-23
 
 ### Fixed

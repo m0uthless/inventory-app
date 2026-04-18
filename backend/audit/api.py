@@ -90,11 +90,25 @@ class AuditEventSerializer(serializers.ModelSerializer):
 class AuditEventFilter(filters.FilterSet):
     actor = filters.NumberFilter(field_name="actor_id")
     action = filters.CharFilter(field_name="action")
-    app_label = filters.CharFilter(field_name="content_type__app_label")
-    model = filters.CharFilter(field_name="content_type__model")
+    # Nota: content_type è nullable (migration 0007). DjangoFilterBackend genera INNER JOIN
+    # su content_type__app_label / content_type__model, escludendo silenziosamente gli eventi
+    # con content_type=NULL (login, bulk restore, ecc.).
+    # Usiamo filtri con metodo esplicito per mantenere il LEFT JOIN corretto.
+    app_label = filters.CharFilter(method="filter_app_label")
+    model = filters.CharFilter(method="filter_model")
     object_id = filters.CharFilter(field_name="object_id")
     created_after = filters.IsoDateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_before = filters.IsoDateTimeFilter(field_name="created_at", lookup_expr="lte")
+
+    def filter_app_label(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(content_type__app_label=value)
+
+    def filter_model(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(content_type__model=value)
 
     class Meta:
         model = AuditEvent
@@ -170,9 +184,14 @@ class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="entities")
     def entities(self, request):
-        """Return distinct entity types present in audit events."""
+        """Return distinct entity types present in audit events.
+
+        Esclude le righe con content_type=NULL (eventi senza entità associata,
+        es. login o bulk-restore): non avrebbero comunque app_label/model utili.
+        """
         rows = (
-            AuditEvent.objects.values("content_type__app_label", "content_type__model")
+            AuditEvent.objects.filter(content_type__isnull=False)
+            .values("content_type__app_label", "content_type__model")
             .distinct()
             .order_by("content_type__app_label", "content_type__model")
         )
@@ -183,5 +202,6 @@ class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
                     "model": r["content_type__model"],
                 }
                 for r in rows
+                if r["content_type__app_label"] and r["content_type__model"]
             ]
         )

@@ -162,7 +162,7 @@ const COLUMNS: GridColDef<MonitorRow>[] = [
   },
 ]
 
-const ALLOWED_ORDERING = ['produttore', 'modello', 'seriale', 'stato', 'tipo', 'created_at', 'updated_at'] as const
+const ALLOWED_ORDERING = ['produttore', 'modello', 'seriale', 'stato', 'tipo', 'created_at', 'updated_at', 'deleted_at'] as const
 
 // ─── Pagina Monitor ───────────────────────────────────────────────────────────
 
@@ -385,6 +385,8 @@ export default function Monitor() {
           q: grid.q,
           onQChange: grid.setQ,
           onReset: grid.reset,
+          viewMode: grid.view,
+          onViewModeChange: grid.setViewMode,
           createButton: (
             <Can perm={PERMS.inventory.monitor.add}>
               <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
