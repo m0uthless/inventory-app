@@ -38,6 +38,8 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILES: -f docker-compose.yml -f docker-compose.dev.yml
     steps:
       - uses: actions/checkout@v4
 
@@ -45,37 +47,37 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build images
-        run: docker compose build
+        run: docker compose $COMPOSE_FILES build
 
       - name: Static type check (mypy)
-        run: docker compose run --rm backend python -m mypy --config-file mypy.ini .
+        run: docker compose $COMPOSE_FILES run --rm backend python -m mypy --config-file mypy.ini .
 
       - name: Start database
-        run: docker compose up -d db
+        run: docker compose $COMPOSE_FILES up -d db redis
 
       - name: Wait for db
         run: |
           for i in {1..30}; do
-            if docker compose exec -T db pg_isready -U "${DB_USER:-inventory_app}" -d "${DB_NAME:-inventory_app}"; then
+            if docker compose $COMPOSE_FILES exec -T db pg_isready -U "inventory_app" -d "inventory_app"; then
               exit 0
             fi
             sleep 2
           done
           echo "DB not ready" >&2
-          docker compose logs db
+          docker compose $COMPOSE_FILES logs db redis
           exit 1
 
       - name: Django checks + migrations check + migration plan
         run: |
-          docker compose run --rm backend python manage.py check
-          docker compose run --rm backend python manage.py makemigrations --check --dry-run
-          docker compose run --rm backend python manage.py migrate --plan
+          docker compose $COMPOSE_FILES run --rm backend python manage.py check
+          docker compose $COMPOSE_FILES run --rm backend python manage.py makemigrations --check --dry-run
+          docker compose $COMPOSE_FILES run --rm backend python manage.py migrate --plan
 
       - name: Run backend tests (pytest)
         run: |
-          docker compose run --rm backend python manage.py migrate
-          docker compose run --rm backend pytest -q
+          docker compose $COMPOSE_FILES run --rm backend python manage.py migrate
+          docker compose $COMPOSE_FILES run --rm backend pytest -q
 
       - name: Tear down
         if: always()
-        run: docker compose down -v
+        run: docker compose $COMPOSE_FILES down -v
