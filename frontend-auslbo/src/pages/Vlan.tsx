@@ -1204,6 +1204,7 @@ export default function VlanPage() {
           bottom: { xs: 16, md: 20 },
           right: { xs: 16, md: 24 },
           zIndex: (t) => t.zIndex.appBar - 1,
+          display: { xs: 'none', md: 'inline-flex' },
           '& .MuiSpeedDial-fab': {
             width: 52, height: 52,
             boxShadow: '0 8px 24px rgba(26,107,181,0.35)',

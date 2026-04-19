@@ -5,6 +5,18 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from auslbo.permissions import IsAuslBoUser, _can_edit_auslbo
+from core.models import UserProfile
+
+
+def _get_avatar_url(user):
+    """Restituisce l'URL dell'avatar del profilo utente, o None."""
+    try:
+        profile = UserProfile.objects.get(user=user)
+        if profile.avatar:
+            return profile.avatar.url
+    except UserProfile.DoesNotExist:
+        pass
+    return None
 
 
 class AuslBoMeView(APIView):
@@ -40,6 +52,7 @@ class AuslBoMeView(APIView):
                 "email": user.email or "",
                 "first_name": user.first_name or "",
                 "last_name": user.last_name or "",
+                "avatar": _get_avatar_url(user),
             },
             "customer": {
                 "id": customer.id,

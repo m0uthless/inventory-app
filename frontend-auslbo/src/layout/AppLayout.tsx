@@ -21,6 +21,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import LogoutIcon from '@mui/icons-material/Logout'
+import SettingsIcon from '@mui/icons-material/Settings'
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
 import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined'
 import RouterOutlinedIcon from '@mui/icons-material/RouterOutlined'
@@ -33,8 +34,14 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 
 import { useAuth } from '../auth/AuthProvider'
+import { Suspense } from 'react'
 import { SIDEBAR } from '../theme'
 import AppFooter from './AppFooter'
+import MobileBottomNavAuslbo from './MobileBottomNavAuslbo'
+
+const ProfileDrawer = React.lazy(() =>
+  import('../pages/ProfileDrawer').then((m) => ({ default: m.ProfileDrawer })),
+)
 
 const drawerWidth = 208
 const collapsedWidth = 58
@@ -103,6 +110,7 @@ export function AppLayout() {
 
   // User menu
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
+  const [profileOpen, setProfileOpen] = React.useState(false)
 
   const initials = React.useMemo(() => {
     const u = me?.user
@@ -340,53 +348,56 @@ export function AppLayout() {
           {/* Spacer allineato alla sidebar su desktop */}
           <Box sx={{ display: { xs: 'none', md: 'block' }, width: sidebarWidth, flexShrink: 0 }} />
 
-          {/* Hamburger mobile */}
-          <IconButton
-            edge="start"
-            onClick={() => setMobileOpen(true)}
-            sx={{ display: { md: 'none' } }}
-            aria-label="Apri menu"
-          >
-            <MenuIcon />
-          </IconButton>
-
-          {/* Page title */}
-          {!!pageTitle && (
-            <Typography
-              variant="h6"
-              noWrap
-              sx={{
-                fontWeight: 900,
-                letterSpacing: '0.22em',
-                color: SIDEBAR.accentLight,
-                lineHeight: 1,
-                fontSize: { xs: 13, md: 15 },
-              }}
+          {/* LEFT: hamburger mobile + page title */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={() => setMobileOpen(true)}
+              sx={{ display: { md: 'none' } }}
+              aria-label="Apri menu"
             >
-              {pageTitle}
-            </Typography>
-          )}
+              <MenuIcon />
+            </IconButton>
 
-          <Box sx={{ flex: 1 }} />
-
-          {/* Avatar */}
-          <Tooltip title={displayName}>
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} aria-label="User menu" sx={{ mr: 0.5 }}>
-              <Avatar
+            {!!pageTitle && (
+              <Typography
+                variant="h6"
+                noWrap
                 sx={{
-                  width: 28,
-                  height: 28,
-                  fontWeight: 800,
-                  fontSize: 11,
-                  bgcolor: 'rgba(93,174,240,0.25)',
-                  border: SIDEBAR.activeBorder,
-                  color: SIDEBAR.textBright,
+                  fontWeight: 900,
+                  letterSpacing: '0.22em',
+                  color: SIDEBAR.accentLight,
+                  lineHeight: 1,
+                  fontSize: { xs: 13, md: 15 },
                 }}
               >
-                {initials}
-              </Avatar>
-            </IconButton>
-          </Tooltip>
+                {pageTitle}
+              </Typography>
+            )}
+          </Box>
+
+          {/* RIGHT: avatar */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+            <Tooltip title={displayName}>
+              <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} aria-label="User menu" sx={{ mr: 0.5 }}>
+                <Avatar
+                  src={me?.user.avatar || undefined}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    fontWeight: 800,
+                    fontSize: 11,
+                    bgcolor: 'rgba(93,174,240,0.25)',
+                    border: SIDEBAR.activeBorder,
+                    color: SIDEBAR.textBright,
+                  }}
+                >
+                  {initials}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -418,6 +429,13 @@ export function AppLayout() {
           </Typography>
         </Box>
         <Divider />
+        <MenuItem
+          onClick={() => { setAnchorEl(null); setProfileOpen(true) }}
+          sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
+        >
+          <SettingsIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          Impostazioni
+        </MenuItem>
         <MenuItem
           onClick={handleLogout}
           sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5, color: 'error.main' }}
@@ -486,12 +504,16 @@ export function AppLayout() {
       >
         <Toolbar sx={{ flexShrink: 0 }} />
 
-        <Box sx={{ p: { xs: 2, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <Outlet />
         </Box>
 
         <AppFooter />
       </Box>
+      <MobileBottomNavAuslbo />
+      <Suspense fallback={null}>
+        <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
+      </Suspense>
     </Box>
   )
 }

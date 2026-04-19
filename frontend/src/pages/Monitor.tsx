@@ -1,20 +1,18 @@
 import * as React from 'react'
 import {
   Box,
-  Button,
   Chip,
   Stack,
   Typography,
 } from '@mui/material'
-import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 
-import { Can } from '../auth/Can'
 import { useAuth } from '../auth/AuthProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { isRecord } from '@shared/utils/guards'
 import type { GridColDef } from '@mui/x-data-grid'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { api } from '@shared/api/client'
@@ -250,8 +248,19 @@ export default function Monitor() {
   const [formTarget, setFormTarget] = React.useState<MonitorRow | null>(null)
   const [formSaving, setFormSaving] = React.useState(false)
 
-  const openCreate = () => { setFormTarget(null); setFormOpen(true) }
-  const openEdit   = () => { if (detail) { setFormTarget(detail); setFormOpen(true) } }
+  const openEdit     = () => { if (detail) { setFormTarget(detail); setFormOpen(true) } }
+  const openCreate   = React.useCallback(() => { setFormTarget(null); setFormOpen(true) }, [])
+
+  // Apri form create se navigato con state { openCreate: true } (da SpeedDial / mobile nav)
+  const openCreateOnceRef = React.useRef(false)
+  React.useEffect(() => {
+    const st = loc.state as unknown
+    if (!isRecord(st) || st['openCreate'] !== true) { openCreateOnceRef.current = false; return }
+    if (openCreateOnceRef.current) return
+    openCreateOnceRef.current = true
+    navigate(loc.pathname, { replace: true, state: {} })
+    openCreate()
+  }, [loc, navigate, openCreate])
 
   const handleSave = async (form: MonitorForm) => {
     setFormSaving(true)
@@ -384,16 +393,6 @@ export default function Monitor() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          onReset: grid.reset,
-          viewMode: grid.view,
-          onViewModeChange: grid.setViewMode,
-          createButton: (
-            <Can perm={PERMS.inventory.monitor.add}>
-              <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-                Nuovo
-              </Button>
-            </Can>
-          ),
         }}
         grid={{
           pageKey: 'monitors',

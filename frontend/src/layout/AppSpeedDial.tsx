@@ -14,6 +14,7 @@ import BusinessIcon from '@mui/icons-material/Business'
 import ContactsIcon from '@mui/icons-material/Contacts'
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
+import MonitorIcon from '@mui/icons-material/MonitorOutlined'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '@mui/material/styles'
@@ -104,6 +105,14 @@ export default function AppSpeedDial() {
         perm: 'wiki.add_wikipage',
         icon: <DescriptionOutlinedIcon sx={{ fontSize: 20 }} />,
       },
+      newMonitor: {
+        key: 'newMonitor',
+        label: 'Nuovo monitor',
+        to: '/monitors',
+        perm: 'inventory.add_monitor',
+        openCreate: true,
+        icon: <MonitorIcon sx={{ fontSize: 20 }} />,
+      },
       newReportRequest: {
         key: 'newReportRequest',
         label: 'Report / Request',
@@ -127,6 +136,9 @@ export default function AppSpeedDial() {
     }
     if (pathStarts(loc.pathname, '/inventory')) {
       return ['newInventory', 'newIssue', 'newReportRequest', 'search']
+    }
+    if (pathStarts(loc.pathname, '/monitors')) {
+      return ['newMonitor', 'newReportRequest', 'search']
     }
     if (pathStarts(loc.pathname, '/issues')) {
       return ['newIssue', 'newInventory', 'newReportRequest', 'search']
@@ -173,6 +185,7 @@ export default function AppSpeedDial() {
       direction="up"
       sx={{
         position: 'fixed',
+        display: { xs: 'none', md: 'inline-flex' },
         bottom: { xs: 16, md: 20 },
         right: { xs: 16, md: 24 },
         zIndex: (t) => t.zIndex.appBar - 1,

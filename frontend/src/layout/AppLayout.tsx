@@ -51,6 +51,7 @@ import AppFooter from './AppFooter'
 import GlobalSearch from './GlobalSearch'
 import MaintenanceNotificationBell from './MaintenanceNotificationBell'
 import AppSpeedDial from './AppSpeedDial'
+import MobileBottomNavArchie from './MobileBottomNavArchie'
 import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '../ui/LockScreen'
@@ -902,7 +903,7 @@ export function AppLayout() {
           '& .MuiInputBase-root': { color: '#ffffff' },
         }}
       >
-        <Toolbar sx={{ pl: 2, pr: 0, gap: 1, position: 'relative' }}>
+        <Toolbar sx={{ pl: 2, pr: 1, gap: 1 }}>
           {/* spacer: allinea contenuti dopo la sidebar su desktop */}
           <Box sx={{ display: { xs: 'none', md: 'block' }, width: sidebarWidth, flexShrink: 0 }} />
 
@@ -927,6 +928,7 @@ export function AppLayout() {
                   letterSpacing: '0.22em',
                   color: SIDEBAR.accentLight,
                   lineHeight: 1,
+                  fontSize: { xs: 13, md: 15 },
                 }}
               >
                 {pageTitle}
@@ -1222,13 +1224,14 @@ export function AppLayout() {
       >
         <Toolbar sx={{ flexShrink: 0 }} />
 
-        <Box sx={{ p: { xs: 2, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <Outlet />
         </Box>
 
         <AppFooter />
       </Box>
       <AppSpeedDial />
+      <MobileBottomNavArchie />
       <LockScreen open={locked} onUnlock={handleUnlock} />
       <Backdrop
         open={eggOpen}

@@ -10,6 +10,7 @@ export type AuslBoMe = {
     email: string
     first_name: string
     last_name: string
+    avatar: string | null
   }
   customer: {
     id: number
@@ -29,6 +30,7 @@ type AuthCtx = {
   loading: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  refreshMe: () => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthCtx | null>(null)
@@ -91,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ me, loading, login, logout }}>
+    <AuthContext.Provider value={{ me, loading, login, logout, refreshMe }}>
       {children}
     </AuthContext.Provider>
   )

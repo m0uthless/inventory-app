@@ -1106,6 +1106,7 @@ export default function Device() {
           width: 52,
           height: 52,
           boxShadow: '0 8px 24px rgba(26,107,181,0.35)',
+          display: { xs: 'none', md: 'inline-flex' },
         }}
       >
         <AddIcon sx={{ fontSize: 26 }} />
