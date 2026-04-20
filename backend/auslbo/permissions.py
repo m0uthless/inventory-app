@@ -35,7 +35,7 @@ def _is_auslbo_user(user) -> bool:
     try:
         from auslbo.models import AuslBoUserProfile
         return AuslBoUserProfile.objects.filter(
-            user_id=user.pk, is_active=True
+            user_id=user.pk
         ).exists()
     except Exception:
         return False
