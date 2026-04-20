@@ -54,18 +54,7 @@ class Inventory(TimeStampedModel):
             models.Index(fields=["site", "deleted_at"], name="inv_site_del_idx"),
             models.Index(fields=["updated_at"], name="inv_updated_at_idx"),
         ]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["knumber"],
-                condition=models.Q(deleted_at__isnull=True, knumber__isnull=False),
-                name="ux_inventories_knumber_active",
-            ),
-            models.UniqueConstraint(
-                fields=["serial_number"],
-                condition=models.Q(deleted_at__isnull=True, serial_number__isnull=False),
-                name="ux_inventories_serial_active",
-            ),
-        ]
+        constraints = []
 
     def clean(self):
         if self.site_id and self.site.customer_id != self.customer_id:
