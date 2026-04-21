@@ -2,50 +2,80 @@ import type { SvgIconComponent } from '@mui/icons-material'
 
 import DesktopWindowsOutlinedIcon from '@mui/icons-material/DesktopWindowsOutlined'
 import BalanceIcon from '@mui/icons-material/Balance'
-import SaveIcon from '@mui/icons-material/Save'
-import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing'
-import DiscFullIcon from '@mui/icons-material/DiscFull'
+import PrecisionManufacturingOutlinedIcon from '@mui/icons-material/PrecisionManufacturingOutlined'
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined'
+import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined'
+import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import MicIcon from '@mui/icons-material/Mic'
 import AccessibleIcon from '@mui/icons-material/Accessible'
-import PublicIcon from '@mui/icons-material/Public'
-import WebhookIcon from '@mui/icons-material/Webhook'
-import WbCloudyOutlinedIcon from '@mui/icons-material/WbCloudyOutlined'
-import StorageIcon from '@mui/icons-material/Storage'
-import ConstructionIcon from '@mui/icons-material/Construction'
+import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined'
+import SwitchVideoOutlinedIcon from '@mui/icons-material/SwitchVideoOutlined'
+import MonitorHeartOutlinedIcon from '@mui/icons-material/MonitorHeartOutlined'
+import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined'
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import ComputerOutlinedIcon from '@mui/icons-material/ComputerOutlined'
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 
 export const INVENTORY_TYPE_ICON_COLOR = '#457f79'
 
 // Mappa type_key (backend InventoryType.key) -> icona Material
 export const INVENTORY_TYPE_ICONS: Record<string, SvgIconComponent> = {
-  service_pc: DesktopWindowsOutlinedIcon,
+  // Workstation / PC
+  service_pc:  DesktopWindowsOutlinedIcon,
   workstation: DesktopWindowsOutlinedIcon,
+  ws:          DesktopWindowsOutlinedIcon,
 
+  // Load balancer
   load_balancer2: BalanceIcon,
   load_balancer1: BalanceIcon,
 
-  storage: SaveIcon,
+  // Storage
+  storage: StorageOutlinedIcon,
 
-  robot: PrecisionManufacturingIcon,
-  pc_robot: DiscFullIcon,
+  // Robot
+  robot:    PrecisionManufacturingOutlinedIcon,
+  pc_robot: SmartToyOutlinedIcon,
 
+  // Broker / hub di rete
+  broker: HubOutlinedIcon,
+
+  // Portale web MyVue
+  myvue: VideocamOutlinedIcon,
+
+  // Video motion
+  vue_motion: SwitchVideoOutlinedIcon,
+
+  // PACS server (WFM)
+  wfm: MedicalServicesOutlinedIcon,
+
+  // Monitoring (Zabbix)
+  zabbix: MonitorHeartOutlinedIcon,
+
+  // Cloud (CSAP)
+  csap: CloudOutlinedIcon,
+
+  // Speech
   speech: MicIcon,
+
+  // Orthoview
   orthoview: AccessibleIcon,
-  vue_motion: PublicIcon,
-  wfm: WebhookIcon,
-  csap: WbCloudyOutlinedIcon,
 
-  host4: StorageIcon,
-  host3: StorageIcon,
-  host2: StorageIcon,
-  host1: StorageIcon,
+  // Domain controller / host
+  dc:    DnsOutlinedIcon,
+  host:  ComputerOutlinedIcon,
+  host4: ComputerOutlinedIcon,
+  host3: ComputerOutlinedIcon,
+  host2: ComputerOutlinedIcon,
+  host1: ComputerOutlinedIcon,
 
-  // Nel seed v0.2.1 esiste "management"; in roadmap potrebbero esistere management1..4
-  management: ConstructionIcon,
-  management4: ConstructionIcon,
-  management3: ConstructionIcon,
-  management2: ConstructionIcon,
-  management1: ConstructionIcon,
+  // Management
+  management:  AdminPanelSettingsOutlinedIcon,
+  management4: AdminPanelSettingsOutlinedIcon,
+  management3: AdminPanelSettingsOutlinedIcon,
+  management2: AdminPanelSettingsOutlinedIcon,
+  management1: AdminPanelSettingsOutlinedIcon,
 }
 
 export function getInventoryTypeIcon(typeKey?: string | null): SvgIconComponent {
