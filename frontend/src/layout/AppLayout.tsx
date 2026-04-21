@@ -531,7 +531,7 @@ export function AppLayout() {
             options.onClick(event)
             return
           }
-          nav(it.path)
+          nav({ pathname: it.path, search: '' })
           setMobileOpen(false)
         }}
         sx={{
@@ -796,7 +796,7 @@ export function AppLayout() {
                     onClick: isMini
                       ? (event) => {
                           if (!children.length) {
-                            nav(it.path)
+                            nav({ pathname: it.path, search: '' })
                             setMobileOpen(false)
                             return
                           }
