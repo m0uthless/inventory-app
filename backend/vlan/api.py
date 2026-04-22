@@ -16,7 +16,7 @@ from auslbo.permissions import IsAuslBoUserOrInternal, IsAuslBoEditor, _can_edit
 from crm.models import Site
 from device.models import Device, DeviceManufacturer, DeviceType, Rispacs
 from inventory.models import Inventory
-from vlan.models import Vlan, VlanIpRequest
+from vlan.models import Vlan, VlanIpRequest, VlanExcludedIp
 
 VLAN_MANAGER_GROUP = "auslbo_editor"  # kept for reference, logic now in IsAuslBoEditor
 
@@ -159,12 +159,13 @@ class VlanSerializer(serializers.ModelSerializer):
 class IpPoolEntrySerializer(serializers.Serializer):
     ip = serializers.CharField()
     kind = serializers.ChoiceField(choices=["network", "broadcast", "gateway", "host"])
-    status = serializers.ChoiceField(choices=["free", "used"])
+    status = serializers.ChoiceField(choices=["free", "used", "reserved", "excluded"])
     used_by = serializers.CharField(allow_null=True)       # nome del device/inventory
     used_by_type = serializers.ChoiceField(
-        choices=["inventory", "device", None], allow_null=True
+        choices=["inventory", "device", "request", "excluded", None], allow_null=True
     )
     used_by_id = serializers.IntegerField(allow_null=True)
+    excluded = serializers.BooleanField(default=False)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -252,6 +253,11 @@ class VlanViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
         for row in pending_qs:
             reserved_map[row["ip"]] = row["id"]
 
+        # Raccoglie IP esclusi manualmente
+        excluded_set: set[str] = set(
+            VlanExcludedIp.objects.filter(vlan=vlan).values_list("ip", flat=True)
+        )
+
         # Costruisce la lista ordinata di tutti gli IP della subnet
         entries = []
         for ip_obj in net:
@@ -259,25 +265,28 @@ class VlanViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
             if ip_str == network_addr:
                 entries.append(
                     {"ip": ip_str, "kind": "network", "status": "used",
-                     "used_by": None, "used_by_type": None, "used_by_id": None}
+                     "used_by": None, "used_by_type": None, "used_by_id": None, "excluded": False}
                 )
             elif ip_str == broadcast_addr:
                 entries.append(
                     {"ip": ip_str, "kind": "broadcast", "status": "used",
-                     "used_by": None, "used_by_type": None, "used_by_id": None}
+                     "used_by": None, "used_by_type": None, "used_by_id": None, "excluded": False}
                 )
             elif ip_str == gateway_addr:
                 entries.append(
                     {"ip": ip_str, "kind": "gateway", "status": "used",
-                     "used_by": "Gateway", "used_by_type": None, "used_by_id": None}
+                     "used_by": "Gateway", "used_by_type": None, "used_by_id": None, "excluded": False}
                 )
             else:
                 info = used_map.get(ip_str)
                 req_id = reserved_map.get(ip_str)
+                is_excluded = ip_str in excluded_set
                 if info:
                     st = "used"
                 elif req_id:
                     st = "reserved"
+                elif is_excluded:
+                    st = "excluded"
                 else:
                     st = "free"
                 entries.append(
@@ -285,13 +294,52 @@ class VlanViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
                         "ip": ip_str,
                         "kind": "host",
                         "status": st,
-                        "used_by": info["name"] if info else ("Richiesta in attesa" if req_id else None),
-                        "used_by_type": info["type"] if info else ("request" if req_id else None),
+                        "used_by": info["name"] if info else ("Richiesta in attesa" if req_id else ("Escluso" if is_excluded else None)),
+                        "used_by_type": info["type"] if info else ("request" if req_id else ("excluded" if is_excluded else None)),
                         "used_by_id": info["id"] if info else req_id,
+                        "excluded": is_excluded,
                     }
                 )
 
         return Response(entries)
+
+    @action(detail=True, methods=["post"], url_path="exclude-ip")
+    def exclude_ip(self, request, pk=None):
+        """Esclude manualmente un IP dalla heatmap (lo marca in rosso)."""
+        vlan: Vlan = self.get_object()
+        ip = request.data.get("ip", "").strip()
+        note = request.data.get("note", "") or None
+        if not ip:
+            return Response({"detail": "Campo 'ip' obbligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+        import ipaddress
+        try:
+            ip_obj = ipaddress.IPv4Address(ip)
+        except ValueError:
+            return Response({"detail": "Indirizzo IP non valido."}, status=status.HTTP_400_BAD_REQUEST)
+        net = vlan.get_network_obj()
+        if net and ip_obj not in net:
+            return Response({"detail": f"L'IP {ip} non appartiene a questa VLAN."}, status=status.HTTP_400_BAD_REQUEST)
+        obj, created = VlanExcludedIp.objects.get_or_create(
+            vlan=vlan, ip=ip,
+            defaults={"note": note, "excluded_by": request.user},
+        )
+        if not created and note is not None:
+            obj.note = note
+            obj.save(update_fields=["note", "updated_at"])
+        return Response({"ip": ip, "excluded": True}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="unexclude-ip")
+    def unexclude_ip(self, request, pk=None):
+        """Rimuove l'esclusione manuale di un IP."""
+        vlan: Vlan = self.get_object()
+        ip = request.data.get("ip", "").strip()
+        if not ip:
+            return Response({"detail": "Campo 'ip' obbligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+        deleted, _ = VlanExcludedIp.objects.filter(vlan=vlan, ip=ip).delete()
+        if not deleted:
+            return Response({"detail": "IP non trovato tra gli esclusi."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"ip": ip, "excluded": False}, status=status.HTTP_200_OK)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import {
   LinearProgress,
   MenuItem,
   Paper,
+  Menu,
   SpeedDial,
   SpeedDialAction,
   SpeedDialIcon,
@@ -32,6 +33,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import RouterOutlinedIcon from '@mui/icons-material/RouterOutlined'
 import DownloadIcon from '@mui/icons-material/Download'
+import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined'
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
 
 import { useAuth } from '../auth/AuthProvider'
 import { useNavigate } from 'react-router-dom'
@@ -57,6 +60,7 @@ import {
   type RispacsLite,
   type RequestModalita,
 } from '../api/vlanRequestApi'
+import { excludeVlanIp, unexcludeVlanIp } from '../api/vlanApi'
 
 // ─── Types per il drawer IP ───────────────────────────────────────────────────
 
@@ -360,6 +364,7 @@ function ipCellColor(entry: IpPoolEntry): {
     default:
       if (entry.status === 'used')     return { bg: '#FCEBEB', text: '#A32D2D', border: '#F7C1C1' }
       if (entry.status === 'reserved') return { bg: '#FAEEDA', text: '#854F0B', border: '#FAC775' }
+      if (entry.status === 'excluded') return { bg: '#FCEBEB', text: '#A32D2D', border: '#F7C1C1' }
       return { bg: '#EAF3DE', text: '#3B6D11', border: '#C0DD97' }
   }
 }
@@ -409,7 +414,7 @@ function KpiCard({
 
 // ─── IP Cell ──────────────────────────────────────────────────────────────────
 
-function IpCell({ entry, onClick }: { entry: IpPoolEntry; onClick?: (e: IpPoolEntry) => void }) {
+function IpCell({ entry, onClick, onContextMenu }: { entry: IpPoolEntry; onClick?: (e: IpPoolEntry) => void; onContextMenu?: (e: React.MouseEvent, entry: IpPoolEntry) => void }) {
   const { bg, text, border } = ipCellColor(entry)
   const label = ipCellLabel(entry)
 
@@ -424,14 +429,18 @@ function IpCell({ entry, onClick }: { entry: IpPoolEntry; onClick?: (e: IpPoolEn
       ? `Occupato — ${entry.used_by ?? ''}${entry.used_by_type ? ` (${entry.used_by_type})` : ''}`
       : entry.status === 'reserved'
       ? `Riservato — richiesta in attesa`
+      : entry.status === 'excluded'
+      ? `Escluso — tasto destro per rimuovere l'esclusione`
       : 'Libero — clicca per richiedere'
 
   const isClickable = entry.kind === 'host' && (entry.status === 'used' || entry.status === 'free') && !!onClick
+  const isContextable = entry.kind === 'host' && !!onContextMenu
 
   return (
     <Tooltip title={tooltipContent} placement="top" arrow>
       <Box
         onClick={isClickable ? () => onClick(entry) : undefined}
+        onContextMenu={isContextable ? (e) => { e.preventDefault(); onContextMenu(e, entry) } : undefined}
         sx={{
           width: 90,
           height: 24,
@@ -466,6 +475,13 @@ function IpCell({ entry, onClick }: { entry: IpPoolEntry; onClick?: (e: IpPoolEn
             <Typography sx={{ fontSize: 7, fontWeight: 700, color: text }}>{label}</Typography>
           </Box>
         )}
+        {entry.status === 'excluded' && (
+          <Box sx={{
+            position: 'absolute', inset: 0, borderRadius: '3px',
+            background: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(163,45,45,0.18) 3px, rgba(163,45,45,0.18) 4px)',
+            pointerEvents: 'none',
+          }} />
+        )}
       </Box>
     </Tooltip>
   )
@@ -496,6 +512,51 @@ function VlanCard({
     open: false, ip: '', usedByType: null, usedById: null, usedByName: null,
   })
   const [requestDialogEntry, setRequestDialogEntry] = React.useState<IpPoolEntry | null>(null)
+
+  // Context menu su IP
+  const [ctxMenu, setCtxMenu] = React.useState<{ mouseX: number; mouseY: number; entry: IpPoolEntry } | null>(null)
+  const [ctxBusy, setCtxBusy] = React.useState(false)
+  const toast = useToast()
+
+  const handleContextMenu = (e: React.MouseEvent, entry: IpPoolEntry) => {
+    setCtxMenu({ mouseX: e.clientX, mouseY: e.clientY, entry })
+  }
+
+  const handleExclude = async () => {
+    if (!ctxMenu) return
+    const { entry } = ctxMenu
+    setCtxMenu(null)
+    setCtxBusy(true)
+    try {
+      await excludeVlanIp(vlan.id, entry.ip)
+      toast.success(`IP ${entry.ip} escluso.`)
+      setPool(null)
+      const data = await fetchVlanIpPool(vlan.id)
+      setPool(data)
+    } catch {
+      toast.error("Errore durante l'esclusione.")
+    } finally {
+      setCtxBusy(false)
+    }
+  }
+
+  const handleUnexclude = async () => {
+    if (!ctxMenu) return
+    const { entry } = ctxMenu
+    setCtxMenu(null)
+    setCtxBusy(true)
+    try {
+      await unexcludeVlanIp(vlan.id, entry.ip)
+      toast.success(`Esclusione di ${entry.ip} rimossa.`)
+      setPool(null)
+      const data = await fetchVlanIpPool(vlan.id)
+      setPool(data)
+    } catch {
+      toast.error("Errore durante la rimozione dell'esclusione.")
+    } finally {
+      setCtxBusy(false)
+    }
+  }
 
   const handleIpClick = (entry: IpPoolEntry) => {
     if (entry.status === 'free') {
@@ -651,7 +712,7 @@ function VlanCard({
             {[
               { color: '#C0DD97', label: 'Libero' },
               { color: '#FAC775', label: 'Riservato' },
-              { color: '#F7C1C1', label: 'Occupato' },
+              { color: '#F7C1C1', label: 'Occupato / Escluso' },
               { color: '#B5D4F4', label: 'Gateway' },
               { color: '#D3D1C7', label: 'Net / Broadcast' },
             ].map((l) => (
@@ -674,7 +735,7 @@ function VlanCard({
           {pool && !loadingPool && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
               {pool.map((entry) => (
-                <IpCell key={entry.ip} entry={entry} onClick={handleIpClick} />
+                <IpCell key={entry.ip} entry={entry} onClick={handleIpClick} onContextMenu={handleContextMenu} />
               ))}
             </Box>
           )}
@@ -690,6 +751,27 @@ function VlanCard({
         id={ipDrawer.open && ipDrawer.usedByType === 'device' ? ipDrawer.usedById : null}
         onClose={() => setIpDrawer((s) => ({ ...s, open: false }))}
       />
+
+      {/* Context menu IP */}
+      <Menu
+        open={!!ctxMenu}
+        onClose={() => setCtxMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={ctxMenu ? { top: ctxMenu.mouseY, left: ctxMenu.mouseX } : undefined}
+      >
+        {ctxMenu?.entry.status !== 'excluded' && (
+          <MenuItem onClick={handleExclude} disabled={ctxBusy}>
+            <BlockOutlinedIcon sx={{ fontSize: 16, mr: 1, color: 'error.main' }} />
+            <Typography sx={{ fontSize: 13, color: 'error.main', fontWeight: 600 }}>Escludi</Typography>
+          </MenuItem>
+        )}
+        {ctxMenu?.entry.status === 'excluded' && (
+          <MenuItem onClick={handleUnexclude} disabled={ctxBusy}>
+            <RemoveCircleOutlineIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+            <Typography sx={{ fontSize: 13 }}>Rimuovi esclusione</Typography>
+          </MenuItem>
+        )}
+      </Menu>
 
       {/* Dialog richiesta nuova modalità (IP libero) */}
       <IpRequestDialog

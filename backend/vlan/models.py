@@ -250,3 +250,44 @@ class VlanIpRequest(TimeStampedModel):
         if self.vlan_id and self.customer_id:
             if self.vlan.customer_id != self.customer_id:
                 raise ValidationError({"vlan": "La VLAN non appartiene al customer."})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VlanExcludedIp — IP esclusi manualmente dalla heatmap (mostrati in rosso)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class VlanExcludedIp(TimeStampedModel):
+    """IP escluso manualmente: compare in rosso nella heatmap senza essere
+    associato ad alcun inventory o device."""
+
+    vlan = models.ForeignKey(
+        Vlan,
+        on_delete=models.CASCADE,
+        related_name="excluded_ips",
+        verbose_name="VLAN",
+    )
+    ip = models.GenericIPAddressField(
+        protocol="IPv4",
+        verbose_name="Indirizzo IP",
+    )
+    note = models.TextField(null=True, blank=True, verbose_name="Note")
+    excluded_by = models.ForeignKey(
+        "auth.User",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name="Escluso da",
+    )
+
+    class Meta:
+        verbose_name = "IP escluso"
+        verbose_name_plural = "IP esclusi"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vlan", "ip"],
+                name="ux_vlan_excluded_ip",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.ip} escluso da {self.vlan}"

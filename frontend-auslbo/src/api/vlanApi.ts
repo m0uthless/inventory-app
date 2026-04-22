@@ -23,9 +23,9 @@ export interface VlanRow {
   updated_at: string
 }
 
-export type IpStatus = 'free' | 'used' | 'reserved'
+export type IpStatus = 'free' | 'used' | 'reserved' | 'excluded'
 export type IpKind = 'network' | 'broadcast' | 'gateway' | 'host'
-export type UsedByType = 'inventory' | 'device' | 'request' | null
+export type UsedByType = 'inventory' | 'device' | 'request' | 'excluded' | null
 
 export interface IpPoolEntry {
   ip: string
@@ -34,6 +34,7 @@ export interface IpPoolEntry {
   used_by: string | null
   used_by_type: UsedByType
   used_by_id: number | null
+  excluded?: boolean
 }
 
 export interface VlanListResponse {
@@ -73,4 +74,12 @@ export async function updateVlan(id: number, payload: Partial<VlanPayload>): Pro
 
 export async function deleteVlan(id: number): Promise<void> {
   return apiDelete<void>(`/vlans/${id}/`)
+}
+
+export async function excludeVlanIp(vlanId: number, ip: string, note?: string): Promise<void> {
+  return apiPost<void>(`/vlans/${vlanId}/exclude-ip/`, { ip, note: note ?? null })
+}
+
+export async function unexcludeVlanIp(vlanId: number, ip: string): Promise<void> {
+  return apiPost<void>(`/vlans/${vlanId}/unexclude-ip/`, { ip })
 }
