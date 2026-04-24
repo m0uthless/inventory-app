@@ -33,6 +33,7 @@ prod-sync.sh
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # frontend
 frontend/node_modules/
