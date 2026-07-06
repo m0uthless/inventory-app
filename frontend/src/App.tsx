@@ -9,6 +9,7 @@ import { RequireAnyPerm } from './auth/RequireAnyPerm'
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const SiteRepository = lazy(() => import('./pages/SiteRepository'))
+const SiteRepositoryV2 = lazy(() => import('./pages/SiteRepositoryV2'))
 const Customers = lazy(() => import('./pages/Customers'))
 const Sites = lazy(() => import('./pages/Sites'))
 const Contacts = lazy(() => import('./pages/Contacts'))
@@ -68,6 +69,22 @@ const router = createBrowserRouter([
             ]}
           >
             {lazyEl(<SiteRepository />)}
+          </RequireAnyPerm>
+        ),
+      },
+
+      {
+        path: 'site-repository-v2',
+        element: (
+          <RequireAnyPerm
+            perms={[
+              'inventory.view_inventory',
+              'crm.view_customer',
+              'crm.view_site',
+              'crm.view_contact',
+            ]}
+          >
+            {lazyEl(<SiteRepositoryV2 />)}
           </RequireAnyPerm>
         ),
       },

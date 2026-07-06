@@ -2,6 +2,8 @@ import * as React from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   AppBar,
+  TextField,
+  InputAdornment,
   Avatar,
   Box,
   Chip,
@@ -55,6 +57,9 @@ import MobileBottomNavArchie from './MobileBottomNavArchie'
 import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '../ui/LockScreen'
+import { SiteRepoV2Provider, useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
+import SearchIcon from '@mui/icons-material/Search'
+import ClearIconSR from '@mui/icons-material/Clear'
 
 const ProfileDrawer = React.lazy(() =>
   import('../pages/Profile').then((m) => ({ default: m.ProfileDrawer })),
@@ -170,6 +175,82 @@ type IssueSummary = {
   resolved_count: number
   closed_count: number
   active_count: number
+}
+
+// ─── SiteRepositoryV2 sticky toolbar ─────────────────────────────────────────
+
+function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
+  const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities } = useSiteRepoV2()
+
+  return (
+    <Box sx={{
+      bgcolor: 'background.paper',
+      borderBottom: '1px solid',
+      borderColor: 'divider',
+      px: { xs: 2, md: 3 },
+      py: 1.125,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 1.5,
+      flexShrink: 0,
+      // override AppBar color inheritance
+      '& .MuiInputBase-root': { color: 'text.primary' },
+      '& .MuiIconButton-root': { color: 'text.secondary !important' },
+      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23) !important' },
+    }}>
+      {/* Spacer sidebar — allinea al contenuto della pagina */}
+      <Box sx={{ display: { xs: 'none', md: 'block' }, width: sidebarWidth, flexShrink: 0 }} />
+
+      <TextField
+        size="small"
+        placeholder="Cerca hostname, cliente, sito, IP..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        sx={{ flex: 1, minWidth: 220, maxWidth: 460 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+            </InputAdornment>
+          ),
+          endAdornment: searchQuery ? (
+            <InputAdornment position="end">
+              <IconButton size="small" onClick={() => setSearchQuery('')}>
+                <ClearIconSR sx={{ fontSize: 16 }} />
+              </IconButton>
+            </InputAdornment>
+          ) : null,
+        }}
+      />
+
+      <Chip
+        label="Comprimi tutto"
+        size="small"
+        clickable
+        onClick={() => handle?.collapseAll()}
+        variant="outlined"
+        sx={{ fontWeight: 600, fontSize: '0.75rem', borderColor: 'divider' }}
+      />
+      <Chip
+        label="Espandi tutto"
+        size="small"
+        clickable
+        onClick={() => handle?.expandAll()}
+        variant="outlined"
+        sx={{ fontWeight: 600, fontSize: '0.75rem', borderColor: 'divider' }}
+      />
+
+      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem', ml: 'auto', whiteSpace: 'nowrap' }}>
+        {totalCustomers} clienti · {totalCities} città
+      </Typography>
+    </Box>
+  )
+}
+
+// Wrapper condizionale — mostrato solo su /site-repository-v2
+function SiteRepoV2Toolbar_Shell({ loc, sidebarWidth }: { loc: string; sidebarWidth: number }) {
+  if (loc !== '/site-repository-v2') return null
+  return <SiteRepoV2Toolbar sidebarWidth={sidebarWidth} />
 }
 
 export function AppLayout() {
@@ -887,6 +968,7 @@ export function AppLayout() {
   )
 
   return (
+    <SiteRepoV2Provider>
     <Box
       sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}
     >
@@ -898,6 +980,7 @@ export function AppLayout() {
           width: '100%',
           left: 0,
           right: 0,
+          flexDirection: 'column',
           '& .MuiIconButton-root': { color: SIDEBAR.textStrong },
           '& .MuiIconButton-root:hover': { color: '#ffffff', backgroundColor: 'rgba(255,255,255,0.12)' },
           '& .MuiInputBase-root': { color: '#ffffff' },
@@ -957,6 +1040,7 @@ export function AppLayout() {
             </Tooltip>
           </Box>
         </Toolbar>
+        <SiteRepoV2Toolbar_Shell loc={loc.pathname} sidebarWidth={sidebarWidth} />
       </AppBar>
 
       <Popover
@@ -1223,8 +1307,9 @@ export function AppLayout() {
         }}
       >
         <Toolbar sx={{ flexShrink: 0 }} />
+        {loc.pathname === '/site-repository-v2' && <Box sx={{ height: 56, flexShrink: 0 }} />}
 
-        <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0, bgcolor: 'background.default' }}>
           <Outlet />
         </Box>
 
@@ -1289,5 +1374,6 @@ export function AppLayout() {
         <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
       </React.Suspense>
     </Box>
+    </SiteRepoV2Provider>
   )
 }
