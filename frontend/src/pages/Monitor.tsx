@@ -59,19 +59,20 @@ const STATO_COLOR: Record<string, { bg: string; fg: string; border: string }> = 
   rma:           { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
 }
 
+// Colore semantico del tema (coerente con Issues.tsx: Chip standard MUI,
+// palette pastello definita centralmente in theme.ts).
+const STATO_SEMANTIC: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
+  in_uso: 'success',
+  da_installare: 'warning',
+  guasto: 'error',
+  rma: 'default',
+}
+
 function StatoChip({ stato, label }: { stato: string; label: string }) {
-  const c = STATO_COLOR[stato] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+  const color = STATO_SEMANTIC[stato] ?? 'default'
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-      <Chip
-        size="small"
-        label={label}
-        sx={{
-          height: 22, fontSize: '0.72rem', fontWeight: 600,
-          bgcolor: c.bg, color: c.fg, border: `1px solid ${c.border}`,
-          '& .MuiChip-label': { px: 0.75 },
-        }}
-      />
+      <Chip size="small" label={label} color={color} variant={color === 'default' ? 'outlined' : 'filled'} />
     </Box>
   )
 }
@@ -134,8 +135,7 @@ const COLUMNS: GridColDef<MonitorRow>[] = [
     width: 140,
     renderCell: ({ value }) => (
       <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-        <Chip size="small" label={value as string} variant="outlined"
-          sx={{ height: 22, fontSize: '0.72rem', fontWeight: 600, '& .MuiChip-label': { px: 0.75 } }} />
+        <Chip size="small" label={value as string} variant="outlined" />
       </Box>
     ),
   },
@@ -152,8 +152,7 @@ const COLUMNS: GridColDef<MonitorRow>[] = [
     renderCell: (p) => p.value
       ? (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip label="Sì" size="small" color="info" variant="outlined"
-            sx={{ height: 22, fontSize: '0.72rem', '& .MuiChip-label': { px: 0.75 } }} />
+          <Chip label="Sì" size="small" color="info" variant="outlined" />
         </Box>
       )
       : null,

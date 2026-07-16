@@ -17,7 +17,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
   FormControlLabel,
   IconButton,
@@ -38,29 +37,22 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import AddLinkIcon from '@mui/icons-material/AddLink'
-import LinkOffIcon from '@mui/icons-material/LinkOff'
-import AttachFileIcon from '@mui/icons-material/AttachFile'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined'
 import CloseIcon from '@mui/icons-material/Close'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
-import BusinessIcon from '@mui/icons-material/Business'
 import HistoryIcon from '@mui/icons-material/History'
-import RestoreIcon from '@mui/icons-material/Restore'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
-import { customerDrawerPath } from '../utils/entityPaths'
 import { Can } from '../auth/Can'
 import { PERMS } from '../auth/perms'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import RichEditor, { type QuillInstance } from '../ui/RichEditor'
+import WikiLinkedCustomersTab, { type WikiLink } from '../features/wiki/WikiLinkedCustomersTab'
+import WikiAttachmentsTab, { type WikiAttachment } from '../features/wiki/WikiAttachmentsTab'
+import WikiRevisionsTab, { type WikiRevision, PROSE_SX } from '../features/wiki/WikiRevisionsTab'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -90,47 +82,9 @@ type PageDetail = {
   updated_at?: string | null
 }
 
-type WikiLink = {
-  id: number
-  entity_type: string
-  entity_id: number
-  entity_label?: string | null
-  entity_path?: string | null
-  notes?: string | null
-}
-
-type WikiAttachment = {
-  id: number
-  filename: string
-  mime_type?: string | null
-  size_bytes?: number | null
-  notes?: string | null
-  file_url?: string | null
-  preview_url?: string | null
-  download_url?: string | null
-  created_at?: string | null
-}
-
-type WikiRevision = {
-  id: number
-  revision_number: number
-  title: string
-  summary?: string | null
-  content_markdown: string
-  saved_by_username?: string | null
-  saved_at: string
-}
-
 type ApiPage<T> = { count: number; results: T[] }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtSize(bytes?: number | null): string {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 function fmtDate(iso?: string | null): string {
   if (!iso) return '—'
@@ -145,6 +99,12 @@ function fmtAverageRating(value?: number | null): string {
   if (typeof value !== 'number') return '—'
   return value.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
+
+// Stile condiviso dai due componenti Rating (voto medio + voto utente)
+const ratingIconSx = {
+  '& .MuiRating-iconFilled': { color: 'warning.main' },
+  '& .MuiRating-iconEmpty': { color: '#fcd34d' },
+} as const
 
 function escapeHtml(value: string): string {
   return value
@@ -163,72 +123,6 @@ function slugifyWikiTitle(value: string): string {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80)
-}
-
-function isImageMime(mime?: string | null): boolean {
-  return !!mime && mime.startsWith('image/')
-}
-
-// ── CustomerChip ──────────────────────────────────────────────────────────────
-
-function CustomerChip({
-  link,
-  customerName,
-  onRemove,
-}: {
-  link: WikiLink
-  customerName: string
-  onRemove: () => void
-}) {
-  const navigate = useNavigate()
-
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={0.75}
-      sx={{
-        border: '1px solid',
-        borderColor: 'grey.200',
-        borderRadius: 1,
-        px: 1.5,
-        py: 0.75,
-        bgcolor: 'background.paper',
-        display: 'inline-flex',
-      }}
-    >
-      <BusinessIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-      <Typography variant="body2" fontWeight={600} fontSize={13}>
-        {customerName}
-      </Typography>
-      {link.notes && (
-        <Typography variant="caption" color="text.secondary" fontSize={11}>
-          — {link.notes}
-        </Typography>
-      )}
-      <Tooltip title="Vai al cliente">
-        <IconButton
-          aria-label="Vai al cliente"
-          size="small"
-          onClick={() => navigate(link.entity_path ?? customerDrawerPath(link.entity_id))}
-        >
-          <OpenInNewIcon sx={{ fontSize: 13 }} />
-        </IconButton>
-      </Tooltip>
-      <Can perm={PERMS.wiki.page.change}>
-        <Tooltip title="Rimuovi collegamento">
-          <IconButton
-            aria-label="Rimuovi collegamento"
-            size="small"
-            color="error"
-            onClick={onRemove}
-          >
-            <LinkOffIcon sx={{ fontSize: 13 }} />
-          </IconButton>
-        </Tooltip>
-      </Can>
-    </Stack>
-  )
 }
 
 // ── WikiLinkDialog — cerca pagine wiki e inserisce link ───────────────────────
@@ -1209,10 +1103,7 @@ export default function WikiPage() {
                       precision={0.1}
                       readOnly
                       size="small"
-                      sx={{
-                        '& .MuiRating-iconFilled': { color: '#f59e0b' },
-                        '& .MuiRating-iconEmpty': { color: '#fcd34d' },
-                      }}
+                      sx={ratingIconSx}
                     />
                     <Typography variant="body2" fontWeight={600}>
                       {detail.rating_count ? fmtAverageRating(detail.average_rating) : '—'}
@@ -1232,10 +1123,7 @@ export default function WikiPage() {
                       }}
                       readOnly={Boolean(detail.current_user_rating) || ratingBusy}
                       size="small"
-                      sx={{
-                        '& .MuiRating-iconFilled': { color: '#f59e0b' },
-                        '& .MuiRating-iconEmpty': { color: '#fcd34d' },
-                      }}
+                      sx={ratingIconSx}
                     />
                     <Typography variant="caption" color="text.secondary">
                       {detail.current_user_rating
@@ -1425,411 +1313,44 @@ export default function WikiPage() {
           TAB 1 — CLIENTI COLLEGATI
       ══════════════════════════════ */}
       {!isNew && tab === 1 && (
-        <Stack spacing={2}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography variant="subtitle2" color="text.secondary">
-              {links.length === 0
-                ? 'Nessun cliente collegato'
-                : `${links.length} client${links.length === 1 ? 'e' : 'i'} collegat${links.length === 1 ? 'o' : 'i'}`}
-            </Typography>
-            <Can perm={PERMS.wiki.page.change}>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AddLinkIcon />}
-                onClick={() => setAddCustomerOpen(true)}
-              >
-                Collega cliente
-              </Button>
-            </Can>
-          </Stack>
-
-          {links.length === 0 ? (
-            <Card variant="outlined" sx={{ borderRadius: 1, p: 4, textAlign: 'center' }}>
-              <BusinessIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
-              <Typography color="text.disabled" fontSize={13}>
-                Collega questa pagina wiki ai clienti pertinenti.
-              </Typography>
-            </Card>
-          ) : (
-            <Stack direction="row" flexWrap="wrap" gap={1}>
-              {links.map((l) => (
-                <CustomerChip
-                  key={l.id}
-                  link={l}
-                  customerName={l.entity_label ?? `Cliente #${l.entity_id}`}
-                  onRemove={() => handleRemoveLink(l.id)}
-                />
-              ))}
-            </Stack>
-          )}
-        </Stack>
+        <WikiLinkedCustomersTab
+          links={links}
+          onRemoveLink={handleRemoveLink}
+          onAddCustomer={() => setAddCustomerOpen(true)}
+        />
       )}
 
       {/* ══════════════════════════════
           TAB 2 — ALLEGATI
       ══════════════════════════════ */}
       {!isNew && tab === 2 && (
-        <Stack spacing={2}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography variant="subtitle2" color="text.secondary">
-              {attachments.length === 0
-                ? 'Nessun allegato'
-                : `${attachments.length} allegat${attachments.length === 1 ? 'o' : 'i'}`}
-            </Typography>
-            <Can perm={PERMS.wiki.page.change}>
-              <>
-                <input
-                  ref={attachInputRef}
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={handleAttachmentUpload}
-                />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={attachUploading ? <CircularProgress size={14} /> : <UploadFileIcon />}
-                  onClick={() => attachInputRef.current?.click()}
-                  disabled={attachUploading}
-                >
-                  Carica file
-                </Button>
-              </>
-            </Can>
-          </Stack>
-
-          {/* Image gallery */}
-          {attachments.some((a) => isImageMime(a.mime_type)) && (
-            <Box>
-              <Typography
-                variant="caption"
-                color="text.disabled"
-                fontWeight={600}
-                sx={{
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  fontSize: 10,
-                  mb: 1,
-                  display: 'block',
-                }}
-              >
-                Immagini
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1.5}>
-                {attachments
-                  .filter((a) => isImageMime(a.mime_type))
-                  .map((a) => (
-                    <Box
-                      key={a.id}
-                      sx={{
-                        width: 120,
-                        height: 90,
-                        borderRadius: 1,
-                        overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: 'grey.200',
-                        position: 'relative',
-                        '&:hover .img-actions': { opacity: 1 },
-                      }}
-                    >
-                      <img
-                        src={a.preview_url ?? a.file_url ?? ''}
-                        alt={a.filename}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                      <Stack
-                        className="img-actions"
-                        direction="row"
-                        justifyContent="center"
-                        alignItems="center"
-                        gap={0.5}
-                        sx={{
-                          position: 'absolute',
-                          inset: 0,
-                          bgcolor: 'rgba(0,0,0,0.45)',
-                          opacity: 0,
-                          transition: 'opacity 0.15s',
-                        }}
-                      >
-                        <Can perm={PERMS.wiki.page.change}>
-                          <Tooltip title="Elimina">
-                            <IconButton
-                              aria-label="Elimina"
-                              size="small"
-                              sx={{ color: '#fff' }}
-                              onClick={() => handleDeleteAttachment(a.id)}
-                            >
-                              <DeleteForeverIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Can>
-                      </Stack>
-                    </Box>
-                  ))}
-              </Stack>
-            </Box>
-          )}
-
-          {/* File list */}
-          {attachments.filter((a) => !isImageMime(a.mime_type)).length > 0 && (
-            <Card variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-              <Stack divider={<Divider />}>
-                {attachments
-                  .filter((a) => !isImageMime(a.mime_type))
-                  .map((a) => (
-                    <Stack
-                      key={a.id}
-                      direction="row"
-                      alignItems="center"
-                      spacing={1.5}
-                      sx={{ px: 2, py: 1.5 }}
-                    >
-                      <AttachFileIcon sx={{ color: 'text.disabled', fontSize: 18 }} />
-                      <Box flex={1} minWidth={0}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          {(() => {
-                            const attachmentHref =
-                              a.preview_url ?? a.download_url ?? a.file_url ?? undefined
-                            return attachmentHref ? (
-                              <a
-                                href={attachmentHref}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: 'inherit', textDecoration: 'none' }}
-                              >
-                                {a.filename}
-                              </a>
-                            ) : (
-                              a.filename
-                            )
-                          })()}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {a.mime_type ?? '—'}
-                          {a.size_bytes ? ` · ${fmtSize(a.size_bytes)}` : ''}
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" color="text.disabled">
-                        {fmtDate(a.created_at)}
-                      </Typography>
-                      <Can perm={PERMS.wiki.page.change}>
-                        <Tooltip title="Elimina allegato">
-                          <IconButton
-                            aria-label="Elimina allegato"
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteAttachment(a.id)}
-                          >
-                            <DeleteForeverIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Can>
-                    </Stack>
-                  ))}
-              </Stack>
-            </Card>
-          )}
-
-          {attachments.length === 0 && (
-            <Card variant="outlined" sx={{ borderRadius: 1, p: 4, textAlign: 'center' }}>
-              <AttachFileIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
-              <Typography color="text.disabled" fontSize={13}>
-                Nessun allegato. Carica file tramite il pulsante sopra, oppure inserisci immagini
-                direttamente dall'editor.
-              </Typography>
-            </Card>
-          )}
-        </Stack>
+        <WikiAttachmentsTab
+          attachments={attachments}
+          attachUploading={attachUploading}
+          attachInputRef={attachInputRef}
+          onUpload={handleAttachmentUpload}
+          onDelete={handleDeleteAttachment}
+        />
       )}
 
       {/* ══════════════════════════════
           TAB 3 — REVISIONI
       ══════════════════════════════ */}
       {!isNew && tab === 3 && (
-        <Stack spacing={2}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                {revisions.length === 0
-                  ? 'Nessuna revisione salvata'
-                  : `${revisions.length} revision${revisions.length === 1 ? 'e' : 'i'} — ogni salvataggio crea uno snapshot automatico`}
-              </Typography>
-            </Box>
-          </Stack>
-
-          {revisions.length === 0 ? (
-            <Card variant="outlined" sx={{ borderRadius: 1, p: 4, textAlign: 'center' }}>
-              <HistoryIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
-              <Typography color="text.disabled" fontSize={13}>
-                Le revisioni vengono create automaticamente ad ogni salvataggio della pagina.
-              </Typography>
-            </Card>
-          ) : (
-            <Card variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-              <Stack divider={<Divider />}>
-                {revisions.map((rev) => (
-                  <Stack
-                    key={rev.id}
-                    direction="row"
-                    alignItems="center"
-                    spacing={1.5}
-                    sx={{ px: 2, py: 1.5, '&:hover': { bgcolor: 'grey.50' } }}
-                  >
-                    {/* Badge revisione */}
-                    <Box
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 1.5,
-                        bgcolor: 'grey.100',
-                        border: '1.5px solid',
-                        borderColor: 'grey.200',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        fontWeight={800}
-                        color="text.secondary"
-                        fontSize={11}
-                      >
-                        #{rev.revision_number}
-                      </Typography>
-                    </Box>
-
-                    {/* Info */}
-                    <Box flex={1} minWidth={0}>
-                      <Typography variant="body2" fontWeight={600} noWrap>
-                        {rev.title}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(rev.saved_at).toLocaleString('it-IT', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                        {rev.saved_by_username && ` · ${rev.saved_by_username}`}
-                      </Typography>
-                    </Box>
-
-                    {/* Azioni */}
-                    <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="Anteprima contenuto">
-                        <IconButton
-                          aria-label="Anteprima contenuto"
-                          size="small"
-                          onClick={() => void handleOpenRevisionPreview(rev)}
-                        >
-                          <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Can perm={PERMS.wiki.page.change}>
-                        <Tooltip title={`Ripristina a questa revisione (#${rev.revision_number})`}>
-                          <span>
-                            <IconButton
-                              aria-label={`Ripristina a questa revisione (#${rev.revision_number})`}
-                              size="small"
-                              color="primary"
-                              disabled={restoring === rev.id}
-                              onClick={() => handleRestore(rev)}
-                            >
-                              {restoring === rev.id ? (
-                                <CircularProgress size={14} />
-                              ) : (
-                                <RestoreIcon sx={{ fontSize: 16 }} />
-                              )}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </Can>
-                    </Stack>
-                  </Stack>
-                ))}
-              </Stack>
-            </Card>
-          )}
-        </Stack>
+        <WikiRevisionsTab
+          revisions={revisions}
+          restoring={restoring}
+          onPreview={(rev) => void handleOpenRevisionPreview(rev)}
+          onRestore={(rev) => void handleRestore(rev)}
+          previewRev={previewRev}
+          previewRevHtml={previewRevHtml}
+          previewRevLoading={previewRevLoading}
+          onClosePreview={() => {
+            setPreviewRev(null)
+            setPreviewRevHtml('')
+          }}
+        />
       )}
-
-      {/* ── Preview revisione ── */}
-      <Dialog
-        open={!!previewRev}
-        onClose={() => {
-          setPreviewRev(null)
-          setPreviewRevHtml('')
-        }}
-        fullWidth
-        maxWidth="md"
-        scroll="paper"
-      >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Box>
-              <Typography variant="h6" fontWeight={700}>
-                Revisione #{previewRev?.revision_number} — {previewRev?.title}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {previewRev &&
-                  new Date(previewRev.saved_at).toLocaleString('it-IT', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                {previewRev?.saved_by_username && ` · salvata da ${previewRev.saved_by_username}`}
-              </Typography>
-            </Box>
-            <IconButton
-              size="small"
-              onClick={() => {
-                setPreviewRev(null)
-                setPreviewRevHtml('')
-              }}
-              aria-label="Chiudi anteprima"
-            >
-              <CloseIcon />
-            </IconButton>
-          </Stack>
-        </DialogTitle>
-        <DialogContent dividers>
-          {previewRev &&
-            (previewRevLoading ? (
-              <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
-                <CircularProgress size={28} />
-              </Stack>
-            ) : (
-              <Box dangerouslySetInnerHTML={{ __html: previewRevHtml }} sx={PROSE_SX} />
-            ))}
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
-          <Button
-            onClick={() => {
-              setPreviewRev(null)
-              setPreviewRevHtml('')
-            }}
-          >
-            Chiudi
-          </Button>
-          <Can perm={PERMS.wiki.page.change}>
-            <Button
-              variant="contained"
-              startIcon={
-                restoring ? <CircularProgress size={14} color="inherit" /> : <RestoreIcon />
-              }
-              disabled={!!restoring}
-              onClick={() => previewRev && handleRestore(previewRev)}
-            >
-              Ripristina questa revisione
-            </Button>
-          </Can>
-        </DialogActions>
-      </Dialog>
 
       {/* ── Dialogs ── */}
       <WikiLinkDialog
@@ -1859,46 +1380,4 @@ export default function WikiPage() {
   )
 }
 
-// ── Prose styles ──────────────────────────────────────────────────────────────
-const PROSE_SX = {
-  '& h1': { fontSize: 24, fontWeight: 800, mt: 2, mb: 1, letterSpacing: '-0.02em' },
-  '& h2': { fontSize: 20, fontWeight: 700, mt: 1.75, mb: 0.75 },
-  '& h3': { fontSize: 16, fontWeight: 700, mt: 1.5, mb: 0.5 },
-  '& p': { my: 1, lineHeight: 1.75, fontSize: 14, color: 'text.secondary' },
-  '& ul, & ol': { pl: 3, my: 1 },
-  '& li': { my: 0.5, fontSize: 14, color: 'text.secondary' },
-  '& code': {
-    fontFamily: 'monospace',
-    fontSize: 12.5,
-    bgcolor: 'grey.100',
-    borderRadius: 1,
-    px: 0.75,
-    py: 0.25,
-  },
-  '& pre': {
-    fontFamily: 'monospace',
-    fontSize: 12.5,
-    bgcolor: '#1a2421',
-    color: '#a7f3d0',
-    p: 2,
-    borderRadius: 1,
-    overflow: 'auto',
-    my: 1.5,
-  },
-  '& pre code': { bgcolor: 'transparent', color: 'inherit', p: 0 },
-  '& blockquote': {
-    borderLeft: '3px solid',
-    borderColor: 'primary.main',
-    pl: 2,
-    ml: 0,
-    my: 1,
-    '& p': { color: 'text.secondary', fontStyle: 'italic' },
-  },
-  '& table': { width: '100%', borderCollapse: 'collapse', my: 1.5 },
-  '& th, & td': { border: '1px solid', borderColor: 'divider', p: 1, fontSize: 13 },
-  '& th': { bgcolor: 'grey.50', fontWeight: 700 },
-  '& hr': { border: 'none', borderTop: '1px solid', borderColor: 'divider', my: 2 },
-  '& a': { color: 'primary.main' },
-  '& img': { maxWidth: '100%', borderRadius: 1, my: 1 },
-  '& mark': { bgcolor: '#fef9c3', borderRadius: '2px', px: 0.5 },
-}
+

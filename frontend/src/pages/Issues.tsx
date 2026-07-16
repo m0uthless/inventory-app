@@ -69,9 +69,16 @@ type CreateFromInventoryState = {
   siteId: number | null
 }
 
+type CreateFromServiceNowCaseState = {
+  number: string
+  account: string
+  shortDescription: string
+}
+
 type OpenCreateState = {
   openCreate?: boolean
   createFromInventory?: CreateFromInventoryState
+  createFromServiceNowCase?: CreateFromServiceNowCaseState
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -94,7 +101,9 @@ function toUserOption(v: unknown): UserOption | null {
   const username = typeof v['username'] === 'string' ? v['username'] : ''
   const fullName = typeof v['full_name'] === 'string' ? v['full_name'] : ''
   const label = (fullName || username || String(id)).trim()
-  return { id, label, username }
+  const is_philips = v['is_philips'] === true
+  const is_servicenow_technician = v['is_servicenow_technician'] !== false
+  return { id, label, username, is_philips, is_servicenow_technician }
 }
 
 function toInventoryOption(v: unknown): InventoryOption | null {
@@ -240,6 +249,7 @@ function fillChartBuckets(
 
 function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boolean }) {
   const theme = useTheme()
+  const toast = useToast()
   const [granularity, setGranularity] = React.useState<Granularity>('day')
   const [avgDaysGlobal, setAvgDaysGlobal] = React.useState<number | null>(null)
   const [chartData, setChartData] = React.useState<{ label: string; opened: number; closed: number }[]>([])
@@ -260,8 +270,8 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
         r.data.closed_buckets ?? [],
         granularity,
       ))
-    }).catch(() => {})
-  }, [granularity])
+    }).catch((e) => toast.error(apiErrorToMessage(e)))
+  }, [granularity, toast])
 
   const open     = rows.filter((r) => r.status === 'open').length
   const inProg   = rows.filter((r) => r.status === 'in_progress').length
@@ -503,6 +513,12 @@ export default function Issues() {
     }
   }, [me, users])
 
+  // Assegnabili alle issue: solo utenti "tecnico ServiceNow" e non Philips (categoria Biotron)
+  const assignableUsers = React.useMemo(
+    () => users.filter((u) => u.is_servicenow_technician !== false && !u.is_philips),
+    [users],
+  )
+
   React.useEffect(() => {
     api
       .get('/issue-categories/')
@@ -621,11 +637,40 @@ export default function Issues() {
     setFormOpen(true)
   }, [me?.id])
 
+  // Click sul numero ServiceNow di un'Issue → apre il drawer del caso
+  // corrispondente nella pagina ServiceNow Case (solo quello: non tocca
+  // il drawer dell'Issue, il click viene fermato con stopPropagation).
+  const [resolvingServiceNowId, setResolvingServiceNowId] = React.useState<string | null>(null)
+
+  const openServiceNowCaseDrawer = React.useCallback(async (number: string) => {
+    setResolvingServiceNowId(number)
+    try {
+      const res = await api.get('/servicenow-cases/', { params: { number } })
+      const payload: unknown = res.data
+      const list: unknown[] = Array.isArray(payload)
+        ? payload
+        : isRecord(payload) && Array.isArray(payload['results'])
+          ? (payload['results'] as unknown[])
+          : []
+      const found = list[0]
+      const caseId = isRecord(found) ? found['id'] : undefined
+      if (typeof caseId === 'number') {
+        navigate(`/servicenow-cases?open=${caseId}`)
+      } else {
+        toast.error(`Nessun ServiceNow Case trovato con numero "${number}"`)
+      }
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setResolvingServiceNowId(null)
+    }
+  }, [navigate, toast])
+
   const openCreateOnceRef = React.useRef(false)
 
   React.useEffect(() => {
     const st = loc.state as OpenCreateState | null
-    const hasOpenCreate = st?.openCreate || st?.createFromInventory
+    const hasOpenCreate = st?.openCreate || st?.createFromInventory || st?.createFromServiceNowCase
     if (!hasOpenCreate) {
       openCreateOnceRef.current = false
       return
@@ -634,6 +679,7 @@ export default function Issues() {
     openCreateOnceRef.current = true
 
     const cfi = st?.createFromInventory
+    const cfsn = st?.createFromServiceNowCase
     if (cfi) {
       // Pre-compila il form con i dati dell'inventory
       const custOpt = { id: cfi.customerId, label: cfi.customerName }
@@ -655,6 +701,23 @@ export default function Issues() {
       setInventoryOptions([invOpt])
       setSelectedInventory(invOpt)
       setPendingInventory(invOpt)
+      setLinkInventoryOpen(false)
+      setFormOpen(true)
+    } else if (cfsn) {
+      // Pre-compila il form con i dati del ServiceNow Case: il case non ha un
+      // collegamento diretto a Customer/Site, quindi vanno scelti manualmente.
+      setEditIssue(null)
+      setForm({
+        ...createEmptyForm(me?.id),
+        title: (cfsn.shortDescription.trim() || `Caso ServiceNow ${cfsn.number}`).slice(0, 255),
+        description: cfsn.shortDescription,
+        servicenow_id: cfsn.number,
+      })
+      setCustFormInput('')
+      setFormErrors({})
+      setInventoryOptions([])
+      setSelectedInventory(null)
+      setPendingInventory(null)
       setLinkInventoryOpen(false)
       setFormOpen(true)
     } else {
@@ -868,7 +931,7 @@ export default function Issues() {
         .then((r) => {
           showIssueDetail(r.data)
         })
-        .catch(() => {})
+        .catch((e) => toast.error(apiErrorToMessage(e)))
     }
     // Pulisce il param dall'URL senza reload
     const newSearch = new URLSearchParams(loc.search)
@@ -1097,7 +1160,20 @@ export default function Issues() {
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           {row.servicenow_id ? (
-            <Typography sx={{ fontSize: '0.85rem' }} noWrap>
+            <Typography
+              onClick={(e) => {
+                e.stopPropagation()
+                void openServiceNowCaseDrawer(row.servicenow_id as string)
+              }}
+              sx={{
+                fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem',
+                cursor: resolvingServiceNowId === row.servicenow_id ? 'wait' : 'pointer',
+                color: 'primary.main',
+                opacity: resolvingServiceNowId === row.servicenow_id ? 0.5 : 1,
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              noWrap
+            >
               {row.servicenow_id}
             </Typography>
           ) : (
@@ -1314,7 +1390,7 @@ export default function Issues() {
         customerLoading={custFormLoading}
         siteOptions={siteOptions}
         categories={categories}
-        users={users}
+        users={assignableUsers}
         pendingInventory={pendingInventory}
         onClose={() => setFormOpen(false)}
         onSave={handleFormSave}

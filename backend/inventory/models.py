@@ -12,8 +12,8 @@ class Inventory(TimeStampedModel):
 
     name = models.CharField(max_length=255, blank=False, null=False)
 
-    knumber = models.CharField(max_length=64, null=True, blank=True)
-    serial_number = models.CharField(max_length=128, null=True, blank=True)
+    knumber = models.CharField(max_length=64, null=True, blank=True, verbose_name="K-Number")
+    serial_number = models.CharField(max_length=128, null=True, blank=True, verbose_name="Numero seriale")
 
     type = models.ForeignKey(InventoryType, on_delete=models.PROTECT, null=False, blank=False)
 

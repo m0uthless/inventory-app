@@ -26,7 +26,7 @@ const NAV_COLOR = '#0f766e'
 
 const NAV_ITEMS: [MobileNavItem, MobileNavItem, MobileNavItem, MobileNavItem] = [
   { key: 'home',        label: 'Home',       icon: <DashboardIcon />, path: '/' },
-  { key: 'repository', label: 'Repository',  icon: <LayersIcon />,    path: '/site-repository' },
+  { key: 'repository', label: 'Repository',  icon: <LayersIcon />,    path: '/site-repository-v2' },
   { key: 'issues',     label: 'Issues',      icon: <BugReportIcon />, path: '/issues' },
   { key: 'manut',      label: 'Manut.',      icon: <HandymanIcon />,  path: '/maintenance' },
 ]

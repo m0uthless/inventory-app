@@ -99,19 +99,32 @@ function fmtDate(ts?: string | null) {
   })
 }
 
-function FileTypeIcon({ mime, size = 20 }: { mime?: string; ext?: string; size?: number }) {
-  const isImage = mime?.startsWith('image/')
-  const isPdf = mime === 'application/pdf'
+// Mappa tipo file → colore, condivisa da FileTypeIcon e fileIconBg
+const FILE_TYPE_COLOR = {
+  image: { bg: '#f0fdf4', fg: '#16a34a' },
+  pdf: { bg: '#fff1f2', fg: '#dc2626' },
+  other: { bg: '#eff6ff', fg: '#2563eb' },
+} as const
+type FileTypeKey = keyof typeof FILE_TYPE_COLOR
 
-  if (isImage) return <ImageOutlinedIcon sx={{ fontSize: size, color: '#16a34a' }} />
-  if (isPdf) return <PictureAsPdfOutlinedIcon sx={{ fontSize: size, color: '#dc2626' }} />
-  return <InsertDriveFileOutlinedIcon sx={{ fontSize: size, color: '#2563eb' }} />
+function fileTypeKey(mime?: string): FileTypeKey {
+  if (mime?.startsWith('image/')) return 'image'
+  if (mime === 'application/pdf') return 'pdf'
+  return 'other'
+}
+
+function FileTypeIcon({ mime, size = 20 }: { mime?: string; ext?: string; size?: number }) {
+  const key = fileTypeKey(mime)
+  const color = FILE_TYPE_COLOR[key].fg
+
+  if (key === 'image') return <ImageOutlinedIcon sx={{ fontSize: size, color }} />
+  if (key === 'pdf') return <PictureAsPdfOutlinedIcon sx={{ fontSize: size, color }} />
+  return <InsertDriveFileOutlinedIcon sx={{ fontSize: size, color }} />
 }
 
 function fileIconBg(mime?: string) {
-  if (mime?.startsWith('image/')) return { bg: '#f0fdf4', color: '#16a34a' }
-  if (mime === 'application/pdf') return { bg: '#fff1f2', color: '#dc2626' }
-  return { bg: '#eff6ff', color: '#2563eb' }
+  const key = fileTypeKey(mime)
+  return { bg: FILE_TYPE_COLOR[key].bg, color: FILE_TYPE_COLOR[key].fg }
 }
 
 // ─── Upload Zone ──────────────────────────────────────────────────────────────
@@ -647,7 +660,7 @@ function FolderCard({
         justifyContent="space-between"
         sx={{ mb: 0.5 }}
       >
-        <FolderIcon sx={{ fontSize: 28, color: '#f59e0b' }} />
+        <FolderIcon sx={{ fontSize: 28, color: 'warning.main' }} />
         <IconButton
           className="folder-menu-btn"
           aria-label="Menu cartella"
@@ -954,7 +967,7 @@ function FolderListRow({
           <CheckBoxOutlineBlankIcon sx={{ fontSize: 18, color: 'grey.300' }} />
         )}
       </Box>
-      <FolderIcon sx={{ fontSize: 20, color: '#f59e0b' }} />
+      <FolderIcon sx={{ fontSize: 20, color: 'warning.main' }} />
       <Typography variant="body2" sx={{ flex: 1, fontWeight: 500 }}>
         {folder.name}
       </Typography>
@@ -2174,7 +2187,7 @@ export default function Drive() {
                 gap: 1,
               }}
             >
-              <FolderIcon sx={{ fontSize: 18, color: '#f59e0b' }} />
+              <FolderIcon sx={{ fontSize: 18, color: 'warning.main' }} />
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 Root
               </Typography>
@@ -2197,7 +2210,7 @@ export default function Drive() {
                   '&:hover': { bgcolor: 'rgba(15,118,110,0.04)' },
                 }}
               >
-                <FolderIcon sx={{ fontSize: 18, color: '#f59e0b' }} />
+                <FolderIcon sx={{ fontSize: 18, color: 'warning.main' }} />
                 <Typography variant="body2">{f.full_path}</Typography>
               </Box>
             ))}

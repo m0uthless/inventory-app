@@ -82,7 +82,7 @@ function PasswordField({
       InputProps={{
         endAdornment: (
           <InputAdornment position="end">
-            <IconButton size="small" onClick={() => setShow((v) => !v)} edge="end" tabIndex={-1}>
+            <IconButton size="small" aria-label={show ? 'Nascondi password' : 'Mostra password'} onClick={() => setShow((v) => !v)} edge="end" tabIndex={-1}>
               {show ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
             </IconButton>
           </InputAdornment>

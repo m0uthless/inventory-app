@@ -284,12 +284,12 @@ function RequestCard({
           {isAdmin && req.stato === 'pending' && (
             <>
               <Tooltip title="Approva — apre il form nuovo device">
-                <IconButton size="small" color="success" onClick={() => onApprove(req)}>
+                <IconButton size="small" aria-label="Approva richiesta" color="success" onClick={() => onApprove(req)}>
                   <CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Rifiuta richiesta">
-                <IconButton size="small" color="error" onClick={() => onReject(req)}>
+                <IconButton size="small" aria-label="Rifiuta richiesta" color="error" onClick={() => onReject(req)}>
                   <CancelOutlinedIcon sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>

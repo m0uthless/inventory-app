@@ -13,6 +13,8 @@ bleach>=6.1
 gunicorn>=22.0
 django-redis>=5.4
 python-magic>=0.4
+pytesseract>=0.3.10
+requests>=2.31
 
 # testing
 pytest>=8.0

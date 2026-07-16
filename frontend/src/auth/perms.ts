@@ -118,6 +118,15 @@ export const PERMS = {
       delete: 'issues.delete_issue',
     },
   },
+
+  servicenow: {
+    case: {
+      view: 'servicenow.view_servicenowcase',
+      add: 'servicenow.add_servicenowcase',
+      change: 'servicenow.change_servicenowcase',
+      delete: 'servicenow.delete_servicenowcase',
+    },
+  },
 } as const
 
 export const TRASH_VIEW_ANY = [

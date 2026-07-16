@@ -150,6 +150,17 @@ class IssueSerializer(serializers.ModelSerializer):
 
         errors = {}
 
+        # ── Assegnazione: solo utenti tecnici ServiceNow non-Philips (categoria Biotron) ──
+        if "assigned_to" in attrs and attrs["assigned_to"] is not None:
+            assignee = attrs["assigned_to"]
+            try:
+                profile = assignee.profile
+                is_assignable = bool(profile.is_servicenow_technician) and not bool(profile.is_philips)
+            except Exception:
+                is_assignable = False
+            if not is_assignable:
+                errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue (deve essere un tecnico ServiceNow non Philips)."
+
         if site is not None and customer is not None and site.customer_id != customer.id:
             errors["site"] = "Il sito selezionato non appartiene al cliente della issue."
 

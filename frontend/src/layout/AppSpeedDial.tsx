@@ -15,6 +15,7 @@ import ContactsIcon from '@mui/icons-material/Contacts'
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
 import MonitorIcon from '@mui/icons-material/MonitorOutlined'
+import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '@mui/material/styles'
@@ -113,6 +114,14 @@ export default function AppSpeedDial() {
         openCreate: true,
         icon: <MonitorIcon sx={{ fontSize: 20 }} />,
       },
+      newServiceNowCase: {
+        key: 'newServiceNowCase',
+        label: 'Nuovo ServiceNow Case',
+        to: '/servicenow-cases',
+        perm: 'servicenow.add_servicenowcase',
+        openCreate: true,
+        icon: <CloudSyncOutlinedIcon sx={{ fontSize: 20 }} />,
+      },
       newReportRequest: {
         key: 'newReportRequest',
         label: 'Report / Request',
@@ -142,6 +151,9 @@ export default function AppSpeedDial() {
     }
     if (pathStarts(loc.pathname, '/issues')) {
       return ['newIssue', 'newInventory', 'newReportRequest', 'search']
+    }
+    if (pathStarts(loc.pathname, '/servicenow-cases')) {
+      return ['newServiceNowCase', 'newReportRequest', 'search']
     }
     if (pathStarts(loc.pathname, '/customers')) {
       return ['newCustomer', 'newSite', 'newContact', 'newReportRequest', 'search']

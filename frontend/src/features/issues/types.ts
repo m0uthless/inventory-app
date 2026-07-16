@@ -50,7 +50,13 @@ export type IssueComment = {
 
 export type CategoryOption = { id: number; label: string }
 export type CustomerOption = { id: number; label: string }
-export type UserOption = { id: number; label: string; username: string }
+export type UserOption = {
+  id: number
+  label: string
+  username: string
+  is_philips?: boolean
+  is_servicenow_technician?: boolean
+}
 export type InventoryOption = {
   id: number
   name: string

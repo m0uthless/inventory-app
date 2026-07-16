@@ -51,6 +51,7 @@ from device.api import (
     RispacsViewSet,
 )
 from vlan.api import VlanViewSet, VlanIpRequestViewSet, CustomerRispacsViewSet
+from servicenow.api import ServiceNowCaseViewSet, ServiceNowCaseTypeViewSet, TechnicianAbsenceViewSet
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customer")
@@ -103,6 +104,11 @@ router.register(r"rispacs", RispacsViewSet, basename="rispacs")
 router.register(r"vlans", VlanViewSet, basename="vlan")
 router.register(r"vlan-ip-requests", VlanIpRequestViewSet, basename="vlan-ip-request")
 router.register(r"customer-rispacs", CustomerRispacsViewSet, basename="customer-rispacs")
+
+# ServiceNow Case
+router.register(r"servicenow-cases", ServiceNowCaseViewSet, basename="servicenow-case")
+router.register(r"servicenow-case-types", ServiceNowCaseTypeViewSet, basename="servicenow-case-type")
+router.register(r"technician-absences", TechnicianAbsenceViewSet, basename="technician-absence")
 
 # Lookups (core)
 router.register(r"customer-statuses", CustomerStatusViewSet, basename="customer-status")

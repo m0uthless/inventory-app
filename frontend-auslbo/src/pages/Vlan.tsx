@@ -51,7 +51,7 @@ import {
   type IpPoolEntry,
   type UsedByType,
 } from '../api/vlanApi'
-import { apiGet } from '../api/client'
+import { apiGet } from '@shared/api/client'
 import AuslBoInventoryDrawer from '../ui/AuslBoInventoryDrawer'
 import AuslBoDeviceDrawer from '../ui/AuslBoDeviceDrawer'
 import {
@@ -274,6 +274,7 @@ function IpRequestDialog({ entry, vlan, customerId, onClose, onSaved }: IpReques
               <Tooltip title="Aggiungi sistema">
                 <IconButton
                   size="small"
+                  aria-label="Aggiungi sistema"
                   onClick={addRow}
                   disabled={loadingRispacs}
                   sx={{ bgcolor: 'rgba(26,107,181,0.08)', color: 'primary.main', '&:hover': { bgcolor: 'rgba(26,107,181,0.16)' } }}
@@ -317,7 +318,7 @@ function IpRequestDialog({ entry, vlan, customerId, onClose, onSaved }: IpReques
                       <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
                     ))}
                   </TextField>
-                  <IconButton size="small" color="error" onClick={() => removeRow(i)}>
+                  <IconButton size="small" aria-label="Rimuovi sistema" color="error" onClick={() => removeRow(i)}>
                     <DeleteOutlineIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Stack>
@@ -663,19 +664,19 @@ function VlanCard({
           {canManage && (
             <>
               <Tooltip title="Modifica VLAN">
-                <IconButton size="small" onClick={() => onEdit(vlan)}>
+                <IconButton size="small" aria-label="Modifica VLAN" onClick={() => onEdit(vlan)}>
                   <EditOutlinedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Elimina VLAN">
-                <IconButton size="small" color="error" onClick={() => onDelete(vlan)}>
+                <IconButton size="small" aria-label="Elimina VLAN" color="error" onClick={() => onDelete(vlan)}>
                   <DeleteOutlineIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
             </>
           )}
           <Tooltip title={expanded ? 'Chiudi heatmap' : 'Espandi heatmap IP'}>
-            <IconButton size="small" onClick={handleToggle}>
+            <IconButton size="small" aria-label={expanded ? 'Chiudi heatmap' : 'Espandi heatmap IP'} onClick={handleToggle}>
               {expanded ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
             </IconButton>
           </Tooltip>
@@ -1096,11 +1097,9 @@ export default function VlanPage() {
       const [vlanRes, siteRes] = await Promise.all([
         fetchVlans({ customer: customerId }),
         // Riuso endpoint sites già esistente
-        import('../api/client').then(({ apiGet }) =>
-          apiGet<{ results: Array<{ id: number; name: string; display_name: string | null }> }>(
-            '/sites/',
-            { params: { customer: customerId, page_size: 200 } },
-          )
+        apiGet<{ results: Array<{ id: number; name: string; display_name: string | null }> }>(
+          '/sites/',
+          { params: { customer: customerId, page_size: 200 } },
         ),
       ])
       setVlans(vlanRes.results)

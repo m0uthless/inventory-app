@@ -1,10 +1,48 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin
 from import_export.admin import ImportExportModelAdmin
-from .models import CustomerStatus, SiteStatus, InventoryStatus, InventoryType, AppSetting
+from .models import CustomerStatus, SiteStatus, InventoryStatus, InventoryType, AppSetting, UserProfile
 
 admin.site.site_header = "Site Repository"
 admin.site.site_title = "Site Repository - Admin"
 admin.site.index_title = "Pannello di amministrazione"
+
+
+# ─── Estensione admin User: campo Philips sul profilo, editabile solo da qui ──
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = "Profilo"
+    fields = ("is_philips", "is_servicenow_technician")
+
+
+User = get_user_model()
+
+admin.site.unregister(User)
+
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    inlines = (UserProfileInline,)
+    list_display = UserAdmin.list_display + ("get_is_philips", "get_is_servicenow_technician")
+
+    @admin.display(boolean=True, description="Philips")
+    def get_is_philips(self, obj):
+        try:
+            return obj.profile.is_philips
+        except UserProfile.DoesNotExist:
+            return False
+
+    @admin.display(boolean=True, description="Tecnico ServiceNow")
+    def get_is_servicenow_technician(self, obj):
+        try:
+            return obj.profile.is_servicenow_technician
+        except UserProfile.DoesNotExist:
+            return True
+
+
 
 @admin.register(CustomerStatus)
 class CustomerStatusAdmin(ImportExportModelAdmin):

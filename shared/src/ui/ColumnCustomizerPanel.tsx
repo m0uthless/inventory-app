@@ -25,10 +25,13 @@ import {
   Divider,
   IconButton,
   Popover,
+  Stack,
   Switch,
   Tooltip,
   Typography,
 } from '@mui/material'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -118,6 +121,18 @@ export default function ColumnCustomizerPanel({
     setDragOver(null)
   }
 
+  // ── Spostamento via pulsanti ↑↓ (alternativa accessibile al drag&drop,
+  // utile anche su touch/trackpad dove il drag nativo è scomodo) ──────────
+  const moveBy = (field: string, delta: -1 | 1) => {
+    const fromIdx = localOrder.indexOf(field)
+    const toIdx = fromIdx + delta
+    if (fromIdx === -1 || toIdx < 0 || toIdx >= localOrder.length) return
+    const next = [...localOrder]
+    ;[next[fromIdx], next[toIdx]] = [next[toIdx], next[fromIdx]]
+    setLocalOrder(next)
+    onOrderChange(next)
+  }
+
   // ── Visibilità ──────────────────────────────────────────────────────────
   const isVisible = (field: string) => columnVisibility[field] !== false
 
@@ -137,7 +152,7 @@ export default function ColumnCustomizerPanel({
       slotProps={{
         paper: {
           sx: {
-            width: 280,
+            width: 300,
             borderRadius: 1,
             border: '1px solid',
             borderColor: 'divider',
@@ -184,7 +199,7 @@ export default function ColumnCustomizerPanel({
       {/* Hint */}
       <Box sx={{ px: 2, pt: 1, pb: 0.25 }}>
         <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-          Trascina per riordinare · attiva/disattiva con il toggle
+          Trascina o usa ↑↓ per riordinare · attiva/disattiva con il toggle
         </Typography>
       </Box>
 
@@ -195,12 +210,14 @@ export default function ColumnCustomizerPanel({
         sx={{ maxHeight: 360, overflowY: 'auto', px: 1, pb: 1 }}
         onDragOver={(e) => e.preventDefault()}
       >
-        {localOrder.map((field) => {
+        {localOrder.map((field, idx) => {
           const col = colByField.get(field)
           if (!col) return null
           const label = col.headerName || field
           const visible = isVisible(field)
           const isOver = dragOver === field
+          const isFirst = idx === 0
+          const isLast = idx === localOrder.length - 1
 
           return (
             <Box
@@ -232,6 +249,28 @@ export default function ColumnCustomizerPanel({
               <DragIndicatorIcon
                 sx={{ fontSize: 18, color: 'text.disabled', flexShrink: 0 }}
               />
+
+              {/* Pulsanti ↑↓: alternativa al drag, più precisa su touch/trackpad */}
+              <Stack spacing={0} sx={{ flexShrink: 0 }}>
+                <IconButton
+                  size="small"
+                  disabled={isFirst}
+                  onClick={(e) => { e.stopPropagation(); moveBy(field, -1) }}
+                  aria-label={`Sposta su ${label}`}
+                  sx={{ p: 0.25, color: 'text.secondary' }}
+                >
+                  <ArrowUpwardIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  disabled={isLast}
+                  onClick={(e) => { e.stopPropagation(); moveBy(field, 1) }}
+                  aria-label={`Sposta giù ${label}`}
+                  sx={{ p: 0.25, color: 'text.secondary' }}
+                >
+                  <ArrowDownwardIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Stack>
 
               {/* Label */}
               <Typography

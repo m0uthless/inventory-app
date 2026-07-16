@@ -1,6 +1,6 @@
 from django.utils import timezone
 from django.db import IntegrityError, transaction
-from django.db.models import OuterRef, Subquery, F, Exists
+from django.db.models import OuterRef, Subquery, F, Exists, Count, IntegerField
 from django.db.models import TextField
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce
@@ -14,6 +14,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from crm.models import Customer, Site, Contact, CustomerVpnAccess
+# Import a livello di modulo: inventory.models e issues.models importano
+# crm.models (non crm.api), quindi non si crea alcun ciclo.
+from inventory.models import Inventory
+from issues.models import IssueStatus
 from core.crypto import decrypt
 from audit.utils import log_event, to_change_value_for_field, to_primitive
 from core.soft_delete import apply_soft_delete_filters
@@ -56,6 +60,28 @@ class CustomerFilter(filters.FilterSet):
             Q(city__icontains=v)  # usa l'annotazione già presente nel queryset
         )
 
+def _count_subquery(related_qs, *, distinct=False):
+    """Conta le righe di `related_qs` per il Customer corrente, come subquery.
+
+    Raggruppa per customer e prende il singolo valore aggregato. Coalesce a 0
+    perche' un cliente senza righe correlate produce NULL, non 0, e il frontend
+    si aspetta un numero.
+
+    `distinct=True` va usato quando `related_qs` contiene un filtro su una
+    relazione che moltiplica le righe (es. inventory filtrati per issue: un
+    inventory con 2 issue produce 2 righe dopo il join). Senza, Count conterebbe
+    le righe post-join (le issue), non le entita' distinte (gli inventory).
+    """
+    aggregated = (
+        related_qs
+        .order_by()                       # azzera l'ordinamento di default: romperebbe il GROUP BY
+        .values("customer_id")
+        .annotate(c=Count("pk", distinct=distinct))
+        .values("c")[:1]
+    )
+    return Coalesce(Subquery(aggregated, output_field=IntegerField()), 0)
+
+
 class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
     custom_fields_entity = "customer"
     status_key = serializers.CharField(source="status.key", read_only=True)
@@ -71,6 +97,13 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
     primary_contact_email = serializers.CharField(read_only=True)
     primary_contact_phone = serializers.CharField(read_only=True)
     has_vpn = serializers.BooleanField(read_only=True, default=False)
+
+    # Contatori annotati nel queryset (vedi _count_subquery). Su retrieve il
+    # queryset e' comunque annotato, ma default=0 evita un 500 se in futuro un
+    # percorso non annotato usasse questo serializer.
+    assets_count = serializers.IntegerField(read_only=True, default=0)
+    sites_count = serializers.IntegerField(read_only=True, default=0)
+    active_issue_count = serializers.IntegerField(read_only=True, default=0)
 
     # Chiavi riconosciute per "città" nei custom_fields (allineate con la Coalesce nel queryset).
     _CITY_KEYS = frozenset({"city", "citta", "città", "Città", "Citta"})
@@ -118,6 +151,9 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
             "status_label",
             "notes",
             "has_vpn",
+            "assets_count",
+            "sites_count",
+            "active_issue_count",
             "tags",
             "custom_fields",
             "created_at",
@@ -131,7 +167,29 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
     filterset_class = CustomerFilter
-    search_fields = ["code", "name", "display_name", "vat_number", "tax_code"]
+    # La ricerca attraversa anche asset e siti del cliente: il Site Repository
+    # cerca "un cliente che possiede questo hostname / IP / seriale / sito", e
+    # prima lo faceva costruendo un indice di stringhe in memoria su liste
+    # troncate dalla paginazione (quindi trovando solo una parte dei record).
+    # DRF applica automaticamente distinct() sui lookup relazionali; i contatori
+    # sono comunque calcolati via subquery, quindi restano corretti.
+    search_fields = [
+        "code",
+        "name",
+        "display_name",
+        "vat_number",
+        "tax_code",
+        "inventories__hostname",
+        "inventories__name",
+        "inventories__serial_number",
+        "inventories__knumber",
+        "inventories__local_ip",
+        "inventories__srsa_ip",
+        "sites__name",
+        "sites__display_name",
+        "sites__city",
+        "sites__address_line1",
+    ]
     ordering_fields = [
         "code",
         "name",
@@ -210,6 +268,44 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
             primary_contact_phone=Subquery(primary_qs.values("phone")[:1]),
             has_vpn=Exists(
                 CustomerVpnAccess.objects.filter(customer_id=OuterRef("pk"))
+            ),
+        )
+
+        # ── Contatori per la card cliente (Site Repository) ───────────────────
+        # Prima venivano calcolati nel frontend scaricando TUTTI gli inventory e
+        # TUTTI i siti in memoria e contandoli lato client: numeri sbagliati non
+        # appena la lista veniva paginata.
+        #
+        # Si usano Subquery e non Count(...) con join: annotare piu' Count su
+        # relazioni diverse nella stessa query produce un prodotto cartesiano fra
+        # i join (inventories x sites), gonfiando i conteggi. Le subquery sono
+        # indipendenti fra loro e immuni al problema, e restano corrette anche
+        # quando SearchFilter applica distinct() per i lookup relazionali.
+        qs = qs.annotate(
+            assets_count=_count_subquery(
+                Inventory.objects.filter(
+                    customer_id=OuterRef("pk"), deleted_at__isnull=True,
+                )
+            ),
+            sites_count=_count_subquery(
+                Site.objects.filter(
+                    customer_id=OuterRef("pk"), deleted_at__isnull=True,
+                )
+            ),
+            # Numero di ASSET che hanno almeno una issue attiva (non numero di
+            # issue): alimenta il badge "segnale" ed e' la stessa semantica del
+            # vecchio conteggio client-side, che contava gli inventory con
+            # has_active_issue.
+            active_issue_count=_count_subquery(
+                Inventory.objects.filter(
+                    customer_id=OuterRef("pk"),
+                    deleted_at__isnull=True,
+                    issues__deleted_at__isnull=True,
+                    issues__status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS],
+                ),
+                # Il join su issues moltiplica la riga inventory per ogni issue:
+                # distinct=True conta gli inventory, non le issue.
+                distinct=True,
             ),
         )
 

@@ -2,22 +2,15 @@ import * as React from 'react'
 import {
   Autocomplete,
   Box,
-  Button,
-  Card,
-  CardContent,
   CircularProgress,
-  Divider,
   FormControl,
-  InputAdornment,
   InputLabel,
   MenuItem,
   Select,
   Stack,
   TextField,
-  Tooltip,
+  Typography,
 } from '@mui/material'
-import SearchIcon from '@mui/icons-material/Search'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 
 import type { GridColDef } from '@mui/x-data-grid'
 
@@ -27,12 +20,12 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { useDrfList } from '@shared/hooks/useDrfList'
-import ServerDataGrid from '@shared/ui/ServerDataGrid'
+import EntityListCard from '@shared/ui/EntityListCard'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { useToast } from '@shared/ui/toast'
 import AuditActionChip, { type AuditAction } from '../ui/AuditActionChip'
 import AuditEventDrawer from '../features/audit/AuditEventDrawer'
 import FilterChip from '@shared/ui/FilterChip'
-import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
 import { isString } from '@shared/utils/guards'
 
 type AuditEvent = {
@@ -162,6 +155,33 @@ const cols: GridColDef<AuditEvent>[] = [
     valueGetter: (_v, row) => entityLabelForEvent(row),
   },
 ]
+
+// ─── Mobile card ──────────────────────────────────────────────────────────────
+
+const renderAuditCard: MobileCardRenderFn<AuditEvent> = ({ row, onOpen }) => (
+  <Box
+    onClick={() => onOpen(row.id)}
+    sx={{
+      bgcolor: 'background.paper',
+      border: '0.5px solid', borderColor: 'divider', borderRadius: 1,
+      p: 1.25, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 0.75,
+      '&:active': { bgcolor: 'action.hover' },
+    }}
+  >
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.subject || row.object_repr || row.object_id || '—'}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {entityLabelForEvent(row)}{row.actor_username ? ` · ${row.actor_username}` : ''}
+        </Typography>
+      </Box>
+      <AuditActionChip action={String(row.action || '')} />
+    </Box>
+    <Typography variant="caption" color="text.disabled">{fmt(row.created_at)}</Typography>
+  </Box>
+)
 
 // prettier-ignore
 export default function Audit() {
@@ -403,240 +423,196 @@ export default function Audit() {
 
   return (
     <Stack spacing={2}>
-      <Card>
-        <CardContent sx={{ pt: 1.5, pb: 2, '&:last-child': { pb: 2 } }}>
-          <Stack spacing={1.5}>
-            {/* ── Toolbar principale ─────────────────────────────────────── */}
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={1}
-              alignItems={{ xs: 'stretch', md: 'center' }}
-              flexWrap="wrap"
+      <EntityListCard<AuditEvent>
+        toolbar={{
+          q: grid.q,
+          onQChange: grid.setQ,
+          compact: true,
+          onReset: resetFilters,
+        }}
+        grid={{
+          rows,
+          columns: cols,
+          loading,
+          rowCount,
+          paginationModel: grid.paginationModel,
+          onPaginationModelChange: grid.onPaginationModelChange,
+          sortModel: grid.sortModel,
+          onSortModelChange: grid.onSortModelChange,
+          onRowClick: openDrawer,
+          height: 680,
+          pageSizeOptions: [25],
+          deletedField: '__never__',
+          footerLabel: 'Eventi',
+          emptyState:
+            grid.search.trim() || action || appLabel || model || actor || createdAfter || createdBefore
+              ? { title: 'Nessun risultato', subtitle: 'Nessun evento corrisponde ai filtri selezionati.' }
+              : { title: 'Nessun evento audit', subtitle: 'Gli eventi vengono registrati automaticamente al primo utilizzo.' },
+          sx: {
+            '--DataGrid-rowHeight': '24px',
+            '--DataGrid-headerHeight': '35px',
+            '& .MuiDataGrid-cell': { py: 0.25 },
+            '& .MuiDataGrid-columnHeader': { py: 0.75 },
+            '& .MuiDataGrid-row:nth-of-type(even)': {
+              backgroundColor: 'rgba(69,127,121,0.03)',
+            },
+            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
+            '& .MuiDataGrid-row.Mui-selected': {
+              backgroundColor: 'rgba(69,127,121,0.10) !important',
+            },
+            '& .MuiDataGrid-row.Mui-selected:hover': {
+              backgroundColor: 'rgba(69,127,121,0.14) !important',
+            },
+          },
+        }}
+        mobileCard={renderAuditCard}
+      >
+        {/* Da */}
+        <TextField
+          size="small"
+          label="Da"
+          type="datetime-local"
+          value={createdAfter}
+          onChange={(e) =>
+            setCreatedAfter(e.target.value, { patch: { page: 1 }, keepOpen: true })
+          }
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: { xs: '100%', md: 200 }, flexShrink: 0, ...inputSx }}
+        />
+
+        {/* A */}
+        <TextField
+          size="small"
+          label="A"
+          type="datetime-local"
+          value={createdBefore}
+          onChange={(e) =>
+            setCreatedBefore(e.target.value, { patch: { page: 1 }, keepOpen: true })
+          }
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: { xs: '100%', md: 200 }, flexShrink: 0, ...inputSx }}
+        />
+
+        {/* FilterChip — tutti gli altri filtri */}
+        <FilterChip
+          compact
+          activeCount={chipActiveCount}
+          onReset={() => {
+            setAction('', { patch: { page: 1 }, keepOpen: true })
+            setAppLabel('', { patch: { page: 1 }, keepOpen: true })
+            setModel('', { patch: { page: 1 }, keepOpen: true })
+            setObjectId('', { patch: { page: 1 }, keepOpen: true })
+            setActor('', { patch: { page: 1 }, keepOpen: true })
+          }}
+        >
+          {/* Azione */}
+          <FormControl size="small" fullWidth sx={selectSx}>
+            <InputLabel>Azione</InputLabel>
+            <Select
+              label="Azione"
+              value={action}
+              onChange={(e) =>
+                setAction(String(e.target.value), { patch: { page: 1 }, keepOpen: true })
+              }
             >
-              {/* Cerca — uguale a ListToolbar / Customers */}
-              <TextField
-                size="small"
-                label="Cerca"
-                placeholder="Cerca"
-                value={grid.q}
-                onChange={(e) => grid.setQ(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ width: { xs: '100%', md: 360 }, flexShrink: 0, ...inputSx }}
-              />
+              <MenuItem value="">Tutte</MenuItem>
+              <MenuItem value="create">Creato</MenuItem>
+              <MenuItem value="update">Modificato</MenuItem>
+              <MenuItem value="delete">Eliminato</MenuItem>
+              <MenuItem value="restore">Ripristinato</MenuItem>
+              <MenuItem value="login">Login</MenuItem>
+              <MenuItem value="login_failed">Login fallito</MenuItem>
+              <MenuItem value="logout">Logout</MenuItem>
+            </Select>
+          </FormControl>
 
-              {/* Da */}
-              <TextField
-                size="small"
-                label="Da"
-                type="datetime-local"
-                value={createdAfter}
-                onChange={(e) =>
-                  setCreatedAfter(e.target.value, { patch: { page: 1 }, keepOpen: true })
-                }
-                InputLabelProps={{ shrink: true }}
-                sx={{ width: { xs: '100%', md: 200 }, flexShrink: 0, ...inputSx }}
-              />
-
-              {/* A */}
-              <TextField
-                size="small"
-                label="A"
-                type="datetime-local"
-                value={createdBefore}
-                onChange={(e) =>
-                  setCreatedBefore(e.target.value, { patch: { page: 1 }, keepOpen: true })
-                }
-                InputLabelProps={{ shrink: true }}
-                sx={{ width: { xs: '100%', md: 200 }, flexShrink: 0, ...inputSx }}
-              />
-
-              {/* FilterChip — tutti gli altri filtri */}
-              <FilterChip
-                compact
-                activeCount={chipActiveCount}
-                onReset={() => {
-                  setAction('', { patch: { page: 1 }, keepOpen: true })
+          {/* Entità */}
+          <FormControl size="small" fullWidth sx={selectSx}>
+            <InputLabel>Entità</InputLabel>
+            <Select
+              label="Entità"
+              value={selectedEntityKey}
+              onChange={(e) => {
+                const v = String(e.target.value)
+                if (!v) {
                   setAppLabel('', { patch: { page: 1 }, keepOpen: true })
                   setModel('', { patch: { page: 1 }, keepOpen: true })
-                  setObjectId('', { patch: { page: 1 }, keepOpen: true })
-                  setActor('', { patch: { page: 1 }, keepOpen: true })
-                }}
-              >
-                {/* Azione */}
-                <FormControl size="small" fullWidth sx={selectSx}>
-                  <InputLabel>Azione</InputLabel>
-                  <Select
-                    label="Azione"
-                    value={action}
-                    onChange={(e) =>
-                      setAction(String(e.target.value), { patch: { page: 1 }, keepOpen: true })
-                    }
-                  >
-                    <MenuItem value="">Tutte</MenuItem>
-                    <MenuItem value="create">Creato</MenuItem>
-                    <MenuItem value="update">Modificato</MenuItem>
-                    <MenuItem value="delete">Eliminato</MenuItem>
-                    <MenuItem value="restore">Ripristinato</MenuItem>
-                    <MenuItem value="login">Login</MenuItem>
-                    <MenuItem value="login_failed">Login fallito</MenuItem>
-                    <MenuItem value="logout">Logout</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {/* Entità */}
-                <FormControl size="small" fullWidth sx={selectSx}>
-                  <InputLabel>Entità</InputLabel>
-                  <Select
-                    label="Entità"
-                    value={selectedEntityKey}
-                    onChange={(e) => {
-                      const v = String(e.target.value)
-                      if (!v) {
-                        setAppLabel('', { patch: { page: 1 }, keepOpen: true })
-                        setModel('', { patch: { page: 1 }, keepOpen: true })
-                        return
-                      }
-                      const [a, m] = v.split('.')
-                      setAppLabel(a || '', { patch: { page: 1 }, keepOpen: true })
-                      setModel(m || '', { patch: { page: 1 }, keepOpen: true })
-                    }}
-                  >
-                    <MenuItem value="">Tutte</MenuItem>
-                    {entitiesLoading ? (
-                      <MenuItem value="" disabled>
-                        Caricamento…
-                      </MenuItem>
-                    ) : (
-                      entities.map((e) => {
-                        const k = entityKey(e.app_label, e.model)
-                        return (
-                          <MenuItem key={k} value={k}>
-                            {entityLabel(k)}
-                          </MenuItem>
-                        )
-                      })
-                    )}
-                  </Select>
-                </FormControl>
-
-                {/* Utente */}
-                <Autocomplete<AuditActor>
-                  options={actorOptions}
-                  loading={actorsLoading}
-                  value={selectedActor}
-                  onChange={(_e, v) =>
-                    setActor(v ? v.id : '', { patch: { page: 1 }, keepOpen: true })
-                  }
-                  inputValue={actorInput}
-                  onInputChange={(_e, v) => setActorInput(v)}
-                  getOptionLabel={(o) => o.label}
-                  isOptionEqualToValue={(o, v) => o.id === v.id}
-                  renderOption={(props, option) => (
-                    <Box component="li" {...props} sx={{ fontSize: 12, minHeight: 36 }}>
-                      {option.label}
-                    </Box>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      size="small"
-                      label="Utente"
-                      placeholder="Cerca…"
-                      sx={inputSx}
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {actorsLoading ? <CircularProgress size={14} /> : null}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      }}
-                    />
-                  )}
-                  fullWidth
-                />
-
-                {/* Object ID */}
-                <TextField
-                  size="small"
-                  label="Object ID"
-                  value={objectId}
-                  onChange={(e) =>
-                    setObjectId(e.target.value, { patch: { page: 1 }, keepOpen: true })
-                  }
-                  sx={inputSx}
-                  fullWidth
-                />
-              </FilterChip>
-
-              {/* Reset — tutto a destra */}
-              <Box sx={{ ml: { md: 'auto' }, display: 'flex' }}>
-                <Tooltip title="Reimposta" arrow>
-                  <span>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={resetFilters}
-                      sx={compactResetButtonSx}
-                    >
-                      <RestartAltIcon />
-                    </Button>
-                  </span>
-                </Tooltip>
-              </Box>
-            </Stack>
-
-            <Divider />
-
-            <ServerDataGrid
-              rows={rows}
-              columns={cols}
-              loading={loading}
-              rowCount={rowCount}
-              paginationModel={grid.paginationModel}
-              onPaginationModelChange={grid.onPaginationModelChange}
-              sortModel={grid.sortModel}
-              onSortModelChange={grid.onSortModelChange}
-              onRowClick={openDrawer}
-              height={680}
-              pageSizeOptions={[25]}
-              deletedField="__never__"
-                  footerLabel="Eventi"
-              emptyState={
-                grid.search.trim() || action || appLabel || model || actor || createdAfter || createdBefore
-                  ? { title: 'Nessun risultato', subtitle: 'Nessun evento corrisponde ai filtri selezionati.' }
-                  : { title: 'Nessun evento audit', subtitle: 'Gli eventi vengono registrati automaticamente al primo utilizzo.' }
-              }
-              sx={
-                {
-                  '--DataGrid-rowHeight': '24px',
-                  '--DataGrid-headerHeight': '35px',
-                  '& .MuiDataGrid-cell': { py: 0.25 },
-                  '& .MuiDataGrid-columnHeader': { py: 0.75 },
-                  '& .MuiDataGrid-row:nth-of-type(even)': {
-                    backgroundColor: 'rgba(69,127,121,0.03)',
-                  },
-                  '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-                  '& .MuiDataGrid-row.Mui-selected': {
-                    backgroundColor: 'rgba(69,127,121,0.10) !important',
-                  },
-                  '& .MuiDataGrid-row.Mui-selected:hover': {
-                    backgroundColor: 'rgba(69,127,121,0.14) !important',
-                  },
+                  return
                 }
-              }
-            />
-          </Stack>
-        </CardContent>
-      </Card>
+                const [a, m] = v.split('.')
+                setAppLabel(a || '', { patch: { page: 1 }, keepOpen: true })
+                setModel(m || '', { patch: { page: 1 }, keepOpen: true })
+              }}
+            >
+              <MenuItem value="">Tutte</MenuItem>
+              {entitiesLoading ? (
+                <MenuItem value="" disabled>
+                  Caricamento…
+                </MenuItem>
+              ) : (
+                entities.map((e) => {
+                  const k = entityKey(e.app_label, e.model)
+                  return (
+                    <MenuItem key={k} value={k}>
+                      {entityLabel(k)}
+                    </MenuItem>
+                  )
+                })
+              )}
+            </Select>
+          </FormControl>
+
+          {/* Utente */}
+          <Autocomplete<AuditActor>
+            options={actorOptions}
+            loading={actorsLoading}
+            value={selectedActor}
+            onChange={(_e, v) =>
+              setActor(v ? v.id : '', { patch: { page: 1 }, keepOpen: true })
+            }
+            inputValue={actorInput}
+            onInputChange={(_e, v) => setActorInput(v)}
+            getOptionLabel={(o) => o.label}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
+            renderOption={(props, option) => (
+              <Box component="li" {...props} sx={{ fontSize: 12, minHeight: 36 }}>
+                {option.label}
+              </Box>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                label="Utente"
+                placeholder="Cerca…"
+                sx={inputSx}
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {actorsLoading ? <CircularProgress size={14} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            fullWidth
+          />
+
+          {/* Object ID */}
+          <TextField
+            size="small"
+            label="Object ID"
+            value={objectId}
+            onChange={(e) =>
+              setObjectId(e.target.value, { patch: { page: 1 }, keepOpen: true })
+            }
+            sx={inputSx}
+            fullWidth
+          />
+        </FilterChip>
+      </EntityListCard>
 
       <AuditEventDrawer
         open={drawerOpen}

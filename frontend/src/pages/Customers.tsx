@@ -98,6 +98,14 @@ type CustomerForm = {
   notes: string
 }
 
+// Stile condiviso dai pulsanti "vai a sezione collegata" (Siti / Inventory / Drive)
+const navSectionButtonSx = {
+  bgcolor: '#0d9488',
+  color: '#fff',
+  fontWeight: 600,
+  '&:hover': { bgcolor: '#0f766e' },
+} as const
+
 const asId = (v: unknown): number | '' => {
   const s = String(v)
   return s === '' ? '' : Number(s)
@@ -177,7 +185,7 @@ function CustomerSitesTab(props: {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+          sx={navSectionButtonSx}
           onClick={() =>
             navigate(
               `/sites${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`,
@@ -293,7 +301,7 @@ function CustomerInventoriesTab(props: {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+          sx={navSectionButtonSx}
           onClick={() =>
             navigate(
               `/inventory${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`,
@@ -473,7 +481,7 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+          sx={navSectionButtonSx}
           onClick={() => navigate('/drive')}
         >
           Apri Drive

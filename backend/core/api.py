@@ -14,13 +14,27 @@ User = get_user_model()
 
 class UserListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    is_philips = serializers.SerializerMethodField()
+    is_servicenow_technician = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
 
+    def get_is_philips(self, obj):
+        try:
+            return obj.profile.is_philips
+        except Exception:
+            return False
+
+    def get_is_servicenow_technician(self, obj):
+        try:
+            return obj.profile.is_servicenow_technician
+        except Exception:
+            return True
+
     class Meta:
         model  = User
-        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active"]
+        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician"]
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -28,7 +42,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return User.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        return User.objects.select_related("profile").filter(is_active=True).order_by("first_name", "last_name", "username")
 
 
 class CustomerStatusLookupSerializer(serializers.ModelSerializer):

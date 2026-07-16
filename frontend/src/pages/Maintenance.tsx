@@ -844,8 +844,8 @@ export default function Maintenance() {
         next30:  all.filter(x => x.next_due_date >= today && x.next_due_date <= in30).length,
         total,
       })
-    }).catch(() => {})
-  }, [today, in30])
+    }).catch((e) => toast.error(apiErrorToMessage(e)))
+  }, [today, in30, toast])
 
   const overdueCount = kpiCounts.overdue
   const next30Count  = kpiCounts.next30

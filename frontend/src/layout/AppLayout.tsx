@@ -43,9 +43,13 @@ import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
+import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded'
+import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
+import ContactsRoundedIcon from '@mui/icons-material/ContactsRounded'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import TerminalIcon from '@mui/icons-material/TerminalOutlined'
 import MonitorIcon from '@mui/icons-material/MonitorOutlined'
+import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -81,6 +85,13 @@ type NavItem = {
 }
 
 
+const SITE_REPOSITORY_CHILDREN: NavItem[] = [
+  { label: 'Clienti', path: '/customers', icon: <PeopleAltRoundedIcon />, perm: 'crm.view_customer' },
+  { label: 'Siti', path: '/sites', icon: <ApartmentRoundedIcon />, perm: 'crm.view_site' },
+  { label: 'Contatti', path: '/contacts', icon: <ContactsRoundedIcon />, perm: 'crm.view_contact' },
+  { label: 'Monitor', path: '/monitors', icon: <MonitorIcon />, perm: 'inventory.view_monitor' },
+]
+
 const MAINTENANCE_CHILDREN: NavItem[] = [
   { label: 'Scadenze', path: '/maintenance', icon: <HandymanIcon />, permAny: ['maintenance.view_maintenanceplan'] },
   { label: 'Piani', path: '/maintenance/plans', icon: <BuildOutlinedIcon />, perm: 'maintenance.view_maintenanceplan' },
@@ -98,6 +109,10 @@ const BUG_FEATURE_CHILDREN: NavItem[] = [
   { label: 'Risolte', path: '/bug-feature/resolved', icon: <DoneAllIcon /> },
 ]
 
+const SERVICENOW_CHILDREN: NavItem[] = [
+  { label: 'SNow Statistiche', path: '/servicenow-stats', icon: <BarChartOutlinedIcon />, perm: 'servicenow.view_servicenowcase' },
+]
+
 const NAV: NavItem[] = [
   // ── Principale ──────────────────────────────────────────────────────────────
   { label: 'Dashboard', path: '/', icon: <DashboardIcon />, section: 'principale' },
@@ -110,9 +125,9 @@ const NAV: NavItem[] = [
     permAny: ['inventory.view_inventory', 'crm.view_customer', 'crm.view_site', 'crm.view_contact'],
   },
 
-  { label: 'Monitor', path: '/monitors', icon: <MonitorIcon />, section: 'principale', perm: 'inventory.view_monitor' },
-
   { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
+
+  { label: 'ServiceNow', path: '/servicenow-cases', icon: <CloudSyncOutlinedIcon />, section: 'principale', perm: 'servicenow.view_servicenowcase' },
 
   {
     label: 'Manutenzione',
@@ -177,7 +192,7 @@ type IssueSummary = {
   active_count: number
 }
 
-// ─── SiteRepositoryV2 sticky toolbar ─────────────────────────────────────────
+// ─── SiteRepository sticky toolbar ───────────────────────────────────────────
 
 function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
   const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities } = useSiteRepoV2()
@@ -247,9 +262,9 @@ function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
   )
 }
 
-// Wrapper condizionale — mostrato solo su /site-repository-v2
+// Wrapper condizionale — mostrato solo su /site-repository (V2, ora rotta definitiva)
 function SiteRepoV2Toolbar_Shell({ loc, sidebarWidth }: { loc: string; sidebarWidth: number }) {
-  if (loc !== '/site-repository-v2') return null
+  if (loc !== '/site-repository') return null
   return <SiteRepoV2Toolbar sidebarWidth={sidebarWidth} />
 }
 
@@ -368,6 +383,14 @@ export function AppLayout() {
     () => MAINTENANCE_CHILDREN.filter(canAccessNavItem),
     [canAccessNavItem],
   )
+  const visibleSiteRepositoryChildren = React.useMemo(
+    () => SITE_REPOSITORY_CHILDREN.filter(canAccessNavItem),
+    [canAccessNavItem],
+  )
+  const visibleServiceNowChildren = React.useMemo(
+    () => SERVICENOW_CHILDREN.filter(canAccessNavItem),
+    [canAccessNavItem],
+  )
 
   const [feedbackSummary, setFeedbackSummary] = React.useState<FeedbackSummary | null>(null)
 
@@ -443,6 +466,28 @@ export function AppLayout() {
   const [maintenanceFlyoutAnchor, setMaintenanceFlyoutAnchor] = React.useState<null | HTMLElement>(null)
   const maintenanceFlyoutOpen = Boolean(maintenanceFlyoutAnchor)
 
+  const siteRepositorySectionActive = React.useMemo(
+    () => ['/site-repository', '/customers', '/sites', '/contacts', '/monitors'].some((path) => isSelected(loc.pathname, path)),
+    [loc.pathname],
+  )
+  const [siteRepositoryOpen, setSiteRepositoryOpen] = React.useState(() => {
+    const v = localStorage.getItem('site_repository_nav_open')
+    return v ? v === '1' : true
+  })
+  const [siteRepositoryFlyoutAnchor, setSiteRepositoryFlyoutAnchor] = React.useState<null | HTMLElement>(null)
+  const siteRepositoryFlyoutOpen = Boolean(siteRepositoryFlyoutAnchor)
+
+  const servicenowSectionActive = React.useMemo(
+    () => ['/servicenow-cases', '/servicenow-stats'].some((path) => isSelected(loc.pathname, path)),
+    [loc.pathname],
+  )
+  const [servicenowOpen, setServicenowOpen] = React.useState(() => {
+    const v = localStorage.getItem('servicenow_nav_open')
+    return v ? v === '1' : true
+  })
+  const [servicenowFlyoutAnchor, setServicenowFlyoutAnchor] = React.useState<null | HTMLElement>(null)
+  const servicenowFlyoutOpen = Boolean(servicenowFlyoutAnchor)
+
 
   React.useEffect(() => {
     localStorage.setItem('wiki_nav_open', wikiOpen ? '1' : '0')
@@ -455,6 +500,14 @@ export function AppLayout() {
   React.useEffect(() => {
     localStorage.setItem('maintenance_nav_open', maintenanceOpen ? '1' : '0')
   }, [maintenanceOpen])
+
+  React.useEffect(() => {
+    localStorage.setItem('site_repository_nav_open', siteRepositoryOpen ? '1' : '0')
+  }, [siteRepositoryOpen])
+
+  React.useEffect(() => {
+    localStorage.setItem('servicenow_nav_open', servicenowOpen ? '1' : '0')
+  }, [servicenowOpen])
 
 
   React.useEffect(() => {
@@ -476,20 +529,38 @@ export function AppLayout() {
   }, [maintenanceSectionActive])
 
   React.useEffect(() => {
+    if (siteRepositorySectionActive) {
+      setSiteRepositoryOpen(true)
+    }
+  }, [siteRepositorySectionActive])
+
+  React.useEffect(() => {
+    if (servicenowSectionActive) {
+      setServicenowOpen(true)
+    }
+  }, [servicenowSectionActive])
+
+  React.useEffect(() => {
     setWikiFlyoutAnchor(null)
     setBugFeatureFlyoutAnchor(null)
     setMaintenanceFlyoutAnchor(null)
+    setSiteRepositoryFlyoutAnchor(null)
+    setServicenowFlyoutAnchor(null)
 
     // Chiudi automaticamente i gruppi che non contengono la rotta corrente.
     if (!wikiSectionActive)           setWikiOpen(false)
     if (!bugFeatureSectionActive)     setBugFeatureOpen(false)
     if (!maintenanceSectionActive)    setMaintenanceOpen(false)
+    if (!siteRepositorySectionActive) setSiteRepositoryOpen(false)
+    if (!servicenowSectionActive)     setServicenowOpen(false)
   }, [loc.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!mini) {
       setWikiFlyoutAnchor(null)
       setBugFeatureFlyoutAnchor(null)
+      setSiteRepositoryFlyoutAnchor(null)
+      setServicenowFlyoutAnchor(null)
     }
   }, [mini])
 
@@ -507,9 +578,11 @@ export function AppLayout() {
       ['/sites',                  'SITI'],
       ['/contacts',               'CONTATTI'],
       ['/inventory',              'INVENTARI'],
-      ['/monitors',               'MONITOR'],
+      ['/monitors',               'SITE REPOSITORY · MONITOR'],
       ['/maintenance',            'MANUTENZIONE'],
       ['/issues',                 'ISSUES'],
+      ['/servicenow-stats',       'SERVICENOW · STATISTICHE'],
+      ['/servicenow-cases',       'SERVICENOW'],
       ['/bug-feature',            'BUG / FEATURE'],
       ['/audit',                  'AUDIT'],
       ['/drive',                  'DRIVE'],
@@ -833,8 +906,9 @@ export function AppLayout() {
               const isWikiGroup = it.path === '/wiki'
               const isBugFeatureGroup = it.path === '/bug-feature'
               const isMaintenanceGroup = it.path === '/maintenance'
+              const isServiceNowGroup = it.path === '/servicenow-cases'
 
-              if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup && !isMaintenanceGroup) {
+              if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup && !isMaintenanceGroup && !isServiceNowGroup) {
                 const issueEndAdornment =
                   it.path === '/issues' ? renderIssueCount(issueSummary?.active_count) : null
                 return (
@@ -844,29 +918,28 @@ export function AppLayout() {
                 )
               }
 
-              // Site Repository è ora un link diretto (senza sotto-elementi)
-              if (isSiteRepositoryGroup) {
-                return (
-                  <React.Fragment key={it.path}>
-                    {renderNavItem(it, isMini)}
-                  </React.Fragment>
-                )
-              }
-
-              const children = isWikiGroup
-                  ? visibleWikiChildren
-                  : isMaintenanceGroup
-                    ? visibleMaintenanceChildren
-                    : visibleBugFeatureChildren
-              const parentSelected = isWikiGroup
-                  ? wikiSectionActive
-                  : isMaintenanceGroup
-                    ? maintenanceSectionActive
-                    : bugFeatureSectionActive
-              const groupOpen = isWikiGroup ? wikiOpen : isMaintenanceGroup ? maintenanceOpen : bugFeatureOpen
-              const setGroupOpen = isWikiGroup ? setWikiOpen : isMaintenanceGroup ? setMaintenanceOpen : setBugFeatureOpen
-              const setFlyoutAnchor = isWikiGroup ? setWikiFlyoutAnchor : isMaintenanceGroup ? setMaintenanceFlyoutAnchor : setBugFeatureFlyoutAnchor
-              const flyoutLabel = isWikiGroup ? 'Knowledge' : isMaintenanceGroup ? 'Manutenzione' : 'Bug / Feature'
+              const children = isSiteRepositoryGroup
+                  ? visibleSiteRepositoryChildren
+                  : isWikiGroup
+                    ? visibleWikiChildren
+                    : isMaintenanceGroup
+                      ? visibleMaintenanceChildren
+                      : isServiceNowGroup
+                        ? visibleServiceNowChildren
+                        : visibleBugFeatureChildren
+              const parentSelected = isSiteRepositoryGroup
+                  ? siteRepositorySectionActive
+                  : isWikiGroup
+                    ? wikiSectionActive
+                    : isMaintenanceGroup
+                      ? maintenanceSectionActive
+                      : isServiceNowGroup
+                        ? servicenowSectionActive
+                        : bugFeatureSectionActive
+              const groupOpen = isSiteRepositoryGroup ? siteRepositoryOpen : isWikiGroup ? wikiOpen : isMaintenanceGroup ? maintenanceOpen : isServiceNowGroup ? servicenowOpen : bugFeatureOpen
+              const setGroupOpen = isSiteRepositoryGroup ? setSiteRepositoryOpen : isWikiGroup ? setWikiOpen : isMaintenanceGroup ? setMaintenanceOpen : isServiceNowGroup ? setServicenowOpen : setBugFeatureOpen
+              const setFlyoutAnchor = isSiteRepositoryGroup ? setSiteRepositoryFlyoutAnchor : isWikiGroup ? setWikiFlyoutAnchor : isMaintenanceGroup ? setMaintenanceFlyoutAnchor : isServiceNowGroup ? setServicenowFlyoutAnchor : setBugFeatureFlyoutAnchor
+              const flyoutLabel = isSiteRepositoryGroup ? 'Site Repository' : isWikiGroup ? 'Knowledge' : isMaintenanceGroup ? 'Manutenzione' : isServiceNowGroup ? 'ServiceNow' : 'Bug / Feature'
               const canExpand = !isMini && children.length > 0
 
               return (
@@ -1151,6 +1224,58 @@ export function AppLayout() {
         </Box>
       </Popover>
 
+      {/* ServiceNow group flyout (mini sidebar) */}
+      <Popover
+        open={servicenowFlyoutOpen}
+        anchorEl={servicenowFlyoutAnchor}
+        onClose={() => setServicenowFlyoutAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{
+          sx: {
+            ml: 1,
+            mt: -0.25,
+            minWidth: 248,
+            borderRadius: 1,
+            overflow: 'hidden',
+            background: SIDEBAR.bgGradient,
+            color: '#ffffff',
+            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
+            border: '1px solid rgba(94,234,212,0.12)',
+          },
+        }}
+      >
+        <Box sx={{ px: 1.25, py: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              px: 1,
+              pb: 0.75,
+              color: SIDEBAR.textMuted,
+              letterSpacing: '0.16em',
+              fontWeight: 800,
+            }}
+          >
+            SERVICENOW
+          </Typography>
+          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
+            {visibleServiceNowChildren.map((child) => (
+              <React.Fragment key={`servicenow-flyout-${child.path}`}>
+                {renderNavItem(child, false, {
+                  nested: true,
+                  selected: isSelected(loc.pathname, child.path),
+                  onClick: () => {
+                    setServicenowFlyoutAnchor(null)
+                    nav(child.path)
+                  },
+                })}
+              </React.Fragment>
+            ))}
+          </List>
+        </Box>
+      </Popover>
+
       {/* Maintenance group flyout (mini sidebar) */}
       <Popover
         open={maintenanceFlyoutOpen}
@@ -1196,6 +1321,58 @@ export function AppLayout() {
                     : isSelected(loc.pathname, child.path),
                   onClick: () => {
                     setMaintenanceFlyoutAnchor(null)
+                    nav(child.path)
+                  },
+                })}
+              </React.Fragment>
+            ))}
+          </List>
+        </Box>
+      </Popover>
+
+      {/* Site Repository group flyout (mini sidebar) */}
+      <Popover
+        open={siteRepositoryFlyoutOpen}
+        anchorEl={siteRepositoryFlyoutAnchor}
+        onClose={() => setSiteRepositoryFlyoutAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{
+          sx: {
+            ml: 1,
+            mt: -0.25,
+            minWidth: 248,
+            borderRadius: 1,
+            overflow: 'hidden',
+            background: SIDEBAR.bgGradient,
+            color: '#ffffff',
+            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
+            border: '1px solid rgba(94,234,212,0.12)',
+          },
+        }}
+      >
+        <Box sx={{ px: 1.25, py: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              px: 1,
+              pb: 0.75,
+              color: SIDEBAR.textMuted,
+              letterSpacing: '0.16em',
+              fontWeight: 800,
+            }}
+          >
+            SITE REPOSITORY
+          </Typography>
+          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
+            {visibleSiteRepositoryChildren.map((child) => (
+              <React.Fragment key={`site-repository-flyout-${child.path}`}>
+                {renderNavItem(child, false, {
+                  nested: true,
+                  selected: isSelected(loc.pathname, child.path),
+                  onClick: () => {
+                    setSiteRepositoryFlyoutAnchor(null)
                     nav(child.path)
                   },
                 })}
@@ -1307,7 +1484,7 @@ export function AppLayout() {
         }}
       >
         <Toolbar sx={{ flexShrink: 0 }} />
-        {loc.pathname === '/site-repository-v2' && <Box sx={{ height: 56, flexShrink: 0 }} />}
+        {loc.pathname === '/site-repository' && <Box sx={{ height: 56, flexShrink: 0 }} />}
 
         <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0, bgcolor: 'background.default' }}>
           <Outlet />

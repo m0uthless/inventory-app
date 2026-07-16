@@ -48,7 +48,7 @@ export default function AuslBoInventoryDrawer({ id, onClose }: AuslBoInventoryDr
   const statusSlot = (
     <Stack direction="row" alignItems="center" spacing={0.75}>
       <Tooltip title="Chiudi">
-        <IconButton size="small" onClick={handleClose} sx={HERO_ICON_BTN_SX}>
+        <IconButton size="small" aria-label="Torna indietro" onClick={handleClose} sx={HERO_ICON_BTN_SX}>
           <ArrowBackIcon fontSize="small" />
         </IconButton>
       </Tooltip>
@@ -68,7 +68,7 @@ export default function AuslBoInventoryDrawer({ id, onClose }: AuslBoInventoryDr
 
   const actions = (
     <Tooltip title="Chiudi">
-      <IconButton size="small" onClick={handleClose} sx={HERO_ICON_BTN_SX}>
+      <IconButton size="small" aria-label="Chiudi" onClick={handleClose} sx={HERO_ICON_BTN_SX}>
         <CloseIcon fontSize="small" />
       </IconButton>
     </Tooltip>

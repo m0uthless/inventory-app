@@ -1,11 +1,13 @@
 import * as React from 'react'
 
 import {
+  Box,
   Button,
   Card,
   CardContent,
-  Divider,
+  Chip,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -25,8 +27,8 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useToast } from '@shared/ui/toast'
 import { emptySelectionModel, selectionSize, selectionToIds } from '@shared/utils/gridSelection'
-import ServerDataGrid from '@shared/ui/ServerDataGrid'
-import ListToolbar from '@shared/ui/ListToolbar'
+import EntityListCard from '@shared/ui/EntityListCard'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { useAuth } from '../auth/AuthProvider'
 import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
@@ -490,6 +492,126 @@ export default function Trash() {
     return false
   }
 
+  // ─── Azioni su singola riga (usate dalla card mobile) ───────────────────────
+
+  const [rowTarget, setRowTarget] = React.useState<{ row: TrashRow; mode: 'restore' | 'purge' } | null>(null)
+
+  const resolveRowCfg = React.useCallback(
+    (row: TrashRow): ResourceCfg | null =>
+      RESOURCES.find((r) => r.key === (row.__kind ?? typeKey)) ?? null,
+    [typeKey],
+  )
+
+  const doSingleRestore = async (row: TrashRow): Promise<boolean> => {
+    const rcfg = resolveRowCfg(row)
+    if (!rcfg || !hasPerm(rcfg.restorePerm)) return false
+    setRestoreBusy(true)
+    try {
+      await api.post(rcfg.restoreEndpoint, { ids: [row.id] })
+      toast.success('Elemento ripristinato ✅')
+      load()
+      return true
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setRestoreBusy(false)
+    }
+    return false
+  }
+
+  const doSinglePurge = async (row: TrashRow): Promise<boolean> => {
+    const rcfg = resolveRowCfg(row)
+    if (!rcfg || !hasPerm(rcfg.purgePerm)) return false
+    setPurgeBusy(true)
+    try {
+      const resp = await api.post(rcfg.purgeEndpoint, { ids: [row.id] })
+      const payload = (resp.data && typeof resp.data === 'object') ? (resp.data as Record<string, unknown>) : {}
+      const count = typeof payload.count === 'number' ? payload.count : 0
+      const blocked = Array.isArray(payload.blocked) ? payload.blocked : []
+      if (count > 0) toast.success('Elemento eliminato definitivamente ✅')
+      if (blocked.length > 0) {
+        const first = blocked[0]
+        const reason =
+          first && typeof first === 'object' && typeof (first as Record<string, unknown>).reason === 'string'
+            ? String((first as Record<string, unknown>).reason)
+            : null
+        toast.warning(`Elemento bloccato.${reason ? ' ' + reason : ''}`)
+      }
+      load()
+      return true
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setPurgeBusy(false)
+    }
+    return false
+  }
+
+  // ─── Mobile card ─────────────────────────────────────────────────────────────
+
+  const renderTrashCard: MobileCardRenderFn<TrashRow> = ({ row }) => {
+    const rcfg = resolveRowCfg(row)
+    const kindLabel = rcfg?.label ?? row.__kind ?? cfg?.label ?? '—'
+    const title = row.__title || (cfg ? cfg.buildTitle(row) : '—')
+    const canRestoreRow = Boolean(rcfg && hasPerm(rcfg.restorePerm))
+    const canPurgeRow = Boolean(rcfg && hasPerm(rcfg.purgePerm))
+
+    return (
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          border: '0.5px solid', borderColor: 'divider', borderRadius: 1,
+          p: 1.25, display: 'flex', flexDirection: 'column', gap: 0.75,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Eliminato il {fmt(row.deleted_at)}
+            </Typography>
+          </Box>
+          {typeKey === 'all' && (
+            <Chip
+              size="small"
+              label={kindLabel}
+              variant="outlined"
+              sx={{ height: 22, fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}
+            />
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+          <Tooltip title={canRestoreRow ? 'Ripristina' : 'Permessi mancanti'} arrow>
+            <span>
+              <IconButton
+                size="small"
+                color="success"
+                disabled={!canRestoreRow || restoreBusy}
+                onClick={() => setRowTarget({ row, mode: 'restore' })}
+              >
+                <RestoreFromTrashIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={canPurgeRow ? 'Elimina definitivamente' : 'Permessi mancanti'} arrow>
+            <span>
+              <IconButton
+                size="small"
+                color="error"
+                disabled={!canPurgeRow || purgeBusy}
+                onClick={() => setRowTarget({ row, mode: 'purge' })}
+              >
+                <DeleteForeverIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      </Box>
+    )
+  }
+
   const cols: GridColDef<TrashRow>[] = [
     {
       field: '__kind',
@@ -535,6 +657,13 @@ export default function Trash() {
     },
   ]
 
+  const noPermMessage =
+    typeKey === 'all' && visibleResources.length === 0
+      ? 'Non hai i permessi per visualizzare alcun tipo di dati.'
+      : typeKey !== 'all' && cfg && !hasPerm(cfg.viewPerm)
+        ? 'Non hai i permessi per visualizzare questo tipo di dati.'
+        : null
+
   return (
     <Stack spacing={2}>
       <ConfirmActionDialog
@@ -574,127 +703,144 @@ export default function Trash() {
         }}
       />
 
-      <Card>
-        <CardContent sx={{ pt: 1.5, pb: 2, '&:last-child': { pb: 2 } }}>
-          <Stack spacing={1.5}>
-            <ListToolbar
-              q={grid.q}
-              onQChange={grid.setQ}
-              compact
-              rightActions={
-                <Stack direction="row" spacing={1}>
-                  <Tooltip
-                    title={
-                      canBulkRestore
-                        ? 'Ripristina selezionati'
-                        : 'Seleziona almeno un elemento da ripristinare'
-                    }
-                    arrow
-                  >
-                    <span>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        disabled={!canBulkRestore}
-                        onClick={() => setBulkRestoreDlgOpen(true)}
-                        sx={compactCreateButtonSx}
-                      >
-                        <RestoreFromTrashIcon />
-                      </Button>
-                    </span>
-                  </Tooltip>
+      <ConfirmActionDialog
+        open={rowTarget !== null}
+        busy={rowTarget?.mode === 'restore' ? restoreBusy : purgeBusy}
+        title={rowTarget?.mode === 'restore' ? 'Ripristinare questo elemento?' : 'Eliminare definitivamente questo elemento?'}
+        description={
+          rowTarget?.mode === 'restore'
+            ? "L'elemento verrà ripristinato dal cestino."
+            : "L'elemento verrà rimosso in modo permanente. L'operazione non è reversibile."
+        }
+        confirmText={rowTarget?.mode === 'restore' ? 'Ripristina' : 'Elimina definitivamente'}
+        confirmColor={rowTarget?.mode === 'restore' ? 'success' : 'error'}
+        confirmStartIcon={rowTarget?.mode === 'purge' ? <DeleteForeverIcon /> : undefined}
+        onClose={() => setRowTarget(null)}
+        onConfirm={async () => {
+          if (!rowTarget) return
+          const ok =
+            rowTarget.mode === 'restore'
+              ? await doSingleRestore(rowTarget.row)
+              : await doSinglePurge(rowTarget.row)
+          if (ok) setRowTarget(null)
+        }}
+      />
 
-                  <Tooltip
-                    title={
-                      canBulkPurge
-                        ? 'Elimina definitivamente selezionati'
-                        : 'Seleziona almeno un elemento da eliminare definitivamente'
-                    }
-                    arrow
-                  >
-                    <span>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        disabled={!canBulkPurge}
-                        onClick={() => setBulkPurgeDlgOpen(true)}
-                        sx={[
-                          compactCreateButtonSx,
-                          (theme) => ({
-                            bgcolor: theme.palette.error.main,
-                            '&:hover': { bgcolor: theme.palette.error.dark },
-                            '&:disabled': { bgcolor: theme.palette.action.disabledBackground },
-                          }),
-                        ]}
-                      >
-                        <DeleteForeverIcon />
-                      </Button>
-                    </span>
-                  </Tooltip>
-                </Stack>
-              }
-            >
-              <FormControl
-                size="small"
-                sx={{
-                  width: { xs: '100%', md: 220 },
-                  '& .MuiInputBase-root': {
-                    height: 40,
-                    fontSize: '0.95rem',
-                    borderRadius: 1.5,
-                  },
-                }}
-              >
-                <InputLabel>Tipo</InputLabel>
-                <Select
-                  label="Tipo"
-                  value={typeKey}
-                  onChange={(e) => setTypeKey(e.target.value as TrashTypeKey)}
+      {noPermMessage ? (
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+              {noPermMessage}
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : (
+        <EntityListCard<TrashRow>
+          toolbar={{
+            q: grid.q,
+            onQChange: grid.setQ,
+            compact: true,
+            rightActions: (
+              <Stack direction="row" spacing={1}>
+                <Tooltip
+                  title={
+                    canBulkRestore
+                      ? 'Ripristina selezionati'
+                      : 'Seleziona almeno un elemento da ripristinare'
+                  }
+                  arrow
                 >
-                  <MenuItem value="all">Tutti</MenuItem>
-                  {visibleResources.map((r) => (
-                    <MenuItem key={r.key} value={r.key}>
-                      {r.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </ListToolbar>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      disabled={!canBulkRestore}
+                      onClick={() => setBulkRestoreDlgOpen(true)}
+                      sx={compactCreateButtonSx}
+                    >
+                      <RestoreFromTrashIcon />
+                    </Button>
+                  </span>
+                </Tooltip>
 
-            <Divider />
-
-            {typeKey === 'all' && visibleResources.length === 0 ? (
-              <Typography variant="body2" sx={{ opacity: 0.7, px: 0.5 }}>
-                Non hai i permessi per visualizzare alcun tipo di dati.
-              </Typography>
-            ) : typeKey !== 'all' && cfg && !hasPerm(cfg.viewPerm) ? (
-              <Typography variant="body2" sx={{ opacity: 0.7, px: 0.5 }}>
-                Non hai i permessi per visualizzare questo tipo di dati.
-              </Typography>
-            ) : (
-              <ServerDataGrid
-                rows={rows}
-                columns={cols}
-                loading={loading}
-                rowCount={rowCount}
-                emptyState={emptyState}
-                columnVisibilityModel={{ __kind: typeKey === 'all' }}
-                paginationModel={grid.paginationModel}
-                onPaginationModelChange={grid.onPaginationModelChange}
-                sortModel={grid.sortModel}
-                onSortModelChange={grid.onSortModelChange}
-                checkboxSelection={grid.view === 'deleted'}
-                rowSelectionModel={selectionModel}
-                onRowSelectionModelChange={(m) => setSelectionModel(m as GridRowSelectionModel)}
-                height={680}
-                deletedField="deleted_at"
-                getRowId={typeKey === 'all' ? (r: TrashRow) => r.__rid || r.id : undefined}
-              />
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
+                <Tooltip
+                  title={
+                    canBulkPurge
+                      ? 'Elimina definitivamente selezionati'
+                      : 'Seleziona almeno un elemento da eliminare definitivamente'
+                  }
+                  arrow
+                >
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={!canBulkPurge}
+                      onClick={() => setBulkPurgeDlgOpen(true)}
+                      sx={[
+                        compactCreateButtonSx,
+                        (theme) => ({
+                          bgcolor: theme.palette.error.main,
+                          '&:hover': { bgcolor: theme.palette.error.dark },
+                          '&:disabled': { bgcolor: theme.palette.action.disabledBackground },
+                        }),
+                      ]}
+                    >
+                      <DeleteForeverIcon />
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
+            ),
+          }}
+          grid={{
+            rows,
+            columns: cols,
+            loading,
+            rowCount,
+            emptyState,
+            columnVisibilityModel: { __kind: typeKey === 'all' },
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            checkboxSelection: grid.view === 'deleted',
+            rowSelectionModel: selectionModel,
+            onRowSelectionModelChange: (m) => setSelectionModel(m as GridRowSelectionModel),
+            height: 680,
+            deletedField: 'deleted_at',
+            getRowId: typeKey === 'all' ? (r: TrashRow) => r.__rid || r.id : undefined,
+          }}
+          mobileCard={renderTrashCard}
+        >
+          <FormControl
+            size="small"
+            sx={{
+              width: { xs: '100%', md: 220 },
+              '& .MuiInputBase-root': {
+                height: 40,
+                fontSize: '0.95rem',
+                borderRadius: 1.5,
+              },
+            }}
+          >
+            <InputLabel>Tipo</InputLabel>
+            <Select
+              label="Tipo"
+              value={typeKey}
+              onChange={(e) => setTypeKey(e.target.value as TrashTypeKey)}
+            >
+              <MenuItem value="all">Tutti</MenuItem>
+              {visibleResources.map((r) => (
+                <MenuItem key={r.key} value={r.key}>
+                  {r.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </EntityListCard>
+      )}
     </Stack>
   )
 }

@@ -11,6 +11,11 @@ export const api = axios.create({
   },
   xsrfCookieName: 'csrftoken',
   xsrfHeaderName: 'X-CSRFToken',
+  // Django (DRF) legge i parametri multipli con request.query_params.getlist("x"),
+  // che si aspetta "x=1&x=2". Il default di axios serializza invece gli array
+  // come "x[]=1&x[]=2", chiave che Django non riconosce: i filtri ad array
+  // (case_type, assigned_to, ecc.) arriverebbero silenziosamente vuoti.
+  paramsSerializer: { indexes: null },
 })
 
 function extractErrorMessage(err: unknown): string {

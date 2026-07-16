@@ -278,16 +278,8 @@ const cols: GridColDef<InventoryRow>[] = [
       const label  = p.value as string | null
       const key    = p.row?.status_key ?? ''
       if (!label) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
-      // Mappa key → colore chip
-      const COLOR: Record<string, { bg: string; fg: string; border: string }> = {
-        in_use:      { bg: 'rgba(16,185,129,0.10)',  fg: '#065f46', border: 'rgba(16,185,129,0.28)' },
-        maintenance: { bg: 'rgba(245,158,11,0.10)',  fg: '#92400e', border: 'rgba(245,158,11,0.28)' },
-        repair:      { bg: 'rgba(239,68,68,0.10)',   fg: '#991b1b', border: 'rgba(239,68,68,0.28)'  },
-        spare:       { bg: 'rgba(99,102,241,0.10)',  fg: '#3730a3', border: 'rgba(99,102,241,0.28)' },
-        retired:     { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
-        storage:     { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
-      }
-      const c = COLOR[key] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+      // Mappa key → colore chip (STATUS_COLOR, definita più sotto e condivisa con la card mobile)
+      const c = STATUS_COLOR[key] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           <Chip

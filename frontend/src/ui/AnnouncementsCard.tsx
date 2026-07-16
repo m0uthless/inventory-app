@@ -10,6 +10,9 @@ import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
 import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
+import { useToast } from '@shared/ui/toast'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../auth/AuthProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -117,6 +120,11 @@ export default function AnnouncementsCard() {
   const [loading,  setLoading]  = React.useState(true)
   const [adding,   setAdding]   = React.useState(false)
   const [editId,   setEditId]   = React.useState<number | null>(null)
+  // Conferma eliminazione: sostituisce window.confirm (non tematizzato, e
+  // incoerente col resto dell'app che usa ConfirmDeleteDialog).
+  const [deleteId, setDeleteId] = React.useState<number | null>(null)
+  const [deleteBusy, setDeleteBusy] = React.useState(false)
+  const toast = useToast()
 
   const load = React.useCallback(() => {
     api.get<{ results: Announcement[] }>('/announcements/', { params: { page_size: 10 } })
@@ -139,10 +147,20 @@ export default function AnnouncementsCard() {
     load()
   }
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Eliminare questa comunicazione?')) return
-    await api.delete(`/announcements/${id}/`)
-    load()
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const confirmDelete = async () => {
+    if (deleteId === null) return
+    setDeleteBusy(true)
+    try {
+      await api.delete(`/announcements/${deleteId}/`)
+      setDeleteId(null)
+      load()
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setDeleteBusy(false)
+    }
   }
 
   return (
@@ -294,6 +312,15 @@ export default function AnnouncementsCard() {
           </Stack>
         )}
       </Box>
+
+      <ConfirmDeleteDialog
+        open={deleteId !== null}
+        title="Eliminare la comunicazione?"
+        description="La comunicazione verrà eliminata definitivamente."
+        busy={deleteBusy}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+      />
     </Card>
   )
 }

@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "auslbo.apps.AuslBoConfig",
     "device.apps.DeviceConfig",
     "vlan.apps.VlanConfig",
+    "servicenow.apps.ServicenowConfig",
 ]
 
 # --- CSRF / Origin handling ---
@@ -211,7 +212,12 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "core.permissions.IsAuthenticatedDjangoModelPermissions",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    # NB: DRF legge dai settings solo PAGE_SIZE. PAGE_SIZE_QUERY_PARAM e
+    # MAX_PAGE_SIZE non sono chiavi di settings ma attributi di classe del
+    # paginatore: lasciate qui da sole erano inerti, e ?page_size= veniva
+    # ignorato su tutta l'API (ogni lista tornava sempre 25 righe).
+    # StandardResultsPagination le rende effettive rileggendole da qui.
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardResultsPagination",
     "PAGE_SIZE": 25,
     "PAGE_SIZE_QUERY_PARAM": "page_size",
     "MAX_PAGE_SIZE": 200,
@@ -320,3 +326,10 @@ if not DEBUG and not FIELD_ENCRYPTION_KEY:
         "Genera una chiave con: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
         "e impostala come variabile d'ambiente FIELD_ENCRYPTION_KEY."
     )
+
+# ── Notifiche Microsoft Teams ─────────────────────────────────────────────────
+# URL del webhook Workflows (Power Automate) del canale/chat Teams dove notificare
+# la creazione di un nuovo ServiceNow Case. Vuoto = notifica disattivata.
+# Va generato da Teams: canale → Workflows → template "Post to a channel when
+# a webhook request is received".
+SERVICENOW_TEAMS_WEBHOOK_URL = os.getenv("SERVICENOW_TEAMS_WEBHOOK_URL", "")

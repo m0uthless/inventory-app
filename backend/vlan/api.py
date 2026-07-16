@@ -442,7 +442,7 @@ class VlanIpRequestSerializer(serializers.ModelSerializer):
 
 
 class IsAdminAuslBo(IsAuslBoEditor):
-    """Approvazione/rifiuto richieste: superuser o permesso vlan.change_vlanIprequest."""
+    """Approvazione/rifiuto richieste: superuser o permesso vlan.change_vlaniprequest."""
     message = "Solo gli amministratori AUSL BO possono approvare le richieste."
 
     def has_permission(self, request, view) -> bool:
@@ -450,7 +450,7 @@ class IsAdminAuslBo(IsAuslBoEditor):
             return False
         if getattr(request.user, "is_superuser", False):
             return True
-        return request.user.has_perm("vlan.change_vlanIprequest")
+        return request.user.has_perm("vlan.change_vlaniprequest")
 
 
 class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
@@ -482,7 +482,7 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="approve",
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def approve(self, request, pk=None):
-        """Approva una richiesta pendente (richiede permesso vlan.change_vlanIprequest)."""
+        """Approva una richiesta pendente (richiede permesso vlan.change_vlaniprequest)."""
         req: VlanIpRequest = self.get_object()
         if req.stato != VlanIpRequest.Stato.PENDING:
             return Response(
@@ -498,7 +498,7 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="reject",
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def reject(self, request, pk=None):
-        """Rifiuta una richiesta pendente (richiede permesso vlan.change_vlanIprequest)."""
+        """Rifiuta una richiesta pendente (richiede permesso vlan.change_vlaniprequest)."""
         req: VlanIpRequest = self.get_object()
         if req.stato != VlanIpRequest.Stato.PENDING:
             return Response(

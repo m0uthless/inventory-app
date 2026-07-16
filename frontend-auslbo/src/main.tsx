@@ -13,6 +13,14 @@ import { api } from '@shared/api/client'
 // customer — indipendentemente dal fatto che l'utente sia staff o meno.
 // Il frontend Archie principale non registra questo interceptor, quindi
 // le sue richieste non portano l'header e non vengono filtrate.
+//
+// Questo è ora l'UNICO punto in cui l'header viene impostato. Prima il portale
+// aveva anche un proprio src/api/client.ts (istanza axios separata, con
+// l'header nei defaults): il ramo VLAN passava da quella, tutto il resto da
+// questa. Le due istanze divergevano — in particolare la locale non aveva
+// `paramsSerializer: { indexes: null }`, quindi qualunque filtro multi-valore
+// aggiunto alle pagine VLAN sarebbe stato serializzato come `key[]=v` e
+// ignorato da DRF, in silenzio. Il client locale è stato rimosso.
 api.interceptors.request.use((config) => {
   config.headers['X-Auslbo-Portal'] = '1'
   return config

@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { Box, CircularProgress } from '@mui/material'
 import { AppLayout } from './layout/AppLayout'
 import { RequirePerm } from './auth/RequirePerm'
@@ -9,7 +9,6 @@ import { RequireAnyPerm } from './auth/RequireAnyPerm'
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const SiteRepository = lazy(() => import('./pages/SiteRepository'))
-const SiteRepositoryV2 = lazy(() => import('./pages/SiteRepositoryV2'))
 const Customers = lazy(() => import('./pages/Customers'))
 const Sites = lazy(() => import('./pages/Sites'))
 const Contacts = lazy(() => import('./pages/Contacts'))
@@ -28,6 +27,8 @@ const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Issues = lazy(() => import('./pages/Issues'))
+const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
+const ServiceNowStats = lazy(() => import('./pages/ServiceNowStats'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
@@ -75,18 +76,7 @@ const router = createBrowserRouter([
 
       {
         path: 'site-repository-v2',
-        element: (
-          <RequireAnyPerm
-            perms={[
-              'inventory.view_inventory',
-              'crm.view_customer',
-              'crm.view_site',
-              'crm.view_contact',
-            ]}
-          >
-            {lazyEl(<SiteRepositoryV2 />)}
-          </RequireAnyPerm>
-        ),
+        element: <Navigate to="/site-repository" replace />,
       },
 
       {
@@ -196,6 +186,14 @@ const router = createBrowserRouter([
       {
         path: 'issues',
         element: <RequirePerm perm="issues.view_issue">{lazyEl(<Issues />)}</RequirePerm>,
+      },
+      {
+        path: 'servicenow-cases',
+        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowCases />)}</RequirePerm>,
+      },
+      {
+        path: 'servicenow-stats',
+        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowStats />)}</RequirePerm>,
       },
       { path: 'bug-feature', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
       { path: 'bug-feature/resolved', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
