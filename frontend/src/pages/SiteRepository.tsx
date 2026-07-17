@@ -775,21 +775,9 @@ function SitesWithInventoryTab({
     return () => { cancelled = true }
   }, [customerId, refreshToken])
 
-  if (loading) return (
-    <Box sx={{ py: 2, px: 2 }}>
-      {[1, 2].map((i) => <Skeleton key={i} height={44} sx={{ mb: 0.5 }} />)}
-    </Box>
-  )
-
-  if (!sites.length) return (
-    <Box sx={{ py: 2, px: 2 }}>
-      <Typography sx={{ fontSize: FS.body, color: 'text.secondary' }}>Nessun sito registrato.</Typography>
-    </Box>
-  )
-
-  const orphans = inventory.filter((inv) => !inv.site)
-
-  // Calcola asset matchanti per la ricerca puntuale
+  // Gli hook devono stare PRIMA di qualsiasi return condizionale (regole degli
+  // hook): con loading iniziale a true, un early-return prima di questi useMemo
+  // farebbe girare un numero di hook diverso tra i render → React error #310.
   const matchedAssetIds = React.useMemo(() => {
     if (!searchQuery) return null
     const ids = new Set<number>()
@@ -815,6 +803,20 @@ function SitesWithInventoryTab({
     if (!searchQuery || !matchedAssetIds) return null
     return matchedAssetIds
   }, [searchQuery, matchedAssetIds])
+
+  if (loading) return (
+    <Box sx={{ py: 2, px: 2 }}>
+      {[1, 2].map((i) => <Skeleton key={i} height={44} sx={{ mb: 0.5 }} />)}
+    </Box>
+  )
+
+  if (!sites.length) return (
+    <Box sx={{ py: 2, px: 2 }}>
+      <Typography sx={{ fontSize: FS.body, color: 'text.secondary' }}>Nessun sito registrato.</Typography>
+    </Box>
+  )
+
+  const orphans = inventory.filter((inv) => !inv.site)
 
   const hasSearch = Boolean(searchQuery)
 
@@ -908,12 +910,8 @@ function InventoryFlatTab({ customerId, searchQuery, statusFilter, onOpenDrawer,
     return () => { cancelled = true }
   }, [customerId, refreshToken])
 
-  if (loading) return (
-    <Box sx={{ py: 2, px: 2 }}>
-      {[1, 2, 3].map((i) => <Skeleton key={i} height={36} sx={{ mb: 0.5 }} />)}
-    </Box>
-  )
-
+  // useMemo prima dell'early-return su loading: stesso vincolo di
+  // SitesWithInventoryTab (React error #310 con loading iniziale a true).
   const filtered = React.useMemo(() => {
     if (!searchQuery) return rows.filter((r) => matchesStatusFilter(statusFilter, r.status_label))
     return rows.filter((r) =>
@@ -921,6 +919,12 @@ function InventoryFlatTab({ customerId, searchQuery, statusFilter, onOpenDrawer,
       matchesSearch(searchQuery, r.hostname, r.name, r.local_ip, r.srsa_ip, r.site_name, r.serial_number, r.knumber)
     )
   }, [rows, searchQuery, statusFilter])
+
+  if (loading) return (
+    <Box sx={{ py: 2, px: 2 }}>
+      {[1, 2, 3].map((i) => <Skeleton key={i} height={36} sx={{ mb: 0.5 }} />)}
+    </Box>
+  )
 
   if (!filtered.length) return (
     <Box sx={{ py: 2, px: 2 }}>
