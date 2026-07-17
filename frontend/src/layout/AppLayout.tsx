@@ -42,6 +42,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBookOutlined'
 import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
+import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
 import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
 import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded'
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
@@ -111,6 +112,7 @@ const BUG_FEATURE_CHILDREN: NavItem[] = [
 
 const SERVICENOW_CHILDREN: NavItem[] = [
   { label: 'SNow Statistiche', path: '/servicenow-stats', icon: <BarChartOutlinedIcon />, perm: 'servicenow.view_servicenowcase' },
+  { label: 'Assenze tecnici', path: '/servicenow-absences', icon: <EventBusyOutlinedIcon />, perm: 'servicenow.view_servicenowcase' },
 ]
 
 const NAV: NavItem[] = [
@@ -478,7 +480,7 @@ export function AppLayout() {
   const siteRepositoryFlyoutOpen = Boolean(siteRepositoryFlyoutAnchor)
 
   const servicenowSectionActive = React.useMemo(
-    () => ['/servicenow-cases', '/servicenow-stats'].some((path) => isSelected(loc.pathname, path)),
+    () => ['/servicenow-cases', '/servicenow-stats', '/servicenow-absences'].some((path) => isSelected(loc.pathname, path)),
     [loc.pathname],
   )
   const [servicenowOpen, setServicenowOpen] = React.useState(() => {
@@ -582,6 +584,7 @@ export function AppLayout() {
       ['/maintenance',            'MANUTENZIONE'],
       ['/issues',                 'ISSUES'],
       ['/servicenow-stats',       'SERVICENOW · STATISTICHE'],
+      ['/servicenow-absences',    'SERVICENOW · ASSENZE TECNICI'],
       ['/servicenow-cases',       'SERVICENOW'],
       ['/bug-feature',            'BUG / FEATURE'],
       ['/audit',                  'AUDIT'],

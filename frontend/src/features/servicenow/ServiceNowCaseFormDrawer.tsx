@@ -29,6 +29,14 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { isRecord } from '@shared/utils/guards'
 import type { ServiceNowCaseRow } from '../../pages/ServiceNowCases'
+import { todayISO } from './absenceShared'
+
+// Ora corrente "HH:MM" (locale) — usata per precompilare l'ora apertura
+// quando la data selezionata/estratta è oggi.
+function nowHHMM(): string {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +47,7 @@ export type ServiceNowCaseForm = {
   category: string
   case_type: number | ''
   opened_date: string      // ISO "YYYY-MM-DD" o ''
+  opened_time: string      // "HH:MM" o '' — richiesta se opened_date è impostata
   short_description: string
   assigned_to: number | null
   external_url: string
@@ -66,6 +75,7 @@ const EMPTY_FORM: ServiceNowCaseForm = {
   category: 'biotron',
   case_type: '',
   opened_date: '',
+  opened_time: '',
   short_description: '',
   assigned_to: null,
   external_url: '',
@@ -132,6 +142,7 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
         category: initial.category,
         case_type: initial.case_type,
         opened_date: initial.opened_date ?? '',
+        opened_time: initial.opened_time ?? '',
         short_description: initial.short_description,
         assigned_to: initial.assigned_to,
         external_url: initial.external_url ?? '',
@@ -191,17 +202,29 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
       .catch(() => {})
   }, [])
 
-  // Tecnici assenti (ferie/malattia/ecc.) nella data di apertura selezionata:
-  // non devono essere proponibili nella select "Assegnato a".
+  // Tecnici assenti (ferie/malattia/ecc.) nella data (e ora, se orario) di
+  // apertura selezionata: non devono essere proponibili in "Assegnato a".
+  // Un'assenza a giornata intera esclude sempre; un permesso orario esclude
+  // solo se l'ora apertura inserita rientra nella fascia registrata.
   const [absentUserIds, setAbsentUserIds] = React.useState<Set<number>>(new Set())
 
   React.useEffect(() => {
     if (!form.opened_date) { setAbsentUserIds(new Set()); return }
     api
-      .get<{ user: number }[]>('/technician-absences/', { params: { date_from: form.opened_date, date_to: form.opened_date } })
-      .then((r) => setAbsentUserIds(new Set(r.data.map((a) => a.user))))
+      .get<{ user: number; is_hourly: boolean; time_from: string | null; time_to: string | null }[]>(
+        '/technician-absences/', { params: { date_from: form.opened_date, date_to: form.opened_date } },
+      )
+      .then((r) => {
+        const openedTime = form.opened_time || null
+        const excluded = r.data.filter((a) => {
+          if (!a.is_hourly) return true
+          if (!openedTime || !a.time_from || !a.time_to) return false
+          return a.time_from.slice(0, 5) <= openedTime && openedTime <= a.time_to.slice(0, 5)
+        })
+        setAbsentUserIds(new Set(excluded.map((a) => a.user)))
+      })
       .catch(() => setAbsentUserIds(new Set()))
-  }, [form.opened_date])
+  }, [form.opened_date, form.opened_time])
 
   // Se il tecnico assegnato risulta assente nella data selezionata (es. la
   // data apertura è stata cambiata dopo l'assegnazione), l'assegnazione va
@@ -216,6 +239,18 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
 
   const set = <K extends keyof ServiceNowCaseForm>(k: K, v: ServiceNowCaseForm[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }))
+
+  // Applica una nuova data apertura con la regola per l'ora: se la data è
+  // oggi, precompila con l'ora attuale (comunque editabile); se è una data
+  // diversa, l'ora va inserita manualmente (azzerata per evitare di lasciare
+  // per sbaglio un vecchio orario riferito a un altro giorno).
+  const applyOpenedDate = (newDate: string) => {
+    setForm((prev) => ({
+      ...prev,
+      opened_date: newDate,
+      opened_time: newDate && newDate === todayISO() ? nowHHMM() : '',
+    }))
+  }
 
   const isSm = { size: 'small' as const, fullWidth: true }
 
@@ -234,14 +269,23 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       const d = res.data
-      setForm((prev) => ({
-        ...prev,
-        number: d.number ?? prev.number,
-        account: d.account ?? prev.account,
-        priority: d.priority ?? prev.priority,
-        opened_date: d.opened_date ?? prev.opened_date,
-        short_description: d.short_description ?? prev.short_description,
-      }))
+      setForm((prev) => {
+        const opened_date = d.opened_date ?? prev.opened_date
+        // Stessa regola del campo manuale: data estratta = oggi → ora attuale
+        // come default; data diversa → ora da inserire manualmente.
+        const opened_time = d.opened_date
+          ? (d.opened_date === todayISO() ? nowHHMM() : '')
+          : prev.opened_time
+        return {
+          ...prev,
+          number: d.number ?? prev.number,
+          account: d.account ?? prev.account,
+          priority: d.priority ?? prev.priority,
+          opened_date,
+          opened_time,
+          short_description: d.short_description ?? prev.short_description,
+        }
+      })
       if (d.warnings?.length) {
         setExtractWarnings(d.warnings)
       } else {
@@ -290,7 +334,9 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
   const title    = isEdit ? initial!.number : 'Nuovo ServiceNow Case'
   const subtitle = isEdit ? initial!.account : undefined
 
-  const canSave = Boolean(form.number.trim() && form.account.trim() && form.priority && form.category && form.case_type !== '') && !extracting
+  const canSave = Boolean(
+    form.number.trim() && form.account.trim() && form.priority && form.category && form.case_type !== '',
+  ) && (!form.opened_date || Boolean(form.opened_time)) && !extracting
 
   return (
     <DrawerShell
@@ -408,16 +454,30 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
           </FormField>
         </Stack>
 
-        {/* Data apertura */}
-        <FormField label="Data apertura">
-          <TextField
-            {...isSm}
-            type="date"
-            value={form.opened_date}
-            onChange={(e) => set('opened_date', e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-        </FormField>
+        {/* Data + ora apertura */}
+        <Stack direction="row" spacing={1}>
+          <FormField label="Data apertura">
+            <TextField
+              {...isSm}
+              type="date"
+              value={form.opened_date}
+              onChange={(e) => applyOpenedDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </FormField>
+          <FormField label={form.opened_date ? 'Ora apertura *' : 'Ora apertura'}>
+            <TextField
+              {...isSm}
+              type="time"
+              value={form.opened_time}
+              onChange={(e) => set('opened_time', e.target.value)}
+              error={Boolean(form.opened_date) && !form.opened_time}
+              disabled={!form.opened_date}
+              helperText={Boolean(form.opened_date) && !form.opened_time ? 'Obbligatoria' : ' '}
+              InputLabelProps={{ shrink: true }}
+            />
+          </FormField>
+        </Stack>
 
         {/* Descrizione breve */}
         <FormField label="Descrizione breve">

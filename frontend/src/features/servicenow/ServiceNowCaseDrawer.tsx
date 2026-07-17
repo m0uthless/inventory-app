@@ -9,6 +9,7 @@ import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import AuditEventsTab from '../../ui/AuditEventsTab'
 import type { ServiceNowCaseRow } from '../../pages/ServiceNowCases'
+import { formatOpenedAt } from '../../pages/ServiceNowCases'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export default function ServiceNowCaseDrawer({
                 { label: 'Categoria', value: detail.category_label },
                 { label: 'Type', value: detail.case_type_label },
                 { label: 'Priorità', value: detail.priority_label },
-                { label: 'Aperto il', value: detail.opened_date },
+                { label: 'Aperto il', value: formatOpenedAt(detail) },
               ]} />
               {detail.external_url && (
                 <Button

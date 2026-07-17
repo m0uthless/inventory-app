@@ -29,6 +29,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
 const ServiceNowStats = lazy(() => import('./pages/ServiceNowStats'))
+const ServiceNowAbsences = lazy(() => import('./pages/ServiceNowAbsences'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
@@ -194,6 +195,10 @@ const router = createBrowserRouter([
       {
         path: 'servicenow-stats',
         element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowStats />)}</RequirePerm>,
+      },
+      {
+        path: 'servicenow-absences',
+        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowAbsences />)}</RequirePerm>,
       },
       { path: 'bug-feature', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
       { path: 'bug-feature/resolved', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },

@@ -3,7 +3,7 @@ categoria Philips/Biotron, esclusione non-tecnici, conteggio case del
 giorno, e marcatura degli assenti.
 """
 import uuid
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -43,6 +43,7 @@ def _create_case_today(api_client, case_type, category, assigned_to=None, number
         "category": category,
         "case_type": case_type.id,
         "opened_date": date.today().isoformat(),
+        "opened_time": "09:00",
     }
     if assigned_to is not None:
         payload["assigned_to"] = assigned_to.id
@@ -111,6 +112,47 @@ def test_triage_marks_absent_technician(api_client, superuser):
     biotron_techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
     assert biotron_techs["Absent Test"]["absent"] is True
     assert biotron_techs["Absent Test"]["absence_reason"] == "Ferie"
+
+
+def test_triage_hourly_absence_marks_absent_only_during_window(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    tech = _make_tech(name="Permesso")
+    TechnicianAbsence.objects.create(
+        user=tech, date_from=date.today(), date_to=date.today(), reason="altro",
+        time_from="14:00", time_to="16:00",
+    )
+
+    with patch("servicenow.api.timezone.localtime") as mock_localtime:
+        mock_localtime.return_value.time.return_value = time(15, 0)
+        resp = api_client.get("/api/servicenow-cases/triage/")
+    techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
+    assert techs["Permesso Test"]["absent"] is True
+
+    with patch("servicenow.api.timezone.localtime") as mock_localtime:
+        mock_localtime.return_value.time.return_value = time(9, 0)
+        resp = api_client.get("/api/servicenow-cases/triage/")
+    techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
+    assert techs["Permesso Test"]["absent"] is False
+
+
+def test_triage_full_day_absence_wins_over_hourly_window(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    tech = _make_tech(name="Doppia")
+    today = date.today()
+    # Ferie giornata intera + un permesso orario registrato per errore lo stesso giorno:
+    # deve restare "assente" per l'intera giornata, con il motivo dell'assenza principale.
+    TechnicianAbsence.objects.create(user=tech, date_from=today, date_to=today, reason="ferie")
+    TechnicianAbsence.objects.create(
+        user=tech, date_from=today, date_to=today, reason="altro",
+        time_from="14:00", time_to="16:00",
+    )
+
+    with patch("servicenow.api.timezone.localtime") as mock_localtime:
+        mock_localtime.return_value.time.return_value = time(9, 0)
+        resp = api_client.get("/api/servicenow-cases/triage/")
+    techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
+    assert techs["Doppia Test"]["absent"] is True
+    assert techs["Doppia Test"]["absence_reason"] == "Ferie"
 
 
 def test_triage_unassigned_cases_grouped_separately(api_client, superuser):

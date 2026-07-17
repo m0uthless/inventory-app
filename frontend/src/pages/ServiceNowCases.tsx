@@ -38,6 +38,14 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import { type AbsenceRow, ABSENCE_REASONS, todayISO, formatItDate, formatItTime } from '../features/servicenow/absenceShared'
+
+// "Aperto il" per card mobile / dettaglio: combina data e ora se entrambe presenti.
+export function formatOpenedAt(row: { opened_date: string | null; opened_time: string | null }): string | null {
+  if (!row.opened_date) return null
+  const time = row.opened_time ? ` · ${formatItTime(row.opened_time)}` : ''
+  return `${formatItDate(row.opened_date)}${time}`
+}
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import ServiceNowCaseDrawer from '../features/servicenow/ServiceNowCaseDrawer'
 import ServiceNowCaseFormDrawer, { type ServiceNowCaseForm } from '../features/servicenow/ServiceNowCaseFormDrawer'
@@ -56,6 +64,7 @@ export type ServiceNowCaseRow = {
   case_type: number
   case_type_label: string
   opened_date: string | null
+  opened_time: string | null
   screenshot_url: string | null
   status: string
   status_label: string
@@ -210,32 +219,6 @@ function TriageCategoryCard({ label, accent, tint, data, canManage, onManage }: 
 }
 
 // ─── Modal gestione assenze tecnico ──────────────────────────────────────────
-
-type AbsenceRow = {
-  id: number
-  user: number
-  user_name: string
-  date_from: string
-  date_to: string
-  reason: string
-  reason_label: string
-  note: string
-}
-
-const ABSENCE_REASONS = [
-  { value: 'ferie', label: 'Ferie' },
-  { value: 'malattia', label: 'Malattia' },
-  { value: 'trasferta', label: 'Trasferta' },
-  { value: 'altro', label: 'Altro' },
-] as const
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function formatItDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
 
 function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
   open: boolean
@@ -479,7 +462,7 @@ const renderServiceNowCaseCard: MobileCardRenderFn<ServiceNowCaseRow> = ({ row, 
         {[
           { label: 'Type', value: `${row.category_label} · ${row.case_type_label}` },
           { label: 'Priorità', value: row.priority_label },
-          { label: 'Aperto il', value: row.opened_date },
+          { label: 'Aperto il', value: formatOpenedAt(row) },
           { label: 'Assegnato a', value: row.assigned_to_full_name },
         ].map(({ label, value }) => (
           <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
@@ -514,7 +497,12 @@ const COLUMNS: GridColDef<ServiceNowCaseRow>[] = [
     width: 130,
     renderCell: ({ row }) => <SemanticChip label={row.priority_label} color={PRIORITY_SEMANTIC[row.priority] ?? 'default'} />,
   },
-  { field: 'opened_date', headerName: 'Aperto il', width: 120 },
+  {
+    field: 'opened_date', headerName: 'Aperto il', width: 150,
+    renderCell: ({ row }) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>{formatOpenedAt(row) ?? '—'}</Box>
+    ),
+  },
   {
     field: 'external_url',
     headerName: 'Link',
@@ -656,6 +644,7 @@ export default function ServiceNowCases() {
       fd.append('category', form.category)
       if (form.case_type !== '') fd.append('case_type', String(form.case_type))
       if (form.opened_date) fd.append('opened_date', form.opened_date)
+      if (form.opened_time) fd.append('opened_time', form.opened_time)
       fd.append('short_description', form.short_description)
       if (form.assigned_to !== null) fd.append('assigned_to', String(form.assigned_to))
       fd.append('external_url', form.external_url)

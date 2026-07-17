@@ -8,6 +8,7 @@ from django.db.models import Count
 from django.db.models.functions import ExtractMonth, ExtractWeek, ExtractIsoYear, ExtractDay
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 import django_filters as filters
 
@@ -53,7 +54,7 @@ class ServiceNowCaseSerializer(serializers.ModelSerializer):
             "priority", "priority_label",
             "category", "category_label",
             "case_type", "case_type_label",
-            "opened_date",
+            "opened_date", "opened_time",
             "screenshot", "screenshot_url",
             "status", "status_label",
             "assigned_to", "assigned_to_username", "assigned_to_full_name", "assigned_to_avatar",
@@ -69,6 +70,18 @@ class ServiceNowCaseSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "screenshot": {"write_only": True, "required": False, "allow_null": True},
         }
+
+    def validate(self, attrs):
+        # Verifichiamo solo se la richiesta tocca opened_date/opened_time: un
+        # PATCH che modifica altri campi non deve rompersi su un case storico
+        # che ha già opened_date senza opened_time (dato pre-esistente a questa
+        # funzionalità).
+        if "opened_date" in attrs or "opened_time" in attrs:
+            opened_date = attrs.get("opened_date", getattr(self.instance, "opened_date", None))
+            opened_time = attrs.get("opened_time", getattr(self.instance, "opened_time", None))
+            if opened_date and not opened_time:
+                raise serializers.ValidationError({"opened_time": "Indicare l'ora di apertura del caso."})
+        return attrs
 
     def get_case_type_label(self, obj):
         return obj.case_type.name if obj.case_type_id else None
@@ -129,11 +142,15 @@ class ServiceNowCaseTypeSerializer(serializers.ModelSerializer):
 class TechnicianAbsenceSerializer(serializers.ModelSerializer):
     user_name    = serializers.SerializerMethodField()
     reason_label = serializers.CharField(source="get_reason_display", read_only=True)
+    is_hourly    = serializers.BooleanField(read_only=True)
 
     class Meta:
         model  = TechnicianAbsence
-        fields = ["id", "user", "user_name", "date_from", "date_to", "reason", "reason_label", "note", "created_at"]
-        read_only_fields = ["id", "user_name", "reason_label", "created_at"]
+        fields = [
+            "id", "user", "user_name", "date_from", "date_to", "reason", "reason_label",
+            "note", "time_from", "time_to", "is_hourly", "created_at",
+        ]
+        read_only_fields = ["id", "user_name", "reason_label", "is_hourly", "created_at"]
 
     def get_user_name(self, obj):
         u = obj.user
@@ -142,8 +159,21 @@ class TechnicianAbsenceSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         date_from = attrs.get("date_from", getattr(self.instance, "date_from", None))
         date_to   = attrs.get("date_to",   getattr(self.instance, "date_to", None))
+        time_from = attrs.get("time_from", getattr(self.instance, "time_from", None))
+        time_to   = attrs.get("time_to",   getattr(self.instance, "time_to", None))
         if date_from and date_to and date_to < date_from:
             raise serializers.ValidationError({"date_to": "La data di fine non può precedere quella di inizio."})
+        if time_from or time_to:
+            if not (time_from and time_to):
+                raise serializers.ValidationError(
+                    "Per un'assenza oraria vanno indicate sia l'ora di inizio sia l'ora di fine."
+                )
+            if date_from and date_to and date_from != date_to:
+                raise serializers.ValidationError(
+                    "Un'assenza oraria (permesso) deve riguardare un solo giorno (Dal = Al)."
+                )
+            if time_to <= time_from:
+                raise serializers.ValidationError({"time_to": "L'ora di fine deve essere successiva all'ora di inizio."})
         return attrs
 
 
@@ -173,7 +203,7 @@ class TechnicianAbsenceViewSet(viewsets.ModelViewSet):
 
     serializer_class   = TechnicianAbsenceSerializer
     permission_classes = [TechnicianAbsencePermission]
-    http_method_names  = ["get", "post", "delete", "head", "options"]
+    http_method_names  = ["get", "post", "patch", "delete", "head", "options"]
     pagination_class   = None
     filter_backends    = [DjangoFilterBackend]
     filterset_fields   = ["user"]
@@ -190,6 +220,33 @@ class TechnicianAbsenceViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=["get"], url_path="technicians")
+    def technicians(self, request):
+        """Elenco tecnici ServiceNow attivi (id, nome, categoria Philips/Biotron).
+
+        Usato dalla pagina calendario 'Assenze tecnici' per costruire le righe,
+        raggruppate per categoria come nel pannello Triage.
+        """
+        users = (
+            User.objects.select_related("profile")
+                .filter(is_active=True)
+                .order_by("first_name", "last_name", "username")
+        )
+        result = []
+        for u in users:
+            try:
+                if not bool(u.profile.is_servicenow_technician):
+                    continue
+                is_philips = bool(u.profile.is_philips)
+            except Exception:
+                continue
+            name = f"{u.first_name} {u.last_name}".strip() or u.username
+            result.append({
+                "id": u.id, "name": name,
+                "category": ServiceNowCaseCategory.PHILIPS if is_philips else ServiceNowCaseCategory.BIOTRON,
+            })
+        return Response(result)
 
 
 # ─── Filters ─────────────────────────────────────────────────────────────────
@@ -345,6 +402,11 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
         (Philips/Biotron) e tecnico, ordinati per numero di casi decrescente.
         Include SEMPRE tutti i tecnici attivi della categoria, anche a 0 casi
         oggi, così il pannello 'Triage' mostra a colpo d'occhio chi è scarico.
+
+        Lo stato 'assente' è sensibile all'ora corrente: un'assenza a giornata
+        intera (ferie/malattia/trasferta/altro senza orario) copre tutto il
+        giorno; un permesso orario segnala il tecnico assente solo mentre
+        l'orario corrente rientra nella fascia registrata.
         """
         today = date.today()
         qs = self.get_queryset().filter(opened_date=today)
@@ -358,12 +420,22 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             else:
                 counts_map[(cat, uid)] = r["count"]
 
-        absent_map = {
-            uid: TechnicianAbsenceReason(reason).label
-            for uid, reason in TechnicianAbsence.objects
+        # Assenza "adesso": le assenze a giornata intera valgono per tutto il
+        # giorno; i permessi orari segnalano il tecnico assente solo mentre
+        # l'orario corrente rientra nella fascia time_from–time_to.
+        now_time = timezone.localtime().time()
+        today_absences = list(
+            TechnicianAbsence.objects
                 .filter(date_from__lte=today, date_to__gte=today)
-                .values_list("user_id", "reason")
-        }
+                .values_list("user_id", "reason", "time_from", "time_to")
+        )
+        absent_map = {}
+        for uid, reason, time_from, time_to in today_absences:
+            if not (time_from and time_to):
+                absent_map[uid] = TechnicianAbsenceReason(reason).label
+        for uid, reason, time_from, time_to in today_absences:
+            if time_from and time_to and uid not in absent_map and time_from <= now_time <= time_to:
+                absent_map[uid] = TechnicianAbsenceReason(reason).label
 
         technicians = list(
             User.objects.select_related("profile")
@@ -500,8 +572,12 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
         # ── Overlay assenze: solo in vista giornaliera per ora (per settimana/
         # mese una singola colonna aggrega più giorni e marcarla come "assente"
         # sarebbe fuorviante). Calcolo l'intervallo di date di ogni periodo e
-        # marco come "assente" ogni cella tecnico×periodo sovrapposta a
-        # un'assenza registrata. Usato dalla heatmap per la cella rossa "F".
+        # associo a ogni cella tecnico×periodo il motivo (reason) dell'assenza
+        # a giornata intera che la copre, se presente — usato dalla heatmap
+        # per colorare la cella (H=Ferie blu, I=Malattia rosso, T=Trasferta/
+        # Altro grigio). I permessi orari (poche ore) NON influenzano la
+        # cella giornaliera: un tecnico con 2 ore di permesso ha comunque
+        # lavorato il resto della giornata.
         if granularity == "day":
             def period_date_range(key):
                 d = date(year, month, key)
@@ -513,16 +589,40 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             if period_ranges:
                 overall_start = min(s for s, _ in period_ranges)
                 overall_end   = max(e for _, e in period_ranges)
-                for a in TechnicianAbsence.objects.filter(date_from__lte=overall_end, date_to__gte=overall_start) \
-                                                   .values("user_id", "date_from", "date_to"):
-                    absences_by_user.setdefault(a["user_id"], []).append((a["date_from"], a["date_to"]))
+                full_day_absences = (
+                    TechnicianAbsence.objects
+                        .filter(
+                            date_from__lte=overall_end, date_to__gte=overall_start,
+                            time_from__isnull=True, time_to__isnull=True,
+                        )
+                        .values("user_id", "date_from", "date_to", "reason")
+                )
+                for a in full_day_absences:
+                    absences_by_user.setdefault(a["user_id"], []).append(
+                        (a["date_from"], a["date_to"], a["reason"])
+                    )
+
+            # Priorità se più assenze a giornata intera si sovrappongono per lo
+            # stesso tecnico/giorno (raro, es. correzione in corso): la più
+            # "grave" vince nella visualizzazione.
+            reason_priority = {
+                TechnicianAbsenceReason.MALATTIA: 0,
+                TechnicianAbsenceReason.FERIE: 1,
+                TechnicianAbsenceReason.TRASFERTA: 2,
+                TechnicianAbsenceReason.ALTRO: 2,
+            }
 
             for s in series:
                 ranges = absences_by_user.get(s["user_id"], [])
-                s["absent_periods"] = [
-                    any(af <= pend and at >= pstart for af, at in ranges)
-                    for pstart, pend in period_ranges
-                ]
+                reasons_for_period = []
+                for pstart, pend in period_ranges:
+                    matches = [r for af, at, r in ranges if af <= pend and at >= pstart]
+                    if matches:
+                        matches.sort(key=lambda r: reason_priority.get(r, 99))
+                        reasons_for_period.append(matches[0])
+                    else:
+                        reasons_for_period.append(None)
+                s["absence_periods"] = reasons_for_period
 
         total = sum(sum(s["counts"]) for s in series)
 

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from core.models import TimeStampedModel
@@ -76,6 +77,10 @@ class ServiceNowCase(TimeStampedModel):
         default=ServiceNowPriority.MODERATE, verbose_name="Priorità",
     )
     opened_date        = models.DateField(null=True, blank=True, verbose_name="Data apertura")
+    opened_time        = models.TimeField(
+        null=True, blank=True, verbose_name="Ora apertura",
+        help_text="Richiesta lato form quando è impostata la data apertura (non estratta via OCR).",
+    )
     short_description  = models.TextField(blank=True, verbose_name="Descrizione breve")
     screenshot         = models.ImageField(
         upload_to=servicenow_screenshot_upload_path,
@@ -160,6 +165,13 @@ class TechnicianAbsence(models.Model):
         default=TechnicianAbsenceReason.FERIE, verbose_name="Motivo",
     )
     note       = models.CharField(max_length=255, blank=True, verbose_name="Nota")
+    time_from  = models.TimeField(
+        null=True, blank=True, verbose_name="Ora inizio",
+        help_text="Valorizzare insieme a Ora fine solo per un'assenza oraria (permesso) su un singolo giorno.",
+    )
+    time_to    = models.TimeField(
+        null=True, blank=True, verbose_name="Ora fine",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name="+", verbose_name="Creato da",
@@ -181,6 +193,20 @@ class TechnicianAbsence(models.Model):
         indexes = [
             models.Index(fields=["user", "date_from", "date_to"], name="sn_absence_user_range_idx"),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.time_from or self.time_to:
+            if not (self.time_from and self.time_to):
+                raise ValidationError("Per un'assenza oraria vanno indicate sia l'ora di inizio sia l'ora di fine.")
+            if self.date_from != self.date_to:
+                raise ValidationError("Un'assenza oraria (permesso) deve riguardare un solo giorno (Dal = Al).")
+            if self.time_to <= self.time_from:
+                raise ValidationError({"time_to": "L'ora di fine deve essere successiva all'ora di inizio."})
+
+    @property
+    def is_hourly(self) -> bool:
+        return bool(self.time_from and self.time_to)
 
     def __str__(self):
         return f"{self.user} · {self.date_from} → {self.date_to} ({self.get_reason_display()})"

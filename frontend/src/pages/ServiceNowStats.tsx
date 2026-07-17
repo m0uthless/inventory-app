@@ -35,8 +35,9 @@ import { isRecord } from '@shared/utils/guards'
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
+type AbsenceReasonCode = 'ferie' | 'malattia' | 'trasferta' | 'altro'
 type StatsPeriod = { key: number; label: string }
-type StatsSeries = { user_id: number | null; name: string; counts: number[]; absent_periods?: boolean[] }
+type StatsSeries = { user_id: number | null; name: string; counts: number[]; absence_periods?: (AbsenceReasonCode | null)[] }
 type TypeBreakdownRow = { id: number; name: string; count: number }
 type StatsResponse = {
   granularity: 'day' | 'week' | 'month'
@@ -186,6 +187,15 @@ function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
   )
 }
 
+// ─── Motivo assenza → lettera/colore cella heatmap ───────────────────────────
+
+const ABSENCE_CELL_STYLE: Record<AbsenceReasonCode, { letter: string; bg: string; fg: string }> = {
+  malattia:  { letter: 'I', bg: '#ef4444', fg: '#ffffff' },  // rosso
+  ferie:     { letter: 'H', bg: '#3b82f6', fg: '#ffffff' },  // azzurro
+  trasferta: { letter: 'T', bg: '#9ca3af', fg: '#1f2937' },  // grigio (come Altro)
+  altro:     { letter: 'T', bg: '#9ca3af', fg: '#1f2937' },  // grigio
+}
+
 // ─── Matrice heatmap ────────────────────────────────────────────────────────
 
 function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: StatsSeries[] }) {
@@ -224,12 +234,13 @@ function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: Stat
             <Box component="tr" key={s.user_id ?? 'unassigned'}>
               <Box component="td" sx={{ p: 0.5, whiteSpace: 'nowrap', position: 'sticky', left: 0, bgcolor: 'background.paper' }}>{s.name}</Box>
               {s.counts.map((v, i) => {
-                const absent = s.absent_periods?.[i]
-                const c = absent ? { bg: '#ef4444', fg: '#ffffff' } : colorFor(v)
+                const reason = s.absence_periods?.[i]
+                const style = reason ? ABSENCE_CELL_STYLE[reason] : null
+                const c = style ? { bg: style.bg, fg: style.fg } : colorFor(v)
                 return (
                   <Box component="td" key={periods[i].key} sx={{ p: 0.4 }}>
                     <Box sx={{ bgcolor: c.bg, color: c.fg, borderRadius: 0.5, textAlign: 'center', fontWeight: 700, py: 0.3 }}>
-                      {absent ? 'F' : (v || '')}
+                      {style ? style.letter : (v || '')}
                     </Box>
                   </Box>
                 )
@@ -499,15 +510,22 @@ function CategoryStatsPanel({ category, label, allUsers }: {
             {view === 'chart'
               ? <StatsBarChart periods={data.periods} series={data.series} />
               : <StatsMatrix periods={data.periods} series={data.series} />}
-            {view === 'matrix' && data.series.some((s) => s.absent_periods?.some(Boolean)) && (
-              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 1 }}>
-                <Box sx={{
-                  width: 16, height: 16, borderRadius: 0.5, bgcolor: '#ef4444', color: '#fff',
-                  fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  F
-                </Box>
-                <Typography variant="caption" sx={{ color: 'text.disabled' }}>Tecnico assente (ferie/malattia/altro)</Typography>
+            {view === 'matrix' && data.series.some((s) => s.absence_periods?.some(Boolean)) && (
+              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1, flexWrap: 'wrap' }}>
+                {(['malattia', 'ferie', 'altro'] as const).map((r) => (
+                  <Stack key={r} direction="row" alignItems="center" spacing={0.5}>
+                    <Box sx={{
+                      width: 16, height: 16, borderRadius: 0.5,
+                      bgcolor: ABSENCE_CELL_STYLE[r].bg, color: ABSENCE_CELL_STYLE[r].fg,
+                      fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {ABSENCE_CELL_STYLE[r].letter}
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                      {r === 'malattia' ? 'Malattia' : r === 'ferie' ? 'Ferie' : 'Trasferta / Altro'}
+                    </Typography>
+                  </Stack>
+                ))}
               </Stack>
             )}
           </Box>

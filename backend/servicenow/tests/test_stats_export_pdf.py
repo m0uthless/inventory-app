@@ -30,6 +30,7 @@ def _create_case(api_client, case_type, *, opened_date, category=ServiceNowCaseC
     payload = {
         "number": f"CS{uuid.uuid4().hex[:8]}", "account": "ACME", "priority": "3",
         "category": category, "case_type": case_type.id, "opened_date": opened_date.isoformat(),
+        "opened_time": "09:00",
     }
     if assigned_to is not None:
         payload["assigned_to"] = assigned_to.id

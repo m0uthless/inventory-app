@@ -29,6 +29,96 @@ def _case_payload(case_type, number=None, **overrides):
     return payload
 
 
+# ─── Ora apertura richiesta insieme alla data ────────────────────────────────
+
+def test_create_case_with_opened_date_requires_opened_time(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, opened_date="2026-07-17"),
+            format="json",
+        )
+    assert resp.status_code == 400
+    assert "opened_time" in resp.data
+
+
+def test_create_case_with_opened_date_and_time_succeeds(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, opened_date="2026-07-17", opened_time="14:30"),
+            format="json",
+        )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["opened_time"] == "14:30:00"
+
+
+def test_create_case_without_opened_date_does_not_require_opened_time(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/", _case_payload(case_type), format="json",
+        )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["opened_time"] is None
+
+
+def test_patch_changing_opened_date_keeps_existing_opened_time(api_client, superuser):
+    """PATCH che cambia solo la data non deve richiedere di reinviare l'ora
+    se il case ha già un opened_time valido."""
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+    case = ServiceNowCase.objects.create(
+        number=f"CS{uuid.uuid4().hex[:8]}", account="ACME", priority="3",
+        category=ServiceNowCaseCategory.BIOTRON, case_type=case_type,
+        opened_date="2026-01-10", opened_time="09:00",
+    )
+
+    resp = api_client.patch(f"/api/servicenow-cases/{case.id}/", {"opened_date": "2026-01-11"}, format="json")
+    assert resp.status_code == 200, resp.data
+    assert resp.data["opened_time"] == "09:00:00"
+
+
+def test_patch_setting_opened_date_on_case_without_time_requires_opened_time(api_client, superuser):
+    """PATCH che imposta/cambia opened_date su un case senza opened_time
+    valorizzata deve invece richiederla esplicitamente."""
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+    case = ServiceNowCase.objects.create(
+        number=f"CS{uuid.uuid4().hex[:8]}", account="ACME", priority="3",
+        category=ServiceNowCaseCategory.BIOTRON, case_type=case_type,
+        opened_date="2026-01-10",  # opened_time volutamente assente
+    )
+
+    resp = api_client.patch(f"/api/servicenow-cases/{case.id}/", {"opened_date": "2026-01-11"}, format="json")
+    assert resp.status_code == 400
+    assert "opened_time" in resp.data
+
+
+def test_patch_unrelated_field_does_not_require_opened_time_on_old_case(api_client, superuser):
+    """Un case storico, creato prima di questa funzionalità, può avere
+    opened_date valorizzata e opened_time nulla: un PATCH che non tocca
+    questi campi non deve rompersi per una validazione retroattiva."""
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+    case = ServiceNowCase.objects.create(
+        number=f"CS{uuid.uuid4().hex[:8]}", account="ACME", priority="3",
+        category=ServiceNowCaseCategory.BIOTRON, case_type=case_type,
+        opened_date="2026-01-10",  # opened_time volutamente assente
+    )
+
+    resp = api_client.patch(f"/api/servicenow-cases/{case.id}/", {"account": "ACME 2"}, format="json")
+    assert resp.status_code == 200, resp.data
+
+
 # ─── Creazione + notifica Teams (best-effort) ────────────────────────────────
 
 def test_create_case_triggers_teams_notification(api_client, superuser):

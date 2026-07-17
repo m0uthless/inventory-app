@@ -35,6 +35,7 @@ def _create_case(api_client, case_type, *, opened_date, category=ServiceNowCaseC
         "category": category,
         "case_type": case_type.id,
         "opened_date": opened_date.isoformat(),
+        "opened_time": "09:00",
     }
     if assigned_to is not None:
         payload["assigned_to"] = assigned_to.id
@@ -146,7 +147,54 @@ def test_stats_day_granularity_requires_month_and_marks_absences(api_client, sup
 
     series = resp.data["series"][0]
     day_10_index = 9  # giorno 10 -> indice 9 (periods parte da 1)
-    assert series["absent_periods"][day_10_index] is True
+    assert series["absence_periods"][day_10_index] == "malattia"
+    assert series["absence_periods"][day_10_index - 1] is None
+
+
+def test_stats_day_granularity_ignores_hourly_absence(api_client, superuser):
+    """Un permesso orario (poche ore) non deve marcare l'intera cella
+    giornaliera come assente nella heatmap: il tecnico ha comunque lavorato
+    il resto del giorno."""
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+    tech = _make_tech()
+    _create_case(api_client, case_type, opened_date=date(2026, 6, 10), assigned_to=tech)
+
+    from servicenow.models import TechnicianAbsence
+    TechnicianAbsence.objects.create(
+        user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="altro",
+        time_from="14:00", time_to="16:00",
+    )
+
+    resp = api_client.get(
+        "/api/servicenow-cases/stats/",
+        {"year": 2026, "granularity": "day", "month": 6},
+    )
+    assert resp.status_code == 200
+    series = resp.data["series"][0]
+    day_10_index = 9
+    assert series["absence_periods"][day_10_index] is None
+
+
+def test_stats_day_granularity_prioritizes_malattia_over_ferie(api_client, superuser):
+    """Se per errore coesistono più assenze a giornata intera lo stesso
+    giorno, in visualizzazione vince quella con priorità più alta."""
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type()
+    tech = _make_tech()
+    _create_case(api_client, case_type, opened_date=date(2026, 6, 10), assigned_to=tech)
+
+    from servicenow.models import TechnicianAbsence
+    TechnicianAbsence.objects.create(user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="ferie")
+    TechnicianAbsence.objects.create(user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="malattia")
+
+    resp = api_client.get(
+        "/api/servicenow-cases/stats/",
+        {"year": 2026, "granularity": "day", "month": 6},
+    )
+    series = resp.data["series"][0]
+    day_10_index = 9
+    assert series["absence_periods"][day_10_index] == "malattia"
 
 
 def test_stats_top_technician_and_top_type_kpi(api_client, superuser):
