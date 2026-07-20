@@ -32,13 +32,13 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import EditIcon from '@mui/icons-material/Edit'
+import StatusChip from '@shared/ui/StatusChip'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
-import StatusChip from '@shared/ui/StatusChip'
-import { getInventoryTypeIcon } from '@shared/ui/inventoryTypeIcon'
+import { getInventoryTypeIcon, getInventoryTypeFamily } from '@shared/ui/inventoryTypeIcon'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
@@ -66,6 +66,7 @@ type CustomerRow = {
   primary_contact_name?: string | null
   primary_contact_phone?: string | null
   status?: number | null
+  status_key?: string | null
   status_label?: string | null
   has_vpn?: boolean | null
   tags?: string[] | null
@@ -358,6 +359,50 @@ function MetaTag({
   )
 }
 
+// ─── ActionButton — pulsante quadrato Info/Modifica ─────────────────────────────
+
+function ActionButton({
+  icon, tone = 'neutral', onClick, ariaLabel, title,
+}: {
+  icon: React.ReactElement
+  tone?: 'info' | 'neutral' | 'success' | 'danger'
+  onClick?: (e: React.MouseEvent) => void
+  ariaLabel: string
+  title?: string
+}) {
+  const theme = useTheme()
+  const paletteColor = {
+    info: theme.palette.info,
+    success: theme.palette.success,
+    danger: theme.palette.error,
+  }[tone as 'info' | 'success' | 'danger']
+  const isNeutral = tone === 'neutral'
+  const btn = (
+    <IconButton
+      size="small"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      sx={{
+        width: 32, height: 32, p: 0, borderRadius: '8px', flexShrink: 0,
+        border: '1px solid',
+        borderColor: isNeutral ? alpha(theme.palette.text.secondary, 0.28) : alpha(paletteColor.main, 0.28),
+        bgcolor: isNeutral ? 'background.paper' : alpha(paletteColor.main, 0.10),
+        color: isNeutral ? 'text.secondary' : paletteColor.dark,
+        cursor: onClick ? 'pointer' : 'default',
+        '&:hover': onClick ? {
+          bgcolor: isNeutral ? 'action.hover' : alpha(paletteColor.main, 0.20),
+          borderColor: isNeutral ? 'text.secondary' : paletteColor.main,
+          color: isNeutral ? 'primary.main' : paletteColor.dark,
+        } : {},
+        '& svg': { fontSize: ICON.feature },
+      }}
+    >
+      {icon}
+    </IconButton>
+  )
+  return title ? <Tooltip title={title} arrow>{btn}</Tooltip> : btn
+}
+
 // ─── CountStat — metrica numerica silenziosa (siti/asset) ──────────────────────
 // Il grado più leggero della gerarchia "meta": nessun contenitore, solo peso
 // tipografico. Riservato a contatori puramente informativi.
@@ -467,6 +512,7 @@ function InventoryInlineList({
       {rows.map((row, idx) => {
         const TypeIcon  = getInventoryTypeIcon(row.type_key)
         const typeLabel = row.type_label ?? ''
+        const typeFamily = getInventoryTypeFamily(row.type_key)
         const zebraBg = idx % 2 === 0 ? 'background.paper' : 'grey.50'
         const issueColor = row.has_active_issue ? toneColors(theme, issuePriorityTone(row.active_issue_priority)) : null
 
@@ -490,13 +536,25 @@ function InventoryInlineList({
               '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
             }}
           >
-            {/* Tipo — badge "meta": categoria, non stato */}
+            {/* Tipo — badge a sfondo pieno per famiglia, larghezza fissa per coerenza in colonna */}
             <Box>
               {typeLabel ? (
-                <MetaTag
-                  icon={<TypeIcon sx={{ fontSize: `${ICON.inline}px !important` }} />}
-                  label={typeLabel}
-                />
+                <Tooltip title={`${typeLabel} — ${typeFamily.label}`} arrow>
+                  <Box sx={{
+                    display: 'inline-flex', alignItems: 'center', gap: 0.5,
+                    width: 132, height: 22, px: 1, borderRadius: '6px',
+                    bgcolor: typeFamily.color,
+                    color: '#fff',
+                  }}>
+                    <TypeIcon sx={{ fontSize: `${ICON.inline}px !important`, color: '#fff', flexShrink: 0 }} />
+                    <Typography sx={{
+                      fontSize: FS.micro, fontWeight: 600, color: '#fff',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {typeLabel}
+                    </Typography>
+                  </Box>
+                </Tooltip>
               ) : (
                 <Typography sx={{ fontSize: FS.body, color: 'text.disabled' }}>—</Typography>
               )}
@@ -559,6 +617,8 @@ type CollapsibleSiteRowProps = {
   onOpenDrawer: (id: number) => void
   onOpenSite: (id: number) => void
   canViewSite: boolean
+  canChangeSite: boolean
+  onEditSite: (id: number) => void
   onSiteContextMenu: (site: SiteRow, e: React.MouseEvent) => void
   onInventoryContextMenu: (row: InventoryRow, e: React.MouseEvent) => void
   isLast: boolean
@@ -572,6 +632,7 @@ const SITE_HEADERS = ['SITO', 'CITTÀ', 'CAP', 'CONTATTO', 'STATO']
 
 function CollapsibleSiteRow({
   site, allInventory, searchQuery, statusFilter, onOpenDrawer, onOpenSite, canViewSite,
+  canChangeSite, onEditSite,
   onSiteContextMenu, onInventoryContextMenu, isLast, rowIndex,
   forceOpen, matchedAssetIds,
 }: CollapsibleSiteRowProps) {
@@ -632,7 +693,7 @@ function CollapsibleSiteRow({
           <IconButton size="small" sx={{ flexShrink: 0, p: 0.25 }}>
             {open ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
           </IconButton>
-          <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography fontWeight={600} sx={{
               fontSize: FS.body,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -648,16 +709,28 @@ function CollapsibleSiteRow({
               </Typography>
             )}
           </Box>
-          {canViewSite && (
-            <Tooltip title="Apri scheda sito" arrow>
-              <MetaTag
-                icon={<InfoOutlinedIcon />}
-                label="Info"
-                onClick={(e) => { e.stopPropagation(); onOpenSite(site.id) }}
-                sx={{ flexShrink: 0 }}
-              />
-            </Tooltip>
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+            {canViewSite && (
+              <Tooltip title="Apri scheda sito" arrow>
+                <ActionButton
+                  tone="info"
+                  icon={<InfoOutlinedIcon />}
+                  ariaLabel="Info sito"
+                  onClick={(e) => { e.stopPropagation(); onOpenSite(site.id) }}
+                />
+              </Tooltip>
+            )}
+            {canChangeSite && (
+              <Tooltip title="Modifica sito" arrow>
+                <ActionButton
+                  tone="neutral"
+                  icon={<EditIcon />}
+                  ariaLabel="Modifica sito"
+                  onClick={(e) => { e.stopPropagation(); onEditSite(site.id) }}
+                />
+              </Tooltip>
+            )}
+          </Box>
         </Box>
 
         {/* Città */}
@@ -746,6 +819,8 @@ type SitesWithInventoryTabProps = {
   onOpenDrawer: (id: number) => void
   onOpenSite: (id: number) => void
   canViewSite: boolean
+  canChangeSite: boolean
+  onEditSite: (id: number) => void
   onSiteContextMenu: (site: SiteRow, e: React.MouseEvent) => void
   onInventoryContextMenu: (row: InventoryRow, e: React.MouseEvent) => void
   // Cambia dopo un delete nel Site Repository: forza il refetch dei dati del
@@ -755,6 +830,7 @@ type SitesWithInventoryTabProps = {
 
 function SitesWithInventoryTab({
   customerId, searchQuery, statusFilter, onOpenDrawer, onOpenSite, canViewSite,
+  canChangeSite, onEditSite,
   onSiteContextMenu, onInventoryContextMenu, refreshToken,
 }: SitesWithInventoryTabProps) {
   const [sites, setSites]         = React.useState<SiteRow[]>([])
@@ -849,6 +925,8 @@ function SitesWithInventoryTab({
           onOpenDrawer={onOpenDrawer}
           onOpenSite={onOpenSite}
           canViewSite={canViewSite}
+          canChangeSite={canChangeSite}
+          onEditSite={onEditSite}
           onSiteContextMenu={onSiteContextMenu}
           onInventoryContextMenu={onInventoryContextMenu}
           isLast={idx === visibleSites.length - 1 && orphans.length === 0}
@@ -953,6 +1031,10 @@ type CustomerCardProps = {
   onOpenSite: (id: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
+  canChangeCustomer: boolean
+  onEditCustomer: (id: number) => void
+  canChangeSite: boolean
+  onEditSite: (id: number) => void
   onCustomerContextMenu: (customer: CustomerRow, e: React.MouseEvent) => void
   onSiteContextMenu: (site: SiteRow, e: React.MouseEvent) => void
   onInventoryContextMenu: (row: InventoryRow, e: React.MouseEvent) => void
@@ -964,6 +1046,7 @@ type CustomerCardProps = {
 function CustomerCard({
   customer, searchQuery, statusFilter, assetCount, siteCount, issueCount, onOpenDrawer, onOpenVpn,
   onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
+  canChangeCustomer, onEditCustomer, canChangeSite, onEditSite,
   onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
   rowIndex, isLast, refreshToken,
 }: CustomerCardProps) {
@@ -1006,6 +1089,10 @@ function CustomerCard({
               {customer.display_name || customer.name}
             </Typography>
             <MonoField value={customer.code} sx={{ flexShrink: 0 }} />
+            {(customer.tags ?? []).length > 0 && (
+              <MetaTag label={(customer.tags ?? [])[0]} sx={{ flexShrink: 0 }} />
+            )}
+            <StatusChip statusId={customer.status ?? undefined} label={customer.status_label} size="small" sx={{ flexShrink: 0 }} />
           </Box>
           {customer.primary_contact_name && (
             <Typography
@@ -1026,78 +1113,91 @@ function CustomerCard({
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
 
-          {/* Info — "meta": apre la scheda cliente dedicata */}
-          {canViewCustomer && (
-            <Tooltip title="Apri scheda cliente" arrow>
-              <MetaTag
-                icon={<InfoOutlinedIcon />}
-                label="Info"
-                onClick={(e) => { e.stopPropagation(); onOpenCustomer(customer.id) }}
-              />
-            </Tooltip>
-          )}
+          {/* Pulsanti azione — stessa dimensione, raggruppati */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            {canViewCustomer && (
+              <Tooltip title="Apri scheda cliente" arrow>
+                <ActionButton
+                  tone="info"
+                  icon={<InfoOutlinedIcon />}
+                  ariaLabel="Info cliente"
+                  onClick={(e) => { e.stopPropagation(); onOpenCustomer(customer.id) }}
+                />
+              </Tooltip>
+            )}
+            {canChangeCustomer && (
+              <Tooltip title="Modifica cliente" arrow>
+                <ActionButton
+                  tone="neutral"
+                  icon={<EditIcon />}
+                  ariaLabel="Modifica cliente"
+                  onClick={(e) => { e.stopPropagation(); onEditCustomer(customer.id) }}
+                />
+              </Tooltip>
+            )}
 
-          {/* Stato — "segnale" */}
-          <StatusChip statusId={customer.status ?? undefined} label={customer.status_label} size="small" />
-
-          {/* Issue attive — "segnale" */}
-          {issueCount > 0 && (
-            <SignalChip tone="error" icon={<WarningAmberRoundedIcon />} label={`${issueCount}`} />
-          )}
-
-          {/* Contatori siti/asset — "meta" più leggero: pura tipografia */}
-          <CountStat
-            value={siteCount ?? '—'}
-            label="siti"
-            tooltip="Vai ai siti"
-            onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(0) }}
-          />
-          <CountStat
-            value={assetCount ?? '—'}
-            label="asset"
-            tooltip="Vai agli asset"
-            onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(siteCount ? 1 : 0) }}
-          />
-
-          {/* Tag cliente (es. tipo contratto) — "meta": outline neutro */}
-          {(customer.tags ?? []).length > 0 && (
-            <MetaTag label={(customer.tags ?? [])[0]} />
-          )}
-
-          {/* Note — solo icona, tooltip con testo. Segnalazione soft (warning) */}
-          {customer.notes && customer.notes.trim().length > 0 && (
-            <Tooltip title={customer.notes.length > 120 ? customer.notes.slice(0, 120) + '…' : customer.notes} arrow>
-              <Box sx={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
-                bgcolor: alpha(theme.palette.warning.main, 0.10),
-                border: `1px solid ${alpha(theme.palette.warning.main, 0.28)}`,
-                cursor: 'default',
-              }}>
-                <NoteAltOutlinedIcon sx={{ fontSize: ICON.feature, color: theme.palette.warning.dark }} />
-              </Box>
-            </Tooltip>
-          )}
-
-          {/* VPN — solo icona, click apre VpnModal */}
-          {customer.has_vpn && (
-            <Tooltip title="Visualizza VPN" arrow>
-              <Box
-                onClick={(e) => { e.stopPropagation(); onOpenVpn(customer) }}
-                sx={{
+            {/* Note — solo icona, tooltip con testo. Segnalazione soft (warning) */}
+            {customer.notes && customer.notes.trim().length > 0 && (
+              <Tooltip title={customer.notes.length > 120 ? customer.notes.slice(0, 120) + '…' : customer.notes} arrow>
+                <Box sx={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
-                  bgcolor: alpha(theme.palette.success.main, 0.10),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.28)}`,
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                  '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.20) },
-                }}
-              >
-                <VpnLockIcon sx={{ fontSize: ICON.feature, color: theme.palette.success.dark }} />
-              </Box>
-            </Tooltip>
+                  bgcolor: alpha(theme.palette.warning.main, 0.10),
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.28)}`,
+                  cursor: 'default',
+                }}>
+                  <NoteAltOutlinedIcon sx={{ fontSize: ICON.feature, color: theme.palette.warning.dark }} />
+                </Box>
+              </Tooltip>
+            )}
+
+            {/* VPN — solo icona, click apre VpnModal */}
+            {customer.has_vpn && (
+              <Tooltip title="Visualizza VPN" arrow>
+                <Box
+                  onClick={(e) => { e.stopPropagation(); onOpenVpn(customer) }}
+                  sx={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
+                    bgcolor: alpha(theme.palette.success.main, 0.10),
+                    border: `1px solid ${alpha(theme.palette.success.main, 0.28)}`,
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                    '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.20) },
+                  }}
+                >
+                  <VpnLockIcon sx={{ fontSize: ICON.feature, color: theme.palette.success.dark }} />
+                </Box>
+              </Tooltip>
+            )}
+          </Box>
+
+          {/* Issue attive — pulsante quadrato, conteggio solo in tooltip */}
+          {issueCount > 0 && (
+            <ActionButton
+              tone="danger"
+              icon={<WarningAmberRoundedIcon />}
+              ariaLabel={`${issueCount} issue attive`}
+              title={`${issueCount} issue attiv${issueCount === 1 ? 'a' : 'e'}`}
+              onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+            />
           )}
+
+          {/* Contatori siti/asset — spinti tutto a destra, subito prima dell'expand */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto', flexShrink: 0 }}>
+            <CountStat
+              value={siteCount ?? '—'}
+              label="siti"
+              tooltip="Vai ai siti"
+              onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(0) }}
+            />
+            <CountStat
+              value={assetCount ?? '—'}
+              label="asset"
+              tooltip="Vai agli asset"
+              onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(siteCount ? 1 : 0) }}
+            />
+          </Box>
 
           <IconButton size="small" sx={{ ml: 0.25 }}>
             {expanded ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
@@ -1143,6 +1243,8 @@ function CustomerCard({
                   onOpenDrawer={onOpenDrawer}
                   onOpenSite={onOpenSite}
                   canViewSite={canViewSite}
+                  canChangeSite={canChangeSite}
+                  onEditSite={onEditSite}
                   onSiteContextMenu={onSiteContextMenu}
                   onInventoryContextMenu={onInventoryContextMenu}
                   refreshToken={refreshToken}
@@ -1180,6 +1282,10 @@ type CitySectionProps = {
   onOpenSite: (id: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
+  canChangeCustomer: boolean
+  onEditCustomer: (id: number) => void
+  canChangeSite: boolean
+  onEditSite: (id: number) => void
   onCustomerContextMenu: (customer: CustomerRow, e: React.MouseEvent) => void
   onSiteContextMenu: (site: SiteRow, e: React.MouseEvent) => void
   onInventoryContextMenu: (row: InventoryRow, e: React.MouseEvent) => void
@@ -1192,6 +1298,7 @@ const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>(
   function CitySection({
     group, searchQuery, statusFilter, counts, issueCounts, onOpenDrawer, onOpenVpn,
     onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
+    canChangeCustomer, onEditCustomer, canChangeSite, onEditSite,
     onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
     refreshToken,
   }, ref) {
@@ -1282,6 +1389,10 @@ const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>(
                 onOpenSite={onOpenSite}
                 canViewCustomer={canViewCustomer}
                 canViewSite={canViewSite}
+                canChangeCustomer={canChangeCustomer}
+                onEditCustomer={onEditCustomer}
+                canChangeSite={canChangeSite}
+                onEditSite={onEditSite}
                 onCustomerContextMenu={onCustomerContextMenu}
                 onSiteContextMenu={onSiteContextMenu}
                 onInventoryContextMenu={onInventoryContextMenu}
@@ -1860,6 +1971,10 @@ export default function SiteRepository() {
               onOpenSite={openSiteDetail}
               canViewCustomer={canViewCustomer}
               canViewSite={canViewSite}
+              canChangeCustomer={canChangeCustomer}
+              onEditCustomer={editCustomerElsewhere}
+              canChangeSite={canChangeSite}
+              onEditSite={editSiteElsewhere}
               onCustomerContextMenu={handleCustomerContextMenu}
               onSiteContextMenu={handleSiteContextMenu}
               onInventoryContextMenu={handleInventoryContextMenu}
