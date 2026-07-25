@@ -119,6 +119,15 @@ export const PERMS = {
     },
   },
 
+  purchaseorders: {
+    entry: {
+      view: 'purchaseorders.view_purchaseorderentry',
+      add: 'purchaseorders.add_purchaseorderentry',
+      change: 'purchaseorders.change_purchaseorderentry',
+      delete: 'purchaseorders.delete_purchaseorderentry',
+    },
+  },
+
   servicenow: {
     case: {
       view: 'servicenow.view_servicenowcase',
@@ -126,6 +135,11 @@ export const PERMS = {
       change: 'servicenow.change_servicenowcase',
       delete: 'servicenow.delete_servicenowcase',
     },
+  },
+
+  core: {
+    manageUsers: 'core.manage_users',
+    accessArchie: 'core.access_archie',
   },
 } as const
 

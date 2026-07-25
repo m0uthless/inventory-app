@@ -161,7 +161,7 @@ class CustomerVpnAccess(TimeStampedModel):
         verbose_name = "Accesso VPN Cliente"
         verbose_name_plural = "Accessi VPN Clienti"
         permissions = [
-            ("view_vpn_secrets", "Can view VPN secrets (password)"),
+            ("view_vpn_secrets", "Può visualizzare le credenziali VPN (password)"),
         ]
 
     def save(self, *args, **kwargs):

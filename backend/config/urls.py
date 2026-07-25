@@ -11,6 +11,11 @@ from rest_framework.routers import DefaultRouter
 
 from audit.api import AuditEventViewSet
 from core.me_api import ChangePasswordView, MeAPIView
+from core.admin_users_api import (
+    GroupAdminViewSet,
+    PermissionModulesView,
+    UserAdminViewSet,
+)
 
 from config.search_api import SearchAPIView
 from config.system_stats_api import HealthAPIView, SystemStatsView
@@ -51,7 +56,16 @@ from device.api import (
     RispacsViewSet,
 )
 from vlan.api import VlanViewSet, VlanIpRequestViewSet, CustomerRispacsViewSet
-from servicenow.api import ServiceNowCaseViewSet, ServiceNowCaseTypeViewSet, TechnicianAbsenceViewSet
+from servicenow.api import ServiceNowCaseViewSet, ServiceNowCaseTypeViewSet
+from attendance.api import AbsenceViewSet, LeaveAreaViewSet, HolidayViewSet
+from expenses.api import (
+    ExpenseReportViewSet,
+    ExpenseItemViewSet,
+    ExpenseKmTripViewSet,
+    ExpenseReceiptViewSet,
+    TechnicianKmRateViewSet,
+)
+from purchaseorders.api import PurchaseOrderEntryViewSet
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customer")
@@ -108,7 +122,21 @@ router.register(r"customer-rispacs", CustomerRispacsViewSet, basename="customer-
 # ServiceNow Case
 router.register(r"servicenow-cases", ServiceNowCaseViewSet, basename="servicenow-case")
 router.register(r"servicenow-case-types", ServiceNowCaseTypeViewSet, basename="servicenow-case-type")
-router.register(r"technician-absences", TechnicianAbsenceViewSet, basename="technician-absence")
+
+# Piano Ferie / assenze (modulo condiviso `attendance`)
+router.register(r"absences", AbsenceViewSet, basename="absence")
+router.register(r"leave-areas", LeaveAreaViewSet, basename="leave-area")
+router.register(r"leave-holidays", HolidayViewSet, basename="leave-holiday")
+
+# Rimborso Spese
+router.register(r"expense-reports", ExpenseReportViewSet, basename="expense-report")
+router.register(r"expense-items", ExpenseItemViewSet, basename="expense-item")
+router.register(r"expense-km-trips", ExpenseKmTripViewSet, basename="expense-km-trip")
+router.register(r"expense-receipts", ExpenseReceiptViewSet, basename="expense-receipt")
+router.register(r"expense-km-rates", TechnicianKmRateViewSet, basename="expense-km-rate")
+
+# Purchase Order
+router.register(r"purchase-order-entries", PurchaseOrderEntryViewSet, basename="purchase-order-entry")
 
 # Lookups (core)
 router.register(r"customer-statuses", CustomerStatusViewSet, basename="customer-status")
@@ -116,6 +144,10 @@ router.register(r"site-statuses", SiteStatusViewSet, basename="site-status")
 router.register(r"inventory-statuses", InventoryStatusViewSet, basename="inventory-status")
 router.register(r"inventory-types", InventoryTypeViewSet, basename="inventory-type")
 router.register(r"users", UserViewSet, basename="user")
+
+# Pannello "Utenti e Gruppi" (core.manage_users)
+router.register(r"admin-users", UserAdminViewSet, basename="admin-user")
+router.register(r"admin-groups", GroupAdminViewSet, basename="admin-group")
 
 
 def legacy_restore_alias(pattern: str, viewset, action: str):
@@ -139,6 +171,9 @@ urlpatterns = [
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
+
+    # Pannello "Utenti e Gruppi"
+    path("api/admin/permission-modules/", PermissionModulesView.as_view()),
 
     # AUSL BO
     path("api/auslbo/me/", AuslBoMeView.as_view(), name="auslbo-me"),

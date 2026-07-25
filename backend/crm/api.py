@@ -103,6 +103,10 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
     # percorso non annotato usasse questo serializer.
     assets_count = serializers.IntegerField(read_only=True, default=0)
     sites_count = serializers.IntegerField(read_only=True, default=0)
+    # Numero di siti che hanno almeno un asset collegato (Site Repository nasconde
+    # i siti "vuoti", quindi il badge "siti" deve contare solo questi, non il
+    # totale sites_count).
+    sites_with_assets_count = serializers.IntegerField(read_only=True, default=0)
     active_issue_count = serializers.IntegerField(read_only=True, default=0)
 
     # Chiavi riconosciute per "città" nei custom_fields (allineate con la Coalesce nel queryset).
@@ -153,6 +157,7 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
             "has_vpn",
             "assets_count",
             "sites_count",
+            "sites_with_assets_count",
             "active_issue_count",
             "tags",
             "custom_fields",
@@ -291,6 +296,16 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
                 Site.objects.filter(
                     customer_id=OuterRef("pk"), deleted_at__isnull=True,
                 )
+            ),
+            # Siti con almeno un asset collegato (usato per il badge "siti" nel
+            # Site Repository, che nasconde i siti privi di asset). distinct=True
+            # perche' il join con inventories moltiplica le righe per sito.
+            sites_with_assets_count=_count_subquery(
+                Site.objects.filter(
+                    customer_id=OuterRef("pk"), deleted_at__isnull=True,
+                    inventories__deleted_at__isnull=True,
+                ),
+                distinct=True,
             ),
             # Numero di ASSET che hanno almeno una issue attiva (non numero di
             # issue): alimenta il badge "segnale" ed e' la stessa semantica del

@@ -75,14 +75,6 @@ export const theme = createTheme(
           scrollbar-color: #45a59d transparent;
         }
 
-        html {
-          scrollbar-gutter: stable;
-        }
-
-        body {
-          scrollbar-gutter: stable;
-        }
-
         ::-webkit-scrollbar {
           width: 8px;
           height: 8px;

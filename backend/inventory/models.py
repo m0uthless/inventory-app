@@ -42,7 +42,7 @@ class Inventory(TimeStampedModel):
 
     class Meta:
         permissions = [
-            ("view_secrets", "Can view inventory secrets"),
+            ("view_secrets", "Può visualizzare le credenziali riservate dell'inventario"),
         ]
         indexes = [
             # Hot paths:

@@ -9,6 +9,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from servicenow.models import ServiceNowCaseType, ServiceNowCaseCategory
+from attendance.models import Absence, DayPart
 
 pytestmark = pytest.mark.django_db
 
@@ -132,9 +133,9 @@ def test_stats_day_granularity_requires_month_and_marks_absences(api_client, sup
     tech = _make_tech()
     _create_case(api_client, case_type, opened_date=date(2026, 6, 10), assigned_to=tech)
 
-    from servicenow.models import TechnicianAbsence
-    TechnicianAbsence.objects.create(
-        user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="malattia",
+    from attendance.models import Absence, DayPart
+    Absence.objects.create(
+        user=tech, date=date(2026, 6, 10), day_part=DayPart.MATTINA, reason="malattia",
     )
 
     resp = api_client.get(
@@ -160,9 +161,9 @@ def test_stats_day_granularity_ignores_hourly_absence(api_client, superuser):
     tech = _make_tech()
     _create_case(api_client, case_type, opened_date=date(2026, 6, 10), assigned_to=tech)
 
-    from servicenow.models import TechnicianAbsence
-    TechnicianAbsence.objects.create(
-        user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="altro",
+    from attendance.models import Absence, DayPart
+    Absence.objects.create(
+        user=tech, date=date(2026, 6, 10), day_part=DayPart.POMERIGGIO, reason="altro",
         time_from="14:00", time_to="16:00",
     )
 
@@ -184,9 +185,11 @@ def test_stats_day_granularity_prioritizes_malattia_over_ferie(api_client, super
     tech = _make_tech()
     _create_case(api_client, case_type, opened_date=date(2026, 6, 10), assigned_to=tech)
 
-    from servicenow.models import TechnicianAbsence
-    TechnicianAbsence.objects.create(user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="ferie")
-    TechnicianAbsence.objects.create(user=tech, date_from=date(2026, 6, 10), date_to=date(2026, 6, 10), reason="malattia")
+    from attendance.models import Absence, DayPart
+    # Giornata intera: mattina ferie + pomeriggio malattia. Nel colore della
+    # cella vince la priorità più alta (malattia).
+    Absence.objects.create(user=tech, date=date(2026, 6, 10), day_part=DayPart.MATTINA, reason="ferie")
+    Absence.objects.create(user=tech, date=date(2026, 6, 10), day_part=DayPart.POMERIGGIO, reason="malattia")
 
     resp = api_client.get(
         "/api/servicenow-cases/stats/",

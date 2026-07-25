@@ -52,6 +52,9 @@ INSTALLED_APPS = [
     "device.apps.DeviceConfig",
     "vlan.apps.VlanConfig",
     "servicenow.apps.ServicenowConfig",
+    "attendance.apps.AttendanceConfig",
+    "expenses.apps.ExpensesConfig",
+    "purchaseorders.apps.PurchaseOrdersConfig",
 ]
 
 # --- CSRF / Origin handling ---

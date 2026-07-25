@@ -30,7 +30,12 @@ const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
 const ServiceNowStats = lazy(() => import('./pages/ServiceNowStats'))
 const ServiceNowAbsences = lazy(() => import('./pages/ServiceNowAbsences'))
+const PianoFerie = lazy(() => import('./pages/PianoFerie'))
+const RimborsoSpese = lazy(() => import('./pages/RimborsoSpese'))
+const RimborsoSpesePage = lazy(() => import('./pages/RimborsoSpesePage'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
+const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
+const UsersAdmin = lazy(() => import('./pages/UsersAdmin'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 import { RequireAuth } from './auth/RequireAuth'
@@ -200,8 +205,28 @@ const router = createBrowserRouter([
         path: 'servicenow-absences',
         element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowAbsences />)}</RequirePerm>,
       },
+      {
+        path: 'piano-ferie',
+        element: <RequireAuth>{lazyEl(<PianoFerie />)}</RequireAuth>,
+      },
+      {
+        path: 'rimborso-spese',
+        element: <RequireAuth>{lazyEl(<RimborsoSpese />)}</RequireAuth>,
+      },
+      {
+        path: 'rimborso-spese/:id',
+        element: <RequireAuth>{lazyEl(<RimborsoSpesePage />)}</RequireAuth>,
+      },
+      {
+        path: 'purchase-orders',
+        element: <RequirePerm perm="purchaseorders.view_purchaseorderentry">{lazyEl(<PurchaseOrders />)}</RequirePerm>,
+      },
       { path: 'bug-feature', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
       { path: 'bug-feature/resolved', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
+      {
+        path: 'utenti',
+        element: <RequirePerm perm="core.manage_users">{lazyEl(<UsersAdmin />)}</RequirePerm>,
+      },
       { path: '*', element: lazyEl(<NotFound />) },
     ],
   },

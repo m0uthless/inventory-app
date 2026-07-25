@@ -214,6 +214,8 @@ export interface DrawerShellProps {
   // ── Hero: titolo ──
   /** Icona/avatar affiancata al titolo. */
   icon?: React.ReactNode
+  /** Se true, `icon` è reso "nudo" (es. Avatar tondo) senza il riquadro/bordo traslucido di default. */
+  iconBare?: boolean
   title: string
   subtitle?: string
   caption?: string
@@ -262,6 +264,7 @@ export function DrawerShell({
   actions,
   // titolo
   icon,
+  iconBare = false,
   title,
   subtitle,
   caption,
@@ -388,9 +391,13 @@ export function DrawerShell({
             ) : null}
             <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: icon ? 0.5 : 0 }}>
               {icon ? (
-                <Box sx={{ width: 44, height: 44, borderRadius: 1, flexShrink: 0, bgcolor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {icon}
-                </Box>
+                iconBare ? (
+                  icon
+                ) : (
+                  <Box sx={{ width: 44, height: 44, borderRadius: 1, flexShrink: 0, bgcolor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {icon}
+                  </Box>
+                )
               ) : null}
               <Typography sx={{ color: '#fff', fontSize: icon ? 24 : 26, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {title}

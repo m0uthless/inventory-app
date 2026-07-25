@@ -29,6 +29,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import LogoutIcon from '@mui/icons-material/Logout'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import SettingsIcon from '@mui/icons-material/Settings'
+import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
 
 import FolderIcon from '@mui/icons-material/FolderOutlined'
 import DashboardIcon from '@mui/icons-material/DashboardOutlined'
@@ -43,6 +44,9 @@ import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
+import BeachAccessOutlinedIcon from '@mui/icons-material/BeachAccessOutlined'
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined'
 import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
 import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded'
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
@@ -130,6 +134,12 @@ const NAV: NavItem[] = [
   { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
 
   { label: 'ServiceNow', path: '/servicenow-cases', icon: <CloudSyncOutlinedIcon />, section: 'principale', perm: 'servicenow.view_servicenowcase' },
+
+  { label: 'Piano Ferie', path: '/piano-ferie', icon: <BeachAccessOutlinedIcon />, section: 'principale' },
+
+  { label: 'Rimborso Spese', path: '/rimborso-spese', icon: <ReceiptLongOutlinedIcon />, section: 'principale' },
+
+  { label: 'Purchase Order', path: '/purchase-orders', icon: <RequestQuoteOutlinedIcon />, section: 'principale', perm: 'purchaseorders.view_purchaseorderentry' },
 
   {
     label: 'Manutenzione',
@@ -566,6 +576,22 @@ export function AppLayout() {
     }
   }, [mini])
 
+  // Flyout dei sottomenu (sidebar mini): si apre in hover sull'icona, si chiude
+  // con un piccolo ritardo per dare il tempo al mouse di raggiungere il popover
+  // senza che si chiuda per lo spazio vuoto fra icona e flyout.
+  const flyoutCloseTimer = React.useRef<number | null>(null)
+  const clearFlyoutCloseTimer = React.useCallback(() => {
+    if (flyoutCloseTimer.current !== null) {
+      window.clearTimeout(flyoutCloseTimer.current)
+      flyoutCloseTimer.current = null
+    }
+  }, [])
+  const scheduleFlyoutClose = React.useCallback((setter: React.Dispatch<React.SetStateAction<HTMLElement | null>>) => {
+    clearFlyoutCloseTimer()
+    flyoutCloseTimer.current = window.setTimeout(() => setter(null), 200)
+  }, [clearFlyoutCloseTimer])
+  React.useEffect(() => () => clearFlyoutCloseTimer(), [clearFlyoutCloseTimer])
+
   const pageTitle = React.useMemo(() => {
     // Entries are checked longest-prefix-first so more-specific routes win.
     const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
@@ -586,7 +612,11 @@ export function AppLayout() {
       ['/servicenow-stats',       'SERVICENOW · STATISTICHE'],
       ['/servicenow-absences',    'SERVICENOW · ASSENZE TECNICI'],
       ['/servicenow-cases',       'SERVICENOW'],
+      ['/piano-ferie',            'PIANO FERIE'],
+      ['/rimborso-spese',         'RIMBORSO SPESE'],
+      ['/purchase-orders',        'PURCHASE ORDERS'],
       ['/bug-feature',            'BUG / FEATURE'],
+      ['/utenti',                 'UTENTI E GRUPPI'],
       ['/audit',                  'AUDIT'],
       ['/drive',                  'DRIVE'],
       ['/trash',                  'CESTINO'],
@@ -669,6 +699,8 @@ export function AppLayout() {
       selected?: boolean
       nested?: boolean
       onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
+      onMouseEnter?: (event: React.MouseEvent<HTMLDivElement>) => void
+      onMouseLeave?: (event: React.MouseEvent<HTMLDivElement>) => void
       endAdornment?: React.ReactNode
       forceTooltip?: boolean
       variant?: 'default' | 'group-parent'
@@ -691,6 +723,8 @@ export function AppLayout() {
           nav({ pathname: it.path, search: '' })
           setMobileOpen(false)
         }}
+        onMouseEnter={options?.onMouseEnter}
+        onMouseLeave={options?.onMouseLeave}
         sx={{
           borderRadius: nested ? 1.5 : 1.25,
           mb: 0.25,
@@ -951,14 +985,21 @@ export function AppLayout() {
                     selected: parentSelected,
                     variant: 'group-parent',
                     onClick: isMini
-                      ? (event) => {
-                          if (!children.length) {
-                            nav({ pathname: it.path, search: '' })
-                            setMobileOpen(false)
-                            return
-                          }
-                          setFlyoutAnchor((current) => (current === event.currentTarget ? null : event.currentTarget))
+                      ? () => {
+                          clearFlyoutCloseTimer()
+                          setFlyoutAnchor(null)
+                          nav({ pathname: it.path, search: '' })
+                          setMobileOpen(false)
                         }
+                      : undefined,
+                    onMouseEnter: isMini && children.length > 0
+                      ? (event) => {
+                          clearFlyoutCloseTimer()
+                          setFlyoutAnchor(event.currentTarget)
+                        }
+                      : undefined,
+                    onMouseLeave: isMini && children.length > 0
+                      ? () => scheduleFlyoutClose(setFlyoutAnchor)
                       : undefined,
                     endAdornment: canExpand ? (
                       <Stack direction="row" spacing={0.5} alignItems="center">
@@ -1125,8 +1166,14 @@ export function AppLayout() {
         onClose={() => setWikiFlyoutAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         PaperProps={{
+          onMouseEnter: clearFlyoutCloseTimer,
+          onMouseLeave: () => scheduleFlyoutClose(setWikiFlyoutAnchor),
           sx: {
+            pointerEvents: 'auto',
             ml: 1,
             mt: -0.25,
             minWidth: 248,
@@ -1177,8 +1224,14 @@ export function AppLayout() {
         onClose={() => setBugFeatureFlyoutAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         PaperProps={{
+          onMouseEnter: clearFlyoutCloseTimer,
+          onMouseLeave: () => scheduleFlyoutClose(setBugFeatureFlyoutAnchor),
           sx: {
+            pointerEvents: 'auto',
             ml: 1,
             mt: -0.25,
             minWidth: 248,
@@ -1234,8 +1287,14 @@ export function AppLayout() {
         onClose={() => setServicenowFlyoutAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         PaperProps={{
+          onMouseEnter: clearFlyoutCloseTimer,
+          onMouseLeave: () => scheduleFlyoutClose(setServicenowFlyoutAnchor),
           sx: {
+            pointerEvents: 'auto',
             ml: 1,
             mt: -0.25,
             minWidth: 248,
@@ -1286,8 +1345,14 @@ export function AppLayout() {
         onClose={() => setMaintenanceFlyoutAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         PaperProps={{
+          onMouseEnter: clearFlyoutCloseTimer,
+          onMouseLeave: () => scheduleFlyoutClose(setMaintenanceFlyoutAnchor),
           sx: {
+            pointerEvents: 'auto',
             ml: 1,
             mt: -0.25,
             minWidth: 248,
@@ -1340,8 +1405,14 @@ export function AppLayout() {
         onClose={() => setSiteRepositoryFlyoutAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         PaperProps={{
+          onMouseEnter: clearFlyoutCloseTimer,
+          onMouseLeave: () => scheduleFlyoutClose(setSiteRepositoryFlyoutAnchor),
           sx: {
+            pointerEvents: 'auto',
             ml: 1,
             mt: -0.25,
             minWidth: 248,
@@ -1416,6 +1487,19 @@ export function AppLayout() {
           <SettingsIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
           Impostazioni
         </MenuItem>
+
+        {hasPerm('core.manage_users') && (
+          <MenuItem
+            onClick={() => {
+              setUserAnchorEl(null)
+              nav('/utenti')
+            }}
+            sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
+          >
+            <GroupOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+            Utenti e Gruppi
+          </MenuItem>
+        )}
 
         <MenuItem
           onClick={async () => {

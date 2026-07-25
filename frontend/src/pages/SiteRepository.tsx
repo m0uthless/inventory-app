@@ -74,6 +74,9 @@ type CustomerRow = {
   // Contatori annotati dal backend (crm/api.py, _count_subquery).
   assets_count?: number
   sites_count?: number
+  // Siti con almeno un asset collegato: usato per il badge "siti", che deve
+  // riflettere solo i siti effettivamente visibili nel Site Repository.
+  sites_with_assets_count?: number
   active_issue_count?: number
 }
 
@@ -864,15 +867,22 @@ function SitesWithInventoryTab({
     return ids
   }, [inventory, searchQuery])
 
+  // Siti con almeno un asset collegato: un sito senza asset non viene mostrato
+  // nel Site Repository (richiesta: nascondere i siti "vuoti").
+  const sitesWithAssets = React.useMemo(
+    () => sites.filter((s) => inventory.some((inv) => inv.site === s.id)),
+    [sites, inventory],
+  )
+
   // Siti visibili: quelli che matchano per nome/città OPPURE hanno asset matchanti
   const visibleSites = React.useMemo(() => {
-    if (!searchQuery) return sites
-    return sites.filter((s) => {
+    if (!searchQuery) return sitesWithAssets
+    return sitesWithAssets.filter((s) => {
       if (matchesSearch(searchQuery, s.name, s.display_name, s.city, s.address_line1)) return true
       if (matchedAssetIds && inventory.some((inv) => inv.site === s.id && matchedAssetIds.has(inv.id))) return true
       return false
     })
-  }, [sites, searchQuery, matchedAssetIds, inventory])
+  }, [sitesWithAssets, searchQuery, matchedAssetIds, inventory])
 
   // Set di asset matchanti per sito specifico (null = mostra tutti)
   const assetIdsForSite = React.useMemo(() => {
@@ -958,6 +968,13 @@ function SitesWithInventoryTab({
       {visibleSites.length === 0 && !orphans.length && searchQuery && (
         <Box sx={{ py: 2, px: 2 }}>
           <Typography sx={{ fontSize: FS.body, color: 'text.secondary' }}>Nessun sito o asset corrisponde alla ricerca.</Typography>
+        </Box>
+      )}
+
+      {/* Tutti i siti del cliente sono privi di asset collegati */}
+      {visibleSites.length === 0 && !orphans.length && !searchQuery && (
+        <Box sx={{ py: 2, px: 2 }}>
+          <Typography sx={{ fontSize: FS.body, color: 'text.secondary' }}>Nessun sito con asset collegati.</Typography>
         </Box>
       )}
     </Box>
@@ -1776,7 +1793,10 @@ export default function SiteRepository() {
   const counts = React.useMemo(() => {
     const map: Record<number, { assets: number | null; sites: number | null }> = {}
     customers.forEach((c) => {
-      map[c.id] = { assets: c.assets_count ?? 0, sites: c.sites_count ?? 0 }
+      // "sites" alimenta il badge "siti": deve contare solo i siti con asset
+      // collegati, coerentemente con i siti effettivamente visibili nella tab
+      // (SitesWithInventoryTab nasconde i siti senza asset).
+      map[c.id] = { assets: c.assets_count ?? 0, sites: c.sites_with_assets_count ?? 0 }
     })
     return map
   }, [customers])

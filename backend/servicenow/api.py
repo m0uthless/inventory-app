@@ -25,9 +25,13 @@ from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from servicenow.models import (
     ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory,
-    TechnicianAbsence, TechnicianAbsenceReason,
 )
 from servicenow.notifications import notify_teams_new_case
+
+# Le assenze sono ora gestite dal modulo condiviso `attendance` (mezza giornata
+# MAT/POM, workflow proposta→validata). Triage e Statistiche le importano da qui.
+from attendance.models import Absence, AbsenceReason, AbsenceStatus, DayPart
+from attendance.bridge import day_part_covers_now
 
 User = get_user_model()
 
@@ -137,116 +141,9 @@ class ServiceNowCaseTypeSerializer(serializers.ModelSerializer):
         fields = ["id", "category", "category_label", "name", "order"]
 
 
-# ─── Serializer / permessi / ViewSet TechnicianAbsence ───────────────────────
-
-class TechnicianAbsenceSerializer(serializers.ModelSerializer):
-    user_name    = serializers.SerializerMethodField()
-    reason_label = serializers.CharField(source="get_reason_display", read_only=True)
-    is_hourly    = serializers.BooleanField(read_only=True)
-
-    class Meta:
-        model  = TechnicianAbsence
-        fields = [
-            "id", "user", "user_name", "date_from", "date_to", "reason", "reason_label",
-            "note", "time_from", "time_to", "is_hourly", "created_at",
-        ]
-        read_only_fields = ["id", "user_name", "reason_label", "is_hourly", "created_at"]
-
-    def get_user_name(self, obj):
-        u = obj.user
-        return f"{u.first_name} {u.last_name}".strip() or u.username
-
-    def validate(self, attrs):
-        date_from = attrs.get("date_from", getattr(self.instance, "date_from", None))
-        date_to   = attrs.get("date_to",   getattr(self.instance, "date_to", None))
-        time_from = attrs.get("time_from", getattr(self.instance, "time_from", None))
-        time_to   = attrs.get("time_to",   getattr(self.instance, "time_to", None))
-        if date_from and date_to and date_to < date_from:
-            raise serializers.ValidationError({"date_to": "La data di fine non può precedere quella di inizio."})
-        if time_from or time_to:
-            if not (time_from and time_to):
-                raise serializers.ValidationError(
-                    "Per un'assenza oraria vanno indicate sia l'ora di inizio sia l'ora di fine."
-                )
-            if date_from and date_to and date_from != date_to:
-                raise serializers.ValidationError(
-                    "Un'assenza oraria (permesso) deve riguardare un solo giorno (Dal = Al)."
-                )
-            if time_to <= time_from:
-                raise serializers.ValidationError({"time_to": "L'ora di fine deve essere successiva all'ora di inizio."})
-        return attrs
-
-
-class TechnicianAbsencePermission(BasePermission):
-    """Lettura per chi può vedere i case ServiceNow (pannello Triage /
-    heatmap Statistiche); scrittura riservata a chi ha il permesso di
-    modifica sui case (stesso perimetro operativo)."""
-
-    def has_permission(self, request, view):
-        user = getattr(request, "user", None)
-        if not user or not user.is_authenticated:
-            return False
-        if request.method in SAFE_METHODS:
-            return user.has_perm("servicenow.view_servicenowcase")
-        return user.has_perm("servicenow.change_servicenowcase")
-
-
-class TechnicianAbsenceViewSet(viewsets.ModelViewSet):
-    """CRUD delle assenze programmate dei tecnici (ferie/malattia/...).
-
-    Nessun soft-delete: le assenze si eliminano direttamente (niente
-    cestino/ripristino, coerente con l'uso previsto — pianificazione rapida).
-    Filtrabile per tecnico (`user`) e per sovrapposizione con un intervallo
-    (`date_from`/`date_to`), usato dalla heatmap per recuperare solo le
-    assenze rilevanti per il periodo visualizzato.
-    """
-
-    serializer_class   = TechnicianAbsenceSerializer
-    permission_classes = [TechnicianAbsencePermission]
-    http_method_names  = ["get", "post", "patch", "delete", "head", "options"]
-    pagination_class   = None
-    filter_backends    = [DjangoFilterBackend]
-    filterset_fields   = ["user"]
-
-    def get_queryset(self):
-        qs = TechnicianAbsence.objects.select_related("user", "user__profile").order_by("-date_from")
-        date_from = self.request.query_params.get("date_from")
-        date_to   = self.request.query_params.get("date_to")
-        if date_from:
-            qs = qs.filter(date_to__gte=date_from)
-        if date_to:
-            qs = qs.filter(date_from__lte=date_to)
-        return qs
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-    @action(detail=False, methods=["get"], url_path="technicians")
-    def technicians(self, request):
-        """Elenco tecnici ServiceNow attivi (id, nome, categoria Philips/Biotron).
-
-        Usato dalla pagina calendario 'Assenze tecnici' per costruire le righe,
-        raggruppate per categoria come nel pannello Triage.
-        """
-        users = (
-            User.objects.select_related("profile")
-                .filter(is_active=True)
-                .order_by("first_name", "last_name", "username")
-        )
-        result = []
-        for u in users:
-            try:
-                if not bool(u.profile.is_servicenow_technician):
-                    continue
-                is_philips = bool(u.profile.is_philips)
-            except Exception:
-                continue
-            name = f"{u.first_name} {u.last_name}".strip() or u.username
-            result.append({
-                "id": u.id, "name": name,
-                "category": ServiceNowCaseCategory.PHILIPS if is_philips else ServiceNowCaseCategory.BIOTRON,
-            })
-        return Response(result)
+# ─── (Assenze) ───────────────────────────────────────────────────────────────
+# Serializer/permessi/ViewSet delle assenze vivono ora in `attendance.api`
+# (endpoint /api/absences/). Qui restano solo Triage e Statistiche che le leggono.
 
 
 # ─── Filters ─────────────────────────────────────────────────────────────────
@@ -420,22 +317,28 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             else:
                 counts_map[(cat, uid)] = r["count"]
 
-        # Assenza "adesso": le assenze a giornata intera valgono per tutto il
-        # giorno; i permessi orari segnalano il tecnico assente solo mentre
-        # l'orario corrente rientra nella fascia time_from–time_to.
+        # Assenza "adesso": una voce a mezza giornata (MAT/POM) copre la fascia
+        # corrispondente all'istante corrente (split sulla soglia 13:00); un
+        # permesso orario segnala assente solo mentre l'orario corrente rientra
+        # nella fascia time_from–time_to. Le proposte non ancora validate
+        # contano comunque come tentativo di assenza (come nel vecchio sistema);
+        # le voci rifiutate no.
         now_time = timezone.localtime().time()
         today_absences = list(
-            TechnicianAbsence.objects
-                .filter(date_from__lte=today, date_to__gte=today)
-                .values_list("user_id", "reason", "time_from", "time_to")
+            Absence.objects
+                .filter(date=today, deleted_at__isnull=True)
+                .exclude(status=AbsenceStatus.RIFIUTATA)
+                .values_list("user_id", "reason", "day_part", "time_from", "time_to")
         )
+        reason_labels = dict(AbsenceReason.choices)
         absent_map = {}
-        for uid, reason, time_from, time_to in today_absences:
-            if not (time_from and time_to):
-                absent_map[uid] = TechnicianAbsenceReason(reason).label
-        for uid, reason, time_from, time_to in today_absences:
-            if time_from and time_to and uid not in absent_map and time_from <= now_time <= time_to:
-                absent_map[uid] = TechnicianAbsenceReason(reason).label
+        for uid, reason, day_part, time_from, time_to in today_absences:
+            if time_from and time_to:
+                covers = time_from <= now_time <= time_to
+            else:
+                covers = day_part_covers_now(day_part, now_time)
+            if covers and uid not in absent_map:
+                absent_map[uid] = reason_labels.get(reason, reason)
 
         technicians = list(
             User.objects.select_related("profile")
@@ -585,44 +488,43 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
 
             period_ranges = [period_date_range(p["key"]) for p in periods]
 
+            # Priorità se, per lo stesso tecnico/giorno, esistono più fasce con
+            # motivi diversi: la più "grave" vince nella visualizzazione.
+            reason_priority = {
+                AbsenceReason.MALATTIA: 0,
+                AbsenceReason.FERIE: 1,
+                AbsenceReason.PERMESSO_104: 1,
+                AbsenceReason.TRAINING: 2,
+                AbsenceReason.TRASFERTA: 2,
+                AbsenceReason.ALTRO: 2,
+            }
+
+            # {user_id: {date: reason}} — solo voci a fascia (NON orarie): un
+            # permesso di poche ore non colora la cella giornaliera. Le voci
+            # rifiutate sono escluse.
             absences_by_user = {}
             if period_ranges:
                 overall_start = min(s for s, _ in period_ranges)
                 overall_end   = max(e for _, e in period_ranges)
-                full_day_absences = (
-                    TechnicianAbsence.objects
+                day_absences = (
+                    Absence.objects
                         .filter(
-                            date_from__lte=overall_end, date_to__gte=overall_start,
+                            date__gte=overall_start, date__lte=overall_end,
                             time_from__isnull=True, time_to__isnull=True,
+                            deleted_at__isnull=True,
                         )
-                        .values("user_id", "date_from", "date_to", "reason")
+                        .exclude(status=AbsenceStatus.RIFIUTATA)
+                        .values_list("user_id", "date", "reason")
                 )
-                for a in full_day_absences:
-                    absences_by_user.setdefault(a["user_id"], []).append(
-                        (a["date_from"], a["date_to"], a["reason"])
-                    )
-
-            # Priorità se più assenze a giornata intera si sovrappongono per lo
-            # stesso tecnico/giorno (raro, es. correzione in corso): la più
-            # "grave" vince nella visualizzazione.
-            reason_priority = {
-                TechnicianAbsenceReason.MALATTIA: 0,
-                TechnicianAbsenceReason.FERIE: 1,
-                TechnicianAbsenceReason.TRASFERTA: 2,
-                TechnicianAbsenceReason.ALTRO: 2,
-            }
+                for uid, d, reason in day_absences:
+                    by_date = absences_by_user.setdefault(uid, {})
+                    prev = by_date.get(d)
+                    if prev is None or reason_priority.get(reason, 99) < reason_priority.get(prev, 99):
+                        by_date[d] = reason
 
             for s in series:
-                ranges = absences_by_user.get(s["user_id"], [])
-                reasons_for_period = []
-                for pstart, pend in period_ranges:
-                    matches = [r for af, at, r in ranges if af <= pend and at >= pstart]
-                    if matches:
-                        matches.sort(key=lambda r: reason_priority.get(r, 99))
-                        reasons_for_period.append(matches[0])
-                    else:
-                        reasons_for_period.append(None)
-                s["absence_periods"] = reasons_for_period
+                by_date = absences_by_user.get(s["user_id"], {})
+                s["absence_periods"] = [by_date.get(pstart) for pstart, _ in period_ranges]
 
         total = sum(sum(s["counts"]) for s in series)
 

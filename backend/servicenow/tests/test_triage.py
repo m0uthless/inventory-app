@@ -10,8 +10,9 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from servicenow.models import (
-    ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory, TechnicianAbsence,
+    ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory,
 )
+from attendance.models import Absence, DayPart
 
 pytestmark = pytest.mark.django_db
 
@@ -104,9 +105,9 @@ def test_triage_counts_only_todays_cases(api_client, superuser):
 def test_triage_marks_absent_technician(api_client, superuser):
     api_client.force_authenticate(user=superuser)
     tech = _make_tech(name="Absent")
-    TechnicianAbsence.objects.create(
-        user=tech, date_from=date.today(), date_to=date.today(), reason="ferie",
-    )
+    # Giornata intera = due righe (MAT + POM): assente a qualunque ora.
+    Absence.objects.create(user=tech, date=date.today(), day_part=DayPart.MATTINA, reason="ferie")
+    Absence.objects.create(user=tech, date=date.today(), day_part=DayPart.POMERIGGIO, reason="ferie")
 
     resp = api_client.get("/api/servicenow-cases/triage/")
     biotron_techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
@@ -117,8 +118,8 @@ def test_triage_marks_absent_technician(api_client, superuser):
 def test_triage_hourly_absence_marks_absent_only_during_window(api_client, superuser):
     api_client.force_authenticate(user=superuser)
     tech = _make_tech(name="Permesso")
-    TechnicianAbsence.objects.create(
-        user=tech, date_from=date.today(), date_to=date.today(), reason="altro",
+    Absence.objects.create(
+        user=tech, date=date.today(), day_part=DayPart.POMERIGGIO, reason="altro",
         time_from="14:00", time_to="16:00",
     )
 
@@ -135,24 +136,25 @@ def test_triage_hourly_absence_marks_absent_only_during_window(api_client, super
     assert techs["Permesso Test"]["absent"] is False
 
 
-def test_triage_full_day_absence_wins_over_hourly_window(api_client, superuser):
+def test_triage_halfday_absence_covers_only_its_fascia(api_client, superuser):
     api_client.force_authenticate(user=superuser)
-    tech = _make_tech(name="Doppia")
+    tech = _make_tech(name="Mezza")
     today = date.today()
-    # Ferie giornata intera + un permesso orario registrato per errore lo stesso giorno:
-    # deve restare "assente" per l'intera giornata, con il motivo dell'assenza principale.
-    TechnicianAbsence.objects.create(user=tech, date_from=today, date_to=today, reason="ferie")
-    TechnicianAbsence.objects.create(
-        user=tech, date_from=today, date_to=today, reason="altro",
-        time_from="14:00", time_to="16:00",
-    )
+    # Solo mattina di ferie: assente al mattino (prima delle 13), presente al pomeriggio.
+    Absence.objects.create(user=tech, date=today, day_part=DayPart.MATTINA, reason="ferie")
 
     with patch("servicenow.api.timezone.localtime") as mock_localtime:
         mock_localtime.return_value.time.return_value = time(9, 0)
         resp = api_client.get("/api/servicenow-cases/triage/")
     techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
-    assert techs["Doppia Test"]["absent"] is True
-    assert techs["Doppia Test"]["absence_reason"] == "Ferie"
+    assert techs["Mezza Test"]["absent"] is True
+    assert techs["Mezza Test"]["absence_reason"] == "Ferie"
+
+    with patch("servicenow.api.timezone.localtime") as mock_localtime:
+        mock_localtime.return_value.time.return_value = time(15, 0)
+        resp = api_client.get("/api/servicenow-cases/triage/")
+    techs = {t["name"]: t for t in resp.data["categories"]["biotron"]["technicians"]}
+    assert techs["Mezza Test"]["absent"] is False
 
 
 def test_triage_unassigned_cases_grouped_separately(api_client, superuser):

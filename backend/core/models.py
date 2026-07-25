@@ -122,6 +122,25 @@ class UserProfile(models.Model):
                    "(né Philips né Biotron) e non compare nel Triage / Statistiche. "
                    "Impostabile solo da admin.",
     )
+    is_leave_coordinator = models.BooleanField(
+        default=False, verbose_name="Coordinatore piano ferie",
+        help_text="Se attivo, l'utente può validare/rifiutare le proposte di ferie e "
+                   "inserire attività (training/104/malattia/…) per chiunque nel Piano Ferie. "
+                   "Impostabile solo da admin.",
+    )
+    leave_area = models.ForeignKey(
+        "attendance.LeaveArea",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="users",
+        verbose_name="Area piano ferie",
+        help_text="Area organizzativa usata per raggruppare le righe del Piano Ferie.",
+    )
+    is_expense_secretary = models.BooleanField(
+        default=False, verbose_name="Segreteria rimborsi spese",
+        help_text="Se attivo, l'utente può vedere tutte le note spese dei dipendenti e "
+                   "validarle/rifiutarle. Impostabile solo da admin.",
+    )
 
     def __str__(self):
         return f"Profile({self.user_id})"
@@ -172,6 +191,23 @@ class ArchieAccess(models.Model):
         default_permissions = ()
         permissions = [
             ("access_archie", "Può accedere al frontend Archie"),
+        ]
+
+
+class UserManagementAccess(models.Model):
+    """Modello dummy (managed=False) usato esclusivamente per registrare
+    il permesso custom `core.manage_users`.
+
+    Non crea nessuna tabella nel DB. Assegna il permesso a un gruppo o a un
+    utente per abilitare l'accesso al pannello "Utenti e Gruppi" (gestione
+    utenti, gruppi, permessi RWD per modulo, reset password).
+    """
+
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = [
+            ("manage_users", "Può gestire utenti, gruppi e permessi"),
         ]
 
 

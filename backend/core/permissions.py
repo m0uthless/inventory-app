@@ -52,6 +52,22 @@ class IsStaffOrAdminGroup(BasePermission):
         return bool(user.has_perm("core.access_archie"))
 
 
+class HasManageUsersPermission(BasePermission):
+    """Accesso al pannello "Utenti e Gruppi".
+
+    Richiede superuser oppure il permesso custom `core.manage_users`
+    (assegnabile liberamente a un gruppo o a un utente).
+    """
+
+    def has_permission(self, request, view) -> bool:
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        return bool(user.has_perm("core.manage_users"))
+
+
 class CanPurgeModelPermission(BasePermission):
     """Generic permission helper for `purge` actions (hard delete).
 
