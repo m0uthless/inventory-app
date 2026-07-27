@@ -1,6 +1,10 @@
 from django.core.management.base import BaseCommand
 from core.models import CustomerStatus, SiteStatus, InventoryStatus, InventoryType, AppSetting
 from custom_fields.models import CustomFieldDefinition
+from attendance.models import LeaveArea
+from issues.models import IssueCategory
+from device.models import DeviceManufacturer, DeviceStatus, DeviceType
+from servicenow.models import ServiceNowCaseType
 
 class Command(BaseCommand):
     help = "Seed default statuses, inventory types, and app settings."
@@ -87,6 +91,82 @@ class Command(BaseCommand):
                     "is_active": True,
                     "deleted_at": None,
                 },
+            )
+
+        # --- Attendance: aree piano ferie ---
+        leave_areas = [
+            ("avec", "AVEC", 10),
+            ("mi_hcis", "Privati", 20),
+            ("avr", "Romagna", 30),
+            ("mi_er", "MI - Emilia Romagna", 40),
+            ("mi_tr", "MI - Triveneto", 50),
+            ("uff", "Ufficio", 60),
+        ]
+        for key, label, sort_order in leave_areas:
+            LeaveArea.objects.update_or_create(
+                key=key, defaults={"label": label, "sort_order": sort_order, "is_active": True, "deleted_at": None}
+            )
+
+        # --- Issues: categorie ticket ---
+        issue_categories = [
+            ("pacs", "PACS", 10),
+            ("ris", "RIS", 20),
+            ("network", "Rete", 30),
+            ("hw", "Hardware", 40),
+            ("org", "Organizzativa", 50),
+        ]
+        for key, label, sort_order in issue_categories:
+            IssueCategory.objects.update_or_create(
+                key=key, defaults={"label": label, "sort_order": sort_order, "is_active": True, "deleted_at": None}
+            )
+
+        # --- Device: produttori (senza loghi: da caricare manualmente dal pannello) ---
+        device_manufacturers = [
+            "Philips", "Carestream", "Esaote", "GE", "Siemens", "Canon",
+            "Mindray", "Boston Scientific", "Fuji", "Agfa", "Samsung",
+            "United", "IMS", "Hologic", "GMM",
+        ]
+        for name in device_manufacturers:
+            DeviceManufacturer.objects.update_or_create(name=name, defaults={"deleted_at": None})
+
+        # --- Device: stati ---
+        device_statuses = ["In Uso", "Dismesso", "Prossima installazione"]
+        for name in device_statuses:
+            DeviceStatus.objects.update_or_create(name=name, defaults={"deleted_at": None})
+
+        # --- Device: tipi/modalità (dose_sr = supporto DoseSR) ---
+        device_types = [
+            ("Digitale Diretta", True),
+            ("Ecografo", False),
+            ("Risonanza Magnetica", False),
+            ("TAC", True),
+            ("IVUS", False),
+            ("CR", False),
+            ("Angiografo", True),
+            ("PET", True),
+            ("Mammografo", True),
+            ("Ortopantomografo", True),
+            ("Conebeam TC", True),
+            ("Endoscopia", False),
+            ("BV", True),
+        ]
+        for name, dose_sr in device_types:
+            DeviceType.objects.update_or_create(name=name, defaults={"dose_sr": dose_sr, "deleted_at": None})
+
+        # --- ServiceNow: type per categoria (Biotron / Philips) ---
+        servicenow_case_types = [
+            ("biotron", "L1", 0),
+            ("biotron", "PRIVATI", 1),
+            ("biotron", "CDD", 2),
+            ("philips", "L1", 0),
+            ("philips", "EBIT", 1),
+            ("philips", "RIS", 2),
+            ("philips", "AC", 3),
+            ("philips", "GEMELLI", 4),
+        ]
+        for category, name, order in servicenow_case_types:
+            ServiceNowCaseType.objects.update_or_create(
+                category=category, name=name, defaults={"order": order, "active": True}
             )
 
         self.stdout.write(self.style.SUCCESS("Seed completato."))

@@ -96,10 +96,18 @@ class AppSettingAdmin(ImportExportModelAdmin):
     list_filter = ("deleted_at",)
     search_fields = ("key", "value")
 
-from core.models import Announcement
+from core.models import Announcement, ChangelogEntry
 
 @admin.register(Announcement)
 class AnnouncementAdmin(admin.ModelAdmin):
     list_display  = ['title', 'category', 'created_by', 'created_at']
     list_filter   = ['category']
     search_fields = ['title', 'body']
+
+
+@admin.register(ChangelogEntry)
+class ChangelogEntryAdmin(admin.ModelAdmin):
+    list_display  = ['title', 'version', 'date', 'created_by', 'updated_at']
+    list_filter   = ['date']
+    search_fields = ['title', 'version', 'body']
+    ordering      = ['-date', '-id']

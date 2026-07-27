@@ -12,7 +12,7 @@ phone_validator = RegexValidator(
 )
 
 class Customer(TimeStampedModel):
-    code = models.CharField(max_length=16, null=True, blank=True)  # auto su save (C-000001)
+    code = models.CharField(max_length=16, null=True, blank=True)  # auto su save (001)
     name = models.CharField(max_length=255)
     display_name = models.CharField(max_length=255, null=True, blank=True)
 
@@ -63,7 +63,7 @@ class Customer(TimeStampedModel):
         creating = self.pk is None
         super().save(*args, **kwargs)
         if creating and not self.code:
-            self.code = f"C-{self.id:06d}"
+            self.code = f"{self.id:03d}"
             Customer.objects.filter(pk=self.pk).update(code=self.code)
 
     def __str__(self):

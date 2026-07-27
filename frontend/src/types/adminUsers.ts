@@ -96,6 +96,23 @@ export type AdminGroupWritePayload = Partial<{
   extra_permission_ids: number[]
 }>
 
+export type AdminUserCreatePayload = {
+  username: string
+  password?: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  is_active?: boolean
+  group_ids?: number[]
+}
+
+/** Risposta di POST /admin-users/: la riga utente creata, più la password
+ * generata automaticamente se non ne è stata specificata una (mostrata una
+ * sola volta, come per reset-password). */
+export type AdminUserCreateResponse = AdminUserRow & { generated_password: string | null }
+
+export type AdminGroupCreatePayload = { name: string }
+
 export type ResetPasswordResponse = {
   password: string
   email_sent: boolean

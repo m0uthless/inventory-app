@@ -3,19 +3,27 @@
 Espone:
 - GET  /api/admin/permission-modules/         elenco moduli + permessi extra disponibili
 - GET  /api/admin-users/                      lista utenti (con permessi effettivi)
+- POST /api/admin-users/                      crea un nuovo utente
 - GET  /api/admin-users/{id}/                 dettaglio utente
 - PATCH/PUT /api/admin-users/{id}/            aggiorna anagrafica, gruppi, permessi diretti, profilo
+- DELETE /api/admin-users/{id}/               elimina l'utente (bloccato per i superuser)
 - POST /api/admin-users/{id}/reset-password/  genera nuova password casuale (one-shot, mostrata all'admin)
 - POST /api/admin-users/{id}/reset-permissions-to-group/  azzera i permessi diretti dell'utente
 - GET  /api/admin-groups/                     lista gruppi (con permessi)
+- POST /api/admin-groups/                     crea un nuovo gruppo
 - GET  /api/admin-groups/{id}/                dettaglio gruppo
 - PATCH/PUT /api/admin-groups/{id}/           rinomina gruppo, aggiorna permessi RWD/extra
-
-Solo gestione di utenti/gruppi ESISTENTI: niente create/delete (per ora).
+- DELETE /api/admin-groups/{id}/              elimina il gruppo
 
 Nota sui permessi diretti utente: sono ADDITIVI rispetto al gruppo (limite nativo
 di Django, vedi permission_modules.py). "reset-permissions-to-group" azzera
 `user.user_permissions`, riportando l'utente a ereditare solo dai suoi gruppi.
+
+Nota sull'eliminazione utenti: è un DELETE reale (User/Group non hanno soft-delete).
+Un superuser non può mai essere eliminato da questo pannello (va prima retrocesso da
+Django Admin), e nessuno può eliminare il proprio account. Alcuni moduli (es. ServiceNow)
+proteggono l'utente con `on_delete=PROTECT` finché ha ticket assegnati: in quel caso la
+delete fallisce con un errore 400 leggibile invece di un 500.
 """
 from __future__ import annotations
 
@@ -24,9 +32,12 @@ import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Exists, OuterRef
+from django.db.models.deletion import ProtectedError
 from django.utils.crypto import get_random_string
 
 from rest_framework import mixins, serializers, status, viewsets
@@ -188,13 +199,51 @@ class UserAdminWriteSerializer(serializers.Serializer):
     auslbo_access = serializers.DictField(required=False)
 
 
+class UserAdminCreateSerializer(serializers.Serializer):
+    """Payload di creazione utente. Riusa gli stessi campi "annidati"
+    (gruppi/permessi/profilo/auslbo) di `UserAdminWriteSerializer`, applicati
+    tramite `_apply_write` subito dopo la creazione della riga `User`."""
+
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    is_active = serializers.BooleanField(required=False, default=True)
+    group_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    module_permissions = serializers.DictField(required=False)
+    extra_permission_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    profile = serializers.DictField(required=False)
+    # {"level": "none"|"read"|"read_write"|"full", "customer_id": int|null}
+    auslbo_access = serializers.DictField(required=False)
+
+    def validate_username(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Lo username è obbligatorio.")
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Username già in uso.")
+        return value
+
+    def validate_password(self, value: str) -> str:
+        if not value:
+            return value
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+
 class UserAdminViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
     mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Gestione utenti (SOLO lettura + modifica: niente create/delete per ora)."""
+    """Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione."""
 
     queryset = User.objects.all()  # sovrascritto da get_queryset()
     serializer_class = UserAdminSerializer
@@ -343,6 +392,84 @@ class UserAdminViewSet(
         out_serializer = self.get_serializer(instance)
         return Response(out_serializer.data)
 
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        in_serializer = UserAdminCreateSerializer(data=request.data)
+        in_serializer.is_valid(raise_exception=True)
+        data = dict(in_serializer.validated_data)
+
+        username = data.pop("username")
+        password = data.pop("password", "") or get_random_string(
+            length=14,
+            allowed_chars="abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%",
+        )
+        generated_password = not bool(in_serializer.validated_data.get("password"))
+
+        # is_staff/is_superuser non sono creabili da qui (stessa logica di
+        # _apply_write): un nuovo utente nasce sempre non-staff/non-superuser.
+        user = User(username=username)
+        user.set_password(password)
+        user.save()
+
+        changed_fields = self._apply_write(user, data, request.user)
+        changed_fields.insert(0, "created")
+
+        log_event(
+            actor=request.user,
+            action="create",
+            instance=user,
+            changes={"fields": changed_fields},
+            request=request,
+            subject=f"Gestione utenti: creato {user.username}",
+        )
+
+        user.refresh_from_db()
+        out_serializer = self.get_serializer(user)
+        payload = dict(out_serializer.data)
+        payload["generated_password"] = password if generated_password else None
+        return Response(payload, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.is_superuser:
+            raise serializers.ValidationError(
+                {"detail": "Non è possibile eliminare un superuser da questo pannello."}
+            )
+        if instance.pk == request.user.pk:
+            raise serializers.ValidationError(
+                {"detail": "Non puoi eliminare il tuo stesso account."}
+            )
+
+        username = instance.username
+        user_id = instance.pk
+
+        log_event(
+            actor=request.user,
+            action="delete",
+            instance=instance,
+            request=request,
+            subject=f"Gestione utenti: eliminato {username}",
+        )
+
+        try:
+            instance.delete()
+        except ProtectedError:
+            # Rollback anche del log_event sopra: la transazione atomica
+            # dell'intera request viene annullata dall'eccezione.
+            raise serializers.ValidationError(
+                {
+                    "detail": (
+                        "Impossibile eliminare l'utente: esistono record collegati che lo "
+                        "impediscono (es. ticket ServiceNow assegnati). Riassegna quei record "
+                        "oppure disattiva l'utente invece di eliminarlo."
+                    )
+                }
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=["post"], url_path="reset-password")
     def reset_password(self, request, pk=None):
         user = self.get_object()
@@ -435,13 +562,29 @@ class GroupAdminWriteSerializer(serializers.Serializer):
     extra_permission_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
 
 
+class GroupAdminCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=150)
+    module_permissions = serializers.DictField(required=False)
+    extra_permission_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+
+    def validate_name(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Il nome del gruppo è obbligatorio.")
+        if Group.objects.filter(name__iexact=value).exists():
+            raise serializers.ValidationError("Esiste già un gruppo con questo nome.")
+        return value
+
+
 class GroupAdminViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
     mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Gestione gruppi (SOLO lettura + modifica: niente create/delete per ora)."""
+    """Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione."""
 
     queryset = Group.objects.all().prefetch_related("permissions").order_by("name")
     serializer_class = GroupAdminSerializer
@@ -481,3 +624,46 @@ class GroupAdminViewSet(
 
         out_serializer = self.get_serializer(instance)
         return Response(out_serializer.data)
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        in_serializer = GroupAdminCreateSerializer(data=request.data)
+        in_serializer.is_valid(raise_exception=True)
+        data = in_serializer.validated_data
+
+        group = Group.objects.create(name=data["name"])
+
+        ids = compute_permission_ids(
+            data.get("module_permissions") or {},
+            data.get("extra_permission_ids"),
+        )
+        if ids:
+            group.permissions.set(ids)
+
+        log_event(
+            actor=request.user,
+            action="create",
+            instance=group,
+            changes={"fields": ["created", "permissions"]},
+            request=request,
+            subject=f"Gestione gruppi: creato {group.name}",
+        )
+
+        out_serializer = self.get_serializer(group)
+        return Response(out_serializer.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        name = instance.name
+
+        log_event(
+            actor=request.user,
+            action="delete",
+            instance=instance,
+            request=request,
+            subject=f"Gestione gruppi: eliminato {name}",
+        )
+
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

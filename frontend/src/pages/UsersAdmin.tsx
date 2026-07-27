@@ -5,6 +5,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   FormControlLabel,
@@ -23,6 +27,8 @@ import {
 } from '@mui/material'
 import type { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid'
 
+import AddIcon from '@mui/icons-material/Add'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
@@ -34,6 +40,7 @@ import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import EntityListCard from '@shared/ui/EntityListCard'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection } from '@shared/ui/DrawerParts'
 import { useAuth } from '../auth/AuthProvider'
@@ -48,6 +55,7 @@ import {
   type ModuleRwd,
   type RwdLevel,
   type ResetPasswordResponse,
+  type AdminUserCreateResponse,
 } from '../types/adminUsers'
 
 const TEAL = '#0f766e'
@@ -329,6 +337,241 @@ function ResetPasswordResultDialog({ result, onClose }: { result: ResetPasswordR
   )
 }
 
+// ─── Dialog creazione utente ────────────────────────────────────────────────
+// Form minimale (anagrafica + gruppi): permessi/profilo dettagliato si
+// configurano dopo, riaprendo il drawer già esistente (nessuna duplicazione
+// della matrice permessi). Se la password è lasciata vuota viene generata
+// automaticamente e mostrata una sola volta, come per "Reimposta password".
+function CreateUserDialog(props: {
+  open: boolean
+  groups: AdminGroupRow[]
+  onClose: () => void
+  onCreated: (user: AdminUserRow) => void
+}) {
+  const { open, groups, onClose, onCreated } = props
+  const toast = useToast()
+  const [saving, setSaving] = React.useState(false)
+  const [username, setUsername] = React.useState('')
+  const [password, setPassword] = React.useState('')
+  const [firstName, setFirstName] = React.useState('')
+  const [lastName, setLastName] = React.useState('')
+  const [email, setEmail] = React.useState('')
+  const [isActive, setIsActive] = React.useState(true)
+  const [groupIds, setGroupIds] = React.useState<number[]>([])
+  const [created, setCreated] = React.useState<AdminUserCreateResponse | null>(null)
+
+  const reset = () => {
+    setUsername('')
+    setPassword('')
+    setFirstName('')
+    setLastName('')
+    setEmail('')
+    setIsActive(true)
+    setGroupIds([])
+    setCreated(null)
+  }
+
+  const handleClose = () => {
+    if (saving) return
+    reset()
+    onClose()
+  }
+
+  const submit = async () => {
+    if (!username.trim()) {
+      toast.error('Lo username è obbligatorio.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await api.post('/admin-users/', {
+        username: username.trim(),
+        password: password || undefined,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        is_active: isActive,
+        group_ids: groupIds,
+      })
+      setCreated(res.data as AdminUserCreateResponse)
+      toast.success('Utente creato.')
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const copyPassword = async () => {
+    if (!created?.generated_password) return
+    try {
+      await navigator.clipboard.writeText(created.generated_password)
+      toast.success('Password copiata negli appunti.')
+    } catch {
+      /* silenzioso */
+    }
+  }
+
+  const finish = () => {
+    if (created) onCreated(created)
+    reset()
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ fontWeight: 800 }}>Nuovo utente</DialogTitle>
+      <DialogContent>
+        {created ? (
+          <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+            <Alert severity="success" sx={{ fontSize: 12.5 }}>
+              Utente <strong>{created.username}</strong> creato. Configura gruppo/permessi dettagliati dal pannello
+              dopo aver chiuso questa finestra.
+            </Alert>
+            {created.generated_password && (
+              <>
+                <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+                  Password generata automaticamente (mostrata una sola volta):
+                </Typography>
+                <TextField
+                  value={created.generated_password}
+                  fullWidth
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                    sx: { fontFamily: 'monospace', fontSize: 14 },
+                    endAdornment: (
+                      <IconButton size="small" onClick={copyPassword}>
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    ),
+                  }}
+                />
+              </>
+            )}
+          </Stack>
+        ) : (
+          <Stack spacing={1.75} sx={{ pt: 0.5 }}>
+            <TextField
+              label="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              fullWidth
+              size="small"
+              autoFocus
+              required
+            />
+            <TextField
+              label="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              fullWidth
+              size="small"
+              helperText="Lascia vuoto per generarla automaticamente."
+            />
+            <Stack direction="row" spacing={1.5}>
+              <TextField label="Nome" value={firstName} onChange={(e) => setFirstName(e.target.value)} fullWidth size="small" />
+              <TextField label="Cognome" value={lastName} onChange={(e) => setLastName(e.target.value)} fullWidth size="small" />
+            </Stack>
+            <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth size="small" />
+            <Autocomplete
+              multiple
+              size="small"
+              options={groups}
+              getOptionLabel={(g) => g.name}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              value={groups.filter((g) => groupIds.includes(g.id))}
+              onChange={(_, v) => setGroupIds(v.map((g) => g.id))}
+              renderInput={(params) => <TextField {...params} label="Gruppi" placeholder="Seleziona gruppo/i" />}
+            />
+            <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Utente attivo" />
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        {created ? (
+          <Button onClick={finish} variant="contained" size="small">
+            Configura permessi
+          </Button>
+        ) : (
+          <>
+            <Button onClick={handleClose} disabled={saving} size="small">
+              Annulla
+            </Button>
+            <Button onClick={submit} variant="contained" disabled={saving} size="small">
+              Crea utente
+            </Button>
+          </>
+        )}
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ─── Dialog creazione gruppo ────────────────────────────────────────────────
+function CreateGroupDialog(props: {
+  open: boolean
+  onClose: () => void
+  onCreated: (group: AdminGroupRow) => void
+}) {
+  const { open, onClose, onCreated } = props
+  const toast = useToast()
+  const [saving, setSaving] = React.useState(false)
+  const [name, setName] = React.useState('')
+
+  const handleClose = () => {
+    if (saving) return
+    setName('')
+    onClose()
+  }
+
+  const submit = async () => {
+    if (!name.trim()) {
+      toast.error('Il nome del gruppo è obbligatorio.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await api.post('/admin-groups/', { name: name.trim() })
+      toast.success('Gruppo creato.')
+      onCreated(res.data as AdminGroupRow)
+      setName('')
+      onClose()
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ fontWeight: 800 }}>Nuovo gruppo</DialogTitle>
+      <DialogContent>
+        <TextField
+          label="Nome gruppo"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          fullWidth
+          size="small"
+          autoFocus
+          required
+          sx={{ mt: 0.5 }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose} disabled={saving} size="small">
+          Annulla
+        </Button>
+        <Button onClick={submit} variant="contained" disabled={saving} size="small">
+          Crea gruppo
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 // ─── Drawer utente ──────────────────────────────────────────────────────────
 function UserDrawer(props: {
   open: boolean
@@ -336,16 +579,20 @@ function UserDrawer(props: {
   groups: AdminGroupRow[]
   modules: PermissionModule[]
   leaveAreas: LeaveAreaOption[]
+  currentUserId?: number
   onClose: () => void
   onSaved: (updated: AdminUserRow) => void
+  onDeleted: (id: number) => void
 }) {
-  const { open, user, groups, modules, leaveAreas, onClose, onSaved } = props
+  const { open, user, groups, modules, leaveAreas, currentUserId, onClose, onSaved, onDeleted } = props
   const toast = useToast()
   const [tab, setTab] = React.useState<UserTabId>('anagrafica')
   const [saving, setSaving] = React.useState(false)
   const [resetting, setResetting] = React.useState(false)
   const [resettingPw, setResettingPw] = React.useState(false)
   const [pwResult, setPwResult] = React.useState<ResetPasswordResponse | null>(null)
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
 
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
@@ -537,6 +784,22 @@ function UserDrawer(props: {
     }
   }
 
+  const doDelete = async () => {
+    setDeleting(true)
+    try {
+      await api.delete(`/admin-users/${user.id}/`)
+      toast.success('Utente eliminato.')
+      setDeleteOpen(false)
+      onDeleted(user.id)
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const canDelete = !user.is_superuser && user.id !== currentUserId
+
   const hasDirectGrants = Object.values(moduleDirect).some((v) => v.r || v.w || v.d) || extraDirect.size > 0
 
   return (
@@ -640,8 +903,35 @@ function UserDrawer(props: {
               Reimposta password
             </Button>
           </DrawerSection>
+
+          {canDelete && (
+            <DrawerSection title="Zona pericolosa" variant="muted">
+              <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1.25 }}>
+                Eliminazione definitiva: l'utente non può essere ripristinato.
+              </Typography>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => setDeleteOpen(true)}
+                size="small"
+              >
+                Elimina utente
+              </Button>
+            </DrawerSection>
+          )}
         </Stack>
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        busy={deleting}
+        title={`Eliminare l'utente ${user.username}?`}
+        description="L'utente verrà eliminato definitivamente (non è un'operazione reversibile e non finisce nel cestino)."
+        confirmText="Elimina"
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={doDelete}
+      />
 
       {tab === 'permessi' && (
         <Stack spacing={2}>
@@ -743,13 +1033,16 @@ function GroupDrawer(props: {
   modules: PermissionModule[]
   onClose: () => void
   onSaved: (updated: AdminGroupRow) => void
+  onDeleted: (id: number) => void
 }) {
-  const { open, group, modules, onClose, onSaved } = props
+  const { open, group, modules, onClose, onSaved, onDeleted } = props
   const toast = useToast()
   const [saving, setSaving] = React.useState(false)
   const [name, setName] = React.useState('')
   const [moduleValue, setModuleValue] = React.useState<Record<string, ModuleRwd>>({})
   const [extraValue, setExtraValue] = React.useState<Set<string>>(new Set())
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
 
   React.useEffect(() => {
     if (!group) return
@@ -782,11 +1075,25 @@ function GroupDrawer(props: {
     }
   }
 
+  const doDelete = async () => {
+    setDeleting(true)
+    try {
+      await api.delete(`/admin-groups/${group.id}/`)
+      toast.success('Gruppo eliminato.')
+      setDeleteOpen(false)
+      onDeleted(group.id)
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <DrawerShell
       open={open}
       onClose={onClose}
-      gradient="blue"
+      gradient="teal"
       width={420}
       icon={<GroupOutlinedIcon />}
       title={group.name}
@@ -817,7 +1124,34 @@ function GroupDrawer(props: {
             Salva gruppo
           </Button>
         </Box>
+
+        <DrawerSection title="Zona pericolosa" variant="muted">
+          <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1.25 }}>
+            {group.user_count > 0
+              ? `Eliminazione definitiva: verrà rimosso da ${group.user_count} utente/i, che perderanno i permessi concessi da questo gruppo.`
+              : 'Eliminazione definitiva: non è un\'operazione reversibile.'}
+          </Typography>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteOutlineIcon />}
+            onClick={() => setDeleteOpen(true)}
+            size="small"
+          >
+            Elimina gruppo
+          </Button>
+        </DrawerSection>
       </Stack>
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        busy={deleting}
+        title={`Eliminare il gruppo "${group.name}"?`}
+        description="Il gruppo verrà eliminato definitivamente (non è un'operazione reversibile e non finisce nel cestino)."
+        confirmText="Elimina"
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={doDelete}
+      />
     </DrawerShell>
   )
 }
@@ -845,6 +1179,8 @@ export default function UsersAdmin() {
   const [leaveAreas, setLeaveAreas] = React.useState<LeaveAreaOption[]>([])
   const [selectedUser, setSelectedUser] = React.useState<AdminUserRow | null>(null)
   const [selectedGroup, setSelectedGroup] = React.useState<AdminGroupRow | null>(null)
+  const [createUserOpen, setCreateUserOpen] = React.useState(false)
+  const [createGroupOpen, setCreateGroupOpen] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -1047,7 +1383,17 @@ export default function UsersAdmin() {
 
       {mainTab === 'utenti' ? (
         <EntityListCard
-          toolbar={{ q: usersGrid.q, onQChange: usersGrid.setQ, compact: true, searchLabel: 'Cerca utente' }}
+          toolbar={{
+            q: usersGrid.q,
+            onQChange: usersGrid.setQ,
+            compact: true,
+            searchLabel: 'Cerca utente',
+            rightActions: (
+              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setCreateUserOpen(true)}>
+                Nuovo utente
+              </Button>
+            ),
+          }}
           grid={{
             pageKey: 'admin-users',
             username: me?.username,
@@ -1065,7 +1411,17 @@ export default function UsersAdmin() {
         />
       ) : (
         <EntityListCard
-          toolbar={{ q: groupsGrid.q, onQChange: groupsGrid.setQ, compact: true, searchLabel: 'Cerca gruppo' }}
+          toolbar={{
+            q: groupsGrid.q,
+            onQChange: groupsGrid.setQ,
+            compact: true,
+            searchLabel: 'Cerca gruppo',
+            rightActions: (
+              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setCreateGroupOpen(true)}>
+                Nuovo gruppo
+              </Button>
+            ),
+          }}
           grid={{
             pageKey: 'admin-groups',
             username: me?.username,
@@ -1089,10 +1445,15 @@ export default function UsersAdmin() {
         groups={groups}
         modules={modules}
         leaveAreas={leaveAreas}
+        currentUserId={me?.id}
         onClose={() => setSelectedUser(null)}
         onSaved={(updated) => {
           setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
           setSelectedUser(updated)
+        }}
+        onDeleted={(id) => {
+          setUsers((prev) => prev.filter((u) => u.id !== id))
+          setSelectedUser(null)
         }}
       />
 
@@ -1104,6 +1465,30 @@ export default function UsersAdmin() {
         onSaved={(updated) => {
           setGroups((prev) => prev.map((g) => (g.id === updated.id ? updated : g)))
           setSelectedGroup(updated)
+        }}
+        onDeleted={(id) => {
+          setGroups((prev) => prev.filter((g) => g.id !== id))
+          setUsers((prev) => prev.map((u) => ({ ...u, groups: u.groups.filter((g) => g.id !== id) })))
+          setSelectedGroup(null)
+        }}
+      />
+
+      <CreateUserDialog
+        open={createUserOpen}
+        groups={groups}
+        onClose={() => setCreateUserOpen(false)}
+        onCreated={(user) => {
+          setUsers((prev) => [...prev, user].sort((a, b) => a.username.localeCompare(b.username)))
+          setSelectedUser(user)
+        }}
+      />
+
+      <CreateGroupDialog
+        open={createGroupOpen}
+        onClose={() => setCreateGroupOpen(false)}
+        onCreated={(group) => {
+          setGroups((prev) => [...prev, group].sort((a, b) => a.name.localeCompare(b.name)))
+          setSelectedGroup(group)
         }}
       />
     </Stack>

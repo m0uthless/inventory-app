@@ -141,6 +141,14 @@ class UserProfile(models.Model):
         help_text="Se attivo, l'utente può vedere tutte le note spese dei dipendenti e "
                    "validarle/rifiutarle. Impostabile solo da admin.",
     )
+    last_seen_changelog = models.ForeignKey(
+        "core.ChangelogEntry",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name="Ultima voce changelog vista",
+        help_text="Impostato automaticamente quando l'utente conferma di aver letto il changelog.",
+    )
 
     def __str__(self):
         return f"Profile({self.user_id})"
@@ -175,6 +183,35 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ChangelogEntry(models.Model):
+    """Voce di changelog applicativo, mostrata agli utenti al login (fino a
+    dismissal via checkbox) e consultabile in qualsiasi momento dal menu
+    utente. Contenuto in Markdown, renderizzato lato frontend (nessun HTML
+    salvato/eseguito lato server).
+    """
+    version     = models.CharField(max_length=32, blank=True, verbose_name='Versione')
+    title       = models.CharField(max_length=255, verbose_name='Titolo')
+    body        = models.TextField(verbose_name='Testo (Markdown)')
+    date        = models.DateField(default=timezone.localdate, verbose_name='Data rilascio')
+    created_by  = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='changelog_entries',
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Voce changelog'
+        verbose_name_plural = 'Changelog'
+        # Ordinamento di lettura per data rilascio; il controllo "letto/non
+        # letto" per utente si basa invece sull'id (ordine di inserimento),
+        # vedi core.api.ChangelogUnseenView.
+        ordering = ['-date', '-id']
+
+    def __str__(self):
+        return f"{self.version + ' — ' if self.version else ''}{self.title}"
 
 
 class ArchieAccess(models.Model):

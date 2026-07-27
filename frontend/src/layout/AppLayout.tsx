@@ -25,6 +25,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import LogoutIcon from '@mui/icons-material/Logout'
 import SettingsIcon from '@mui/icons-material/Settings'
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
+import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { Backdrop, Fade, Zoom } from '@mui/material'
@@ -59,6 +60,8 @@ import { NavGroupFlyout } from './NavGroupFlyout'
 const ProfileDrawer = React.lazy(() =>
   import('../pages/Profile').then((m) => ({ default: m.ProfileDrawer })),
 )
+const ChangelogDialog = React.lazy(() => import('../ui/ChangelogDialog'))
+const ChangelogLoginModal = React.lazy(() => import('../ui/ChangelogLoginModal'))
 
 const drawerWidth = 208
 const collapsedWidth = 58
@@ -159,6 +162,7 @@ export function AppLayout() {
   const [userAnchorEl, setUserAnchorEl] = React.useState<null | HTMLElement>(null)
   const userMenuOpen = Boolean(userAnchorEl)
   const [profileOpen, setProfileOpen] = React.useState(false)
+  const [changelogOpen, setChangelogOpen] = React.useState(false)
 
   const initials = React.useMemo(() => {
     const base =
@@ -943,6 +947,17 @@ export function AppLayout() {
           Impostazioni
         </MenuItem>
 
+        <MenuItem
+          onClick={() => {
+            setUserAnchorEl(null)
+            setChangelogOpen(true)
+          }}
+          sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
+        >
+          <HistoryRoundedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          Changelog
+        </MenuItem>
+
         {hasPerm('core.manage_users') && (
           <MenuItem
             onClick={() => {
@@ -1099,6 +1114,8 @@ export function AppLayout() {
       </Backdrop>
       <React.Suspense fallback={null}>
         <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
+        <ChangelogDialog open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+        {Boolean(me) && <ChangelogLoginModal />}
       </React.Suspense>
     </Box>
     </SiteRepoV2Provider>

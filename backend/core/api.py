@@ -1,11 +1,16 @@
 from django.utils import timezone
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, viewsets, status
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_METHODS
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
-from core.models import Announcement, CustomerStatus, SiteStatus, InventoryStatus, InventoryType, UserTask
+from core.models import (
+    Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
+    InventoryType, UserProfile, UserTask,
+)
 
 User = get_user_model()
 
@@ -151,6 +156,99 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+# ─── Changelog ─────────────────────────────────────────────────────────────────
+#
+# Modal obbligatorio (con checkbox di conferma) mostrato al login se esistono
+# voci non ancora viste dall'utente + voce "Changelog" nel menu utente per
+# rileggerle in qualsiasi momento. Il contenuto è Markdown, renderizzato lato
+# client (nessun HTML salvato/eseguito lato server).
+#
+# Tracking "letto/non letto": UserProfile.last_seen_changelog punta alla voce
+# più recente (per id di inserimento) confermata dall'utente. "Più recente" è
+# sempre calcolato per id (non per `date`, che è editabile e può essere
+# retrodatata inserendo voci storiche) così l'ordine di comparsa del modal
+# segue l'ordine reale di pubblicazione.
+
+class ChangelogEntrySerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = ChangelogEntry
+        fields = [
+            'id', 'version', 'title', 'body', 'date',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_by_name', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        u = obj.created_by
+        if not u:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+class ChangelogEntryViewSet(viewsets.ModelViewSet):
+    """
+    CRUD voci di changelog.
+    Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+    IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+    """
+    queryset           = ChangelogEntry.objects.select_related('created_by').all()
+    serializer_class   = ChangelogEntrySerializer
+    permission_classes = [IsAuthenticated, IsStaffOrReadOnly]
+    ordering           = ['-date', '-id']
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class ChangelogUnseenView(APIView):
+    """
+    GET /api/changelog/unseen/
+    Voci non ancora confermate dall'utente loggato (per il modal al login).
+
+    - Se l'utente non ha mai confermato nulla: solo l'ultima voce inserita
+      (evita di sommergere un utente nuovo con l'intero storico).
+    - Altrimenti: tutte le voci inserite dopo l'ultima confermata, in ordine
+      cronologico di rilascio (le più vecchie per prime), fino a 10.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        latest = ChangelogEntry.objects.order_by('-id').first()
+        if latest is None:
+            return Response({'entries': [], 'latest_id': None})
+
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        last_seen_id = profile.last_seen_changelog_id
+
+        if last_seen_id is None:
+            qs = ChangelogEntry.objects.filter(id=latest.id)
+        elif last_seen_id < latest.id:
+            qs = ChangelogEntry.objects.filter(id__gt=last_seen_id).order_by('date', 'id')[:10]
+        else:
+            qs = ChangelogEntry.objects.none()
+
+        entries = ChangelogEntrySerializer(qs, many=True).data
+        return Response({'entries': entries, 'latest_id': latest.id})
+
+
+class ChangelogDismissView(APIView):
+    """
+    POST /api/changelog/dismiss/
+    Segna come letto il changelog fino all'ultima voce esistente (calcolata
+    lato server, ignorando qualsiasi id passato dal client).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        latest = ChangelogEntry.objects.order_by('-id').first()
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile.last_seen_changelog = latest
+        profile.save(update_fields=['last_seen_changelog'])
+        return Response({'latest_id': latest.id if latest else None}, status=status.HTTP_200_OK)
 
 
 # ─── UserTask ─────────────────────────────────────────────────────────────────
