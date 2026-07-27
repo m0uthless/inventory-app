@@ -1,5 +1,5 @@
 # build — il contesto Docker è la root del monorepo (inventory-app/)
-FROM node:20 AS build
+FROM node:20.18.1 AS build
 WORKDIR /app
 
 # Installa dipendenze di frontend
@@ -15,6 +15,6 @@ COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
 
 # serve
-FROM nginx:alpine
+FROM nginx:1.27-alpine
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html

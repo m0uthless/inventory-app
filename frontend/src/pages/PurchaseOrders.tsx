@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -19,6 +20,8 @@ import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import UndoIcon from '@mui/icons-material/Undo'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
@@ -62,7 +65,6 @@ import {
   CURRENT_YEAR,
   STATUS_COLOR,
   STATUS_LABEL,
-  YEAR_OPTIONS,
   committenteColor,
   emptyForm,
   formatEuro,
@@ -939,17 +941,38 @@ export default function PurchaseOrders() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          children: (
-            <FormControl size="small" sx={{ minWidth: 90 }}>
-              <InputLabel>Anno</InputLabel>
-              <Select
-                label="Anno"
-                value={effectiveYear}
-                onChange={(e) => setYear(Number(e.target.value), { patch: { page: 1 }, keepOpen: false })}
+          rightActions: (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.25,
+                bgcolor: 'rgba(241,245,249,0.9)',
+                border: '0.5px solid',
+                borderColor: 'divider',
+                borderRadius: 999,
+                px: 0.5,
+                height: 32,
+              }}
+            >
+              <IconButton
+                size="small"
+                aria-label="Anno precedente"
+                onClick={() => setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })}
               >
-                {YEAR_OPTIONS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-              </Select>
-            </FormControl>
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', minWidth: 52, textAlign: 'center' }}>
+                {effectiveYear}
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label="Anno successivo"
+                onClick={() => setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })}
+              >
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </Box>
           ),
         }}
         grid={{

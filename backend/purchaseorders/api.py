@@ -273,20 +273,44 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         `waiting` sono invece conteggi filtrati per stato:
           - to_send: stato INSERITO (offerta non ancora inviata)
           - waiting: stato INVIATO o RICEVUTO (in attesa di riscontro dal cliente)
+
+        Include anche il confronto con l'anno precedente (`previous_year`,
+        `previous_year_amount`, `yoy_delta_pct`) per il KPI di variazione
+        annua del totale in Euro (deciso in chat). `yoy_delta_pct` è `None`
+        quando l'anno precedente non ha importi da confrontare (evita
+        divisioni per zero / percentuali fuorvianti).
         """
-        qs = PurchaseOrderEntry.objects.filter(deleted_at__isnull=True)
-        year = request.query_params.get("year")
-        if year:
-            try:
-                qs = qs.filter(offer_date__year=int(year))
-            except (TypeError, ValueError):
-                pass
+        base_qs = PurchaseOrderEntry.objects.filter(deleted_at__isnull=True)
+
+        year_param = request.query_params.get("year")
+        try:
+            year = int(year_param) if year_param else None
+        except (TypeError, ValueError):
+            year = None
+
+        qs = base_qs.filter(offer_date__year=year) if year else base_qs
 
         total_amount = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0")
         to_send = qs.filter(status=PurchaseOrderStatus.INSERITO).count()
         waiting = qs.filter(status__in=[PurchaseOrderStatus.INVIATO, PurchaseOrderStatus.RICEVUTO]).count()
 
-        return Response({"total_amount": str(total_amount), "to_send": to_send, "waiting": waiting})
+        previous_year = (year - 1) if year else None
+        previous_year_amount = None
+        yoy_delta_pct = None
+        if previous_year:
+            prev_total = base_qs.filter(offer_date__year=previous_year).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+            previous_year_amount = str(prev_total)
+            if prev_total:
+                yoy_delta_pct = float((total_amount - prev_total) / prev_total * 100)
+
+        return Response({
+            "total_amount": str(total_amount),
+            "to_send": to_send,
+            "waiting": waiting,
+            "previous_year": previous_year,
+            "previous_year_amount": previous_year_amount,
+            "yoy_delta_pct": yoy_delta_pct,
+        })
 
     # ── Workflow: advance / revert ────────────────────────────────────────────
 

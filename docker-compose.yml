@@ -124,6 +124,13 @@ services:
     entrypoint: []
     command: >
       sh -c "
+        if ! python manage.py migrate --check >/dev/null 2>&1; then
+          echo '[cron] ATTENZIONE: risultano migrazioni Django non applicate.';
+          if [ \"${FAIL_ON_PENDING_MIGRATIONS:-0}\" = \"1\" ]; then
+            echo '[cron] FAIL_ON_PENDING_MIGRATIONS=1: interrompo avvio scheduler.';
+            exit 1;
+          fi;
+        fi &&
         echo '[cron] Avvio scheduler close_resolved_issues (ogni ora)' &&
         while true; do
           python manage.py close_resolved_issues;

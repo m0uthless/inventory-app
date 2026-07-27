@@ -10,10 +10,27 @@ services:
   backend:
     env_file:
       - ./.env.prod
+    environment:
+      # Fix P3 17 (audit 2026-07): prima le migrazioni pendenti in produzione
+      # producevano solo un warning nei log (vedi backend/entrypoint.sh,
+      # fix 2.11), non bloccavano l'avvio: un rilascio poteva partire con
+      # backend e schema DB disallineati. In produzione va bloccato davvero.
+      # (RUN_MIGRATIONS resta "0": le migrazioni si applicano manualmente col
+      # comando dedicato prima del deploy, come da procedura; questo flag
+      # impedisce solo di avviare il backend se qualcuno se ne dimentica.)
+      FAIL_ON_PENDING_MIGRATIONS: "1"
+      # Controlli di sicurezza/settings Django (SECURE_*, DEBUG, ALLOWED_HOSTS,
+      # ecc.) prima di servire traffico: in precedenza disattivati di default
+      # anche in produzione.
+      DJANGO_RUN_DEPLOY_CHECK: "1"
 
   cron:
     env_file:
       - ./.env.prod
+    environment:
+      # Stesso gate delle migrazioni anche per il container cron, che esegue
+      # comandi di management schedulati contro lo stesso schema DB.
+      FAIL_ON_PENDING_MIGRATIONS: "1"
 
   frontend-auslbo:
     build:

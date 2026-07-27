@@ -70,7 +70,14 @@ export type CustomerItem = { id: number; code?: string; name?: string; display_n
 
 export type DocumentSlot = 'offer' | 'po' | 'invoice'
 
-export type PurchaseOrderSummary = { total_amount: string; to_send: number; waiting: number }
+export type PurchaseOrderSummary = {
+  total_amount: string
+  to_send: number
+  waiting: number
+  previous_year?: number | null
+  previous_year_amount?: string | null
+  yoy_delta_pct?: number | null
+}
 
 export const DOCUMENT_SLOT_LABEL: Record<DocumentSlot, string> = {
   offer: 'Offerta',
