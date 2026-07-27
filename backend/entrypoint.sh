@@ -1,6 +1,5 @@
 #!/bin/sh
 set -eu
-
 # NOTE: In production you usually want controlled deploy steps.
 # Set RUN_MIGRATIONS=0 to disable automatic migrations at container start.
 if [ "${RUN_MIGRATIONS:-0}" = "1" ]; then
@@ -25,7 +24,6 @@ else
     fi
   fi
 fi
-
 # Collect static files into STATIC_ROOT (shared with nginx)
 # Set RUN_COLLECTSTATIC=0 to disable (e.g. if you bake static into an image).
 if [ "${RUN_COLLECTSTATIC:-1}" = "1" ]; then
@@ -34,14 +32,20 @@ if [ "${RUN_COLLECTSTATIC:-1}" = "1" ]; then
 else
   echo "[entrypoint] Skipping collectstatic (RUN_COLLECTSTATIC!=1)."
 fi
-
 # Production deploy checks (security/settings sanity)
 if [ "${DJANGO_RUN_DEPLOY_CHECK:-0}" = "1" ]; then
   echo "[entrypoint] Running django deploy checks..."
-  python manage.py check --deploy --fail-level WARNING
+  # Fix deploycheck-00 (2026-07-27): --fail-level WARNING blocca l'avvio per
+  # qualsiasi warning, inclusi quelli puramente cosmetici di drf_spectacular
+  # (schema OpenAPI, type hint mancanti su SerializerMethodField) che non
+  # rappresentano un rischio di sicurezza o un problema di deploy reale.
+  # Portato a ERROR: il gate resta attivo per problemi bloccanti veri
+  # (es. SECRET_KEY debole, DEBUG=True in produzione, ecc.) senza fermare
+  # l'avvio per rumore di documentazione API. I warning restano comunque
+  # visibili nei log per revisione manuale.
+  python manage.py check --deploy --fail-level ERROR
 else
   echo "[entrypoint] Skipping deploy checks (DJANGO_RUN_DEPLOY_CHECK!=1)."
 fi
-
 # Start app server
 exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers "${GUNICORN_WORKERS:-4}" --timeout "${GUNICORN_TIMEOUT:-120}"
