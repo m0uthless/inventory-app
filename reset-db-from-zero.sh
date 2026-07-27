@@ -127,39 +127,33 @@ $COMPOSE exec -T db psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c \
   "CREATE DATABASE \"${POSTGRES_DB}\" OWNER \"${POSTGRES_USER}\";"
 
 # ---------------------------------------------------------------------------
-# 4. Pulizia file /media orfani
+# 4. Pulizia file /media, migrazioni e seed
 # ---------------------------------------------------------------------------
+# NOTA: qui backend è FERMO (fermato al punto 2) e il DB appena ricreato
+# non ha ancora lo schema. Non si può usare "compose exec" (il container
+# non gira) né "compose up -d backend" con l'entrypoint normale: in prod
+# FAIL_ON_PENDING_MIGRATIONS=1 farebbe fallire l'avvio finché le
+# migrazioni non sono applicate. Si usa quindi "run --entrypoint ''" per
+# lanciare comandi one-off che bypassano l'entrypoint/gunicorn, stessa
+# convenzione già in uso nel progetto per le migrazioni manuali.
 echo
 echo "── Pulizia file /media..."
-$COMPOSE exec -T backend sh -c 'rm -rf /app/media/* 2>/dev/null || true'
-
-# ---------------------------------------------------------------------------
-# 5. Riavvio backend + migrazioni + seed
-# ---------------------------------------------------------------------------
-echo
-echo "── Riavvio backend..."
-$COMPOSE up -d backend
-
-echo "── Attendo che il backend risponda..."
-for i in $(seq 1 30); do
-  if $COMPOSE exec -T backend python -c \
-    "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=3).getcode()==200 else 1)" \
-    >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
+$COMPOSE run --rm --entrypoint "" backend sh -c 'rm -rf /app/media/* 2>/dev/null || true'
 
 echo "── Migrazioni..."
-$COMPOSE exec -T backend python manage.py migrate
+$COMPOSE run --rm --entrypoint "" backend python manage.py migrate
 
 echo "── Seed dati di riferimento..."
-$COMPOSE exec -T backend python manage.py seed_defaults
+$COMPOSE run --rm --entrypoint "" backend python manage.py seed_defaults
 
 # ---------------------------------------------------------------------------
-# 6. Riavvio cron (fermato al punto 2)
+# 5. Avvio backend (entrypoint normale: ora le migrazioni sono applicate,
+#    quindi FAIL_ON_PENDING_MIGRATIONS non blocca più l'avvio) e cron
 # ---------------------------------------------------------------------------
 echo
+echo "── Avvio backend..."
+$COMPOSE up -d backend
+
 echo "── Riavvio cron..."
 $COMPOSE up -d cron
 
