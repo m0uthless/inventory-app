@@ -5,7 +5,8 @@
 - limiti di dimensione e content-type
 - download del certificato via endpoint protetto
 - soft-delete/restore
-- permessi (lettura libera, scrittura riservata a IsAuslBoEditor)
+- permessi (matrice reale view/add/change/delete_devicewifi via AuslBoModelPermissions)
+- fix 2.4: pass_certificato nascosta senza device.view_wifi_secrets, scope tenant
 
 Segue le convenzioni già in uso in device/tests/ (helper locali, non le
 fixture del conftest.py di root, dato che questo modulo usa SQLite in-memory
@@ -42,7 +43,25 @@ def _internal_user(*, can_edit: bool):
     user = User.objects.create_user(username=f"wifi_internal_{uuid.uuid4().hex[:6]}", password="pw")
     user.user_permissions.add(Permission.objects.get(codename="access_archie"))
     if can_edit:
-        user.user_permissions.add(Permission.objects.get(codename="change_device"))
+        codenames = ["view_devicewifi", "add_devicewifi", "change_devicewifi", "delete_devicewifi"]
+        user.user_permissions.add(*Permission.objects.filter(codename__in=codenames))
+    return user
+
+
+def _auslbo_user(customer, *, can_edit: bool = False, can_view_secrets: bool = False):
+    """Utente portale AUSL BO associato al customer indicato (fix 2.4:
+    DeviceWifiViewSet ora rispetta lo scope tenant)."""
+    from auslbo.models import AuslBoUserProfile
+
+    user = User.objects.create_user(username=f"wifi_auslbo_{uuid.uuid4().hex[:6]}", password="pw")
+    AuslBoUserProfile.objects.create(user=user, customer=customer)
+    codenames = []
+    if can_edit:
+        codenames += ["view_devicewifi", "add_devicewifi", "change_devicewifi", "delete_devicewifi"]
+    if can_view_secrets:
+        codenames.append("view_wifi_secrets")
+    if codenames:
+        user.user_permissions.add(*Permission.objects.filter(codename__in=codenames))
     return user
 
 
@@ -310,13 +329,19 @@ def test_no_restore_action_exposed_for_wifi_detail():
 
 # ─── Permessi ────────────────────────────────────────────────────────────────
 
-def test_read_allowed_without_edit_permission():
+def test_read_requires_view_permission():
+    """FIX 2.5 (audit 2026-07): prima IsAuslBoEditor lasciava passare
+    qualunque GET senza controllare device.view_devicewifi."""
     user = _superuser()
     device = _make_device(user, suffix="permread")
     wifi = DeviceWifi.objects.create(device=device)
 
     reader = _internal_user(can_edit=False)
     client = _auth_client(reader)
+    resp = client.get(f"/api/device-wifi/{wifi.id}/")
+    assert resp.status_code == 403
+
+    reader.user_permissions.add(Permission.objects.get(codename="view_devicewifi"))
     resp = client.get(f"/api/device-wifi/{wifi.id}/")
     assert resp.status_code == 200
 
@@ -337,3 +362,157 @@ def test_anonymous_cannot_access_wifi_endpoint():
     client = APIClient()
     resp = client.get("/api/device-wifi/")
     assert resp.status_code in (401, 403)
+
+
+# ─── Fix 2.4: password non piu' esposta in chiaro a chiunque ─────────────────
+
+def test_password_hidden_without_secrets_permission():
+    user = _superuser()
+    device = _make_device(user, suffix="secrethidden")
+    admin_client = _auth_client(user)
+    create_resp = admin_client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "pass_certificato": "TopSecretPass"},
+        format="json",
+    )
+    wifi_id = create_resp.data["id"]
+
+    reader = _internal_user(can_edit=True)  # view/add/change/delete_devicewifi, MA non view_wifi_secrets
+    client = _auth_client(reader)
+
+    detail = client.get(f"/api/device-wifi/{wifi_id}/")
+    assert detail.status_code == 200
+    assert "pass_certificato" not in detail.data
+
+    listing = client.get("/api/device-wifi/", {"device": device.id})
+    assert "pass_certificato" not in listing.data["results"][0]
+
+
+def test_password_visible_with_secrets_permission():
+    user = _superuser()
+    device = _make_device(user, suffix="secretvisible")
+    admin_client = _auth_client(user)
+    create_resp = admin_client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "pass_certificato": "TopSecretPass"},
+        format="json",
+    )
+    wifi_id = create_resp.data["id"]
+
+    reader = _internal_user(can_edit=True)
+    reader.user_permissions.add(Permission.objects.get(codename="view_wifi_secrets"))
+    client = _auth_client(reader)
+
+    detail = client.get(f"/api/device-wifi/{wifi_id}/")
+    assert detail.status_code == 200
+    assert detail.data["pass_certificato"] == "TopSecretPass"
+
+
+def test_password_hidden_in_nested_device_detail_without_permission():
+    """La stessa protezione vale per il nested wifi_detail dentro il
+    dettaglio Device, non solo per l'endpoint /api/device-wifi/ diretto."""
+    user = _superuser()
+    device = _make_device(user, suffix="secretnested")
+    admin_client = _auth_client(user)
+    admin_client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "pass_certificato": "TopSecretPass"},
+        format="json",
+    )
+
+    reader = _internal_user(can_edit=False)
+    reader.user_permissions.add(Permission.objects.get(codename="view_device"))
+    client = _auth_client(reader)
+
+    detail = client.get(f"/api/devices/{device.id}/")
+    assert detail.status_code == 200
+    assert "pass_certificato" not in (detail.data.get("wifi_detail") or {})
+
+
+def test_cannot_write_password_without_secrets_permission():
+    user = _superuser()
+    device = _make_device(user, suffix="secretwrite")
+
+    editor = _internal_user(can_edit=True)  # niente view_wifi_secrets
+    client = _auth_client(editor)
+    resp = client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "pass_certificato": "AttemptedPass"},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "pass_certificato" in resp.data
+
+
+def test_certificato_download_requires_secrets_permission():
+    user = _superuser()
+    device = _make_device(user, suffix="downloadperm")
+    admin_client = _auth_client(user)
+    create_resp = admin_client.post(
+        "/api/device-wifi/", {"device": device.id, "certificato": _p12_file()}, format="multipart",
+    )
+    wifi_id = create_resp.data["id"]
+
+    reader = _internal_user(can_edit=True)
+    client = _auth_client(reader)
+    resp = client.get(f"/api/device-wifi/{wifi_id}/certificato/")
+    assert resp.status_code == 403
+
+    reader.user_permissions.add(Permission.objects.get(codename="view_wifi_secrets"))
+    resp = client.get(f"/api/device-wifi/{wifi_id}/certificato/")
+    assert resp.status_code == 200
+
+
+# ─── Fix 2.4: scope tenant (DeviceWifiViewSet non era scopato) ──────────────
+
+def test_portal_user_cannot_see_wifi_of_another_customer():
+    admin = _superuser()
+    device_a = _make_device(admin, suffix="tenantwifia")
+    device_b = _make_device(admin, suffix="tenantwifib")
+    admin_client = _auth_client(admin)
+    resp_a = admin_client.post(
+        "/api/device-wifi/", {"device": device_a.id, "pass_certificato": "PassA"}, format="json",
+    )
+    resp_b = admin_client.post(
+        "/api/device-wifi/", {"device": device_b.id, "pass_certificato": "PassB"}, format="json",
+    )
+    wifi_b_id = resp_b.data["id"]
+
+    portal_a = _auslbo_user(device_a.customer, can_edit=True, can_view_secrets=True)
+    client = _auth_client(portal_a)
+
+    # Lista: deve vedere solo il proprio.
+    listing = client.get("/api/device-wifi/")
+    ids = {w["id"] for w in listing.data["results"]}
+    assert resp_a.data["id"] in ids
+    assert wifi_b_id not in ids
+
+    # Accesso diretto al dettaglio/certificato di un altro customer: 404.
+    detail = client.get(f"/api/device-wifi/{wifi_b_id}/")
+    assert detail.status_code == 404
+
+    download = client.get(f"/api/device-wifi/{wifi_b_id}/certificato/")
+    assert download.status_code == 404
+
+
+def test_portal_user_cannot_create_wifi_for_device_of_another_customer():
+    admin = _superuser()
+    device_b = _make_device(admin, suffix="tenantwifiwriteb")
+    other_customer = Customer.objects.create(
+        name="TenantWriteA",
+        status=CustomerStatus.objects.get_or_create(
+            key="wifi_e2e_cs_tenantwritea", defaults={"label": "Active"},
+        )[0],
+    )
+
+    portal_user = _auslbo_user(other_customer, can_edit=True, can_view_secrets=True)
+    client = _auth_client(portal_user)
+
+    resp = client.post(
+        "/api/device-wifi/",
+        {"device": device_b.id, "pass_certificato": "Attempt"},
+        format="json",
+    )
+    # device_b non è scopato nel queryset dell'utente portale (customer
+    # diverso): il PrimaryKeyRelatedField "device" non lo trova -> 400.
+    assert resp.status_code == 400

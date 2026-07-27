@@ -4,13 +4,7 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
-  Menu,
-  MenuItem,
   LinearProgress,
   Stack,
   TextField,
@@ -19,23 +13,13 @@ import {
 } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
-import CloseIcon from '@mui/icons-material/Close'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
 import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined'
-import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
 import FolderIcon from '@mui/icons-material/Folder'
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined'
-import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import ReorderIcon from '@mui/icons-material/Reorder'
-import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank'
 import CheckBoxIcon from '@mui/icons-material/CheckBox'
-import MoreVertIcon from '@mui/icons-material/MoreVert'
-import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 
 import { Can } from '../auth/Can'
@@ -43,1176 +27,18 @@ import { PERMS } from '../auth/perms'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
-import { DrawerShell } from '@shared/ui/DrawerShell'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import { ActionIconButton } from '@shared/ui/ActionIconButton'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type DriveFolder = {
-  id: number
-  name: string
-  parent: number | null
-  full_path: string
-  children_count: number
-  files_count: number
-  customers: number[]
-  created_by_name: string | null
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
-}
-
-type DriveFile = {
-  id: number
-  name: string
-  folder: number | null
-  folder_name: string | null
-  file: string
-  mime_type: string
-  size: number
-  size_human: string
-  extension: string
-  is_previewable: boolean
-  is_image: boolean
-  is_pdf: boolean
-  customers: number[]
-  created_by_name: string | null
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
-}
-
-type BreadcrumbItem = { id: number; name: string }
-type CustomerMini = { id: number; display_name: string }
-
-type DrawerItem = { kind: 'folder'; data: DriveFolder } | { kind: 'file'; data: DriveFile }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtDate(ts?: string | null) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleDateString('it-IT', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-// Mappa tipo file → colore, condivisa da FileTypeIcon e fileIconBg
-const FILE_TYPE_COLOR = {
-  image: { bg: '#f0fdf4', fg: '#16a34a' },
-  pdf: { bg: '#fff1f2', fg: '#dc2626' },
-  other: { bg: '#eff6ff', fg: '#2563eb' },
-} as const
-type FileTypeKey = keyof typeof FILE_TYPE_COLOR
-
-function fileTypeKey(mime?: string): FileTypeKey {
-  if (mime?.startsWith('image/')) return 'image'
-  if (mime === 'application/pdf') return 'pdf'
-  return 'other'
-}
-
-function FileTypeIcon({ mime, size = 20 }: { mime?: string; ext?: string; size?: number }) {
-  const key = fileTypeKey(mime)
-  const color = FILE_TYPE_COLOR[key].fg
-
-  if (key === 'image') return <ImageOutlinedIcon sx={{ fontSize: size, color }} />
-  if (key === 'pdf') return <PictureAsPdfOutlinedIcon sx={{ fontSize: size, color }} />
-  return <InsertDriveFileOutlinedIcon sx={{ fontSize: size, color }} />
-}
-
-function fileIconBg(mime?: string) {
-  const key = fileTypeKey(mime)
-  return { bg: FILE_TYPE_COLOR[key].bg, color: FILE_TYPE_COLOR[key].fg }
-}
-
-// ─── Upload Zone ──────────────────────────────────────────────────────────────
-
-const MAX_UPLOAD_MB = 25
-const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
-const BLOCKED_EXT = new Set([
-  'exe',
-  'bat',
-  'cmd',
-  'com',
-  'msi',
-  'sh',
-  'bash',
-  'ps1',
-  'vbs',
-  'js',
-  'ts',
-  'php',
-  'py',
-  'rb',
-  'pl',
-  'jar',
-  'dll',
-  'so',
-])
-
-function UploadZone({ onFiles }: { onFiles: (files: FileList) => void }) {
-  const [over, setOver] = React.useState(false)
-  const inputRef = React.useRef<HTMLInputElement>(null)
-  const toast = useToast()
-
-  const validate = (files: FileList): FileList | null => {
-    const errors: string[] = []
-    Array.from(files).forEach((f) => {
-      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
-      if (BLOCKED_EXT.has(ext)) {
-        errors.push(`"${f.name}" — tipo di file non consentito (.${ext})`)
-      } else if (f.size > MAX_UPLOAD_BYTES) {
-        const mb = (f.size / 1024 / 1024).toFixed(1)
-        errors.push(`"${f.name}" — troppo grande (${mb} MB, max ${MAX_UPLOAD_MB} MB)`)
-      }
-    })
-    if (errors.length) {
-      errors.forEach((e) => toast.error(e))
-      return null
-    }
-    return files
-  }
-
-  return (
-    <Box
-      onDragOver={(e) => {
-        e.preventDefault()
-        setOver(true)
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault()
-        setOver(false)
-        if (e.dataTransfer.files.length) {
-          const valid = validate(e.dataTransfer.files)
-          if (valid) onFiles(valid)
-        }
-      }}
-      onClick={() => inputRef.current?.click()}
-      sx={{
-        border: '2px dashed',
-        borderColor: over ? 'primary.main' : 'grey.200',
-        borderRadius: 1,
-        py: 2,
-        px: 3,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        background: over ? 'rgba(15,118,110,0.04)' : '#fafafa',
-        transition: 'all 0.15s',
-        cursor: 'pointer',
-        mb: 2.5,
-        '&:hover': { borderColor: 'primary.main', background: 'rgba(15,118,110,0.03)' },
-      }}
-    >
-      <UploadFileOutlinedIcon sx={{ color: over ? 'primary.main' : 'grey.400', fontSize: 22 }} />
-      <Box sx={{ flex: 1 }}>
-        <Typography
-          variant="body2"
-          sx={{ fontWeight: 600, color: over ? 'primary.main' : 'text.secondary' }}
-        >
-          Trascina file qui
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-          oppure{' '}
-          <Box component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
-            seleziona dal computer
-          </Box>
-          {' · '}max {MAX_UPLOAD_MB} MB · no file eseguibili
-        </Typography>
-      </Box>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => {
-          if (e.target.files?.length) {
-            const valid = validate(e.target.files)
-            if (valid) onFiles(valid)
-          }
-          e.target.value = '' // reset so same file can be re-selected
-        }}
-      />
-    </Box>
-  )
-}
-
-// ─── Preview Drawer ───────────────────────────────────────────────────────────
-
-function PreviewDrawer({
-  item,
-  onClose,
-}: {
-  item: DrawerItem | null
-  onClose: () => void
-}) {
-  const toast = useToast()
-  const [pdfOpen, setPdfOpen] = React.useState(false)
-  const [customers, setCustomers] = React.useState<CustomerMini[]>([])
-  const [assigned, setAssigned] = React.useState<CustomerMini[]>([])
-  const [savingCustomers, setSavingCustomers] = React.useState(false)
-
-  React.useEffect(() => {
-    api
-      .get('/customers/', { params: { page_size: 500, ordering: 'display_name' } })
-      .then((r) => setCustomers(r.data?.results ?? r.data ?? []))
-      .catch(() => {})
-  }, [])
-
-  React.useEffect(() => {
-    if (!item) return
-    const ids: number[] = item.data.customers ?? []
-    setAssigned(customers.filter((c) => ids.includes(c.id)))
-  }, [item, customers])
-
-  const saveCustomers = async (newAssigned: CustomerMini[]) => {
-    if (!item) return
-    setSavingCustomers(true)
-    try {
-      const url =
-        item.kind === 'folder' ? `/drive-folders/${item.data.id}/` : `/drive-files/${item.data.id}/`
-      await api.patch(url, { customers: newAssigned.map((c) => c.id) })
-      item.data.customers = newAssigned.map((c) => c.id)
-      toast.success('Clienti aggiornati ✅')
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSavingCustomers(false)
-    }
-  }
-
-  if (!item) return null
-  const isFolder = item.kind === 'folder'
-  const folder: DriveFolder | null = item.kind === 'folder' ? item.data : null
-  const file: DriveFile | null = item.kind === 'file' ? item.data : null
-
-  const handleDownload = () => {
-    if (!file) return
-    window.open(`/api/drive-files/${file.id}/download/`, '_blank')
-  }
-
-  const kindLabel = isFolder ? 'Cartella' : file?.is_pdf ? 'PDF' : 'File'
-  const heroSubtitle = isFolder
-    ? `${folder?.children_count ?? 0} cartelle · ${folder?.files_count ?? 0} file`
-    : [file?.size_human ?? '—', file?.folder_name || 'Root'].filter(Boolean).join(' · ')
-
-  const rows = isFolder
-    ? [
-        { label: 'Percorso', value: folder?.full_path || folder?.name || '—' },
-        { label: 'Cartelle', value: folder?.children_count ?? 0 },
-        { label: 'File', value: folder?.files_count ?? 0 },
-        { label: 'Creato da', value: folder?.created_by_name || '—' },
-        { label: 'Creato il', value: fmtDate(folder?.created_at) },
-        { label: 'Modificato', value: fmtDate(folder?.updated_at) },
-      ]
-    : [
-        { label: 'Dimensione', value: file?.size_human ?? '—' },
-        { label: 'Tipo', value: file?.mime_type || file?.extension?.toUpperCase() || '—' },
-        { label: 'Cartella', value: file?.folder_name || 'Root' },
-        { label: 'Creato da', value: file?.created_by_name || '—' },
-        { label: 'Creato il', value: fmtDate(file?.created_at) },
-        { label: 'Modificato', value: fmtDate(file?.updated_at) },
-      ]
-
-  const sectionCardSx = {
-    bgcolor: '#fff',
-    border: '1px solid',
-    borderColor: 'grey.200',
-    borderRadius: 1,
-    p: 1.75,
-  } as const
-
-  return (
-    <>
-      <DrawerShell
-        open={!!item}
-        onClose={onClose}
-        gradient="teal"
-        statusLabel={`● ${kindLabel}`}
-        title={folder?.name ?? file?.name ?? ''}
-        subtitle={heroSubtitle}
-      >
-        <>
-          <Box
-            sx={{
-              flex: 1,
-              overflowY: 'auto',
-              px: 2.5,
-              py: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1.5,
-              bgcolor: '#f8fafc',
-            }}
-          >
-            {file && file.is_image ? (
-              <Box sx={{ ...sectionCardSx, overflow: 'hidden', p: 0 }}>
-                <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.disabled',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Anteprima
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    borderTop: '1px solid',
-                    borderColor: 'grey.100',
-                    bgcolor: '#fff',
-                    minHeight: 220,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    p: 1.5,
-                  }}
-                >
-                  <Box
-                    component="img"
-                    src={`/api/drive-files/${file.id}/preview/`}
-                    alt={file.name}
-                    sx={{ maxWidth: '100%', maxHeight: 260, objectFit: 'contain' }}
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
-                </Box>
-              </Box>
-            ) : null}
-
-            <Box sx={sectionCardSx}>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 700,
-                  color: 'text.disabled',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  display: 'block',
-                  mb: 1,
-                }}
-              >
-                Informazioni
-              </Typography>
-              <Stack spacing={0}>
-                {rows.map((r) => (
-                  <Stack
-                    key={r.label}
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    sx={{ py: 0.75, gap: 1 }}
-                  >
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      {r.label}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 600,
-                        maxWidth: 240,
-                        textAlign: 'right',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {String(r.value ?? '—')}
-                    </Typography>
-                  </Stack>
-                ))}
-                {!isFolder ? (
-                  <>
-                    {file?.is_pdf ? (
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        sx={{ py: 0.75, gap: 1 }}
-                      >
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                          Anteprima
-                        </Typography>
-                        <Button
-                          size="small"
-                          variant="text"
-                          startIcon={<OpenInNewIcon />}
-                          onClick={() => setPdfOpen(true)}
-                          sx={{ minWidth: 0, px: 0, textTransform: 'none', fontWeight: 700 }}
-                        >
-                          Apri PDF
-                        </Button>
-                      </Stack>
-                    ) : null}
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      sx={{ py: 0.75, gap: 1 }}
-                    >
-                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                        Download
-                      </Typography>
-                      <Button
-                        size="small"
-                        variant="text"
-                        startIcon={<DownloadOutlinedIcon />}
-                        onClick={handleDownload}
-                        sx={{ minWidth: 0, px: 0, textTransform: 'none', fontWeight: 700 }}
-                      >
-                        Scarica file
-                      </Button>
-                    </Stack>
-                  </>
-                ) : null}
-              </Stack>
-            </Box>
-
-            <Box sx={sectionCardSx}>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 700,
-                  color: 'text.disabled',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  display: 'block',
-                  mb: 1,
-                }}
-              >
-                Clienti collegati
-              </Typography>
-              <Can perm={isFolder ? PERMS.drive.folder.change : PERMS.drive.file.change}>
-                <Autocomplete
-                  multiple
-                  size="small"
-                  options={customers}
-                  value={assigned}
-                  onChange={(_e, newVal) => {
-                    setAssigned(newVal)
-                    saveCustomers(newVal)
-                  }}
-                  getOptionLabel={(o) => o.display_name}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
-                  loading={savingCustomers}
-                  renderTags={(val, getProps) =>
-                    val.map((opt, i) => (
-                      <Chip
-                        label={opt.display_name}
-                        size="small"
-                        {...getProps({ index: i })}
-                        key={opt.id}
-                        sx={{ fontSize: 10.5, height: 22, '& .MuiChip-label': { px: 1 } }}
-                      />
-                    ))
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder={assigned.length ? '' : 'Aggiungi cliente…'}
-                      size="small"
-                      sx={{
-                        '& .MuiOutlinedInput-root': { borderRadius: 1 },
-                        '& .MuiInputBase-input': { fontSize: 13 },
-                      }}
-                    />
-                  )}
-                  sx={{
-                    width: '100%',
-                    '& .MuiAutocomplete-inputRoot': { alignItems: 'flex-start' },
-                    '& .MuiAutocomplete-tag': { maxWidth: '100%' },
-                    '& .MuiAutocomplete-option': { fontSize: 13, minHeight: 34 },
-                    '& .MuiChip-label': { fontSize: 11 },
-                  }}
-                  noOptionsText="Nessun cliente trovato"
-                />
-              </Can>
-              <Can perm={isFolder ? PERMS.drive.folder.view : PERMS.drive.file.view}>
-                {assigned.length === 0 && (
-                  <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                    Nessun cliente collegato.
-                  </Typography>
-                )}
-              </Can>
-            </Box>
-          </Box>
-        </>
-      </DrawerShell>
-
-      {file && file.is_pdf && (
-        <Dialog
-          open={pdfOpen}
-          onClose={() => setPdfOpen(false)}
-          maxWidth={false}
-          PaperProps={{
-            sx: {
-              width: '90vw',
-              height: '92vh',
-              maxWidth: 'none',
-              borderRadius: 1,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            },
-          }}
-        >
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={1}
-            sx={{
-              px: 2.5,
-              py: 1.5,
-              borderBottom: '1px solid',
-              borderColor: 'divider',
-              flexShrink: 0,
-            }}
-          >
-            <Typography
-              variant="body2"
-              sx={{
-                fontWeight: 700,
-                flex: 1,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {file?.name ?? ''}
-            </Typography>
-            <ActionIconButton
-              label="Apri in una nuova scheda"
-              icon={<OpenInNewIcon fontSize="small" />}
-              size="small"
-              onClick={() => window.open(`/api/drive-files/${file.id}/preview/`, '_blank')}
-              sx={{ color: 'primary.main' }}
-            />
-            <ActionIconButton
-              label="Chiudi anteprima"
-              icon={<CloseIcon fontSize="small" />}
-              size="small"
-              onClick={() => setPdfOpen(false)}
-            />
-          </Stack>
-          <Box sx={{ flex: 1, minHeight: 0, bgcolor: '#525659' }}>
-            <iframe
-              src={`/api/drive-files/${file.id}/preview/`}
-              title={file.name}
-              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-            />
-          </Box>
-        </Dialog>
-      )}
-    </>
-  )
-}
-
-// ─── Folder Card ──────────────────────────────────────────────────────────────
-
-function FolderCard({
-  folder,
-  onOpen,
-  onRename,
-  onMove,
-  onDelete,
-  onLinkCustomers,
-}: {
-  folder: DriveFolder
-  onOpen: () => void
-  onRename: () => void
-  onMove: () => void
-  onDelete: () => void
-  onLinkCustomers: () => void
-}) {
-  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null)
-
-  return (
-    <Box
-      onClick={onOpen}
-      sx={{
-        bgcolor: '#fff',
-        border: '1px solid',
-        borderColor: 'grey.200',
-        borderRadius: 1,
-        p: 1.5,
-        cursor: 'pointer',
-        transition: 'all 0.13s',
-        position: 'relative',
-        '&:hover': {
-          bgcolor: '#f0fdf9',
-          borderColor: 'primary.light',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          '& .folder-menu-btn': { opacity: 1 },
-        },
-      }}
-    >
-      <Stack
-        direction="row"
-        alignItems="flex-start"
-        justifyContent="space-between"
-        sx={{ mb: 0.5 }}
-      >
-        <FolderIcon sx={{ fontSize: 28, color: 'warning.main' }} />
-        <IconButton
-          className="folder-menu-btn"
-          aria-label="Menu cartella"
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation()
-            setMenuAnchor(e.currentTarget)
-          }}
-          sx={{
-            opacity: 0,
-            transition: 'opacity 0.15s',
-            mt: -0.5,
-            mr: -0.75,
-            color: 'text.disabled',
-            '&:hover': { color: 'text.primary' },
-          }}
-        >
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
-      </Stack>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 600,
-          color: 'text.primary',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {folder.name}
-      </Typography>
-      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-        {folder.files_count} file · {fmtDate(folder.updated_at)}
-      </Typography>
-
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onOpen()
-          }}
-          dense
-        >
-          <FolderIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Apri
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onRename()
-          }}
-          dense
-        >
-          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Rinomina
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onMove()
-          }}
-          dense
-        >
-          <DriveFileMoveOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Sposta in…
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onLinkCustomers()
-          }}
-          dense
-        >
-          <PersonAddOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Collega
-          clienti
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onDelete()
-          }}
-          dense
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina
-        </MenuItem>
-      </Menu>
-    </Box>
-  )
-}
-
-// ─── File Card ────────────────────────────────────────────────────────────────
-
-function FileCard({
-  file,
-  onSelect,
-  selected,
-  onRename,
-  onMove,
-  onDelete,
-  onLinkCustomers,
-}: {
-  file: DriveFile
-  onSelect: () => void
-  selected: boolean
-  onRename: () => void
-  onMove: () => void
-  onDelete: () => void
-  onLinkCustomers: () => void
-}) {
-  const { bg } = fileIconBg(file.mime_type)
-  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null)
-  const handleDownload = () => window.open(`/api/drive-files/${file.id}/download/`, '_blank')
-
-  return (
-    <Box
-      sx={{
-        bgcolor: selected ? 'rgba(15,118,110,0.07)' : '#fff',
-        border: '1px solid',
-        borderColor: selected ? 'primary.main' : 'grey.200',
-        borderRadius: 1,
-        p: 1.5,
-        cursor: 'pointer',
-        transition: 'all 0.13s',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.25,
-        position: 'relative',
-        '&:hover': {
-          bgcolor: selected ? 'rgba(15,118,110,0.09)' : '#f8fafc',
-          borderColor: selected ? 'primary.main' : 'grey.300',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          '& .file-menu-btn': { opacity: 1 },
-        },
-      }}
-    >
-      <Box
-        onClick={onSelect}
-        sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0 }}
-      >
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: 1.5,
-            bgcolor: bg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <FileTypeIcon mime={file.mime_type} size={18} />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 600,
-              color: 'text.primary',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {file.name}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            {file.size_human} · {fmtDate(file.updated_at)}
-          </Typography>
-        </Box>
-      </Box>
-      <IconButton
-        className="file-menu-btn"
-        aria-label="Menu file"
-        size="small"
-        onClick={(e) => {
-          e.stopPropagation()
-          setMenuAnchor(e.currentTarget)
-        }}
-        sx={{
-          opacity: 0,
-          transition: 'opacity 0.15s',
-          flexShrink: 0,
-          color: 'text.disabled',
-          '&:hover': { color: 'text.primary' },
-        }}
-      >
-        <MoreVertIcon fontSize="small" />
-      </IconButton>
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            handleDownload()
-          }}
-          dense
-        >
-          <DownloadOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Scarica
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onLinkCustomers()
-          }}
-          dense
-        >
-          <PersonAddOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Collega
-          clienti
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onRename()
-          }}
-          dense
-        >
-          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Rinomina
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onMove()
-          }}
-          dense
-        >
-          <DriveFileMoveOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Sposta in…
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onDelete()
-          }}
-          dense
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina
-        </MenuItem>
-      </Menu>
-    </Box>
-  )
-}
-
-// ─── Folder List Row ──────────────────────────────────────────────────────────
-
-function FolderListRow({
-  folder,
-  idx,
-  total,
-  onOpen,
-  onRename,
-  onMove,
-  onDelete,
-  onLinkCustomers,
-  isSelected,
-  onToggleSelect,
-}: {
-  folder: DriveFolder
-  idx: number
-  total: number
-  onOpen: () => void
-  onRename: () => void
-  onMove: () => void
-  onDelete: () => void
-  onLinkCustomers: () => void
-  isSelected: boolean
-  onToggleSelect: (e: React.MouseEvent) => void
-}) {
-  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null)
-
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={1.5}
-      onClick={onOpen}
-      sx={{
-        px: 2,
-        py: 1,
-        borderBottom: idx < total - 1 ? '1px solid' : 'none',
-        borderColor: 'grey.100',
-        bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.015)' : '#fff',
-        cursor: 'pointer',
-        transition: 'background 0.1s',
-        '&:hover': { bgcolor: 'rgba(15,118,110,0.04)', '& .folder-row-menu': { opacity: 1 } },
-      }}
-    >
-      <Box onClick={onToggleSelect} sx={{ display: 'flex', alignItems: 'center', mr: -0.5 }}>
-        {isSelected ? (
-          <CheckBoxIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-        ) : (
-          <CheckBoxOutlineBlankIcon sx={{ fontSize: 18, color: 'grey.300' }} />
-        )}
-      </Box>
-      <FolderIcon sx={{ fontSize: 20, color: 'warning.main' }} />
-      <Typography variant="body2" sx={{ flex: 1, fontWeight: 500 }}>
-        {folder.name}
-      </Typography>
-      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-        {folder.files_count} file · {folder.children_count} cartelle
-      </Typography>
-      <Typography variant="caption" sx={{ color: 'text.disabled', width: 70, textAlign: 'right' }}>
-        {fmtDate(folder.updated_at)}
-      </Typography>
-      <IconButton
-        className="folder-row-menu"
-        aria-label="Azioni cartella"
-        size="small"
-        onClick={(e) => {
-          e.stopPropagation()
-          setMenuAnchor(e.currentTarget)
-        }}
-        sx={{ opacity: 0, transition: 'opacity 0.15s', color: 'text.disabled' }}
-      >
-        <MoreVertIcon fontSize="small" />
-      </IconButton>
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onOpen()
-          }}
-          dense
-        >
-          <FolderIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Apri
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onRename()
-          }}
-          dense
-        >
-          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Rinomina
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onMove()
-          }}
-          dense
-        >
-          <DriveFileMoveOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Sposta in…
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onLinkCustomers()
-          }}
-          dense
-        >
-          <PersonAddOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Collega
-          clienti
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onDelete()
-          }}
-          dense
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina
-        </MenuItem>
-      </Menu>
-    </Stack>
-  )
-}
-
-// ─── File List Row ────────────────────────────────────────────────────────────
-
-function FileListRow({
-  file,
-  idx,
-  globalIdx,
-  totalItems,
-  selected,
-  onSelect,
-  onRename,
-  onMove,
-  onDelete,
-  onLinkCustomers,
-  isChecked,
-  onToggleCheck,
-}: {
-  file: DriveFile
-  idx: number
-  globalIdx: number
-  totalItems: number
-  selected: boolean
-  onSelect: () => void
-  onRename: () => void
-  onMove: () => void
-  onDelete: () => void
-  onLinkCustomers: () => void
-  isChecked: boolean
-  onToggleCheck: (e: React.MouseEvent) => void
-}) {
-  const { bg } = fileIconBg(file.mime_type)
-  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null)
-  const handleDownload = () => window.open(`/api/drive-files/${file.id}/download/`, '_blank')
-
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={1.5}
-      onClick={onSelect}
-      sx={{
-        px: 2,
-        py: 1,
-        borderBottom: globalIdx < totalItems - 1 ? '1px solid' : 'none',
-        borderColor: 'grey.100',
-        bgcolor: selected
-          ? 'rgba(15,118,110,0.06)'
-          : idx % 2 === 1
-            ? 'rgba(15,118,110,0.015)'
-            : '#fff',
-        cursor: 'pointer',
-        transition: 'background 0.1s',
-        '&:hover': { bgcolor: 'rgba(15,118,110,0.04)', '& .file-row-menu': { opacity: 1 } },
-      }}
-    >
-      <Box onClick={onToggleCheck} sx={{ display: 'flex', alignItems: 'center', mr: -0.5 }}>
-        {isChecked ? (
-          <CheckBoxIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-        ) : (
-          <CheckBoxOutlineBlankIcon sx={{ fontSize: 18, color: 'grey.300' }} />
-        )}
-      </Box>
-      <Box
-        sx={{
-          width: 28,
-          height: 28,
-          borderRadius: 1,
-          bgcolor: bg,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <FileTypeIcon mime={file.mime_type} size={15} />
-      </Box>
-      <Typography
-        variant="body2"
-        sx={{
-          flex: 1,
-          fontWeight: 500,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {file.name}
-      </Typography>
-      <Typography variant="caption" sx={{ color: 'text.disabled', width: 65, textAlign: 'right' }}>
-        {file.size_human}
-      </Typography>
-      <Typography variant="caption" sx={{ color: 'text.disabled', width: 80, textAlign: 'right' }}>
-        {fmtDate(file.updated_at)}
-      </Typography>
-      <IconButton
-        className="file-row-menu"
-        aria-label="Azioni file"
-        size="small"
-        onClick={(e) => {
-          e.stopPropagation()
-          setMenuAnchor(e.currentTarget)
-        }}
-        sx={{ opacity: 0, transition: 'opacity 0.15s', color: 'text.disabled' }}
-      >
-        <MoreVertIcon fontSize="small" />
-      </IconButton>
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            handleDownload()
-          }}
-          dense
-        >
-          <DownloadOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Scarica
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onLinkCustomers()
-          }}
-          dense
-        >
-          <PersonAddOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Collega
-          clienti
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onRename()
-          }}
-          dense
-        >
-          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Rinomina
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onMove()
-          }}
-          dense
-        >
-          <DriveFileMoveOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Sposta in…
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onDelete()
-          }}
-          dense
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina
-        </MenuItem>
-      </Menu>
-    </Stack>
-  )
-}
+import type { BreadcrumbItem, CustomerMini, DrawerItem, DriveFile, DriveFolder } from './drive/types'
+import { UploadZone } from './drive/UploadZone'
+import { PreviewDrawer } from './drive/PreviewDrawer'
+import { FolderCard } from './drive/FolderCard'
+import { FileCard } from './drive/FileCard'
+import { FolderListRow } from './drive/FolderListRow'
+import { FileListRow } from './drive/FileListRow'
+import { CreateFolderDialog } from './drive/CreateFolderDialog'
+import { RenameDialog } from './drive/RenameDialog'
+import { MoveDialog } from './drive/MoveDialog'
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -1262,15 +88,11 @@ export default function Drive() {
     e.stopPropagation()
     setSelected((prev) => {
       const next = new Set(prev)
-      setSelected((prev) => {
-        const next = new Set(prev)
-        if (next.has(key)) {
-          next.delete(key)
-        } else {
-          next.add(key)
-        }
-        return next
-      })
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
       return next
     })
   }
@@ -1295,8 +117,14 @@ export default function Drive() {
 
   // ── Load current folder contents ──────────────────────────────────────────
 
+  // Fix P1 7.4: incrementale, permette a loadFolder di riconoscere ed
+  // ignorare risposte "in ritardo" rispetto a una richiesta più recente
+  // (es. navigazione rapida o cambio filtro cliente durante un fetch).
+  const loadFolderRequestId = React.useRef(0)
+
   const loadFolder = React.useCallback(
     async (id: number | null, custFilter?: CustomerMini | null) => {
+      const requestId = ++loadFolderRequestId.current
       setLoading(true)
       setFolders([])
       setFiles([])
@@ -1310,21 +138,25 @@ export default function Drive() {
             api.get('/drive-folders/', { params: { root: 'true', page_size: 200, ...custParam } }),
             api.get('/drive-files/', { params: { root: 'true', page_size: 200, ...custParam } }),
           ])
+          if (loadFolderRequestId.current !== requestId) return // risposta obsoleta, ignorata
           setFolders(fRes.data?.results ?? fRes.data ?? [])
           setFiles(fileRes.data?.results ?? fileRes.data ?? [])
           setBreadcrumb([])
         } else {
           const res = await api.get(`/drive-folders/${id}/children/`, { params: custParam })
+          if (loadFolderRequestId.current !== requestId) return // risposta obsoleta, ignorata
           setFolders(res.data.folders ?? [])
           setFiles(res.data.files ?? [])
           // Breadcrumb
           const bcRes = await api.get(`/drive-folders/${id}/breadcrumb/`)
+          if (loadFolderRequestId.current !== requestId) return // risposta obsoleta, ignorata
           setBreadcrumb(bcRes.data ?? [])
         }
       } catch (e) {
+        if (loadFolderRequestId.current !== requestId) return // richiesta superata, non mostrare errore
         toast.error(apiErrorToMessage(e))
       } finally {
-        setLoading(false)
+        if (loadFolderRequestId.current === requestId) setLoading(false)
       }
     },
     [toast],
@@ -1337,10 +169,13 @@ export default function Drive() {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   const navigateTo = (id: number | null) => {
+    // Fix P1 7.2: prima chiamava anche loadFolder(id, ...) qui, mentre
+    // l'useEffect sopra osserva folderId e richiama loadFolder a sua volta:
+    // ogni cambio cartella produceva due richieste. Ora si limita ad
+    // aggiornare lo stato; il caricamento resta responsabilità dell'effect.
     setFolderId(id)
     setSelectedId(null)
     setDrawerItem(null)
-    void loadFolder(id, customerFilter)
   }
 
   const selectItem = (key: string, item: DrawerItem) => {
@@ -1416,7 +251,7 @@ export default function Drive() {
       toast.success('Cartella creata ✅')
       setCreateFolderOpen(false)
       setCreateFolderName('')
-      void loadFolder(folderId)
+      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -1444,7 +279,7 @@ export default function Drive() {
       setRenameItem(null)
       setDrawerItem(null)
       setSelectedId(null)
-      void loadFolder(folderId)
+      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -1469,7 +304,7 @@ export default function Drive() {
       setDeleteItem(null)
       setDrawerItem(null)
       setSelectedId(null)
-      void loadFolder(folderId)
+      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -1508,7 +343,7 @@ export default function Drive() {
       setMoveItem(null)
       setDrawerItem(null)
       setSelectedId(null)
-      void loadFolder(folderId)
+      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -2101,130 +936,35 @@ export default function Drive() {
       />
 
       {/* ── Create folder dialog ── */}
-      <Dialog
+      <CreateFolderDialog
         open={createFolderOpen}
+        name={createFolderName}
+        busy={createFolderBusy}
+        onNameChange={setCreateFolderName}
         onClose={() => setCreateFolderOpen(false)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle>Nuova cartella</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            size="small"
-            label="Nome cartella"
-            value={createFolderName}
-            onChange={(e) => setCreateFolderName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') doCreateFolder()
-            }}
-            fullWidth
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateFolderOpen(false)} disabled={createFolderBusy}>
-            Annulla
-          </Button>
-          <Button
-            variant="contained"
-            onClick={doCreateFolder}
-            disabled={createFolderBusy || !createFolderName.trim()}
-          >
-            {createFolderBusy ? 'Creazione…' : 'Crea'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onCreate={doCreateFolder}
+      />
 
       {/* ── Rename dialog ── */}
-      <Dialog open={!!renameItem} onClose={() => setRenameItem(null)} fullWidth maxWidth="xs">
-        <DialogTitle>Rinomina</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            size="small"
-            label="Nuovo nome"
-            value={renameName}
-            onChange={(e) => setRenameName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') doRename()
-            }}
-            fullWidth
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setRenameItem(null)} disabled={renameBusy}>
-            Annulla
-          </Button>
-          <Button
-            variant="contained"
-            onClick={doRename}
-            disabled={renameBusy || !renameName.trim()}
-          >
-            {renameBusy ? 'Salvataggio…' : 'Salva'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <RenameDialog
+        item={renameItem}
+        name={renameName}
+        busy={renameBusy}
+        onNameChange={setRenameName}
+        onClose={() => setRenameItem(null)}
+        onRename={doRename}
+      />
 
       {/* ── Move dialog ── */}
-      <Dialog open={!!moveItem} onClose={() => setMoveItem(null)} fullWidth maxWidth="xs">
-        <DialogTitle>Sposta in…</DialogTitle>
-        <DialogContent>
-          <Stack spacing={0.5} sx={{ mt: 1, maxHeight: 300, overflowY: 'auto' }}>
-            <Box
-              onClick={() => setMoveTarget(null)}
-              sx={{
-                px: 1.5,
-                py: 1,
-                borderRadius: 1.5,
-                cursor: 'pointer',
-                bgcolor: moveTarget === null ? 'rgba(15,118,110,0.08)' : 'transparent',
-                border: '1px solid',
-                borderColor: moveTarget === null ? 'primary.main' : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-              }}
-            >
-              <FolderIcon sx={{ fontSize: 18, color: 'warning.main' }} />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Root
-              </Typography>
-            </Box>
-            {moveFolders.map((f) => (
-              <Box
-                key={f.id}
-                onClick={() => setMoveTarget(f.id)}
-                sx={{
-                  px: 1.5,
-                  py: 1,
-                  borderRadius: 1.5,
-                  cursor: 'pointer',
-                  bgcolor: moveTarget === f.id ? 'rgba(15,118,110,0.08)' : 'transparent',
-                  border: '1px solid',
-                  borderColor: moveTarget === f.id ? 'primary.main' : 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  '&:hover': { bgcolor: 'rgba(15,118,110,0.04)' },
-                }}
-              >
-                <FolderIcon sx={{ fontSize: 18, color: 'warning.main' }} />
-                <Typography variant="body2">{f.full_path}</Typography>
-              </Box>
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setMoveItem(null)} disabled={moveBusy}>
-            Annulla
-          </Button>
-          <Button variant="contained" onClick={doMove} disabled={moveBusy}>
-            {moveBusy ? 'Spostamento…' : 'Sposta'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <MoveDialog
+        item={moveItem}
+        folders={moveFolders}
+        target={moveTarget}
+        busy={moveBusy}
+        onSelectTarget={setMoveTarget}
+        onClose={() => setMoveItem(null)}
+        onMove={doMove}
+      />
 
       {/* ── Delete confirm ── */}
       <ConfirmDeleteDialog

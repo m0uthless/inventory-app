@@ -19,8 +19,10 @@ from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, Resto
 from core.media import build_action_url, protected_media_response
 from core.uploads import validate_upload
 from vlan.models import Vlan
-from auslbo.mixins import AuslBoScopedMixin
-from auslbo.permissions import IsAuslBoUserOrInternal, IsAuslBoEditor
+from auslbo.mixins import AuslBoScopedMixin, AuslBoTenantWriteMixin
+from auslbo.permissions import (
+    IsAuslBoUserOrInternal, AuslBoModelPermissions, IsInternalOrReadOnly,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,8 +111,23 @@ class RispacsSerializer(serializers.ModelSerializer):
 
 
 class RispacsViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
+    """Registro RIS/PACS globale (condiviso tra tutti i customer).
+
+    Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+    qualunque utente portale autenticato, anche solo lettore, senza
+    rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+    interni da portale. Ora:
+    - la lettura richiede `device.view_rispacs` (chiunque, interno o
+      portale, via AuslBoModelPermissions);
+    - le scritture richiedono ANCHE l'accesso interno Archie
+      (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+    Gli utenti portale che devono solo consultare i sistemi collegati ai
+    propri device continuano a usare l'endpoint già scoped
+    `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+    """
+
     serializer_class = RispacsSerializer
-    permission_classes = [IsAuslBoUserOrInternal]
+    permission_classes = [IsAuslBoUserOrInternal, IsInternalOrReadOnly, AuslBoModelPermissions]
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ["name", "ip", "aetitle"]
     ordering_fields = ["name", "ip", "aetitle", "port", "updated_at"]
@@ -144,14 +161,27 @@ class DeviceRispacsSerializer(serializers.ModelSerializer):
         }
 
 
-class DeviceRispacsViewSet(viewsets.ModelViewSet):
+class DeviceRispacsViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, viewsets.ModelViewSet):
+    """Tabella associativa Device↔RIS/PACS.
+
+    Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+    né `AuslBoScopedMixin` né `permission_classes` espliciti, quindi un
+    utente portale con un permesso Django sufficiente poteva leggere/creare
+    collegamenti per device di QUALSIASI customer, non solo il proprio.
+    """
+
     serializer_class = DeviceRispacsSerializer
+    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["device", "rispacs"]
     ordering = ["rispacs__name"]
 
+    # Il modello non ha un customer proprio: deriva dal device collegato.
+    tenant_owned_field = None
+    tenant_related_fields = ("device",)
+
     def get_queryset(self):
-        return DeviceRispacs.objects.select_related("rispacs").all()
+        return DeviceRispacs.objects.select_related("rispacs", "device").all()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -166,7 +196,61 @@ class DecryptedPasswordField(serializers.CharField):
             return None
 
 
-class DeviceWifiSerializer(serializers.ModelSerializer):
+def _can_view_wifi_secrets(request) -> bool:
+    """True se l'utente della request può leggere/scrivere pass_certificato
+    e scaricare il certificato WiFi (fix 2.4). Richiede il permesso Django
+    extra `device.view_wifi_secrets`, non basta essere editor WiFi generico."""
+    user = getattr(request, "user", None)
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(getattr(user, "is_superuser", False) or user.has_perm("device.view_wifi_secrets"))
+
+
+class WifiSecretPermissionMixin:
+    """Nasconde `pass_certificato` in lettura a chi non ha `device.view_wifi_secrets`,
+    e blocca la scrittura dello stesso campo senza quel permesso (fix 2.4,
+    audit 2026-07 — stesso pattern di SecretsPermissionMixin in inventory/api.py).
+
+    NB: il controllo di lettura avviene in `to_representation()`, non in
+    `__init__()` come in SecretsPermissionMixin. `DeviceWifiSerializer` viene
+    usato anche NESTED (`DeviceDetailSerializer.wifi_detail`): quell'istanza
+    è creata una sola volta all'import del modulo, con `context` vuoto — un
+    controllo in `__init__` vedrebbe sempre "nessun permesso" per il nested
+    field, indipendentemente da chi fa la richiesta. `to_representation` è
+    invece chiamato ad ogni serializzazione, quando il field è già bindato
+    al serializer radice e `self.context` riflette la request reale.
+    """
+
+    _secret_fields = ("pass_certificato",)
+    _secret_permission = "device.view_wifi_secrets"
+
+    def _can_view_secrets(self) -> bool:
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return _can_view_wifi_secrets(request)
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        if not self._can_view_secrets():
+            for field_name in self._secret_fields:
+                rep.pop(field_name, None)
+        return rep
+
+    def _secret_fields_present_in_input(self):
+        incoming = getattr(self, "initial_data", None)
+        if not incoming or not hasattr(incoming, "keys"):
+            return []
+        return [f for f in self._secret_fields if f in incoming]
+
+    def enforce_secret_write_permission(self) -> None:
+        attempted = self._secret_fields_present_in_input()
+        if attempted and not self._can_view_secrets():
+            raise serializers.ValidationError({
+                f: "Non hai i permessi per modificare questo campo (serve device.view_wifi_secrets)."
+                for f in attempted
+            })
+
+
+class DeviceWifiSerializer(WifiSecretPermissionMixin, serializers.ModelSerializer):
     pass_certificato = DecryptedPasswordField(required=False, allow_null=True, allow_blank=True)
     certificato_url  = serializers.SerializerMethodField()
 
@@ -198,14 +282,30 @@ class DeviceWifiSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         return build_action_url(request=request, relative_path=f"/api/device-wifi/{obj.pk}/certificato/")
 
+    def validate(self, attrs):
+        self.enforce_secret_write_permission()
+        return super().validate(attrs)
 
-class DeviceWifiViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
+
+class DeviceWifiViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+    """Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+    AuslBoScopedMixin) — un utente portale poteva leggere/scaricare il
+    certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+    Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+    della password."""
+
     serializer_class = DeviceWifiSerializer
-    permission_classes = [IsAuslBoUserOrInternal, IsAuslBoEditor]
+    # Fix 2.5: sostituisce IsAuslBoEditor con la matrice reale
+    # view/add/change/delete_devicewifi.
+    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["device"]
     ordering = ["id"]
+
+    # Il modello non ha un customer proprio: deriva dal device collegato.
+    tenant_owned_field = None
+    tenant_related_fields = ("device",)
 
     def get_queryset(self):
         return DeviceWifi.objects.select_related("device").filter(deleted_at__isnull=True)
@@ -213,7 +313,13 @@ class DeviceWifiViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="certificato")
     def certificato(self, request, pk=None):
+        # self.get_object() passa da filter_queryset() -> AuslBoScopedMixin:
+        # un utente portale non può più scaricare il certificato di un
+        # device di un altro customer (prima restituiva 200 per qualunque id).
         wifi = self.get_object()
+        if not _can_view_wifi_secrets(request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Non hai i permessi per scaricare il certificato (serve device.view_wifi_secrets).")
         filename = wifi.certificato.name.rsplit('/', 1)[-1] if wifi.certificato else None
         return protected_media_response(
             file_field=wifi.certificato,
@@ -414,10 +520,23 @@ class DeviceDetailSerializer(CustomFieldsValidationMixin, serializers.ModelSeria
 # Device — ViewSet
 # ─────────────────────────────────────────────────────────────────────────────
 
-class DeviceViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class DeviceViewSet(
+    AuslBoTenantWriteMixin,
+    AuslBoScopedMixin,
+    PurgeActionMixin,
+    RestoreActionMixin,
+    SoftDeleteAuditMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = DeviceDetailSerializer
-    permission_classes = [IsAuslBoUserOrInternal, IsAuslBoEditor]
+    # Fix 2.5: sostituisce IsAuslBoEditor (solo device.change_device per
+    # QUALSIASI scrittura) con la matrice reale view/add/change/delete_device.
+    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
     filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+    # Fix 2.2: per utenti portale "puri" forza customer=proprio tenant e
+    # verifica che il site scelto appartenga allo stesso tenant.
+    tenant_related_fields = ("site",)
 
     filterset_fields = ["customer", "site", "status", "type", "manufacturer", "vlan", "wifi", "rispacs", "dose", "reparto"]
 

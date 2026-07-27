@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 
+from django.conf import settings
 from django.db import connection
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -10,7 +11,16 @@ from rest_framework.views import APIView
 
 # Tempo di avvio del processo Django (calcolato al primo import del modulo)
 _PROCESS_START = time.time()
-_DEFAULT_APP_VERSION = os.getenv("APP_VERSION", "0.5.0")
+
+# Fix "versione prodotto disallineata" (audit 2026-07): prima questo modulo
+# aveva un proprio default hardcoded ("0.5.0") indipendente da
+# SPECTACULAR_SETTINGS["VERSION"] in settings.py — motivo per cui i due
+# erano andati fuori sincrono dal rilascio 0.6 in poi. Ora c'è una sola
+# sorgente lato backend (settings.py); APP_VERSION resta disponibile come
+# override esplicito via env se mai servisse discostarsene.
+_DEFAULT_APP_VERSION = os.getenv(
+    "APP_VERSION", settings.SPECTACULAR_SETTINGS.get("VERSION", "dev")
+)
 
 
 def _format_uptime(seconds: float) -> str:
@@ -37,7 +47,7 @@ class SystemStatsView(APIView):
     {
         "inventory_count": 142,
         "uptime": "3d 4h",
-        "version": "0.5.0"
+        "version": "0.8"
     }
     """
 

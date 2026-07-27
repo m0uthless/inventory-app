@@ -254,6 +254,9 @@ class DeviceWifi(TimeStampedModel):
     class Meta:
         verbose_name = "WiFi device"
         verbose_name_plural = "WiFi device"
+        permissions = [
+            ("view_wifi_secrets", "Può visualizzare/modificare la password del certificato WiFi"),
+        ]
 
     def __str__(self):
         return f"WiFi {self.device_id} — {self.ip}"

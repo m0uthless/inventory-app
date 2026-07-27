@@ -7,7 +7,7 @@ App web per la gestione di **Clienti**, **Siti**, **Contatti** e **Inventari** (
 - **Runtime**: Docker Compose + Nginx (proxy + static/media)
 
 ## Versione
-- Current: **0.6**
+- Current: **0.8**
 - OpenAPI: `/api/schema/` (e `/api/docs/`)
 - Health: `/api/health/` (backend) e `/healthz` (frontend)
 
@@ -85,7 +85,8 @@ Questa repo è pronta per LAN/dev, ma **prima di prod**:
 - Impostare `DJANGO_SECRET_KEY` forte e `DJANGO_DEBUG=0`.
 - Configurare `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ORIGINS` e `CSRF_TRUSTED_ORIGINS`.
 - **Non usare** `CSRF_ALLOW_ALL_ORIGINS=1` in ambienti non controllati (è un bypass dell’Origin check).
-- Le credenziali inventario sono salvate in chiaro: valutare cifratura at-rest (KMS/fernet/field encryption) e policy di accesso.
+- Le credenziali sensibili (inventario, VPN, WiFi certificati) sono cifrate at-rest con Fernet (`core/crypto.py`, `FIELD_ENCRYPTION_KEY` obbligatoria in prod). L'esposizione in lettura è comunque vincolata a permessi Django dedicati (`inventory.view_secrets`, `crm.view_vpn_secrets`, `device.view_wifi_secrets`): verificare che siano assegnati solo ai gruppi che devono davvero vederle.
+- **Portale AUSL BO**: la separazione tra clienti (tenant scoping) è applicata interamente lato server in base ai permessi dell'utente autenticato — nessun header o parametro client-side deve mai essere trattato come confine di sicurezza.
 
 ---
 

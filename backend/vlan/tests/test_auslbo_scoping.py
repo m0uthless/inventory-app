@@ -1,12 +1,19 @@
-"""Test per AuslBoScopedMixin sulle liste di Vlan e VlanIpRequest:
-- utente portale AUSL BO con header X-Auslbo-Portal:1 → vede solo il proprio customer
-- utente portale senza header (richiesta da Archie) → vede tutto
-- utente interno → vede tutto indipendentemente dall'header
+"""Test per AuslBoScopedMixin sulle liste di Vlan e VlanIpRequest, dopo il
+fix 2.1 (audit 2026-07): lo scope NON dipende più dall'header
+X-Auslbo-Portal (controllabile dal client), ma solo da identità/permessi
+server-side:
+
+- utente portale "puro" (AuslBoUserProfile, nessun accesso interno) →
+  SEMPRE scopato sul proprio customer, con o senza header, con o senza
+  header manomesso/omesso;
+- utente interno (core.access_archie o superuser) → mai scopato;
+- utente "duale" (profilo AUSL BO + accesso interno) → mai scopato, per
+  decisione esplicita del 2026-07-25 (vede tutto da Archie).
 """
 import pytest
 
 from vlan.models import Vlan, VlanIpRequest
-from vlan.tests.conftest import make_auslbo_user, make_customer, make_internal_user, make_site
+from vlan.tests.conftest import make_auslbo_user, make_customer, make_dual_user, make_internal_user, make_site
 
 pytestmark = pytest.mark.django_db
 
@@ -20,7 +27,7 @@ def _make_vlan(customer, site, **overrides):
     return Vlan.objects.create(**defaults)
 
 
-def test_auslbo_user_with_portal_header_sees_only_own_customer(api_client, customer_status, site_status):
+def test_auslbo_user_sees_only_own_customer_with_header(api_client, customer_status, site_status):
     customer_a = make_customer(None, customer_status, "scopea")
     customer_b = make_customer(None, customer_status, "scopeb")
     site_a = make_site(None, customer_a, site_status, "scopea")
@@ -39,10 +46,10 @@ def test_auslbo_user_with_portal_header_sees_only_own_customer(api_client, custo
     assert customer_ids == {customer_a.id}
 
 
-def test_auslbo_user_without_portal_header_sees_everything(api_client, customer_status, site_status):
-    """Se l'header manca, la richiesta si considera proveniente da Archie
-    principale: anche un utente con profilo AUSL BO vede tutto (comportamento
-    documentato in auslbo/mixins.py)."""
+def test_auslbo_user_sees_only_own_customer_without_header(api_client, customer_status, site_status):
+    """FIX 2.1: prima del fix, un utente portale senza header vedeva TUTTI
+    i customer (bypass completo dello scope, bastava non mandare l'header
+    da Postman/curl). Ora lo scope è identico con o senza header."""
     customer_a = make_customer(None, customer_status, "noheadera")
     customer_b = make_customer(None, customer_status, "noheaderb")
     site_a = make_site(None, customer_a, site_status, "noheadera")
@@ -58,10 +65,31 @@ def test_auslbo_user_without_portal_header_sees_everything(api_client, customer_
     resp = api_client.get("/api/vlans/")  # nessun header
     assert resp.status_code == 200
     customer_ids = {v["customer"] for v in resp.data["results"]}
-    assert customer_ids == {customer_a.id, customer_b.id}
+    assert customer_ids == {customer_a.id}
 
 
-def test_internal_user_sees_everything_even_with_portal_header(api_client, customer_status, site_status):
+def test_auslbo_user_sees_only_own_customer_with_forged_header(api_client, customer_status, site_status):
+    """Un header manomesso/arbitrario non deve avere alcun effetto: non è
+    più un fattore autorizzativo."""
+    customer_a = make_customer(None, customer_status, "forgeda")
+    customer_b = make_customer(None, customer_status, "forgedb")
+    site_a = make_site(None, customer_a, site_status, "forgeda")
+    site_b = make_site(None, customer_b, site_status, "forgedb")
+    _make_vlan(customer_a, site_a, vlan_id=815, network="10.55.0.0/29",
+               subnet="255.255.255.248", gateway="10.55.0.1")
+    _make_vlan(customer_b, site_b, vlan_id=816, network="10.56.0.0/29",
+               subnet="255.255.255.248", gateway="10.56.0.1")
+
+    portal_user = make_auslbo_user(customer_a)
+    api_client.force_authenticate(user=portal_user)
+
+    resp = api_client.get("/api/vlans/", HTTP_X_AUSLBO_PORTAL="qualunque-cosa")
+    assert resp.status_code == 200
+    customer_ids = {v["customer"] for v in resp.data["results"]}
+    assert customer_ids == {customer_a.id}
+
+
+def test_internal_user_sees_everything_regardless_of_header(api_client, customer_status, site_status):
     customer_a = make_customer(None, customer_status, "intera")
     customer_b = make_customer(None, customer_status, "interb")
     site_a = make_site(None, customer_a, site_status, "intera")
@@ -75,6 +103,28 @@ def test_internal_user_sees_everything_even_with_portal_header(api_client, custo
     api_client.force_authenticate(user=internal_user)
 
     resp = api_client.get("/api/vlans/", HTTP_X_AUSLBO_PORTAL="1")
+    assert resp.status_code == 200
+    customer_ids = {v["customer"] for v in resp.data["results"]}
+    assert customer_ids == {customer_a.id, customer_b.id}
+
+
+def test_dual_profile_user_sees_everything(api_client, customer_status, site_status):
+    """Utente con SIA profilo AUSL BO SIA accesso interno: per decisione
+    esplicita (2026-07-25) non viene scopato, vede tutti i customer —
+    indipendentemente dall'header."""
+    customer_a = make_customer(None, customer_status, "duala")
+    customer_b = make_customer(None, customer_status, "dualb")
+    site_a = make_site(None, customer_a, site_status, "duala")
+    site_b = make_site(None, customer_b, site_status, "dualb")
+    _make_vlan(customer_a, site_a, vlan_id=817, network="10.57.0.0/29",
+               subnet="255.255.255.248", gateway="10.57.0.1")
+    _make_vlan(customer_b, site_b, vlan_id=818, network="10.58.0.0/29",
+               subnet="255.255.255.248", gateway="10.58.0.1")
+
+    dual_user = make_dual_user(customer_a)
+    api_client.force_authenticate(user=dual_user)
+
+    resp = api_client.get("/api/vlans/")  # nessun header
     assert resp.status_code == 200
     customer_ids = {v["customer"] for v in resp.data["results"]}
     assert customer_ids == {customer_a.id, customer_b.id}
@@ -95,29 +145,81 @@ def test_auslbo_scoping_applies_to_vlan_ip_requests_too(api_client, customer_sta
     portal_user = make_auslbo_user(customer_a)
     api_client.force_authenticate(user=portal_user)
 
-    resp = api_client.get("/api/vlan-ip-requests/", HTTP_X_AUSLBO_PORTAL="1")
+    # Senza header: prima del fix 2.1 avrebbe visto entrambi i customer.
+    resp = api_client.get("/api/vlan-ip-requests/")
     assert resp.status_code == 200
     customer_ids = {r["customer"] for r in resp.data["results"]}
     assert customer_ids == {customer_a.id}
 
 
-def test_superuser_with_portal_header_and_no_profile_sees_nothing(api_client, customer_status, site_status, superuser):
-    """CASO LIMITE SCOPERTO (vedi nota di consegna): _is_auslbo_user()
-    ritorna True per qualunque superuser (bypass esplicito), a prescindere
-    dall'esistenza di un AuslBoUserProfile. Se un superuser invia l'header
-    X-Auslbo-Portal:1 (es. per debug/test manuale da Postman), il mixin
-    prova comunque ad applicare lo scoping: _get_auslbo_customer_id()
-    restituisce None (nessun profilo), e il queryset diventa .none() —
-    il superuser non vede NESSUNA vlan, anche se ne esistono. Non è un
-    problema pratico nell'uso reale (il frontend AUSL BO manda l'header
-    solo per chi ha davvero un profilo portal), ma vale la pena saperlo se
-    mai si testa manualmente l'API con quell'header da un account admin."""
-    customer = make_customer(None, customer_status, "superuserscope")
-    site = make_site(None, customer, site_status, "superuserscope")
-    _make_vlan(customer, site, vlan_id=809, network="10.49.0.0/29",
-               subnet="255.255.255.248", gateway="10.49.0.1")
+# ─── Fix 2.2: scritture cross-customer bloccate per utenti portale ────────────
 
-    api_client.force_authenticate(user=superuser)
-    resp = api_client.get("/api/vlans/", HTTP_X_AUSLBO_PORTAL="1")
-    assert resp.status_code == 200
-    assert resp.data["results"] == []
+def test_portal_user_cannot_create_vlan_for_another_customer(api_client, customer_status, site_status):
+    """Anche inviando esplicitamente il customer/site di un altro cliente,
+    la VLAN creata deve appartenere SEMPRE al customer reale dell'utente
+    portale (server-side, fix 2.2)."""
+    customer_a = make_customer(None, customer_status, "writea")
+    customer_b = make_customer(None, customer_status, "writeb")
+    site_b = make_site(None, customer_b, site_status, "writeb")
+
+    portal_user = make_auslbo_user(customer_a, can_edit=True)
+    api_client.force_authenticate(user=portal_user)
+
+    resp = api_client.post(
+        "/api/vlans/",
+        {
+            "customer": customer_b.id, "site": site_b.id, "vlan_id": 850,
+            "name": "Tentativo cross-tenant",
+            "network": "10.60.0.0/29", "subnet": "255.255.255.248", "gateway": "10.60.0.1",
+        },
+        format="json",
+    )
+    # Il site appartiene a customer_b, ma il customer viene forzato ad A:
+    # la validazione tenant_related_fields deve rifiutare il mismatch.
+    assert resp.status_code == 400
+    assert "site" in resp.data
+
+
+def test_portal_user_creates_vlan_forced_to_own_customer(api_client, customer_status, site_status):
+    """Un portale che invia dati coerenti con il PROPRIO customer crea
+    normalmente, e il campo customer risultante è comunque quello reale
+    (anche se il client ne avesse inviato uno diverso)."""
+    customer_a = make_customer(None, customer_status, "writeok")
+    site_a = make_site(None, customer_a, site_status, "writeok")
+
+    portal_user = make_auslbo_user(customer_a, can_edit=True)
+    api_client.force_authenticate(user=portal_user)
+
+    resp = api_client.post(
+        "/api/vlans/",
+        {
+            "customer": customer_a.id, "site": site_a.id, "vlan_id": 851,
+            "name": "VLAN OK",
+            "network": "10.61.0.0/29", "subnet": "255.255.255.248", "gateway": "10.61.0.1",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["customer"] == customer_a.id
+
+
+def test_internal_user_can_still_create_vlan_for_any_customer(api_client, customer_status, site_status):
+    """Gli utenti interni non sono vincolati dal tenant enforcement."""
+    customer_a = make_customer(None, customer_status, "internalwritea")
+    customer_b = make_customer(None, customer_status, "internalwriteb")
+    site_b = make_site(None, customer_b, site_status, "internalwriteb")
+
+    internal_user = make_internal_user()
+    api_client.force_authenticate(user=internal_user)
+
+    resp = api_client.post(
+        "/api/vlans/",
+        {
+            "customer": customer_b.id, "site": site_b.id, "vlan_id": 852,
+            "name": "VLAN da interno",
+            "network": "10.62.0.0/29", "subnet": "255.255.255.248", "gateway": "10.62.0.1",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["customer"] == customer_b.id

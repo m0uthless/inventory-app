@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.permissions import BasePermission, DjangoModelPermissions, SAFE_METHODS
+
+from core.permissions import IsAuthenticatedDjangoModelPermissions
 
 
 # ─── Accesso Archie ────────────────────────────────────────────────────────────
@@ -24,7 +26,11 @@ def _can_access_archie(user) -> bool:
 def _is_auslbo_user(user) -> bool:
     """True se l'utente può accedere al portal AUSL BO.
 
-    Unico criterio: esiste un AuslBoUserProfile attivo.
+    Criterio: esiste un AuslBoUserProfile *attivo*, cioè con un customer
+    non eliminato (soft delete). Un profilo il cui customer è stato
+    disattivato non deve continuare a garantire accesso al portal, anche
+    se il record AuslBoUserProfile esiste ancora.
+
     Nessun controllo su gruppi: i gruppi gestiscono i permessi
     sui singoli modelli tramite DjangoModelPermissions standard.
     """
@@ -35,7 +41,8 @@ def _is_auslbo_user(user) -> bool:
     try:
         from auslbo.models import AuslBoUserProfile
         return AuslBoUserProfile.objects.filter(
-            user_id=user.pk
+            user_id=user.pk,
+            customer__deleted_at__isnull=True,
         ).exists()
     except Exception:
         return False
@@ -127,3 +134,85 @@ class IsArchieAdmin(BasePermission):
         if getattr(user, "is_superuser", False):
             return True
         return bool(user.has_perm("core.access_archie"))
+
+
+# ─── Matrice permessi R/W/D reale per Device/VLAN/Rispacs ─────────────────────
+#
+# `IsAuthenticatedDjangoModelPermissions` (il default globale, in core/permissions.py)
+# eredita da DRF DjangoModelPermissions il cui perms_map lascia GET/HEAD senza
+# alcun permesso richiesto: qualunque utente autenticato può leggere.
+# Per i moduli "AUSLBO_DEDICATED_APPS" (auslbo, device, vlan — vedi
+# core/permission_modules.py) la UI "Utenti e Gruppi" dichiara e assegna
+# esplicitamente anche i permessi `view_<model>`: questa classe li fa
+# rispettare davvero, mappando GET/HEAD su `view_<model>` e sostituendo
+# `IsAuslBoEditor` (che controllava solo `device.change_device` per
+# QUALSIASI scrittura, ignorando add_*/delete_*/view_vlan/ecc.).
+class AuslBoModelPermissions(DjangoModelPermissions):
+    """DjangoModelPermissions esteso: richiede `view_<model>` anche in lettura.
+
+    Usare SEMPRE insieme a `IsAuslBoUserOrInternal` (o `IsAuslBoUser`/
+    `IsInternalUser`) nei `permission_classes`, perché questa classe da sola
+    non verifica che l'utente possa accedere al portal/modulo: verifica solo
+    che, potendoci accedere, abbia il permesso Django corretto per l'azione.
+    """
+
+    perms_map = {
+        "GET":     ["%(app_label)s.view_%(model_name)s"],
+        "OPTIONS": [],
+        "HEAD":    ["%(app_label)s.view_%(model_name)s"],
+        "POST":    ["%(app_label)s.add_%(model_name)s"],
+        "PUT":     ["%(app_label)s.change_%(model_name)s"],
+        "PATCH":   ["%(app_label)s.change_%(model_name)s"],
+        "DELETE":  ["%(app_label)s.delete_%(model_name)s"],
+    }
+
+
+# ─── Matrice permessi per moduli NON dedicati AUSLBO (CRM, Inventario) ────────
+#
+# A differenza di device/vlan, i moduli crm e inventory sono il cuore
+# dell'Archie principale: gli utenti interni li usano da sempre senza che
+# gli sia richiesto un `view_<model>` esplicito (il default storico
+# `IsAuthenticatedDjangoModelPermissions` lascia GET/HEAD liberi a chiunque
+# sia autenticato). Applicare `AuslBoModelPermissions` a questi ViewSet
+# indistintamente avrebbe potuto rompere l'accesso in lettura per il
+# personale interno i cui gruppi non hanno mai avuto bisogno di
+# view_customer/view_site/view_contact/view_inventory.
+#
+# Fix P0 6.2/6.6: qui serve solo chiudere il buco lato PORTALE AUSL BO (un
+# utente portale autenticato poteva leggere/scrivere senza alcun permesso
+# Django esplicito, oltre allo scope tenant di AuslBoScopedMixin). Per gli
+# utenti interni il comportamento resta quello storico.
+class CrmInventoryModelPermissions(BasePermission):
+    """Utenti interni: comportamento storico (autenticazione basta in lettura,
+    permessi Django standard add/change/delete in scrittura).
+    Utenti portale AUSL BO "puri": stessa matrice R/W/D esplicita già usata
+    per device/vlan (`AuslBoModelPermissions`)."""
+
+    def has_permission(self, request, view) -> bool:
+        user = getattr(request, "user", None)
+        if _is_internal_user(user):
+            return IsAuthenticatedDjangoModelPermissions().has_permission(request, view)
+        return AuslBoModelPermissions().has_permission(request, view)
+
+    def has_object_permission(self, request, view, obj) -> bool:
+        user = getattr(request, "user", None)
+        if _is_internal_user(user):
+            return IsAuthenticatedDjangoModelPermissions().has_object_permission(request, view, obj)
+        return AuslBoModelPermissions().has_object_permission(request, view, obj)
+
+
+class IsInternalOrReadOnly(BasePermission):
+    """Le scritture sono riservate agli utenti interni; la lettura passa a tutti
+    gli utenti autorizzati dalle altre permission class della view.
+
+    Usata per il registro RIS/PACS globale (`RispacsViewSet`): gli utenti
+    portale possono solo consultarlo (tramite `CustomerRispacsViewSet` per la
+    versione scoped, o in lettura qui), non crearlo/modificarlo/cancellarlo.
+    """
+
+    message = "Il registro RIS/PACS globale è modificabile solo da utenti interni."
+
+    def has_permission(self, request, view) -> bool:
+        if request.method in SAFE_METHODS:
+            return True
+        return _is_internal_user(request.user)

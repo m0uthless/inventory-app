@@ -35,6 +35,9 @@ import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 
 import { useAuth } from '../auth/AuthProvider'
 import { Suspense } from 'react'
+import { api } from '@shared/api/client'
+import { useIdleTimer } from '@shared/hooks/useIdleTimer'
+import LockScreen from '@shared/ui/LockScreen'
 import { SIDEBAR } from '../theme'
 import AppFooter from './AppFooter'
 import MobileBottomNavAuslbo from './MobileBottomNavAuslbo'
@@ -51,14 +54,18 @@ type NavItem = {
   path: string
   icon: React.ReactNode
   section: 'panoramica' | 'inventario' | 'struttura' | 'dedicato'
+  /** Permesso Django richiesto per vedere la voce (stesso codename applicato
+   * lato server da AuslBoModelPermissions). Se assente, visibile a chiunque
+   * sia autenticato. */
+  requiredPerm?: string
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',        path: '/',          icon: <DashboardOutlinedIcon />,  section: 'panoramica' },
   { label: 'RIS/PACS Systems', path: '/inventory', icon: <MemoryOutlinedIcon />,     section: 'inventario' },
-  { label: 'Device',           path: '/device',    icon: <RouterOutlinedIcon />,     section: 'inventario' },
-  { label: 'VLAN',             path: '/vlan',      icon: <LanOutlinedIcon />,        section: 'inventario' },
-  { label: 'Richieste',        path: '/richieste', icon: <AssignmentOutlinedIcon />, section: 'inventario' },
+  { label: 'Device',           path: '/device',    icon: <RouterOutlinedIcon />,     section: 'inventario', requiredPerm: 'device.view_device' },
+  { label: 'VLAN',             path: '/vlan',      icon: <LanOutlinedIcon />,        section: 'inventario', requiredPerm: 'vlan.view_vlan' },
+  { label: 'Richieste',        path: '/richieste', icon: <AssignmentOutlinedIcon />, section: 'inventario', requiredPerm: 'vlan.view_vlaniprequest' },
   { label: 'Scadenze',         path: '/scadenze',  icon: <AccessTimeOutlinedIcon />, section: 'inventario' },
   { label: 'Sedi',             path: '/sites',     icon: <HomeWorkOutlinedIcon />,   section: 'struttura'  },
   { label: 'Contatti',         path: '/contacts',  icon: <PeopleOutlinedIcon />,     section: 'struttura'  },
@@ -90,9 +97,38 @@ function isSelected(currentPath: string, itemPath: string) {
 }
 
 export function AppLayout() {
-  const { me, logout } = useAuth()
+  const { me, login, logout, locked, lock, unlock } = useAuth()
   const nav = useNavigate()
   const loc = useLocation()
+
+  const { resetAfterUnlock } = useIdleTimer({
+    lockAfterMs:   15 * 60 * 1000, // 15 minuti → lock screen
+    logoutAfterMs: 60 * 60 * 1000, // 60 minuti → logout automatico
+    enabled: Boolean(me),
+    onLock: lock,
+    onLogout: async () => {
+      try {
+        await api.post('/auth/logout/')
+      } catch { /* ignora errori di rete */ }
+      window.location.assign('/login')
+    },
+  })
+
+  const handleUnlock = React.useCallback(() => {
+    unlock()
+    resetAfterUnlock()
+  }, [unlock, resetAfterUnlock])
+
+  // Fix "controlli frontend nascosti quando non autorizzati" (audit 2026-07):
+  // le voci con requiredPerm compaiono solo se l'utente ha davvero quel
+  // permesso Django (stesso codename richiesto server-side). Non è un
+  // confine di sicurezza — solo evita di mostrare una voce che poi fallisce
+  // con 403 alla prima chiamata API.
+  const grantedPerms = me?.auslbo.permissions ?? []
+  const visibleNavItems = React.useMemo(
+    () => NAV_ITEMS.filter((it) => !it.requiredPerm || grantedPerms.includes(it.requiredPerm)),
+    [grantedPerms],
+  )
 
   // Sidebar mini-variant, persistita in localStorage
   const [desktopOpen, setDesktopOpen] = React.useState(() => {
@@ -223,7 +259,7 @@ export function AppLayout() {
       {/* Nav */}
       <List sx={{ px: isMini ? 0.75 : 1, py: 1, flex: 1 }}>
         {SECTIONS.flatMap(({ key, label }) => {
-          const items = NAV_ITEMS.filter((it) => it.section === key)
+          const items = visibleNavItems.filter((it) => it.section === key)
           if (!items.length) return []
 
           const sectionEl = !isMini ? (
@@ -514,6 +550,18 @@ export function AppLayout() {
       <Suspense fallback={null}>
         <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
       </Suspense>
+      <LockScreen
+        open={locked}
+        username={me?.user.username ?? ''}
+        displayName={displayName || 'Utente'}
+        avatarUrl={me?.user.avatar}
+        onSubmitPassword={(password) => login(me?.user.username ?? '', password)}
+        onUnlock={handleUnlock}
+        onLogout={logout}
+        accentFrom="#0B3D6B"
+        accentVia="#1A6BB5"
+        accentTo="#134e7a"
+      />
     </Box>
   )
 }

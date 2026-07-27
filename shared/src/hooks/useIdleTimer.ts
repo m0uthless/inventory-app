@@ -27,6 +27,16 @@ type UseIdleTimerOptions = {
  * - onLogout dopo `logoutAfterMs` ms di inattività
  *
  * Ogni interazione dell'utente resetta entrambi i timer.
+ *
+ * Fix P2 (audit 2026-07, punto 9 "Sessione"): `onLock`/`onLogout` vengono
+ * spesso passate come funzioni inline dal componente chiamante (es.
+ * `AppLayout`), quindi cambiano identità ad ogni render. Prima erano nelle
+ * dipendenze di `reset`/dell'effect principale: un semplice re-render del
+ * genitore (non legato all'attività dell'utente) poteva ricreare l'effect,
+ * rimuovere e riaggiungere tutti i listener, e riavviare i timer da capo,
+ * allungando artificialmente il tempo di inattività reale prima del
+ * lock/logout. Con il pattern "latest ref" le callback più recenti sono
+ * sempre disponibili senza far dipendere l'effect dalla loro identità.
  */
 export function useIdleTimer({
   lockAfterMs   = 15 * 60 * 1000, // 15 minuti
@@ -39,6 +49,13 @@ export function useIdleTimer({
   const logoutTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const lockedRef      = React.useRef(false)
 
+  // "Latest ref": sempre aggiornate ad ogni render, ma la loro identità non
+  // fa parte delle dipendenze di reset/effect qui sotto.
+  const onLockRef   = React.useRef(onLock)
+  const onLogoutRef = React.useRef(onLogout)
+  React.useEffect(() => { onLockRef.current = onLock }, [onLock])
+  React.useEffect(() => { onLogoutRef.current = onLogout }, [onLogout])
+
   const clear = React.useCallback(() => {
     if (lockTimerRef.current)   clearTimeout(lockTimerRef.current)
     if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
@@ -50,13 +67,13 @@ export function useIdleTimer({
 
     lockTimerRef.current = setTimeout(() => {
       lockedRef.current = true
-      onLock()
+      onLockRef.current()
     }, lockAfterMs)
 
     logoutTimerRef.current = setTimeout(() => {
-      onLogout()
+      onLogoutRef.current()
     }, logoutAfterMs)
-  }, [enabled, clear, onLock, onLogout, lockAfterMs, logoutAfterMs])
+  }, [enabled, clear, lockAfterMs, logoutAfterMs])
 
   // Chiamato dall'esterno quando l'utente sblocca — resetta i timer
   const resetAfterUnlock = React.useCallback(() => {

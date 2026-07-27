@@ -1,24 +1,11 @@
 import * as React from 'react'
 import {
-  Alert,
   Box,
-  Button,
   Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
   Fab,
   Stack,
-  TextField,
-  Typography,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
-
-import type { GridColDef } from '@mui/x-data-grid'
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useDrfList } from '@shared/hooks/useDrfList'
@@ -27,7 +14,6 @@ import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import EntityListCard from '@shared/ui/EntityListCard'
-import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { useListUrlNumberParam, useListUrlStringParam } from '@shared/hooks/useListUrlParam'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import WifiPasswordIcon from '@mui/icons-material/WifiPassword'
@@ -38,8 +24,6 @@ import { useAuth } from '../auth/AuthProvider'
 import AuslBoDeviceDrawer from '../ui/AuslBoDeviceDrawer'
 import AuslBoDevicePageDrawer from '../ui/AuslBoDevicePageDrawer'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 import {
   emptyDeviceForm,
   type DeviceFormState,
@@ -48,463 +32,18 @@ import {
   type ManufacturerItem,
   type RispacsItem,
   type SiteItem,
-  type RispacsLink,
-  type WifiDetail,
 } from '@shared/device/deviceTypes'
 
-type DeviceRow = {
-  id: number
-  customer: number | null
-  customer_name: string | null
-  customer_code: string | null
-  site: number | null
-  site_name: string | null
-  site_display_name: string | null
-  type: number | null
-  type_name: string | null
-  type_dose_sr: boolean
-  status: number | null
-  status_name: string | null
-  manufacturer: number | null
-  manufacturer_name: string | null
-  manufacturer_logo_url: string | null
-  model: string | null
-  aetitle: string | null
-  serial_number: string | null
-  inventario: string | null
-  reparto: string | null
-  room: string | null
-  ip: string | null
-  vlan: boolean
-  wifi: boolean
-  rispacs: boolean
-  dose: boolean
-  updated_at: string | null
-  deleted_at: string | null
-}
-
-type DeviceDetail = DeviceRow & {
-  note: string | null
-  location: string | null
-  custom_fields: Record<string, unknown> | null
-  rispacs_links: RispacsLink[]
-  wifi_detail: WifiDetail | null
-}
-
-// ─── Status colours ───────────────────────────────────────────────────────────
-
-function statusColor(name: string | null): { bg: string; fg: string; border: string } {
-  const lower = (name ?? '').toLowerCase()
-  if (lower.includes('attiv') || lower.includes('operativ'))
-    return { bg: 'rgba(16,185,129,0.10)', fg: '#065f46', border: 'rgba(16,185,129,0.28)' }
-  if (lower.includes('manutenzione') || lower.includes('riparazione'))
-    return { bg: 'rgba(245,158,11,0.10)', fg: '#92400e', border: 'rgba(245,158,11,0.28)' }
-  if (lower.includes('dismess') || lower.includes('fuori'))
-    return { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' }
-  return { bg: 'rgba(99,102,241,0.10)', fg: '#3730a3', border: 'rgba(99,102,241,0.28)' }
-}
-
-// ─── Flag badge helper ─────────────────────────────────────────────────────────
-
-function FlagBadge({ label, active }: { label: string; active: boolean }) {
-  if (!active) return null
-  return (
-    <Chip size="small" label={label} sx={{
-      height: 18, fontSize: '0.65rem', fontWeight: 700,
-      bgcolor: 'rgba(26,107,181,0.10)', color: '#1A4F7A',
-      border: '1px solid rgba(26,107,181,0.22)',
-      '& .MuiChip-label': { px: 0.6 },
-    }} />
-  )
-}
-
-// ─── Columns ──────────────────────────────────────────────────────────────────
-
-const FLAG_CHIP_SX = {
-  height: 16, fontSize: '0.60rem', fontWeight: 700,
-  bgcolor: 'rgba(26,107,181,0.10)', color: '#1A4F7A',
-  border: '1px solid rgba(26,107,181,0.22)',
-  '& .MuiChip-label': { px: 0.5 },
-} as const
-
-const cols: GridColDef<DeviceRow>[] = [
-  { field: 'inventario', headerName: 'Inventario', width: 140 },
-  {
-    field: 'type_name', headerName: 'Tipo', width: 140,
-    renderCell: (p) => {
-      const label = p.value as string | null
-      if (!label) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
-      return (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip size="small" label={label} sx={{
-            height: 22, fontSize: '0.72rem', fontWeight: 600,
-            bgcolor: 'rgba(26,107,181,0.08)', color: 'text.primary',
-            border: '1px solid rgba(26,107,181,0.18)',
-            '& .MuiChip-label': { px: 0.75 },
-          }} />
-        </Box>
-      )
-    },
-  },
-  { field: 'manufacturer_name', headerName: 'Produttore', width: 140 },
-  {
-    field: 'model', headerName: 'Modello', flex: 1, minWidth: 160,
-    renderCell: (p) => {
-      const label = p.value as string | null
-      return (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: label ? 'text.primary' : 'text.disabled' }}>
-            {label ?? '—'}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 0.3, flexShrink: 0 }}>
-            {p.row.vlan    && <Chip size="small" label="VLAN"    sx={FLAG_CHIP_SX} />}
-            {p.row.wifi    && <Chip size="small" label="WiFi"    sx={FLAG_CHIP_SX} />}
-            {p.row.rispacs && <Chip size="small" label="PACS"    sx={FLAG_CHIP_SX} />}
-            {p.row.dose && <Chip size="small" label="DoseSR" sx={FLAG_CHIP_SX} />}
-          </Box>
-        </Box>
-      )
-    },
-  },
-  {
-    field: 'aetitle', headerName: 'AE Title', width: 130,
-    renderCell: (p) => (
-      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12, color: p.value ? 'text.primary' : 'text.disabled' }}>
-        {p.value ?? '—'}
-      </Typography>
-    ),
-  },
-  {
-    field: 'site_display_name', headerName: 'Sede', width: 160,
-    valueGetter: (_v, row) => row.site_display_name || row.site_name || '—',
-  },
-  { field: 'reparto', headerName: 'Reparto', width: 130 },
-  { field: 'room',    headerName: 'Stanza',  width: 110 },
-  {
-    field: 'status_name', headerName: 'Stato', width: 140,
-    renderCell: (p) => {
-      const label = p.value as string | null
-      if (!label) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
-      const c = statusColor(label)
-      return (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip size="small" label={label} sx={{
-            height: 22, fontSize: '0.72rem', fontWeight: 600,
-            bgcolor: c.bg, color: c.fg, border: `1px solid ${c.border}`,
-            '& .MuiChip-label': { px: 0.75 },
-          }} />
-        </Box>
-      )
-    },
-  },
-]
-
-// ─── Mobile card ──────────────────────────────────────────────────────────────
-
-const renderDeviceCard: MobileCardRenderFn<DeviceRow> = ({ row, onOpen }) => {
-  const sc = statusColor(row.status_name)
-  const meta: { label: string; value: string | null | undefined; mono?: boolean }[] = [
-    { label: 'Sede',    value: row.site_display_name || row.site_name },
-    { label: 'IP',      value: row.ip, mono: true },
-    { label: 'Seriale', value: row.serial_number, mono: true },
-    { label: 'Inv.',    value: row.inventario },
-  ]
-  return (
-    <Box onClick={() => onOpen(row.id)} sx={{
-      bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider',
-      borderRadius: 1, p: 1.25, cursor: 'pointer', display: 'flex',
-      flexDirection: 'column', gap: 0.75, '&:active': { bgcolor: 'action.hover' },
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.model || row.type_name || `Device #${row.id}`}
-          </Typography>
-          {(row.manufacturer_name || row.type_name) && (
-            <Typography variant="caption" color="text.secondary">
-              {[row.manufacturer_name, row.type_name].filter(Boolean).join(' · ')}
-            </Typography>
-          )}
-        </Box>
-        {row.status_name && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.fg, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
-            {row.status_name}
-          </Box>
-        )}
-      </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {meta.map(({ label, value, mono }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', fontFamily: mono && value ? 'monospace' : 'inherit', lineHeight: 1.3 }}>
-              {value || '—'}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, flexWrap: 'wrap' }}>
-        <FlagBadge label="VLAN" active={row.vlan} />
-        <FlagBadge label="WiFi" active={row.wifi} />
-        <FlagBadge label="PACS" active={row.rispacs} />
-        <FlagBadge label="DoseSR" active={row.dose} />
-      </Box>
-      {(row.site_display_name || row.site_name) && (
-        <Box sx={{ borderTop: '0.5px solid', borderColor: 'divider', pt: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', opacity: 0.5, flexShrink: 0 }} />
-          <Typography variant="caption" color="text.secondary">{row.site_display_name || row.site_name}</Typography>
-        </Box>
-      )}
-    </Box>
-  )
-}
-
-
-
-// ─── WiFi Quick Dialog ────────────────────────────────────────────────────────
-
-interface WifiQuickDialogProps {
-  deviceId: number | null
-  onClose: () => void
-  onSaved: () => void
-}
-
-function WifiQuickDialog({ deviceId, onClose, onSaved }: WifiQuickDialogProps) {
-  const toast = useToast()
-  const [ip, setIp] = React.useState('')
-  const [mac, setMac] = React.useState('')
-  const [scad, setScad] = React.useState('')
-  const [certFile, setCertFile] = React.useState<File | null>(null)
-  const [saving, setSaving] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const certInputRef = React.useRef<HTMLInputElement>(null)
-
-  React.useEffect(() => {
-    if (deviceId) { setIp(''); setMac(''); setScad(''); setCertFile(null); setError(null) }
-  }, [deviceId])
-
-  const handleSave = async () => {
-    if (!deviceId) return
-    setError(null)
-    setSaving(true)
-    try {
-      // Prima attiva il flag wifi sul device (PATCH)
-      await api.patch(`/devices/${deviceId}/`, { wifi: true })
-
-      // Poi crea/aggiorna il record DeviceWifi via multipart
-      const fd = new FormData()
-      if (ip) fd.append('ip', ip)
-      if (mac) fd.append('mac_address', mac)
-      if (scad) fd.append('scad_certificato', scad)
-      if (certFile) fd.append('certificato', certFile)
-
-      // Prova PUT su device-wifi esistente, altrimenti POST
-      try {
-        await api.put(`/device-wifi/${deviceId}/`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-      } catch {
-        await api.post('/device-wifi/', (() => {
-          fd.append('device', String(deviceId))
-          return fd
-        })(), { headers: { 'Content-Type': 'multipart/form-data' } })
-      }
-
-      toast.success('Configurazione WiFi salvata.')
-      onSaved()
-    } catch (e: unknown) {
-      const data = (e as { response?: { data?: unknown } })?.response?.data
-      if (data && typeof data === 'object') {
-        const msgs = Object.values(data as Record<string, unknown>)
-          .flatMap((v) => (Array.isArray(v) ? v : [v]))
-          .join(' ')
-        setError(msgs)
-      } else {
-        setError(apiErrorToMessage(e))
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog open={!!deviceId} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 600, fontSize: 15 }}>
-        Imposta WiFi
-      </DialogTitle>
-      <Divider />
-      <DialogContent sx={{ pt: 2 }}>
-        <Stack spacing={2}>
-          {error && <Alert severity="error" sx={{ fontSize: 12 }}>{error}</Alert>}
-          <TextField
-            label="Indirizzo IP WiFi"
-            size="small"
-            fullWidth
-            value={ip}
-            onChange={(e) => setIp(e.target.value)}
-            placeholder="es. 192.168.10.20"
-            inputProps={{ style: { fontFamily: 'monospace' } }}
-          />
-          <TextField
-            label="MAC Address"
-            size="small"
-            fullWidth
-            value={mac}
-            onChange={(e) => setMac(e.target.value)}
-            placeholder="es. AA:BB:CC:DD:EE:FF"
-            inputProps={{ style: { fontFamily: 'monospace' }, maxLength: 17 }}
-          />
-          <TextField
-            label="Scadenza certificato"
-            size="small"
-            fullWidth
-            type="date"
-            value={scad}
-            onChange={(e) => setScad(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-          <Box>
-            <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, display: 'block', mb: 0.5 }}>
-              Certificato (.p12)
-            </Typography>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Button variant="outlined" size="small" onClick={() => certInputRef.current?.click()} sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {certFile ? 'Cambia file' : 'Seleziona file'}
-              </Button>
-              <input
-                hidden
-                ref={certInputRef}
-                type="file"
-                accept=".p12,.pfx"
-                onChange={(e) => setCertFile(e.target.files?.[0] ?? null)}
-              />
-              <Typography variant="caption" sx={{ color: certFile ? 'text.secondary' : 'text.disabled', fontStyle: certFile ? 'normal' : 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {certFile ? certFile.name : 'Nessun file selezionato'}
-              </Typography>
-            </Stack>
-          </Box>
-        </Stack>
-      </DialogContent>
-      <Divider />
-      <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1 }}>
-        <Button onClick={onClose} disabled={saving} variant="outlined" size="small">Annulla</Button>
-        <Button onClick={handleSave} disabled={saving} variant="contained" size="small">
-          {saving && <CircularProgress size={14} sx={{ mr: 1 }} color="inherit" />}
-          Salva
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-// ─── Grafico torta Reparto ────────────────────────────────────────────────────
-
-const PIE_COLORS = ['#1A6BB5', '#6366f1', '#14b8a6', '#f59e0b', '#e24b4a', '#8b5cf6', '#10b981', '#f97316']
-
-function RepartoChart({
-  rows,
-  repartoF,
-  onSelect,
-}: {
-  rows: DeviceRow[]
-  repartoF: string
-  onSelect: (v: string) => void
-}) {
-  const data = React.useMemo(() => {
-    const counts: Record<string, number> = {}
-    rows.forEach((r) => {
-      const key = r.reparto?.trim() || '—'
-      counts[key] = (counts[key] ?? 0) + 1
-    })
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-  }, [rows])
-
-  if (!data.length) {
-    return (
-      <Box sx={{ height: '100%', border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-        <Typography sx={{ fontSize: '0.70rem', fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Reparto</Typography>
-        <Typography sx={{ fontSize: '0.62rem', color: 'text.disabled' }}>Nessun dato</Typography>
-      </Box>
-    )
-  }
-
-  return (
-    <Box sx={{ height: '100%', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {/* Titolo */}
-      <Box sx={{ px: 1.5, py: 0.9, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Reparto</Typography>
-        {repartoF && (
-          <Chip size="small" label="✕ reset" onClick={() => onSelect('')}
-            sx={{ height: 16, fontSize: '0.60rem', fontWeight: 700, cursor: 'pointer', bgcolor: 'rgba(26,107,181,0.12)', color: 'primary.main', border: '1px solid rgba(26,107,181,0.25)', '& .MuiChip-label': { px: 0.6 }, '&:hover': { bgcolor: 'rgba(26,107,181,0.22)' } }} />
-        )}
-      </Box>
-
-      {/* Torta + legenda */}
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5, py: 0.5, overflow: 'hidden' }}>
-        {/* Pie */}
-        <Box sx={{ width: 140, height: '100%', flexShrink: 0 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius="30%"
-                outerRadius="82%"
-                paddingAngle={2}
-                dataKey="value"
-                onClick={(entry) => {
-                  const name = (entry as { name: string }).name
-                  onSelect(repartoF === (name === '—' ? '' : name) ? '' : (name === '—' ? '' : name))
-                }}
-                cursor="pointer"
-                stroke="none"
-              >
-                {data.map((entry, i) => (
-                  <Cell
-                    key={entry.name}
-                    fill={PIE_COLORS[i % PIE_COLORS.length]}
-                    opacity={repartoF && repartoF !== entry.name ? 0.35 : 1}
-                  />
-                ))}
-              </Pie>
-              <RechartsTooltip
-                formatter={(value: number, name: string) => [value, name]}
-                contentStyle={{ fontSize: '0.70rem', borderRadius: 6, border: '1px solid #e2e8f0', padding: '4px 8px' }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </Box>
-
-        {/* Legenda compatta */}
-        <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.3, overflowY: 'auto', maxHeight: '100%', pr: 0.5 }}>
-          {data.map((entry, i) => {
-            const color = PIE_COLORS[i % PIE_COLORS.length]
-            const active = repartoF === entry.name || (!repartoF)
-            return (
-              <Box
-                key={entry.name}
-                onClick={() => onSelect(repartoF === entry.name ? '' : (entry.name === '—' ? '' : entry.name))}
-                sx={{ display: 'flex', alignItems: 'center', gap: 0.6, cursor: 'pointer', opacity: active ? 1 : 0.4, transition: 'opacity 0.15s', '&:hover': { opacity: 1 } }}
-              >
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                  {entry.name}
-                </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', flexShrink: 0 }}>
-                  {entry.value}
-                </Typography>
-              </Box>
-            )
-          })}
-        </Box>
-      </Box>
-    </Box>
-  )
-}
+import {
+  type DeviceRow,
+  type DeviceDetail,
+  deviceGridColumns,
+  renderDeviceCard,
+} from './device/deviceGrid'
+import WifiQuickDialog from './device/WifiQuickDialog'
+import RepartoChart from './device/RepartoChart'
+import MiniGridFilter from './device/MiniGridFilter'
+import KpiCard from './device/KpiCard'
 
 export default function Device() {
   const toast  = useToast()
@@ -847,15 +386,12 @@ export default function Device() {
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
 
-  const columns   = React.useMemo(() => cols, [])
+  const columns = React.useMemo(() => deviceGridColumns, [])
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const totalDevices = rowCount
   const pacsCount    = rows.filter((r) => r.rispacs).length
   const pacsPercent  = totalDevices > 0 ? Math.round((pacsCount / totalDevices) * 100) : 0
-
-  // Mini-grid cols
-
 
   const emptyState = React.useMemo(() => {
     if (!grid.search.trim()) return { title: 'Nessun risultato', subtitle: 'Nessun risultato secondo i filtri applicati.' }
@@ -864,155 +400,32 @@ export default function Device() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  // KPI card renderer
-  const KpiCard = ({ label, value, sub, accent }: { label: string; value: string | number; sub: string; accent: string }) => (
-    <Box sx={{
-      position: 'relative', overflow: 'hidden', borderRadius: '8px',
-      p: '10px 14px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
-      backgroundImage: `linear-gradient(135deg, ${accent}99 0%, ${accent}ee 100%)`,
-      border: `1px solid ${accent}40`,
-      boxShadow: `0 8px 20px ${accent}30`,
-      '&::before': { content: '""', position: 'absolute', width: 70, height: 70, borderRadius: '50%', right: -18, top: -18, backgroundColor: 'rgba(255,255,255,0.14)' },
-    }}>
-      <Box sx={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <Typography sx={{ fontSize: '0.70rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)', mb: '4px', lineHeight: 1.2 }}>{label}</Typography>
-        <Typography sx={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', lineHeight: 1, letterSpacing: -0.5 }}>{value}</Typography>
-        <Typography sx={{ fontSize: '0.66rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', mt: '3px' }}>{sub}</Typography>
-      </Box>
-    </Box>
-  )
-
   return (
     <Stack spacing={1.5} sx={{ height: '100%' }}>
 
       {/* ── Riga superiore: 3 mini-grid + colonna KPI (2 impilate) + placeholder ── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 1.5, alignItems: 'stretch' }}>
 
-        {/* Mini-grid Sedi */}
-        <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ px: 1.5, py: 0.9, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}>
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Sedi</Typography>
-            {siteId !== '' && (
-              <Chip size="small" label="✕ reset" onClick={() => setSiteId('')}
-                sx={{ height: 16, fontSize: '0.60rem', fontWeight: 700, cursor: 'pointer', bgcolor: 'rgba(26,107,181,0.12)', color: 'primary.main', border: '1px solid rgba(26,107,181,0.25)', '& .MuiChip-label': { px: 0.6 }, '&:hover': { bgcolor: 'rgba(26,107,181,0.22)' } }} />
-            )}
-          </Box>
-          <Box sx={{
-            maxHeight: 180,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-          }}>
-            {sites.map((s) => ({ id: s.id, name: s.display_name || s.name })).map((row) => {
-              const active = siteId === row.id
-              return (
-                <Box
-                  key={row.id}
-                  onClick={() => setSiteId(active ? '' : row.id)}
-                  sx={{
-                    height: 36,
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 1.5,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    bgcolor: active ? 'rgba(26,107,181,0.22)' : 'transparent',
-                    '&:hover': { bgcolor: active ? 'rgba(26,107,181,0.28)' : 'rgba(26,107,181,0.07)' },
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {row.name}
-                </Box>
-              )
-            })}
-          </Box>
-        </Box>
+        <MiniGridFilter
+          title="Sedi"
+          items={sites.map((s) => ({ id: s.id, name: s.display_name || s.name }))}
+          activeId={siteId}
+          onChange={setSiteId}
+        />
 
-        {/* Mini-grid Tipi */}
-        <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ px: 1.5, py: 0.9, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}>
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Tipi</Typography>
-            {typeId !== '' && (
-              <Chip size="small" label="✕ reset" onClick={() => setTypeId('')}
-                sx={{ height: 16, fontSize: '0.60rem', fontWeight: 700, cursor: 'pointer', bgcolor: 'rgba(26,107,181,0.12)', color: 'primary.main', border: '1px solid rgba(26,107,181,0.25)', '& .MuiChip-label': { px: 0.6 }, '&:hover': { bgcolor: 'rgba(26,107,181,0.22)' } }} />
-            )}
-          </Box>
-          <Box sx={{
-            maxHeight: 180,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-          }}>
-            {types.map((t) => ({ id: t.id, name: t.name })).map((row) => {
-              const active = typeId === row.id
-              return (
-                <Box
-                  key={row.id}
-                  onClick={() => setTypeId(active ? '' : row.id)}
-                  sx={{
-                    height: 36,
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 1.5,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    bgcolor: active ? 'rgba(26,107,181,0.22)' : 'transparent',
-                    '&:hover': { bgcolor: active ? 'rgba(26,107,181,0.28)' : 'rgba(26,107,181,0.07)' },
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {row.name}
-                </Box>
-              )
-            })}
-          </Box>
-        </Box>
+        <MiniGridFilter
+          title="Tipi"
+          items={types.map((t) => ({ id: t.id, name: t.name }))}
+          activeId={typeId}
+          onChange={setTypeId}
+        />
 
-        {/* Mini-grid Produttori */}
-        <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ px: 1.5, py: 0.9, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}>
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Produttori</Typography>
-            {manufacturerId !== '' && (
-              <Chip size="small" label="✕ reset" onClick={() => setManufacturerId('')}
-                sx={{ height: 16, fontSize: '0.60rem', fontWeight: 700, cursor: 'pointer', bgcolor: 'rgba(26,107,181,0.12)', color: 'primary.main', border: '1px solid rgba(26,107,181,0.25)', '& .MuiChip-label': { px: 0.6 }, '&:hover': { bgcolor: 'rgba(26,107,181,0.22)' } }} />
-            )}
-          </Box>
-          <Box sx={{
-            maxHeight: 180,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-          }}>
-            {manufacturers.map((m) => ({ id: m.id, name: m.name })).map((row) => {
-              const active = manufacturerId === row.id
-              return (
-                <Box
-                  key={row.id}
-                  onClick={() => setManufacturerId(active ? '' : row.id)}
-                  sx={{
-                    height: 36,
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 1.5,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    bgcolor: active ? 'rgba(26,107,181,0.22)' : 'transparent',
-                    '&:hover': { bgcolor: active ? 'rgba(26,107,181,0.28)' : 'rgba(26,107,181,0.07)' },
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {row.name}
-                </Box>
-              )
-            })}
-          </Box>
-        </Box>
+        <MiniGridFilter
+          title="Produttori"
+          items={manufacturers.map((m) => ({ id: m.id, name: m.name }))}
+          activeId={manufacturerId}
+          onChange={setManufacturerId}
+        />
 
         {/* Colonna KPI: 2 card impilate, ognuna alta metà della mini-grid */}
         <Stack spacing={1} sx={{ height: '100%' }}>

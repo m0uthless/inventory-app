@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { api } from '@shared/api/client'
 import { setUnauthorizedHandler } from '@shared/api/runtime'
+import { createAuthBroadcast, type AuthBroadcast } from '@shared/auth/authBroadcast'
 
 // Tipo ritornato da /api/auslbo/me/
 export type AuslBoMe = {
@@ -31,6 +32,9 @@ type AuthCtx = {
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refreshMe: () => Promise<void>
+  locked: boolean
+  lock: () => void
+  unlock: () => void
 }
 
 const AuthContext = React.createContext<AuthCtx | null>(null)
@@ -45,6 +49,33 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = React.useState<AuslBoMe | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [locked, setLocked] = React.useState(false)
+
+  // Fix P2 9: sincronizza lock/unlock/logout con le altre schede del
+  // portale AUSL BO aperte nello stesso browser.
+  const broadcastRef = React.useRef<AuthBroadcast | null>(null)
+
+  React.useEffect(() => {
+    const bc = createAuthBroadcast('auslbo-auth-sync', (msg) => {
+      if (msg.type === 'lock') setLocked(true)
+      else if (msg.type === 'unlock') setLocked(false)
+      else if (msg.type === 'logout') {
+        setMe(null)
+        window.location.assign('/login')
+      }
+    })
+    broadcastRef.current = bc
+    return () => bc.close()
+  }, [])
+
+  const lock = React.useCallback(() => {
+    setLocked(true)
+    broadcastRef.current?.post({ type: 'lock' })
+  }, [])
+  const unlock = React.useCallback(() => {
+    setLocked(false)
+    broadcastRef.current?.post({ type: 'unlock' })
+  }, [])
 
   React.useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -89,11 +120,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await api.post('/auth/logout/')
     } finally {
       setMe(null)
+      broadcastRef.current?.post({ type: 'logout' })
     }
   }, [])
 
   return (
-    <AuthContext.Provider value={{ me, loading, login, logout, refreshMe }}>
+    <AuthContext.Provider value={{ me, loading, login, logout, refreshMe, locked, lock, unlock }}>
       {children}
     </AuthContext.Provider>
   )

@@ -2,11 +2,8 @@ import * as React from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   AppBar,
-  TextField,
-  InputAdornment,
   Avatar,
   Box,
-  Chip,
   Collapse,
   Divider,
   Drawer,
@@ -17,7 +14,6 @@ import {
   ListItemText,
   Menu,
   MenuItem,
-  Popover,
   Stack,
   Toolbar,
   Tooltip,
@@ -27,34 +23,10 @@ import {
 import MenuIcon from '@mui/icons-material/Menu'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import LogoutIcon from '@mui/icons-material/Logout'
-import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import SettingsIcon from '@mui/icons-material/Settings'
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
-
-import FolderIcon from '@mui/icons-material/FolderOutlined'
-import DashboardIcon from '@mui/icons-material/DashboardOutlined'
-import LayersIcon from '@mui/icons-material/Layers'
-import HistoryIcon from '@mui/icons-material/HistoryOutlined'
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
-import HandymanIcon from '@mui/icons-material/HandymanOutlined'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import MenuBookIcon from '@mui/icons-material/MenuBookOutlined'
-import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
-import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
-import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
-import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
-import BeachAccessOutlinedIcon from '@mui/icons-material/BeachAccessOutlined'
-import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
-import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined'
-import DoneAllIcon from '@mui/icons-material/DoneAllOutlined'
-import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded'
-import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
-import ContactsRoundedIcon from '@mui/icons-material/ContactsRounded'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
-import TerminalIcon from '@mui/icons-material/TerminalOutlined'
-import MonitorIcon from '@mui/icons-material/MonitorOutlined'
-import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -65,10 +37,24 @@ import AppSpeedDial from './AppSpeedDial'
 import MobileBottomNavArchie from './MobileBottomNavArchie'
 import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
-import LockScreen from '../ui/LockScreen'
-import { SiteRepoV2Provider, useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
-import SearchIcon from '@mui/icons-material/Search'
-import ClearIconSR from '@mui/icons-material/Clear'
+import LockScreen from '@shared/ui/LockScreen'
+import { SiteRepoV2Provider } from '../features/siterepov2/SiteRepoV2Context'
+
+import {
+  type NavItem,
+  NAV,
+  SITE_REPOSITORY_CHILDREN,
+  MAINTENANCE_CHILDREN,
+  WIKI_CHILDREN,
+  BUG_FEATURE_CHILDREN,
+  SERVICENOW_CHILDREN,
+  isSelected,
+  getPageTitle,
+} from './appLayoutNav'
+import { SiteRepoV2Toolbar_Shell } from './SiteRepoV2Toolbar'
+import { renderFeedbackCount, renderIssueCount } from './NavCountChip'
+import { useCollapsibleNavGroup } from './useCollapsibleNavGroup'
+import { NavGroupFlyout } from './NavGroupFlyout'
 
 const ProfileDrawer = React.lazy(() =>
   import('../pages/Profile').then((m) => ({ default: m.ProfileDrawer })),
@@ -76,111 +62,6 @@ const ProfileDrawer = React.lazy(() =>
 
 const drawerWidth = 208
 const collapsedWidth = 58
-
-type NavItem = {
-  label: string
-  path: string
-  icon: React.ReactNode
-  perm?: string
-  permAny?: string[]
-  /** Sezione di appartenenza nella sidebar — usata per i label di gruppo */
-  section?: 'principale' | 'strumenti' | 'sistema'
-  /** Mostra un badge "WIP" accanto al label */
-  wip?: boolean
-}
-
-
-const SITE_REPOSITORY_CHILDREN: NavItem[] = [
-  { label: 'Clienti', path: '/customers', icon: <PeopleAltRoundedIcon />, perm: 'crm.view_customer' },
-  { label: 'Siti', path: '/sites', icon: <ApartmentRoundedIcon />, perm: 'crm.view_site' },
-  { label: 'Contatti', path: '/contacts', icon: <ContactsRoundedIcon />, perm: 'crm.view_contact' },
-  { label: 'Monitor', path: '/monitors', icon: <MonitorIcon />, perm: 'inventory.view_monitor' },
-]
-
-const MAINTENANCE_CHILDREN: NavItem[] = [
-  { label: 'Scadenze', path: '/maintenance', icon: <HandymanIcon />, permAny: ['maintenance.view_maintenanceplan'] },
-  { label: 'Piani', path: '/maintenance/plans', icon: <BuildOutlinedIcon />, perm: 'maintenance.view_maintenanceplan' },
-  { label: 'Rapportini', path: '/maintenance/rapportini', icon: <CheckCircleOutlineIcon />, perm: 'maintenance.view_maintenanceevent' },
-]
-
-const WIKI_CHILDREN: NavItem[] = [
-  { label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, perm: 'wiki.view_wikipage' },
-  { label: 'Query', path: '/wiki/queries', icon: <TerminalIcon />, perm: 'wiki.view_wikiquery' },
-  { label: 'Statistiche', path: '/wiki/stats', icon: <BarChartOutlinedIcon />, perm: 'wiki.view_wikipage' },
-]
-
-const BUG_FEATURE_CHILDREN: NavItem[] = [
-  { label: 'Aperte', path: '/bug-feature', icon: <FeedbackOutlinedIcon /> },
-  { label: 'Risolte', path: '/bug-feature/resolved', icon: <DoneAllIcon /> },
-]
-
-const SERVICENOW_CHILDREN: NavItem[] = [
-  { label: 'SNow Statistiche', path: '/servicenow-stats', icon: <BarChartOutlinedIcon />, perm: 'servicenow.view_servicenowcase' },
-  { label: 'Assenze tecnici', path: '/servicenow-absences', icon: <EventBusyOutlinedIcon />, perm: 'servicenow.view_servicenowcase' },
-]
-
-const NAV: NavItem[] = [
-  // ── Principale ──────────────────────────────────────────────────────────────
-  { label: 'Dashboard', path: '/', icon: <DashboardIcon />, section: 'principale' },
-
-  {
-    label: 'Site Repository',
-    path: '/site-repository',
-    icon: <LayersIcon />,
-    section: 'principale',
-    permAny: ['inventory.view_inventory', 'crm.view_customer', 'crm.view_site', 'crm.view_contact'],
-  },
-
-  { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
-
-  { label: 'ServiceNow', path: '/servicenow-cases', icon: <CloudSyncOutlinedIcon />, section: 'principale', perm: 'servicenow.view_servicenowcase' },
-
-  { label: 'Piano Ferie', path: '/piano-ferie', icon: <BeachAccessOutlinedIcon />, section: 'principale' },
-
-  { label: 'Rimborso Spese', path: '/rimborso-spese', icon: <ReceiptLongOutlinedIcon />, section: 'principale' },
-
-  { label: 'Purchase Order', path: '/purchase-orders', icon: <RequestQuoteOutlinedIcon />, section: 'principale', perm: 'purchaseorders.view_purchaseorderentry' },
-
-  {
-    label: 'Manutenzione',
-    path: '/maintenance',
-    icon: <HandymanIcon />,
-    section: 'principale',
-    permAny: [
-      'maintenance.view_maintenanceplan',
-      'maintenance.view_maintenanceevent',
-    ],
-  },
-
-  // ── Strumenti ────────────────────────────────────────────────────────────────
-  {
-    label: 'Drive',
-    path: '/drive',
-    icon: <FolderIcon />,
-    section: 'strumenti',
-    permAny: ['drive.view_drivefolder', 'drive.view_drivefile'],
-  },
-  { label: 'Knowledge', path: '/wiki', icon: <MenuBookIcon />, section: 'strumenti', perm: 'wiki.view_wikipage' },
-
-  // ── Sistema ──────────────────────────────────────────────────────────────────
-  { label: 'Audit', path: '/audit', icon: <HistoryIcon />, section: 'sistema', perm: 'audit.view_auditevent' },
-
-  {
-    label: 'Cestino',
-    path: '/trash',
-    icon: <DeleteSweepIcon />,
-    section: 'sistema',
-    permAny: ['crm.view_customer', 'crm.view_site', 'crm.view_contact', 'inventory.view_inventory'],
-  },
-
-  { label: 'Bug / Feature', path: '/bug-feature', icon: <FeedbackOutlinedIcon />, section: 'sistema' },
-]
-
-function isSelected(currentPath: string, itemPath: string) {
-  if (itemPath === '/') return currentPath === '/'
-  return currentPath.startsWith(itemPath)
-}
-
 
 type FeedbackSummary = {
   total_count: number
@@ -204,84 +85,8 @@ type IssueSummary = {
   active_count: number
 }
 
-// ─── SiteRepository sticky toolbar ───────────────────────────────────────────
-
-function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
-  const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities } = useSiteRepoV2()
-
-  return (
-    <Box sx={{
-      bgcolor: 'background.paper',
-      borderBottom: '1px solid',
-      borderColor: 'divider',
-      px: { xs: 2, md: 3 },
-      py: 1.125,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 1.5,
-      flexShrink: 0,
-      // override AppBar color inheritance
-      '& .MuiInputBase-root': { color: 'text.primary' },
-      '& .MuiIconButton-root': { color: 'text.secondary !important' },
-      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23) !important' },
-    }}>
-      {/* Spacer sidebar — allinea al contenuto della pagina */}
-      <Box sx={{ display: { xs: 'none', md: 'block' }, width: sidebarWidth, flexShrink: 0 }} />
-
-      <TextField
-        size="small"
-        placeholder="Cerca hostname, cliente, sito, IP..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        sx={{ flex: 1, minWidth: 220, maxWidth: 460 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-            </InputAdornment>
-          ),
-          endAdornment: searchQuery ? (
-            <InputAdornment position="end">
-              <IconButton size="small" onClick={() => setSearchQuery('')}>
-                <ClearIconSR sx={{ fontSize: 16 }} />
-              </IconButton>
-            </InputAdornment>
-          ) : null,
-        }}
-      />
-
-      <Chip
-        label="Comprimi tutto"
-        size="small"
-        clickable
-        onClick={() => handle?.collapseAll()}
-        variant="outlined"
-        sx={{ fontWeight: 600, fontSize: '0.75rem', borderColor: 'divider' }}
-      />
-      <Chip
-        label="Espandi tutto"
-        size="small"
-        clickable
-        onClick={() => handle?.expandAll()}
-        variant="outlined"
-        sx={{ fontWeight: 600, fontSize: '0.75rem', borderColor: 'divider' }}
-      />
-
-      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem', ml: 'auto', whiteSpace: 'nowrap' }}>
-        {totalCustomers} clienti · {totalCities} città
-      </Typography>
-    </Box>
-  )
-}
-
-// Wrapper condizionale — mostrato solo su /site-repository (V2, ora rotta definitiva)
-function SiteRepoV2Toolbar_Shell({ loc, sidebarWidth }: { loc: string; sidebarWidth: number }) {
-  if (loc !== '/site-repository') return null
-  return <SiteRepoV2Toolbar sidebarWidth={sidebarWidth} />
-}
-
 export function AppLayout() {
-  const { me, logout, hasPerm, locked, lock, unlock } = useAuth()
+  const { me, login, logout, hasPerm, locked, lock, unlock } = useAuth()
 
   const { resetAfterUnlock } = useIdleTimer({
     lockAfterMs:   15 * 60 * 1000, // 15 minuti → lock screen
@@ -446,111 +251,33 @@ export function AppLayout() {
   }, [loc.pathname, hasPerm])
 
 
-  const wikiSectionActive = React.useMemo(
-    () => ['/wiki', '/wiki/stats', '/wiki/queries'].some((path) => isSelected(loc.pathname, path)),
-    [loc.pathname],
-  )
-  const [wikiOpen, setWikiOpen] = React.useState(() => {
-    const v = localStorage.getItem('wiki_nav_open')
-    return v ? v === '1' : true
-  })
-  const [wikiFlyoutAnchor, setWikiFlyoutAnchor] = React.useState<null | HTMLElement>(null)
-  const wikiFlyoutOpen = Boolean(wikiFlyoutAnchor)
-  const bugFeatureSectionActive = React.useMemo(
-    () => ['/bug-feature', '/bug-feature/resolved'].some((path) => isSelected(loc.pathname, path)),
-    [loc.pathname],
-  )
-  const [bugFeatureOpen, setBugFeatureOpen] = React.useState(() => {
-    const v = localStorage.getItem('bug_feature_nav_open')
-    return v ? v === '1' : true
-  })
-  const [bugFeatureFlyoutAnchor, setBugFeatureFlyoutAnchor] = React.useState<null | HTMLElement>(null)
-  const bugFeatureFlyoutOpen = Boolean(bugFeatureFlyoutAnchor)
+  // Stato dei 5 gruppi collassabili della sidebar (Wiki, Bug/Feature,
+  // Manutenzione, Site Repository, ServiceNow): apertura persistita in
+  // localStorage + auto-espansione sulla rotta corrente + anchor flyout
+  // (sidebar mini). Vedi useCollapsibleNavGroup.ts.
+  const wiki           = useCollapsibleNavGroup(['/wiki', '/wiki/stats', '/wiki/queries'], 'wiki_nav_open', loc.pathname)
+  const bugFeature     = useCollapsibleNavGroup(['/bug-feature', '/bug-feature/resolved'], 'bug_feature_nav_open', loc.pathname)
+  const maintenance    = useCollapsibleNavGroup(['/maintenance', '/maintenance/plans', '/maintenance/rapportini'], 'maintenance_nav_open', loc.pathname)
+  const siteRepository = useCollapsibleNavGroup(['/site-repository', '/customers', '/sites', '/contacts', '/monitors'], 'site_repository_nav_open', loc.pathname)
+  const servicenow     = useCollapsibleNavGroup(['/servicenow-cases', '/servicenow-stats', '/servicenow-absences'], 'servicenow_nav_open', loc.pathname)
 
-  const maintenanceSectionActive = React.useMemo(
-    () => ['/maintenance', '/maintenance/plans', '/maintenance/rapportini'].some((path) => isSelected(loc.pathname, path)),
-    [loc.pathname],
-  )
-  const [maintenanceOpen, setMaintenanceOpen] = React.useState(() => {
-    const v = localStorage.getItem('maintenance_nav_open')
-    return v ? v === '1' : true
-  })
-  const [maintenanceFlyoutAnchor, setMaintenanceFlyoutAnchor] = React.useState<null | HTMLElement>(null)
-  const maintenanceFlyoutOpen = Boolean(maintenanceFlyoutAnchor)
+  const wikiSectionActive           = wiki.sectionActive
+  const bugFeatureSectionActive     = bugFeature.sectionActive
+  const maintenanceSectionActive    = maintenance.sectionActive
+  const siteRepositorySectionActive = siteRepository.sectionActive
+  const servicenowSectionActive     = servicenow.sectionActive
 
-  const siteRepositorySectionActive = React.useMemo(
-    () => ['/site-repository', '/customers', '/sites', '/contacts', '/monitors'].some((path) => isSelected(loc.pathname, path)),
-    [loc.pathname],
-  )
-  const [siteRepositoryOpen, setSiteRepositoryOpen] = React.useState(() => {
-    const v = localStorage.getItem('site_repository_nav_open')
-    return v ? v === '1' : true
-  })
-  const [siteRepositoryFlyoutAnchor, setSiteRepositoryFlyoutAnchor] = React.useState<null | HTMLElement>(null)
-  const siteRepositoryFlyoutOpen = Boolean(siteRepositoryFlyoutAnchor)
+  const wikiOpen           = wiki.open,           setWikiOpen           = wiki.setOpen
+  const bugFeatureOpen     = bugFeature.open,      setBugFeatureOpen     = bugFeature.setOpen
+  const maintenanceOpen    = maintenance.open,     setMaintenanceOpen    = maintenance.setOpen
+  const siteRepositoryOpen = siteRepository.open,  setSiteRepositoryOpen = siteRepository.setOpen
+  const servicenowOpen     = servicenow.open,      setServicenowOpen     = servicenow.setOpen
 
-  const servicenowSectionActive = React.useMemo(
-    () => ['/servicenow-cases', '/servicenow-stats', '/servicenow-absences'].some((path) => isSelected(loc.pathname, path)),
-    [loc.pathname],
-  )
-  const [servicenowOpen, setServicenowOpen] = React.useState(() => {
-    const v = localStorage.getItem('servicenow_nav_open')
-    return v ? v === '1' : true
-  })
-  const [servicenowFlyoutAnchor, setServicenowFlyoutAnchor] = React.useState<null | HTMLElement>(null)
-  const servicenowFlyoutOpen = Boolean(servicenowFlyoutAnchor)
-
-
-  React.useEffect(() => {
-    localStorage.setItem('wiki_nav_open', wikiOpen ? '1' : '0')
-  }, [wikiOpen])
-
-  React.useEffect(() => {
-    localStorage.setItem('bug_feature_nav_open', bugFeatureOpen ? '1' : '0')
-  }, [bugFeatureOpen])
-
-  React.useEffect(() => {
-    localStorage.setItem('maintenance_nav_open', maintenanceOpen ? '1' : '0')
-  }, [maintenanceOpen])
-
-  React.useEffect(() => {
-    localStorage.setItem('site_repository_nav_open', siteRepositoryOpen ? '1' : '0')
-  }, [siteRepositoryOpen])
-
-  React.useEffect(() => {
-    localStorage.setItem('servicenow_nav_open', servicenowOpen ? '1' : '0')
-  }, [servicenowOpen])
-
-
-  React.useEffect(() => {
-    if (wikiSectionActive) {
-      setWikiOpen(true)
-    }
-  }, [wikiSectionActive])
-
-  React.useEffect(() => {
-    if (bugFeatureSectionActive) {
-      setBugFeatureOpen(true)
-    }
-  }, [bugFeatureSectionActive])
-
-  React.useEffect(() => {
-    if (maintenanceSectionActive) {
-      setMaintenanceOpen(true)
-    }
-  }, [maintenanceSectionActive])
-
-  React.useEffect(() => {
-    if (siteRepositorySectionActive) {
-      setSiteRepositoryOpen(true)
-    }
-  }, [siteRepositorySectionActive])
-
-  React.useEffect(() => {
-    if (servicenowSectionActive) {
-      setServicenowOpen(true)
-    }
-  }, [servicenowSectionActive])
+  const wikiFlyoutAnchor           = wiki.flyoutAnchor,           setWikiFlyoutAnchor           = wiki.setFlyoutAnchor,           wikiFlyoutOpen           = wiki.flyoutOpen
+  const bugFeatureFlyoutAnchor     = bugFeature.flyoutAnchor,     setBugFeatureFlyoutAnchor     = bugFeature.setFlyoutAnchor,     bugFeatureFlyoutOpen     = bugFeature.flyoutOpen
+  const maintenanceFlyoutAnchor    = maintenance.flyoutAnchor,    setMaintenanceFlyoutAnchor    = maintenance.setFlyoutAnchor,    maintenanceFlyoutOpen    = maintenance.flyoutOpen
+  const siteRepositoryFlyoutAnchor = siteRepository.flyoutAnchor, setSiteRepositoryFlyoutAnchor = siteRepository.setFlyoutAnchor, siteRepositoryFlyoutOpen = siteRepository.flyoutOpen
+  const servicenowFlyoutAnchor     = servicenow.flyoutAnchor,     setServicenowFlyoutAnchor     = servicenow.setFlyoutAnchor,     servicenowFlyoutOpen     = servicenow.flyoutOpen
 
   React.useEffect(() => {
     setWikiFlyoutAnchor(null)
@@ -573,6 +300,8 @@ export function AppLayout() {
       setBugFeatureFlyoutAnchor(null)
       setSiteRepositoryFlyoutAnchor(null)
       setServicenowFlyoutAnchor(null)
+      // NB: il flyout di Manutenzione non viene chiuso qui — comportamento
+      // preesistente, mantenuto invariato.
     }
   }, [mini])
 
@@ -592,41 +321,7 @@ export function AppLayout() {
   }, [clearFlyoutCloseTimer])
   React.useEffect(() => () => clearFlyoutCloseTimer(), [clearFlyoutCloseTimer])
 
-  const pageTitle = React.useMemo(() => {
-    // Entries are checked longest-prefix-first so more-specific routes win.
-    const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
-      ['/bug-feature/resolved',   'BUG / FEATURE · RESOLVED'],
-      ['/maintenance/plans',      'MANUTENZIONE · PIANI'],
-      ['/maintenance/rapportini', 'MANUTENZIONE · RAPPORTINI'],
-      ['/wiki/stats',             'KNOWLEDGE · STATISTICHE'],
-      ['/wiki/queries',           'KNOWLEDGE · QUERY'],
-      ['/wiki',                   'KNOWLEDGE · WIKI'],
-      ['/site-repository',        'SITE REPOSITORY'],
-      ['/customers',              'CLIENTI'],
-      ['/sites',                  'SITI'],
-      ['/contacts',               'CONTATTI'],
-      ['/inventory',              'INVENTARI'],
-      ['/monitors',               'SITE REPOSITORY · MONITOR'],
-      ['/maintenance',            'MANUTENZIONE'],
-      ['/issues',                 'ISSUES'],
-      ['/servicenow-stats',       'SERVICENOW · STATISTICHE'],
-      ['/servicenow-absences',    'SERVICENOW · ASSENZE TECNICI'],
-      ['/servicenow-cases',       'SERVICENOW'],
-      ['/piano-ferie',            'PIANO FERIE'],
-      ['/rimborso-spese',         'RIMBORSO SPESE'],
-      ['/purchase-orders',        'PURCHASE ORDERS'],
-      ['/bug-feature',            'BUG / FEATURE'],
-      ['/utenti',                 'UTENTI E GRUPPI'],
-      ['/audit',                  'AUDIT'],
-      ['/drive',                  'DRIVE'],
-      ['/trash',                  'CESTINO'],
-      ['/search',                 'RICERCA'],
-      ['/profile',                'PROFILO'],
-      ['/',                       'DASHBOARD'],
-    ]
-    const path = loc.pathname
-    return ROUTE_TITLES.find(([prefix]) => path === prefix || path.startsWith(prefix + '/'))?.[1] ?? ''
-  }, [loc.pathname])
+  const pageTitle = React.useMemo(() => getPageTitle(loc.pathname), [loc.pathname])
 
   const isWikiPagesSelected = React.useMemo(
     () => loc.pathname === '/wiki' || (/^\/wiki\/\d+$/.test(loc.pathname) && !loc.pathname.startsWith('/wiki/stats')),
@@ -648,49 +343,6 @@ export function AppLayout() {
     () => loc.pathname === '/bug-feature/resolved' || loc.pathname.startsWith('/bug-feature/resolved/'),
     [loc.pathname],
   )
-
-  const renderFeedbackCount = React.useCallback((count?: number | null, tone: 'open' | 'resolved' = 'open') => {
-    if (!count) return null
-    return (
-      <Chip
-        size="small"
-        label={count > 99 ? '99+' : count}
-        sx={{
-          height: 20,
-          fontSize: '0.72rem',
-          fontWeight: 800,
-          borderRadius: 1.25,
-          color: tone === 'open' ? SIDEBAR.accentBright : SIDEBAR.textStrong,
-          bgcolor: tone === 'open' ? SIDEBAR.selectedBgHover : SIDEBAR.chipBg,
-          border: '1px solid',
-          borderColor: tone === 'open' ? SIDEBAR.chipBorderOpen : SIDEBAR.chipBorder,
-          '& .MuiChip-label': { px: 0.9 },
-        }}
-      />
-    )
-  }, [])
-
-  const renderIssueCount = React.useCallback((count?: number | null) => {
-    if (!count) return null
-    return (
-      <Chip
-        size="small"
-        label={count > 99 ? '99+' : count}
-        sx={{
-          height: 20,
-          fontSize: '0.72rem',
-          fontWeight: 800,
-          borderRadius: 1.25,
-          color: SIDEBAR.accentBright,
-          bgcolor: SIDEBAR.selectedBgHover,
-          border: '1px solid',
-          borderColor: SIDEBAR.chipBorderOpen,
-          '& .MuiChip-label': { px: 0.9 },
-        }}
-      />
-    )
-  }, [])
-
 
   const renderNavItem = (
     it: NavItem,
@@ -1160,301 +812,104 @@ export function AppLayout() {
         <SiteRepoV2Toolbar_Shell loc={loc.pathname} sidebarWidth={sidebarWidth} />
       </AppBar>
 
-      <Popover
+      <NavGroupFlyout
         open={wikiFlyoutOpen}
         anchorEl={wikiFlyoutAnchor}
         onClose={() => setWikiFlyoutAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableRestoreFocus
-        disableScrollLock
-        sx={{ pointerEvents: 'none' }}
-        PaperProps={{
-          onMouseEnter: clearFlyoutCloseTimer,
-          onMouseLeave: () => scheduleFlyoutClose(setWikiFlyoutAnchor),
-          sx: {
-            pointerEvents: 'auto',
-            ml: 1,
-            mt: -0.25,
-            minWidth: 248,
-            borderRadius: 1,
-            overflow: 'hidden',
-            background: SIDEBAR.bgGradient,
-            color: '#ffffff',
-            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-            border: '1px solid rgba(94,234,212,0.12)',
+        onMouseEnter={clearFlyoutCloseTimer}
+        onMouseLeave={() => scheduleFlyoutClose(setWikiFlyoutAnchor)}
+        label="WIKI"
+        items={visibleWikiChildren}
+        renderItem={(child) => renderNavItem(child, false, {
+          nested: true,
+          selected: child.path === '/wiki' ? isWikiPagesSelected : child.path === '/wiki/queries' ? isWikiQueriesSelected : isWikiStatsSelected,
+          onClick: () => {
+            setWikiFlyoutAnchor(null)
+            nav(child.path)
           },
-        }}
-      >
-        <Box sx={{ px: 1.25, py: 1 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              px: 1,
-              pb: 0.75,
-              color: SIDEBAR.textMuted,
-              letterSpacing: '0.16em',
-              fontWeight: 800,
-            }}
-          >
-            WIKI
-          </Typography>
+        })}
+      />
 
-          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-            {visibleWikiChildren.map((child) => (
-              <React.Fragment key={`wiki-flyout-${child.path}`}>
-                {renderNavItem(child, false, {
-                  nested: true,
-                  selected: child.path === '/wiki' ? isWikiPagesSelected : child.path === '/wiki/queries' ? isWikiQueriesSelected : isWikiStatsSelected,
-                  onClick: () => {
-                    setWikiFlyoutAnchor(null)
-                    nav(child.path)
-                  },
-                })}
-              </React.Fragment>
-            ))}
-          </List>
-        </Box>
-      </Popover>
-
-      <Popover
+      <NavGroupFlyout
         open={bugFeatureFlyoutOpen}
         anchorEl={bugFeatureFlyoutAnchor}
         onClose={() => setBugFeatureFlyoutAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableRestoreFocus
-        disableScrollLock
-        sx={{ pointerEvents: 'none' }}
-        PaperProps={{
-          onMouseEnter: clearFlyoutCloseTimer,
-          onMouseLeave: () => scheduleFlyoutClose(setBugFeatureFlyoutAnchor),
-          sx: {
-            pointerEvents: 'auto',
-            ml: 1,
-            mt: -0.25,
-            minWidth: 248,
-            borderRadius: 1,
-            overflow: 'hidden',
-            background: SIDEBAR.bgGradient,
-            color: '#ffffff',
-            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-            border: '1px solid rgba(94,234,212,0.12)',
+        onMouseEnter={clearFlyoutCloseTimer}
+        onMouseLeave={() => scheduleFlyoutClose(setBugFeatureFlyoutAnchor)}
+        label="BUG / FEATURE"
+        items={visibleBugFeatureChildren}
+        renderItem={(child) => renderNavItem(child, false, {
+          nested: true,
+          selected: child.path === '/bug-feature' ? isBugFeatureOpenSelected : isBugFeatureResolvedSelected,
+          endAdornment:
+            child.path === '/bug-feature'
+              ? renderFeedbackCount(feedbackSummary?.open_count, 'open')
+              : undefined,
+          onClick: () => {
+            setBugFeatureFlyoutAnchor(null)
+            nav(child.path)
           },
-        }}
-      >
-        <Box sx={{ px: 1.25, py: 1 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              px: 1,
-              pb: 0.75,
-              color: SIDEBAR.textMuted,
-              letterSpacing: '0.16em',
-              fontWeight: 800,
-            }}
-          >
-            BUG / FEATURE
-          </Typography>
-
-          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-            {visibleBugFeatureChildren.map((child) => (
-              <React.Fragment key={`bugfeature-flyout-${child.path}`}>
-                {renderNavItem(child, false, {
-                  nested: true,
-                  selected: child.path === '/bug-feature' ? isBugFeatureOpenSelected : isBugFeatureResolvedSelected,
-                  endAdornment:
-                    child.path === '/bug-feature'
-                      ? renderFeedbackCount(feedbackSummary?.open_count, 'open')
-                      : undefined,
-                  onClick: () => {
-                    setBugFeatureFlyoutAnchor(null)
-                    nav(child.path)
-                  },
-                })}
-              </React.Fragment>
-            ))}
-          </List>
-        </Box>
-      </Popover>
+        })}
+      />
 
       {/* ServiceNow group flyout (mini sidebar) */}
-      <Popover
+      <NavGroupFlyout
         open={servicenowFlyoutOpen}
         anchorEl={servicenowFlyoutAnchor}
         onClose={() => setServicenowFlyoutAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableRestoreFocus
-        disableScrollLock
-        sx={{ pointerEvents: 'none' }}
-        PaperProps={{
-          onMouseEnter: clearFlyoutCloseTimer,
-          onMouseLeave: () => scheduleFlyoutClose(setServicenowFlyoutAnchor),
-          sx: {
-            pointerEvents: 'auto',
-            ml: 1,
-            mt: -0.25,
-            minWidth: 248,
-            borderRadius: 1,
-            overflow: 'hidden',
-            background: SIDEBAR.bgGradient,
-            color: '#ffffff',
-            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-            border: '1px solid rgba(94,234,212,0.12)',
+        onMouseEnter={clearFlyoutCloseTimer}
+        onMouseLeave={() => scheduleFlyoutClose(setServicenowFlyoutAnchor)}
+        label="SERVICENOW"
+        items={visibleServiceNowChildren}
+        renderItem={(child) => renderNavItem(child, false, {
+          nested: true,
+          selected: isSelected(loc.pathname, child.path),
+          onClick: () => {
+            setServicenowFlyoutAnchor(null)
+            nav(child.path)
           },
-        }}
-      >
-        <Box sx={{ px: 1.25, py: 1 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              px: 1,
-              pb: 0.75,
-              color: SIDEBAR.textMuted,
-              letterSpacing: '0.16em',
-              fontWeight: 800,
-            }}
-          >
-            SERVICENOW
-          </Typography>
-          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-            {visibleServiceNowChildren.map((child) => (
-              <React.Fragment key={`servicenow-flyout-${child.path}`}>
-                {renderNavItem(child, false, {
-                  nested: true,
-                  selected: isSelected(loc.pathname, child.path),
-                  onClick: () => {
-                    setServicenowFlyoutAnchor(null)
-                    nav(child.path)
-                  },
-                })}
-              </React.Fragment>
-            ))}
-          </List>
-        </Box>
-      </Popover>
+        })}
+      />
 
       {/* Maintenance group flyout (mini sidebar) */}
-      <Popover
+      <NavGroupFlyout
         open={maintenanceFlyoutOpen}
         anchorEl={maintenanceFlyoutAnchor}
         onClose={() => setMaintenanceFlyoutAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableRestoreFocus
-        disableScrollLock
-        sx={{ pointerEvents: 'none' }}
-        PaperProps={{
-          onMouseEnter: clearFlyoutCloseTimer,
-          onMouseLeave: () => scheduleFlyoutClose(setMaintenanceFlyoutAnchor),
-          sx: {
-            pointerEvents: 'auto',
-            ml: 1,
-            mt: -0.25,
-            minWidth: 248,
-            borderRadius: 1,
-            overflow: 'hidden',
-            background: SIDEBAR.bgGradient,
-            color: '#ffffff',
-            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-            border: '1px solid rgba(94,234,212,0.12)',
+        onMouseEnter={clearFlyoutCloseTimer}
+        onMouseLeave={() => scheduleFlyoutClose(setMaintenanceFlyoutAnchor)}
+        label="MANUTENZIONE"
+        items={visibleMaintenanceChildren}
+        renderItem={(child) => renderNavItem(child, false, {
+          nested: true,
+          selected: child.path === '/maintenance'
+            ? loc.pathname === '/maintenance'
+            : isSelected(loc.pathname, child.path),
+          onClick: () => {
+            setMaintenanceFlyoutAnchor(null)
+            nav(child.path)
           },
-        }}
-      >
-        <Box sx={{ px: 1.25, py: 1 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              px: 1,
-              pb: 0.75,
-              color: SIDEBAR.textMuted,
-              letterSpacing: '0.16em',
-              fontWeight: 800,
-            }}
-          >
-            MANUTENZIONE
-          </Typography>
-          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-            {visibleMaintenanceChildren.map((child) => (
-              <React.Fragment key={`maintenance-flyout-${child.path}`}>
-                {renderNavItem(child, false, {
-                  nested: true,
-                  selected: child.path === '/maintenance'
-                    ? loc.pathname === '/maintenance'
-                    : isSelected(loc.pathname, child.path),
-                  onClick: () => {
-                    setMaintenanceFlyoutAnchor(null)
-                    nav(child.path)
-                  },
-                })}
-              </React.Fragment>
-            ))}
-          </List>
-        </Box>
-      </Popover>
+        })}
+      />
 
       {/* Site Repository group flyout (mini sidebar) */}
-      <Popover
+      <NavGroupFlyout
         open={siteRepositoryFlyoutOpen}
         anchorEl={siteRepositoryFlyoutAnchor}
         onClose={() => setSiteRepositoryFlyoutAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableRestoreFocus
-        disableScrollLock
-        sx={{ pointerEvents: 'none' }}
-        PaperProps={{
-          onMouseEnter: clearFlyoutCloseTimer,
-          onMouseLeave: () => scheduleFlyoutClose(setSiteRepositoryFlyoutAnchor),
-          sx: {
-            pointerEvents: 'auto',
-            ml: 1,
-            mt: -0.25,
-            minWidth: 248,
-            borderRadius: 1,
-            overflow: 'hidden',
-            background: SIDEBAR.bgGradient,
-            color: '#ffffff',
-            boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-            border: '1px solid rgba(94,234,212,0.12)',
+        onMouseEnter={clearFlyoutCloseTimer}
+        onMouseLeave={() => scheduleFlyoutClose(setSiteRepositoryFlyoutAnchor)}
+        label="SITE REPOSITORY"
+        items={visibleSiteRepositoryChildren}
+        renderItem={(child) => renderNavItem(child, false, {
+          nested: true,
+          selected: isSelected(loc.pathname, child.path),
+          onClick: () => {
+            setSiteRepositoryFlyoutAnchor(null)
+            nav(child.path)
           },
-        }}
-      >
-        <Box sx={{ px: 1.25, py: 1 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              px: 1,
-              pb: 0.75,
-              color: SIDEBAR.textMuted,
-              letterSpacing: '0.16em',
-              fontWeight: 800,
-            }}
-          >
-            SITE REPOSITORY
-          </Typography>
-          <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
-            {visibleSiteRepositoryChildren.map((child) => (
-              <React.Fragment key={`site-repository-flyout-${child.path}`}>
-                {renderNavItem(child, false, {
-                  nested: true,
-                  selected: isSelected(loc.pathname, child.path),
-                  onClick: () => {
-                    setSiteRepositoryFlyoutAnchor(null)
-                    nav(child.path)
-                  },
-                })}
-              </React.Fragment>
-            ))}
-          </List>
-        </Box>
-      </Popover>
+        })}
+      />
 
       {/* User menu */}
       <Menu
@@ -1581,7 +1036,15 @@ export function AppLayout() {
       </Box>
       <AppSpeedDial />
       <MobileBottomNavArchie />
-      <LockScreen open={locked} onUnlock={handleUnlock} />
+      <LockScreen
+        open={locked}
+        username={me?.username ?? ''}
+        displayName={me ? ([me.first_name, me.last_name].filter(Boolean).join(' ') || me.username) : 'Utente'}
+        avatarUrl={me?.profile?.avatar}
+        onSubmitPassword={(password) => login(me?.username ?? '', password)}
+        onUnlock={handleUnlock}
+        onLogout={logout}
+      />
       <Backdrop
         open={eggOpen}
         onClick={() => setEggOpen(false)}

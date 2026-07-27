@@ -8,9 +8,16 @@ from django.core.exceptions import ValidationError
 from core.models import TimeStampedModel
 from crm.models import Customer, Site
 
+# Prefisso CIDR minimo ammesso per una VLAN (fix 2.9, audit 2026-07): una rete
+# più ampia di /24 (>254 host) materializzata via iter_host_ips()/hosts() può
+# esaurire memoria/CPU del worker (una /8 produce oltre 16 milioni di IP).
+# Valore deciso con Fede il 2026-07-25: /24, 254 host max.
+MIN_VLAN_PREFIXLEN = 24
+
 
 def _validate_network(value: str) -> None:
-    """Valida che il valore sia un indirizzo di rete IPv4 valido (es. 10.241.0.64/26)."""
+    """Valida che il valore sia un indirizzo di rete IPv4 valido (es. 10.241.0.64/26)
+    e non più ampio del limite massimo consentito (fix 2.9)."""
     try:
         net = ipaddress.IPv4Network(value, strict=False)
         # Avvisiamo se l'host è diverso dall'indirizzo di rete
@@ -21,13 +28,24 @@ def _validate_network(value: str) -> None:
     except ValueError:
         raise ValidationError("Inserire un indirizzo di rete IPv4 valido (es. 10.241.0.64/26).")
 
+    if net.prefixlen < MIN_VLAN_PREFIXLEN:
+        raise ValidationError(
+            f"La rete /{net.prefixlen} è troppo ampia: il massimo consentito è "
+            f"/{MIN_VLAN_PREFIXLEN} ({2 ** (32 - MIN_VLAN_PREFIXLEN) - 2} host)."
+        )
+
 
 def _validate_subnet(value: str) -> None:
-    """Valida che il valore sia una subnet mask IPv4 valida (es. 255.255.255.192)."""
+    """Valida che il valore sia una subnet mask IPv4 valida e *contigua*
+    (es. 255.255.255.192), non un IPv4 generico (fix 2.10)."""
     try:
-        ipaddress.IPv4Address(value)
+        # ipaddress solleva ValueError se la maschera non è contigua
+        # (es. 255.0.255.0), quindi questo controllo copre già il caso.
+        ipaddress.IPv4Network(f"0.0.0.0/{value}", strict=False)
     except ValueError:
-        raise ValidationError("Inserire una subnet mask IPv4 valida (es. 255.255.255.192).")
+        raise ValidationError(
+            "Inserire una subnet mask IPv4 valida e contigua (es. 255.255.255.192)."
+        )
 
 
 def _validate_ip(value: str) -> None:
@@ -35,6 +53,45 @@ def _validate_ip(value: str) -> None:
         ipaddress.IPv4Address(value)
     except ValueError:
         raise ValidationError("Inserire un indirizzo IPv4 valido.")
+
+
+def validate_subnet_matches_network(network: str, subnet: str) -> str | None:
+    """Verifica incrociata (fix 2.10): la subnet mask deve corrispondere
+    esattamente al prefisso CIDR dichiarato in `network`.
+
+    Ritorna un messaggio di errore, oppure None se tutto è coerente.
+    """
+    try:
+        net = ipaddress.IPv4Network(network, strict=False)
+        mask_net = ipaddress.IPv4Network(f"0.0.0.0/{subnet}", strict=False)
+    except ValueError:
+        return None  # i validator sui singoli campi segnalano già il problema
+    if mask_net.prefixlen != net.prefixlen:
+        return (
+            f"La subnet mask {subnet} corrisponde a /{mask_net.prefixlen}, "
+            f"ma la rete dichiarata è /{net.prefixlen}."
+        )
+    return None
+
+
+def validate_gateway_in_network(network: str, gateway: str) -> str | None:
+    """Verifica incrociata (fix 2.10): il gateway deve appartenere alla rete
+    dichiarata e non può coincidere con network o broadcast address.
+
+    Ritorna un messaggio di errore, oppure None se tutto è coerente.
+    """
+    try:
+        net = ipaddress.IPv4Network(network, strict=False)
+        gw = ipaddress.IPv4Address(gateway)
+    except ValueError:
+        return None  # i validator sui singoli campi segnalano già il problema
+    if gw not in net:
+        return f"Il gateway {gateway} non appartiene alla rete {network}."
+    if gw == net.network_address:
+        return f"Il gateway {gateway} coincide con l'indirizzo di rete."
+    if gw == net.broadcast_address:
+        return f"Il gateway {gateway} coincide con l'indirizzo di broadcast."
+    return None
 
 
 class Vlan(TimeStampedModel):
@@ -101,6 +158,16 @@ class Vlan(TimeStampedModel):
         if self.site_id and self.customer_id:
             if self.site.customer_id != self.customer_id:
                 raise ValidationError({"site": "Il sito selezionato non appartiene al customer."})
+
+        if self.network and self.subnet:
+            error = validate_subnet_matches_network(self.network, self.subnet)
+            if error:
+                raise ValidationError({"subnet": error})
+
+        if self.network and self.gateway:
+            error = validate_gateway_in_network(self.network, self.gateway)
+            if error:
+                raise ValidationError({"gateway": error})
 
     # ── Helpers di calcolo pool ───────────────────────────────────────────────
 

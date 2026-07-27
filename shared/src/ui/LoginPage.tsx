@@ -14,7 +14,10 @@ import {
   Box,
   Button,
   CircularProgress,
+  IconButton,
   InputBase,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -43,10 +46,15 @@ export interface LoginPageProps {
 const BG_PHOTO = '/login-bg.jpg'
 
 // ─── Field ────────────────────────────────────────────────────────────────────
+// Fix accessibilità (audit 2026-07): label associata al campo tramite
+// htmlFor/id — prima era un semplice Typography senza alcun legame
+// semantico/ARIA con l'input, invisibile per screen reader e tecnologie
+// assistive.
 
 function Field({
   label, type = 'text', value, onChange, onKeyDown,
   placeholder, autoFocus, endAdornment, accentColor, accentLight,
+  name, autoComplete,
 }: {
   label: string
   type?: string
@@ -58,14 +66,22 @@ function Field({
   endAdornment?: React.ReactNode
   accentColor: string
   accentLight: string
+  name?: string
+  autoComplete?: string
 }) {
   const [focused, setFocused] = React.useState(false)
+  const inputId = React.useId()
   return (
     <Box>
-      <Typography sx={{
-        fontSize: 11.5, fontWeight: 600, color: '#4B5563',
-        mb: 0.6, letterSpacing: '0.2px',
-      }}>
+      <Typography
+        component="label"
+        htmlFor={inputId}
+        sx={{
+          display: 'block',
+          fontSize: 11.5, fontWeight: 600, color: '#4B5563',
+          mb: 0.6, letterSpacing: '0.2px',
+        }}
+      >
         {label}
       </Typography>
       <Box sx={{
@@ -78,6 +94,9 @@ function Field({
         transition: 'border-color 0.15s, box-shadow 0.15s',
       }}>
         <InputBase
+          id={inputId}
+          name={name}
+          autoComplete={autoComplete}
           fullWidth
           autoFocus={autoFocus}
           type={type}
@@ -96,6 +115,10 @@ function Field({
 }
 
 // ─── AmbitoToggle ─────────────────────────────────────────────────────────────
+// Fix accessibilità (audit 2026-07): prima erano due Box cliccabili senza
+// ruolo, focus o gestione tastiera (Space/Enter). ToggleButtonGroup fornisce
+// nativamente elementi <button> reali, focus visibile, Enter/Space e stato
+// aria-pressed, mantenendo lo stesso aspetto tramite gli stessi valori sx.
 
 function AmbitoToggle({
   ambiti, selected, onChange,
@@ -104,45 +127,73 @@ function AmbitoToggle({
   selected: Ambito
   onChange: (a: Ambito) => void
 }) {
+  const current = ambiti.find((a) => a.value === selected) ?? ambiti[0]
   return (
     <Box>
-      <Typography sx={{
-        fontSize: 11.5, fontWeight: 600, color: '#4B5563',
-        mb: 0.6, letterSpacing: '0.2px',
-      }}>
+      <Typography
+        component="span"
+        id="ambito-toggle-label"
+        sx={{
+          display: 'block',
+          fontSize: 11.5, fontWeight: 600, color: '#4B5563',
+          mb: 0.6, letterSpacing: '0.2px',
+        }}
+      >
         Ambito
       </Typography>
-      <Box sx={{
-        display: 'flex',
-        border: '1px solid #DDE1E7',
-        borderRadius: '10px',
-        overflow: 'hidden',
-      }}>
+      <ToggleButtonGroup
+        value={selected}
+        exclusive
+        aria-labelledby="ambito-toggle-label"
+        onChange={(_e, next: Ambito | null) => {
+          if (next) onChange(next)
+        }}
+        sx={{
+          display: 'flex',
+          width: '100%',
+          border: '1px solid #DDE1E7',
+          borderRadius: '10px',
+          overflow: 'hidden',
+        }}
+      >
         {ambiti.map((a, i) => {
           const active = selected === a.value
           return (
-            <Box
+            <ToggleButton
               key={a.value}
-              onClick={() => onChange(a.value)}
+              value={a.value}
+              aria-label={a.label}
               sx={{
                 flex: 1,
                 py: 0.9,
                 textAlign: 'center',
-                cursor: 'pointer',
                 fontSize: 13,
                 fontWeight: active ? 600 : 400,
+                textTransform: 'none',
                 color: active ? '#fff' : '#6B7280',
                 background: active ? a.color : 'transparent',
                 borderLeft: i > 0 ? '1px solid #DDE1E7' : 'none',
+                borderRadius: 0,
+                border: 'none',
                 transition: 'background 0.18s, color 0.18s',
-                userSelect: 'none',
+                '&:hover': {
+                  background: active ? current.colorHover : 'rgba(0,0,0,0.03)',
+                },
+                '&.Mui-selected': {
+                  color: '#fff',
+                  background: a.color,
+                  '&:hover': { background: a.colorHover },
+                },
+                '&.Mui-focusVisible': {
+                  boxShadow: `inset 0 0 0 2px ${a.colorLight}`,
+                },
               }}
             >
               {a.label}
-            </Box>
+            </ToggleButton>
           )
         })}
-      </Box>
+      </ToggleButtonGroup>
     </Box>
   )
 }
@@ -213,7 +264,12 @@ export function LoginPage({
       }} />
 
       {/* ── Scritta in basso a sinistra ── */}
+      {/* Fix responsive (audit 2026-07): nascosta sotto 'sm' per evitare
+          sovrapposizione con la card login su schermi bassi/stretti
+          (es. 320×568) — prima era sempre renderizzata in posizione assoluta
+          indipendentemente dalla viewport. */}
       <Box sx={{
+        display: { xs: 'none', sm: 'block' },
         position: 'absolute',
         bottom: 40,
         left: 48,
@@ -298,6 +354,8 @@ export function LoginPage({
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
             <Field
               label="Username"
+              name="username"
+              autoComplete="username"
               value={username}
               onChange={setUsername}
               onKeyDown={onKeyDown}
@@ -308,6 +366,8 @@ export function LoginPage({
             />
             <Field
               label="Password"
+              name="password"
+              autoComplete="current-password"
               type={showPwd ? 'text' : 'password'}
               value={password}
               onChange={setPassword}
@@ -316,18 +376,20 @@ export function LoginPage({
               accentColor={current.color}
               accentLight={current.colorLight}
               endAdornment={
-                <Box
-                  component="span"
+                <IconButton
+                  type="button"
+                  size="small"
                   onClick={() => setShowPwd((v) => !v)}
+                  aria-label={showPwd ? 'Nascondi password' : 'Mostra password'}
+                  aria-pressed={showPwd}
                   sx={{
-                    cursor: 'pointer', color: '#8A93A2',
-                    display: 'flex', alignItems: 'center', pl: 0.5,
+                    color: '#8A93A2', p: 0.5, ml: 0.5,
                   }}
                 >
                   {showPwd
                     ? <VisibilityOffIcon sx={{ fontSize: 18 }} />
                     : <VisibilityIcon sx={{ fontSize: 18 }} />}
-                </Box>
+                </IconButton>
               }
             />
             <AmbitoToggle

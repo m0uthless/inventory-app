@@ -27,14 +27,15 @@ def _make_vlan(user, customer, site, *, vlan_id=100, network="10.241.0.64/26",
 
 # ─── Validatori IPv4 ──────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("network", ["10.241.0.64/26", "192.168.1.0/24", "172.16.5.0/30"])
-def test_valid_network_passes_validation(superuser, customer_status, site_status, network):
+@pytest.mark.parametrize("network,subnet,gateway", [
+    ("10.241.0.64/26", "255.255.255.192", "10.241.0.65"),
+    ("192.168.1.0/24",  "255.255.255.0",   "192.168.1.1"),
+    ("172.16.5.0/30",   "255.255.255.252", "172.16.5.1"),
+])
+def test_valid_network_passes_validation(superuser, customer_status, site_status, network, subnet, gateway):
     customer = make_customer(superuser, customer_status)
     site = make_site(superuser, customer, site_status)
-    vlan = _make_vlan(superuser, customer, site, network=network, gateway=network.split("/")[0])
-    # gateway = network address stesso non è un host valido semanticamente ma
-    # _validate_ip accetta qualunque IPv4: qui verifichiamo solo che il
-    # network passi la validazione.
+    vlan = _make_vlan(superuser, customer, site, network=network, subnet=subnet, gateway=gateway)
     assert vlan.pk is not None
 
 
@@ -64,6 +65,67 @@ def test_invalid_gateway_is_rejected(superuser, customer_status, site_status):
     site = make_site(superuser, customer, site_status)
     with pytest.raises(ValidationError):
         _make_vlan(superuser, customer, site, gateway="999.999.999.999")
+
+
+# ─── Fix 2.9: limite massimo dimensione rete (/24, anti-DoS) ─────────────────
+
+def test_network_wider_than_slash24_is_rejected(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    with pytest.raises(ValidationError):
+        _make_vlan(superuser, customer, site, network="10.0.0.0/16",
+                    subnet="255.255.0.0", gateway="10.0.0.1")
+
+
+def test_network_exactly_slash24_is_accepted(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    vlan = _make_vlan(superuser, customer, site, network="10.0.9.0/24",
+                       subnet="255.255.255.0", gateway="10.0.9.1")
+    assert vlan.pk is not None
+
+
+# ─── Fix 2.10: coerenza subnet/gateway rispetto al CIDR dichiarato ───────────
+
+def test_subnet_not_matching_network_prefix_is_rejected(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    with pytest.raises(ValidationError):
+        # network è /29 (8 indirizzi) ma la subnet dichiarata è /24: incoerente.
+        _make_vlan(superuser, customer, site, network="10.0.10.0/29",
+                    subnet="255.255.255.0", gateway="10.0.10.1")
+
+
+def test_gateway_equal_to_network_address_is_rejected(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    with pytest.raises(ValidationError):
+        _make_vlan(superuser, customer, site, network="10.0.11.0/29",
+                    subnet="255.255.255.248", gateway="10.0.11.0")
+
+
+def test_gateway_equal_to_broadcast_address_is_rejected(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    with pytest.raises(ValidationError):
+        _make_vlan(superuser, customer, site, network="10.0.12.0/29",
+                    subnet="255.255.255.248", gateway="10.0.12.7")
+
+
+def test_gateway_outside_network_is_rejected(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    with pytest.raises(ValidationError):
+        _make_vlan(superuser, customer, site, network="10.0.13.0/29",
+                    subnet="255.255.255.248", gateway="192.168.1.1")
+
+
+def test_non_contiguous_subnet_mask_is_rejected(superuser, customer_status, site_status):
+    customer = make_customer(superuser, customer_status)
+    site = make_site(superuser, customer, site_status)
+    with pytest.raises(ValidationError):
+        _make_vlan(superuser, customer, site, network="10.0.14.0/24",
+                    subnet="255.0.255.0", gateway="10.0.14.1")
 
 
 # ─── Vlan.clean() — coerenza site/customer ────────────────────────────────────

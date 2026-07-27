@@ -14,15 +14,43 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import LogoutIcon from '@mui/icons-material/Logout'
-import { useAuth } from '../auth/AuthProvider'
 
-type Props = {
+/**
+ * LockScreen — sovrapposta a tutta la viewport, chiede la password per
+ * sbloccare la sessione dopo un periodo di inattività (vedi useIdleTimer).
+ *
+ * Condivisa tra frontend Archie e frontend AUSL BO (fix "parità idle-lock",
+ * audit 2026-07: prima esisteva solo in Archie, AUSLBO non aveva alcun
+ * blocco/logout automatico per inattività). Non dipende da un useAuth()
+ * specifico: riceve i dati utente e le azioni via props.
+ */
+export type LockScreenProps = {
   open: boolean
+  username: string
+  displayName: string
+  avatarUrl?: string | null
+  /** Verifica la password e sblocca (deve rilanciare in caso di errore). */
+  onSubmitPassword: (password: string) => Promise<void>
   onUnlock: () => void
+  onLogout: () => Promise<void>
+  /** Colori del brand (default: palette Archie). */
+  accentFrom?: string
+  accentVia?: string
+  accentTo?: string
 }
 
-export default function LockScreen({ open, onUnlock }: Props) {
-  const { me, login, logout } = useAuth()
+export default function LockScreen({
+  open,
+  username,
+  displayName,
+  avatarUrl,
+  onSubmitPassword,
+  onUnlock,
+  onLogout,
+  accentFrom = '#0a3d38',
+  accentVia = '#0f766e',
+  accentTo = '#134e4a',
+}: LockScreenProps) {
   const [password, setPassword]   = React.useState('')
   const [showPwd, setShowPwd]     = React.useState(false)
   const [loading, setLoading]     = React.useState(false)
@@ -39,11 +67,11 @@ export default function LockScreen({ open, onUnlock }: Props) {
   }, [open])
 
   const handleUnlock = async () => {
-    if (!password.trim() || !me) return
+    if (!password.trim()) return
     setLoading(true)
     setError(null)
     try {
-      await login(me.username, password)
+      await onSubmitPassword(password)
       setPassword('')
       onUnlock()
     } catch {
@@ -58,7 +86,7 @@ export default function LockScreen({ open, onUnlock }: Props) {
   const handleLogout = async () => {
     setLoading(true)
     try {
-      await logout()
+      await onLogout()
     } finally {
       window.location.assign('/login')
     }
@@ -66,16 +94,19 @@ export default function LockScreen({ open, onUnlock }: Props) {
 
   if (!open) return null
 
-  const displayName = me
-    ? [me.first_name, me.last_name].filter(Boolean).join(' ') || me.username
-    : 'Utente'
-
-  const initials = me
-    ? ((me.first_name?.[0] ?? '') + (me.last_name?.[0] ?? '')).toUpperCase() || me.username[0].toUpperCase()
-    : '?'
+  const initials = ((displayName || username || '?')
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()) || '?'
 
   return (
     <Box
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sessione bloccata"
       sx={{
         position: 'fixed',
         inset: 0,
@@ -83,7 +114,7 @@ export default function LockScreen({ open, onUnlock }: Props) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0a3d38 0%, #0f766e 50%, #134e4a 100%)',
+        background: `linear-gradient(135deg, ${accentFrom} 0%, ${accentVia} 50%, ${accentTo} 100%)`,
         backdropFilter: 'blur(12px)',
       }}
     >
@@ -130,7 +161,7 @@ export default function LockScreen({ open, onUnlock }: Props) {
         {/* Avatar + nome utente */}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
           <Avatar
-            src={me?.profile?.avatar || undefined}
+            src={avatarUrl || undefined}
             sx={{
               width: 56, height: 56,
               bgcolor: alpha('#fff', 0.18),
@@ -144,7 +175,7 @@ export default function LockScreen({ open, onUnlock }: Props) {
             {displayName}
           </Typography>
           <Typography variant="caption" sx={{ color: alpha('#fff', 0.55) }}>
-            {me?.username}
+            {username}
           </Typography>
         </Box>
 
@@ -153,6 +184,7 @@ export default function LockScreen({ open, onUnlock }: Props) {
           inputRef={inputRef}
           fullWidth
           type={showPwd ? 'text' : 'password'}
+          label="Password"
           placeholder="Password"
           value={password}
           onChange={e => { setPassword(e.target.value); setError(null) }}
@@ -165,8 +197,11 @@ export default function LockScreen({ open, onUnlock }: Props) {
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
+                  type="button"
                   size="small"
                   onClick={() => setShowPwd(v => !v)}
+                  aria-label={showPwd ? 'Nascondi password' : 'Mostra password'}
+                  aria-pressed={showPwd}
                   edge="end"
                   sx={{ color: alpha('#fff', 0.6), '&:hover': { color: '#fff' } }}
                 >
@@ -176,6 +211,7 @@ export default function LockScreen({ open, onUnlock }: Props) {
             ),
           }}
           sx={{
+            '& .MuiInputLabel-root': { color: alpha('#fff', 0.55) },
             '& .MuiOutlinedInput-root': {
               color: '#fff',
               bgcolor: alpha('#fff', 0.1),

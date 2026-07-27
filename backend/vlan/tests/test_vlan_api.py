@@ -1,5 +1,6 @@
-"""Test per l'API di VlanViewSet: CRUD, permessi (lettura libera, scrittura
-riservata a IsAuslBoEditor), e le action ip-pool / exclude-ip / unexclude-ip.
+"""Test per l'API di VlanViewSet: CRUD, permessi (matrice reale
+view/add/change/delete_vlan via AuslBoModelPermissions), e le action
+ip-pool / exclude-ip / unexclude-ip.
 """
 import pytest
 
@@ -75,10 +76,10 @@ def test_create_vlan_rejects_site_from_different_customer(api_client, superuser,
     assert "site" in resp.data
 
 
-def test_delete_vlan_is_a_hard_delete(api_client, superuser, customer_status, site_status):
-    """VlanViewSet non usa SoftDeleteAuditMixin: pur avendo il campo
-    deleted_at (ereditato da TimeStampedModel), il DELETE via API rimuove
-    davvero la riga — non è recuperabile da nessuna action 'restore'."""
+def test_delete_vlan_is_now_a_soft_delete(api_client, superuser, customer_status, site_status):
+    """FIX 2.6 (audit 2026-07): VlanViewSet usa ora SoftDeleteAuditMixin.
+    Il DELETE via API non rimuove più la riga: imposta deleted_at e la
+    esclude dalle liste, ma resta recuperabile con /restore/."""
     api_client.force_authenticate(user=superuser)
     customer = make_customer(superuser, customer_status)
     site = make_site(superuser, customer, site_status)
@@ -87,15 +88,35 @@ def test_delete_vlan_is_a_hard_delete(api_client, superuser, customer_status, si
 
     resp = api_client.delete(f"/api/vlans/{vlan.id}/")
     assert resp.status_code in (200, 204)
-    assert not Vlan.objects.filter(pk=vlan.id).exists()
+
+    vlan.refresh_from_db()
+    assert vlan.deleted_at is not None
+    assert Vlan.objects.filter(pk=vlan.id).exists()  # riga ancora presente in DB
+
+    # Non compare più nella lista standard...
+    resp = api_client.get("/api/vlans/")
+    assert vlan.id not in {v["id"] for v in resp.data["results"]}
+
+    # ...ma è recuperabile.
+    resp = api_client.post(f"/api/vlans/{vlan.id}/restore/")
+    assert resp.status_code in (200, 204)
+    vlan.refresh_from_db()
+    assert vlan.deleted_at is None
 
 
-def test_read_allowed_without_edit_permission(api_client, customer_status, site_status):
-    """La lettura è consentita a qualunque utente interno o AUSL BO, anche
-    senza device.change_device (IsAuslBoEditor lascia passare i SAFE_METHODS)."""
+def test_read_requires_view_permission(api_client, customer_status, site_status):
+    """FIX 2.5 (audit 2026-07): prima IsAuslBoEditor lasciava passare
+    qualunque GET a chiunque fosse interno o portale, senza controllare
+    vlan.view_vlan. Ora AuslBoModelPermissions lo richiede esplicitamente."""
+    from django.contrib.auth.models import Permission
+
     internal_user = make_internal_user(can_edit=False)
     api_client.force_authenticate(user=internal_user)
 
+    resp = api_client.get("/api/vlans/")
+    assert resp.status_code == 403
+
+    internal_user.user_permissions.add(Permission.objects.get(codename="view_vlan"))
     resp = api_client.get("/api/vlans/")
     assert resp.status_code == 200
 

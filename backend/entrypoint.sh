@@ -8,6 +8,22 @@ if [ "${RUN_MIGRATIONS:-0}" = "1" ]; then
   python manage.py migrate --noinput
 else
   echo "[entrypoint] Skipping migrations (RUN_MIGRATIONS!=1)."
+  # Fix 2.11 (audit 2026-07): con le migrazioni disattivate nulla garantiva
+  # che lo schema fosse aggiornato prima dell'avvio (rischio: backend contro
+  # schema vecchio, errori 500 durante un rilascio). `migrate --check` esce
+  # con codice diverso da zero se esistono migrazioni non applicate, senza
+  # applicarle. Di default logga solo un warning (non blocca l'avvio, per
+  # non rompere il flusso manuale esistente); impostare
+  # FAIL_ON_PENDING_MIGRATIONS=1 per bloccare l'avvio in ambienti che
+  # vogliono un rilascio atomico più severo.
+  if ! python manage.py migrate --check >/dev/null 2>&1; then
+    echo "[entrypoint] ATTENZIONE: risultano migrazioni Django non applicate."
+    echo "[entrypoint] Esegui manualmente 'python manage.py migrate' prima di considerare il rilascio completo."
+    if [ "${FAIL_ON_PENDING_MIGRATIONS:-0}" = "1" ]; then
+      echo "[entrypoint] FAIL_ON_PENDING_MIGRATIONS=1: interrompo l'avvio."
+      exit 1
+    fi
+  fi
 fi
 
 # Collect static files into STATIC_ROOT (shared with nginx)

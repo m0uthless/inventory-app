@@ -7,6 +7,139 @@ Le date sono in timezone Europe/Rome.
 
 ---
 
+## [0.8] - 2026-07-25
+
+Rilascio dedicato alla correzione dei problemi critici emersi da un audit di
+sicurezza indipendente sul portale AUSL BO (moduli `auslbo`, `device`, `vlan`).
+
+### Security
+
+- **Bypass dello scope cliente AUSL BO tramite header client-controllato** —
+  `AuslBoScopedMixin.filter_queryset` applicava lo scope tenant solo in
+  presenza dell'header `X-Auslbo-Portal: 1`, inviato dal frontend ma
+  omettibile/falsificabile da qualunque chiamata diretta all'API. Un utente
+  con solo profilo AUSL BO poteva così vedere i dati di TUTTI i clienti
+  (inventari, device, contatti, sedi, VLAN, richieste IP). Lo scope è ora
+  deciso esclusivamente da identità/permessi server-side
+  (`core.access_archie` per gli utenti interni, incluso chi ha sia profilo
+  portale sia accesso interno): l'header non ha più alcun effetto
+  autorizzativo. `backend/auslbo/mixins.py`.
+
+- **Creazione/modifica cross-cliente su Device, VLAN, VlanIpRequest,
+  DeviceWifi, DeviceRispacs** — i serializer validavano solo la coerenza
+  interna dei campi inviati (es. site vs customer nel payload), non
+  l'appartenenza al customer reale del richiedente: un utente portale con
+  permesso di scrittura poteva creare/modificare record per clienti diversi
+  dal proprio. Nuovo `AuslBoTenantWriteMixin` forza il tenant al customer
+  reale dell'utente portale e valida le relazioni referenziate.
+  `backend/auslbo/mixins.py`, `backend/device/api.py`, `backend/vlan/api.py`.
+
+- **Registro RIS/PACS globale (`RispacsViewSet`) modificabile da qualunque
+  utente portale** — CRUD completo aperto a chiunque avesse un profilo AUSL
+  BO, anche solo lettore, senza rispettare i permessi Django né distinguere
+  interni da portale. Le scritture sono ora riservate a utenti interni con
+  il permesso Django corrispondente; la lettura scoped per il portale resta
+  su `CustomerRispacsViewSet` (già esistente). `backend/device/api.py`.
+
+- **Password certificato WiFi (`DeviceWifi.pass_certificato`) esposta
+  decifrata in chiaro a chiunque, senza scope tenant** — il campo non era
+  `write_only`, quindi veniva restituita in chiaro in ogni response
+  (incluso il nested `wifi_detail` dentro il dettaglio Device); il
+  `DeviceWifiViewSet` non aveva alcuno scope tenant, quindi un utente
+  portale poteva leggere/scaricare certificati e password di qualunque
+  cliente. Nuovo permesso `device.view_wifi_secrets` richiesto per
+  leggere/scrivere la password e scaricare il certificato; `DeviceWifiViewSet`
+  ora rispetta lo scope tenant. `backend/device/api.py`, `backend/device/models.py`.
+
+- **Matrice permessi R/W/D non rispettata dagli endpoint Device/VLAN/RIS-PACS/
+  DeviceWifi** — le letture passavano per qualunque utente portale/interno
+  senza controllare `view_*`; tutte le scritture dipendevano dal solo
+  `device.change_device`, ignorando `add_*`/`delete_*`/`view_vlan`/ecc.
+  Nuova `AuslBoModelPermissions` (in `backend/auslbo/permissions.py`)
+  richiede la matrice reale view/add/change/delete per modello, sostituendo
+  `IsAuslBoEditor` su tutti i ViewSet coinvolti.
+
+- **Cancellazione fisica (hard delete) delle VLAN** — `VlanViewSet` non usava
+  `SoftDeleteAuditMixin`: il DELETE rimuoveva la riga in modo non
+  recuperabile, con solo `device.change_device` come permesso richiesto. Ora
+  soft-delete + restore/purge, coerente con le altre entità.
+  `backend/vlan/api.py`.
+
+- **Profilo AUSL BO considerato attivo solo perché esiste** — `_is_auslbo_user`
+  verificava solo l'esistenza del record `AuslBoUserProfile`, non che il
+  customer collegato fosse ancora attivo (non soft-deleted): un profilo
+  restava valido anche dopo la disattivazione del cliente. `backend/auslbo/permissions.py`.
+
+- **Pool VLAN senza limite di dimensione (rischio DoS)** — nessun limite al
+  prefisso CIDR: una rete `/8` materializzava oltre 16 milioni di IP in
+  memoria (`iter_host_ips()`/`hosts()`), con rischio di esaurimento
+  memoria/CPU del worker. Rete VLAN ora limitata a `/24` (max 254 host).
+  `backend/vlan/models.py`.
+
+- **Subnet mask e gateway non validati contro il CIDR dichiarato** — la
+  subnet era validata solo come IPv4 generico (accettava maschere non
+  contigue), il gateway solo come IPv4 valido (poteva coincidere con
+  network/broadcast o stare fuori dalla rete). Aggiunta validazione
+  incrociata (`Vlan.clean()` + `VlanSerializer.validate()`).
+  `backend/vlan/models.py`, `backend/vlan/api.py`.
+
+- **`.env.dev` con segreti reali incluso in un archivio condiviso con terzi**
+  — aggiunto `.env.example` (nessun segreto) come base da copiare. La
+  rotazione dei valori reali (`DJANGO_SECRET_KEY`, password DB,
+  `FIELD_ENCRYPTION_KEY`, webhook Teams) resta un'azione operativa da
+  eseguire manualmente, non automatizzabile in un rilascio di codice.
+
+### Changed
+
+- `backend/entrypoint.sh`: con `RUN_MIGRATIONS=0` (default anche in
+  `docker-compose.prod.yml`), l'avvio ora avvisa se esistono migrazioni
+  Django non applicate (`migrate --check`), senza bloccare l'avvio di
+  default. `FAIL_ON_PENDING_MIGRATIONS=1` per bloccarlo esplicitamente in
+  ambienti che vogliono un rilascio più severo.
+
+- Nuovo Django system check (`backend/core/checks.py`) che avvisa in
+  produzione (`DEBUG=False`) se `SESSION_COOKIE_DOMAIN` o
+  `SECURE_SSL_REDIRECT` non sono configurati — rilevante per la sessione
+  condivisa tra ARCHIE e il portale AUSL BO su sottodomini diversi.
+
+- **Versione allineata a 0.8** in tutti i file di progetto:
+  `backend/config/settings.py` (`SPECTACULAR_SETTINGS["VERSION"]`, ora
+  unica sorgente lato backend — `backend/config/system_stats_api.py` la
+  legge da lì invece di un secondo default hardcoded, causa del drift
+  rilevato dall'audit tra README/system-stats/frontend), `frontend/package.json`
+  (letto da Vite e iniettato come `VITE_APP_VERSION`), `README.md`.
+  Il portale AUSL BO (`frontend-auslbo/package.json`) mantiene un
+  versionamento indipendente, essendo un frontend/prodotto separato.
+
+- `README.md`: rimosso il claim obsoleto "credenziali salvate in chiaro"
+  (la cifratura Fernet at-rest è implementata da tempo per inventario, VPN
+  e certificati WiFi); aggiunta nota esplicita sul tenant scoping AUSL BO
+  come confine di sicurezza server-side.
+
+### Migrations
+
+- `device/0009_devicewifi_view_wifi_secrets_permission`: aggiunge il
+  permesso extra `device.view_wifi_secrets` (`DeviceWifi.Meta.permissions`).
+
+### Tests
+
+- `vlan/tests/test_auslbo_scoping.py`: riscritto per il comportamento
+  corretto post-fix (in precedenza certificava esplicitamente il bypass
+  come "atteso"); aggiunti test per header assente/manomesso, utente duale,
+  scritture cross-cliente bloccate.
+- `vlan/tests/test_vlan_api.py`, `vlan/tests/test_vlan_model.py`: aggiornati
+  per la nuova matrice permessi e per soft-delete VLAN; aggiunti test per
+  limite `/24` e validazione incrociata subnet/gateway.
+- `device/tests/test_wifi_certificate_e2e.py`: aggiornato per la nuova
+  matrice permessi; aggiunti test per occultamento password senza
+  `view_wifi_secrets` (anche nel nested `wifi_detail`), scope tenant su
+  `DeviceWifiViewSet`.
+- Nuovo `device/tests/test_rispacs_permissions.py`: copertura per
+  `RispacsViewSet` (scritture riservate a interni) e `DeviceRispacsViewSet`
+  (scope tenant, prima assente).
+
+---
+
 ## [0.6] - 2026-04-18
 
 ### Fixed

@@ -3,22 +3,29 @@ from __future__ import annotations
 import ipaddress
 
 from django.utils import timezone
+from django.db import transaction
 
 from django.contrib.auth.models import Group
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import serializers, status, viewsets
+from rest_framework.generics import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
-from auslbo.mixins import AuslBoScopedMixin
-from auslbo.permissions import IsAuslBoUserOrInternal, IsAuslBoEditor, _can_edit_auslbo
+from auslbo.mixins import AuslBoScopedMixin, AuslBoTenantWriteMixin
+from auslbo.permissions import IsAuslBoUserOrInternal, IsAuslBoEditor, AuslBoModelPermissions, _can_edit_auslbo
+from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin, PurgeActionMixin
+from core.soft_delete import apply_soft_delete_filters
 from crm.models import Site
 from device.models import Device, DeviceManufacturer, DeviceType, Rispacs
 from inventory.models import Inventory
-from vlan.models import Vlan, VlanIpRequest, VlanExcludedIp
+from vlan.models import (
+    Vlan, VlanIpRequest, VlanExcludedIp,
+    validate_subnet_matches_network, validate_gateway_in_network,
+)
 
-VLAN_MANAGER_GROUP = "auslbo_editor"  # kept for reference, logic now in IsAuslBoEditor
+VLAN_MANAGER_GROUP = "auslbo_editor"  # kept for reference, logic now in AuslBoModelPermissions
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,12 +150,28 @@ class VlanSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Verifica che il sito appartenga al customer
-        site: Site | None = attrs.get("site")
-        customer = attrs.get("customer")
+        site: Site | None = attrs.get("site") or (self.instance.site if self.instance else None)
+        customer = attrs.get("customer") or (self.instance.customer if self.instance else None)
         if site and customer and site.customer_id != customer.pk:
             raise serializers.ValidationError(
                 {"site": "Il sito selezionato non appartiene al customer."}
             )
+
+        # Fix 2.10: coerenza subnet/gateway rispetto al CIDR dichiarato.
+        network = attrs.get("network") or (self.instance.network if self.instance else None)
+        subnet = attrs.get("subnet") or (self.instance.subnet if self.instance else None)
+        gateway = attrs.get("gateway") or (self.instance.gateway if self.instance else None)
+
+        if network and subnet:
+            error = validate_subnet_matches_network(network, subnet)
+            if error:
+                raise serializers.ValidationError({"subnet": error})
+
+        if network and gateway:
+            error = validate_gateway_in_network(network, gateway)
+            if error:
+                raise serializers.ValidationError({"gateway": error})
+
         return attrs
 
 
@@ -172,21 +195,35 @@ class IpPoolEntrySerializer(serializers.Serializer):
 # ViewSet
 # ─────────────────────────────────────────────────────────────────────────────
 
-class VlanViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
+class VlanViewSet(
+    AuslBoTenantWriteMixin,
+    AuslBoScopedMixin,
+    PurgeActionMixin,
+    RestoreActionMixin,
+    SoftDeleteAuditMixin,
+    viewsets.ModelViewSet,
+):
     serializer_class = VlanSerializer
-    permission_classes = [IsAuslBoUserOrInternal, IsAuslBoEditor]
+    # Fix 2.5: sostituisce IsAuslBoEditor (controllava solo device.change_device
+    # per QUALSIASI scrittura) con la matrice reale view/add/change/delete_vlan.
+    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["customer", "site", "vlan_id"]
     search_fields = ["name", "network", "gateway", "lan"]
     ordering_fields = ["vlan_id", "name", "site"]
     ordering = ["site", "vlan_id"]
 
+    # Fix 2.2: per utenti portale "puri" forza customer=proprio tenant e
+    # verifica che il site scelto appartenga allo stesso tenant.
+    tenant_related_fields = ("site",)
+
     def get_queryset(self):
-        return (
-            Vlan.objects.filter(deleted_at__isnull=True)
-            .select_related("customer", "site")
-            .order_by("site", "vlan_id")
-        )
+        qs = Vlan.objects.select_related("customer", "site").order_by("site", "vlan_id")
+        # Fix P0 6.4: prima filtrava sempre deleted_at__isnull=True, quindi
+        # restore/purge/bulk_restore/bulk_purge (che leggono da questo stesso
+        # get_queryset() tramite get_object()/_get_scoped_trash_queryset())
+        # non potevano MAI trovare un oggetto cancellato: 404 costante.
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     @action(detail=True, methods=["get"], url_path="ip-pool")
     def ip_pool(self, request, pk=None):
@@ -453,18 +490,24 @@ class IsAdminAuslBo(IsAuslBoEditor):
         return request.user.has_perm("vlan.change_vlaniprequest")
 
 
-class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
+class VlanIpRequestViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class   = VlanIpRequestSerializer
-    permission_classes = [IsAuslBoUserOrInternal, IsAuslBoEditor]
+    # Fix 2.5: sostituisce IsAuslBoEditor con la matrice reale
+    # view/add/change/delete_vlaniprequest.
+    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields   = ["customer", "vlan", "stato", "modalita"]
     search_fields      = ["ip", "aetitle"]
     ordering_fields    = ["created_at", "stato", "ip"]
     ordering           = ["-created_at"]
 
+    # Fix 2.2: per utenti portale "puri" forza customer=proprio tenant e
+    # verifica che vlan/site scelti appartengano allo stesso tenant.
+    tenant_related_fields = ("vlan", "site")
+
     def get_queryset(self):
-        return (
-            VlanIpRequest.objects.filter(deleted_at__isnull=True)
+        qs = (
+            VlanIpRequest.objects
             .select_related(
                 "customer", "vlan", "richiedente", "approvato_da",
                 "site", "device_type", "manufacturer",
@@ -472,47 +515,72 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
             .prefetch_related("rispacs")
             .order_by("-created_at")
         )
+        # Fix P0 6.5: prima era hard delete (nessun SoftDeleteAuditMixin);
+        # ora segue la stessa convenzione del resto del progetto.
+        return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_create(self, serializer):
+        self._enforce_tenant(serializer)
         serializer.save(
             richiedente=self.request.user,
             stato=VlanIpRequest.Stato.PENDING,
         )
 
+    def perform_update(self, serializer):
+        self._enforce_tenant(serializer)
+        serializer.save()
+
     @action(detail=True, methods=["post"], url_path="approve",
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def approve(self, request, pk=None):
-        """Approva una richiesta pendente (richiede permesso vlan.change_vlaniprequest)."""
-        req: VlanIpRequest = self.get_object()
-        if req.stato != VlanIpRequest.Stato.PENDING:
-            return Response(
-                {"detail": "Solo le richieste in attesa possono essere approvate."},
-                status=status.HTTP_400_BAD_REQUEST,
+        """Approva una richiesta pendente (richiede permesso vlan.change_vlaniprequest).
+
+        Fix P0 6.5: prima leggeva `stato` e poi salvava senza alcun lock,
+        quindi due approve() concorrenti sulla stessa richiesta potevano
+        entrambi superare il controllo "PENDING" prima che l'altro scrivesse.
+        Ora la riga viene bloccata con select_for_update dentro una
+        transazione, quindi la seconda richiesta aspetta e poi trova
+        `stato` già cambiato dalla prima.
+        """
+        with transaction.atomic():
+            req: VlanIpRequest = get_object_or_404(
+                self.filter_queryset(self.get_queryset()).select_for_update(), pk=pk
             )
-        req.stato = VlanIpRequest.Stato.APPROVED
-        req.approvato_da = request.user
-        req.approvato_at = timezone.now()
-        req.save(update_fields=["stato", "approvato_da", "approvato_at", "updated_at"])
+            if req.stato != VlanIpRequest.Stato.PENDING:
+                return Response(
+                    {"detail": "Solo le richieste in attesa possono essere approvate."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            req.stato = VlanIpRequest.Stato.APPROVED
+            req.approvato_da = request.user
+            req.approvato_at = timezone.now()
+            req.save(update_fields=["stato", "approvato_da", "approvato_at", "updated_at"])
         return Response(VlanIpRequestSerializer(req, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="reject",
             permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
     def reject(self, request, pk=None):
-        """Rifiuta una richiesta pendente (richiede permesso vlan.change_vlaniprequest)."""
-        req: VlanIpRequest = self.get_object()
-        if req.stato != VlanIpRequest.Stato.PENDING:
-            return Response(
-                {"detail": "Solo le richieste in attesa possono essere rifiutate."},
-                status=status.HTTP_400_BAD_REQUEST,
+        """Rifiuta una richiesta pendente (richiede permesso vlan.change_vlaniprequest).
+
+        Fix P0 6.5: stesso lock di approve() per evitare race condition.
+        """
+        with transaction.atomic():
+            req: VlanIpRequest = get_object_or_404(
+                self.filter_queryset(self.get_queryset()).select_for_update(), pk=pk
             )
-        motivo = (request.data.get("motivo") or "").strip()
-        if motivo:
-            prefix = f"Motivo rifiuto: {motivo}"
-            req.note = f"{prefix}\n{req.note}".strip() if req.note else prefix
-        req.stato = VlanIpRequest.Stato.REJECTED
-        req.approvato_da = request.user
-        req.approvato_at = timezone.now()
-        req.save(update_fields=["stato", "approvato_da", "approvato_at", "note", "updated_at"])
+            if req.stato != VlanIpRequest.Stato.PENDING:
+                return Response(
+                    {"detail": "Solo le richieste in attesa possono essere rifiutate."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            motivo = (request.data.get("motivo") or "").strip()
+            if motivo:
+                prefix = f"Motivo rifiuto: {motivo}"
+                req.note = f"{prefix}\n{req.note}".strip() if req.note else prefix
+            req.stato = VlanIpRequest.Stato.REJECTED
+            req.approvato_da = request.user
+            req.approvato_at = timezone.now()
+            req.save(update_fields=["stato", "approvato_da", "approvato_at", "note", "updated_at"])
         return Response(VlanIpRequestSerializer(req, context={"request": request}).data)
 
 
@@ -520,7 +588,10 @@ class VlanIpRequestViewSet(AuslBoScopedMixin, viewsets.ModelViewSet):
 class CustomerRispacsViewSet(viewsets.ReadOnlyModelViewSet):
     """Restituisce i sistemi RIS/PACS collegati ai device del customer autenticato."""
     serializer_class   = RispacsLiteSerializer
-    permission_classes = [IsAuslBoUserOrInternal]
+    # Fix P0 6.3: prima bastava essere utente AUSL BO/interno per leggere,
+    # senza richiedere esplicitamente device.view_rispacs come per
+    # RispacsViewSet (il registro globale).
+    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
     filter_backends    = [SearchFilter]
     search_fields      = ["name", "ip", "aetitle"]
 

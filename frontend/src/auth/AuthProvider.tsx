@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { api } from '@shared/api/client'
 import { setUnauthorizedHandler } from '@shared/api/runtime'
+import { createAuthBroadcast, type AuthBroadcast } from '@shared/auth/authBroadcast'
 
 export type Me = {
   id: number
@@ -46,8 +47,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true)
   const [locked, setLocked] = React.useState(false)
 
-  const lock   = React.useCallback(() => setLocked(true),  [])
-  const unlock = React.useCallback(() => setLocked(false), [])
+  // Fix P2 9: sincronizza lock/unlock/logout con le altre schede della
+  // stessa app aperte nello stesso browser (vedi shared/src/auth/authBroadcast.ts).
+  const broadcastRef = React.useRef<AuthBroadcast | null>(null)
+
+  React.useEffect(() => {
+    const bc = createAuthBroadcast('archie-auth-sync', (msg) => {
+      if (msg.type === 'lock') setLocked(true)
+      else if (msg.type === 'unlock') setLocked(false)
+      else if (msg.type === 'logout') {
+        setMe(null)
+        window.location.assign('/login')
+      }
+    })
+    broadcastRef.current = bc
+    return () => bc.close()
+  }, [])
+
+  const lock = React.useCallback(() => {
+    setLocked(true)
+    broadcastRef.current?.post({ type: 'lock' })
+  }, [])
+  const unlock = React.useCallback(() => {
+    setLocked(false)
+    broadcastRef.current?.post({ type: 'unlock' })
+  }, [])
   React.useEffect(() => {
     setUnauthorizedHandler(() => {
       setMe(null)
@@ -94,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await api.post('/auth/logout/')
     } finally {
       setMe(null)
+      broadcastRef.current?.post({ type: 'logout' })
     }
   }, [])
 
