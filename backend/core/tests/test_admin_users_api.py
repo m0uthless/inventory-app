@@ -324,3 +324,67 @@ def test_superuser_can_grant_is_staff():
 
     target.refresh_from_db()
     assert target.is_staff is True
+
+
+# ── Area piano ferie (leave_area) — regressione bug 500 ─────────────────────
+# `leave_area` è una FK (attendance.LeaveArea): _apply_write riceve solo
+# l'id grezzo dal client e deve risolverlo via leave_area_id, non con un
+# setattr diretto (che con un id scalare fa fallire Django con ValueError,
+# non intercettato -> 500). Il test Philips esistente non copre questo path
+# perché in quel caso il valore viene forzato a None prima del setattr, e
+# None è sempre stato un valore accettabile per una FK nullable.
+
+def test_assign_leave_area_to_non_philips_user():
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+    from attendance.models import LeaveArea
+
+    leave_area = LeaveArea.objects.create(label=f"area_{uuid.uuid4().hex[:6]}")
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"profile": {"leave_area": leave_area.id}},
+        format="json",
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["profile"]["leave_area"] == leave_area.id
+    assert data["profile"]["leave_area_name"] == leave_area.label
+
+    target.refresh_from_db()
+    assert target.profile.leave_area_id == leave_area.id
+
+
+def test_clear_leave_area_with_null():
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+    from attendance.models import LeaveArea
+
+    leave_area = LeaveArea.objects.create(label=f"area_{uuid.uuid4().hex[:6]}")
+    UserProfile.objects.update_or_create(user=target, defaults={"leave_area": leave_area})
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"profile": {"leave_area": None}},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["profile"]["leave_area"] is None
+
+    target.refresh_from_db()
+    assert target.profile.leave_area_id is None
+
+
+def test_assign_nonexistent_leave_area_returns_400_not_500():
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"profile": {"leave_area": 999999}},
+        format="json",
+    )
+    assert resp.status_code == 400

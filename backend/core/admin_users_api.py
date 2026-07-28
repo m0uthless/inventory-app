@@ -360,11 +360,37 @@ class UserAdminViewSet(
                 "is_philips",
                 "is_servicenow_technician",
                 "is_leave_coordinator",
-                "leave_area",
                 "is_expense_secretary",
             ):
                 if field in profile_data:
                     setattr(profile, field, profile_data[field])
+
+            # `leave_area` è una FK (attendance.LeaveArea): il client manda solo
+            # l'id grezzo (o null), non un'istanza. Un `setattr` diretto come per
+            # i booleani sopra fa fallire Django con un ValueError non gestito
+            # ("Cannot assign ...: must be a LeaveArea instance") -> 500.
+            # Si assegna via `leave_area_id`, pattern standard per FK by pk, con
+            # validazione esplicita così un id inesistente/non valido torna un
+            # 400 pulito invece di rompere a metà request.
+            if "leave_area" in profile_data:
+                raw_value = profile_data["leave_area"]
+                if raw_value in (None, "", 0, "0"):
+                    profile.leave_area = None
+                else:
+                    try:
+                        leave_area_id = int(raw_value)
+                    except (TypeError, ValueError):
+                        raise serializers.ValidationError(
+                            {"profile": {"leave_area": "Area non valida."}}
+                        )
+                    from attendance.models import LeaveArea
+
+                    if not LeaveArea.objects.filter(pk=leave_area_id).exists():
+                        raise serializers.ValidationError(
+                            {"profile": {"leave_area": "Area non trovata."}}
+                        )
+                    profile.leave_area_id = leave_area_id
+
             profile.save()
             changed_fields.append("profile")
 
