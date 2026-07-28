@@ -1346,7 +1346,7 @@ export default function Issues() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ height: '100%' }}>
       <IssuesSummaryWidget rows={rows} loading={loading} />
       <EntityListCard
         toolbar={{

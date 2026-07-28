@@ -1075,12 +1075,15 @@ export function AppLayout() {
               <Box
                 sx={{
                   position: 'relative',
-                  borderRadius: 1,
+                  borderRadius: 2,
                   overflow: 'hidden',
                   boxShadow: 24,
                   transform: 'rotate(-1deg)',
-                  width: { xs: '85vw', sm: 416 },
-                  maxWidth: 720,
+                  width: { xs: '94vw', sm: '85vw', md: '72vw' },
+                  maxWidth: 1200,
+                  maxHeight: '92vh',
+                  p: { xs: 1, sm: 1.75 },
+                  bgcolor: '#0f172a',
                   '@keyframes eggPop': {
                     '0%': { transform: 'scale(0.92) rotate(-2deg)' },
                     '40%': { transform: 'scale(1.02) rotate(1deg)' },
@@ -1094,16 +1097,21 @@ export function AppLayout() {
                   component="img"
                   src="/supertennis.jpeg"
                   alt="supertennis"
-                  sx={{ display: 'block', width: '100%' }}
+                  sx={{
+                    display: 'block', width: '100%', height: 'auto',
+                    maxHeight: { xs: 'calc(92vh - 16px)', sm: 'calc(92vh - 28px)' },
+                    objectFit: 'contain', borderRadius: 1,
+                  }}
                 />
 
-                {/* cornice teal “glow” */}
+                {/* cornice: bordo teal "glow" arretrato dal bordo esterno, sul passe-partout scuro */}
                 <Box
                   sx={{
                     position: 'absolute',
-                    inset: 0,
+                    inset: { xs: 6, sm: 10 },
                     border: '2px solid rgba(14,165,164,0.75)',
                     boxShadow: '0 0 0 2px rgba(15,118,110,0.25) inset',
+                    borderRadius: 1,
                     pointerEvents: 'none',
                   }}
                 />
