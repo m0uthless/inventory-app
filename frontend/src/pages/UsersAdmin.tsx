@@ -1212,6 +1212,17 @@ export default function UsersAdmin() {
 
   const userColumns: GridColDef<AdminUserRow>[] = [
     {
+      field: 'login',
+      headerName: 'Login',
+      width: 140,
+      valueGetter: (_v, row) => row.username,
+      renderCell: (p) => (
+        <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(0,0,0,0.62)' }}>
+          {p.row.username}
+        </span>
+      ),
+    },
+    {
       field: 'username',
       headerName: 'Utente',
       flex: 1.3,
