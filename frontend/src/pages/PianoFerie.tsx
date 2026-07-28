@@ -740,6 +740,13 @@ export default function PianoFerie() {
   const [hoveredIso, setHoveredIso] = React.useState<string | null>(null)
   const hoveredDayIndex = hoveredIso != null ? dayIndexMap.get(hoveredIso) ?? null : null
 
+  // Colonna del giorno odierno, evidenziata in modo permanente (solo quando
+  // il mese/anno mostrato è quello corrente).
+  const todayIso = toISODate(today)
+  const todayDayIndex = (year === today.getFullYear() && month === today.getMonth())
+    ? dayIndexMap.get(todayIso) ?? null
+    : null
+
   // ── Drag: seleziona esattamente le fasce toccate (solo MAT, solo POM, o
   // entrambe se il trascinamento passa dall'una all'altra) su più giorni ────
   const [drag, setDrag] = React.useState<DragState | null>(null)
@@ -869,6 +876,18 @@ export default function PianoFerie() {
           ) : (
             <Box sx={{ overflowX: 'auto', pb: 1 }}>
               <Box sx={{ position: 'relative' }}>
+                {/* Colonna di oggi: overlay verticale permanente (sotto al
+                    fascio luminoso dell'hover), visibile solo quando il mese
+                    mostrato è quello corrente. */}
+                {todayDayIndex != null && (
+                  <Box sx={{
+                    position: 'absolute', top: 0, bottom: 0,
+                    left: `${192 + todayDayIndex * (cellW + 2)}px`, width: cellW,
+                    bgcolor: 'rgba(25,118,210,0.09)',
+                    border: '1px solid rgba(25,118,210,0.4)',
+                    borderRadius: '4px', pointerEvents: 'none', zIndex: 0,
+                  }} />
+                )}
                 {/* Fascio luminoso: un unico overlay verticale sopra l'intera
                     colonna (header + tutte le righe), invece di bordi sulle
                     singole celle. */}
@@ -886,6 +905,7 @@ export default function PianoFerie() {
                     const iso = toISODate(d)
                     const labels = headerHolidays.get(iso)
                     const weekend = isWeekend(d)
+                    const isToday = iso === todayIso
                     return (
                       <Tooltip key={iso} title={labels ? labels.join(', ') : ''} arrow disableHoverListener={!labels}>
                         <Box
@@ -893,10 +913,16 @@ export default function PianoFerie() {
                           onMouseLeave={() => setHoveredIso(null)}
                           sx={{ width: cellW, textAlign: 'center' }}
                         >
-                          <Typography sx={{ fontSize: '0.6rem', fontWeight: 600, color: (weekend || labels) ? 'error.main' : 'text.secondary', lineHeight: 1.2 }}>
+                          <Typography sx={{
+                            fontSize: '0.6rem', fontWeight: 700, lineHeight: 1.2,
+                            color: (weekend || labels) ? 'error.main' : isToday ? 'primary.main' : 'text.secondary',
+                          }}>
                             {d.getDate()}
                           </Typography>
-                          <Typography sx={{ fontSize: '0.5rem', fontWeight: 600, color: (weekend || labels) ? 'error.main' : 'text.disabled', letterSpacing: '0.02em', lineHeight: 1.2 }}>
+                          <Typography sx={{
+                            fontSize: '0.5rem', fontWeight: 600, letterSpacing: '0.02em', lineHeight: 1.2,
+                            color: (weekend || labels) ? 'error.main' : isToday ? 'primary.main' : 'text.disabled',
+                          }}>
                             {WEEKDAY_SHORT_IT[d.getDay()]}
                           </Typography>
                         </Box>
