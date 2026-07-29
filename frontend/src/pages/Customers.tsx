@@ -4,12 +4,7 @@ import {
   Button,
   Chip,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
-  TextField,
   Tooltip,
   Typography,
   List,
@@ -29,13 +24,11 @@ import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
-import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { useAuth } from '../auth/AuthProvider'
 import { api } from '@shared/api/client'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useCustomerKpis } from '../hooks/useCustomerKpis'
-import type { SelectChangeEvent } from '@mui/material/Select'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
@@ -46,7 +39,6 @@ import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import StatusChip from '@shared/ui/StatusChip'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
@@ -105,11 +97,6 @@ const navSectionButtonSx = {
   fontWeight: 600,
   '&:hover': { bgcolor: '#0f766e' },
 } as const
-
-const asId = (v: unknown): number | '' => {
-  const s = String(v)
-  return s === '' ? '' : Number(s)
-}
 
 type SiteMini = {
   id: number
@@ -740,6 +727,7 @@ export default function Customers() {
   const grid = useServerGrid({
     defaultOrdering: 'display_name',
     allowedOrderingFields: [
+      'id',
       'display_name',
       'status_label',
       'city',
@@ -784,8 +772,6 @@ export default function Customers() {
     return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
   }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
 
-  const [statusId, setStatusId] = useUrlNumberParam('status')
-  const [city, setCity] = useUrlStringParam('city')
   const [statuses, setStatuses] = React.useState<LookupItem[]>([])
 
   const listParams = React.useMemo(
@@ -798,10 +784,6 @@ export default function Customers() {
         pageSize: grid.paginationModel.pageSize,
         includeDeleted: grid.includeDeleted,
         onlyDeleted: grid.onlyDeleted,
-        extra: {
-          ...(statusId !== '' ? { status: statusId } : {}),
-          ...(city.trim() ? { city: city.trim() } : {}),
-        },
       }),
     [
       grid.search,
@@ -810,8 +792,6 @@ export default function Customers() {
       grid.paginationModel.pageSize,
       grid.includeDeleted,
       grid.onlyDeleted,
-      statusId,
-      city,
     ],
   )
 
@@ -1070,49 +1050,6 @@ export default function Customers() {
   }, [openVpnModal])
 
   // Configurazione filtri URL per il kebab menu delle colonne
-  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
-    status_label: {
-      value: statusId,
-      label: 'Filtra per stato',
-      onSet: (v) => setStatusId(v as number | '', { patch: { search: grid.q, page: 1 }, keepOpen: true }),
-      onReset: () => setStatusId('', { patch: { search: grid.q, page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
-          <InputLabel>Stato</InputLabel>
-          <Select
-            label="Stato"
-            value={statusId === '' ? '' : String(statusId)}
-            onChange={(e: SelectChangeEvent) => {
-              const v = asId(e.target.value)
-              setStatusId(v, { patch: { search: grid.q, page: 1 }, keepOpen: true })
-            }}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {statuses.map((s) => (
-              <MenuItem key={s.id} value={String(s.id)}>{s.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      ),
-    },
-    city: {
-      value: city,
-      label: 'Filtra per città',
-      onSet: (v) => setCity(String(v), { patch: { search: grid.q, page: 1 }, keepOpen: true }),
-      onReset: () => setCity('', { patch: { search: grid.q, page: 1 }, keepOpen: true }),
-      children: (
-        <TextField
-          size="small"
-          label="Città"
-          value={city}
-          onChange={(e) => setCity(e.target.value, { patch: { search: grid.q, page: 1 }, keepOpen: true })}
-          fullWidth
-          sx={{ mt: 0.5 }}
-        />
-      ),
-    },
-  }), [statusId, city, setStatusId, setCity, statuses, grid.q])
-
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
     return new URLSearchParams(loc.search).get('return')
@@ -1286,7 +1223,6 @@ export default function Customers() {
         grid={{
           pageKey: 'customers',
           username: me?.username,
-          filterConfig,
 
           emptyState,
           columnVisibilityModel: {},

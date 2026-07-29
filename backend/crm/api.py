@@ -206,6 +206,7 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
         "sites__address_line1",
     ]
     ordering_fields = [
+        "id",
         "code",
         "name",
         "display_name",

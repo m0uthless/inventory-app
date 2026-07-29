@@ -316,11 +316,19 @@ class CustomFieldsValidationMixin:
             attrs["custom_fields"] = normalized
         elif "custom_fields" in attrs:
             incoming = attrs.get("custom_fields")
+            # NB: quando il client include esplicitamente "custom_fields" nel
+            # payload (anche in una PATCH), invia sempre lo stato completo
+            # desiderato: il frontend (CustomFieldsEditor / setCustomFieldValue)
+            # rimuove del tutto la chiave per segnalare "campo cancellato",
+            # non la manda con valore vuoto. Va quindi trattato come
+            # sostituzione integrale (partial=False), non come merge coi
+            # valori esistenti — altrimenti le chiavi rimosse dall'utente
+            # restano "resuscitate" dal merge e non vengono mai cancellate.
             normalized = normalize_and_validate_custom_fields(
                 entity=self.custom_fields_entity,
                 incoming=incoming if incoming is not None else {},
                 existing=getattr(self.instance, "custom_fields", None) or {},
-                partial=bool(getattr(self, "partial", False)),
+                partial=False,
             )
             attrs["custom_fields"] = normalized
 
