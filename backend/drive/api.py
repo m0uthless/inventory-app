@@ -86,27 +86,6 @@ def fmt_size(size: int) -> str:
 MAX_UPLOAD_MB = int(os.environ.get("DRIVE_MAX_UPLOAD_MB", "25"))
 MAX_UPLOAD_SIZE = MAX_UPLOAD_MB * 1024 * 1024
 
-BLOCKED_EXTENSIONS = {
-    "exe",
-    "bat",
-    "cmd",
-    "com",
-    "msi",
-    "sh",
-    "bash",
-    "ps1",
-    "vbs",
-    "js",
-    "ts",
-    "php",
-    "py",
-    "rb",
-    "pl",
-    "jar",
-    "dll",
-    "so",
-}
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Folder serializers
@@ -233,45 +212,6 @@ class DriveFileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Il file è troppo grande ({human}). Dimensione massima consentita: {MAX_UPLOAD_MB} MB."
             )
-
-        _, ext = os.path.splitext(value.name)
-        ext_clean = ext.lower().lstrip(".")
-        if ext_clean in BLOCKED_EXTENSIONS:
-            raise serializers.ValidationError(
-                f"Il tipo di file '.{ext_clean}' non è consentito per motivi di sicurezza."
-            )
-
-        # Verifica MIME type reale del contenuto (non solo l'estensione).
-        # Previene il bypass via rinomina (es. script.php → script.txt).
-        if _MAGIC_AVAILABLE:
-            header = value.read(2048)
-            value.seek(0)
-            try:
-                real_mime = _magic.from_buffer(header, mime=True) or ""
-            except Exception:
-                real_mime = ""
-            # Lista di MIME type bloccati indipendentemente dall'estensione dichiarata.
-            BLOCKED_MIMES = {
-                "application/x-sh",
-                "application/x-shellscript",
-                "text/x-shellscript",
-                "application/x-php",
-                "application/x-httpd-php",
-                "text/x-php",
-                "application/x-python",
-                "text/x-python",
-                "application/x-ruby",
-                "application/x-perl",
-                "application/x-msdos-program",
-                "application/x-msdownload",
-                "application/x-dosexec",
-                "application/java-archive",
-                "application/x-java-archive",
-            }
-            if real_mime in BLOCKED_MIMES:
-                raise serializers.ValidationError(
-                    f"Il contenuto del file è di un tipo non consentito ({real_mime}). Rinominare l'estensione non aggira questo controllo."
-                )
 
         return value
 

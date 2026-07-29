@@ -3,7 +3,7 @@ import { Box, ButtonBase, Typography } from '@mui/material'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 
 import { useToast } from '@shared/ui/toast'
-import { MAX_UPLOAD_MB, MAX_UPLOAD_BYTES, BLOCKED_EXT } from './style'
+import { MAX_UPLOAD_MB, MAX_UPLOAD_BYTES } from './style'
 
 // ─── Upload Zone ──────────────────────────────────────────────────────────────
 
@@ -15,10 +15,7 @@ export function UploadZone({ onFiles }: { onFiles: (files: FileList) => void }) 
   const validate = (files: FileList): FileList | null => {
     const errors: string[] = []
     Array.from(files).forEach((f) => {
-      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
-      if (BLOCKED_EXT.has(ext)) {
-        errors.push(`"${f.name}" — tipo di file non consentito (.${ext})`)
-      } else if (f.size > MAX_UPLOAD_BYTES) {
+      if (f.size > MAX_UPLOAD_BYTES) {
         const mb = (f.size / 1024 / 1024).toFixed(1)
         errors.push(`"${f.name}" — troppo grande (${mb} MB, max ${MAX_UPLOAD_MB} MB)`)
       }

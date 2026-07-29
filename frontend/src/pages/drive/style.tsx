@@ -45,23 +45,3 @@ export function fileIconBg(mime?: string) {
 
 export const MAX_UPLOAD_MB = 25
 export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
-export const BLOCKED_EXT = new Set([
-  'exe',
-  'bat',
-  'cmd',
-  'com',
-  'msi',
-  'sh',
-  'bash',
-  'ps1',
-  'vbs',
-  'js',
-  'ts',
-  'php',
-  'py',
-  'rb',
-  'pl',
-  'jar',
-  'dll',
-  'so',
-])
