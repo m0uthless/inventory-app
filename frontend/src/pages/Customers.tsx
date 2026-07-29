@@ -552,6 +552,13 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
 function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<CustomerRow>[] {
   return [
   {
+    field: 'id',
+    headerName: 'ID',
+    width: 80,
+    align: 'right',
+    headerAlign: 'right',
+  },
+  {
     field: 'display_name',
     headerName: 'Cliente',
     flex: 1,
