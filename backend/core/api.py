@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
+from attendance.models import LeaveArea
+
 from core.models import (
     AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
     InventoryType, UserProfile, UserTask,
@@ -292,6 +294,13 @@ class UserTaskViewSet(viewsets.ModelViewSet):
 # duplicare il concetto con un modello "gruppo" separato.
 
 class AreaTaskSerializer(serializers.ModelSerializer):
+    # Scrivibile (necessario per permettere ai superuser di creare un task
+    # in un'area diversa dalla propria): la validazione di CHI può
+    # effettivamente scegliere l'area è nella view (perform_create), non qui.
+    area = serializers.PrimaryKeyRelatedField(
+        queryset=LeaveArea.objects.filter(deleted_at__isnull=True, is_active=True),
+        required=False,
+    )
     area_label      = serializers.CharField(source='area.label', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     can_edit        = serializers.SerializerMethodField()
@@ -303,7 +312,7 @@ class AreaTaskSerializer(serializers.ModelSerializer):
             'due_date', 'created_by', 'created_by_name', 'created_at',
             'updated_at', 'completed_at', 'can_edit',
         ]
-        read_only_fields = ['id', 'area', 'created_by', 'created_at', 'updated_at', 'completed_at']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'completed_at']
 
     def get_created_by_name(self, obj):
         if not obj.created_by_id:
@@ -315,7 +324,10 @@ class AreaTaskSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request:
             return False
-        user_area_id = getattr(getattr(request.user, 'profile', None), 'leave_area_id', None)
+        user = request.user
+        if getattr(user, 'is_superuser', False):
+            return True
+        user_area_id = getattr(getattr(user, 'profile', None), 'leave_area_id', None)
         return user_area_id is not None and user_area_id == obj.area_id
 
 
@@ -348,7 +360,13 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
         return getattr(getattr(user, 'profile', None), 'leave_area_id', None)
 
     def _check_own_area(self, area_id):
-        user_area_id = self._user_area_id(self.request.user)
+        """I superuser possono sempre gestire task di qualunque area; per
+        tutti gli altri l'area deve coincidere con quella del proprio
+        profilo (`UserProfile.leave_area`)."""
+        user = self.request.user
+        if getattr(user, 'is_superuser', False):
+            return area_id
+        user_area_id = self._user_area_id(user)
         if user_area_id is None or area_id != user_area_id:
             raise PermissionDenied(
                 "Puoi creare o modificare solo i task della tua area. "
@@ -357,8 +375,29 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
         return user_area_id
 
     def perform_create(self, serializer):
-        user_area_id = self._check_own_area(self._user_area_id(self.request.user))
-        serializer.save(created_by=self.request.user, area_id=user_area_id)
+        user = self.request.user
+        user_area_id = self._user_area_id(user)
+
+        if getattr(user, 'is_superuser', False):
+            # Il superuser può creare in una qualunque area: usa quella
+            # inviata dal client (il selettore area del widget), con
+            # fallback alla propria se non specificata.
+            chosen_area = serializer.validated_data.get('area')
+            area_id = chosen_area.id if chosen_area is not None else user_area_id
+            if not area_id:
+                raise PermissionDenied(
+                    "Specifica un'area: il tuo profilo non ne ha una assegnata."
+                )
+            serializer.save(created_by=user, area_id=area_id)
+            return
+
+        # Utenti normali: sempre e solo la propria area, a prescindere da
+        # cosa venga eventualmente inviato dal client.
+        if not user_area_id:
+            raise PermissionDenied(
+                "Nessuna area assegnata al tuo profilo: contatta un amministratore."
+            )
+        serializer.save(created_by=user, area_id=user_area_id)
 
     def perform_update(self, serializer):
         instance = serializer.instance
@@ -372,7 +411,10 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
         else:
             completed_at = instance.completed_at
 
-        serializer.save(completed_at=completed_at)
+        # L'area di un task non si cambia mai in modifica (nemmeno per il
+        # superuser): resta quella di creazione, a prescindere da cosa
+        # venga eventualmente inviato dal client.
+        serializer.save(completed_at=completed_at, area_id=instance.area_id)
 
     def perform_destroy(self, instance):
         self._check_own_area(instance.area_id)

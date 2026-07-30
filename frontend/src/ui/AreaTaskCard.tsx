@@ -124,7 +124,8 @@ export default function AreaTaskCard() {
   React.useEffect(() => { load(selectedArea) }, [selectedArea, load])
 
   const isOwnArea = selectedArea !== null && selectedArea === myAreaId
-  const readOnly = !isOwnArea
+  const isSuperuser = Boolean(me?.is_superuser)
+  const readOnly = !isOwnArea && !isSuperuser
 
   const addTask = async () => {
     const title = input.trim()
@@ -134,6 +135,10 @@ export default function AreaTaskCard() {
       const r = await api.post<AreaTask>('/area-tasks/', {
         title,
         due_date: dueDate || null,
+        // Rilevante solo per i superuser (possono creare in un'area diversa
+        // dalla propria): per gli utenti normali il backend forza comunque
+        // la propria area, ignorando questo valore.
+        area: selectedArea ?? undefined,
       })
       setTasks(prev => [r.data, ...prev])
       setInput('')
@@ -210,7 +215,7 @@ export default function AreaTaskCard() {
         </Box>
       )}
 
-      {!myAreaId && (
+      {!myAreaId && !isSuperuser && (
         <Box sx={{ px: 2, py: 0.75, bgcolor: 'warning.light', borderBottom: '1px solid', borderColor: 'divider' }}>
           <Typography variant="caption" sx={{ color: 'warning.dark' }}>
             Nessuna area assegnata al tuo profilo: contatta un amministratore per poter creare task.
@@ -231,7 +236,7 @@ export default function AreaTaskCard() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addTask() }}
-            placeholder={`Aggiungi un task per ${myAreaLabel ?? 'la tua area'}...`}
+            placeholder={`Aggiungi un task per ${isOwnArea ? (myAreaLabel ?? 'la tua area') : (areas.find(a => a.id === selectedArea)?.label ?? 'quest\'area')}...`}
             sx={{ flex: 1, fontSize: '0.82rem', color: 'text.primary' }}
             inputProps={{ maxLength: 200 }}
           />
