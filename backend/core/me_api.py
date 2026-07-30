@@ -148,6 +148,8 @@ class MeAPIView(APIView):
                 "avatar": avatar_url,
                 "preferred_customer": preferred_customer_id,
                 "preferred_customer_name": preferred_customer_name,
+                "leave_area": leave_area_id,
+                "leave_area_label": leave_area_label,
             },
         }
         return data

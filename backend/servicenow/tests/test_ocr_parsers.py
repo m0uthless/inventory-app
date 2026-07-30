@@ -12,8 +12,10 @@ from servicenow.ocr import (
     _find_value_words_for_label,
     _is_icon_artifact,
     _is_probable_label_or_icon_fragment,
+    _overlaps_existing,
     _parse_date,
     _parse_priority,
+    _project_to_native,
     _strip_icon_artifacts,
 )
 
@@ -145,6 +147,25 @@ def test_find_value_words_skips_icon_artifact_between_value_words():
     assert [w.text for w in value_words] == ["Nuovo", "profilo"]
 
 
+def test_find_value_words_keeps_short_real_word_despite_anomalous_height():
+    # Il filtro geometrico per altezza anomala NON va applicato qui (solo
+    # nel fallback Short Description — vedi _is_probable_label_or_icon_fragment):
+    # un token corto ma reale (es. "DI" in "CITTA DI UDINE") può avere una
+    # bounding-box tanto anomala quanto un'icona per un puro artefatto di
+    # Tesseract, pur essendo testo di valore legittimo. Qui si filtra solo
+    # per contenuto testuale (_is_icon_artifact), mai per geometria.
+    label = _Word(text="Account", left=0, top=0, right=50, bottom=10)
+    v1    = _Word(text="CITTA", left=55, top=0, right=90, bottom=8)
+    di    = _Word(text="DI", left=95, top=-11, right=105, bottom=17)  # altezza 28, come il caso reale
+    v2    = _Word(text="UDINE", left=110, top=0, right=145, bottom=8)
+    words = [label, v1, di, v2]
+
+    value_words = _find_value_words_for_label(
+        words, label, y_tolerance=15.0, max_label_gap=50.0, max_word_gap=10.0,
+    )
+    assert [w.text for w in value_words] == ["CITTA", "DI", "UDINE"]
+
+
 # ─── _is_probable_label_or_icon_fragment ──────────────────────────────────────
 # Usato solo nel fallback "Short" → valore quando "Description" non viene
 # rilevata a bassa risoluzione (vedi extract_servicenow_fields).
@@ -154,12 +175,21 @@ def test_find_value_words_skips_icon_artifact_between_value_words():
     ["Descrption|", "Description", "descr", "2", "|", "©"],
 )
 def test_is_probable_label_or_icon_fragment_true(text):
-    assert _is_probable_label_or_icon_fragment(text) is True
+    word = _Word(text=text, left=0, top=0, right=20, bottom=10)
+    assert _is_probable_label_or_icon_fragment(word, char_height=10.0) is True
 
 
 @pytest.mark.parametrize("text", ["Nuovo", "profilo", "Problema", "42gg"])
 def test_is_probable_label_or_icon_fragment_false_for_real_value_tokens(text):
-    assert _is_probable_label_or_icon_fragment(text) is False
+    word = _Word(text=text, left=0, top=0, right=20, bottom=10)
+    assert _is_probable_label_or_icon_fragment(word, char_height=10.0) is False
+
+
+def test_is_probable_label_or_icon_fragment_true_for_anomalous_height():
+    # Testo qualunque ("bette", non un frammento noto di label né un glifo
+    # icona riconosciuto) ma con altezza anomala rispetto al form: scartato.
+    word = _Word(text="bette", left=0, top=0, right=30, bottom=34)
+    assert _is_probable_label_or_icon_fragment(word, char_height=10.0) is True
 
 
 # ─── _estimate_char_height — soglia bassa risoluzione ─────────────────────────
@@ -173,3 +203,34 @@ def test_estimate_char_height_median_ignores_icon_outliers():
     heights = [8, 8, 9, 9, 9, 8, 28, 32, 28] * 3
     words = [_Word(text="x", left=0, top=0, right=5, bottom=h) for h in heights]
     assert _estimate_char_height(words) == pytest.approx(9.0)
+
+
+# ─── _project_to_native — merge multi-scala per screenshot a bassa risoluzione
+
+def test_project_to_native_divides_coordinates_by_scale():
+    word = _Word(text="Priority", left=200, top=100, right=300, bottom=130)
+    projected = _project_to_native(word, scale=2.5)
+    assert (projected.left, projected.top, projected.right, projected.bottom) == (80, 40, 120, 52)
+    assert projected.text == "Priority"
+
+
+# ─── _overlaps_existing — dedup geometrico (non testuale) tra pass a scale diverse
+
+def test_overlaps_existing_true_for_same_physical_region_different_text():
+    # Stessa area fisica, letta con testo diverso da due pass a scale
+    # diverse (es. 'CS0649645' vs '50649645' per lo stesso Number): deve
+    # essere riconosciuta come duplicato NONOSTANTE il testo sia diverso.
+    existing = [_Word(text="50649645", left=208, top=23, right=263, bottom=31)]
+    candidate = _Word(text="CS0649645", left=206, top=22, right=265, bottom=32)
+    assert _overlaps_existing(candidate, existing) is True
+
+
+def test_overlaps_existing_false_for_distinct_words():
+    existing = [_Word(text="Nuovo", left=45, top=0, right=80, bottom=10)]
+    candidate = _Word(text="profilo", left=91, top=0, right=130, bottom=10)
+    assert _overlaps_existing(candidate, existing) is False
+
+
+def test_overlaps_existing_false_when_no_existing_words():
+    candidate = _Word(text="Nuovo", left=45, top=0, right=80, bottom=10)
+    assert _overlaps_existing(candidate, []) is False

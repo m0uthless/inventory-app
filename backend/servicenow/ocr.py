@@ -107,14 +107,35 @@ REFINE_MAX_WORDS      = 2   # oltre, il crop largo peggiora la lettura: si salta
 # quella riga in un crop, Tesseract le legge correttamente. Ingrandire SEMPRE
 # l'immagine peggiora invece i casi normali (fonde colonne diverse — vedi
 # note in cima al file), quindi l'upscale si applica solo quando serve
-# davvero: se il primo pass nativo rileva un'altezza mediana del testo sotto
-# la soglia, si rifà un secondo pass su un'immagine ingrandita fino a portare
-# il testo alla dimensione "di comfort" per Tesseract, e si usa quel pass
-# solo se ha trovato *più* parole del pass nativo (mai un downgrade silenzioso).
+# davvero (testo nativo sotto soglia).
+#
+# Verificato empiricamente: NESSUNA singola scala fissa è affidabile — su
+# uno stesso screenshot, scale 2.4 può perdere "Short" mentre scale 2.44 lo
+# trova, scale 2.8 può perdere "Account" mentre scale 2.5 lo trova. Piccole
+# variazioni di scala (o di versione di Tesseract tra ambienti diversi)
+# spostano in modo imprevedibile quali parole isolate vengono lette — anche
+# provare 3-4 scale attorno a un'unica stima "di comfort" può cadere per
+# sfortuna proprio in una di queste "zone morte" (verificato: un pass basato
+# su multipli relativi di una singola scala target ha comunque perso "Short"
+# su un caso reale). Per questo si ingrandisce a un ventaglio più fitto di
+# altezze-target ASSOLUTE (non relative a una singola stima) e si uniscono le
+# parole trovate in un unico pool (proiettate nello spazio pixel
+# dell'immagine nativa, con deduplica geometrica): basta che una label venga
+# letta correttamente in UNA delle scale perché l'estrazione la trovi.
 LOW_RES_CHAR_HEIGHT_TRIGGER_PX = 14.0  # sotto questa altezza, il pass nativo è a rischio
-LOW_RES_TARGET_CHAR_HEIGHT_PX  = 22.0  # altezza di testo "di comfort" per Tesseract
+LOW_RES_TARGET_CHAR_HEIGHTS_PX = (15.0, 19.0, 23.0, 27.0, 31.0)  # ventaglio di altezze "di comfort"
 LOW_RES_MIN_SCALE              = 1.3
-LOW_RES_MAX_SCALE              = 3.0
+LOW_RES_MAX_SCALE              = 3.5
+
+# L'ancora "Short" del fallback (vedi LABEL_SHORTDESC_FALLBACK) proviene
+# spesso da un pass ingrandito dove si fonde con l'icona a tooltip adiacente:
+# la sua bounding-box verticale risulta più alta del testo reale, e il suo
+# centro può scivolare fuori dalla tolleranza verticale standard rispetto
+# al vero valore sulla stessa riga. Qui si usa una tolleranza più larga,
+# solo per questo fallback già "degradato".
+SHORTDESC_FALLBACK_Y_TOLERANCE_CHARS = 2.5
+LOW_RES_OVERLAP_DEDUP_RATIO    = 0.4  # quota minima di area sovrapposta per considerare
+                                       # due rilevazioni la stessa parola fisica
 
 # Glifi "icona" ricorrenti (lente di ricerca, freccine, ecc.) che Tesseract a
 # volte legge come parole isolate a sé stanti, tipicamente accanto ai campi
@@ -122,7 +143,12 @@ LOW_RES_MAX_SCALE              = 3.0
 # geometrica (non solo ripuliti in coda), perché possono comparire anche
 # all'inizio del valore (es. dopo un upscale che li rende visibili come
 # parola separata) — non solo alla fine.
-ICON_ARTIFACT_RE = re.compile(r"^[|Q©~»«•×✓✔›‹°®]+\.?$")
+ICON_ARTIFACT_RE = re.compile(r"^[|Q©~»«•×✓✔›‹°®\[\]]+\.?$")
+
+# Segnale geometrico complementare al testo: le icone lette male hanno quasi
+# sempre un'altezza molto maggiore del testo reale del form (osservato
+# ripetutamente in questo modulo: icone a 24-43px contro testo a 8-11px).
+MAX_ARTIFACT_HEIGHT_RATIO = 2.2
 
 
 @dataclass
@@ -178,6 +204,124 @@ def _estimate_char_height(words: list[_Word]) -> float:
     return statistics.median(heights)
 
 
+def _project_to_native(word: _Word, scale: float) -> _Word:
+    """Riproietta una parola letta su un'immagine ingrandita di `scale`
+    nello spazio pixel dell'immagine nativa, così parole trovate a scale
+    diverse possono convivere nello stesso pool geometrico."""
+    return _Word(
+        text=word.text,
+        left=round(word.left / scale),
+        top=round(word.top / scale),
+        right=round(word.right / scale),
+        bottom=round(word.bottom / scale),
+    )
+
+
+# Caratteri "puliti" attesi in un valore di campo reale (lettere anche
+# accentate, cifre, spazio, punteggiatura tipica di date/numeri). Tutto il
+# resto (~, (, ), €, backtick, ecc.) è quasi sempre rumore da icona/fusione
+# a bassa risoluzione, usato per scegliere la lettura migliore tra due
+# rilevazioni sovrapposte in _merge_low_res_words.
+_SUSPICIOUS_CHAR_RE = re.compile(r"[^0-9A-Za-zÀ-ÖØ-öø-ÿ\-/:.,]")
+
+
+def _is_better_reading(candidate_text: str, existing_text: str) -> bool:
+    """Confronta due letture OCR della stessa area fisica (stesso token,
+    riproiettato da scale diverse) e decide se `candidate_text` è
+    preferibile a `existing_text` già nel pool:
+    1. prima per MENO caratteri sospetti (rumore/simboli non tipici di un
+       valore di campo — es. '3~-' ha un carattere sospetto, '3' zero);
+    2. a parità di 'pulizia', per lunghezza MAGGIORE (più probabile sia una
+       lettura completa — es. 'Short' batte 'sr', entrambi puliti).
+    Puro confronto per lunghezza da solo sceglierebbe letture sporche più
+    lunghe invece di quelle corte ma corrette; puro 'tieni il primo trovato'
+    scarterebbe correzioni migliori arrivate da un pass successivo.
+    """
+    candidate_suspicious = len(_SUSPICIOUS_CHAR_RE.findall(candidate_text))
+    existing_suspicious  = len(_SUSPICIOUS_CHAR_RE.findall(existing_text))
+    if candidate_suspicious != existing_suspicious:
+        return candidate_suspicious < existing_suspicious
+    return len(candidate_text) > len(existing_text)
+
+
+def _find_overlap_index(candidate: _Word, existing: list[_Word]) -> Optional[int]:
+    """Ritorna l'indice della parola in `existing` che si sovrappone in modo
+    significativo a `candidate` (o None). Il dedup NON può basarsi sul
+    testo: la stessa area fisica letta a scale diverse può produrre testo
+    diverso (es. '50649645' vs 'CS0649645' vs '(€S0649645' per lo stesso
+    'Number', o 'sr' vs 'Short' per la stessa label) — è la posizione, non
+    il contenuto, a dire che è la stessa parola fisica rilevata due volte.
+
+    Il rapporto di sovrapposizione usa l'area PIÙ PICCOLA tra le due (non
+    quella del candidato): se il candidato è "gonfiato" da rumore fuso
+    (es. un'icona attaccata alla cifra vera, bounding-box più larga), usare
+    la sua area come denominatore diluirebbe il rapporto e la duplicazione
+    sfuggirebbe al filtro.
+    """
+    for i, w in enumerate(existing):
+        if candidate.left >= w.right or w.left >= candidate.right:
+            continue  # nessuna sovrapposizione orizzontale
+        vertical_overlap = min(candidate.bottom, w.bottom) - max(candidate.top, w.top)
+        if vertical_overlap <= 0:
+            continue
+        horizontal_overlap = min(candidate.right, w.right) - max(candidate.left, w.left)
+        candidate_area = max(1, (candidate.right - candidate.left) * (candidate.bottom - candidate.top))
+        existing_area  = max(1, (w.right - w.left) * (w.bottom - w.top))
+        overlap_area = horizontal_overlap * vertical_overlap
+        if overlap_area / min(candidate_area, existing_area) > LOW_RES_OVERLAP_DEDUP_RATIO:
+            return i
+    return None
+
+
+def _overlaps_existing(candidate: _Word, existing: list[_Word]) -> bool:
+    """Wrapper booleano su `_find_overlap_index`, usato dove serve solo
+    sapere SE c'è sovrapposizione (non l'indice)."""
+    return _find_overlap_index(candidate, existing) is not None
+
+
+def _merge_low_res_words(
+    pil_image: Image.Image, native_words: list[_Word], native_char_height: float,
+) -> list[_Word]:
+    """Ripete l'OCR su più copie ingrandite dell'immagine (un ventaglio di
+    altezze-target assolute — vedi LOW_RES_TARGET_CHAR_HEIGHTS_PX) e unisce
+    le parole trovate in un unico pool, proiettate nello spazio pixel
+    dell'immagine nativa e deduplicate per sovrapposizione geometrica (vedi
+    `_find_overlap_index`).
+
+    Nessuna scala fissa singola è affidabile (vedi note sulla costante più
+    sopra): basta che una label venga letta correttamente in UNA delle scale
+    perché l'estrazione la trovi. Quando due letture si sovrappongono si
+    tiene quella "migliore" secondo `_is_better_reading` (non semplicemente
+    la prima trovata): il pass nativo a volte legge una label come un
+    frammento troncato (es. 'sr' invece di 'Short'), e un pass successivo
+    più a fuoco la legge per intero — tenere sempre la prima getterebbe via
+    la lettura migliore; tenere sempre la più lunga sceglierebbe invece
+    letture sporche più lunghe (es. '3~-' invece di '3').
+    """
+    merged = list(native_words)
+
+    tried_scales: set = set()
+    for target in LOW_RES_TARGET_CHAR_HEIGHTS_PX:
+        scale = min(max(target / native_char_height, LOW_RES_MIN_SCALE), LOW_RES_MAX_SCALE)
+        rounded_scale = round(scale, 2)
+        if rounded_scale in tried_scales:
+            continue
+        tried_scales.add(rounded_scale)
+
+        upscaled_image = pil_image.resize(
+            (int(pil_image.width * scale), int(pil_image.height * scale)), Image.LANCZOS,
+        )
+        for w in _ocr_words(upscaled_image):
+            projected = _project_to_native(w, scale)
+            idx = _find_overlap_index(projected, merged)
+            if idx is None:
+                merged.append(projected)
+            elif _is_better_reading(projected.text, merged[idx].text):
+                merged[idx] = projected
+
+    return merged
+
+
 def _is_icon_artifact(word_text: str) -> bool:
     """True se la parola è verosimilmente un glifo-icona (lente di ricerca,
     freccina, ecc.) letto da Tesseract come testo isolato, non un token di
@@ -185,19 +329,36 @@ def _is_icon_artifact(word_text: str) -> bool:
     return bool(ICON_ARTIFACT_RE.match(word_text))
 
 
-def _is_probable_label_or_icon_fragment(word_text: str) -> bool:
+def _is_geometric_artifact(word: _Word, char_height: float) -> bool:
+    """Un'icona può anche essere letta con un testo qualsiasi (non
+    riconducibile a ICON_ARTIFACT_RE) ma con un bounding-box ANOMALO:
+    osservato empiricamente più volte in questo modulo, le icone lette
+    male hanno quasi sempre un'altezza 2-4 volte quella del testo reale
+    del form (che è pressoché costante). È un segnale più affidabile del
+    contenuto testuale, che a bassa risoluzione può essere qualunque cosa.
+    """
+    if char_height <= 0:
+        return False
+    return word.height > char_height * MAX_ARTIFACT_HEIGHT_RATIO
+
+
+def _is_word_artifact(word: _Word, char_height: float) -> bool:
+    return _is_icon_artifact(word.text) or _is_geometric_artifact(word, char_height)
+
+
+def _is_probable_label_or_icon_fragment(word: _Word, char_height: float) -> bool:
     """Usato solo nel fallback 'Short' → valore (vedi
     LABEL_SHORTDESC_FALLBACK): a bassa risoluzione, tra l'ancora 'Short' e
     il vero valore del campo possono comparire frammenti residui della
-    label composta 'Short Description' letta male (es. 'Descrption|') o
-    icone corte non alfabetiche (es. un '2' o un '|' isolati, tipicamente
-    dall'icona a tooltip accanto alla label). Vanno scartati prima di
-    iniziare a ricostruire il valore vero e proprio."""
-    if _is_icon_artifact(word_text):
+    label composta 'Short Description' letta male (es. 'Descrption|',
+    'bette', '7]' — il pass nativo spesso legge l'intera label+icona come
+    una sequenza di parole garbled) o icone isolate. Vanno scartati prima
+    di iniziare a ricostruire il valore vero e proprio."""
+    if _is_word_artifact(word, char_height):
         return True
-    if LABEL_FRAGMENT_RE.match(word_text):
+    if LABEL_FRAGMENT_RE.match(word.text):
         return True
-    if len(word_text) <= 2 and not word_text.isalpha():
+    if len(word.text) <= 2 and not word.text.isalpha():
         return True
     return False
 
@@ -231,10 +392,18 @@ def _find_value_words_for_label(
     verso destra a partire dalla label, fermandosi al primo gap orizzontale
     troppo ampio (passaggio a un altro campo/un'altra colonna del form).
 
-    I glifi-icona (lente di ricerca, ecc. — vedi `_is_icon_artifact`) restano
-    nel cammino come "punti di appoggio" per il calcolo dei gap (altrimenti
-    un'icona in mezzo a due parole del valore spezzerebbe il valore a metà),
-    ma vengono esclusi dall'elenco restituito: non sono mai testo di valore.
+    I glifi-icona riconoscibili dal testo (vedi `_is_icon_artifact`)
+    restano nel cammino come "punti di appoggio" per il calcolo dei gap
+    (altrimenti un'icona in mezzo a due parole del valore spezzerebbe il
+    valore a metà), ma vengono esclusi dall'elenco restituito.
+
+    NOTA: qui si filtra solo per testo, non per l'anomalia di altezza
+    (`_is_geometric_artifact`) — quel controllo aggiuntivo è confinato al
+    solo fallback di Short Description (`_is_probable_label_or_icon_fragment`)
+    perché si è rivelato troppo aggressivo su questo percorso generale:
+    token legittimi ma corti (es. 'DI' in 'CITTA DI UDINE') possono avere
+    bounding-box altrettanto anomale per un artefatto di Tesseract, pur
+    essendo testo di valore reale.
     """
     candidates = [
         w for w in words
@@ -345,21 +514,19 @@ def extract_servicenow_fields(pil_image: Image.Image) -> ServiceNowExtractResult
 
     # Pass di recupero per screenshot a bassa risoluzione: se il testo è
     # troppo piccolo, la segmentazione automatica di Tesseract sull'immagine
-    # intera può "perdere" label isolate (vedi note sulla costante più sopra).
-    # Si riprova su una copia ingrandita e si usa quel pass SOLO se ha
-    # effettivamente trovato più parole di quello nativo — mai un downgrade
-    # silenzioso se l'upscale non aiuta.
+    # intera può "perdere" label isolate in modo imprevedibile e sensibile
+    # alla scala esatta (vedi note sulle costanti più sopra). Si arricchisce
+    # il pool di parole con più pass a scale diverse invece di scommettere
+    # su un singolo pass sostitutivo — non è mai un downgrade: il pass
+    # nativo resta sempre incluso nel pool.
     if words and char_height < LOW_RES_CHAR_HEIGHT_TRIGGER_PX:
-        scale = LOW_RES_TARGET_CHAR_HEIGHT_PX / char_height
-        scale = min(max(scale, LOW_RES_MIN_SCALE), LOW_RES_MAX_SCALE)
-        upscaled_image = pil_image.resize(
-            (int(pil_image.width * scale), int(pil_image.height * scale)), Image.LANCZOS,
-        )
-        upscaled_words = _ocr_words(upscaled_image)
-        if len(upscaled_words) > len(words):
-            pil_image = upscaled_image
-            words = upscaled_words
-            char_height = _estimate_char_height(words)
+        words = _merge_low_res_words(pil_image, words, char_height)
+        # NON si ricalcola char_height dal pool unito: i pass di recupero
+        # aggiungono spesso artefatti con bounding-box enormi (icone, testo
+        # fuso — vedi MAX_ARTIFACT_HEIGHT_RATIO) che sposterebbero la
+        # mediana verso l'alto e indebolirebbero a cascata tutte le soglie
+        # geometriche a valle. Si resta ancorati alla dimensione del testo
+        # REALE misurata nel pass nativo.
 
     # Calibrazione elastica: le soglie si adattano alla dimensione del testo
     # rilevato in QUESTO screenshot, non a una frazione fissa dell'immagine.
@@ -409,9 +576,10 @@ def extract_servicenow_fields(pil_image: Image.Image) -> ServiceNowExtractResult
         if short_label is not None:
             candidate_words = _find_value_words_for_label(
                 words, short_label,
-                y_tolerance=y_tolerance, max_label_gap=max_label_gap, max_word_gap=max_word_gap,
+                y_tolerance=char_height * SHORTDESC_FALLBACK_Y_TOLERANCE_CHARS,
+                max_label_gap=max_label_gap, max_word_gap=max_word_gap,
             )
-            while candidate_words and _is_probable_label_or_icon_fragment(candidate_words[0].text):
+            while candidate_words and _is_probable_label_or_icon_fragment(candidate_words[0], char_height):
                 candidate_words = candidate_words[1:]
             result.short_description = " ".join(w.text for w in candidate_words).strip() or None
 
