@@ -1,5 +1,9 @@
+from datetime import timedelta
+
 from django.utils import timezone
 from rest_framework import serializers, viewsets, status
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
@@ -8,7 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
 from core.models import (
-    Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
+    AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
     InventoryType, UserProfile, UserTask,
 )
 
@@ -279,3 +283,116 @@ class UserTaskViewSet(viewsets.ModelViewSet):
         done = serializer.validated_data.get('done', instance.done)
         done_at = timezone.now() if done and not instance.done else (None if not done else instance.done_at)
         serializer.save(done_at=done_at)
+
+
+# ─── AreaTask ───────────────────────────────────────────────────────────────
+# Task specifici per area organizzativa (dashboard). L'area è la stessa già
+# usata per il Piano Ferie (`attendance.LeaveArea`, vedi `UserProfile.leave_area`):
+# ogni utente appartiene a una sola area, riusata qui per evitare di
+# duplicare il concetto con un modello "gruppo" separato.
+
+class AreaTaskSerializer(serializers.ModelSerializer):
+    area_label      = serializers.CharField(source='area.label', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    can_edit        = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = AreaTask
+        fields = [
+            'id', 'area', 'area_label', 'title', 'description', 'status',
+            'due_date', 'created_by', 'created_by_name', 'created_at',
+            'updated_at', 'completed_at', 'can_edit',
+        ]
+        read_only_fields = ['id', 'area', 'created_by', 'created_at', 'updated_at', 'completed_at']
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by_id:
+            return None
+        u = obj.created_by
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+    def get_can_edit(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return False
+        user_area_id = getattr(getattr(request.user, 'profile', None), 'leave_area_id', None)
+        return user_area_id is not None and user_area_id == obj.area_id
+
+
+class AreaTaskViewSet(viewsets.ModelViewSet):
+    """
+    Task di area per la dashboard. Lettura: tutte le aree, a chiunque sia
+    autenticato (sola lettura sulle aree diverse dalla propria). Scrittura
+    (create/update/delete): solo sui task della propria area
+    (`request.user.profile.leave_area`).
+
+    I task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS` giorni
+    sono esclusi dalla lista di default (restano in DB, non cancellati) —
+    passare `?include_hidden=1` per vederli comunque.
+    """
+    serializer_class   = AreaTaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = AreaTask.objects.select_related('area', 'created_by').all()
+        area_param = self.request.query_params.get('area')
+        if area_param:
+            qs = qs.filter(area_id=area_param)
+        if self.request.query_params.get('include_hidden') != '1':
+            hide_before = timezone.now() - timedelta(days=AreaTask.HIDE_COMPLETED_AFTER_DAYS)
+            qs = qs.exclude(status=AreaTask.STATUS_COMPLETATO, completed_at__lt=hide_before)
+        return qs
+
+    @staticmethod
+    def _user_area_id(user):
+        return getattr(getattr(user, 'profile', None), 'leave_area_id', None)
+
+    def _check_own_area(self, area_id):
+        user_area_id = self._user_area_id(self.request.user)
+        if user_area_id is None or area_id != user_area_id:
+            raise PermissionDenied(
+                "Puoi creare o modificare solo i task della tua area. "
+                "Se non hai un'area assegnata, contatta un amministratore."
+            )
+        return user_area_id
+
+    def perform_create(self, serializer):
+        user_area_id = self._check_own_area(self._user_area_id(self.request.user))
+        serializer.save(created_by=self.request.user, area_id=user_area_id)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        self._check_own_area(instance.area_id)
+
+        new_status = serializer.validated_data.get('status', instance.status)
+        if new_status == AreaTask.STATUS_COMPLETATO and instance.status != AreaTask.STATUS_COMPLETATO:
+            completed_at = timezone.now()
+        elif new_status != AreaTask.STATUS_COMPLETATO:
+            completed_at = None
+        else:
+            completed_at = instance.completed_at
+
+        serializer.save(completed_at=completed_at)
+
+    def perform_destroy(self, instance):
+        self._check_own_area(instance.area_id)
+        instance.delete()
+
+    @action(detail=False, methods=['get'])
+    def due(self, request):
+        """
+        Task della propria area, non completati, con scadenza entro domani
+        (inclusa) o già scaduta. Usati dalla campanella "Scadenze" in header.
+        """
+        user_area_id = self._user_area_id(request.user)
+        if not user_area_id:
+            return Response([])
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        qs = (
+            AreaTask.objects
+            .filter(area_id=user_area_id, due_date__isnull=False, due_date__lte=tomorrow)
+            .exclude(status=AreaTask.STATUS_COMPLETATO)
+            .select_related('area')
+            .order_by('due_date')
+        )
+        return Response(AreaTaskSerializer(qs, many=True, context={'request': request}).data)

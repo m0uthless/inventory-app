@@ -78,7 +78,11 @@ LABEL_NUMBER    = re.compile(r"\bnumber\b", re.IGNORECASE)
 LABEL_ACCOUNT   = re.compile(r"\baccount\b", re.IGNORECASE)
 LABEL_PRIORITY  = re.compile(r"\bpriority\b", re.IGNORECASE)
 LABEL_OPENED    = re.compile(r"\bopened\b", re.IGNORECASE)
-LABEL_SHORTDESC = re.compile(r"description", re.IGNORECASE)
+LABEL_SHORTDESC          = re.compile(r"description", re.IGNORECASE)
+# A bassissima risoluzione "Description" a volte non viene letta affatto
+# mentre "Short" sì: usato come ancora di riserva (vedi extract_servicenow_fields).
+LABEL_SHORTDESC_FALLBACK = re.compile(r"\bshort\b", re.IGNORECASE)
+LABEL_FRAGMENT_RE        = re.compile(r"^descr", re.IGNORECASE)
 
 DATE_RE = re.compile(r"(\d{2})[-/](\d{2})[-/](\d{4})")
 
@@ -95,6 +99,30 @@ REFINE_PADDING_X_PX  = 4
 REFINE_SCALE          = 3.0
 REFINE_MIN_HEIGHT_PX  = 5   # sotto questa altezza, il testo non è leggibile in alcun modo
 REFINE_MAX_WORDS      = 2   # oltre, il crop largo peggiora la lettura: si salta la rifinitura
+
+# ─── Pass di recupero per screenshot a bassa risoluzione ─────────────────────
+# Screenshot molto compressi/piccoli (testo <~12-14px di altezza) mandano in
+# crisi la segmentazione automatica "a pagina intera" di Tesseract: alcune
+# label isolate (es. "Priority", "Opened") vengono scartate anche se, isolando
+# quella riga in un crop, Tesseract le legge correttamente. Ingrandire SEMPRE
+# l'immagine peggiora invece i casi normali (fonde colonne diverse — vedi
+# note in cima al file), quindi l'upscale si applica solo quando serve
+# davvero: se il primo pass nativo rileva un'altezza mediana del testo sotto
+# la soglia, si rifà un secondo pass su un'immagine ingrandita fino a portare
+# il testo alla dimensione "di comfort" per Tesseract, e si usa quel pass
+# solo se ha trovato *più* parole del pass nativo (mai un downgrade silenzioso).
+LOW_RES_CHAR_HEIGHT_TRIGGER_PX = 14.0  # sotto questa altezza, il pass nativo è a rischio
+LOW_RES_TARGET_CHAR_HEIGHT_PX  = 22.0  # altezza di testo "di comfort" per Tesseract
+LOW_RES_MIN_SCALE              = 1.3
+LOW_RES_MAX_SCALE              = 3.0
+
+# Glifi "icona" ricorrenti (lente di ricerca, freccine, ecc.) che Tesseract a
+# volte legge come parole isolate a sé stanti, tipicamente accanto ai campi
+# con lookup. Vengono scartati come CANDIDATI valore fin dalla ricostruzione
+# geometrica (non solo ripuliti in coda), perché possono comparire anche
+# all'inizio del valore (es. dopo un upscale che li rende visibili come
+# parola separata) — non solo alla fine.
+ICON_ARTIFACT_RE = re.compile(r"^[|Q©~»«•×✓✔›‹°®]+\.?$")
 
 
 @dataclass
@@ -150,6 +178,30 @@ def _estimate_char_height(words: list[_Word]) -> float:
     return statistics.median(heights)
 
 
+def _is_icon_artifact(word_text: str) -> bool:
+    """True se la parola è verosimilmente un glifo-icona (lente di ricerca,
+    freccina, ecc.) letto da Tesseract come testo isolato, non un token di
+    valore reale."""
+    return bool(ICON_ARTIFACT_RE.match(word_text))
+
+
+def _is_probable_label_or_icon_fragment(word_text: str) -> bool:
+    """Usato solo nel fallback 'Short' → valore (vedi
+    LABEL_SHORTDESC_FALLBACK): a bassa risoluzione, tra l'ancora 'Short' e
+    il vero valore del campo possono comparire frammenti residui della
+    label composta 'Short Description' letta male (es. 'Descrption|') o
+    icone corte non alfabetiche (es. un '2' o un '|' isolati, tipicamente
+    dall'icona a tooltip accanto alla label). Vanno scartati prima di
+    iniziare a ricostruire il valore vero e proprio."""
+    if _is_icon_artifact(word_text):
+        return True
+    if LABEL_FRAGMENT_RE.match(word_text):
+        return True
+    if len(word_text) <= 2 and not word_text.isalpha():
+        return True
+    return False
+
+
 def _find_label_word(words: list[_Word], label_re: re.Pattern) -> Optional[_Word]:
     """Ritorna, tra tutte le parole il cui testo corrisponde alla label,
     quella più in alto (top minore). Il match è a livello di SINGOLA parola
@@ -178,6 +230,11 @@ def _find_value_words_for_label(
     """Ricostruisce le parole del valore associato a una label camminando
     verso destra a partire dalla label, fermandosi al primo gap orizzontale
     troppo ampio (passaggio a un altro campo/un'altra colonna del form).
+
+    I glifi-icona (lente di ricerca, ecc. — vedi `_is_icon_artifact`) restano
+    nel cammino come "punti di appoggio" per il calcolo dei gap (altrimenti
+    un'icona in mezzo a due parole del valore spezzerebbe il valore a metà),
+    ma vengono esclusi dall'elenco restituito: non sono mai testo di valore.
     """
     candidates = [
         w for w in words
@@ -193,12 +250,13 @@ def _find_value_words_for_label(
     if first.left - label_word.right > max_label_gap:
         return []
 
-    value_words = [first]
+    value_words = [] if _is_icon_artifact(first.text) else [first]
     prev = first
     for w in candidates[1:]:
         if w.left - prev.right > max_word_gap:
             break
-        value_words.append(w)
+        if not _is_icon_artifact(w.text):
+            value_words.append(w)
         prev = w
     return value_words
 
@@ -283,10 +341,28 @@ def extract_servicenow_fields(pil_image: Image.Image) -> ServiceNowExtractResult
     _require_tesseract()
 
     words = _ocr_words(pil_image)
+    char_height = _estimate_char_height(words)
+
+    # Pass di recupero per screenshot a bassa risoluzione: se il testo è
+    # troppo piccolo, la segmentazione automatica di Tesseract sull'immagine
+    # intera può "perdere" label isolate (vedi note sulla costante più sopra).
+    # Si riprova su una copia ingrandita e si usa quel pass SOLO se ha
+    # effettivamente trovato più parole di quello nativo — mai un downgrade
+    # silenzioso se l'upscale non aiuta.
+    if words and char_height < LOW_RES_CHAR_HEIGHT_TRIGGER_PX:
+        scale = LOW_RES_TARGET_CHAR_HEIGHT_PX / char_height
+        scale = min(max(scale, LOW_RES_MIN_SCALE), LOW_RES_MAX_SCALE)
+        upscaled_image = pil_image.resize(
+            (int(pil_image.width * scale), int(pil_image.height * scale)), Image.LANCZOS,
+        )
+        upscaled_words = _ocr_words(upscaled_image)
+        if len(upscaled_words) > len(words):
+            pil_image = upscaled_image
+            words = upscaled_words
+            char_height = _estimate_char_height(words)
 
     # Calibrazione elastica: le soglie si adattano alla dimensione del testo
     # rilevato in QUESTO screenshot, non a una frazione fissa dell'immagine.
-    char_height   = _estimate_char_height(words)
     y_tolerance   = char_height * Y_TOLERANCE_CHARS
     max_label_gap = char_height * MAX_LABEL_TO_VALUE_CHARS
     max_word_gap  = char_height * MAX_WORD_GAP_CHARS
@@ -321,7 +397,23 @@ def extract_servicenow_fields(pil_image: Image.Image) -> ServiceNowExtractResult
     opened_raw = value_for(_find_label_word(words, LABEL_OPENED))
     result.opened_date = _parse_date(opened_raw)
 
-    result.short_description = value_for(_find_label_word(words, LABEL_SHORTDESC), allow_refine=False)
+    shortdesc_label = _find_label_word(words, LABEL_SHORTDESC)
+    if shortdesc_label is not None:
+        result.short_description = value_for(shortdesc_label, allow_refine=False)
+    else:
+        # Fallback per screenshot a bassa risoluzione dove "Description" non
+        # viene rilevata affatto ma "Short" sì: si riparte da "Short"
+        # scartando gli eventuali frammenti di label/icona residui prima del
+        # vero valore (vedi _is_probable_label_or_icon_fragment).
+        short_label = _find_label_word(words, LABEL_SHORTDESC_FALLBACK)
+        if short_label is not None:
+            candidate_words = _find_value_words_for_label(
+                words, short_label,
+                y_tolerance=y_tolerance, max_label_gap=max_label_gap, max_word_gap=max_word_gap,
+            )
+            while candidate_words and _is_probable_label_or_icon_fragment(candidate_words[0].text):
+                candidate_words = candidate_words[1:]
+            result.short_description = " ".join(w.text for w in candidate_words).strip() or None
 
     if not result.number:
         result.warnings.append("Campo 'Number' non riconosciuto, verificare manualmente.")

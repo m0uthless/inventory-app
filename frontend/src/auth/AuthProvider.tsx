@@ -17,6 +17,8 @@ export type Me = {
     avatar: string | null
     preferred_customer: number | null
     preferred_customer_name?: string | null
+    leave_area?: number | null
+    leave_area_label?: string | null
   }
 }
 

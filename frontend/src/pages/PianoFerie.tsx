@@ -338,6 +338,10 @@ function AreaGroup({
   cellH: number
 }) {
   const nameColW = 190
+  // Riga sotto hover, per l'evidenziazione della riga (nome tecnico + celle
+  // giorno), analoga al fascio luminoso già presente per la colonna.
+  const [hoveredUserId, setHoveredUserId] = React.useState<number | null>(null)
+  const ROW_HOVER_BG = 'rgba(25,118,210,0.07)'
   return (
     <Box sx={{ mb: 1 }}>
       <Box
@@ -356,12 +360,19 @@ function AreaGroup({
         <Stack spacing="2px">
           {users.map((u) => {
             const editable = canEditRow(u.id)
+            const rowHovered = hoveredUserId === u.id
             return (
-              <Box key={u.id} sx={{ display: 'flex', alignItems: 'stretch', gap: '2px' }}>
+              <Box
+                key={u.id}
+                onMouseEnter={() => setHoveredUserId(u.id)}
+                onMouseLeave={() => setHoveredUserId((cur) => (cur === u.id ? null : cur))}
+                sx={{ display: 'flex', alignItems: 'stretch', gap: '2px' }}
+              >
                 <Box sx={{
                   position: 'sticky', left: 0, zIndex: 1, width: nameColW, minWidth: nameColW,
                   display: 'flex', alignItems: 'center', px: 1,
-                  bgcolor: 'background.paper', borderRight: '1px solid', borderColor: 'divider',
+                  bgcolor: rowHovered ? ROW_HOVER_BG : 'background.paper',
+                  borderRight: '1px solid', borderColor: 'divider',
                 }}>
                   <Typography noWrap sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{u.name}</Typography>
                 </Box>
@@ -375,7 +386,7 @@ function AreaGroup({
                       onMouseLeave={() => onHoverDay(null)}
                       sx={{
                         py: '1px',
-                        bgcolor: isWeekend(d) ? 'action.hover' : 'transparent',
+                        bgcolor: rowHovered ? ROW_HOVER_BG : (isWeekend(d) ? 'action.hover' : 'transparent'),
                       }}
                     >
                       <DayCell

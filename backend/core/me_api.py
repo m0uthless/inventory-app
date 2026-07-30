@@ -96,7 +96,7 @@ class MeAPIView(APIView):
     def _get_profile(self, user):
         """Restituisce il profilo con select_related per evitare query N+1."""
         try:
-            return UserProfile.objects.select_related("preferred_customer").get(user=user)
+            return UserProfile.objects.select_related("preferred_customer", "leave_area").get(user=user)
         except UserProfile.DoesNotExist:
             return None
 
@@ -107,6 +107,8 @@ class MeAPIView(APIView):
         avatar_url = None
         preferred_customer_id = None
         preferred_customer_name = None
+        leave_area_id = None
+        leave_area_label = None
 
         if profile is not None:
             if profile.avatar:
@@ -123,6 +125,14 @@ class MeAPIView(APIView):
                     preferred_customer_name = profile.preferred_customer.name
                 except Exception:
                     preferred_customer_name = None
+
+            if profile.leave_area_id:
+                leave_area_id = profile.leave_area_id
+                # leave_area già in JOIN grazie a select_related: nessuna query extra
+                try:
+                    leave_area_label = profile.leave_area.label
+                except Exception:
+                    leave_area_label = None
 
         data = {
             "id": user.id,

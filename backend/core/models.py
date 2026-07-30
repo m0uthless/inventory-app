@@ -266,3 +266,58 @@ class UserTask(models.Model):
 
     def __str__(self):
         return f"{self.user} — {self.text[:40]}"
+
+
+class AreaTask(models.Model):
+    """Task specifico di un'area organizzativa (stessa `attendance.LeaveArea`
+    già usata come area del profilo utente — vedi `UserProfile.leave_area`).
+
+    Chiunque appartenga all'area può creare/modificare/chiudere i task della
+    propria area; le altre aree sono visibili in sola lettura. I task
+    completati vengono nascosti dalle liste 3 giorni dopo il completamento
+    (filtro in `get_queryset` della viewset), ma restano in DB.
+    """
+
+    STATUS_DA_FARE    = 'da_fare'
+    STATUS_IN_CORSO   = 'in_corso'
+    STATUS_COMPLETATO = 'completato'
+    STATUS_CHOICES = [
+        (STATUS_DA_FARE, 'Da fare'),
+        (STATUS_IN_CORSO, 'In corso'),
+        (STATUS_COMPLETATO, 'Completato'),
+    ]
+
+    # Nascondi i task completati dalle liste dopo N giorni dal completamento.
+    HIDE_COMPLETED_AFTER_DAYS = 3
+
+    area = models.ForeignKey(
+        'attendance.LeaveArea',
+        on_delete=models.CASCADE,
+        related_name='tasks',
+        verbose_name='Area',
+    )
+    title       = models.CharField(max_length=200, verbose_name='Titolo')
+    description = models.TextField(blank=True, verbose_name='Descrizione')
+    status      = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_DA_FARE, verbose_name='Stato',
+    )
+    due_date = models.DateField(null=True, blank=True, verbose_name='Scadenza')
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='created_area_tasks',
+        verbose_name='Creato da',
+    )
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Task di area'
+        verbose_name_plural = 'Task di area'
+        ordering = ['status', 'due_date', '-created_at']
+
+    def __str__(self):
+        return f"[{self.area}] {self.title[:40]}"

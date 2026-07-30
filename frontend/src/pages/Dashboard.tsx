@@ -5,15 +5,17 @@ import ContributorCard from '../ui/ContributorCard'
 import RecentIssuesCard from '../ui/RecentIssuesCard'
 import AnnouncementsCard from '../ui/AnnouncementsCard'
 import TodoCard from '../ui/TodoCard'
+import AreaTaskCard from '../ui/AreaTaskCard'
 import MaintenanceAlertsCard from '../ui/MaintenanceAlertsCard'
 
 // ─── Widget carousel (mobile) ─────────────────────────────────────────────────
 
 const WIDGETS = [
   <RecentIssuesCard key="issues" />,
-  <MaintenanceAlertsCard key="maintenance" />,
+  <AreaTaskCard key="area-tasks" />,
   <AnnouncementsCard key="announcements" />,
   <TodoCard key="todo" />,
+  <MaintenanceAlertsCard key="maintenance" />,
 ]
 const TOTAL = WIDGETS.length
 
@@ -84,13 +86,18 @@ export default function Dashboard() {
       {/* Riga 2: desktop = griglia 2 colonne, mobile = carousel swipe */}
       <Box sx={{ display: { xs: 'none', md: 'grid' }, gridTemplateColumns: '1fr 1fr', gap: 2, alignItems: 'stretch' }}>
         <RecentIssuesCard />
-        <MaintenanceAlertsCard />
+        <AreaTaskCard />
       </Box>
 
       {/* Riga 3: desktop = griglia 2 colonne */}
       <Box sx={{ display: { xs: 'none', md: 'grid' }, gridTemplateColumns: '1fr 1fr', gap: 2, alignItems: 'stretch' }}>
         <AnnouncementsCard />
         <TodoCard />
+      </Box>
+
+      {/* Riga 4: scadenze manutenzione (desktop) */}
+      <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+        <MaintenanceAlertsCard />
       </Box>
 
       {/* Mobile: carousel swipe */}

@@ -33,7 +33,7 @@ import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import AppFooter from './AppFooter'
 import GlobalSearch from './GlobalSearch'
-import MaintenanceNotificationBell from './MaintenanceNotificationBell'
+import NotificationsBell from './NotificationsBell'
 import AppSpeedDial from './AppSpeedDial'
 import MobileBottomNavArchie from './MobileBottomNavArchie'
 import { SIDEBAR } from '../theme/tokens'
@@ -798,7 +798,7 @@ export function AppLayout() {
             <GlobalSearch onEggTrigger={openEgg} />
 
             {/* Maintenance notification bell */}
-            <MaintenanceNotificationBell enabled={Boolean(me)} />
+            <NotificationsBell enabled={Boolean(me)} />
 
             {/* User avatar dopo search/+ */}
             <Tooltip title={displayName}>
