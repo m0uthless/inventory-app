@@ -40,6 +40,9 @@ import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '@shared/ui/LockScreen'
 import { SiteRepoV2Provider } from '../features/siterepov2/SiteRepoV2Context'
+import { DashboardEditModeProvider, useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
+import DashboardCustomizeOutlinedIcon from '@mui/icons-material/DashboardCustomizeOutlined'
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 
 import {
   type NavItem,
@@ -86,6 +89,40 @@ type IssueSummary = {
   resolved_count: number
   closed_count: number
   active_count: number
+}
+
+// Spegne automaticamente la modalità "Personalizza" quando si esce dalla
+// route della dashboard (evita che il toggle resti "acceso" in background
+// se l'utente naviga via senza disattivarlo esplicitamente dal menu).
+// NB: eventuali modifiche di layout non ancora salvate in quel momento non
+// vengono persistite — il salvataggio avviene solo allo spegnimento
+// esplicito del toggle, vedi DynamicDesktopLayout in pages/Dashboard.tsx.
+function DashboardEditModeRouteGuard({ isDashboardRoute }: { isDashboardRoute: boolean }) {
+  const { editMode, setEditMode } = useDashboardEditMode()
+  React.useEffect(() => {
+    if (!isDashboardRoute && editMode) setEditMode(false)
+  }, [isDashboardRoute, editMode, setEditMode])
+  return null
+}
+
+// Voce di menu "Personalizza dashboard": componente separato perché deve
+// leggere il context DashboardEditModeProvider, che avvolge il return di
+// AppLayout (quindi non è ancora disponibile nel corpo della funzione
+// AppLayout stessa al momento in cui costruisce il JSX del <Menu>).
+function DashboardEditToggleMenuItem({ isDashboardRoute, onClose }: { isDashboardRoute: boolean; onClose: () => void }) {
+  const { editMode, toggleEditMode } = useDashboardEditMode()
+  if (!isDashboardRoute) return null
+  return (
+    <MenuItem
+      onClick={() => { onClose(); toggleEditMode() }}
+      sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
+    >
+      {editMode
+        ? <CheckCircleOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+        : <DashboardCustomizeOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
+      {editMode ? 'Fine personalizzazione' : 'Personalizza dashboard'}
+    </MenuItem>
+  )
 }
 
 export function AppLayout() {
@@ -741,6 +778,7 @@ export function AppLayout() {
   )
 
   return (
+    <DashboardEditModeProvider>
     <SiteRepoV2Provider>
     <Box
       sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}
@@ -936,6 +974,11 @@ export function AppLayout() {
           list: { dense: true, sx: { py: 0 } },
         }}
       >
+        <DashboardEditToggleMenuItem
+          isDashboardRoute={loc.pathname === '/'}
+          onClose={() => setUserAnchorEl(null)}
+        />
+
         <MenuItem
           onClick={() => {
             setUserAnchorEl(null)
@@ -1044,6 +1087,7 @@ export function AppLayout() {
         {loc.pathname === '/site-repository' && <Box sx={{ height: 56, flexShrink: 0 }} />}
 
         <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0, bgcolor: 'background.default' }}>
+          <DashboardEditModeRouteGuard isDashboardRoute={loc.pathname === '/'} />
           <Outlet />
         </Box>
 
@@ -1127,5 +1171,6 @@ export function AppLayout() {
       </React.Suspense>
     </Box>
     </SiteRepoV2Provider>
+    </DashboardEditModeProvider>
   )
 }

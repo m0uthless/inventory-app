@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers, viewsets, status
 from rest_framework.decorators import action
@@ -12,10 +13,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
 from attendance.models import LeaveArea
+from audit.utils import log_event, to_change_value_for_field, to_primitive
 
 from core.models import (
     AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
-    InventoryType, UserProfile, UserTask,
+    InventoryType, UserProfile, UserTask, DashboardWidget, UserDashboardLayout,
 )
 
 User = get_user_model()
@@ -341,12 +343,17 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
     I task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS` giorni
     sono esclusi dalla lista di default (restano in DB, non cancellati) —
     passare `?include_hidden=1` per vederli comunque.
+
+    Soft-delete + audit: l'eliminazione è un soft-delete (`deleted_at`,
+    stesso pattern di `SoftDeleteAuditMixin` — vedi `core/mixins.py`) e ogni
+    create/update/delete viene registrato in `AuditEvent`. Per ora non c'è
+    un ripristino esposto in UI: serve come salvaguardia/audit trail.
     """
     serializer_class   = AreaTaskSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = AreaTask.objects.select_related('area', 'created_by').all()
+        qs = AreaTask.objects.select_related('area', 'created_by').filter(deleted_at__isnull=True)
         area_param = self.request.query_params.get('area')
         if area_param:
             qs = qs.filter(area_id=area_param)
@@ -354,6 +361,23 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
             hide_before = timezone.now() - timedelta(days=AreaTask.HIDE_COMPLETED_AFTER_DAYS)
             qs = qs.exclude(status=AreaTask.STATUS_COMPLETATO, completed_at__lt=hide_before)
         return qs
+
+    @staticmethod
+    def _changes_from_validated(instance, validated: dict) -> dict:
+        """Stesso schema di `SoftDeleteAuditMixin._changes_from_validated`
+        (core/mixins.py), non riusabile direttamente qui perché la viewset
+        ha una logica di permessi/campi troppo specifica per il mixin
+        generico — vedi `_check_own_area` e la gestione di `completed_at`."""
+        changes = {}
+        for k, v in (validated or {}).items():
+            before_raw = getattr(instance, k, None)
+            after_raw = v
+            if to_primitive(before_raw) != to_primitive(after_raw):
+                changes[k] = {
+                    "from": to_change_value_for_field(k, before_raw),
+                    "to":   to_change_value_for_field(k, after_raw),
+                }
+        return changes
 
     @staticmethod
     def _user_area_id(user):
@@ -388,20 +412,29 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
                 raise PermissionDenied(
                     "Specifica un'area: il tuo profilo non ne ha una assegnata."
                 )
-            serializer.save(created_by=user, area_id=area_id)
-            return
+            instance = serializer.save(created_by=user, updated_by=user, area_id=area_id)
+        else:
+            # Utenti normali: sempre e solo la propria area, a prescindere
+            # da cosa venga eventualmente inviato dal client.
+            if not user_area_id:
+                raise PermissionDenied(
+                    "Nessuna area assegnata al tuo profilo: contatta un amministratore."
+                )
+            instance = serializer.save(created_by=user, updated_by=user, area_id=user_area_id)
 
-        # Utenti normali: sempre e solo la propria area, a prescindere da
-        # cosa venga eventualmente inviato dal client.
-        if not user_area_id:
-            raise PermissionDenied(
-                "Nessuna area assegnata al tuo profilo: contatta un amministratore."
-            )
-        serializer.save(created_by=user, area_id=user_area_id)
+        changes = {
+            k: {"from": None, "to": to_change_value_for_field(k, v)}
+            for k, v in (serializer.validated_data or {}).items()
+        }
+        log_event(
+            actor=user, action="create", instance=instance,
+            changes=changes, request=self.request,
+        )
 
     def perform_update(self, serializer):
         instance = serializer.instance
         self._check_own_area(instance.area_id)
+        changes = self._changes_from_validated(instance, serializer.validated_data)
 
         new_status = serializer.validated_data.get('status', instance.status)
         if new_status == AreaTask.STATUS_COMPLETATO and instance.status != AreaTask.STATUS_COMPLETATO:
@@ -414,11 +447,30 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
         # L'area di un task non si cambia mai in modifica (nemmeno per il
         # superuser): resta quella di creazione, a prescindere da cosa
         # venga eventualmente inviato dal client.
-        serializer.save(completed_at=completed_at, area_id=instance.area_id)
+        saved = serializer.save(
+            completed_at=completed_at, area_id=instance.area_id, updated_by=self.request.user,
+        )
+        log_event(
+            actor=self.request.user, action="update", instance=saved,
+            changes=changes or None, request=self.request,
+        )
 
     def perform_destroy(self, instance):
         self._check_own_area(instance.area_id)
-        instance.delete()
+        before = instance.deleted_at
+        instance.deleted_at = timezone.now()
+        instance.updated_by = self.request.user
+        instance.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
+        log_event(
+            actor=self.request.user, action="delete", instance=instance,
+            changes={
+                "deleted_at": {
+                    "from": to_change_value_for_field("deleted_at", before),
+                    "to":   to_change_value_for_field("deleted_at", instance.deleted_at),
+                }
+            },
+            request=self.request,
+        )
 
     @action(detail=False, methods=['get'])
     def due(self, request):
@@ -432,9 +484,120 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
         tomorrow = timezone.localdate() + timedelta(days=1)
         qs = (
             AreaTask.objects
-            .filter(area_id=user_area_id, due_date__isnull=False, due_date__lte=tomorrow)
+            .filter(area_id=user_area_id, due_date__isnull=False, due_date__lte=tomorrow, deleted_at__isnull=True)
             .exclude(status=AreaTask.STATUS_COMPLETATO)
             .select_related('area')
             .order_by('due_date')
         )
         return Response(AreaTaskSerializer(qs, many=True, context={'request': request}).data)
+
+
+# ─── Dashboard dinamica ───────────────────────────────────────────────────────
+# Catalogo widget (sola lettura) + layout personalizzato per utente.
+# Il frontend salva l'intero layout in un colpo solo via l'azione `bulk`
+# (POST /dashboard-layout/bulk/), non riga per riga: evita N richieste dopo
+# ogni drag/resize e permette una validazione server-side coerente in un
+#'unica transazione.
+
+class DashboardWidgetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = DashboardWidget
+        fields = ['id', 'key', 'label', 'allowed_sizes', 'default_w', 'default_h', 'sort_order']
+
+
+class DashboardWidgetViewSet(viewsets.ReadOnlyModelViewSet):
+    """Catalogo dei widget disponibili (statico, non editabile da UI)."""
+    serializer_class   = DashboardWidgetSerializer
+    permission_classes = [IsAuthenticated]
+    queryset            = DashboardWidget.objects.filter(is_active=True).order_by('sort_order', 'id')
+
+
+class UserDashboardLayoutSerializer(serializers.ModelSerializer):
+    widget_key = serializers.CharField(source='widget.key', read_only=True)
+
+    class Meta:
+        model  = UserDashboardLayout
+        fields = ['id', 'widget', 'widget_key', 'x', 'y', 'w', 'h', 'visible', 'updated_at']
+        read_only_fields = ['id', 'updated_at']
+
+
+class DashboardLayoutBulkItemSerializer(serializers.Serializer):
+    """Un singolo item nel payload di `bulk`: identifica il widget per `key`
+    (stabile, coincide col catalogo) invece che per id numerico, per
+    semplicità lato frontend (WIDGET_REGISTRY è keyed per `key`)."""
+    widget_key = serializers.CharField(max_length=64)
+    x          = serializers.IntegerField(min_value=0)
+    y          = serializers.IntegerField(min_value=0)
+    w          = serializers.IntegerField(min_value=1)
+    h          = serializers.IntegerField(min_value=1)
+    visible    = serializers.BooleanField(required=False, default=True)
+
+
+class UserDashboardLayoutViewSet(viewsets.ModelViewSet):
+    """Layout dashboard personale dell'utente loggato.
+
+    Il CRUD standard resta disponibile (utile per debug/admin), ma il
+    frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+    dopo ogni modifica in modalità "Personalizza".
+    """
+    serializer_class   = UserDashboardLayoutSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            UserDashboardLayout.objects
+            .filter(user=self.request.user)
+            .select_related('widget')
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def bulk(self, request):
+        """Sostituisce l'intero layout dell'utente con quello inviato.
+
+        Valida ogni item contro `allowed_sizes` del widget corrispondente nel
+        catalogo (difesa in profondità: lo snap ai formati ammessi avviene
+        già lato frontend durante il drag, ma il backend non si fida di
+        coppie w/h arbitrarie in arrivo). `allowed_sizes` è una lista di
+        coppie [w, h] esplicite, non due assi indipendenti: alcuni widget
+        (es. il meteo) ammettono combinazioni specifiche non cartesiane.
+        """
+        items_serializer = DashboardLayoutBulkItemSerializer(data=request.data, many=True)
+        items_serializer.is_valid(raise_exception=True)
+        items = items_serializer.validated_data
+
+        widget_keys = [it['widget_key'] for it in items]
+        widgets_by_key = {
+            w.key: w for w in DashboardWidget.objects.filter(key__in=widget_keys, is_active=True)
+        }
+
+        errors = []
+        for it in items:
+            widget = widgets_by_key.get(it['widget_key'])
+            if widget is None:
+                errors.append(f"Widget sconosciuto: {it['widget_key']}")
+                continue
+            if widget.allowed_sizes and [it['w'], it['h']] not in widget.allowed_sizes:
+                errors.append(
+                    f"{widget.key}: formato {it['w']}x{it['h']} non ammesso "
+                    f"(formati validi: {widget.allowed_sizes})"
+                )
+        if errors:
+            return Response({'detail': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            for it in items:
+                widget = widgets_by_key[it['widget_key']]
+                UserDashboardLayout.objects.update_or_create(
+                    user=request.user,
+                    widget=widget,
+                    defaults={
+                        'x': it['x'], 'y': it['y'], 'w': it['w'], 'h': it['h'],
+                        'visible': it['visible'],
+                    },
+                )
+
+        qs = self.get_queryset()
+        return Response(UserDashboardLayoutSerializer(qs, many=True).data)

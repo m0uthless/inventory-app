@@ -268,7 +268,7 @@ class UserTask(models.Model):
         return f"{self.user} — {self.text[:40]}"
 
 
-class AreaTask(models.Model):
+class AreaTask(TimeStampedModel):
     """Task specifico di un'area organizzativa (stessa `attendance.LeaveArea`
     già usata come area del profilo utente — vedi `UserProfile.leave_area`).
 
@@ -276,6 +276,12 @@ class AreaTask(models.Model):
     propria area; le altre aree sono visibili in sola lettura. I task
     completati vengono nascosti dalle liste 3 giorni dopo il completamento
     (filtro in `get_queryset` della viewset), ma restano in DB.
+
+    Soft-delete + audit: eredita `deleted_at` da TimeStampedModel (stesso
+    pattern di `SoftDeleteAuditMixin` usato nel resto del progetto — vedi
+    `core/mixins.py`). Per ora il ripristino non è esposto in UI: il
+    soft-delete serve come salvaguardia/audit trail, non come cestino
+    consultabile dall'utente.
     """
 
     STATUS_DA_FARE    = 'da_fare'
@@ -310,14 +316,92 @@ class AreaTask(models.Model):
         related_name='created_area_tasks',
         verbose_name='Creato da',
     )
-    created_at   = models.DateTimeField(auto_now_add=True)
-    updated_at   = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='updated_area_tasks',
+        verbose_name='Ultima modifica di',
+    )
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Task di area'
         verbose_name_plural = 'Task di area'
         ordering = ['status', 'due_date', '-created_at']
+        indexes = [
+            models.Index(fields=['deleted_at'], name='areatask_deleted_at_idx'),
+            models.Index(fields=['area', 'deleted_at'], name='areatask_area_del_idx'),
+        ]
 
     def __str__(self):
         return f"[{self.area}] {self.title[:40]}"
+
+
+# ─── Dashboard dinamica ───────────────────────────────────────────────────────
+# Catalogo statico dei widget disponibili (seed via data migration, non
+# editabile da UI) + layout personalizzato per utente (posizione/dimensioni
+# su griglia a 6 colonne, salvato via bulk upsert da DashboardGrid.tsx).
+
+class DashboardWidget(models.Model):
+    """Catalogo dei widget disponibili nella dashboard.
+
+    `key` è l'identificativo stabile usato anche nel frontend
+    (WIDGET_REGISTRY in features/dashboard/dashboardTypes.ts) per mappare
+    la riga al componente React da renderizzare. `allowed_sizes` è una lista
+    di coppie [w, h] ammesse (non due assi indipendenti: alcuni widget hanno
+    combinazioni specifiche, es. il meteo può essere 5x2 ma non 5x1) usata
+    per vincolare lo snap del resize libero al widget corrispondente.
+    """
+    key           = models.CharField(max_length=64, unique=True, verbose_name='Chiave')
+    label         = models.CharField(max_length=128, verbose_name='Etichetta')
+    allowed_sizes = models.JSONField(default=list, verbose_name='Formati ammessi (coppie w,h)')
+    default_w   = models.PositiveSmallIntegerField(verbose_name='Larghezza predefinita')
+    default_h   = models.PositiveSmallIntegerField(verbose_name='Altezza predefinita')
+    sort_order  = models.IntegerField(default=0, verbose_name='Ordine')
+    is_active   = models.BooleanField(default=True, verbose_name='Attivo')
+
+    class Meta:
+        verbose_name = 'Widget dashboard'
+        verbose_name_plural = 'Widget dashboard'
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return self.label
+
+
+class UserDashboardLayout(models.Model):
+    """Posizione/dimensione di un widget nella dashboard di un utente.
+
+    Una riga per (user, widget). Se un utente non ha ancora personalizzato
+    la dashboard, il frontend usa i default del DashboardWidget e crea le
+    righe alla prima modifica (upsert via bulk endpoint, vedi
+    UserDashboardLayoutViewSet.bulk).
+    """
+    user       = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='dashboard_layout_items',
+    )
+    widget     = models.ForeignKey(
+        DashboardWidget,
+        on_delete=models.CASCADE,
+        related_name='user_layouts',
+    )
+    x          = models.PositiveSmallIntegerField(default=0)
+    y          = models.PositiveSmallIntegerField(default=0)
+    w          = models.PositiveSmallIntegerField()
+    h          = models.PositiveSmallIntegerField()
+    visible    = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Layout dashboard utente'
+        verbose_name_plural = 'Layout dashboard utente'
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'widget'], name='uniq_user_dashboard_widget'),
+        ]
+
+    def __str__(self):
+        return f"{self.user} — {self.widget.key} ({self.x},{self.y} {self.w}x{self.h})"
+

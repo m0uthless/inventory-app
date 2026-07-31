@@ -294,7 +294,17 @@ const CONDITION_LABELS: Record<WeatherCondition, string> = {
   thunder: 'Temporale',
 }
 
-export default function WeatherHeroCard() {
+type Props = {
+  /** Se true, riempie l'altezza del contenitore (`height: 100%`) invece di
+   * calcolarla da `aspectRatio` in base alla larghezza. Usato solo dalla
+   * griglia dashboard dinamica, dove il contenitore ha un'altezza fissa
+   * (righe della griglia) che l'aspect-ratio ignorerebbe. Le altre chiamate
+   * (hero mobile, fallback statico) restano ad aspect-ratio, comportamento
+   * invariato. */
+  fillHeight?: boolean
+}
+
+export default function WeatherHeroCard({ fillHeight = false }: Props = {}) {
   const { me } = useAuth()
   const displayName = me
     ? (me.first_name?.trim() || me.username)
@@ -355,8 +365,9 @@ export default function WeatherHeroCard() {
         overflow: 'hidden',
         background: `linear-gradient(160deg, ${cardBg[0]} 0%, ${cardBg[1]} 100%)`,
         transition: 'background 0.8s ease',
-        minHeight: 93,
-        aspectRatio: '16/2.7',
+        ...(fillHeight
+          ? { height: '100%' }
+          : { minHeight: 93, aspectRatio: '16/2.7' }),
       }}
     >
       {loading && (

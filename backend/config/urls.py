@@ -34,6 +34,8 @@ from core.api import (
     ChangelogDismissView,
     UserTaskViewSet,
     AreaTaskViewSet,
+    DashboardWidgetViewSet,
+    UserDashboardLayoutViewSet,
 )
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
@@ -104,6 +106,8 @@ router.register(r"announcements", AnnouncementViewSet, basename="announcement")
 router.register(r"changelog-entries", ChangelogEntryViewSet, basename="changelog-entry")
 router.register(r"user-tasks", UserTaskViewSet, basename="user-task")
 router.register(r"area-tasks", AreaTaskViewSet, basename="area-task")
+router.register(r"dashboard-widgets", DashboardWidgetViewSet, basename="dashboard-widget")
+router.register(r"dashboard-layout", UserDashboardLayoutViewSet, basename="dashboard-layout")
 router.register(r"drive-files", DriveFileViewSet, basename="drive-file")
 
 # Issues
