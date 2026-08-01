@@ -1,5 +1,5 @@
 # build — il contesto Docker è la root del monorepo (inventory-app/)
-FROM node:20.18.1 AS build
+FROM node:20.19.0 AS build
 WORKDIR /app
 
 # Installa dipendenze di frontend-auslbo
