@@ -16,12 +16,15 @@ type Props = {
   disabled?: boolean
   /**
    * 'fill' (default): riempie tutta la cella della griglia.
-   * 'square': si vincola a un quadrato (aspect-ratio 1) alto quanto il
-   * genitore, larghezza automatica — usato da QuickActionsPairCard per
-   * affiancare due tile senza deformarle.
+   * 'square': dimensione fissa e compatta (84x84), centrata nel genitore
+   * invece di riempire tutta l'altezza della riga — usato da
+   * QuickActionsPairCard per affiancare due tile piccole, non due "hero"
+   * card enormi.
    */
   fit?: 'fill' | 'square'
 }
+
+const SQUARE_SIZE = 84
 
 // Tile riusata dai widget dashboard "scorciatoia di creazione" (attualmente
 // solo dal widget combinato QuickActionsPairCard). Colore pieno, icona del
@@ -45,9 +48,9 @@ export default function QuickActionTile({
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        height: '100%',
-        width: fit === 'square' ? 'auto' : '100%',
-        aspectRatio: fit === 'square' ? '1' : undefined,
+        height: fit === 'square' ? SQUARE_SIZE : '100%',
+        width: fit === 'square' ? SQUARE_SIZE : '100%',
+        flexShrink: 0,
         borderRadius: 1,
         bgcolor: background,
         border: '1px solid',
@@ -66,18 +69,18 @@ export default function QuickActionTile({
       }}
     >
       {/* Watermark grande di sfondo, stessa idea della torta/trofeo */}
-      <Box sx={{ position: 'absolute', right: -10, bottom: -10, zIndex: 0, opacity: 0.18 }}>
-        <Box sx={{ '& svg': { fontSize: 84 } }}>{watermarkIcon}</Box>
+      <Box sx={{ position: 'absolute', right: -8, bottom: -8, zIndex: 0, opacity: 0.18 }}>
+        <Box sx={{ '& svg': { fontSize: fit === 'square' ? 56 : 84 } }}>{watermarkIcon}</Box>
       </Box>
 
       <Box sx={{
         position: 'relative', zIndex: 1, height: '100%',
         display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 0.5,
+        alignItems: 'center', justifyContent: 'center', gap: fit === 'square' ? 0.25 : 0.5,
       }}>
-        <AddRoundedIcon sx={{ fontSize: 52, color: '#fff' }} />
+        <AddRoundedIcon sx={{ fontSize: fit === 'square' ? 30 : 52, color: '#fff' }} />
         <Typography variant="caption" fontWeight={800} sx={{
-          color: '#fff', fontSize: '0.78rem', letterSpacing: '0.02em',
+          color: '#fff', fontSize: fit === 'square' ? '0.65rem' : '0.78rem', letterSpacing: '0.02em',
         }}>
           {label}
         </Typography>
@@ -89,9 +92,8 @@ export default function QuickActionTile({
     return (
       <Tooltip title="Non hai i permessi necessari">
         <span style={{
-          height: '100%',
-          width: fit === 'square' ? 'auto' : '100%',
-          aspectRatio: fit === 'square' ? '1' : undefined,
+          height: fit === 'square' ? SQUARE_SIZE : '100%',
+          width: fit === 'square' ? SQUARE_SIZE : '100%',
           display: 'block',
         }}>{card}</span>
       </Tooltip>
