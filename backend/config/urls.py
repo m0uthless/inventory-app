@@ -36,6 +36,7 @@ from core.api import (
     AreaTaskViewSet,
     DashboardWidgetViewSet,
     UserDashboardLayoutViewSet,
+    DefaultDashboardLayoutViewSet,
     StickyNoteView,
     BirthdaysView,
 )
@@ -110,6 +111,7 @@ router.register(r"user-tasks", UserTaskViewSet, basename="user-task")
 router.register(r"area-tasks", AreaTaskViewSet, basename="area-task")
 router.register(r"dashboard-widgets", DashboardWidgetViewSet, basename="dashboard-widget")
 router.register(r"dashboard-layout", UserDashboardLayoutViewSet, basename="dashboard-layout")
+router.register(r"dashboard-default-layout", DefaultDashboardLayoutViewSet, basename="dashboard-default-layout")
 router.register(r"drive-files", DriveFileViewSet, basename="drive-file")
 
 # Issues

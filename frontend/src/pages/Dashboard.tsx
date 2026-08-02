@@ -1,6 +1,11 @@
 import * as React from 'react'
-import { Box, CircularProgress, Chip, Stack, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, Chip, Stack, Typography } from '@mui/material'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded'
+import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
+import { useToast } from '@shared/ui/toast'
+import { useAuth } from '../auth/AuthProvider'
 import WeatherHeroCard from '../ui/WeatherHeroCard'
 import ContributorCard from '../ui/ContributorCard'
 import RecentIssuesCard from '../ui/RecentIssuesCard'
@@ -108,6 +113,9 @@ function LegacyDesktopLayout() {
 function DynamicDesktopLayout() {
   const { editMode } = useDashboardEditMode()
   const { widgets, layoutItems, setLayoutItems, loading, save } = useDashboardLayout()
+  const { me } = useAuth()
+  const toast = useToast()
+  const [settingDefault, setSettingDefault] = React.useState(false)
   const wasEditMode = React.useRef(editMode)
   const layoutItemsRef = React.useRef(layoutItems)
   const hasPendingChanges = React.useRef(false)
@@ -189,8 +197,33 @@ function DynamicDesktopLayout() {
     ))
   }
 
+  const handleSetDefaultLayout = async () => {
+    setSettingDefault(true)
+    try {
+      await api.post('/dashboard-default-layout/set_mine/')
+      toast.success('Layout predefinito impostato: i nuovi utenti lo vedranno al primo accesso.')
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setSettingDefault(false)
+    }
+  }
+
   return (
     <>
+      {editMode && me?.is_superuser && (
+        <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<PushPinRoundedIcon sx={{ fontSize: 16 }} />}
+            onClick={handleSetDefaultLayout}
+            disabled={settingDefault}
+          >
+            Imposta come layout predefinito
+          </Button>
+        </Stack>
+      )}
       {editMode && hiddenWidgets.length > 0 && (
         <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary">

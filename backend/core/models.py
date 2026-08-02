@@ -407,6 +407,37 @@ class UserDashboardLayout(models.Model):
         ]
 
 
+class DefaultDashboardLayout(models.Model):
+    """Layout predefinito applicato SOLO agli utenti che non hanno ancora
+    mai personalizzato la propria dashboard (nessuna riga
+    UserDashboardLayout salvata) — il frontend lo usa come seed per
+    l'auto-posizionamento al primo accesso, al posto dello shelf-packing
+    riga-per-riga usato in assenza di un default. Chi ha già personalizzato
+    non viene mai toccato.
+
+    Gestito da un superuser tramite l'azione `set_mine` (vedi
+    DefaultDashboardLayoutViewSet): un'istantanea presa on-demand, non una
+    sincronizzazione continua col layout di chi lo imposta.
+    """
+    widget  = models.ForeignKey(
+        DashboardWidget,
+        on_delete=models.CASCADE,
+        related_name='default_layout',
+    )
+    x       = models.PositiveSmallIntegerField(default=0)
+    y       = models.PositiveSmallIntegerField(default=0)
+    w       = models.PositiveSmallIntegerField()
+    h       = models.PositiveSmallIntegerField()
+    visible = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Layout predefinito dashboard'
+        verbose_name_plural = 'Layout predefinito dashboard'
+        constraints = [
+            models.UniqueConstraint(fields=['widget'], name='uniq_default_dashboard_widget'),
+        ]
+
+
 class StickyNote(models.Model):
     """Nota personale dell'utente (widget dashboard 'sticky-note').
 

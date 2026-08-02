@@ -18,6 +18,7 @@ from audit.utils import log_event, to_change_value_for_field, to_primitive
 from core.models import (
     AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
     InventoryType, UserProfile, UserTask, DashboardWidget, UserDashboardLayout, StickyNote,
+    DefaultDashboardLayout,
 )
 
 User = get_user_model()
@@ -601,6 +602,56 @@ class UserDashboardLayoutViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset()
         return Response(UserDashboardLayoutSerializer(qs, many=True).data)
+
+
+class DefaultDashboardLayoutSerializer(serializers.ModelSerializer):
+    widget_key = serializers.CharField(source='widget.key', read_only=True)
+
+    class Meta:
+        model  = DefaultDashboardLayout
+        fields = ['widget_key', 'x', 'y', 'w', 'h', 'visible']
+
+
+class DefaultDashboardLayoutViewSet(viewsets.ReadOnlyModelViewSet):
+    """Layout predefinito applicato solo ai nuovi utenti (nessuna riga
+    UserDashboardLayout ancora salvata). Lettura aperta a chiunque sia
+    autenticato — serve al frontend per il fallback al primo accesso; la
+    scrittura passa solo dall'azione `set_mine`, riservata ai superuser.
+    """
+    serializer_class   = DefaultDashboardLayoutSerializer
+    permission_classes = [IsAuthenticated]
+    queryset            = DefaultDashboardLayout.objects.select_related('widget')
+
+    @action(detail=False, methods=['post'])
+    def set_mine(self, request):
+        """Sostituisce l'intero layout predefinito con quello ATTUALE
+        dell'utente che chiama (deve essere superuser). Istantanea presa
+        on-demand, non una sincronizzazione continua: chi ha già
+        personalizzato la propria dashboard non viene mai toccato, il
+        default si applica solo ai nuovi utenti da questo momento in poi.
+        """
+        if not request.user.is_superuser:
+            return Response(
+                {'detail': 'Solo un superuser può impostare il layout predefinito.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        my_layout = UserDashboardLayout.objects.filter(user=request.user).select_related('widget')
+        if not my_layout.exists():
+            return Response(
+                {'detail': 'Non hai ancora nessun layout personalizzato da salvare come predefinito.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            DefaultDashboardLayout.objects.all().delete()
+            DefaultDashboardLayout.objects.bulk_create([
+                DefaultDashboardLayout(widget=it.widget, x=it.x, y=it.y, w=it.w, h=it.h, visible=it.visible)
+                for it in my_layout
+            ])
+
+        qs = self.get_queryset()
+        return Response(DefaultDashboardLayoutSerializer(qs, many=True).data)
 
 
 # ─── Sticky note (nota personale, widget dashboard 'sticky-note') ────────────

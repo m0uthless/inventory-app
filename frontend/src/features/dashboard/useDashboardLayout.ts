@@ -68,9 +68,14 @@ export function useDashboardLayout() {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const [widgetsRes, layoutRes] = await Promise.all([
+      const [widgetsRes, layoutRes, defaultLayoutRes] = await Promise.all([
         api.get<DashboardWidgetDef[] | { results: DashboardWidgetDef[] }>('/dashboard-widgets/', { params: { page_size: 100 } }),
         api.get<DashboardLayoutItem[] | { results: DashboardLayoutItem[] }>('/dashboard-layout/', { params: { page_size: 100 } }),
+        // Layout predefinito (vedi DefaultDashboardLayoutViewSet.set_mine, superuser-only):
+        // usato SOLO come seed quando l'utente non ha ancora nessuna riga propria
+        // (primo accesso), mai per chi ha già personalizzato — vedi sotto.
+        api.get<DashboardLayoutItem[] | { results: DashboardLayoutItem[] }>('/dashboard-default-layout/', { params: { page_size: 100 } })
+          .catch(() => ({ data: [] as DashboardLayoutItem[] })),
       ])
       const widgetList = Array.isArray(widgetsRes.data) ? widgetsRes.data : widgetsRes.data.results
       const layoutListRaw = Array.isArray(layoutRes.data) ? layoutRes.data : layoutRes.data.results
@@ -78,8 +83,18 @@ export function useDashboardLayout() {
         widget_key: it.widget_key,
         x: it.x, y: it.y, w: it.w, h: it.h, visible: it.visible,
       }))
+
+      let seed = layoutList
+      if (layoutList.length === 0) {
+        const defaultListRaw = Array.isArray(defaultLayoutRes.data) ? defaultLayoutRes.data : defaultLayoutRes.data.results
+        seed = defaultListRaw.map(it => ({
+          widget_key: it.widget_key,
+          x: it.x, y: it.y, w: it.w, h: it.h, visible: it.visible,
+        }))
+      }
+
       setWidgets(widgetList)
-      setLayoutItems(autoPlace(widgetList, layoutList))
+      setLayoutItems(autoPlace(widgetList, seed))
     } catch {
       // Se il caricamento fallisce, la dashboard resta vuota/statica:
       // Dashboard.tsx ricade sul layout legacy fisso in questo caso.
