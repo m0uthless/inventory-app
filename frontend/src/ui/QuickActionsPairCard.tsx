@@ -9,9 +9,10 @@ import QuickActionTile from './QuickActionTile'
 // Widget dashboard 'quick-actions-pair' (1x1 fisso, unico widget con le
 // scorciatoie di creazione rapida — sostituisce i vecchi widget standalone
 // 'new-issue' e 'new-triage-case', rimossi dal catalogo). Le due tile sono
-// affiancate, ciascuna vincolata a un quadrato (fit="square", ~112x112 come
-// l'altezza della riga, indipendente dalla larghezza della colonna) e
-// separate da uno spazio, colore pieno (non gradiente).
+// affiancate e riempiono tutta la cella (fit="half": altezza piena, metà
+// larghezza ciascuna), così il bordo esterno della coppia combacia con
+// quello degli altri widget nella stessa colonna (es. Compleanni) invece
+// di lasciare margini vuoti ai lati. Colore pieno (non gradiente).
 export default function QuickActionsPairCard() {
   const navigate = useNavigate()
   const { hasPerm } = useAuth()
@@ -19,11 +20,10 @@ export default function QuickActionsPairCard() {
   return (
     <Box sx={{
       height: '100%', width: '100%',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      gap: 1, px: 0.5,
+      display: 'flex', gap: 1,
     }}>
       <QuickActionTile
-        fit="square"
+        fit="half"
         watermarkIcon={<AssignmentIndRoundedIcon />}
         label="Triage"
         background="#1f6fb5"
@@ -34,7 +34,7 @@ export default function QuickActionsPairCard() {
         onClick={() => navigate('/servicenow-cases', { state: { openCreate: true } })}
       />
       <QuickActionTile
-        fit="square"
+        fit="half"
         watermarkIcon={<BugReportRoundedIcon />}
         label="Issue"
         background="#ea580c"
