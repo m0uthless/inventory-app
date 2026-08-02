@@ -141,6 +141,10 @@ class UserProfile(models.Model):
         help_text="Se attivo, l'utente può vedere tutte le note spese dei dipendenti e "
                    "validarle/rifiutarle. Impostabile solo da admin.",
     )
+    birth_date = models.DateField(
+        null=True, blank=True, verbose_name="Data di nascita",
+        help_text="Usata dal widget dashboard 'Compleanni'. Impostabile solo da admin.",
+    )
     last_seen_changelog = models.ForeignKey(
         "core.ChangelogEntry",
         null=True, blank=True,
@@ -401,6 +405,30 @@ class UserDashboardLayout(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['user', 'widget'], name='uniq_user_dashboard_widget'),
         ]
+
+
+class StickyNote(models.Model):
+    """Nota personale dell'utente (widget dashboard 'sticky-note').
+
+    Una sola nota per utente (OneToOne): il frontend fa sempre
+    get-or-create sull'endpoint singleton `/api/sticky-note/`, non c'è un
+    ViewSet con lista/CRUD multiplo perché non serve — è un caso analogo a
+    UserProfile/MeAPIView, non al catalogo widget/layout.
+    """
+    user       = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sticky_note',
+    )
+    text       = models.TextField(blank=True, default='', verbose_name='Testo')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Nota personale'
+        verbose_name_plural = 'Note personali'
+
+    def __str__(self):
+        return f"Nota di {self.user}"
 
     def __str__(self):
         return f"{self.user} — {self.widget.key} ({self.x},{self.y} {self.w}x{self.h})"

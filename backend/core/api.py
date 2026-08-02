@@ -17,7 +17,7 @@ from audit.utils import log_event, to_change_value_for_field, to_primitive
 
 from core.models import (
     AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
-    InventoryType, UserProfile, UserTask, DashboardWidget, UserDashboardLayout,
+    InventoryType, UserProfile, UserTask, DashboardWidget, UserDashboardLayout, StickyNote,
 )
 
 User = get_user_model()
@@ -601,3 +601,76 @@ class UserDashboardLayoutViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset()
         return Response(UserDashboardLayoutSerializer(qs, many=True).data)
+
+
+# ─── Sticky note (nota personale, widget dashboard 'sticky-note') ────────────
+# Endpoint singleton (get-or-create + update), stesso pattern di /api/me/:
+# non è un ViewSet perché non esiste una lista/CRUD multiplo, ogni utente ha
+# esattamente una nota.
+
+class StickyNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = StickyNote
+        fields = ['text', 'updated_at']
+        read_only_fields = ['updated_at']
+
+
+class StickyNoteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        note, _ = StickyNote.objects.get_or_create(user=request.user)
+        return Response(StickyNoteSerializer(note).data)
+
+    def patch(self, request):
+        note, _ = StickyNote.objects.get_or_create(user=request.user)
+        serializer = StickyNoteSerializer(note, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+# ─── Compleanni (widget dashboard 'birthdays') ────────────────────────────────
+# Stesso pattern di WikiStatsView.monthly_contributor: un solo "prossimo
+# evento" featured (non un elenco), coerente con ContributorCard che il
+# widget riprende come stile visivo. Se più utenti condividono la stessa
+# data più vicina, sono restituiti tutti insieme in `people`.
+
+class BirthdaysView(APIView):
+    """Compleanni di oggi tra gli utenti attivi (widget dashboard 'birthdays').
+
+    Solo il giorno corrente: niente fallback sul "prossimo compleanno" se
+    oggi non festeggia nessuno — il widget deve mostrare solo eventi del
+    giorno, non un conto alla rovescia.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.localdate()
+        profiles = (
+            UserProfile.objects
+            .filter(
+                birth_date__month=today.month,
+                birth_date__day=today.day,
+                user__is_active=True,
+            )
+            .select_related('user')
+        )
+
+        def _avatar_url(profile):
+            if not profile.avatar:
+                return None
+            try:
+                return profile.avatar.url
+            except Exception:
+                return None
+
+        people = [
+            {
+                'user_id': p.user_id,
+                'name': f"{p.user.first_name} {p.user.last_name}".strip() or p.user.username,
+                'avatar': _avatar_url(p),
+            }
+            for p in profiles
+        ]
+        return Response({'day': today.day, 'month': today.month, 'people': people})

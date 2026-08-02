@@ -436,10 +436,11 @@ function formatDateRange(dates: string[]): string {
   return sameMonth ? `${fmt(first, false)}–${fmt(last, true)}` : `${fmt(first, true)} – ${fmt(last, true)}`
 }
 
-function SummaryPanel({ periodLabel, areaLabel, absences, roster, canEditAll, onOpenPending, onGroupResolved }: {
+function SummaryPanel({ periodLabel, areaLabel, absences, pendingAbsences, roster, canEditAll, onOpenPending, onGroupResolved }: {
   periodLabel: string
   areaLabel: string | null
   absences: AbsenceRow[]
+  pendingAbsences: AbsenceRow[]
   roster: RosterRow[]
   canEditAll: boolean
   onOpenPending: (row: AbsenceRow) => void
@@ -471,9 +472,13 @@ function SummaryPanel({ periodLabel, areaLabel, absences, roster, canEditAll, on
   // Raggruppa le proposte per request_group: una selezione (click o
   // trascinamento) = UNA voce, validabile/rifiutabile con un solo click,
   // invece di una riga per ogni singola mezza giornata.
+  // NB: usa `pendingAbsences` (tutte le proposte in attesa, su qualunque
+  // mese) e non `absences` (che è limitato al mese attualmente in vista),
+  // così il coordinatore può validare ferie richieste per un mese diverso
+  // da quello visualizzato nel calendario.
   const pendingGroups = React.useMemo((): PendingGroup[] => {
     const map = new Map<string, PendingGroup>()
-    for (const a of absences) {
+    for (const a of pendingAbsences) {
       if (a.status !== 'proposta') continue
       const key = a.request_group ? `g:${a.request_group}` : `id:${a.id}`
       let g = map.get(key)
@@ -487,8 +492,8 @@ function SummaryPanel({ periodLabel, areaLabel, absences, roster, canEditAll, on
     }
     return Array.from(map.values())
       .sort((a, b) => Math.min(...a.dates.map(Date.parse)) - Math.min(...b.dates.map(Date.parse)))
-      .slice(0, 8)
-  }, [absences])
+      .slice(0, 12)
+  }, [pendingAbsences])
 
   const nameFor = React.useCallback((userId: number) => {
     return roster.find((u) => u.id === userId)?.name ?? `#${userId}`
@@ -569,7 +574,7 @@ function SummaryPanel({ periodLabel, areaLabel, absences, roster, canEditAll, on
                   >
                     <Box
                       onClick={() => {
-                        const row = absences.find((a) => a.id === g.ids[0])
+                        const row = pendingAbsences.find((a) => a.id === g.ids[0])
                         if (row) onOpenPending(row)
                       }}
                       sx={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
@@ -619,6 +624,7 @@ export default function PianoFerie() {
   const [currentUserId, setCurrentUserId] = React.useState<number | null>(null)
   const [currentUserAreaId, setCurrentUserAreaId] = React.useState<number | null>(null)
   const [absences, setAbsences] = React.useState<AbsenceRow[]>([])
+  const [pendingAbsences, setPendingAbsences] = React.useState<AbsenceRow[]>([])
   const [holidayRows, setHolidayRows] = React.useState<HolidayRow[]>([])
   const [loading, setLoading] = React.useState(true)
 
@@ -668,6 +674,29 @@ export default function PianoFerie() {
 
   React.useEffect(() => { reload() }, [reload])
 
+  // Proposte in attesa di validazione: caricate SENZA filtro di data, così
+  // il pannello "Da validare" mostra sempre tutte le richieste pendenti
+  // (es. ferie chieste a settembre mentre si sta guardando agosto), non
+  // solo quelle del mese attualmente in vista nel calendario. Caricato solo
+  // per chi può validare (canEditAll); altrimenti resta vuoto.
+  const reloadPending = React.useCallback(() => {
+    if (!canEditAll) { setPendingAbsences([]); return }
+    api.get<AbsenceRow[]>('/absences/', { params: { status: 'proposta' } })
+      .then((r) => setPendingAbsences(r.data))
+      .catch((e) => toast.error(apiErrorToMessage(e)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEditAll])
+
+  React.useEffect(() => { reloadPending() }, [reloadPending])
+
+  // Ricarica sia la vista del mese corrente sia l'elenco completo delle
+  // proposte pendenti: da usare ovunque una modifica possa cambiare lo
+  // stato di una richiesta (validazione, rifiuto, modifica, cancellazione).
+  const reloadAll = React.useCallback(() => {
+    reload()
+    reloadPending()
+  }, [reload, reloadPending])
+
   const index = React.useMemo(() => indexAbsences(absences), [absences])
 
   const groups = React.useMemo(() => {
@@ -699,6 +728,11 @@ export default function PianoFerie() {
     if (!statsScopedToOwnArea) return absences
     return absences.filter((a) => userAreaMap.get(a.user) === currentUserAreaId)
   }, [absences, statsScopedToOwnArea, userAreaMap, currentUserAreaId])
+
+  const pendingAbsencesForPanel = React.useMemo(() => {
+    if (!statsScopedToOwnArea) return pendingAbsences
+    return pendingAbsences.filter((a) => userAreaMap.get(a.user) === currentUserAreaId)
+  }, [pendingAbsences, statsScopedToOwnArea, userAreaMap, currentUserAreaId])
 
   const canEditRow = React.useCallback((userId: number) => {
     if (canEditAll) return true
@@ -966,15 +1000,15 @@ export default function PianoFerie() {
         <Box sx={{ width: { xs: '100%', lg: 'auto' }, flex: { lg: '1 1 320px' }, minWidth: { lg: 300 }, maxWidth: { lg: 440 } }}>
           <SummaryPanel
             periodLabel={periodLabel} areaLabel={currentUserAreaLabel}
-            absences={absencesForPanel} roster={roster}
+            absences={absencesForPanel} pendingAbsences={pendingAbsencesForPanel} roster={roster}
             canEditAll={canEditAll} onOpenPending={openPendingFromSummary}
-            onGroupResolved={reload}
+            onGroupResolved={reloadAll}
           />
         </Box>
       </Stack>
 
-      <CellEditorDialog target={editorTarget} onClose={() => setEditorTarget(null)} onSaved={reload} />
-      <BulkEditorDialog target={bulkTarget} onClose={() => setBulkTarget(null)} onSaved={reload} />
+      <CellEditorDialog target={editorTarget} onClose={() => setEditorTarget(null)} onSaved={reloadAll} />
+      <BulkEditorDialog target={bulkTarget} onClose={() => setBulkTarget(null)} onSaved={reloadAll} />
     </Box>
   )
 }

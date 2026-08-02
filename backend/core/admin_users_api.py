@@ -113,6 +113,7 @@ class UserAdminProfileSerializer(serializers.ModelSerializer):
             "leave_area",
             "leave_area_name",
             "is_expense_secretary",
+            "birth_date",
         ]
 
     def get_avatar(self, obj):
@@ -390,6 +391,14 @@ class UserAdminViewSet(
                             {"profile": {"leave_area": "Area non trovata."}}
                         )
                     profile.leave_area_id = leave_area_id
+
+            # `birth_date` è un DateField: un campo vuoto dal client arriva come
+            # stringa vuota, non None, e farebbe fallire il parsing di Django.
+            # Normalizzato esplicitamente, stesso trattamento riservato sopra
+            # a `leave_area` per i valori "assenti".
+            if "birth_date" in profile_data:
+                raw_value = profile_data["birth_date"]
+                profile.birth_date = raw_value if raw_value else None
 
             profile.save()
             changed_fields.append("profile")

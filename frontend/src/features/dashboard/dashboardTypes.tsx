@@ -6,6 +6,9 @@ import AreaTaskCard from '../../ui/AreaTaskCard'
 import AnnouncementsCard from '../../ui/AnnouncementsCard'
 import TodoCard from '../../ui/TodoCard'
 import MaintenanceAlertsCard from '../../ui/MaintenanceAlertsCard'
+import StickyNoteCard from '../../ui/StickyNoteCard'
+import BirthdaysCard from '../../ui/BirthdaysCard'
+import QuickActionsPairCard from '../../ui/QuickActionsPairCard'
 
 // ─── Tipi (rispecchiano DashboardWidget / UserDashboardLayout nel backend) ─────
 
@@ -52,6 +55,9 @@ export const WIDGET_REGISTRY: Record<string, React.ComponentType> = {
   announcements: AnnouncementsCard,
   todo:          TodoCard,
   maintenance:   MaintenanceAlertsCard,
+  'sticky-note': StickyNoteCard,
+  birthdays:     BirthdaysCard,
+  'quick-actions-pair': QuickActionsPairCard,
 }
 
 // ─── Griglia: 6 colonne, altezza riga in px ────────────────────────────────────

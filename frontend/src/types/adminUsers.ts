@@ -42,6 +42,7 @@ export type AdminUserProfile = {
   leave_area: number | null
   leave_area_name: string | null
   is_expense_secretary: boolean
+  birth_date: string | null
 }
 
 export type AdminUserGroupRef = { id: number; name: string }
@@ -87,6 +88,7 @@ export type AdminUserWritePayload = Partial<{
     is_leave_coordinator: boolean
     leave_area: number | null
     is_expense_secretary: boolean
+    birth_date: string | null
   }>
 }>
 

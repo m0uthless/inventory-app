@@ -36,6 +36,8 @@ from core.api import (
     AreaTaskViewSet,
     DashboardWidgetViewSet,
     UserDashboardLayoutViewSet,
+    StickyNoteView,
+    BirthdaysView,
 )
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
@@ -182,6 +184,8 @@ urlpatterns = [
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
+    path("api/sticky-note/", StickyNoteView.as_view()),
+    path("api/birthdays/", BirthdaysView.as_view()),
 
     # Changelog (modal al login + voce menu utente)
     path("api/changelog/unseen/", ChangelogUnseenView.as_view()),
