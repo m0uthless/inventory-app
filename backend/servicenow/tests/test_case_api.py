@@ -136,6 +136,68 @@ def test_create_case_triggers_teams_notification(api_client, superuser):
     assert notified_case.number == response.data["number"]
 
 
+# ─── Switch Philips: notifica Teams vs modal (TEMPORANEO in prova) ──────────
+
+def test_create_biotron_case_always_triggers_teams_notification_regardless_of_philips_mode(api_client, superuser, settings):
+    """Lo switch SERVICENOW_PHILIPS_NOTIFY_MODE non deve mai toccare i case
+    Biotron, qualunque sia il suo valore."""
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "modal"
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type(category=ServiceNowCaseCategory.BIOTRON)
+
+    with patch("servicenow.api.notify_teams_new_case") as mock_notify:
+        response = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, category=ServiceNowCaseCategory.BIOTRON),
+            format="json",
+        )
+
+    assert response.status_code == 201, response.data
+    assert mock_notify.call_count == 1
+
+
+def test_create_philips_case_triggers_teams_notification_when_mode_is_teams(api_client, superuser, settings):
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "teams"
+    api_client.force_authenticate(user=superuser)
+    philips_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS)
+
+    with patch("servicenow.api.notify_teams_new_case") as mock_notify:
+        response = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(philips_type, category=ServiceNowCaseCategory.PHILIPS),
+            format="json",
+        )
+
+    assert response.status_code == 201, response.data
+    assert mock_notify.call_count == 1
+
+
+def test_create_philips_case_skips_teams_notification_when_mode_is_modal(api_client, superuser, settings):
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "modal"
+    api_client.force_authenticate(user=superuser)
+    philips_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS)
+
+    with patch("servicenow.api.notify_teams_new_case") as mock_notify:
+        response = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(philips_type, category=ServiceNowCaseCategory.PHILIPS),
+            format="json",
+        )
+
+    assert response.status_code == 201, response.data
+    assert mock_notify.call_count == 0
+
+
+def test_notification_settings_endpoint_reports_current_mode(api_client, superuser, settings):
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "modal"
+    api_client.force_authenticate(user=superuser)
+
+    response = api_client.get("/api/servicenow-cases/notification-settings/")
+
+    assert response.status_code == 200, response.data
+    assert response.data == {"philips_notify_mode": "modal"}
+
+
 def test_create_case_succeeds_even_if_teams_webhook_unreachable(api_client, superuser, settings):
     """Verifica end-to-end il comportamento best-effort: con un webhook
     configurato che fallisce a livello di rete (non la funzione di notifica

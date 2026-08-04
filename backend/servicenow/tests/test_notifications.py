@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import requests
 
-from servicenow.notifications import notify_teams_new_case
+from servicenow.notifications import notify_teams_new_case, get_philips_notify_mode
 
 
 def _make_case(**overrides):
@@ -121,3 +121,22 @@ def test_request_uses_short_timeout(settings):
         mock_post.return_value = SimpleNamespace(status_code=200, text="")
         notify_teams_new_case(_make_case())
     assert mock_post.call_args.kwargs["timeout"] == 5
+
+
+# ─── get_philips_notify_mode ────────────────────────────────────────────────
+# Switch TEMPORANEO in prova (SERVICENOW_PHILIPS_NOTIFY_MODE): "teams"
+# (default, storico) oppure "modal" (niente Teams per i case Philips).
+
+def test_philips_notify_mode_defaults_to_teams(settings):
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "teams"
+    assert get_philips_notify_mode() == "teams"
+
+
+def test_philips_notify_mode_reads_modal(settings):
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "modal"
+    assert get_philips_notify_mode() == "modal"
+
+
+def test_philips_notify_mode_falls_back_to_teams_on_invalid_value(settings):
+    settings.SERVICENOW_PHILIPS_NOTIFY_MODE = "carrier-pigeon"
+    assert get_philips_notify_mode() == "teams"

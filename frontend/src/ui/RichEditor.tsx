@@ -243,6 +243,42 @@ export default function RichEditor({
         const norm = html === '<p><br></p>' || html === '<p></p>' ? '' : html
         onChangeRef.current(norm)
       })
+
+      // Intercetta il paste di immagini (es. screenshot copiati con Ctrl+V).
+      // Senza questo handler, Quill inserirebbe l'immagine come <img src="data:...">
+      // (base64 inline): visibile in modifica, ma rimossa dal backend in fase di
+      // sanitizzazione HTML alla pubblicazione (bleach ammette solo protocolli
+      // http/https/mailto negli attributi src). Qui la carichiamo invece come
+      // allegato reale e inseriamo l'URL persistente restituito dal server.
+      const handleImagePaste = (e: ClipboardEvent) => {
+        const uploadFn = onImageUploadRef.current
+        const items = e.clipboardData?.items
+        if (!items || !uploadFn) return
+        const imageItem = Array.from(items).find(
+          (it) => it.kind === 'file' && it.type.startsWith('image/'),
+        )
+        if (!imageItem) return
+        const file = imageItem.getAsFile()
+        if (!file) return
+
+        e.preventDefault()
+        e.stopPropagation()
+
+        const range = quill.getSelection(true)
+        const idx = range?.index ?? quill.getLength()
+        setUploading(true)
+        uploadFn(file)
+          .then((url) => {
+            quill.insertEmbed(idx, 'image', url)
+            quill.setSelection(idx + 1)
+          })
+          .catch(() => {
+            // toast gestito dal parent
+          })
+          .finally(() => setUploading(false))
+      }
+      // Capture phase: deve intercettare l'evento prima del listener interno di Quill.
+      editorEl.addEventListener('paste', handleImagePaste, true)
     })
 
     return () => {

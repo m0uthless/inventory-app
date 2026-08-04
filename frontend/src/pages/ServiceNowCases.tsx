@@ -14,6 +14,7 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
@@ -21,6 +22,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
 import CloseIcon from '@mui/icons-material/Close'
@@ -51,6 +54,8 @@ export function formatOpenedAt(row: { opened_date: string | null; opened_time: s
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import ServiceNowCaseDrawer from '../features/servicenow/ServiceNowCaseDrawer'
 import ServiceNowCaseFormDrawer, { type ServiceNowCaseForm } from '../features/servicenow/ServiceNowCaseFormDrawer'
+import PhilipsAssignmentCopyDialog, { buildPhilipsAssignmentCopyText } from '../features/servicenow/PhilipsAssignmentCopyDialog'
+import ImportHistoricalDialog from '../features/servicenow/ImportHistoricalDialog'
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -551,7 +556,31 @@ export default function ServiceNowCases() {
 
   const canChange = hasPerm(PERMS.servicenow.case.change)
   const canDelete  = hasPerm(PERMS.servicenow.case.delete)
+  const canCreate  = hasPerm(PERMS.servicenow.case.add)
   const canCreateIssue = hasPerm(PERMS.issues.issue.add)
+
+  // Dialog "Import storico" (CSV → creazione bulk di case, vedi
+  // ImportHistoricalDialog.tsx). Stessa permission 'add' della creazione
+  // singola: il backend richiede servicenow.add_servicenowcase per entrambi
+  // gli endpoint di import.
+  const [importHistoricalOpen, setImportHistoricalOpen] = React.useState(false)
+
+  // Switch TEMPORANEO in prova: modalità di notifica per i case Philips
+  // ("teams" storico o "modal" — vedi GET /servicenow-cases/notification-settings/
+  // e servicenow/notifications.py lato backend). Default prudente su "teams"
+  // finché la risposta non arriva, per non aprire il modal per errore.
+  const [philipsNotifyMode, setPhilipsNotifyMode] = React.useState<'teams' | 'modal'>('teams')
+  React.useEffect(() => {
+    api
+      .get<{ philips_notify_mode: 'teams' | 'modal' }>('/servicenow-cases/notification-settings/')
+      .then((r) => setPhilipsNotifyMode(r.data.philips_notify_mode))
+      .catch(() => {})
+  }, [])
+
+  // Modal di copia mostrato al posto della notifica Teams per i case
+  // Philips quando philipsNotifyMode === 'modal'.
+  const [philipsCopyOpen, setPhilipsCopyOpen] = React.useState(false)
+  const [philipsCopyText, setPhilipsCopyText] = React.useState('')
 
   const grid = useServerGrid({
     defaultOrdering: '-created_at',
@@ -677,6 +706,19 @@ export default function ServiceNowCases() {
         reloadList()
         setTriageRefreshKey((k) => k + 1)
         openDrawer(res.data.id)
+        // Switch TEMPORANEO in prova: per i case Philips con modalità
+        // "modal" il backend non ha inviato alcuna notifica Teams (vedi
+        // perform_create) — mostriamo qui il testo pronto da copiare.
+        if (res.data.category === 'philips' && philipsNotifyMode === 'modal') {
+          setPhilipsCopyText(buildPhilipsAssignmentCopyText({
+            assignedToLabel: res.data.assigned_to_full_name || res.data.assigned_to_username,
+            number: res.data.number,
+            account: res.data.account,
+            shortDescription: res.data.short_description,
+            caseTypeLabel: res.data.case_type_label,
+          }))
+          setPhilipsCopyOpen(true)
+        }
       }
       setFormOpen(false)
     } catch (e) {
@@ -772,6 +814,21 @@ export default function ServiceNowCases() {
     return [
       { key: 'open',   label: 'Apri',     icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => { openDrawer(row.id); setContextMenu(null) } },
       {
+        key: 'philipsMessage', label: 'Messaggio', icon: <ChatBubbleOutlineIcon fontSize="small" />,
+        hidden: row.category !== 'philips',
+        onClick: () => {
+          setContextMenu(null)
+          setPhilipsCopyText(buildPhilipsAssignmentCopyText({
+            assignedToLabel: row.assigned_to_full_name || row.assigned_to_username,
+            number: row.number,
+            account: row.account,
+            shortDescription: row.short_description,
+            caseTypeLabel: row.case_type_label,
+          }))
+          setPhilipsCopyOpen(true)
+        },
+      },
+      {
         key: 'createIssue', label: 'Crea Issue', icon: <BugReportOutlinedIcon fontSize="small" />,
         hidden: !canCreateIssue,
         onClick: () => {
@@ -814,6 +871,20 @@ export default function ServiceNowCases() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
+          rightActions: canCreate ? (
+            <Tooltip title="Import storico da CSV" arrow>
+              <span>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<HistoryOutlinedIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => setImportHistoricalOpen(true)}
+                >
+                  Import storico
+                </Button>
+              </span>
+            </Tooltip>
+          ) : undefined,
         }}
         grid={{
           pageKey: 'servicenow-cases',
@@ -875,6 +946,20 @@ export default function ServiceNowCases() {
         description="Il ServiceNow Case verrà spostato nel cestino e potrà essere ripristinato."
         onClose={() => setDeleteDlgOpen(false)}
         onConfirm={doDelete}
+      />
+
+      {/* ── Modal copia testo Philips (switch TEMPORANEO al posto di Teams) ── */}
+      <PhilipsAssignmentCopyDialog
+        open={philipsCopyOpen}
+        onClose={() => setPhilipsCopyOpen(false)}
+        text={philipsCopyText}
+      />
+
+      {/* ── Import storico da CSV ── */}
+      <ImportHistoricalDialog
+        open={importHistoricalOpen}
+        onClose={() => setImportHistoricalOpen(false)}
+        onImported={() => { reloadList(); setTriageRefreshKey((k) => k + 1) }}
       />
 
       {/* ── Context menu ── */}

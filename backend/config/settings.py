@@ -336,3 +336,12 @@ if not DEBUG and not FIELD_ENCRYPTION_KEY:
 # Va generato da Teams: canale → Workflows → template "Post to a channel when
 # a webhook request is received".
 SERVICENOW_TEAMS_WEBHOOK_URL = os.getenv("SERVICENOW_TEAMS_WEBHOOK_URL", "")
+
+# Modalità di notifica per i case ServiceNow di categoria Philips (switch
+# TEMPORANEO in prova, vedi servicenow/notifications.py):
+# - "teams" (default, comportamento storico invariato): notifica sul canale
+#   Teams come per i case Biotron.
+# - "modal": nessuna notifica Teams per i case Philips, il frontend mostra
+#   invece un modal con un testo pronto da copiare e incollare a mano.
+# I case Biotron non sono mai toccati da questo switch.
+SERVICENOW_PHILIPS_NOTIFY_MODE = os.getenv("SERVICENOW_PHILIPS_NOTIFY_MODE", "teams")

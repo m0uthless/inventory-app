@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 TEAMS_REQUEST_TIMEOUT_S = 5
 
+PHILIPS_NOTIFY_MODE_TEAMS = "teams"
+PHILIPS_NOTIFY_MODE_MODAL = "modal"
+
+
+def get_philips_notify_mode() -> str:
+    """Modalità di notifica attiva per i case Philips (switch TEMPORANEO in
+    prova, vedi SERVICENOW_PHILIPS_NOTIFY_MODE in settings):
+    - "teams" (default): comportamento storico invariato, notifica Teams.
+    - "modal": nessuna notifica Teams, il frontend mostra un modal con
+      testo pronto da copiare (vedi ServiceNowCaseViewSet.perform_create).
+    Qualsiasi valore diverso da questi due ricade su "teams" per sicurezza.
+    """
+    mode = getattr(settings, "SERVICENOW_PHILIPS_NOTIFY_MODE", PHILIPS_NOTIFY_MODE_TEAMS)
+    if mode not in (PHILIPS_NOTIFY_MODE_TEAMS, PHILIPS_NOTIFY_MODE_MODAL):
+        return PHILIPS_NOTIFY_MODE_TEAMS
+    return mode
+
 
 def notify_teams_new_case(case) -> None:
     """Invia al webhook Teams configurato un Adaptive Card con i dati

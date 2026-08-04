@@ -29,7 +29,10 @@ from core.soft_delete import apply_soft_delete_filters
 from servicenow.models import (
     ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory,
 )
-from servicenow.notifications import notify_teams_new_case
+from servicenow.notifications import notify_teams_new_case, get_philips_notify_mode, PHILIPS_NOTIFY_MODE_MODAL
+from servicenow.historical_import import (
+    process_csv, build_users_name_index, build_users_username_index, build_case_type_lookup, summarize,
+)
 
 # Le assenze sono ora gestite dal modulo condiviso `attendance` (mezza giornata
 # MAT/POM, workflow proposta→validata). Triage e Statistiche le importano da qui.
@@ -432,9 +435,148 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
 
     def perform_create(self, serializer):
         super().perform_create(serializer)
+        case = serializer.instance
+        # Switch TEMPORANEO in prova: i case Philips con modalità "modal"
+        # configurata (SERVICENOW_PHILIPS_NOTIFY_MODE) non generano alcuna
+        # notifica Teams. Il frontend mostra invece un modal con un testo
+        # pronto da copiare, costruito con i dati già presenti nella
+        # risposta di questa stessa POST (nessun round-trip aggiuntivo).
+        # I case Biotron non sono mai toccati da questo switch.
+        if case.category == ServiceNowCaseCategory.PHILIPS and get_philips_notify_mode() == PHILIPS_NOTIFY_MODE_MODAL:
+            return
         # Best-effort: un fallimento della notifica non deve mai far fallire
         # la creazione del case (vedi servicenow/notifications.py).
-        notify_teams_new_case(serializer.instance)
+        notify_teams_new_case(case)
+
+    @action(detail=False, methods=["get"], url_path="notification-settings")
+    def notification_settings(self, request):
+        """Espone al frontend la modalità di notifica attiva per i case
+        Philips, così il form di creazione sa se mostrare il modal di copia
+        dopo il salvataggio oppure affidarsi (come da sempre) al canale
+        Teams. Switch TEMPORANEO in prova — vedi servicenow/notifications.py.
+        """
+        return Response({"philips_notify_mode": get_philips_notify_mode()})
+
+    # ── Import storico da CSV (preview → commit, come extract → create) ──────
+
+    def _historical_csv_context(self):
+        """Dati condivisi da preview e commit: numeri già in Archie (per il
+        controllo duplicati), indice utenti per il match "assegnato a" (per
+        nome+cognome e per username, quest'ultimo per l'assegnatario fisso
+        dei Type AC/RIS), e lookup dei Type per categoria. Ricalcolati a
+        ogni chiamata così da essere sempre aggiornati rispetto allo stato
+        corrente del DB.
+        """
+        existing_numbers = {
+            n.upper() for n in
+            ServiceNowCase.objects.filter(deleted_at__isnull=True).values_list("number", flat=True)
+        }
+        return existing_numbers, build_users_name_index(), build_case_type_lookup(), build_users_username_index()
+
+    @staticmethod
+    def _historical_row_to_dict(r) -> dict:
+        return {
+            "line": r.line,
+            "number": r.number,
+            "account": r.account,
+            "category": r.category,
+            "case_type_name": r.case_type_name,
+            "priority": r.priority,
+            "opened_date": r.opened_date,
+            "opened_time": r.opened_time,
+            "short_description": r.short_description,
+            "assigned_to_csv": r.assigned_to_csv,
+            "assigned_to_label": r.assigned_to_label,
+            "outcome": r.outcome,
+            "error": r.error,
+            "warnings": r.warnings,
+        }
+
+    @action(
+        detail=False, methods=["post"], url_path="import-historical-preview",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_historical_preview(self, request):
+        """Valida e mappa TUTTE le righe del CSV senza scrivere nulla sul DB,
+        così l'utente può rivedere il riepilogo (righe da creare, duplicati,
+        errori, avvisi) prima di confermare con import-historical-commit.
+        """
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response(
+                {"detail": "Nessun file CSV caricato (campo 'file' mancante)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_numbers, users_index, case_type_lookup, users_by_username = self._historical_csv_context()
+        rows, missing_columns = process_csv(upload.read(), existing_numbers, users_index, case_type_lookup, users_by_username)
+        if missing_columns:
+            return Response(
+                {"detail": f"Colonne obbligatorie mancanti nel CSV: {', '.join(missing_columns)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "summary": summarize(rows),
+            "rows": [self._historical_row_to_dict(r) for r in rows],
+        })
+
+    @action(
+        detail=False, methods=["post"], url_path="import-historical-commit",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_historical_commit(self, request):
+        """Esegue l'import vero e proprio. Ri-analizza lo stesso CSV (i dati
+        possono essere cambiati tra preview e commit, es. un case creato nel
+        frattempo) e crea un case per ogni riga valida; un errore su una
+        riga non blocca le altre. MAI notifica Teams/modal Philips per
+        queste righe: a differenza di perform_create, qui non si richiama
+        notify_teams_new_case in nessun caso — sono case storici.
+        """
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response(
+                {"detail": "Nessun file CSV caricato (campo 'file' mancante)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_numbers, users_index, case_type_lookup, users_by_username = self._historical_csv_context()
+        rows, missing_columns = process_csv(upload.read(), existing_numbers, users_index, case_type_lookup, users_by_username)
+        if missing_columns:
+            return Response(
+                {"detail": f"Colonne obbligatorie mancanti nel CSV: {', '.join(missing_columns)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = 0
+        for row in rows:
+            if row.outcome != "create":
+                continue
+            case_type_id = case_type_lookup.get((row.category, row.case_type_name.upper()))
+            serializer = ServiceNowCaseSerializer(data=row.payload(case_type_id), context={"request": request})
+            if not serializer.is_valid():
+                row.outcome = "error"
+                row.error = "; ".join(
+                    f"{field}: {', '.join(str(msg) for msg in errs)}"
+                    for field, errs in serializer.errors.items()
+                )
+                continue
+            instance = serializer.save()
+            log_event(
+                actor=request.user, action="create", instance=instance,
+                changes={
+                    k: {"from": None, "to": to_change_value_for_field(k, v)}
+                    for k, v in (serializer.validated_data or {}).items()
+                },
+                request=request,
+            )
+            created += 1
+
+        return Response({
+            "summary": summarize(rows),
+            "created": created,
+            "rows": [self._historical_row_to_dict(r) for r in rows],
+        })
 
     # ── screenshot (media protetta) ───────────────────────────────────────────
 
@@ -689,10 +831,34 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
                 series_map[key] = {"user_id": uid, "name": name, "counts_by_period": {}}
             series_map[key]["counts_by_period"][r["period"]] = r["count"]
 
+        # Breakdown per Type per tecnico (es. quanti dei case L1+EBIT di una
+        # persona sono EBIT): usato dal frontend per il tooltip "Di cui EBIT"
+        # sul totale riga della tabella L1/EBIT. Aggregato sull'intero
+        # queryset filtrato (tutti i periodi), non per singolo periodo.
+        type_totals_by_user = {}
+        for r in qs.values("assigned_to_id", "case_type__name").annotate(count=Count("id")):
+            uid = r["assigned_to_id"]
+            key = uid if uid is not None else "unassigned"
+            type_totals_by_user.setdefault(key, {})[r["case_type__name"]] = r["count"]
+
+        # Stesso breakdown ma per singolo periodo (es. quanti EBIT nel giorno
+        # X): usato dal tooltip "Di cui EBIT" su ogni singola cella della
+        # heatmap, non solo sul totale riga.
+        type_totals_by_user_period = {}
+        for r in qs.values("assigned_to_id", "period", "case_type__name").annotate(count=Count("id")):
+            uid = r["assigned_to_id"]
+            key = uid if uid is not None else "unassigned"
+            type_totals_by_user_period.setdefault(key, {}).setdefault(r["period"], {})[r["case_type__name"]] = r["count"]
+
         series = []
-        for s in series_map.values():
+        for key, s in series_map.items():
             counts = [s["counts_by_period"].get(p["key"], 0) for p in periods]
-            series.append({"user_id": s["user_id"], "name": s["name"], "counts": counts})
+            per_period_types = type_totals_by_user_period.get(key, {})
+            series.append({
+                "user_id": s["user_id"], "name": s["name"], "counts": counts,
+                "type_totals": type_totals_by_user.get(key, {}),
+                "type_totals_by_period": [per_period_types.get(p["key"], {}) for p in periods],
+            })
         series.sort(key=lambda s: sum(s["counts"]), reverse=True)
 
         # ── Overlay assenze: solo in vista giornaliera per ora (per settimana/

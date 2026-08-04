@@ -37,7 +37,16 @@ import { isRecord } from '@shared/utils/guards'
 
 type AbsenceReasonCode = 'ferie' | 'malattia' | 'trasferta' | 'altro'
 type StatsPeriod = { key: number; label: string }
-type StatsSeries = { user_id: number | null; name: string; counts: number[]; absence_periods?: (AbsenceReasonCode | null)[] }
+type StatsSeries = {
+  user_id: number | null
+  name: string
+  counts: number[]
+  absence_periods?: (AbsenceReasonCode | null)[]
+  /** Breakdown per Type (es. {"L1": 12, "EBIT": 3}), aggregato su tutti i periodi. */
+  type_totals?: Record<string, number>
+  /** Come type_totals ma per singolo periodo (stesso ordine di counts/periods). */
+  type_totals_by_period?: Record<string, number>[]
+}
 type TypeBreakdownRow = { id: number; name: string; count: number }
 type StatsResponse = {
   granularity: 'day' | 'week' | 'month'
@@ -198,7 +207,16 @@ const ABSENCE_CELL_STYLE: Record<AbsenceReasonCode, { letter: string; bg: string
 
 // ─── Matrice heatmap ────────────────────────────────────────────────────────
 
-function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: StatsSeries[] }) {
+export function StatsMatrix({ periods, series, showRowTotal, rowTotalTooltip, cellTooltip }: {
+  periods: StatsPeriod[]
+  series: StatsSeries[]
+  /** Aggiunge una colonna "Totale" (somma dei periodi) per ogni tecnico. */
+  showRowTotal?: boolean
+  /** Testo del tooltip mostrato sul totale di una riga (es. "Di cui EBIT: 3"). null/undefined = nessun tooltip per quella riga. */
+  rowTotalTooltip?: (s: StatsSeries) => string | null | undefined
+  /** Testo del tooltip mostrato su una singola cella (tecnico × periodo), es. "Di cui EBIT: 1" per quel giorno. null/undefined = nessun tooltip per quella cella. */
+  cellTooltip?: (s: StatsSeries, periodIndex: number) => string | null | undefined
+}) {
   const max = Math.max(1, ...series.flatMap((s) => s.counts))
 
   const colorFor = (v: number) => {
@@ -218,6 +236,9 @@ function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: Stat
     return <Typography sx={{ color: 'text.disabled', fontSize: 13, py: 4, textAlign: 'center' }}>Nessun dato per i filtri selezionati</Typography>
   }
 
+  const rowTotal = (s: StatsSeries) => s.counts.reduce((a, b) => a + b, 0)
+  const grandTotal = series.reduce((sum, s) => sum + rowTotal(s), 0)
+
   return (
     <Box sx={{ overflowX: 'auto' }}>
       <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem' }}>
@@ -227,6 +248,15 @@ function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: Stat
             {periods.map((p) => (
               <Box component="th" key={p.key} sx={{ textAlign: 'center', p: 0.5, color: 'text.secondary', fontWeight: 600, minWidth: 28 }}>{p.label}</Box>
             ))}
+            {showRowTotal && (
+              <Box component="th" sx={{
+                textAlign: 'center', p: 0.5, color: 'text.secondary', fontWeight: 700, minWidth: 40,
+                borderLeft: '1px solid', borderColor: 'divider',
+                position: 'sticky', right: 0, bgcolor: 'background.paper',
+              }}>
+                Totale
+              </Box>
+            )}
           </Box>
         </Box>
         <Box component="tbody">
@@ -237,14 +267,58 @@ function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: Stat
                 const reason = s.absence_periods?.[i]
                 const style = reason ? ABSENCE_CELL_STYLE[reason] : null
                 const c = style ? { bg: style.bg, fg: style.fg } : colorFor(v)
-                return (
-                  <Box component="td" key={periods[i].key} sx={{ p: 0.4 }}>
-                    <Box sx={{ bgcolor: c.bg, color: c.fg, borderRadius: 0.5, textAlign: 'center', fontWeight: 700, py: 0.3 }}>
+                const tooltip = cellTooltip?.(s, i)
+                const inner = (
+                  <Box component="td" sx={{ p: 0.4, ...(tooltip ? { cursor: 'help' } : {}) }}>
+                    <Box sx={{
+                      bgcolor: c.bg, color: c.fg, borderRadius: 0.5, textAlign: 'center', fontWeight: 700, py: 0.3,
+                      ...(tooltip ? { textDecoration: 'underline dotted', textUnderlineOffset: '2px' } : {}),
+                    }}>
                       {style ? style.letter : (v || '')}
                     </Box>
                   </Box>
                 )
+                // Stesso principio della cella Totale: il Tooltip avvolge
+                // l'INTERA cella (hitbox grande) e la sottolineatura
+                // tratteggiata segnala visivamente che c'è altro da vedere.
+                return (
+                  <React.Fragment key={periods[i].key}>
+                    {tooltip ? <MuiTooltip title={tooltip} arrow>{inner}</MuiTooltip> : inner}
+                  </React.Fragment>
+                )
               })}
+              {showRowTotal && (() => {
+                const total = rowTotal(s)
+                const tooltip = rowTotalTooltip?.(s)
+                const cellBox = (
+                  <Box
+                    component="td"
+                    sx={{
+                      p: 0.4, borderLeft: '1px solid', borderColor: 'divider',
+                      position: 'sticky', right: 0, bgcolor: 'background.paper',
+                      ...(tooltip ? { cursor: 'help' } : {}),
+                    }}
+                  >
+                    <Box sx={{
+                      textAlign: 'center', fontWeight: 700, py: 0.3, borderRadius: 0.5,
+                      color: total ? 'text.primary' : 'text.disabled',
+                      ...(tooltip ? {
+                        textDecoration: 'underline dotted',
+                        textDecorationColor: 'text.disabled',
+                        textUnderlineOffset: '3px',
+                      } : {}),
+                    }}>
+                      {total || '—'}
+                    </Box>
+                  </Box>
+                )
+                // Il Tooltip avvolge l'INTERA cella (non solo il numero): un
+                // hitbox più grande evita che sfiorare di un pixel il bordo
+                // faccia sembrare l'hover "rotto". La sottolineatura
+                // tratteggiata sopra è l'indizio visivo che c'è altro da
+                // vedere, indipendente dal solo cambio di cursore.
+                return tooltip ? <MuiTooltip title={tooltip} arrow>{cellBox}</MuiTooltip> : cellBox
+              })()}
             </Box>
           ))}
         </Box>
@@ -263,6 +337,16 @@ function StatsMatrix({ periods, series }: { periods: StatsPeriod[]; series: Stat
                 </Box>
               )
             })}
+            {showRowTotal && (
+              <Box component="td" sx={{
+                p: 0.4, borderTop: '1px solid', borderLeft: '1px solid', borderColor: 'divider',
+                position: 'sticky', right: 0, bgcolor: 'background.paper',
+              }}>
+                <Box sx={{ textAlign: 'center', fontWeight: 700, py: 0.3, color: grandTotal ? 'text.primary' : 'text.disabled' }}>
+                  {grandTotal || '—'}
+                </Box>
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>
@@ -312,6 +396,56 @@ function StatsBarChart({ periods, series }: { periods: StatsPeriod[]; series: St
   )
 }
 
+// ─── Blocco tabella/grafico + legenda assenze (riusato per ogni tabella) ────
+
+function StatsTableBlock({ title, view, data, showRowTotal, rowTotalTooltip, cellTooltip }: {
+  title?: string
+  view: 'chart' | 'matrix'
+  data: StatsResponse
+  showRowTotal?: boolean
+  rowTotalTooltip?: (s: StatsSeries) => string | null | undefined
+  cellTooltip?: (s: StatsSeries, periodIndex: number) => string | null | undefined
+}) {
+  return (
+    <Box sx={{ bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+      {title && (
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
+          {title}
+        </Typography>
+      )}
+      {view === 'chart'
+        ? <StatsBarChart periods={data.periods} series={data.series} />
+        : <StatsMatrix periods={data.periods} series={data.series} showRowTotal={showRowTotal} rowTotalTooltip={rowTotalTooltip} cellTooltip={cellTooltip} />}
+      {view === 'matrix' && data.series.some((s) => s.absence_periods?.some(Boolean)) && (
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1, flexWrap: 'wrap' }}>
+          {(['malattia', 'ferie', 'altro'] as const).map((r) => (
+            <Stack key={r} direction="row" alignItems="center" spacing={0.5}>
+              <Box sx={{
+                width: 16, height: 16, borderRadius: 0.5,
+                bgcolor: ABSENCE_CELL_STYLE[r].bg, color: ABSENCE_CELL_STYLE[r].fg,
+                fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {ABSENCE_CELL_STYLE[r].letter}
+              </Box>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                {r === 'malattia' ? 'Malattia' : r === 'ferie' ? 'Ferie' : 'Trasferta / Altro'}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+      )}
+    </Box>
+  )
+}
+
+// ─── Type Philips raggruppati per le due tabelle (vedi CategoryStatsPanel) ──
+// "Casi L1 · EBIT": tabella principale, totale riga = L1+EBIT combinati,
+// col tooltip che isola il sottoinsieme EBIT. "AC · GEMELLI · RIS": tabella
+// separata, i tre Type sommati in un unico numero per cella. Biotron non ha
+// questi Type (solo L1/PRIVATI/CDD) e non è toccato da questo split.
+const PHILIPS_MAIN_TYPES = ['L1', 'EBIT']
+const PHILIPS_SECONDARY_TYPES = ['AC', 'GEMELLI', 'RIS']
+
 // ─── Pannello statistiche per una singola categoria ──────────────────────────
 
 function CategoryStatsPanel({ category, label, allUsers }: {
@@ -329,8 +463,14 @@ function CategoryStatsPanel({ category, label, allUsers }: {
   const [view, setView]             = React.useState<'chart' | 'matrix'>('matrix')
 
   const [typeRows, setTypeRows] = React.useState<CaseTypeOption[]>([])
+  // Chip Type manuali: solo Biotron (L1/PRIVATI/CDD). Per Philips lo split
+  // L1+EBIT / AC+GEMELLI+RIS è automatico in due tabelle separate, i chip
+  // non servono più (vedi PHILIPS_MAIN_TYPES/PHILIPS_SECONDARY_TYPES).
   const [caseTypes, setCaseTypes] = React.useState<number[]>([])
   const [data, setData] = React.useState<StatsResponse | null>(null)
+  // Solo per Philips: dataset della tabella "L1 · EBIT" e "AC · GEMELLI · RIS".
+  const [mainData, setMainData] = React.useState<StatsResponse | null>(null)
+  const [secondaryData, setSecondaryData] = React.useState<StatsResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
 
   // Tecnici assegnabili a questa categoria (stesso criterio del drawer di inserimento)
@@ -346,22 +486,58 @@ function CategoryStatsPanel({ category, label, allUsers }: {
     setCaseTypes((prev) => prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id])
   }
 
-  const buildStatsParams = React.useCallback((): Record<string, string | number | number[]> => {
+  const mainTypeIds = React.useMemo(
+    () => typeRows.filter((t) => PHILIPS_MAIN_TYPES.includes(t.name)).map((t) => t.id),
+    [typeRows],
+  )
+  const secondaryTypeIds = React.useMemo(
+    () => typeRows.filter((t) => PHILIPS_SECONDARY_TYPES.includes(t.name)).map((t) => t.id),
+    [typeRows],
+  )
+
+  const buildStatsParams = React.useCallback((overrideCaseTypeIds?: number[]): Record<string, string | number | number[]> => {
     const params: Record<string, string | number | number[]> = { year, granularity, category }
     if (granularity === 'day') params.month = month
     if (granularity === 'week' && week !== '') params.week = week
-    if (caseTypes.length > 0) params.case_type = caseTypes
+    // Philips non usa più i chip manuali: ogni chiamata passa esplicitamente
+    // il set di Type che le serve (o nessuno, per il dataset KPI "tutti i Type").
+    const caseTypeIds = overrideCaseTypeIds !== undefined
+      ? overrideCaseTypeIds
+      : (category === 'biotron' ? caseTypes : [])
+    if (caseTypeIds.length > 0) params.case_type = caseTypeIds
     if (assignedTo.length > 0) params.assigned_to = assignedTo
     return params
   }, [category, year, granularity, month, week, caseTypes, assignedTo])
 
+  // Per Philips servono i type_id di L1/EBIT/AC/GEMELLI/RIS (da typeRows)
+  // prima di poter interrogare le due tabelle: senza aspettarli si
+  // vedrebbe per un istante il dataset "tutti i Type" al posto di quello
+  // corretto, finché typeRows non arriva.
+  const philipsTypesReady = category !== 'philips' || (mainTypeIds.length > 0 && secondaryTypeIds.length > 0)
+
   React.useEffect(() => {
+    if (!philipsTypesReady) return
     setLoading(true)
-    api.get<StatsResponse>('/servicenow-cases/stats/', { params: buildStatsParams() })
-      .then((r) => setData(r.data))
-      .catch((e) => toast.error(apiErrorToMessage(e)))
-      .finally(() => setLoading(false))
-  }, [buildStatsParams, toast])
+    if (category === 'philips') {
+      Promise.all([
+        api.get<StatsResponse>('/servicenow-cases/stats/', { params: buildStatsParams([]) }),        // KPI: tutti i Type
+        api.get<StatsResponse>('/servicenow-cases/stats/', { params: buildStatsParams(mainTypeIds) }),
+        api.get<StatsResponse>('/servicenow-cases/stats/', { params: buildStatsParams(secondaryTypeIds) }),
+      ])
+        .then(([kpiRes, mainRes, secRes]) => {
+          setData(kpiRes.data)
+          setMainData(mainRes.data)
+          setSecondaryData(secRes.data)
+        })
+        .catch((e) => toast.error(apiErrorToMessage(e)))
+        .finally(() => setLoading(false))
+    } else {
+      api.get<StatsResponse>('/servicenow-cases/stats/', { params: buildStatsParams() })
+        .then((r) => setData(r.data))
+        .catch((e) => toast.error(apiErrorToMessage(e)))
+        .finally(() => setLoading(false))
+    }
+  }, [philipsTypesReady, category, buildStatsParams, mainTypeIds, secondaryTypeIds, toast])
 
   const [exportingPdf, setExportingPdf] = React.useState(false)
 
@@ -389,6 +565,27 @@ function CategoryStatsPanel({ category, label, allUsers }: {
   }
 
   const isSm = { size: 'small' as const }
+
+  // Totale riga L1+EBIT combinati: il tooltip isola il sottoinsieme EBIT.
+  // Sempre visibile quando la riga ha almeno un caso (anche "Di cui EBIT: 0"),
+  // altrimenti il mouseover su una persona con soli case L1 non mostrava
+  // nulla e sembrava "rotto".
+  const ebitTooltip = (s: StatsSeries) => {
+    const total = s.counts.reduce((a, b) => a + b, 0)
+    if (total === 0) return null
+    const ebit = s.type_totals?.EBIT ?? 0
+    return `Di cui EBIT: ${ebit}`
+  }
+
+  // Stesso principio ma per singola cella (tecnico × giorno/periodo), non
+  // solo sul totale riga.
+  const ebitCellTooltip = (s: StatsSeries, i: number) => {
+    if (s.counts[i] === 0) return null
+    const ebit = s.type_totals_by_period?.[i]?.EBIT ?? 0
+    return `Di cui EBIT: ${ebit}`
+  }
+
+  const dataReady = category === 'philips' ? Boolean(data && mainData && secondaryData) : Boolean(data)
 
   return (
     <Stack spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
@@ -472,23 +669,27 @@ function CategoryStatsPanel({ category, label, allUsers }: {
         </MuiTooltip>
       </Stack>
 
-      <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={0.5} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, mr: 0.25 }}>Type</Typography>
-        {typeRows.map((o) => (
-          <Chip
-            key={o.id}
-            size="small"
-            label={o.name}
-            clickable
-            onClick={() => toggleCaseType(o.id)}
-            color={caseTypes.includes(o.id) ? 'primary' : 'default'}
-            variant={caseTypes.includes(o.id) ? 'filled' : 'outlined'}
-            sx={{ fontSize: '0.72rem' }}
-          />
-        ))}
-      </Stack>
+      {/* Chip Type manuali: solo Biotron. Philips ha le due tabelle fisse
+          L1·EBIT e AC·GEMELLI·RIS, i chip non servono più. */}
+      {category === 'biotron' && (
+        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={0.5} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+          <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, mr: 0.25 }}>Type</Typography>
+          {typeRows.map((o) => (
+            <Chip
+              key={o.id}
+              size="small"
+              label={o.name}
+              clickable
+              onClick={() => toggleCaseType(o.id)}
+              color={caseTypes.includes(o.id) ? 'primary' : 'default'}
+              variant={caseTypes.includes(o.id) ? 'filled' : 'outlined'}
+              sx={{ fontSize: '0.72rem' }}
+            />
+          ))}
+        </Stack>
+      )}
 
-      {loading || !data ? (
+      {loading || !dataReady || !data ? (
         <Stack alignItems="center" justifyContent="center" minHeight={160}>
           <CircularProgress size={24} />
         </Stack>
@@ -506,29 +707,14 @@ function CategoryStatsPanel({ category, label, allUsers }: {
             />
           </Stack>
 
-          <Box sx={{ bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
-            {view === 'chart'
-              ? <StatsBarChart periods={data.periods} series={data.series} />
-              : <StatsMatrix periods={data.periods} series={data.series} />}
-            {view === 'matrix' && data.series.some((s) => s.absence_periods?.some(Boolean)) && (
-              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                {(['malattia', 'ferie', 'altro'] as const).map((r) => (
-                  <Stack key={r} direction="row" alignItems="center" spacing={0.5}>
-                    <Box sx={{
-                      width: 16, height: 16, borderRadius: 0.5,
-                      bgcolor: ABSENCE_CELL_STYLE[r].bg, color: ABSENCE_CELL_STYLE[r].fg,
-                      fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {ABSENCE_CELL_STYLE[r].letter}
-                    </Box>
-                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                      {r === 'malattia' ? 'Malattia' : r === 'ferie' ? 'Ferie' : 'Trasferta / Altro'}
-                    </Typography>
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-          </Box>
+          {category === 'philips' && mainData && secondaryData ? (
+            <>
+              <StatsTableBlock title="Casi L1 · EBIT" view={view} data={mainData} showRowTotal rowTotalTooltip={ebitTooltip} cellTooltip={ebitCellTooltip} />
+              <StatsTableBlock title="Casi AC · GEMELLI · RIS" view={view} data={secondaryData} showRowTotal />
+            </>
+          ) : (
+            <StatsTableBlock view={view} data={data} />
+          )}
         </>
       )}
     </Stack>

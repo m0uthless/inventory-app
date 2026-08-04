@@ -24,7 +24,10 @@ def _make_tech(name="Tech"):
 
 
 def _make_case_type(category=ServiceNowCaseCategory.BIOTRON, name=None):
-    return ServiceNowCaseType.objects.create(category=category, name=name or f"TT{uuid.uuid4().hex[:8]}")
+    if name:
+        obj, _ = ServiceNowCaseType.objects.get_or_create(category=category, name=name)
+        return obj
+    return ServiceNowCaseType.objects.create(category=category, name=f"TT{uuid.uuid4().hex[:8]}")
 
 
 def _create_case(api_client, case_type, *, opened_date, category=ServiceNowCaseCategory.BIOTRON,
@@ -223,3 +226,69 @@ def test_stats_empty_period_returns_zero_kpi(api_client, superuser):
     assert resp.data["kpi"]["total"] == 0
     assert resp.data["kpi"]["top_technician"] is None
     assert resp.data["series"] == []
+
+
+# ─── type_totals per serie (breakdown per Type, usato dal tooltip "Di cui EBIT") ──
+
+def test_stats_series_includes_type_totals_breakdown(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    l1 = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+    ebit = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="EBIT")
+    tech = _make_tech("Nicole")
+
+    _create_case(api_client, l1, opened_date=date(2026, 7, 1), category=ServiceNowCaseCategory.PHILIPS, assigned_to=tech)
+    _create_case(api_client, l1, opened_date=date(2026, 7, 2), category=ServiceNowCaseCategory.PHILIPS, assigned_to=tech)
+    _create_case(api_client, ebit, opened_date=date(2026, 7, 3), category=ServiceNowCaseCategory.PHILIPS, assigned_to=tech)
+
+    resp = api_client.get(
+        "/api/servicenow-cases/stats/",
+        {"year": 2026, "granularity": "month", "category": "philips", "case_type": [l1.id, ebit.id]},
+    )
+    assert resp.status_code == 200, resp.data
+    series = next(s for s in resp.data["series"] if s["user_id"] == tech.id)
+    assert series["type_totals"] == {"L1": 2, "EBIT": 1}
+    assert sum(series["counts"]) == 3  # totale riga = L1 + EBIT combinati
+
+
+def test_stats_type_totals_for_unassigned_bucket(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    l1 = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+    _create_case(api_client, l1, opened_date=date(2026, 7, 1), category=ServiceNowCaseCategory.PHILIPS)  # senza assigned_to
+
+    resp = api_client.get(
+        "/api/servicenow-cases/stats/", {"year": 2026, "granularity": "month", "category": "philips"},
+    )
+    unassigned = next(s for s in resp.data["series"] if s["user_id"] is None)
+    assert unassigned["type_totals"] == {"L1": 1}
+
+
+def test_stats_series_includes_type_totals_by_period(api_client, superuser):
+    """Breakdown per Type per singolo periodo (non solo aggregato): usato dal
+    tooltip 'Di cui EBIT' su ogni cella della heatmap, non solo sul totale
+    riga. Due case L1 a luglio, un EBIT ad agosto: il periodo di luglio non
+    deve "vedere" l'EBIT di agosto e viceversa."""
+    api_client.force_authenticate(user=superuser)
+    l1 = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+    ebit = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="EBIT")
+    tech = _make_tech("Nicole")
+
+    _create_case(api_client, l1, opened_date=date(2026, 7, 1), category=ServiceNowCaseCategory.PHILIPS, assigned_to=tech)
+    _create_case(api_client, l1, opened_date=date(2026, 7, 2), category=ServiceNowCaseCategory.PHILIPS, assigned_to=tech)
+    _create_case(api_client, ebit, opened_date=date(2026, 8, 1), category=ServiceNowCaseCategory.PHILIPS, assigned_to=tech)
+
+    resp = api_client.get(
+        "/api/servicenow-cases/stats/",
+        {"year": 2026, "granularity": "month", "category": "philips", "case_type": [l1.id, ebit.id]},
+    )
+    series = next(s for s in resp.data["series"] if s["user_id"] == tech.id)
+    periods = resp.data["periods"]
+    july_index = next(i for i, p in enumerate(periods) if p["label"] == "Lug")
+    august_index = next(i for i, p in enumerate(periods) if p["label"] == "Ago")
+
+    assert series["counts"][july_index] == 2
+    assert series["counts"][august_index] == 1
+    assert series["type_totals_by_period"][july_index] == {"L1": 2}
+    assert series["type_totals_by_period"][august_index] == {"EBIT": 1}
+    # Un periodo senza case per questa persona ha un breakdown vuoto, non un errore.
+    other_index = next(i for i in range(len(periods)) if i not in (july_index, august_index))
+    assert series["type_totals_by_period"][other_index] == {}
