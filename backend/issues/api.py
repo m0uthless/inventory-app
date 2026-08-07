@@ -13,7 +13,7 @@ from audit.utils import log_event, to_change_value_for_field
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
-from issues.models import Issue, IssueCategory, IssueComment, IssueStatus
+from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
 
 User = get_user_model()
 
@@ -54,8 +54,9 @@ class IssueCommentSerializer(serializers.ModelSerializer):
 
 
 class IssueSerializer(serializers.ModelSerializer):
-    customer_name           = serializers.CharField(source="customer.name",              read_only=True)
+    customer_name           = serializers.SerializerMethodField()
     customer_code           = serializers.CharField(source="customer.code",              read_only=True)
+    is_customer_placeholder = serializers.SerializerMethodField()
     site_name               = serializers.CharField(source="site.name",                  read_only=True)
     inventory_name          = serializers.CharField(source="inventory.name",             read_only=True)
     inventory_knumber       = serializers.CharField(source="inventory.knumber",          read_only=True)
@@ -71,6 +72,14 @@ class IssueSerializer(serializers.ModelSerializer):
     status_label            = serializers.CharField(source="get_status_display",         read_only=True)
     comments_count          = serializers.SerializerMethodField()
     days_open               = serializers.SerializerMethodField()
+
+    def get_customer_name(self, obj):
+        if obj.customer_placeholder:
+            return obj.customer_placeholder
+        return obj.customer.name if obj.customer_id else None
+
+    def get_is_customer_placeholder(self, obj):
+        return bool(obj.customer_placeholder)
 
     def get_assigned_to_full_name(self, obj):
         u = obj.assigned_to
@@ -150,6 +159,28 @@ class IssueSerializer(serializers.ModelSerializer):
 
         errors = {}
 
+        # ── Cliente non presente in anagrafica: testo libero al posto del FK ──
+        placeholder_text = attrs.get("customer_placeholder", "").strip() if "customer_placeholder" in attrs else None
+        if placeholder_text:
+            if site is not None or inventory is not None:
+                errors["customer_placeholder"] = (
+                    "Non è possibile indicare sito o inventory quando il cliente è un testo libero."
+                )
+            else:
+                attrs["customer_placeholder"] = placeholder_text
+                attrs["customer"] = get_placeholder_customer()
+                customer = attrs["customer"]
+        elif placeholder_text == "" and "customer_placeholder" in attrs:
+            # L'utente ha rimosso il placeholder: deve selezionare un cliente reale.
+            if customer is None:
+                errors["customer"] = "Il cliente è obbligatorio."
+
+        if customer is None and not placeholder_text:
+            errors.setdefault(
+                "customer",
+                "Il cliente è obbligatorio, oppure spunta \"Cliente non presente in DB\" e inserisci un nome.",
+            )
+
         # ── Assegnazione: solo utenti tecnici ServiceNow non-Philips (categoria Biotron) ──
         if "assigned_to" in attrs and attrs["assigned_to"] is not None:
             assignee = attrs["assigned_to"]
@@ -181,6 +212,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "id",
             "title", "description", "servicenow_id",
             "customer", "customer_name", "customer_code",
+            "customer_placeholder", "is_customer_placeholder",
             "site", "site_name",
             "inventory", "inventory_name", "inventory_knumber", "inventory_serial_number", "inventory_hostname",
             "category", "category_label",
@@ -195,12 +227,19 @@ class IssueSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id", "created_by", "created_at", "updated_at", "deleted_at",
-            "customer_name", "customer_code", "site_name", "category_label",
+            "customer_name", "customer_code", "is_customer_placeholder", "site_name", "category_label",
             "inventory_name", "inventory_knumber", "inventory_serial_number", "inventory_hostname",
             "assigned_to_username", "assigned_to_full_name", "assigned_to_avatar",
             "created_by_username", "created_by_full_name",
             "priority_label", "status_label", "comments_count", "days_open", "closed_at",
         ]
+        extra_kwargs = {
+            # Obbligatorio a livello di modello (FK non-null): qui diventa
+            # facoltativo perché può essere sostituito da customer_placeholder
+            # (vedi validate()), che risolve comunque un customer reale
+            # (il record sentinella) prima del salvataggio.
+            "customer": {"required": False},
+        }
 
 
 # ─── Filters ─────────────────────────────────────────────────────────────────
@@ -266,7 +305,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     filter_backends     = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class     = IssueFilter
     search_fields       = [
-        "title", "description", "servicenow_id", "customer__name",
+        "title", "description", "servicenow_id", "customer__name", "customer_placeholder",
         "inventory__name", "inventory__knumber", "inventory__serial_number", "inventory__hostname",
     ]
     ordering_fields     = [

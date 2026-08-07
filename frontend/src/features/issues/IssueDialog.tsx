@@ -3,12 +3,14 @@ import {
   Alert,
   Autocomplete,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -106,36 +108,79 @@ export default function IssueDialog({
             helperText={errors.title}
           />
 
-          <Autocomplete
-            size="small"
-            value={form.customer}
-            inputValue={customerInput}
-            onInputChange={(_, value) => onCustomerInputChange(value)}
-            onChange={(_, value) => onFormChange((f) => ({ ...f, customer: value, site_id: '' }))}
-            options={customerOptions}
-            loading={customerLoading}
-            isOptionEqualToValue={(a, b) => a.id === b.id}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Cliente *"
+          {form.useCustomerPlaceholder ? (
+            <TextField
+              label="Cliente (testo libero) *"
+              size="small"
+              fullWidth
+              value={form.customerPlaceholder}
+              onChange={(e) => onFormChange((f) => ({ ...f, customerPlaceholder: e.target.value }))}
+              error={Boolean(errors.customer_placeholder || errors.customer)}
+              helperText={
+                errors.customer_placeholder || errors.customer ||
+                'Cliente non ancora presente in anagrafica: verrà collegato in un secondo momento.'
+              }
+              placeholder="Nome del cliente"
+            />
+          ) : (
+            <Autocomplete
+              size="small"
+              value={form.customer}
+              inputValue={customerInput}
+              onInputChange={(_, value) => onCustomerInputChange(value)}
+              onChange={(_, value) => onFormChange((f) => ({ ...f, customer: value, site_id: '' }))}
+              options={customerOptions}
+              loading={customerLoading}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Cliente *"
+                  size="small"
+                  error={Boolean(errors.customer)}
+                  helperText={errors.customer}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {customerLoading ? <CircularProgress size={16} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          )}
+
+          <FormControlLabel
+            sx={{ mt: -1, ml: 0 }}
+            control={
+              <Checkbox
                 size="small"
-                error={Boolean(errors.customer)}
-                helperText={errors.customer}
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {customerLoading ? <CircularProgress size={16} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
+                checked={form.useCustomerPlaceholder}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  onFormChange((f) => ({
+                    ...f,
+                    useCustomerPlaceholder: checked,
+                    // Passando al testo libero azzeriamo cliente/sito (non applicabili);
+                    // tornando all'anagrafica azzeriamo il testo libero.
+                    customer: checked ? null : f.customer,
+                    site_id: checked ? '' : f.site_id,
+                    customerPlaceholder: checked ? f.customerPlaceholder : '',
+                  }))
                 }}
               />
-            )}
+            }
+            label={
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Cliente non presente in DB
+              </Typography>
+            }
           />
 
-          {siteOptions.length > 0 ? (
+          {!form.useCustomerPlaceholder && siteOptions.length > 0 ? (
             <FormControl size="small" fullWidth>
               <InputLabel>Sito</InputLabel>
               <Select
@@ -286,7 +331,7 @@ export default function IssueDialog({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        {editIssue && !isClosed ? (
+        {editIssue && !isClosed && !editIssue.is_customer_placeholder ? (
           <Button variant="outlined" onClick={onOpenLinkInventory} disabled={saving}>
             Collega a inventory
           </Button>

@@ -1,9 +1,44 @@
 from django.conf import settings
 from django.db import models
 
-from core.models import TimeStampedModel, LookupBase
+from core.models import TimeStampedModel, LookupBase, CustomerStatus
 from crm.models import Customer, Site
 from inventory.models import Inventory
+
+
+# ─── Cliente placeholder (issue create da caso ServiceNow senza match in anagrafica) ──
+
+# Codice fisso del cliente "sentinella": tenere il FK Issue.customer sempre
+# valorizzato (obbligatorio, on_delete=PROTECT) anche quando il cliente reale
+# non è ancora presente in anagrafica. Il nome effettivo digitato dall'utente
+# viene conservato in Issue.customer_placeholder; l'API sostituisce sempre il
+# FK con questo record quando customer_placeholder è valorizzato.
+PLACEHOLDER_CUSTOMER_CODE = "SYS-PLACEHOLDER"
+
+
+def get_placeholder_customer():
+    """Recupera (o crea) il cliente sentinella usato per le issue con cliente
+    non ancora presente in anagrafica. Idempotente: safe da chiamare ad ogni
+    save, non richiede una migrazione dati dedicata.
+
+    Il record viene creato soft-deleted (deleted_at valorizzato) in modo da
+    non comparire mai nelle liste/autocomplete cliente standard: resta
+    comunque un FK valido e riutilizzabile via get_or_create(code=...)."""
+    from django.utils import timezone
+
+    status, _ = CustomerStatus.objects.get_or_create(
+        key="placeholder",
+        defaults={"label": "N/D (placeholder)", "sort_order": 999, "is_active": True},
+    )
+    customer = Customer.objects.filter(code=PLACEHOLDER_CUSTOMER_CODE).first()
+    if customer is None:
+        customer = Customer.objects.create(
+            code=PLACEHOLDER_CUSTOMER_CODE,
+            name="Cliente da specificare",
+            status=status,
+            deleted_at=timezone.now(),
+        )
+    return customer
 
 
 # ─── Lookup: categoria issue (configurabile da admin) ────────────────────────
@@ -54,6 +89,15 @@ class Issue(TimeStampedModel):
     customer        = models.ForeignKey(
         Customer, on_delete=models.PROTECT,
         related_name="issues", verbose_name="Cliente",
+    )
+    customer_placeholder = models.CharField(
+        max_length=255, blank=True,
+        verbose_name="Cliente (testo libero)",
+        help_text=(
+            "Nome del cliente reale, usato quando non è ancora presente in "
+            "anagrafica. Se valorizzato, il campo Cliente punta al record "
+            "sentinella e questo testo viene mostrato al suo posto."
+        ),
     )
     site            = models.ForeignKey(
         Site, null=True, blank=True, on_delete=models.SET_NULL,
@@ -109,6 +153,10 @@ class Issue(TimeStampedModel):
 
     def __str__(self):
         return f"[{self.get_priority_display()}] {self.title}"
+
+    @property
+    def is_customer_placeholder(self):
+        return bool(self.customer_placeholder)
 
 
 # ─── IssueComment ─────────────────────────────────────────────────────────────

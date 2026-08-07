@@ -6,6 +6,8 @@ export type IssueRow = {
   customer: number
   customer_name: string
   customer_code: string
+  customer_placeholder: string
+  is_customer_placeholder: boolean
   site: number | null
   site_name: string | null
   inventory: number | null
@@ -73,6 +75,8 @@ export type IssueFormData = {
   description: string
   servicenow_id: string
   customer: CustomerOption | null
+  useCustomerPlaceholder: boolean
+  customerPlaceholder: string
   site_id: number | ''
   category_id: number | ''
   assigned_to_id: number | ''
@@ -170,6 +174,8 @@ export function createEmptyIssueForm(defaultAssignedToId?: number): IssueFormDat
     description: '',
     servicenow_id: '',
     customer: null,
+    useCustomerPlaceholder: false,
+    customerPlaceholder: '',
     site_id: '',
     category_id: '',
     assigned_to_id: defaultAssignedToId ?? '',

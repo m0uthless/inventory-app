@@ -750,14 +750,18 @@ export default function Issues() {
     } else if (cfsn) {
       // Pre-compila il form con i dati del ServiceNow Case: il case non ha un
       // collegamento diretto a Customer/Site, quindi vanno scelti manualmente.
+      // L'account del caso viene comunque usato per avviare la ricerca del
+      // cliente in anagrafica e, se l'utente spunta "Cliente non presente in
+      // DB", come testo libero già pronto.
       setEditIssue(null)
       setForm({
         ...createEmptyForm(me?.id),
         title: (cfsn.shortDescription.trim() || `Caso ServiceNow ${cfsn.number}`).slice(0, 255),
         description: cfsn.shortDescription,
         servicenow_id: cfsn.number,
+        customerPlaceholder: cfsn.account || '',
       })
-      setCustFormInput('')
+      setCustFormInput(cfsn.account || '')
       setFormErrors({})
       setInventoryOptions([])
       setSelectedInventory(null)
@@ -780,7 +784,9 @@ export default function Issues() {
       title: row.title,
       description: row.description,
       servicenow_id: row.servicenow_id,
-      customer: custOpt,
+      customer: row.is_customer_placeholder ? null : custOpt,
+      useCustomerPlaceholder: row.is_customer_placeholder,
+      customerPlaceholder: row.customer_placeholder || '',
       site_id: row.site ?? '',
       category_id: row.category ?? '',
       assigned_to_id: row.assigned_to ?? '',
@@ -856,7 +862,11 @@ export default function Issues() {
   const handleFormSave = async () => {
     const errors: Record<string, string> = {}
     if (!form.title.trim()) errors.title = 'Il titolo è obbligatorio.'
-    if (!form.customer) errors.customer = 'Il cliente è obbligatorio.'
+    if (form.useCustomerPlaceholder) {
+      if (!form.customerPlaceholder.trim()) errors.customer_placeholder = 'Il nome del cliente è obbligatorio.'
+    } else if (!form.customer) {
+      errors.customer = 'Il cliente è obbligatorio.'
+    }
     if (Object.keys(errors).length) {
       setFormErrors(errors)
       return
@@ -867,14 +877,21 @@ export default function Issues() {
       title: form.title.trim(),
       description: form.description.trim(),
       servicenow_id: form.servicenow_id.trim(),
-      customer: form.customer!.id,
-      site: form.site_id || null,
+      customer_placeholder: form.useCustomerPlaceholder ? form.customerPlaceholder.trim() : '',
       category: form.category_id || null,
       assigned_to: form.assigned_to_id || null,
       priority: form.priority,
       status: form.status,
       opened_at: form.opened_at || null,
       due_date: form.due_date || null,
+    }
+    if (form.useCustomerPlaceholder) {
+      // Cliente/sito non applicabili col testo libero: il backend risolve
+      // customer al record sentinella a partire da customer_placeholder.
+      payload.site = null
+    } else {
+      payload.customer = form.customer!.id
+      payload.site = form.site_id || null
     }
 
     // Se c'è un inventory pre-selezionato (da "Apri issue" in Inventory) lo includiamo subito
@@ -1232,8 +1249,14 @@ export default function Issues() {
       width: 160,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2" noWrap>
+          <Typography
+            variant="body2"
+            noWrap
+            sx={row.is_customer_placeholder ? { fontStyle: 'italic', color: 'text.secondary' } : undefined}
+            title={row.is_customer_placeholder ? 'Cliente non presente in DB (testo libero)' : undefined}
+          >
             {row.customer_name}
+            {row.is_customer_placeholder ? ' *' : ''}
           </Typography>
         </Box>
       ),
