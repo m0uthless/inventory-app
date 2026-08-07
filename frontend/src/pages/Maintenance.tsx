@@ -761,6 +761,7 @@ export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function Maintenance() {
+  const theme = useTheme()
   const { me } = useAuth()
   const toast = useToast()
   const { exporting, exportCsv } = useExportCsv()
@@ -1066,9 +1067,9 @@ export default function Maintenance() {
     <Stack spacing={2}>
       {/* KPI */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
-        <StatCard value={overdueCount} label="Scaduti" sublabel={overdueCount === 1 ? 'Scadenza in ritardo' : 'Scadenze in ritardo'} accent="#ef4444" icon={WarningAmberRoundedIcon} />
-        <StatCard value={next30Count} label="Prossimi 30 gg" sublabel="In scadenza a breve" accent="#f59e0b" icon={CheckCircleOutlineIcon} />
-        <StatCard value={kpiCounts.total} label="Totale scadenze" sublabel="Da completare" accent="#0f766e" icon={BuildOutlinedIcon} />
+        <StatCard value={overdueCount} label="Scaduti" sublabel={overdueCount === 1 ? 'Scadenza in ritardo' : 'Scadenze in ritardo'} accent={theme.palette.error.main} icon={WarningAmberRoundedIcon} />
+        <StatCard value={next30Count} label="Prossimi 30 gg" sublabel="In scadenza a breve" accent={theme.palette.warning.main} icon={CheckCircleOutlineIcon} />
+        <StatCard value={kpiCounts.total} label="Totale scadenze" sublabel="Da completare" accent={theme.palette.primary.main} icon={BuildOutlinedIcon} />
       </Box>
 
       {/* Grid stile Customers */}

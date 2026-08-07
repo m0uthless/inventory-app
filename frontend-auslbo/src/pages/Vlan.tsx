@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useTheme } from '@mui/material/styles'
 import {
   Alert,
   Box,
@@ -32,6 +33,7 @@ import DeleteVlanDialog from './vlan/DeleteVlanDialog'
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function VlanPage() {
+  const theme = useTheme()
   const { me } = useAuth()
   const nav = useNavigate()
   const customerId = me?.customer.id ?? 0
@@ -156,7 +158,7 @@ export default function VlanPage() {
     <Box>
       {/* KPI */}
       <Stack direction="row" spacing={1.5} sx={{ mb: 2.5, flexWrap: 'wrap' }}>
-        <KpiCard label="VLAN totali"  value={kpi.totalVlan} color="#1A6BB5" sub="in questo customer" />
+        <KpiCard label="VLAN totali"  value={kpi.totalVlan} color={theme.palette.primary.main} sub="in questo customer" />
         <KpiCard label="IP totali"    value={kpi.totalIp}   color="#6366f1" sub="su tutte le VLAN" />
         <KpiCard label="IP liberi"    value={kpi.freeIp}    color="#16a34a" sub={`${kpi.pctFree}% disponibili`} />
         <KpiCard label="IP occupati"  value={kpi.usedIp}    color="#dc2626" sub="da inventory / device" />

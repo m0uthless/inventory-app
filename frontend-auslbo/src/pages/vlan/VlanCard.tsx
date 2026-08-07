@@ -14,6 +14,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -68,6 +69,7 @@ export default function VlanCard({
   onDelete: (v: VlanRow) => void
   onRequestSaved: () => void
 }) {
+  const theme = useTheme()
   const [expanded, setExpanded] = React.useState(false)
   const [pool, setPool] = React.useState<IpPoolEntry[] | null>(null)
   const [loadingPool, setLoadingPool] = React.useState(false)
@@ -137,7 +139,7 @@ export default function VlanCard({
   }
 
   const occ = calcOccupazione(vlan)
-  const occColor = occ > 80 ? '#A32D2D' : occ > 50 ? '#BA7517' : '#3B6D11'
+  const occColor = occ > 80 ? theme.palette.error.dark : occ > 50 ? theme.palette.warning.dark : theme.palette.success.dark
 
   const handleToggle = async () => {
     if (!expanded && pool === null) {
@@ -181,7 +183,7 @@ export default function VlanCard({
           label={`VLAN ${vlan.vlan_id}`}
           size="small"
           sx={{
-            bgcolor: '#E6F1FB',
+            bgcolor: (theme) => theme.palette.info.light,
             color: '#185FA5',
             fontWeight: 700,
             fontSize: 11,
@@ -203,13 +205,13 @@ export default function VlanCard({
         {/* Contatori */}
         <Stack direction="row" spacing={2} alignItems="center">
           <Box sx={{ textAlign: 'center' }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#3B6D11', lineHeight: 1 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: theme.palette.success.dark, lineHeight: 1 }}>
               {vlan.free_count}
             </Typography>
             <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>liberi</Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#A32D2D', lineHeight: 1 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: theme.palette.error.dark, lineHeight: 1 }}>
               {vlan.used_count}
             </Typography>
             <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>occupati</Typography>
@@ -262,7 +264,7 @@ export default function VlanCard({
           sx={{
             height: 4,
             borderRadius: 2,
-            bgcolor: '#EAF3DE',
+            bgcolor: theme.palette.success.light,
             '& .MuiLinearProgress-bar': { bgcolor: occColor, borderRadius: 2 },
           }}
         />

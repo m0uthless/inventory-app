@@ -10,6 +10,7 @@
  */
 import * as React from 'react'
 import { Box, CircularProgress, Typography } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 
 interface Props {
   address: string
@@ -112,6 +113,7 @@ async function geocode(address: string): Promise<{ lat: number; lon: number } | 
 }
 
 export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) {
+  const theme = useTheme()
   const containerRef = React.useRef<HTMLDivElement>(null)
   const mapRef = React.useRef<LeafletMapInstance | null>(null)
   const [state, setState] = React.useState<'loading' | 'ok' | 'error'>('loading')
@@ -154,7 +156,7 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
         const icon = L.divIcon({
           className: '',
           html: `<div style="width:28px;height:28px;border-radius:50% 50% 50% 0;
-            background:#0f766e;transform:rotate(-45deg);
+            background:${theme.palette.primary.main};transform:rotate(-45deg);
             border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);"></div>`,
           iconSize: [28, 28],
           iconAnchor: [14, 28],
@@ -199,7 +201,7 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
             bgcolor: '#f8fafc',
           }}
         >
-          <CircularProgress size={24} sx={{ color: '#0f766e' }} />
+          <CircularProgress size={24} sx={{ color: theme.palette.primary.main }} />
         </Box>
       )}
       {state === 'error' && (

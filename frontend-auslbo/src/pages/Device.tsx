@@ -5,6 +5,7 @@ import {
   Fab,
   Stack,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import AddIcon from '@mui/icons-material/Add'
 
 import { useServerGrid } from '@shared/hooks/useServerGrid'
@@ -46,6 +47,7 @@ import MiniGridFilter from './device/MiniGridFilter'
 import KpiCard from './device/KpiCard'
 
 export default function Device() {
+  const theme = useTheme()
   const toast  = useToast()
   const { me } = useAuth()
 
@@ -433,7 +435,7 @@ export default function Device() {
             label="Totale Device"
             value={loading ? '…' : totalDevices}
             sub="nel tuo ente"
-            accent="#1A6BB5"
+            accent={theme.palette.primary.main}
           />
           <KpiCard
             label="Device con PACS"

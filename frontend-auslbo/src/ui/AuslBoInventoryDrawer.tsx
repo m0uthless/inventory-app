@@ -8,6 +8,7 @@ import { DrawerShell, HERO_ICON_BTN_SX, FEATURE_CHIP_SX } from '@shared/ui/Drawe
 import { DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import type { InventoryReadDetail } from '@shared/inventory/inventoryTypes'
 import InventoryReadContent from '@shared/inventory/InventoryReadContent'
+import { SIDEBAR } from '../theme'
 
 // AuslBoInventoryDetail estende InventoryReadDetail senza aggiungere campi
 // (alias esplicito per chiarezza nei consumer)
@@ -55,7 +56,7 @@ export default function AuslBoInventoryDrawer({ id, onClose }: AuslBoInventoryDr
       {detail?.status_label ? (
         <Box
           sx={{
-            bgcolor: 'rgba(93,174,240,0.20)', color: '#93C9F8', fontWeight: 700,
+            bgcolor: 'rgba(93,174,240,0.20)', color: SIDEBAR.accentLight, fontWeight: 700,
             fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(147,201,248,0.3)',
             borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center', gap: 0.5,
           }}

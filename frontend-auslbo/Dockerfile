@@ -10,6 +10,12 @@ RUN cd frontend-auslbo && npm install --legacy-peer-deps
 COPY shared/ ./shared/
 RUN ln -s /app/frontend-auslbo/node_modules /app/shared/node_modules
 
+# Identifica l'ambiente di build (dev/prod), passato da docker-compose
+# tramite build.args. Default "production" se l'arg non viene passato
+# (es. build manuale senza compose).
+ARG VITE_APP_ENV=production
+ENV VITE_APP_ENV=${VITE_APP_ENV}
+
 # Copia frontend-auslbo e builda
 COPY frontend-auslbo/ ./frontend-auslbo/
 RUN cd frontend-auslbo && npm run build

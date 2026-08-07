@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { LoginPage, type AmbitoConfig, type Ambito } from '@shared/ui/LoginPage'
 import { useAuth } from '../auth/AuthProvider'
 import { api } from '@shared/api/client'
+import { theme } from '../theme'
 
 const AMBITI: AmbitoConfig[] = [
   {
     value: 'archie',
     label: 'ARCHIE',
-    color: '#0f766e',
-    colorHover: '#0a524d',
+    color: theme.palette.primary.main,
+    colorHover: theme.palette.primary.dark,
     colorLight: 'rgba(15,118,110,0.12)',
   },
   {

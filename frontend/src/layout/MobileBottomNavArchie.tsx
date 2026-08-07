@@ -18,11 +18,9 @@ import BusinessIcon from '@mui/icons-material/Business'
 import ContactsIcon from '@mui/icons-material/Contacts'
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
 import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
+import { useTheme } from '@mui/material/styles'
 import { MobileBottomNav, type MobileNavAction, type MobileNavItem } from '@shared/ui/MobileBottomNav'
 import { useAuth } from '../auth/AuthProvider'
-
-/* Colore primario ARCHIE (teal) */
-const NAV_COLOR = '#0f766e'
 
 const NAV_ITEMS: [MobileNavItem, MobileNavItem, MobileNavItem, MobileNavItem] = [
   { key: 'home',        label: 'Home',       icon: <DashboardIcon />, path: '/' },
@@ -44,6 +42,7 @@ function pathStarts(p: string, base: string) {
 }
 
 export default function MobileBottomNavArchie() {
+  const theme = useTheme()
   const { hasPerm } = useAuth()
   const nav = useNavigate()
   const loc = useLocation()
@@ -150,7 +149,7 @@ export default function MobileBottomNavArchie() {
 
   return (
     <MobileBottomNav
-      color={NAV_COLOR}
+      color={theme.palette.primary.main}
       items={NAV_ITEMS}
       activeKey={activeKey}
       onNavigate={handleNavigate}

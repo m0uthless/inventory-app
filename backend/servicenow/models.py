@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
 
 from core.models import TimeStampedModel
@@ -22,6 +23,18 @@ class ServiceNowCaseStatus(models.TextChoices):
 class ServiceNowCaseCategory(models.TextChoices):
     PHILIPS = "philips", "Philips"
     BIOTRON = "biotron", "Biotron"
+
+
+# Utente di servizio (account funzionale, vedi UserProfile.is_functional_account)
+# a cui va SEMPRE un case Philips che altrimenti resterebbe senza assegnatario,
+# qualunque sia il percorso di creazione (form manuale/OCR, import storico CSV,
+# API diretta). Applicato in ServiceNowCase.save() così da essere un'unica
+# fonte di verità, non duplicata per ogni punto di creazione. Vedi anche
+# historical_import.resolve_assignment(), che replica la stessa risoluzione
+# in fase di ANTEPRIMA import (dove non si scrive nulla sul DB, quindi
+# save() non interviene ancora) così l'utente vede già in anteprima l'esito
+# finale.
+PHILIPS_UNASSIGNED_FALLBACK_USERNAME = "jolly.philips"
 
 
 def servicenow_screenshot_upload_path(instance, filename):
@@ -133,6 +146,21 @@ class ServiceNowCase(TimeStampedModel):
 
     def __str__(self):
         return f"{self.number} — {self.account}"
+
+    def save(self, *args, **kwargs):
+        # Fallback SOLO in creazione (mai su un update: se un case Philips già
+        # esistente viene volutamente sganciato da un assegnatario in un
+        # secondo momento, non lo riassegniamo automaticamente qui). Vedi
+        # PHILIPS_UNASSIGNED_FALLBACK_USERNAME per il perché.
+        if self._state.adding and self.category == ServiceNowCaseCategory.PHILIPS and not self.assigned_to_id:
+            User = get_user_model()
+            fallback = (
+                User.objects.filter(username__iexact=PHILIPS_UNASSIGNED_FALLBACK_USERNAME, is_active=True)
+                .first()
+            )
+            if fallback:
+                self.assigned_to_id = fallback.id
+        super().save(*args, **kwargs)
 
 
 # NOTA: il vecchio modello `TechnicianAbsence` è stato spostato e generalizzato

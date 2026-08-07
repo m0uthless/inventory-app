@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { theme } from '../theme'
 import {
   Alert,
   Avatar,
@@ -58,7 +59,7 @@ import {
   type AdminUserCreateResponse,
 } from '../types/adminUsers'
 
-const TEAL = '#0f766e'
+const TEAL = theme.palette.primary.main
 
 type LeaveAreaOption = { id: number; label: string }
 type CustomerOption = { id: number; label: string }
@@ -602,6 +603,7 @@ function UserDrawer(props: {
 
   const [isPhilips, setIsPhilips] = React.useState(false)
   const [isTechnician, setIsTechnician] = React.useState(true)
+  const [isFunctionalAccount, setIsFunctionalAccount] = React.useState(false)
   const [isLeaveCoordinator, setIsLeaveCoordinator] = React.useState(false)
   const [isExpenseSecretary, setIsExpenseSecretary] = React.useState(false)
   const [leaveArea, setLeaveArea] = React.useState<number | ''>('')
@@ -628,6 +630,7 @@ function UserDrawer(props: {
     setExtraDirect(new Set(user.direct_permissions.extra_permissions))
     setIsPhilips(user.profile.is_philips)
     setIsTechnician(user.profile.is_servicenow_technician)
+    setIsFunctionalAccount(user.profile.is_functional_account)
     setIsLeaveCoordinator(user.profile.is_leave_coordinator)
     setIsExpenseSecretary(user.profile.is_expense_secretary)
     setLeaveArea(user.profile.leave_area ?? '')
@@ -723,6 +726,7 @@ function UserDrawer(props: {
         profile: {
           is_philips: isPhilips,
           is_servicenow_technician: isTechnician,
+          is_functional_account: isFunctionalAccount,
           is_leave_coordinator: isLeaveCoordinator,
           is_expense_secretary: isExpenseSecretary,
           leave_area: leaveArea === '' ? null : leaveArea,
@@ -853,6 +857,17 @@ function UserDrawer(props: {
                 control={<Switch checked={isTechnician} disabled={isPhilips} onChange={(e) => setIsTechnician(e.target.checked)} />}
                 label="Tecnico ServiceNow (assegnabile ai case)"
               />
+              <FormControlLabel
+                control={<Switch checked={isFunctionalAccount} onChange={(e) => setIsFunctionalAccount(e.target.checked)} />}
+                label="Account funzionale (es. ac.philips, cdd.biotron)"
+              />
+              {isFunctionalAccount && (
+                <Typography sx={{ fontSize: 11.5, color: 'text.secondary', ml: 5.5, mt: -0.5 }}>
+                  Utente di servizio usato solo come assegnatario automatico di fallback: resta assegnabile
+                  normalmente ai case ServiceNow, ma non compare nel pannello Triage né nella vista settimanale
+                  assenze.
+                </Typography>
+              )}
               <FormControlLabel control={<Switch checked={isPhilips} onChange={(e) => handlePhilipsChange(e.target.checked)} />} label="Philips (altrimenti: Biotron)" />
               {isPhilips && (
                 <Typography sx={{ fontSize: 11.5, color: 'text.secondary', ml: 5.5, mt: -0.5 }}>
@@ -1252,6 +1267,11 @@ export default function UsersAdmin() {
               <span style={{ fontSize: 12, lineHeight: 1 }}>👑</span>
             </Tooltip>
           )}
+          {p.row.profile.is_functional_account && (
+            <Tooltip title="Account funzionale: non compare in Triage / vista assenze">
+              <Chip label="FUNZ." size="small" sx={{ fontSize: 9.5, height: 18, fontWeight: 700, bgcolor: (theme) => theme.palette.background.default, color: '#475569' }} />
+            </Tooltip>
+          )}
         </Stack>
       ),
     },
@@ -1357,8 +1377,8 @@ export default function UsersAdmin() {
           size="small"
           sx={{
             fontSize: 11, height: 22,
-            bgcolor: p.row.is_active ? '#DCFCE7' : '#FEE2E2',
-            color: p.row.is_active ? '#166534' : '#991B1B',
+            bgcolor: (theme) => p.row.is_active ? theme.palette.success.light : theme.palette.error.light,
+            color: (theme) => p.row.is_active ? theme.palette.success.dark : theme.palette.error.dark,
             border: '1px solid transparent',
           }}
         />

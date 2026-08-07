@@ -39,6 +39,7 @@ import MobileBottomNavArchie from './MobileBottomNavArchie'
 import { SIDEBAR } from '../theme/tokens'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '@shared/ui/LockScreen'
+import DevEnvironmentBadge from '@shared/ui/DevEnvironmentBadge'
 import { SiteRepoV2Provider } from '../features/siterepov2/SiteRepoV2Context'
 import { DashboardEditModeProvider, useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
 import DashboardCustomizeOutlinedIcon from '@mui/icons-material/DashboardCustomizeOutlined'
@@ -440,7 +441,7 @@ export function AppLayout() {
           '&.Mui-selected': nested
             ? {
                 backgroundColor: SIDEBAR.selectedBgStrong,
-                color: '#ffffff',
+                color: (theme) => theme.palette.common.white,
                 borderLeft: SIDEBAR.activeBorder,
                 pl: isMini ? 1 : '10px',
                 boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.22)',
@@ -493,7 +494,7 @@ export function AppLayout() {
                     py: 0.15,
                     borderRadius: 0.75,
                     bgcolor: 'rgba(245,158,11,0.18)',
-                    color: '#f59e0b',
+                    color: (theme) => theme.palette.warning.main,
                     border: '1px solid rgba(245,158,11,0.28)',
                     lineHeight: 1.6,
                     flexShrink: 0,
@@ -783,6 +784,7 @@ export function AppLayout() {
     <Box
       sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}
     >
+      <DevEnvironmentBadge />
       {/* AppBar FULL WIDTH */}
       <AppBar
         position="fixed"
@@ -793,8 +795,8 @@ export function AppLayout() {
           right: 0,
           flexDirection: 'column',
           '& .MuiIconButton-root': { color: SIDEBAR.textStrong },
-          '& .MuiIconButton-root:hover': { color: '#ffffff', backgroundColor: 'rgba(255,255,255,0.12)' },
-          '& .MuiInputBase-root': { color: '#ffffff' },
+          '& .MuiIconButton-root:hover': { color: (theme) => theme.palette.common.white, backgroundColor: 'rgba(255,255,255,0.12)' },
+          '& .MuiInputBase-root': { color: (theme) => theme.palette.common.white },
         }}
       >
         <Toolbar sx={{ pl: 2, pr: 1, gap: 1 }}>

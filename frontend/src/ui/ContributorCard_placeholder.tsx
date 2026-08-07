@@ -24,7 +24,7 @@ export default function ContributorCard(_props: Props) {
         borderRadius: 1,
         height: '100%',
         minHeight: 0,
-        background: 'linear-gradient(160deg, #0d4f4a 0%, #0f766e 55%, #0a3d38 100%)',
+        background: (theme) => `linear-gradient(160deg, #0d4f4a 0%, ${theme.palette.primary.main} 55%, #0a3d38 100%)`,
         border: '1px solid rgba(94,234,212,0.25)',
         boxShadow: '0 14px 34px rgba(15,118,110,0.28)',
         display: 'flex',

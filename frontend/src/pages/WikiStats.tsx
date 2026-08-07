@@ -297,8 +297,8 @@ function PageListCard({
                       fontSize: 10,
                       fontWeight: 700,
                       flexShrink: 0,
-                      bgcolor: page.is_published ? '#dcfce7' : '#fef9c3',
-                      color: page.is_published ? '#166534' : '#854d0e',
+                      bgcolor: page.is_published ? theme.palette.success.light : theme.palette.warning.light,
+                      color: page.is_published ? theme.palette.success.dark : theme.palette.warning.dark,
                     }}
                   />
                 </Stack>
@@ -510,7 +510,7 @@ export default function WikiStats() {
                     contentStyle={{
                       borderRadius: 8,
                       fontSize: 12,
-                      border: '1px solid #e2e8f0',
+                      border: `1px solid ${theme.palette.divider}`,
                       boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                       padding: '6px 12px',
                     }}

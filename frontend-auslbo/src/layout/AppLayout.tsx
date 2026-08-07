@@ -33,11 +33,13 @@ import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 
+import { useTheme } from '@mui/material/styles'
 import { useAuth } from '../auth/AuthProvider'
 import { Suspense } from 'react'
 import { api } from '@shared/api/client'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '@shared/ui/LockScreen'
+import DevEnvironmentBadge from '@shared/ui/DevEnvironmentBadge'
 import { SIDEBAR } from '../theme'
 import AppFooter from './AppFooter'
 import MobileBottomNavAuslbo from './MobileBottomNavAuslbo'
@@ -97,6 +99,7 @@ function isSelected(currentPath: string, itemPath: string) {
 }
 
 export function AppLayout() {
+  const theme = useTheme()
   const { me, login, logout, locked, lock, unlock } = useAuth()
   const nav = useNavigate()
   const loc = useLocation()
@@ -364,6 +367,7 @@ export function AppLayout() {
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}>
+      <DevEnvironmentBadge />
       {/* AppBar FULL WIDTH */}
       <AppBar
         position="fixed"
@@ -375,7 +379,7 @@ export function AppLayout() {
           bgcolor: 'primary.main',
           '& .MuiIconButton-root': { color: SIDEBAR.textStrong },
           '& .MuiIconButton-root:hover': {
-            color: '#ffffff',
+            color: 'common.white',
             backgroundColor: 'rgba(255,255,255,0.12)',
           },
         }}
@@ -558,8 +562,8 @@ export function AppLayout() {
         onSubmitPassword={(password) => login(me?.user.username ?? '', password)}
         onUnlock={handleUnlock}
         onLogout={logout}
-        accentFrom="#0B3D6B"
-        accentVia="#1A6BB5"
+        accentFrom={theme.palette.primary.dark}
+        accentVia={theme.palette.primary.main}
         accentTo="#134e7a"
       />
     </Box>

@@ -340,3 +340,91 @@ def test_filter_by_assigned_to(api_client, superuser):
 def test_anonymous_user_cannot_access_cases(api_client):
     response = api_client.get("/api/servicenow-cases/")
     assert response.status_code in (401, 403)
+
+
+# ─── Fallback automatico jolly.philips per case Philips senza assegnatario ──
+
+def _make_service_user(username, first_name="Servizio"):
+    User = get_user_model()
+    return User.objects.create_user(username=username, password="pw", first_name=first_name, last_name=username)
+
+
+def test_create_philips_case_without_assignee_falls_back_to_jolly_philips(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    fallback = _make_service_user("jolly.philips")
+    case_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, category=ServiceNowCaseCategory.PHILIPS),
+            format="json",
+        )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["assigned_to"] == fallback.id
+
+
+def test_create_philips_case_with_explicit_assignee_is_not_overridden(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    _make_service_user("jolly.philips")
+    real_tech = _make_service_user("mario.rossi", first_name="Mario")
+    case_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, category=ServiceNowCaseCategory.PHILIPS, assigned_to=real_tech.id),
+            format="json",
+        )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["assigned_to"] == real_tech.id
+
+
+def test_create_philips_case_without_jolly_user_stays_unassigned(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    case_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, category=ServiceNowCaseCategory.PHILIPS),
+            format="json",
+        )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["assigned_to"] is None
+
+
+def test_create_biotron_case_without_assignee_never_gets_philips_fallback(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    _make_service_user("jolly.philips")
+    case_type = _make_case_type(category=ServiceNowCaseCategory.BIOTRON)
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, category=ServiceNowCaseCategory.BIOTRON),
+            format="json",
+        )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["assigned_to"] is None
+
+
+def test_unassigning_existing_philips_case_via_patch_is_not_reverted(api_client, superuser):
+    # Il fallback scatta SOLO in creazione: un unassign volontario successivo
+    # (PATCH) non deve essere silenziosamente riassegnato a jolly.philips.
+    api_client.force_authenticate(user=superuser)
+    _make_service_user("jolly.philips")
+    real_tech = _make_service_user("mario.rossi", first_name="Mario")
+    case_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+
+    with patch("servicenow.api.notify_teams_new_case"):
+        create_resp = api_client.post(
+            "/api/servicenow-cases/",
+            _case_payload(case_type, category=ServiceNowCaseCategory.PHILIPS, assigned_to=real_tech.id),
+            format="json",
+        )
+    case_id = create_resp.data["id"]
+
+    patch_resp = api_client.patch(f"/api/servicenow-cases/{case_id}/", {"assigned_to": None}, format="json")
+    assert patch_resp.status_code == 200, patch_resp.data
+    assert patch_resp.data["assigned_to"] is None

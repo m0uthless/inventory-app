@@ -283,7 +283,7 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
 
   const kpis = [
     { label: 'Aperte',          value: open,       sub: `su ${rows.length} totali`,    accent: '#e24b4a' },
-    { label: 'In lavorazione',  value: inProg,     sub: 'in corso',                    accent: '#f59e0b' },
+    { label: 'In lavorazione',  value: inProg,     sub: 'in corso',                    accent: theme.palette.warning.main },
     { label: 'Critiche aperte', value: critical,   sub: 'richiedono attenzione',       accent: '#6366f1' },
     { label: 'Tempo medio',     value: avgLabel,   sub: 'su tutte le issue chiuse',    accent: '#14b8a6' },
   ]

@@ -109,6 +109,7 @@ class UserAdminProfileSerializer(serializers.ModelSerializer):
             "avatar",
             "is_philips",
             "is_servicenow_technician",
+            "is_functional_account",
             "is_leave_coordinator",
             "leave_area",
             "leave_area_name",
@@ -360,6 +361,7 @@ class UserAdminViewSet(
             for field in (
                 "is_philips",
                 "is_servicenow_technician",
+                "is_functional_account",
                 "is_leave_coordinator",
                 "is_expense_secretary",
             ):

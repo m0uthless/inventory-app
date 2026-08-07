@@ -28,6 +28,7 @@ import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import DoneAllIcon from '@mui/icons-material/DoneAll'
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -61,7 +62,7 @@ const SECTION_OPTIONS = [
 ] as const
 
 type ReportKind = 'bug' | 'feature'
-type ReportStatus = 'open' | 'resolved'
+type ReportStatus = 'open' | 'resolved' | 'rejected'
 
 type ReportRow = {
   id: number
@@ -83,6 +84,10 @@ type ReportRow = {
   resolved_at?: string | null
   resolved_by_username?: string | null
   resolved_by_full_name?: string | null
+  rejection_reason?: string | null
+  rejected_at?: string | null
+  rejected_by_username?: string | null
+  rejected_by_full_name?: string | null
 }
 
 
@@ -150,6 +155,13 @@ function KindChip({ kind }: { kind: ReportKind }) {
   )
 }
 
+function ResolutionStatusChip({ status, label }: { status: ReportStatus; label: string }) {
+  if (status === 'rejected') {
+    return <Chip size="small" label={label} color="error" variant="outlined" sx={{ fontWeight: 700 }} />
+  }
+  return <Chip size="small" label={label} color="success" variant="outlined" sx={{ fontWeight: 700 }} />
+}
+
 
 
 export default function BugFeaturePage() {
@@ -174,6 +186,9 @@ export default function BugFeaturePage() {
   const [form, setForm] = React.useState<FormState>(EMPTY_FORM)
   const [selected, setSelected] = React.useState<ReportRow | null>(null)
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null)
+  const [rejectTarget, setRejectTarget] = React.useState<ReportRow | null>(null)
+  const [rejectReason, setRejectReason] = React.useState('')
+  const [rejectBusy, setRejectBusy] = React.useState(false)
 
   const uploadInputRef = React.useRef<HTMLInputElement | null>(null)
   const pendingUploadRowRef = React.useRef<ReportRow | null>(null)
@@ -205,7 +220,7 @@ export default function BugFeaturePage() {
         pageSize: grid.paginationModel.pageSize,
         ordering: grid.ordering,
         search: grid.search,
-        extra: { ...commonExtraParams, status: isResolvedPage ? 'resolved' : 'open' },
+        extra: { ...commonExtraParams, status: isResolvedPage ? 'resolved,rejected' : 'open' },
       }),
     [grid.paginationModel, grid.ordering, grid.search, commonExtraParams, isResolvedPage],
   )
@@ -337,6 +352,44 @@ export default function BugFeaturePage() {
     [loadItem, reload, selected, toast],
   )
 
+  const openRejectDialog = React.useCallback((row: ReportRow) => {
+    setRejectTarget(row)
+    setRejectReason('')
+  }, [])
+
+  const closeRejectDialog = React.useCallback(() => {
+    if (rejectBusy) return
+    setRejectTarget(null)
+    setRejectReason('')
+  }, [rejectBusy])
+
+  const handleRejectSubmit = React.useCallback(async () => {
+    if (!rejectTarget) return
+    const reason = rejectReason.trim()
+    if (!reason) {
+      toast.error('Inserisci una motivazione per il rifiuto.')
+      return
+    }
+    setRejectBusy(true)
+    setActionBusyId(rejectTarget.id)
+    try {
+      await api.patch(`/feedback-items/${rejectTarget.id}/`, { status: 'rejected', rejection_reason: reason })
+      toast.success('Segnalazione rifiutata.')
+      if (selected?.id === rejectTarget.id) {
+        const fresh = await loadItem(rejectTarget.id)
+        setSelected(fresh)
+      }
+      reload()
+      setRejectTarget(null)
+      setRejectReason('')
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setRejectBusy(false)
+      setActionBusyId(null)
+    }
+  }, [loadItem, rejectTarget, rejectReason, reload, selected, toast])
+
   const triggerUploadForRow = React.useCallback((row: ReportRow) => {
     pendingUploadRowRef.current = row
     uploadInputRef.current?.click()
@@ -397,10 +450,17 @@ export default function BugFeaturePage() {
         onClick: () => handleResolve(row),
         disabled: row.status === 'resolved' || actionBusyId === row.id,
       })
+      items.push({
+        key: 'reject',
+        label: 'Rifiuta',
+        icon: <ThumbDownOutlinedIcon fontSize="small" />,
+        onClick: () => openRejectDialog(row),
+        disabled: row.status !== 'open' || actionBusyId === row.id,
+      })
     }
 
     return items
-  }, [actionBusyId, contextMenu, handleOpenContext, handleResolve, isResolvedPage, triggerUploadForRow])
+  }, [actionBusyId, contextMenu, handleOpenContext, handleResolve, isResolvedPage, openRejectDialog, triggerUploadForRow])
 
   const baseColumns = React.useMemo<GridColDef<ReportRow>[]>(
     () => [
@@ -505,14 +565,28 @@ export default function BugFeaturePage() {
     if (!isResolvedPage) return baseColumns
     const next = [...baseColumns]
     next.splice(1, 0, {
-      field: 'resolved_at',
+      field: 'status',
+      headerName: 'Esito',
+      minWidth: 130,
+      flex: 0.55,
+      sortable: false,
+      renderCell: (params) => (
+        <Box sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+          <ResolutionStatusChip status={params.row.status} label={params.row.status_label} />
+        </Box>
+      ),
+    })
+    next.splice(2, 0, {
+      field: 'closed_at',
       headerName: 'Chiusa il',
       minWidth: 164,
       flex: 0.82,
-      sortable: true,
+      sortable: false,
       renderCell: (params) => (
         <Box sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-          <Typography variant="body2">{formatDateTime(params.row.resolved_at)}</Typography>
+          <Typography variant="body2">
+            {formatDateTime(params.row.resolved_at || params.row.rejected_at)}
+          </Typography>
         </Box>
       ),
     })
@@ -774,7 +848,35 @@ export default function BugFeaturePage() {
         isResolvedPage={isResolvedPage}
         actionBusyId={actionBusyId}
         onResolve={(row) => void handleResolve(row as unknown as ReportRow)}
+        onReject={(row) => openRejectDialog(row as unknown as ReportRow)}
       />
+
+      <Dialog open={Boolean(rejectTarget)} onClose={closeRejectDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>Rifiuta segnalazione</DialogTitle>
+        <DialogContent dividers sx={{ display: 'grid', gap: 2 }}>
+          <Alert severity="warning" sx={{ borderRadius: 1.5 }}>
+            La motivazione sarà visibile all'utente che ha creato la segnalazione.
+          </Alert>
+          <TextField
+            autoFocus
+            multiline
+            minRows={4}
+            label="Motivazione del rifiuto"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Spiega perché la segnalazione viene rifiutata."
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={closeRejectDialog} disabled={rejectBusy}>
+            Annulla
+          </Button>
+          <Button onClick={handleRejectSubmit} variant="contained" color="error" disabled={rejectBusy || !rejectReason.trim()}>
+            {rejectBusy ? 'Invio…' : 'Rifiuta'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   )
 }

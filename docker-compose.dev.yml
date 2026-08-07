@@ -15,7 +15,16 @@ services:
     env_file:
       - ./.env.dev
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_APP_ENV: development
+
   frontend-auslbo:
     build:
       context: .
       dockerfile: frontend-auslbo/Dockerfile
+      args:
+        VITE_APP_ENV: development

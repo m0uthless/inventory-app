@@ -155,7 +155,7 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     width: 130,
     renderCell: (p) =>
       p.value ? (
-        <Chip size="small" label="Fatturato" sx={{ bgcolor: 'rgba(16,185,129,0.10)', color: '#065f46', border: '0.5px solid rgba(16,185,129,0.28)' }} />
+        <Chip size="small" label="Fatturato" sx={{ bgcolor: 'rgba(16,185,129,0.10)', color: (theme) => theme.palette.success.dark, border: '0.5px solid rgba(16,185,129,0.28)' }} />
       ) : (
         <Chip size="small" variant="outlined" label="Non fatturato" />
       ),

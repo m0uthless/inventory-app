@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Box, Card, CardContent, Chip, CircularProgress, Grid, Typography } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 
@@ -38,6 +39,7 @@ function KpiCard({
 }
 
 export default function Dashboard() {
+  const theme = useTheme()
   const { me } = useAuth()
   const [kpi, setKpi] = React.useState<KpiData | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -91,7 +93,7 @@ export default function Dashboard() {
                 label="Apparecchiature"
                 value={kpi?.inventory_count ?? 0}
                 sub="totali"
-                dotColor="#1A6BB5"
+                dotColor={theme.palette.primary.main}
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
@@ -99,7 +101,7 @@ export default function Dashboard() {
                 label="Sedi"
                 value={kpi?.sites_count ?? 0}
                 sub="area Bologna"
-                dotColor="#1A6BB5"
+                dotColor={theme.palette.primary.main}
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>

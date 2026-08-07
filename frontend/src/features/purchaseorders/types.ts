@@ -1,3 +1,5 @@
+import { theme } from '../../theme'
+
 export type PurchaseOrderKind = 'ordinario' | 'extra'
 export type PurchaseOrderAmountMode = 'fisso' | 'giornate'
 export type PurchaseOrderStatus = 'inserito' | 'inviato' | 'ricevuto' | 'fatturato'
@@ -23,7 +25,7 @@ export const STATUS_COLOR: Record<PurchaseOrderStatus, { bg: string; color: stri
   inserito:  { bg: 'rgba(148,163,184,0.16)', color: '#475569', border: 'rgba(148,163,184,0.34)' },
   inviato:   { bg: 'rgba(59,130,246,0.12)',  color: '#1d4ed8', border: 'rgba(59,130,246,0.30)' },
   ricevuto:  { bg: 'rgba(249,115,22,0.12)',  color: '#c2410c', border: 'rgba(249,115,22,0.30)' },
-  fatturato: { bg: 'rgba(16,185,129,0.10)',  color: '#065f46', border: 'rgba(16,185,129,0.28)' },
+  fatturato: { bg: 'rgba(16,185,129,0.10)',  color: theme.palette.success.dark, border: 'rgba(16,185,129,0.28)' },
 }
 
 export function nextStatus(status: PurchaseOrderStatus): PurchaseOrderStatus | null {

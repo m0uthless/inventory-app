@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import type { TodoRow } from '../pages/maintenanceTypes'
+import { theme } from '../theme'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,10 +38,10 @@ function getUrgency(days: number): Urgency {
 }
 
 const URGENCY: Record<Urgency, { label: string; color: string; chipColor: 'error' | 'warning' | 'info' | 'default'; barColor: string }> = {
-  overdue:  { label: 'Scaduto',   color: '#d32f2f', chipColor: 'error',   barColor: '#d32f2f' },
-  critical: { label: 'Urgente',   color: '#ed6c02', chipColor: 'warning', barColor: '#ed6c02' },
-  soon:     { label: 'In arrivo', color: '#0288d1', chipColor: 'info',    barColor: '#0288d1' },
-  ok:       { label: 'Ok',        color: '#9e9e9e', chipColor: 'default', barColor: '#9e9e9e' },
+  overdue:  { label: 'Scaduto',   color: theme.palette.error.main,   chipColor: 'error',   barColor: theme.palette.error.main },
+  critical: { label: 'Urgente',   color: theme.palette.warning.main, chipColor: 'warning', barColor: theme.palette.warning.main },
+  soon:     { label: 'In arrivo', color: theme.palette.info.main,    chipColor: 'info',    barColor: theme.palette.info.main },
+  ok:       { label: 'Ok',        color: theme.palette.text.secondary, chipColor: 'default', barColor: theme.palette.text.secondary },
 }
 
 // ─── Grouped by customer ──────────────────────────────────────────────────────

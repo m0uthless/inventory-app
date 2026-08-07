@@ -4,6 +4,7 @@
  * tab Dettagli / Audit, link "Apri workstation" cliccabile.
  */
 import { Box, Button, Stack } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
@@ -12,11 +13,14 @@ import type { MonitorRow } from '../../pages/Monitor'
 
 // ─── Colori stato ─────────────────────────────────────────────────────────────
 
-const STATO_HEX: Record<string, string> = {
-  in_uso:        '#10b981',
-  da_installare: '#f59e0b',
-  guasto:        '#ef4444',
-  rma:           '#94a3b8',
+function useStatoHex(): Record<string, string> {
+  const theme = useTheme()
+  return {
+    in_uso:        theme.palette.success.main,
+    da_installare: theme.palette.warning.main,
+    guasto:        theme.palette.error.main,
+    rma:           '#94a3b8',
+  }
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -49,6 +53,8 @@ export default function MonitorDrawer({
   onEdit, onDelete, onRestore,
   onNavigateToInventory,
 }: MonitorDrawerProps) {
+  const theme = useTheme()
+  const STATO_HEX = useStatoHex()
   const color = STATO_HEX[detail?.stato ?? ''] ?? '#94a3b8'
   const isDeleted = !!detail?.deleted_at
 
@@ -67,7 +73,7 @@ export default function MonitorDrawer({
         size="small"
         variant="contained"
         endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-        sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+        sx={{ bgcolor: '#0d9488', color: theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: theme.palette.primary.main } }}
         onClick={() => onNavigateToInventory(detail.inventory!)}
       >
         Apri workstation

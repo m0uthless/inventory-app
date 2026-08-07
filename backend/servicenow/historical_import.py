@@ -18,7 +18,15 @@ Regole di mappatura concordate (vedi anche commento nella view):
   (Moderate, non blocca la riga).
 - assigned_to: match per nome+cognome (case-insensitive, ordine parole
   indifferente) contro gli User Archie; nessun match/ambiguo → nessun
-  assegnatario, solo un avviso.
+  assegnatario, solo un avviso. Due eccezioni "fallback" (mai al posto di
+  un match riuscito, solo quando fallisce):
+  - Type CDD (Biotron) → utente di servizio "cdd.biotron" (CDD_FALLBACK_USERNAME);
+  - qualsiasi Type categoria Philips → utente di servizio "jolly.philips"
+    (da servicenow.models.PHILIPS_UNASSIGNED_FALLBACK_USERNAME), stessa
+    regola applicata anche fuori da questo import (vedi ServiceNowCase.save()):
+    replicata qui SOLO per mostrarla già in anteprima, non per duplicarne
+    la fonte di verità.
+  Sempre con avviso esplicito che spiega il motivo dell'assegnazione automatica.
 - numero duplicato (in Archie o nello stesso file) → riga saltata.
 - status sempre "open"; MAI notifica Teams/modal Philips per righe importate
   da qui (l'endpoint non richiama servicenow.notifications).
@@ -34,7 +42,10 @@ from typing import Optional
 
 from django.contrib.auth import get_user_model
 
-from servicenow.models import ServiceNowCaseCategory, ServiceNowCaseType, ServiceNowPriority
+from servicenow.models import (
+    ServiceNowCaseCategory, ServiceNowCaseType, ServiceNowPriority,
+    PHILIPS_UNASSIGNED_FALLBACK_USERNAME,
+)
 
 User = get_user_model()
 
@@ -161,6 +172,13 @@ FIXED_TYPE_ASSIGNEE_USERNAME = {
     "RIS": "ris.philips",
 }
 
+# Type Biotron con assegnatario di FALLBACK (non fisso): a differenza di
+# FIXED_TYPE_ASSIGNEE_USERNAME, qui il nome nella colonna assigned_to del
+# CSV viene provato per primo con il match normale per nome+cognome; solo
+# se non trova nessun utente (o è ambiguo) il case va a questo login di
+# servizio, invece di restare senza assegnatario. Vedi resolve_assignment().
+CDD_FALLBACK_USERNAME = "cdd.biotron"
+
 
 def build_users_username_index() -> dict[str, object]:
     """Indice {username in minuscolo -> User} per il match esatto usato dagli
@@ -189,17 +207,29 @@ def _user_label(user) -> str:
 
 
 def resolve_assignment(
-    type_name: str, raw_name: str, users_by_name: dict, users_by_username: dict,
+    category: str, type_name: str, raw_name: str, users_by_name: dict, users_by_username: dict,
 ) -> tuple[Optional[object], list]:
     """Determina l'assegnatario del case, incrociando la regola "assegnatario
     fisso per Type" (AC/RIS → utenti di servizio, vedi
-    FIXED_TYPE_ASSIGNEE_USERNAME) con il normale match per nome da CSV.
+    FIXED_TYPE_ASSIGNEE_USERNAME), quella "assegnatario di fallback per Type"
+    (CDD → utente di servizio, vedi CDD_FALLBACK_USERNAME) e quella
+    "assegnatario di fallback per categoria" (Philips → utente di servizio,
+    vedi PHILIPS_UNASSIGNED_FALLBACK_USERNAME) con il normale match per nome
+    da CSV.
 
     Per i Type con assegnatario fisso il nome nel CSV viene ignorato (quel
     campo su ServiceNow riporta spesso una persona diversa dall'utente di
     servizio reale): ritorna sempre l'utente fisso se esiste, altrimenti
     nessun assegnatario con un avviso esplicito — MAI un fallback silenzioso
     sul nome CSV per questi Type.
+
+    Per il Type CDD e, più in generale, per QUALSIASI case categoria Philips,
+    invece, si tenta prima il match normale per nome; solo se fallisce
+    (nessun match o ambiguo, incluso il caso di nome assente nel CSV) il case
+    viene assegnato all'utente di servizio corrispondente (cdd.biotron per
+    CDD, jolly.philips per Philips), sempre con un avviso esplicito. Se
+    entrambe le condizioni si applicassero (non capita nella pratica: CDD è
+    sempre categoria Biotron), vince il ramo CDD, controllato per primo.
     """
     fixed_username = FIXED_TYPE_ASSIGNEE_USERNAME.get(type_name)
     if fixed_username:
@@ -209,7 +239,29 @@ def resolve_assignment(
         return None, [f'Type {type_name}: utente di servizio "{fixed_username}" non trovato in Archie, case importato senza assegnatario.']
 
     user, warning = match_assigned_to(raw_name, users_by_name)
-    return user, ([warning] if warning else [])
+    if user is not None:
+        return user, []
+
+    fallback_username = None
+    fallback_reason = None
+    if type_name == "CDD":
+        fallback_username = CDD_FALLBACK_USERNAME
+        fallback_reason = "fallback Type CDD"
+    elif category == ServiceNowCaseCategory.PHILIPS:
+        fallback_username = PHILIPS_UNASSIGNED_FALLBACK_USERNAME
+        fallback_reason = "fallback categoria Philips"
+
+    if fallback_username:
+        fallback_user = users_by_username.get(fallback_username.lower())
+        if fallback_user is None:
+            extra = f'Utente di fallback "{fallback_username}" non trovato in Archie: case importato senza assegnatario.'
+            return None, [warning, extra] if warning else [extra]
+        fallback_note = f'Assegnato automaticamente a "{_user_label(fallback_user)}" ({fallback_username}) come {fallback_reason}.'
+        if warning:
+            return fallback_user, [warning, fallback_note]
+        return fallback_user, [f'Assegnatario non specificato nel CSV. {fallback_note}']
+
+    return None, ([warning] if warning else [])
 
 
 # ─── Risultato per riga ───────────────────────────────────────────────────────
@@ -333,7 +385,7 @@ def process_csv(
 
         assigned_name = (raw_row.get("assigned_to") or "").strip()
         row.assigned_to_csv = assigned_name
-        user, assign_notes = resolve_assignment(type_name, assigned_name, users_index, users_by_username)
+        user, assign_notes = resolve_assignment(category, type_name, assigned_name, users_index, users_by_username)
         if user is not None:
             row.assigned_to_id = user.id
             row.assigned_to_label = _user_label(user)

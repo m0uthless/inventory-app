@@ -16,7 +16,7 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = "Profilo"
     fields = (
-        "is_philips", "is_servicenow_technician",
+        "is_philips", "is_servicenow_technician", "is_functional_account",
         "leave_area", "is_leave_coordinator",
     )
     autocomplete_fields = ("leave_area",)
@@ -31,7 +31,7 @@ admin.site.unregister(User)
 class CustomUserAdmin(UserAdmin):
     inlines = (UserProfileInline,)
     list_display = UserAdmin.list_display + (
-        "get_is_philips", "get_is_servicenow_technician",
+        "get_is_philips", "get_is_servicenow_technician", "get_is_functional_account",
         "get_leave_area", "get_is_leave_coordinator",
     )
 
@@ -48,6 +48,13 @@ class CustomUserAdmin(UserAdmin):
             return obj.profile.is_servicenow_technician
         except UserProfile.DoesNotExist:
             return True
+
+    @admin.display(boolean=True, description="Account funzionale")
+    def get_is_functional_account(self, obj):
+        try:
+            return obj.profile.is_functional_account
+        except UserProfile.DoesNotExist:
+            return False
 
     @admin.display(description="Area piano ferie")
     def get_leave_area(self, obj):

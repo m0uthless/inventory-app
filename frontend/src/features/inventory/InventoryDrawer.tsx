@@ -238,7 +238,7 @@ export default function InventoryDrawer({
       <Stack sx={{ height: '100%', overflow: 'hidden' }}>
         <Box
           sx={{
-            background: 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)',
+            background: (theme) => `linear-gradient(140deg, ${theme.palette.primary.main} 0%, #0d9488 55%, #0e7490 100%)`,
             px: 2.5,
             pt: 2.25,
             pb: 2.25,

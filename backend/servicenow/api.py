@@ -200,9 +200,11 @@ class SnTechnicianAbsenceSerializer(serializers.ModelSerializer):
         if user is not None:
             try:
                 is_sn_tech = bool(user.profile.is_servicenow_technician)
+                is_functional = bool(user.profile.is_functional_account)
             except Exception:
                 is_sn_tech = False
-            if not is_sn_tech:
+                is_functional = False
+            if not is_sn_tech or is_functional:
                 raise serializers.ValidationError({"user": "L'utente selezionato non è un tecnico ServiceNow."})
 
         # Pre-check esplicito del vincolo di unicità (user, date, day_part) sulle
@@ -294,10 +296,12 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
     @action(detail=False, methods=["get"], url_path="technicians")
     def technicians(self, request):
         """Elenco tecnici ServiceNow attivi, con categoria Philips/Biotron
-        (per popolare la vista settimanale, coerente col Triage)."""
+        (per popolare la vista settimanale, coerente col Triage). Esclude gli
+        account funzionali (profile.is_functional_account): non sono persone
+        e non possono avere assenze da pianificare."""
         users = (
             User.objects.select_related("profile")
-            .filter(is_active=True, profile__is_servicenow_technician=True)
+            .filter(is_active=True, profile__is_servicenow_technician=True, profile__is_functional_account=False)
             .order_by("first_name", "last_name", "username")
         )
         data = [
@@ -665,6 +669,11 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
         Include SEMPRE tutti i tecnici attivi della categoria, anche a 0 casi
         oggi, così il pannello 'Triage' mostra a colpo d'occhio chi è scarico.
 
+        Gli account funzionali (profile.is_functional_account, es. ac.philips,
+        ris.philips, cdd.biotron, jolly.philips) sono esclusi dall'elenco e dal
+        totale: non sono persone da bilanciare nel Triage, anche se restano
+        normali assegnatari validi per i case (fallback automatico).
+
         Lo stato 'assente' è sensibile all'ora corrente: un'assenza a giornata
         intera (ferie/malattia/trasferta/altro senza orario) copre tutto il
         giorno; un permesso orario segnala il tecnico assente solo mentre
@@ -718,6 +727,8 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             for u in technicians:
                 try:
                     if not bool(u.profile.is_servicenow_technician):
+                        continue
+                    if bool(u.profile.is_functional_account):
                         continue
                     u_is_philips = bool(u.profile.is_philips)
                 except Exception:

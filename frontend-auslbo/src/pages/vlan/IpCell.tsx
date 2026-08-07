@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Box, Tooltip, Typography } from '@mui/material'
 import type { IpPoolEntry } from '../../api/vlanApi'
+import { theme } from '../../theme'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -14,12 +15,12 @@ export function ipCellColor(entry: IpPoolEntry): {
     case 'broadcast':
       return { bg: '#F1EFE8', text: '#5F5E5A', border: '#D3D1C7' }
     case 'gateway':
-      return { bg: '#E6F1FB', text: '#185FA5', border: '#B5D4F4' }
+      return { bg: theme.palette.info.light, text: '#185FA5', border: '#B5D4F4' }
     default:
-      if (entry.status === 'used')     return { bg: '#FCEBEB', text: '#A32D2D', border: '#F7C1C1' }
-      if (entry.status === 'reserved') return { bg: '#FAEEDA', text: '#854F0B', border: '#FAC775' }
-      if (entry.status === 'excluded') return { bg: '#FCEBEB', text: '#A32D2D', border: '#F7C1C1' }
-      return { bg: '#EAF3DE', text: '#3B6D11', border: '#C0DD97' }
+      if (entry.status === 'used')     return { bg: theme.palette.error.light, text: theme.palette.error.dark, border: '#F7C1C1' }
+      if (entry.status === 'reserved') return { bg: theme.palette.warning.light, text: theme.palette.warning.dark, border: '#FAC775' }
+      if (entry.status === 'excluded') return { bg: theme.palette.error.light, text: theme.palette.error.dark, border: '#F7C1C1' }
+      return { bg: theme.palette.success.light, text: theme.palette.success.dark, border: '#C0DD97' }
   }
 }
 

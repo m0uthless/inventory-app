@@ -122,6 +122,14 @@ class UserProfile(models.Model):
                    "(né Philips né Biotron) e non compare nel Triage / Statistiche. "
                    "Impostabile solo da admin.",
     )
+    is_functional_account = models.BooleanField(
+        default=False, verbose_name="Account funzionale",
+        help_text="Utente di servizio (es. ac.philips, ris.philips, cdd.biotron, jolly.philips) "
+                   "usato solo come assegnatario automatico di fallback per i case ServiceNow "
+                   "senza un tecnico reale disponibile: resta assegnabile normalmente, ma non "
+                   "compare nel pannello Triage né nella vista settimanale assenze, dato che non "
+                   "è una persona. Impostabile solo da admin.",
+    )
     is_leave_coordinator = models.BooleanField(
         default=False, verbose_name="Coordinatore piano ferie",
         help_text="Se attivo, l'utente può validare/rifiutare le proposte di ferie e "

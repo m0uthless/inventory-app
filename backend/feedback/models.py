@@ -12,6 +12,7 @@ class ReportKind(models.TextChoices):
 class ReportStatus(models.TextChoices):
     OPEN = 'open', 'Open'
     RESOLVED = 'resolved', 'Resolved'
+    REJECTED = 'rejected', 'Rejected'
 
 
 class ReportSection(models.TextChoices):
@@ -53,6 +54,16 @@ class ReportRequest(TimeStampedModel):
         blank=True,
         verbose_name='Risolto da',
     )
+    rejection_reason = models.TextField(blank=True, default='', verbose_name='Motivazione rifiuto')
+    rejected_at = models.DateTimeField(null=True, blank=True, verbose_name='Rifiutato il')
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='rejected_report_requests',
+        null=True,
+        blank=True,
+        verbose_name='Rifiutato da',
+    )
 
     class Meta:
         verbose_name = 'Report / Request'
@@ -64,8 +75,10 @@ class ReportRequest(TimeStampedModel):
             models.Index(fields=['section'], name='reportrequest_section_idx'),
             models.Index(fields=['created_by'], name='reportrequest_created_by_idx'),
             models.Index(fields=['resolved_by'], name='reportrequest_resolved_by_idx'),
+            models.Index(fields=['rejected_by'], name='reportrequest_rejected_by_idx'),
             models.Index(fields=['-created_at'], name='reportrequest_created_at_idx'),
             models.Index(fields=['-resolved_at'], name='reportrequest_resolved_at_idx'),
+            models.Index(fields=['-rejected_at'], name='reportrequest_rejected_at_idx'),
         ]
 
     def __str__(self):

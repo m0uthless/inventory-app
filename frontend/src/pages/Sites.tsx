@@ -198,7 +198,7 @@ function SiteContactsTab(props: {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+          sx={{ bgcolor: '#0d9488', color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.main } }}
           onClick={() =>
             navigate(
               `/contacts${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
@@ -314,7 +314,7 @@ function SiteInventoriesTab(props: {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#0f766e' } }}
+          sx={{ bgcolor: '#0d9488', color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.main } }}
           onClick={() =>
             navigate(
               `/inventory${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,

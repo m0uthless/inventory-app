@@ -15,7 +15,7 @@ User = get_user_model()
 URL = "/api/absences/"
 
 
-def _make_user(*, philips=False, coordinator=False, area=None):
+def _make_user(*, philips=False, coordinator=False, area=None, functional=False):
     u = User.objects.create_user(
         username=f"u-{uuid.uuid4().hex[:8]}",
         password="pw", first_name="Nome", last_name="Cognome",
@@ -24,6 +24,7 @@ def _make_user(*, philips=False, coordinator=False, area=None):
     prof.is_philips = philips
     prof.is_leave_coordinator = coordinator
     prof.leave_area = area
+    prof.is_functional_account = functional
     prof.save()
     return u
 
@@ -42,6 +43,29 @@ def test_roster_excludes_philips_users(api_client, superuser):
     assert plan_user.id in ids
     assert philips_user.id not in ids
     assert resp.data["can_edit_all"] is True
+
+
+def test_roster_excludes_functional_accounts(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    area = LeaveArea.objects.create(key="avec2", label="AVEC2", sort_order=1)
+    plan_user = _make_user(philips=False, area=area)
+    functional_user = _make_user(philips=False, functional=True)
+
+    resp = api_client.get(f"{URL}roster/")
+    assert resp.status_code == 200
+    ids = {r["id"] for r in resp.data["rows"]}
+    assert plan_user.id in ids
+    assert functional_user.id not in ids
+
+
+def test_functional_account_cannot_propose_own_ferie(api_client):
+    functional_user = _make_user(functional=True)
+    api_client.force_authenticate(user=functional_user)
+    resp = api_client.post(URL, {
+        "user": functional_user.id, "date": date(2026, 7, 1).isoformat(),
+        "day_part": DayPart.MATTINA, "reason": "ferie",
+    }, format="json")
+    assert resp.status_code == 403
 
 
 # ─── Permessi dipendente ─────────────────────────────────────────────────────

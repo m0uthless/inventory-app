@@ -12,10 +12,8 @@ import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined'
 import AddToQueueOutlinedIcon from '@mui/icons-material/AddToQueueOutlined'
 import WifiOutlinedIcon from '@mui/icons-material/WifiOutlined'
+import { useTheme } from '@mui/material/styles'
 import { MobileBottomNav, type MobileNavAction, type MobileNavItem } from '@shared/ui/MobileBottomNav'
-
-/* Colore primario AUSL BO (blu istituzionale) */
-const NAV_COLOR = '#1A6BB5'
 
 const NAV_ITEMS: [MobileNavItem, MobileNavItem, MobileNavItem, MobileNavItem] = [
   { key: 'home',      label: 'Home',      icon: <DashboardOutlinedIcon />, path: '/'          },
@@ -37,6 +35,7 @@ function pathStarts(p: string, base: string) {
 }
 
 export default function MobileBottomNavAuslbo() {
+  const theme = useTheme()
   const nav = useNavigate()
   const loc = useLocation()
 
@@ -86,7 +85,7 @@ export default function MobileBottomNavAuslbo() {
 
   return (
     <MobileBottomNav
-      color={NAV_COLOR}
+      color={theme.palette.primary.main}
       items={NAV_ITEMS}
       activeKey={activeKey}
       onNavigate={handleNavigate}

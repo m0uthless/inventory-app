@@ -2,6 +2,7 @@ import { Box, Chip, Typography } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import type { RispacsLink, WifiDetail } from '@shared/device/deviceTypes'
+import { theme } from '../../theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,9 +50,9 @@ export type DeviceDetail = DeviceRow & {
 export function statusColor(name: string | null): { bg: string; fg: string; border: string } {
   const lower = (name ?? '').toLowerCase()
   if (lower.includes('attiv') || lower.includes('operativ'))
-    return { bg: 'rgba(16,185,129,0.10)', fg: '#065f46', border: 'rgba(16,185,129,0.28)' }
+    return { bg: 'rgba(16,185,129,0.10)', fg: theme.palette.success.dark, border: 'rgba(16,185,129,0.28)' }
   if (lower.includes('manutenzione') || lower.includes('riparazione'))
-    return { bg: 'rgba(245,158,11,0.10)', fg: '#92400e', border: 'rgba(245,158,11,0.28)' }
+    return { bg: 'rgba(245,158,11,0.10)', fg: theme.palette.warning.dark, border: 'rgba(245,158,11,0.28)' }
   if (lower.includes('dismess') || lower.includes('fuori'))
     return { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' }
   return { bg: 'rgba(99,102,241,0.10)', fg: '#3730a3', border: 'rgba(99,102,241,0.28)' }

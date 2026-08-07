@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { theme, SIDEBAR } from '../theme'
 import {
   Alert,
   Avatar,
@@ -35,9 +36,9 @@ import { ActionIconButton } from '@shared/ui/ActionIconButton'
 import { useAuth, type AuslBoMe } from '../auth/AuthProvider'
 
 // ─── Palette blu AUSL BO ──────────────────────────────────────────────────────
-const BLUE       = '#1A6BB5'
-const BLUE_DARK  = '#0B3D6B'
-const BLUE_LIGHT = '#5DAEF0'
+const BLUE       = theme.palette.primary.main
+const BLUE_DARK  = theme.palette.primary.dark
+const BLUE_LIGHT = SIDEBAR.accent
 
 const COMPACT_TEXTFIELD_SX: SxProps<Theme> = {
   '& .MuiInputLabel-root': { fontSize: 12 },
@@ -306,7 +307,7 @@ function SezioneAccesso({ me }: { me: AuslBoMe }) {
             size="small"
             sx={{
               bgcolor: me.auslbo.is_active ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
-              color:   me.auslbo.is_active ? '#065f46' : '#991b1b',
+              color:   me.auslbo.is_active ? theme.palette.success.dark : theme.palette.error.dark,
               border:  `1px solid ${me.auslbo.is_active ? 'rgba(16,185,129,0.28)' : 'rgba(239,68,68,0.28)'}`,
               fontWeight: 700, fontSize: '0.72rem',
             }}
@@ -389,7 +390,7 @@ export function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () =>
           <Chip
             size="small"
             label={me.auslbo.can_edit_devices ? '● Editor' : '● Utente'}
-            sx={{ bgcolor: 'rgba(93,174,240,0.22)', color: '#D1EAFE', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(209,234,254,0.3)', height: 22 }}
+            sx={{ bgcolor: 'rgba(93,174,240,0.22)', color: SIDEBAR.accentBright, fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(209,234,254,0.3)', height: 22 }}
           />
           <ActionIconButton
             label="Chiudi"

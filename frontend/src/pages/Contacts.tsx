@@ -164,7 +164,7 @@ const renderContactCard: MobileCardRenderFn<ContactRow> = ({ row, onOpen }) => {
           )}
         </Box>
         {row.is_primary && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: 'rgba(16,185,129,0.10)', color: '#065f46', border: '0.5px solid rgba(16,185,129,0.28)', whiteSpace: 'nowrap' }}>
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: 'rgba(16,185,129,0.10)', color: (theme) => theme.palette.success.dark, border: '0.5px solid rgba(16,185,129,0.28)', whiteSpace: 'nowrap' }}>
             Primario
           </Box>
         )}

@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Box, Chip, Typography } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
 import type { DeviceRow } from './deviceGrid'
@@ -17,6 +18,7 @@ export default function RepartoChart({
   repartoF: string
   onSelect: (v: string) => void
 }) {
+  const theme = useTheme()
   const data = React.useMemo(() => {
     const counts: Record<string, number> = {}
     rows.forEach((r) => {
@@ -79,7 +81,7 @@ export default function RepartoChart({
               </Pie>
               <RechartsTooltip
                 formatter={(value: number, name: string) => [value, name]}
-                contentStyle={{ fontSize: '0.70rem', borderRadius: 6, border: '1px solid #e2e8f0', padding: '4px 8px' }}
+                contentStyle={{ fontSize: '0.70rem', borderRadius: 6, border: `1px solid ${theme.palette.divider}`, padding: '4px 8px' }}
               />
             </PieChart>
           </ResponsiveContainer>

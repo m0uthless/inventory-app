@@ -143,3 +143,104 @@ class TestReportRequestPermissions:
 
         assert res.status_code == 201, res.data
         assert res.data['status'] == ReportStatus.OPEN
+
+    def test_creator_cannot_reject_without_change_permission(self):
+        owner = _make_user()
+        item = _make_item(owner)
+        client = _auth_client(owner)
+
+        res = client.patch(
+            f'/api/feedback-items/{item.id}/',
+            {'status': 'rejected', 'rejection_reason': 'Non prioritario'},
+            format='json',
+        )
+
+        assert res.status_code == 403, res.data
+        item.refresh_from_db()
+        assert item.status == ReportStatus.OPEN
+        assert item.rejected_at is None
+
+    def test_user_with_change_permission_can_reject_with_reason(self):
+        owner = _make_user()
+        manager = _make_user()
+        perm = Permission.objects.get(codename='change_reportrequest')
+        manager.user_permissions.add(perm)
+        item = _make_item(owner)
+        client = _auth_client(manager)
+
+        res = client.patch(
+            f'/api/feedback-items/{item.id}/',
+            {'status': 'rejected', 'rejection_reason': 'Duplicato di #12'},
+            format='json',
+        )
+
+        assert res.status_code == 200, res.data
+        item.refresh_from_db()
+        assert item.status == ReportStatus.REJECTED
+        assert item.rejected_by_id == manager.id
+        assert item.rejected_at is not None
+        assert item.rejection_reason == 'Duplicato di #12'
+        assert item.resolved_at is None
+        assert item.resolved_by_id is None
+
+    def test_reject_without_reason_is_rejected_by_validation(self):
+        owner = _make_user()
+        manager = _make_user()
+        perm = Permission.objects.get(codename='change_reportrequest')
+        manager.user_permissions.add(perm)
+        item = _make_item(owner)
+        client = _auth_client(manager)
+
+        res = client.patch(f'/api/feedback-items/{item.id}/', {'status': 'rejected'}, format='json')
+
+        assert res.status_code == 400, res.data
+        assert 'rejection_reason' in res.data
+        item.refresh_from_db()
+        assert item.status == ReportStatus.OPEN
+
+    def test_reopening_a_rejected_item_clears_rejection_fields(self):
+        owner = _make_user()
+        manager = _make_user()
+        perm = Permission.objects.get(codename='change_reportrequest')
+        manager.user_permissions.add(perm)
+        item = _make_item(owner)
+        client = _auth_client(manager)
+
+        client.patch(
+            f'/api/feedback-items/{item.id}/',
+            {'status': 'rejected', 'rejection_reason': 'Non ora'},
+            format='json',
+        )
+        res = client.patch(f'/api/feedback-items/{item.id}/', {'status': 'open'}, format='json')
+
+        assert res.status_code == 200, res.data
+        item.refresh_from_db()
+        assert item.status == ReportStatus.OPEN
+        assert item.rejected_at is None
+        assert item.rejected_by_id is None
+        assert item.rejection_reason == ''
+
+    def test_status_filter_accepts_comma_separated_values(self):
+        owner = _make_user()
+        manager = _make_user()
+        perm = Permission.objects.get(codename='change_reportrequest')
+        manager.user_permissions.add(perm)
+        resolved_item = _make_item(owner)
+        rejected_item = _make_item(owner)
+        open_item = _make_item(owner)
+        client = _auth_client(manager)
+
+        client.patch(f'/api/feedback-items/{resolved_item.id}/', {'status': 'resolved'}, format='json')
+        client.patch(
+            f'/api/feedback-items/{rejected_item.id}/',
+            {'status': 'rejected', 'rejection_reason': 'motivo'},
+            format='json',
+        )
+
+        res = client.get('/api/feedback-items/', {'status': 'resolved,rejected'})
+
+        assert res.status_code == 200, res.data
+        returned_ids = {row['id'] for row in res.data['results']}
+        assert resolved_item.id in returned_ids
+        assert rejected_item.id in returned_ids
+        assert open_item.id not in returned_ids

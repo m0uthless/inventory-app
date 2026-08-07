@@ -29,6 +29,7 @@ import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
 import CloseIcon from '@mui/icons-material/Close'
 
 import { useAuth } from '../auth/AuthProvider'
+import { theme } from '../theme'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isRecord } from '@shared/utils/guards'
 import type { GridColDef } from '@mui/x-data-grid'
@@ -90,9 +91,9 @@ const SERVICENOW_CASES_PATH = '/servicenow-cases/' as const satisfies Collection
 // ─── Chip priorità / stato ─────────────────────────────────────────────────
 
 const PRIORITY_COLOR: Record<string, { bg: string; fg: string; border: string }> = {
-  '1': { bg: 'rgba(239,68,68,0.10)',  fg: '#991b1b', border: 'rgba(239,68,68,0.28)' },  // Critical
-  '2': { bg: 'rgba(245,158,11,0.10)', fg: '#92400e', border: 'rgba(245,158,11,0.28)' }, // High
-  '3': { bg: 'rgba(59,130,246,0.10)', fg: '#1e40af', border: 'rgba(59,130,246,0.28)' }, // Moderate
+  '1': { bg: 'rgba(239,68,68,0.10)',  fg: theme.palette.error.dark,  border: 'rgba(239,68,68,0.28)' },  // Critical
+  '2': { bg: 'rgba(245,158,11,0.10)', fg: theme.palette.warning.dark, border: 'rgba(245,158,11,0.28)' }, // High
+  '3': { bg: 'rgba(59,130,246,0.10)', fg: theme.palette.info.dark, border: 'rgba(59,130,246,0.28)' }, // Moderate
   '4': { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' }, // Low
 }
 
@@ -122,8 +123,8 @@ type TriageCategoryData = { total: number; technicians: TriageTechnician[] }
 type TriageResponse = { date: string; categories: Record<string, TriageCategoryData> }
 
 const TRIAGE_CATEGORIES = [
-  { value: 'philips', label: 'Philips', accent: '#0f766e', tint: 'rgba(15,118,110,0.08)' },
-  { value: 'biotron', label: 'Biotron', accent: '#0ea5e9', tint: 'rgba(14,165,233,0.08)' },
+  { value: 'philips', label: 'Philips', accent: theme.palette.primary.main, tint: 'rgba(15,118,110,0.08)' },
+  { value: 'biotron', label: 'Biotron', accent: theme.palette.secondary.main, tint: 'rgba(14,165,233,0.08)' },
 ] as const
 
 function initialsOf(name: string): string {

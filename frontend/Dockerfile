@@ -10,6 +10,12 @@ RUN cd frontend && npm install --legacy-peer-deps
 COPY shared/ ./shared/
 RUN ln -s /app/frontend/node_modules /app/shared/node_modules
 
+# Identifica l'ambiente di build (dev/prod), passato da docker-compose
+# tramite build.args. Default "production" se l'arg non viene passato
+# (es. build manuale senza compose).
+ARG VITE_APP_ENV=production
+ENV VITE_APP_ENV=${VITE_APP_ENV}
+
 # Copia frontend e builda
 COPY frontend/ ./frontend/
 RUN cd frontend && npm run build

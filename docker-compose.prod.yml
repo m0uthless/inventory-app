@@ -32,7 +32,16 @@ services:
       # comandi di management schedulati contro lo stesso schema DB.
       FAIL_ON_PENDING_MIGRATIONS: "1"
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_APP_ENV: production
+
   frontend-auslbo:
     build:
       context: .
       dockerfile: frontend-auslbo/Dockerfile
+      args:
+        VITE_APP_ENV: production

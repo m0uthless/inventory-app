@@ -30,6 +30,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
+import { theme } from '../theme'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -271,7 +272,7 @@ const EMPTY_FORM: FormState = {
   description: '',
   sort_order: '0',
   emoji: '📄',
-  color: '#0f766e',
+  color: theme.palette.primary.main,
 }
 
 function CategoryFormDialog({
@@ -297,7 +298,7 @@ function CategoryFormDialog({
         description: initial.description ?? '',
         sort_order: String(initial.sort_order),
         emoji: initial.emoji || '📄',
-        color: initial.color || '#0f766e',
+        color: initial.color || theme.palette.primary.main,
       })
     } else {
       setForm(EMPTY_FORM)

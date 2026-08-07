@@ -19,7 +19,7 @@ pytestmark = pytest.mark.django_db
 User = get_user_model()
 
 
-def _make_tech(*, is_philips=False, is_servicenow_technician=True, name="Tech"):
+def _make_tech(*, is_philips=False, is_servicenow_technician=True, is_functional_account=False, name="Tech"):
     user = User.objects.create_user(
         username=f"{name.lower()}_{uuid.uuid4().hex[:6]}",
         password="pw",
@@ -28,7 +28,8 @@ def _make_tech(*, is_philips=False, is_servicenow_technician=True, name="Tech"):
     )
     user.profile.is_philips = is_philips
     user.profile.is_servicenow_technician = is_servicenow_technician
-    user.profile.save(update_fields=["is_philips", "is_servicenow_technician"])
+    user.profile.is_functional_account = is_functional_account
+    user.profile.save(update_fields=["is_philips", "is_servicenow_technician", "is_functional_account"])
     return user
 
 
@@ -165,3 +166,26 @@ def test_triage_unassigned_cases_grouped_separately(api_client, superuser):
     resp = api_client.get("/api/servicenow-cases/triage/")
     biotron_techs = {t["name"]: t["count"] for t in resp.data["categories"]["biotron"]["technicians"]}
     assert biotron_techs.get("Non assegnato") == 1
+
+
+def test_triage_excludes_functional_accounts(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    _make_tech(is_functional_account=True, name="CddBiotron")
+    real_tech = _make_tech(name="RealTech")
+
+    resp = api_client.get("/api/servicenow-cases/triage/")
+    biotron_names = [t["name"] for t in resp.data["categories"]["biotron"]["technicians"]]
+    assert "RealTech Test" in biotron_names
+    assert "CddBiotron Test" not in biotron_names
+
+
+def test_triage_functional_account_cases_not_counted_in_total(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    functional = _make_tech(is_functional_account=True, name="JollyPhilips", is_philips=True)
+    case_type = _make_case_type(ServiceNowCaseCategory.PHILIPS)
+    _create_case_today(api_client, case_type, ServiceNowCaseCategory.PHILIPS, assigned_to=functional, number="CS_FUNCTIONAL")
+
+    resp = api_client.get("/api/servicenow-cases/triage/")
+    philips_names = [t["name"] for t in resp.data["categories"]["philips"]["technicians"]]
+    assert "JollyPhilips Test" not in philips_names
+    assert resp.data["categories"]["philips"]["total"] == 0

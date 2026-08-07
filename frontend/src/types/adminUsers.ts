@@ -38,6 +38,7 @@ export type AdminUserProfile = {
   avatar: string | null
   is_philips: boolean
   is_servicenow_technician: boolean
+  is_functional_account: boolean
   is_leave_coordinator: boolean
   leave_area: number | null
   leave_area_name: string | null
@@ -85,6 +86,7 @@ export type AdminUserWritePayload = Partial<{
   profile: Partial<{
     is_philips: boolean
     is_servicenow_technician: boolean
+    is_functional_account: boolean
     is_leave_coordinator: boolean
     leave_area: number | null
     is_expense_secretary: boolean

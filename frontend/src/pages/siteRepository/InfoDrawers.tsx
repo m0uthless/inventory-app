@@ -63,7 +63,7 @@ export function CustomerInfoDrawer({
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{detail.primary_contact_email || ''}</Typography>
               </Box>
               {detail.primary_contact_phone ? (
-                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: '#0f766e', border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
+                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: (theme) => theme.palette.primary.main, border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
               ) : null}
             </Stack>
           </DrawerSection>
@@ -161,7 +161,7 @@ export function SiteInfoDrawer({
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{detail.primary_contact_email || ''}</Typography>
               </Box>
               {detail.primary_contact_phone ? (
-                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: '#0f766e', border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
+                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: (theme) => theme.palette.primary.main, border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
               ) : null}
             </Stack>
           </DrawerSection>

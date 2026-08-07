@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { LoginPage, type AmbitoConfig, type Ambito } from '@shared/ui/LoginPage'
 import { useAuth } from '../auth/AuthProvider'
 import { api } from '@shared/api/client'
+import { theme } from '../theme'
 
 const AMBITI: AmbitoConfig[] = [
   {
@@ -15,7 +16,7 @@ const AMBITI: AmbitoConfig[] = [
   {
     value: 'auslbo',
     label: 'AUSL Bologna',
-    color: '#1A6BB5',
+    color: theme.palette.primary.main,
     colorHover: '#155C9E',
     colorLight: 'rgba(26,107,181,0.12)',
   },

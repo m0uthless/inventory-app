@@ -5,12 +5,13 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { PRIORITY_META } from '../features/issues/types'
 import type { IssueRow } from '../features/issues/types'
+import { theme } from '../theme'
 
 const PRIORITY_BAR: Record<string, string> = {
-  critical: '#d32f2f',
+  critical: theme.palette.error.main,
   high:     '#ed6c02',
   medium:   '#0288d1',
-  low:      '#9e9e9e',
+  low:      theme.palette.text.secondary,
 }
 
 function timeAgo(dateStr: string): string {
@@ -86,7 +87,7 @@ export default function RecentIssuesCard() {
           <Stack divider={<Divider />}>
             {issues.map(issue => {
               const meta     = PRIORITY_META[issue.priority] ?? { label: issue.priority, color: 'default' as const }
-              const barColor = PRIORITY_BAR[issue.priority] ?? '#9e9e9e'
+              const barColor = PRIORITY_BAR[issue.priority] ?? theme.palette.text.secondary
               const assignee = issue.assigned_to_full_name || issue.assigned_to_username || null
 
               return (

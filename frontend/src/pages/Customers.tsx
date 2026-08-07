@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { Theme } from '@mui/material/styles'
 import {
   Box,
   Button,
@@ -93,9 +94,9 @@ type CustomerForm = {
 // Stile condiviso dai pulsanti "vai a sezione collegata" (Siti / Inventory / Drive)
 const navSectionButtonSx = {
   bgcolor: '#0d9488',
-  color: '#fff',
+  color: (theme: Theme) => theme.palette.common.white,
   fontWeight: 600,
-  '&:hover': { bgcolor: '#0f766e' },
+  '&:hover': { bgcolor: (theme: Theme) => theme.palette.primary.main },
 } as const
 
 type SiteMini = {

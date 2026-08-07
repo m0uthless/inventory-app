@@ -231,7 +231,7 @@ def test_resolve_assignment_ac_uses_fixed_user_ignoring_csv_name():
     names_index = build_users_name_index()
     username_index = build_users_username_index()
 
-    user, notes = resolve_assignment("AC", "Nome Diverso Nel Csv", names_index, username_index)
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "AC", "Nome Diverso Nel Csv", names_index, username_index)
     assert user is not None
     assert user.id == fixed.id
     assert any("assegnato automaticamente" in n for n in notes)
@@ -242,7 +242,7 @@ def test_resolve_assignment_ris_uses_fixed_user():
     names_index = build_users_name_index()
     username_index = build_users_username_index()
 
-    user, notes = resolve_assignment("RIS", "", names_index, username_index)
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "RIS", "", names_index, username_index)
     assert user is not None
     assert user.id == fixed.id
 
@@ -251,7 +251,7 @@ def test_resolve_assignment_ac_missing_fixed_user_returns_warning_no_fallback():
     names_index = build_users_name_index()
     username_index = build_users_username_index()  # ac.philips non esiste
 
-    user, notes = resolve_assignment("AC", "Qualcuno Reale", names_index, username_index)
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "AC", "Qualcuno Reale", names_index, username_index)
     assert user is None
     assert any("ac.philips" in n and "non trovato" in n for n in notes)
 
@@ -261,10 +261,131 @@ def test_resolve_assignment_l1_falls_back_to_normal_name_matching():
     names_index = build_users_name_index()
     username_index = build_users_username_index()
 
-    user, notes = resolve_assignment("L1", "Mario Rossi", names_index, username_index)
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "L1", "Mario Rossi", names_index, username_index)
     assert user is not None
     assert user.id == real_user.id
     assert notes == []
+
+
+# ─── resolve_assignment (fallback Type CDD, categoria Biotron) ───────────────
+
+def test_resolve_assignment_cdd_matches_real_name_first_no_fallback():
+    real_user = _make_user("Mario", "Rossi")
+    _make_user("Cdd", "Biotron", username="cdd.biotron")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.BIOTRON, "CDD", "Mario Rossi", names_index, username_index)
+    assert user is not None
+    assert user.id == real_user.id
+    assert notes == []
+
+
+def test_resolve_assignment_cdd_falls_back_when_name_not_found():
+    fallback = _make_user("Cdd", "Biotron", username="cdd.biotron")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.BIOTRON, "CDD", "Persona Inesistente", names_index, username_index)
+    assert user is not None
+    assert user.id == fallback.id
+    assert any("cdd.biotron" in n and "fallback" in n for n in notes)
+    # l'avviso originale (nome non trovato) resta comunque presente
+    assert any("Persona Inesistente" in n for n in notes)
+
+
+def test_resolve_assignment_cdd_falls_back_when_name_ambiguous():
+    _make_user("Luca", "Bianchi")
+    _make_user("Luca", "Bianchi")  # omonimo
+    fallback = _make_user("Cdd", "Biotron", username="cdd.biotron")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.BIOTRON, "CDD", "Luca Bianchi", names_index, username_index)
+    assert user is not None
+    assert user.id == fallback.id
+    assert any("ambigu" in n.lower() for n in notes)
+    assert any("fallback" in n for n in notes)
+
+
+def test_resolve_assignment_cdd_falls_back_when_csv_name_empty():
+    fallback = _make_user("Cdd", "Biotron", username="cdd.biotron")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.BIOTRON, "CDD", "", names_index, username_index)
+    assert user is not None
+    assert user.id == fallback.id
+    assert any("non specificato" in n.lower() for n in notes)
+
+
+def test_resolve_assignment_cdd_missing_fallback_user_returns_warning_only():
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()  # cdd.biotron non esiste
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.BIOTRON, "CDD", "Persona Inesistente", names_index, username_index)
+    assert user is None
+    assert any("cdd.biotron" in n and "non trovato" in n for n in notes)
+
+
+# ─── resolve_assignment (fallback categoria Philips) ─────────────────────────
+
+def test_resolve_assignment_philips_l1_matches_real_name_first_no_fallback():
+    real_user = _make_user("Mario", "Rossi")
+    _make_user("Jolly", "Philips", username="jolly.philips")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "L1", "Mario Rossi", names_index, username_index)
+    assert user is not None
+    assert user.id == real_user.id
+    assert notes == []
+
+
+def test_resolve_assignment_philips_l1_falls_back_when_name_not_found():
+    fallback = _make_user("Jolly", "Philips", username="jolly.philips")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "L1", "Persona Inesistente", names_index, username_index)
+    assert user is not None
+    assert user.id == fallback.id
+    assert any("jolly.philips" in n and "fallback" in n for n in notes)
+
+
+def test_resolve_assignment_philips_gemelli_falls_back_when_csv_name_empty():
+    fallback = _make_user("Jolly", "Philips", username="jolly.philips")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "GEMELLI", "", names_index, username_index)
+    assert user is not None
+    assert user.id == fallback.id
+    assert any("non specificato" in n.lower() for n in notes)
+
+
+def test_resolve_assignment_philips_missing_fallback_user_returns_warning_only():
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()  # jolly.philips non esiste
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.PHILIPS, "L1", "Persona Inesistente", names_index, username_index)
+    assert user is None
+    assert any("jolly.philips" in n and "non trovato" in n for n in notes)
+
+
+def test_resolve_assignment_biotron_l1_no_philips_fallback_stays_unassigned():
+    # Un Type Biotron generico (non CDD) NON deve avere alcun fallback: solo
+    # CDD (Biotron) e qualsiasi Type Philips lo hanno.
+    _make_user("Jolly", "Philips", username="jolly.philips")
+    _make_user("Cdd", "Biotron", username="cdd.biotron")
+    names_index = build_users_name_index()
+    username_index = build_users_username_index()
+
+    user, notes = resolve_assignment(ServiceNowCaseCategory.BIOTRON, "L1", "Persona Inesistente", names_index, username_index)
+    assert user is None
+    assert len(notes) == 1
+    assert "non trovato" in notes[0]
+    assert not any("fallback" in n for n in notes)
 
 
 # ─── validate_columns ──────────────────────────────────────────────────────────
@@ -318,6 +439,35 @@ def test_process_csv_ac_type_gets_fixed_assignee_via_full_pipeline():
     assert rows[0].case_type_name == "AC"
     assert rows[0].assigned_to_id == fixed.id
     assert rows[0].assigned_to_csv == "Persona Diversa"  # il nome CSV resta visibile, ma ignorato
+
+
+def test_process_csv_cdd_type_falls_back_to_service_user_via_full_pipeline():
+    ServiceNowCaseType.objects.get_or_create(category=ServiceNowCaseCategory.BIOTRON, name="CDD")
+    fallback = _make_user("Cdd", "Biotron", username="cdd.biotron")
+    lookup = build_case_type_lookup()
+    username_index = build_users_username_index()
+    csv_bytes = _csv_bytes(
+        'CS0003,ACME Hospital,03-08-2026 10:00:00,x,3 - Moderate,Radiology Italy Biotron,Persona Inesistente,CDD\n'
+    )
+    rows, _ = process_csv(csv_bytes, set(), build_users_name_index(), lookup, username_index)
+    assert rows[0].case_type_name == "CDD"
+    assert rows[0].assigned_to_id == fallback.id
+    assert any("fallback" in w for w in rows[0].warnings)
+
+
+def test_process_csv_philips_l1_falls_back_to_service_user_via_full_pipeline():
+    ServiceNowCaseType.objects.get_or_create(category=ServiceNowCaseCategory.PHILIPS, name="L1")
+    fallback = _make_user("Jolly", "Philips", username="jolly.philips")
+    lookup = build_case_type_lookup()
+    username_index = build_users_username_index()
+    csv_bytes = _csv_bytes(
+        'CS0004,ACME Hospital,03-08-2026 10:00:00,x,3 - Moderate,Radiology IIG,Persona Inesistente,\n'
+    )
+    rows, _ = process_csv(csv_bytes, set(), build_users_name_index(), lookup, username_index)
+    assert rows[0].case_type_name == "L1"
+    assert rows[0].category == ServiceNowCaseCategory.PHILIPS
+    assert rows[0].assigned_to_id == fallback.id
+    assert any("fallback" in w for w in rows[0].warnings)
 
 
 def test_process_csv_skips_duplicate_against_existing_db_numbers():

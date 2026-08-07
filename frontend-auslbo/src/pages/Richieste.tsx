@@ -34,13 +34,14 @@ import {
 } from '../api/vlanRequestApi'
 import AuslBoNewDeviceDrawer from '../ui/AuslBoNewDeviceDrawer'
 import { type NewDeviceFormState, emptyDeviceForm } from '@shared/device/deviceTypes'
+import { theme } from '../theme'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATO_CHIP: Record<RequestStato, { label: string; color: string; bg: string; border: string }> = {
-  pending:  { label: 'In attesa',  color: '#854F0B', bg: '#FAEEDA', border: '#FAC775' },
-  approved: { label: 'Approvata',  color: '#3B6D11', bg: '#EAF3DE', border: '#C0DD97' },
-  rejected: { label: 'Rifiutata',  color: '#A32D2D', bg: '#FCEBEB', border: '#F7C1C1' },
+  pending:  { label: 'In attesa',  color: theme.palette.warning.dark, bg: theme.palette.warning.light, border: '#FAC775' },
+  approved: { label: 'Approvata',  color: theme.palette.success.dark, bg: theme.palette.success.light, border: '#C0DD97' },
+  rejected: { label: 'Rifiutata',  color: theme.palette.error.dark,   bg: theme.palette.error.light,   border: '#F7C1C1' },
 }
 
 function StatoBadge({ stato }: { stato: RequestStato }) {

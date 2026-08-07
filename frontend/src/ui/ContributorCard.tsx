@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Avatar, Box, Card, Skeleton, Stack, Typography } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded'
 import { api } from '@shared/api/client'
 
@@ -39,6 +40,7 @@ const CONFETTI = Array.from({ length: 16 }, (_, i) => ({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ContributorCard({ contributor: contributorProp }: Props) {
+  const theme = useTheme()
   const isControlled = contributorProp !== undefined
 
   const [contributor, setContributor] = React.useState<ContributorData | null>(
@@ -72,7 +74,7 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
         borderRadius: 1,
         height: '100%',
         minHeight: 240,
-        background: 'linear-gradient(160deg, #0d4f4a 0%, #0f766e 55%, #0a3d38 100%)',
+        background: `linear-gradient(160deg, #0d4f4a 0%, ${theme.palette.primary.main} 55%, #0a3d38 100%)`,
         border: '1px solid rgba(94,234,212,0.25)',
         boxShadow: '0 14px 34px rgba(15,118,110,0.28)',
       }}
@@ -109,7 +111,7 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
 
       {/* Trofeo grande di sfondo */}
       <Box sx={{ position: 'absolute', right: -8, bottom: -8, zIndex: 1, opacity: 0.18 }}>
-        <EmojiEventsRoundedIcon sx={{ fontSize: 140, color: '#f59e0b' }} />
+        <EmojiEventsRoundedIcon sx={{ fontSize: 140, color: theme.palette.warning.main }} />
       </Box>
 
       {/* Contenuto */}
@@ -123,9 +125,9 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
         {/* Titolo */}
         <Stack alignItems="center" spacing={0.25}>
           <Stack direction="row" alignItems="center" spacing={0.75}>
-            <EmojiEventsRoundedIcon sx={{ fontSize: 20, color: '#fbbf24' }} />
+            <EmojiEventsRoundedIcon sx={{ fontSize: 20, color: theme.palette.warning.main }} />
             <Typography variant="overline" sx={{
-              color: '#fde68a', fontSize: '0.68rem', fontWeight: 800,
+              color: theme.palette.warning.light, fontSize: '0.68rem', fontWeight: 800,
               letterSpacing: '0.1em', lineHeight: 1,
             }}>
               Contributor del mese
@@ -149,7 +151,7 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
             <Box sx={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               <Box sx={{
                 position: 'absolute', width: 108, height: 108, borderRadius: '50%',
-                border: '2.5px solid #f59e0b',
+                border: `2.5px solid ${theme.palette.warning.main}`,
                 boxShadow: '0 0 18px rgba(245,158,11,0.45)',
               }} />
               <Avatar
@@ -166,7 +168,7 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
               <Box sx={{
                 position: 'absolute', bottom: -4, right: -4,
                 width: 22, height: 22, borderRadius: '50%',
-                bgcolor: '#f59e0b', display: 'grid', placeItems: 'center',
+                bgcolor: theme.palette.warning.main, display: 'grid', placeItems: 'center',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
               }}>
                 <EmojiEventsRoundedIcon sx={{ fontSize: 13, color: '#fff' }} />

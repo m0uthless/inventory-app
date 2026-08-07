@@ -160,8 +160,8 @@ function WikiCard({
                 fontSize: 10,
                 fontWeight: 700,
                 borderRadius: 0.75,
-                bgcolor: '#fef9c3',
-                color: '#854d0e',
+                bgcolor: (theme) => theme.palette.warning.light,
+                color: (theme) => theme.palette.warning.dark,
               }}
             />
           )}
@@ -209,8 +209,8 @@ function WikiCard({
             readOnly
             size="small"
             sx={{
-              '& .MuiRating-iconFilled': { color: '#f59e0b' },
-              '& .MuiRating-iconEmpty': { color: '#fcd34d' },
+              '& .MuiRating-iconFilled': { color: (theme) => theme.palette.warning.main },
+              '& .MuiRating-iconEmpty': { color: (theme) => theme.palette.warning.light },
               fontSize: 16,
             }}
           />
@@ -335,8 +335,8 @@ function WikiListRow({
                   fontSize: 10,
                   fontWeight: 700,
                   borderRadius: 0.75,
-                  bgcolor: '#fef9c3',
-                  color: '#854d0e',
+                  bgcolor: (theme) => theme.palette.warning.light,
+                  color: (theme) => theme.palette.warning.dark,
                 }}
               />
             )}
@@ -416,8 +416,8 @@ function WikiListRow({
               readOnly
               size="small"
               sx={{
-                '& .MuiRating-iconFilled': { color: '#f59e0b' },
-                '& .MuiRating-iconEmpty': { color: '#fcd34d' },
+                '& .MuiRating-iconFilled': { color: (theme) => theme.palette.warning.main },
+                '& .MuiRating-iconEmpty': { color: (theme) => theme.palette.warning.light },
                 fontSize: 16,
               }}
             />

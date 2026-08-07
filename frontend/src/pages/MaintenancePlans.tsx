@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react'
+import { useTheme } from '@mui/material/styles'
 import {
   Box,
   Button,
@@ -123,6 +124,7 @@ const PLAN0: PlanForm = { customer: '', inventory_types: [], title: '', schedule
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function MaintenancePlans() {
+  const theme = useTheme()
   const { me } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -269,9 +271,9 @@ export default function MaintenancePlans() {
     const RESULT_IT: Record<string, string> = { ok: 'OK', ko: 'KO', partial: 'Parziale', not_planned: 'Non previsto' }
     type ResultKey = 'ok' | 'ko' | 'partial' | 'not_planned'
     const RESULT_STYLE: Record<ResultKey, string> = {
-      ok:          'background:#dcfce7;color:#166534',
-      ko:          'background:#fee2e2;color:#991b1b',
-      partial:     'background:#fef9c3;color:#854d0e',
+      ok:          `background:${theme.palette.success.light};color:${theme.palette.success.dark}`,
+      ko:          `background:${theme.palette.error.light};color:${theme.palette.error.dark}`,
+      partial:     `background:${theme.palette.warning.light};color:${theme.palette.warning.dark}`,
       not_planned: 'background:#f3f4f6;color:#6b7280',
     }
 
@@ -319,7 +321,7 @@ export default function MaintenancePlans() {
     const missing        = Math.max(0, coveredCount - completedCount)
     const pct            = coveredCount > 0 ? Math.round(completedCount / coveredCount * 100) : 0
     const isCompleted    = coveredCount > 0 && completedCount >= coveredCount
-    const barColor       = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626'
+    const barColor       = pct === 100 ? theme.palette.success.main : pct >= 50 ? theme.palette.warning.main : theme.palette.error.main
 
     const scheduleLabel = plan.schedule_type === 'interval'
       ? `Ogni ${plan.interval_value ?? ''} ${plan.interval_unit ?? ''}`
@@ -335,7 +337,7 @@ export default function MaintenancePlans() {
   .page{padding:22px 26px 18px}
 
   /* ── Header ── */
-  .hdr{background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;
+  .hdr{background:linear-gradient(135deg,${theme.palette.primary.main},#134e4a);color:${theme.palette.common.white};
        padding:16px 20px;border-radius:8px;margin-bottom:14px;
        display:flex;justify-content:space-between;align-items:flex-start}
   .hdr-left h1{font-size:16px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
@@ -344,49 +346,49 @@ export default function MaintenancePlans() {
   .tag{background:rgba(255,255,255,.18);color:#fff;padding:2px 8px;
        border-radius:4px;font-size:9.5px;font-weight:600}
   .hdr-right{text-align:right;font-size:9px;opacity:.55;line-height:1.7;white-space:nowrap;padding-left:16px}
-  .status-ok  {background:#dcfce7;color:#166534;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700}
-  .status-wip {background:#fef9c3;color:#854d0e;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700}
+  .status-ok  {background:${theme.palette.success.light};color:${theme.palette.success.dark};padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700}
+  .status-wip {background:${theme.palette.warning.light};color:${theme.palette.warning.dark};padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700}
 
   /* ── KPI strip ── */
   .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
-  .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:9px 12px}
+  .kpi{background:#f8fafc;border:1px solid ${theme.palette.divider};border-radius:6px;padding:9px 12px}
   .kpi-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:3px}
-  .kpi-val{font-size:20px;font-weight:800;line-height:1;color:#0f172a}
+  .kpi-val{font-size:20px;font-weight:800;line-height:1;color:${theme.palette.text.primary}}
   .kpi-sub{font-size:9px;color:#94a3b8;margin-top:2px}
 
   /* ── Progress ── */
-  .prog{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
+  .prog{background:#f8fafc;border:1px solid ${theme.palette.divider};border-radius:6px;
         padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:14px}
-  .prog-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;white-space:nowrap}
-  .prog-bar-bg{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+  .prog-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${theme.palette.text.secondary};white-space:nowrap}
+  .prog-bar-bg{flex:1;height:8px;background:${theme.palette.divider};border-radius:4px;overflow:hidden}
   .prog-bar-fill{height:100%;border-radius:4px}
   .prog-pct{font-size:13px;font-weight:800;white-space:nowrap}
 
   /* ── Notes ── */
-  .notes{background:#f0fdf4;border-left:3px solid #0f766e;padding:7px 12px;
+  .notes{background:#f0fdf4;border-left:3px solid ${theme.palette.primary.main};padding:7px 12px;
          border-radius:0 5px 5px 0;margin-bottom:12px;font-size:10px;color:#374151;white-space:pre-wrap}
 
   /* ── Section title ── */
   .sec{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-       color:#64748b;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+       color:${theme.palette.text.secondary};margin-bottom:6px;display:flex;align-items:center;gap:6px}
   .sec::before{content:'';display:inline-block;width:3px;height:12px;
-               background:#0f766e;border-radius:2px;flex-shrink:0}
+               background:${theme.palette.primary.main};border-radius:2px;flex-shrink:0}
 
   /* ── Table ── */
   table{width:100%;border-collapse:collapse}
-  thead th{background:#0f766e;color:#fff;padding:6px 8px;
+  thead th{background:${theme.palette.primary.main};color:${theme.palette.common.white};padding:6px 8px;
            font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:left}
   thead th:first-child{border-radius:5px 0 0 0}
   thead th:last-child {border-radius:0 5px 0 0}
   tbody tr:nth-child(even) td{background:#f8fafc}
-  td{padding:5px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;font-size:10.5px}
+  td{padding:5px 8px;border-bottom:1px solid ${theme.palette.background.default};vertical-align:middle;font-size:10.5px}
   td.mono{font-family:ui-monospace,monospace;font-weight:600;font-size:10px}
   td.muted{color:#6b7280}
   td.center{text-align:center}
   td.small{font-size:9.5px}
 
   /* ── Footer ── */
-  .footer{margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0;
+  .footer{margin-top:14px;padding-top:10px;border-top:1px solid ${theme.palette.divider};
           display:flex;justify-content:space-between;font-size:9px;color:#94a3b8}
 
   @media print{
@@ -420,12 +422,12 @@ export default function MaintenancePlans() {
     </div>
     <div class="kpi">
       <div class="kpi-lbl">Eseguiti</div>
-      <div class="kpi-val" style="color:#16a34a">${completedCount}</div>
+      <div class="kpi-val" style="color:${theme.palette.success.main}">${completedCount}</div>
       <div class="kpi-sub">ciclo corrente</div>
     </div>
     <div class="kpi">
       <div class="kpi-lbl">Mancanti</div>
-      <div class="kpi-val" style="color:${missing > 0 ? '#dc2626' : '#16a34a'}">${missing}</div>
+      <div class="kpi-val" style="color:${missing > 0 ? theme.palette.error.main : theme.palette.success.main}">${missing}</div>
       <div class="kpi-sub">da completare</div>
     </div>
     <div class="kpi">
@@ -506,10 +508,10 @@ export default function MaintenancePlans() {
               sx={{
                 height: 22, fontSize: '0.72rem', fontWeight: 600,
                 ...(isArchived
-                  ? { bgcolor: 'rgba(148,163,184,0.15)', color: '#64748b', border: '1px solid rgba(148,163,184,0.35)' }
+                  ? { bgcolor: 'rgba(148,163,184,0.15)', color: theme.palette.text.secondary, border: '1px solid rgba(148,163,184,0.35)' }
                   : isCompleted
-                  ? { bgcolor: 'rgba(34,197,94,0.12)',   color: '#15803d', border: '1px solid rgba(34,197,94,0.35)' }
-                  : { bgcolor: 'rgba(234,179,8,0.12)',   color: '#a16207', border: '1px solid rgba(234,179,8,0.35)' }),
+                  ? { bgcolor: 'rgba(34,197,94,0.12)',   color: theme.palette.success.dark, border: '1px solid rgba(34,197,94,0.35)' }
+                  : { bgcolor: 'rgba(234,179,8,0.12)',   color: theme.palette.warning.dark, border: '1px solid rgba(234,179,8,0.35)' }),
               }}
             />
           </Box>
@@ -522,7 +524,7 @@ export default function MaintenancePlans() {
         const total     = p.row.covered_count  ?? 0
         const completed = p.row.completed_count ?? 0
         const pct       = total > 0 ? Math.round(completed / total * 100) : 0
-        const color     = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626'
+        const color     = pct === 100 ? theme.palette.success.main : pct >= 50 ? theme.palette.warning.main : theme.palette.error.main
         const trackClr  = pct === 100 ? 'rgba(34,197,94,0.15)' : pct >= 50 ? 'rgba(234,179,8,0.15)' : 'rgba(220,38,38,0.12)'
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', height: '100%' }}>

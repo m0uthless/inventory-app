@@ -26,7 +26,7 @@ export default function PurchaseOrderKpis({ year, summary, loading }: PurchaseOr
 
   // Verde se in crescita, rosso se in calo, grigio se invariato/non disponibile
   // (deciso in chat: confronto Totale in Euro vs anno precedente).
-  const yoyAccent = deltaPct == null ? '#64748b' : deltaPct > 0 ? '#16a34a' : deltaPct < 0 ? '#dc2626' : '#64748b'
+  const yoyAccent = deltaPct == null ? theme.palette.text.secondary : deltaPct > 0 ? '#16a34a' : deltaPct < 0 ? '#dc2626' : theme.palette.text.secondary
   const YoyIcon = deltaPct == null || deltaPct === 0 ? RemoveIcon : deltaPct > 0 ? ArrowUpwardIcon : ArrowDownwardIcon
 
   const yoySub = !hasYoy
@@ -35,7 +35,7 @@ export default function PurchaseOrderKpis({ year, summary, loading }: PurchaseOr
 
   const kpis = [
     { label: 'Totale Purchase Order', value: summary ? formatEuro(summary.total_amount) : '—', sub: `valore economico nel ${year}`, accent: '#0d9488' },
-    { label: 'Da inviare',            value: summary?.to_send ?? '—', sub: 'stato "Inserito"', accent: '#f59e0b' },
+    { label: 'Da inviare',            value: summary?.to_send ?? '—', sub: 'stato "Inserito"', accent: theme.palette.warning.main },
     { label: 'In attesa',             value: summary?.waiting ?? '—', sub: 'inviato o ricevuto, in attesa di riscontro', accent: '#6366f1' },
     {
       label: `Variazione vs ${year - 1}`,

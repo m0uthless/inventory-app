@@ -249,12 +249,12 @@ export default function ImportHistoricalDialog({ open, onClose, onImported }: Pr
                     <TableCell>Type</TableCell>
                     <TableCell>Assegnato a</TableCell>
                     <TableCell>Esito</TableCell>
+                    <TableCell>Avvisi</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {rowsToShow.map((r) => {
                     const chip = OUTCOME_CHIP[r.outcome]
-                    const notes = [r.error, ...r.warnings].filter(Boolean).join(' · ')
                     return (
                       <TableRow key={r.line} hover>
                         <TableCell sx={{ color: 'text.secondary' }}>{r.line}</TableCell>
@@ -266,9 +266,34 @@ export default function ImportHistoricalDialog({ open, onClose, onImported }: Pr
                         <TableCell>{r.case_type_name ?? '—'}</TableCell>
                         <TableCell>{r.assigned_to_label ?? (r.assigned_to_csv || '—')}</TableCell>
                         <TableCell>
-                          <Tooltip title={notes || ''} arrow disableHoverListener={!notes}>
+                          <Tooltip title={r.error || ''} arrow disableHoverListener={!r.error}>
                             <Chip size="small" color={chip.color} label={chip.label} sx={{ fontWeight: 600 }} />
                           </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                          {r.warnings.length > 0 && (
+                            <Tooltip
+                              arrow
+                              title={
+                                <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                                  {r.warnings.map((w, i) => (
+                                    <li key={i}>
+                                      <Typography variant="caption" sx={{ display: 'block' }}>{w}</Typography>
+                                    </li>
+                                  ))}
+                                </Box>
+                              }
+                            >
+                              <Chip
+                                size="small"
+                                color="warning"
+                                variant="outlined"
+                                icon={<WarningAmberRoundedIcon sx={{ fontSize: 14 }} />}
+                                label={r.warnings.length > 1 ? `${r.warnings.length} avvisi` : '1 avviso'}
+                                sx={{ cursor: 'help', fontWeight: 600 }}
+                              />
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     )

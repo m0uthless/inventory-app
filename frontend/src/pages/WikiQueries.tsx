@@ -22,6 +22,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { alpha } from '@mui/material/styles'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
@@ -77,8 +78,9 @@ function fmtDate(iso?: string | null): string {
 }
 
 function LangChip({ label, color, textColor }: { label: string | null; color: string | null; textColor: string | null }) {
+  const theme = useTheme()
   if (!label) return null
-  const bg = color ?? '#f1f5f9'
+  const bg = color ?? theme.palette.background.default
   const text = textColor ?? '#475569'
   return (
     <Chip

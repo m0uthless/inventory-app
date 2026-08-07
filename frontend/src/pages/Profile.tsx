@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { theme } from '../theme'
 import {
   Alert,
   Avatar,
@@ -46,7 +47,7 @@ import { isRecord } from '@shared/utils/guards'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
 
 // ─── Costanti palette ──────────────────────────────────────────────────────────
-const TEAL       = '#0f766e'
+const TEAL       = theme.palette.primary.main
 const TEAL_LIGHT = '#14b8a6'
 const TEAL_DARK  = '#0a4f4a'
 
@@ -325,7 +326,7 @@ function SezionePermessi({ me }: { me: NonNullable<ReturnType<typeof useAuth>['m
       <Box sx={{ mb: 3 }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'text.secondary', mb: 1.5 }}>Ruolo sistema</Typography>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {me.is_superuser && <Chip label="Superuser" size="small" sx={{ bgcolor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', fontWeight: 700, fontSize: '0.72rem' }} />}
+          {me.is_superuser && <Chip label="Superuser" size="small" sx={{ bgcolor: 'warning.light', color: 'warning.dark', border: '1px solid #fde68a', fontWeight: 700, fontSize: '0.72rem' }} />}
           {me.is_staff    && <Chip label="Staff" size="small" sx={{ bgcolor: 'rgba(15,118,110,0.08)', color: TEAL, border: 'rgba(15,118,110,0.2)', fontWeight: 700, fontSize: '0.72rem' }} />}
           {!me.is_staff && !me.is_superuser && <Chip label="Utente standard" size="small" variant="outlined" sx={{ fontSize: '0.72rem' }} />}
         </Stack>
@@ -453,7 +454,7 @@ export function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () =>
       {/* ── Hero (identico a CustomerDrawer / InventoryDrawer) ── */}
       <Box
         sx={{
-          background: 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)',
+          background: `linear-gradient(140deg, ${TEAL} 0%, #0d9488 55%, #0e7490 100%)`,
           px: 2.5,
           pt: 2.25,
           pb: 2.25,
@@ -543,7 +544,7 @@ function ProfilePageContent({
               <Typography sx={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', mt: 0.25 }}>@{me.username}</Typography>
             </Box>
             <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="center" useFlexGap sx={{ position: 'relative', zIndex: 1 }}>
-              {me.is_superuser && <Chip label="Superuser" size="small" sx={{ fontSize: '0.62rem', height: 18, bgcolor: 'rgba(251,191,36,0.2)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)', fontWeight: 700 }} />}
+              {me.is_superuser && <Chip label="Superuser" size="small" sx={{ fontSize: '0.62rem', height: 18, bgcolor: 'rgba(251,191,36,0.2)', color: 'warning.main', border: '1px solid rgba(251,191,36,0.3)', fontWeight: 700 }} />}
               {me.is_staff    && <Chip label="Staff"     size="small" sx={{ fontSize: '0.62rem', height: 18, bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 700 }} />}
               {me.groups.slice(0, 2).map((g) => <Chip key={g} label={g} size="small" sx={{ fontSize: '0.62rem', height: 18, bgcolor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.12)' }} />)}
             </Stack>

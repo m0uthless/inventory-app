@@ -1,7 +1,10 @@
 """attendance/api.py — API Piano Ferie / assenze.
 
 Perimetro permessi indipendente da ServiceNow:
-  • Roster del Piano Ferie = utenti attivi con profilo NON Philips (is_philips=False).
+  • Roster del Piano Ferie = utenti attivi con profilo NON Philips
+    (is_philips=False) e NON account funzionale (is_functional_account=False):
+    un account di servizio Biotron (es. cdd.biotron) non è una persona e non
+    deve avere righe di ferie/assenze proprie.
   • Dipendente in roster: crea/modifica/elimina SOLO le proprie righe, solo
     `reason=ferie` e solo in stato `proposta` (non può validare).
   • Coordinatore (`profile.is_leave_coordinator` o superuser): valida/rifiuta e
@@ -41,12 +44,15 @@ def is_leave_coordinator(user) -> bool:
 
 
 def in_leave_plan(user) -> bool:
-    """Roster Piano Ferie: utenti attivi NON Philips, esclusi i superuser
-    (account tecnici/root, es. l'utente amministrativo di sistema)."""
+    """Roster Piano Ferie: utenti attivi NON Philips e NON account
+    funzionale, esclusi i superuser (account tecnici/root, es. l'utente
+    amministrativo di sistema)."""
     if not user or not user.is_authenticated or not user.is_active or user.is_superuser:
         return False
     prof = _profile(user)
-    return bool(prof and not getattr(prof, "is_philips", False))
+    if prof is None:
+        return False
+    return not getattr(prof, "is_philips", False) and not getattr(prof, "is_functional_account", False)
 
 
 def _user_name(u) -> str:
@@ -424,7 +430,9 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
     @action(detail=False, methods=["get"], url_path="roster")
     def roster(self, request):
         """Righe del Piano Ferie: utenti attivi NON Philips (esclusi i
-        superuser, es. account root/amministrativi), con area.
+        superuser, es. account root/amministrativi) e NON account funzionali
+        (es. cdd.biotron: sono utenti di servizio Biotron, non persone reali,
+        vedi profile.is_functional_account), con area.
         Include `can_edit_all` (coordinatore o staff/superuser, per i
         permessi di modifica) e `is_full_access` (solo staff/superuser, per
         distinguere il coordinatore "puro" — che vede le statistiche solo
@@ -443,6 +451,8 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
         for u in users:
             prof = getattr(u, "profile", None)
             if prof is None or getattr(prof, "is_philips", False):
+                continue
+            if getattr(prof, "is_functional_account", False):
                 continue
             area = getattr(prof, "leave_area", None)
             rows.append({

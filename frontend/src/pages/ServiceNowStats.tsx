@@ -6,6 +6,7 @@
  */
 import * as React from 'react'
 import { alpha, useTheme } from '@mui/material/styles'
+import { theme } from '../theme'
 import {
   Box,
   Checkbox,
@@ -144,6 +145,7 @@ function KpiCard({ label, value, helper, accent, valueFontSize = '1.75rem' }: {
 // ─── Mini donut "Casi per Type" ─────────────────────────────────────────────
 
 function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
+  const theme = useTheme()
   const total = rows.reduce((s, r) => s + r.count, 0)
 
   if (total === 0) {
@@ -174,7 +176,7 @@ function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
             <Pie data={pieData} dataKey="count" nameKey="name" innerRadius={16} outerRadius={30} paddingAngle={1} stroke="none" isAnimationActive={false}>
               {pieData.map((r, i) => <Cell key={r.id} fill={TYPE_COLORS[i % TYPE_COLORS.length]} />)}
             </Pie>
-            <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid #e2e8f0' }} isAnimationActive={false} />
+            <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12, border: `1px solid ${theme.palette.divider}` }} isAnimationActive={false} />
           </PieChart>
         </ResponsiveContainer>
       </Box>
@@ -199,10 +201,10 @@ function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
 // ─── Motivo assenza → lettera/colore cella heatmap ───────────────────────────
 
 const ABSENCE_CELL_STYLE: Record<AbsenceReasonCode, { letter: string; bg: string; fg: string }> = {
-  malattia:  { letter: 'I', bg: '#ef4444', fg: '#ffffff' },  // rosso
-  ferie:     { letter: 'H', bg: '#3b82f6', fg: '#ffffff' },  // azzurro
-  trasferta: { letter: 'T', bg: '#9ca3af', fg: '#1f2937' },  // grigio (come Altro)
-  altro:     { letter: 'T', bg: '#9ca3af', fg: '#1f2937' },  // grigio
+  malattia:  { letter: 'I', bg: theme.palette.error.main, fg: theme.palette.common.white },  // rosso
+  ferie:     { letter: 'H', bg: theme.palette.info.main, fg: theme.palette.common.white },  // azzurro
+  trasferta: { letter: 'T', bg: '#9ca3af', fg: theme.palette.text.primary },  // grigio (come Altro)
+  altro:     { letter: 'T', bg: '#9ca3af', fg: theme.palette.text.primary },  // grigio
 }
 
 // ─── Matrice heatmap ────────────────────────────────────────────────────────
@@ -357,6 +359,7 @@ export function StatsMatrix({ periods, series, showRowTotal, rowTotalTooltip, ce
 // ─── Grafico a barre ────────────────────────────────────────────────────────
 
 function StatsBarChart({ periods, series }: { periods: StatsPeriod[]; series: StatsSeries[] }) {
+  const theme = useTheme()
   if (series.length === 0) {
     return <Typography sx={{ color: 'text.disabled', fontSize: 13, py: 4, textAlign: 'center' }}>Nessun dato per i filtri selezionati</Typography>
   }
@@ -371,11 +374,11 @@ function StatsBarChart({ periods, series }: { periods: StatsPeriod[]; series: St
     <>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e1e0d9" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
           <XAxis dataKey="period" tick={{ fontSize: 10 }} />
           <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={26} />
           <Tooltip
-            contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid #e2e8f0' }}
+            contentStyle={{ borderRadius: 8, fontSize: 12, border: `1px solid ${theme.palette.divider}` }}
             isAnimationActive={false}
             cursor={{ fill: 'rgba(15,110,86,0.06)' }}
           />
@@ -696,13 +699,13 @@ function CategoryStatsPanel({ category, label, allUsers }: {
       ) : (
         <>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <KpiCard label="Casi totali" value={String(data.kpi.total)} accent={category === 'philips' ? '#0f766e' : '#0ea5e9'} />
+            <KpiCard label="Casi totali" value={String(data.kpi.total)} accent={category === 'philips' ? theme.palette.primary.main : theme.palette.secondary.main} />
             <TypeMiniDonut rows={data.type_breakdown} />
             <KpiCard
               label="Tecnico top"
               value={data.kpi.top_technician ? `${data.kpi.top_technician.name} ${topTechnicianEmoji(data.kpi.top_technician.count)}` : '—'}
               helper={data.kpi.top_technician ? `${data.kpi.top_technician.count} casi` : 'Nessun dato'}
-              accent={category === 'philips' ? '#6366f1' : '#f59e0b'}
+              accent={category === 'philips' ? '#6366f1' : theme.palette.warning.main}
               valueFontSize="0.9rem"
             />
           </Stack>

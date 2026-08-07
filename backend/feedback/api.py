@@ -43,6 +43,8 @@ class ReportRequestSerializer(serializers.ModelSerializer):
     created_by_full_name = serializers.SerializerMethodField()
     resolved_by_username = serializers.CharField(source='resolved_by.username', read_only=True)
     resolved_by_full_name = serializers.SerializerMethodField()
+    rejected_by_username = serializers.CharField(source='rejected_by.username', read_only=True)
+    rejected_by_full_name = serializers.SerializerMethodField()
     screenshot_url = serializers.SerializerMethodField()
     can_upload_screenshot = serializers.SerializerMethodField()
     can_resolve = serializers.SerializerMethodField()
@@ -71,6 +73,11 @@ class ReportRequestSerializer(serializers.ModelSerializer):
             'resolved_by',
             'resolved_by_username',
             'resolved_by_full_name',
+            'rejection_reason',
+            'rejected_at',
+            'rejected_by',
+            'rejected_by_username',
+            'rejected_by_full_name',
         ]
         read_only_fields = [
             'id',
@@ -86,10 +93,29 @@ class ReportRequestSerializer(serializers.ModelSerializer):
             'resolved_by',
             'resolved_by_username',
             'resolved_by_full_name',
+            'rejected_at',
+            'rejected_by',
+            'rejected_by_username',
+            'rejected_by_full_name',
             'screenshot_url',
             'can_upload_screenshot',
             'can_resolve',
         ]
+
+    def validate(self, attrs):
+        # Il motivo del rifiuto è obbligatorio quando si transita a "rejected"
+        # (sia in creazione della richiesta di update, sia sull'istanza già
+        # rifiutata se non viene inviato un nuovo motivo).
+        target_status = attrs.get('status', getattr(self.instance, 'status', None))
+        if target_status == ReportStatus.REJECTED:
+            reason = attrs.get('rejection_reason')
+            if reason is None and self.instance is not None:
+                reason = self.instance.rejection_reason
+            if not reason or not reason.strip():
+                raise serializers.ValidationError(
+                    {'rejection_reason': 'La motivazione del rifiuto è obbligatoria.'}
+                )
+        return attrs
 
     def validate_screenshot(self, value):
         return validate_upload(
@@ -109,6 +135,13 @@ class ReportRequestSerializer(serializers.ModelSerializer):
 
     def get_resolved_by_full_name(self, obj):
         user = obj.resolved_by
+        if user is None:
+            return None
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        return full_name or user.username
+
+    def get_rejected_by_full_name(self, obj):
+        user = obj.rejected_by
         if user is None:
             return None
         full_name = f"{user.first_name} {user.last_name}".strip()
@@ -143,7 +176,7 @@ class ReportRequestSerializer(serializers.ModelSerializer):
 
 class ReportRequestFilter(filters.FilterSet):
     kind = filters.CharFilter(field_name='kind')
-    status = filters.CharFilter(field_name='status')
+    status = filters.CharFilter(method='filter_status')
     section = filters.CharFilter(field_name='section')
     created_by = filters.NumberFilter(field_name='created_by_id')
     has_screenshot = filters.BooleanFilter(method='filter_has_screenshot')
@@ -151,6 +184,14 @@ class ReportRequestFilter(filters.FilterSet):
     class Meta:
         model = ReportRequest
         fields = ['kind', 'status', 'section', 'created_by', 'has_screenshot']
+
+    def filter_status(self, queryset, _name, value):
+        # Supporta valori multipli separati da virgola (es. "resolved,rejected")
+        # per la vista "Risolte" che raggruppa gli esiti chiusi.
+        statuses = [item.strip() for item in value.split(',') if item.strip()]
+        if not statuses:
+            return queryset
+        return queryset.filter(status__in=statuses)
 
     def filter_has_screenshot(self, queryset, _name, value):
         if value is True:
@@ -221,8 +262,10 @@ class ReportRequestViewSet(
             total_count=Count('id'),
             open_count=Count('id', filter=Q(status=ReportStatus.OPEN)),
             resolved_count=Count('id', filter=Q(status=ReportStatus.RESOLVED)),
+            rejected_count=Count('id', filter=Q(status=ReportStatus.REJECTED)),
             mine_open_count=Count('id', filter=Q(status=ReportStatus.OPEN, created_by=user)),
             mine_resolved_count=Count('id', filter=Q(status=ReportStatus.RESOLVED, created_by=user)),
+            mine_rejected_count=Count('id', filter=Q(status=ReportStatus.REJECTED, created_by=user)),
             open_missing_screenshot_count=Count(
                 'id',
                 filter=Q(status=ReportStatus.OPEN) & (Q(screenshot='') | Q(screenshot__isnull=True)),
@@ -258,11 +301,26 @@ class ReportRequestViewSet(
         old_status = instance.status
         old_section = instance.section
         old_has_screenshot = bool(instance.screenshot)
+        old_rejection_reason = instance.rejection_reason
 
-        if serializer.validated_data.get('status') == ReportStatus.RESOLVED and instance.status != ReportStatus.RESOLVED:
-            item = serializer.save(resolved_at=timezone.now(), resolved_by=self.request.user)
-        elif serializer.validated_data.get('status') == ReportStatus.OPEN and instance.status != ReportStatus.OPEN:
-            item = serializer.save(resolved_at=None, resolved_by=None)
+        new_status = serializer.validated_data.get('status')
+
+        if new_status == ReportStatus.RESOLVED and instance.status != ReportStatus.RESOLVED:
+            item = serializer.save(
+                resolved_at=timezone.now(), resolved_by=self.request.user,
+                rejected_at=None, rejected_by=None, rejection_reason='',
+            )
+        elif new_status == ReportStatus.REJECTED and instance.status != ReportStatus.REJECTED:
+            reason = serializer.validated_data.get('rejection_reason', instance.rejection_reason)
+            item = serializer.save(
+                rejected_at=timezone.now(), rejected_by=self.request.user, rejection_reason=reason,
+                resolved_at=None, resolved_by=None,
+            )
+        elif new_status == ReportStatus.OPEN and instance.status != ReportStatus.OPEN:
+            item = serializer.save(
+                resolved_at=None, resolved_by=None,
+                rejected_at=None, rejected_by=None, rejection_reason='',
+            )
         else:
             item = serializer.save()
 
@@ -275,6 +333,8 @@ class ReportRequestViewSet(
             changes['section'] = [old_section, item.section]
         if old_has_screenshot != bool(item.screenshot):
             changes['screenshot'] = [old_has_screenshot, bool(item.screenshot)]
+        if old_rejection_reason != item.rejection_reason:
+            changes['rejection_reason'] = [old_rejection_reason, item.rejection_reason]
 
         if changes:
             log_event(

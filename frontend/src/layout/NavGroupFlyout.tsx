@@ -46,7 +46,7 @@ export function NavGroupFlyout({
           borderRadius: 1,
           overflow: 'hidden',
           background: SIDEBAR.bgGradient,
-          color: '#ffffff',
+          color: (theme) => theme.palette.common.white,
           boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
           border: '1px solid rgba(94,234,212,0.12)',
         },

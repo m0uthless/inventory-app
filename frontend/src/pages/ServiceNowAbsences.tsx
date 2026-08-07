@@ -28,6 +28,7 @@ import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
 import { PERMS } from '../auth/perms'
+import { theme } from '../theme'
 import {
   type AbsenceRow, type AbsenceTechnician, type AbsenceReason, type DayPart,
   ABSENCE_REASONS, ABSENCE_REASON_COLORS, ABSENCE_HOURLY_COLOR, DAY_PART_OPTIONS,
@@ -38,8 +39,8 @@ import {
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven']
 
 const CATEGORY_SECTIONS = [
-  { value: 'philips' as const, label: 'Philips', accent: '#0f766e', tint: 'rgba(15,118,110,0.06)' },
-  { value: 'biotron' as const, label: 'Biotron', accent: '#0ea5e9', tint: 'rgba(14,165,233,0.06)' },
+  { value: 'philips' as const, label: 'Philips', accent: theme.palette.primary.main, tint: 'rgba(15,118,110,0.06)' },
+  { value: 'biotron' as const, label: 'Biotron', accent: theme.palette.secondary.main, tint: 'rgba(14,165,233,0.06)' },
 ]
 
 function initialsOf(name: string): string {

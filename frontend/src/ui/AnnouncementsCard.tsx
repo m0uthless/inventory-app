@@ -14,6 +14,7 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../auth/AuthProvider'
+import { theme } from '../theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category = 'news' | 'warning' | 'maintenance'
@@ -29,8 +30,8 @@ type Announcement = {
 
 // ─── Category config ──────────────────────────────────────────────────────────
 const CAT: Record<Category, { label: string; color: string; bg: string; chipColor: 'default' | 'warning' | 'info' }> = {
-  news:        { label: 'News',         color: '#0284c7', bg: 'rgba(2,132,199,0.07)',   chipColor: 'info' },
-  warning:     { label: 'Avviso',       color: '#ea580c', bg: 'rgba(234,88,12,0.07)',   chipColor: 'warning' },
+  news:        { label: 'News',         color: theme.palette.info.main,    bg: 'rgba(2,132,199,0.07)',   chipColor: 'info' },
+  warning:     { label: 'Avviso',       color: theme.palette.warning.main, bg: 'rgba(234,88,12,0.07)',   chipColor: 'warning' },
   maintenance: { label: 'Manutenzione', color: '#7c3aed', bg: 'rgba(124,58,237,0.07)', chipColor: 'default' },
 }
 

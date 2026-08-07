@@ -103,7 +103,7 @@ function fmtAverageRating(value?: number | null): string {
 // Stile condiviso dai due componenti Rating (voto medio + voto utente)
 const ratingIconSx = {
   '& .MuiRating-iconFilled': { color: 'warning.main' },
-  '& .MuiRating-iconEmpty': { color: '#fcd34d' },
+  '& .MuiRating-iconEmpty': { color: 'warning.light' },
 } as const
 
 function escapeHtml(value: string): string {
@@ -841,7 +841,7 @@ export default function WikiPage() {
                   fontSize: 10,
                   fontWeight: 800,
                   bgcolor: '#f0fdf9',
-                  color: '#0f766e',
+                  color: (theme) => theme.palette.primary.main,
                   border: '1px solid #0f766e40',
                   fontFamily: 'monospace',
                 }}
@@ -855,8 +855,8 @@ export default function WikiPage() {
                   height: 20,
                   fontSize: 10,
                   fontWeight: 700,
-                  bgcolor: detail.is_published ? '#dcfce7' : '#fef9c3',
-                  color: detail.is_published ? '#166534' : '#854d0e',
+                  bgcolor: detail.is_published ? (theme) => theme.palette.success.light : (theme) => theme.palette.warning.light,
+                  color: detail.is_published ? (theme) => theme.palette.success.dark : (theme) => theme.palette.warning.dark,
                 }}
               />
             )}
@@ -875,7 +875,7 @@ export default function WikiPage() {
             )}
             {detail && (
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: 'text.disabled' }}>
-                <Typography component="span" variant="caption" fontSize={11} sx={{ color: '#d97706' }}>
+                <Typography component="span" variant="caption" fontSize={11} sx={{ color: 'warning.main' }}>
                   ★
                 </Typography>
                 <Typography variant="caption" fontSize={11}>
