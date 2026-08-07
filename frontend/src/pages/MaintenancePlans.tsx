@@ -556,7 +556,7 @@ export default function MaintenancePlans() {
       field: 'last_done_date', headerName: 'Ultima eseg.', width: 115,
       renderCell: (p: GridRenderCellParams<PlanRow>) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2" sx={{ fontSize: '0.82rem', color: 'text.secondary' }}>{(p.value as string) ?? '—'}</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>{(p.value as string) ?? '—'}</Typography>
         </Box>
       ),
     },
