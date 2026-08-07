@@ -195,6 +195,45 @@ function IssueStatusChip({ status }: { status: string }) {
   )
 }
 
+// Raggruppamento "Aperte"/"Chiuse" già usato in /issues/summary/ e nel grafico
+// andamento: risolta + chiusa contano entrambe come "chiuse" agli occhi
+// dell'utente (solo "chiusa" è lo stato terminale/immutabile).
+function isClosedIssueRow(row: Pick<IssueRow, 'status'>) {
+  return row.status === 'resolved' || row.status === 'closed'
+}
+
+function StatusViewChipBar({
+  value,
+  onChange,
+}: {
+  value: 'all' | 'open' | 'closed'
+  onChange: (v: 'all' | 'open' | 'closed') => void
+}) {
+  const options: { key: 'all' | 'open' | 'closed'; label: string }[] = [
+    { key: 'open', label: 'Aperte' },
+    { key: 'closed', label: 'Chiuse' },
+    { key: 'all', label: 'Tutte' },
+  ]
+  return (
+    <Stack direction="row" spacing={1}>
+      {options.map((o) => {
+        const selected = value === o.key
+        return (
+          <Chip
+            key={o.key}
+            size="small"
+            label={o.label}
+            clickable
+            onClick={() => onChange(o.key)}
+            color={selected ? (o.key === 'open' ? 'error' : o.key === 'closed' ? 'default' : 'primary') : 'default'}
+            variant={selected ? 'filled' : 'outlined'}
+          />
+        )
+      })}
+    </Stack>
+  )
+}
+
 // ─── Widget riepilogo ────────────────────────────────────────────────────────
 
 type Granularity = 'day' | 'week' | 'month'
@@ -451,6 +490,7 @@ export default function Issues() {
   const [filterAssigned, setFilterAssigned] = React.useState<UserOption | null>(null)
   const [hideClosedCases, setHideClosedCases] = React.useState(false)
   const [onlyMyIssues, setOnlyMyIssues] = React.useState(false)
+  const [statusView, setStatusView] = React.useState<'all' | 'open' | 'closed'>('open')
   const previousAssignedFilterRef = React.useRef<UserOption | null>(null)
   const activeFilterCount = [
     filterStatus,
@@ -458,6 +498,7 @@ export default function Issues() {
     filterCustomer,
     onlyMyIssues ? 'only_mine' : filterAssigned,
     hideClosedCases ? 'hide_closed' : '',
+    statusView !== 'open' ? statusView : '',
   ].filter(Boolean).length
 
   const resetFilters = () => {
@@ -467,6 +508,7 @@ export default function Issues() {
     setFilterAssigned(null)
     setHideClosedCases(false)
     setOnlyMyIssues(false)
+    setStatusView('open')
     previousAssignedFilterRef.current = null
   }
 
@@ -479,8 +521,10 @@ export default function Issues() {
     if (onlyMyIssues && me?.id) p.assigned_to = me.id
     else if (filterAssigned) p.assigned_to = filterAssigned.id
     if (hideClosedCases) p.hide_closed = true
+    if (statusView === 'open') p.hide_closed = true
+    if (statusView === 'closed') p.only_closed = true
     return p
-  }, [grid.view, filterStatus, filterPriority, filterCustomer, filterAssigned, hideClosedCases, onlyMyIssues, me])
+  }, [grid.view, filterStatus, filterPriority, filterCustomer, filterAssigned, hideClosedCases, onlyMyIssues, statusView, me])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -1133,7 +1177,7 @@ export default function Issues() {
       sortable: true,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'text.secondary', fontFamily: 'ui-monospace, monospace' }}>
+          <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.secondary', fontFamily: 'ui-monospace, monospace' }}>
             #{row.id}
           </Typography>
         </Box>
@@ -1146,7 +1190,7 @@ export default function Issues() {
       minWidth: 200,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%', minWidth: 0 }}>
-          <Typography sx={{ fontSize: '0.85rem' }} noWrap>
+          <Typography variant="body2" noWrap>
             {row.title}
           </Typography>
           {!row.inventory && <UnlinkedInventoryWarningIcon />}
@@ -1177,7 +1221,7 @@ export default function Issues() {
               {row.servicenow_id}
             </Typography>
           ) : (
-            <Typography sx={{ color: '#bbb' }}>—</Typography>
+            <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
           )}
         </Box>
       ),
@@ -1188,7 +1232,7 @@ export default function Issues() {
       width: 160,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography sx={{ fontSize: '0.82rem' }} noWrap>
+          <Typography variant="body2" noWrap>
             {row.customer_name}
           </Typography>
         </Box>
@@ -1203,7 +1247,7 @@ export default function Issues() {
           {row.category_label ? (
             <Chip size="small" label={row.category_label} variant="outlined" />
           ) : (
-            <Typography sx={{ color: '#bbb' }}>—</Typography>
+            <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
           )}
         </Box>
       ),
@@ -1230,7 +1274,7 @@ export default function Issues() {
               >
                 {initialsFromName(row.assigned_to_full_name)}
               </Avatar>
-              <Typography sx={{ fontSize: '0.82rem' }} noWrap>
+              <Typography variant="body2" noWrap>
                 {row.assigned_to_full_name}
               </Typography>
             </>
@@ -1254,8 +1298,8 @@ export default function Issues() {
           <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
             {d ? (
               <Typography
+                variant="body2"
                 sx={{
-                  fontSize: '0.82rem',
                   color: overdue ? 'error.main' : 'inherit',
                   fontWeight: overdue ? 700 : 400,
                 }}
@@ -1263,7 +1307,7 @@ export default function Issues() {
                 {d}
               </Typography>
             ) : (
-              <Typography sx={{ color: '#bbb' }}>—</Typography>
+              <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
             )}
           </Box>
         )
@@ -1307,7 +1351,7 @@ export default function Issues() {
         const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Typography sx={{ fontSize: '0.82rem' }}>{d}</Typography>
+            <Typography variant="body2">{d}</Typography>
           </Box>
         )
       },
@@ -1320,7 +1364,7 @@ export default function Issues() {
         const d = fmtDate(row.closed_at)
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Typography sx={{ fontSize: '0.82rem' }}>{d || '—'}</Typography>
+            <Typography variant="body2">{d || '—'}</Typography>
           </Box>
         )
       },
@@ -1335,7 +1379,7 @@ export default function Issues() {
         const color = days > 30 ? 'error.main' : days > 14 ? 'warning.main' : 'text.primary'
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color }}>
               {days} {days === 1 ? 'giorno' : 'giorni'}
             </Typography>
           </Box>
@@ -1371,13 +1415,17 @@ export default function Issues() {
             if (row) openDetail(row, 0)
           },
           onRowContextMenu: handleRowContextMenu,
+          getRowClassName: (row) => (isClosedIssueRow(row) ? 'row-closed-issue' : undefined),
           sx: {
             cursor: 'pointer',
             '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
             '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
+            '& .row-closed-issue': { opacity: 0.5 },
+            '& .row-closed-issue:hover': { opacity: 0.8 },
           },
         }}
       >
+        <StatusViewChipBar value={statusView} onChange={setStatusView} />
       </EntityListCard>
       <IssueDialog
         open={formOpen}

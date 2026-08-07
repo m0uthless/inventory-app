@@ -115,6 +115,7 @@ class UserAdminProfileSerializer(serializers.ModelSerializer):
             "leave_area_name",
             "is_expense_secretary",
             "birth_date",
+            "gender",
         ]
 
     def get_avatar(self, obj):
@@ -401,6 +402,20 @@ class UserAdminViewSet(
             if "birth_date" in profile_data:
                 raw_value = profile_data["birth_date"]
                 profile.birth_date = raw_value if raw_value else None
+
+            # `gender` è un CharField con choices ('M'/'F'): stesso trattamento
+            # di `birth_date` per il valore "assente" (stringa vuota dal client),
+            # con validazione esplicita sui soli valori ammessi.
+            if "gender" in profile_data:
+                raw_value = profile_data["gender"]
+                if raw_value in (None, ""):
+                    profile.gender = None
+                elif raw_value in (UserProfile.Gender.MALE, UserProfile.Gender.FEMALE):
+                    profile.gender = raw_value
+                else:
+                    raise serializers.ValidationError(
+                        {"profile": {"gender": "Valore non valido."}}
+                    )
 
             profile.save()
             changed_fields.append("profile")

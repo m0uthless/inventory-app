@@ -608,6 +608,7 @@ function UserDrawer(props: {
   const [isExpenseSecretary, setIsExpenseSecretary] = React.useState(false)
   const [leaveArea, setLeaveArea] = React.useState<number | ''>('')
   const [birthDate, setBirthDate] = React.useState('')
+  const [gender, setGender] = React.useState<'M' | 'F' | ''>('')
 
   const [moduleDirect, setModuleDirect] = React.useState<Record<string, ModuleRwd>>({})
   const [extraDirect, setExtraDirect] = React.useState<Set<string>>(new Set())
@@ -635,6 +636,7 @@ function UserDrawer(props: {
     setIsExpenseSecretary(user.profile.is_expense_secretary)
     setLeaveArea(user.profile.leave_area ?? '')
     setBirthDate(user.profile.birth_date ?? '')
+    setGender(user.profile.gender ?? '')
     setAuslboLevel(rwdToLevel(user.direct_permissions.modules['auslbo']))
     setAuslboCustomer(
       user.auslbo_profile ? { id: user.auslbo_profile.customer_id, label: user.auslbo_profile.customer_name } : null,
@@ -731,6 +733,7 @@ function UserDrawer(props: {
           is_expense_secretary: isExpenseSecretary,
           leave_area: leaveArea === '' ? null : leaveArea,
           birth_date: birthDate === '' ? null : birthDate,
+          gender: gender === '' ? null : gender,
         },
       })
       onSaved(res.data as AdminUserRow)
@@ -847,6 +850,21 @@ function UserDrawer(props: {
                 size="small"
                 helperText="Usata dal widget dashboard 'Compleanni'."
               />
+              <FormControl fullWidth size="small">
+                <InputLabel id="user-gender-label">Genere</InputLabel>
+                <Select
+                  labelId="user-gender-label"
+                  label="Genere"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as 'M' | 'F' | '')}
+                >
+                  <MenuItem value="">
+                    <em>Non specificato</em>
+                  </MenuItem>
+                  <MenuItem value="M">Uomo</MenuItem>
+                  <MenuItem value="F">Donna</MenuItem>
+                </Select>
+              </FormControl>
               <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Utente attivo" />
             </Stack>
           </DrawerSection>

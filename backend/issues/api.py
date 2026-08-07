@@ -216,14 +216,23 @@ class IssueFilter(filters.FilterSet):
     due_before  = filters.DateFilter(field_name="due_date", lookup_expr="lte")
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
+    only_closed = filters.BooleanFilter(method="filter_only_closed")
 
     class Meta:
         model  = Issue
-        fields = ["status", "priority", "customer", "site", "inventory", "category", "assigned_to", "hide_closed"]
+        fields = ["status", "priority", "customer", "site", "inventory", "category", "assigned_to", "hide_closed", "only_closed"]
 
     def filter_hide_closed(self, queryset, name, value):
         if value:
             return queryset.filter(status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS])
+        return queryset
+
+    def filter_only_closed(self, queryset, name, value):
+        # Stesso raggruppamento "Risolte/Chiuse" già usato in /issues/summary/
+        # e nel widget grafico: risolta e chiusa sono entrambe considerate
+        # "chiuse" agli occhi dell'utente (solo "chiusa" è terminale/immutabile).
+        if value:
+            return queryset.filter(status__in=[IssueStatus.RESOLVED, IssueStatus.CLOSED])
         return queryset
 
 

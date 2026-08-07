@@ -153,6 +153,16 @@ class UserProfile(models.Model):
         null=True, blank=True, verbose_name="Data di nascita",
         help_text="Usata dal widget dashboard 'Compleanni'. Impostabile solo da admin.",
     )
+
+    class Gender(models.TextChoices):
+        MALE = "M", "Uomo"
+        FEMALE = "F", "Donna"
+
+    gender = models.CharField(
+        max_length=1, choices=Gender.choices, null=True, blank=True,
+        verbose_name="Genere",
+        help_text="Usato per personalizzare i saluti (es. widget Meteo). Impostabile solo da admin.",
+    )
     last_seen_changelog = models.ForeignKey(
         "core.ChangelogEntry",
         null=True, blank=True,

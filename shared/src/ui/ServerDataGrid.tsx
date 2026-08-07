@@ -48,6 +48,8 @@ type Props<R extends GridValidRowModel> = {
   height?: number | string
   pageSizeOptions?: number[]
   deletedField?: keyof R | string
+  /** Classe CSS extra per riga (es. per attenuare visivamente righe "chiuse"). */
+  getRowClassName?: (row: R) => string | null | undefined | false
   getRowId?: DataGridProps<R>['getRowId']
   sx?: SxProps<Theme>
   slots?: DataGridProps<R>['slots']
@@ -298,6 +300,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     onRowContextMenu,
     height = '100%',
     deletedField = 'deleted_at',
+    getRowClassName: getRowClassNameExtra,
     getRowId,
     sx,
     slots,
@@ -670,6 +673,8 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
             if (delVal) cls.push('row-deleted')
           }
           if (zebra) cls.push(p.indexRelativeToCurrentPage % 2 === 0 ? 'row-even' : 'row-odd')
+          const extra = getRowClassNameExtra?.(p.row)
+          if (extra) cls.push(extra)
           return cls.join(' ')
         }}
         sx={mergedSx}

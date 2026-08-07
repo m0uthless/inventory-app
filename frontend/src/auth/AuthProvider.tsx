@@ -19,6 +19,7 @@ export type Me = {
     preferred_customer_name?: string | null
     leave_area?: number | null
     leave_area_label?: string | null
+    gender?: 'M' | 'F' | null
   }
 }
 

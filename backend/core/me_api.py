@@ -150,6 +150,7 @@ class MeAPIView(APIView):
                 "preferred_customer_name": preferred_customer_name,
                 "leave_area": leave_area_id,
                 "leave_area_label": leave_area_label,
+                "gender": profile.gender if profile is not None else None,
             },
         }
         return data
