@@ -27,6 +27,8 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined'
 import HistoryIcon from '@mui/icons-material/History'
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined'
@@ -45,6 +47,7 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 import { buildDrfListParams } from '@shared/api/drf'
 import { isRecord } from '@shared/utils/guards'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
+import { THEME_REGISTRY, resolveThemeKey, type ThemeKey } from '../theme/themeRegistry'
 
 // ─── Costanti palette ──────────────────────────────────────────────────────────
 const TEAL       = theme.palette.primary.main
@@ -56,10 +59,11 @@ const COMPACT_TEXTFIELD_SX: SxProps<Theme> = {
   '& .MuiInputBase-input': { fontSize: 12, py: '6px' },
 }
 
-type NavSection = 'profilo' | 'sicurezza' | 'permessi' | 'attivita'
+type NavSection = 'profilo' | 'aspetto' | 'sicurezza' | 'permessi' | 'attivita'
 
 const NAV_ITEMS: { id: NavSection; label: string; icon: React.ReactElement }[] = [
   { id: 'profilo',   label: 'Profilo',   icon: <PersonOutlineIcon fontSize="small" /> },
+  { id: 'aspetto',   label: 'Aspetto',   icon: <PaletteOutlinedIcon fontSize="small" /> },
   { id: 'sicurezza', label: 'Sicurezza', icon: <LockOutlinedIcon fontSize="small" /> },
   { id: 'permessi',  label: 'Permessi',  icon: <ShieldOutlinedIcon fontSize="small" /> },
   { id: 'attivita',  label: 'Attività',  icon: <HistoryIcon fontSize="small" /> },
@@ -236,6 +240,78 @@ function SezioneProfilo({ me, onSaved }: { me: NonNullable<ReturnType<typeof use
           </Button>
         </Box>
       </Stack>
+    </Box>
+  )
+}
+
+// ─── SEZIONE: Aspetto ─────────────────────────────────────────────────────────
+function SezioneAspetto({ me, onSaved }: { me: NonNullable<ReturnType<typeof useAuth>['me']>; onSaved: () => Promise<void> }) {
+  const toast = useToast()
+  const [saving, setSaving] = React.useState<ThemeKey | null>(null)
+  const currentKey = resolveThemeKey(me.profile?.theme)
+
+  const onSelect = async (key: ThemeKey) => {
+    if (key === currentKey || saving) return
+    setSaving(key)
+    try {
+      await api.patch('/me/', { theme: key })
+      await onSaved()
+      toast.success('Tema aggiornato.')
+    } catch {
+      toast.error('Errore durante il salvataggio del tema.')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  return (
+    <Box>
+      <SectionTitle>Tema interfaccia</SectionTitle>
+      <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2.5 }}>
+        Il tema scelto viene salvato sul tuo account e si applica automaticamente su tutti i
+        dispositivi da cui accedi ad Archie.
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+        {(Object.entries(THEME_REGISTRY) as [ThemeKey, typeof THEME_REGISTRY[ThemeKey]][]).map(([key, entry]) => {
+          const active = key === currentKey
+          const p = entry.theme.palette
+          return (
+            <Box
+              key={key}
+              onClick={() => onSelect(key)}
+              sx={{
+                position: 'relative',
+                borderRadius: 2,
+                border: '2px solid',
+                borderColor: active ? p.primary.main : 'divider',
+                cursor: saving ? 'default' : 'pointer',
+                overflow: 'hidden',
+                opacity: saving && saving !== key ? 0.5 : 1,
+                transition: 'all 0.15s',
+                '&:hover': saving ? undefined : { borderColor: p.primary.main },
+              }}
+            >
+              {/* Anteprima: barra "sidebar" scura + blocco chiaro con swatch colore */}
+              <Box sx={{ display: 'flex', height: 64 }}>
+                <Box sx={{ width: 28, background: entry.sidebar.bgGradient }} />
+                <Box sx={{ flex: 1, bgcolor: p.background.default, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+                  {[p.primary.main, p.secondary.main, p.info.main].map((c) => (
+                    <Box key={c} sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: c }} />
+                  ))}
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1, bgcolor: 'background.paper' }}>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{entry.label}</Typography>
+                {saving === key ? (
+                  <CircularProgress size={16} />
+                ) : active ? (
+                  <CheckCircleIcon fontSize="small" sx={{ color: p.primary.main }} />
+                ) : null}
+              </Box>
+            </Box>
+          )
+        })}
+      </Box>
     </Box>
   )
 }
@@ -507,6 +583,7 @@ export function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () =>
       {/* ── Contenuto scrollabile ── */}
       <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
         {section === 'profilo'   && <SezioneProfilo  me={me} onSaved={refreshMe} />}
+        {section === 'aspetto'   && <SezioneAspetto   me={me} onSaved={refreshMe} />}
         {section === 'sicurezza' && <SezioneSicurezza />}
         {section === 'permessi'  && <SezionePermessi  me={me} />}
         {section === 'attivita'  && <SezioneAttivita  me={me} />}
@@ -572,6 +649,7 @@ function ProfilePageContent({
         {/* ── MAIN ── */}
         <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'background.paper', borderRadius: 2.5, border: '1px solid', borderColor: 'divider', p: { xs: 2, sm: 3 }, boxShadow: '0 1px 6px rgba(15,23,42,0.06)' }}>
           {section === 'profilo'   && <SezioneProfilo  me={me} onSaved={refreshMe} />}
+          {section === 'aspetto'   && <SezioneAspetto   me={me} onSaved={refreshMe} />}
           {section === 'sicurezza' && <SezioneSicurezza />}
           {section === 'permessi'  && <SezionePermessi  me={me} />}
           {section === 'attivita'  && <SezioneAttivita  me={me} />}

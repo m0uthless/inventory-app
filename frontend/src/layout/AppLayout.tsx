@@ -36,7 +36,7 @@ import GlobalSearch from './GlobalSearch'
 import NotificationsBell from './NotificationsBell'
 import AppSpeedDial from './AppSpeedDial'
 import MobileBottomNavArchie from './MobileBottomNavArchie'
-import { SIDEBAR } from '../theme/tokens'
+import { useSidebarTokens } from '../theme/AppThemeProvider'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '@shared/ui/LockScreen'
 import DevEnvironmentBadge from '@shared/ui/DevEnvironmentBadge'
@@ -128,6 +128,7 @@ function DashboardEditToggleMenuItem({ isDashboardRoute, onClose }: { isDashboar
 
 export function AppLayout() {
   const { me, login, logout, hasPerm, locked, lock, unlock } = useAuth()
+  const SIDEBAR = useSidebarTokens()
 
   const { resetAfterUnlock } = useIdleTimer({
     lockAfterMs:   15 * 60 * 1000, // 15 minuti → lock screen
@@ -641,7 +642,7 @@ export function AppLayout() {
 
               if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup && !isMaintenanceGroup && !isServiceNowGroup) {
                 const issueEndAdornment =
-                  it.path === '/issues' ? renderIssueCount(issueSummary?.active_count) : null
+                  it.path === '/issues' ? renderIssueCount(issueSummary?.active_count, SIDEBAR) : null
                 return (
                   <React.Fragment key={it.path}>
                     {renderNavItem(it, isMini, issueEndAdornment ? { endAdornment: issueEndAdornment } : undefined)}
@@ -697,7 +698,7 @@ export function AppLayout() {
                       : undefined,
                     endAdornment: canExpand ? (
                       <Stack direction="row" spacing={0.5} alignItems="center">
-                        {isBugFeatureGroup ? renderFeedbackCount(feedbackSummary?.open_count, 'open') : null}
+                        {isBugFeatureGroup ? renderFeedbackCount(feedbackSummary?.open_count, 'open', SIDEBAR) : null}
                         <IconButton
                           size="small"
                           onClick={(e) => {
@@ -755,7 +756,7 @@ export function AppLayout() {
                                   selected: nestedSelected,
                                   endAdornment:
                                     child.path === '/bug-feature'
-                                      ? renderFeedbackCount(feedbackSummary?.open_count, 'open')
+                                      ? renderFeedbackCount(feedbackSummary?.open_count, 'open', SIDEBAR)
                                       : undefined,
                                 })}
                               </React.Fragment>
@@ -887,7 +888,7 @@ export function AppLayout() {
           selected: child.path === '/bug-feature' ? isBugFeatureOpenSelected : isBugFeatureResolvedSelected,
           endAdornment:
             child.path === '/bug-feature'
-              ? renderFeedbackCount(feedbackSummary?.open_count, 'open')
+              ? renderFeedbackCount(feedbackSummary?.open_count, 'open', SIDEBAR)
               : undefined,
           onClick: () => {
             setBugFeatureFlyoutAnchor(null)

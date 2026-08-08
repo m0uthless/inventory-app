@@ -13,6 +13,9 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Changed
 - aggiunto supporto a maggiore dimensione dei widget notizie, task, task area e issues
 
+### Added
+- supporto ai temi e aggiunta primo tema secondario navy
+
 ## [0.8.1] - 2026-08-08
 
 ## [0.8.0] - 2026-08-08

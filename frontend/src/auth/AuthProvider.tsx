@@ -20,6 +20,7 @@ export type Me = {
     leave_area?: number | null
     leave_area_label?: string | null
     gender?: 'M' | 'F' | null
+    theme?: 'default' | 'navy' | null
   }
 }
 

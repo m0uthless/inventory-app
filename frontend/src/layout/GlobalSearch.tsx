@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Box, IconButton, InputAdornment, TextField } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import ClearIcon from '@mui/icons-material/Clear'
-import { SIDEBAR } from '../theme/tokens'
+import { useSidebarTokens } from '../theme/AppThemeProvider'
 
 type Props = {
   /** Called when the easter-egg trigger word is typed, instead of navigating. */
@@ -13,6 +13,7 @@ type Props = {
 const EGG_TRIGGER = 'supertennis'
 
 export default function GlobalSearch({ onEggTrigger }: Props) {
+  const SIDEBAR = useSidebarTokens()
   const nav = useNavigate()
   const [q, setQ] = React.useState('')
 
