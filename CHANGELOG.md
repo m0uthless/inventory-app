@@ -7,6 +7,9 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Fixed
+- uso di displayname invece che name relativo al site per import inventory
+
 ## [0.8.1] - 2026-08-08
 
 ## [0.8.0] - 2026-08-08
