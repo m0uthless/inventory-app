@@ -22,9 +22,9 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
 import type { SiteRepoV2Handle } from '../features/siterepov2/SiteRepoV2Context'
 
-import type { CustomerRow, SiteRow, InventoryRow, CityGroup, StatusFilter } from './siteRepository/types'
-import { normalizeCity, matchesStatusFilter } from './siteRepository/style'
-import { CitySection, type CitySectionHandle } from './siteRepository/CitySection'
+import type { CustomerRow, SiteRow, InventoryRow, ProvinceGroup, StatusFilter } from './siteRepository/types'
+import { normalizeProvince, matchesStatusFilter } from './siteRepository/style'
+import { ProvinceSection, type ProvinceSectionHandle } from './siteRepository/ProvinceSection'
 import { CustomerInfoDrawer, SiteInfoDrawer } from './siteRepository/InfoDrawers'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -243,29 +243,29 @@ export default function SiteRepository() {
     [customers, statusFilter],
   )
 
-  const cityGroups = React.useMemo<CityGroup[]>(() => {
+  const provinceGroups = React.useMemo<ProvinceGroup[]>(() => {
     const map = new Map<string, CustomerRow[]>()
     filteredCustomers.forEach((c) => {
-      const city = normalizeCity(c.city)
-      if (!map.has(city)) map.set(city, [])
-      map.get(city)!.push(c)
+      const province = normalizeProvince(c.province)
+      if (!map.has(province)) map.set(province, [])
+      map.get(province)!.push(c)
     })
     return Array.from(map.entries())
-      .map(([city, custs]) => ({
-        city,
+      .map(([province, custs]) => ({
+        province,
         customers: custs,
-        // Somma delle issue attive di tutti i clienti della città
+        // Somma delle issue attive di tutti i clienti della provincia
         issueCount: custs.reduce((sum, c) => sum + (issueCountsByCustomer[c.id] ?? 0), 0),
       }))
       .sort((a, b) => {
-        if (a.city === 'Senza città') return 1
-        if (b.city === 'Senza città') return -1
-        return a.city.localeCompare(b.city, 'it')
+        if (a.province === 'Senza provincia') return 1
+        if (b.province === 'Senza provincia') return -1
+        return a.province.localeCompare(b.province, 'it')
       })
   }, [filteredCustomers, issueCountsByCustomer])
 
   // Refs per Comprimi / Espandi tutto
-  const sectionRefs = React.useRef<Map<string, CitySectionHandle>>(new Map())
+  const sectionRefs = React.useRef<Map<string, ProvinceSectionHandle>>(new Map())
 
   // Registra handle nel context (per toolbar in AppLayout)
   React.useEffect(() => {
@@ -279,8 +279,8 @@ export default function SiteRepository() {
 
   // Aggiorna contatori nella toolbar
   React.useEffect(() => {
-    setTotals(filteredCustomers.length, cityGroups.length)
-  }, [filteredCustomers.length, cityGroups.length, setTotals])
+    setTotals(filteredCustomers.length, provinceGroups.length)
+  }, [filteredCustomers.length, provinceGroups.length, setTotals])
 
   // VPN modal
   const [vpnModalOpen, setVpnModalOpen] = React.useState(false)
@@ -397,15 +397,15 @@ export default function SiteRepository() {
             </Box>
           ))}
         </Stack>
-      ) : cityGroups.length === 0 ? (
+      ) : provinceGroups.length === 0 ? (
         <Alert severity="info">
           {customers.length === 0 ? 'Nessun cliente trovato.' : 'Nessun risultato per i filtri selezionati.'}
         </Alert>
       ) : (
         <Stack spacing={0} sx={{ gap: 0 }}>
-          {cityGroups.map((group) => (
-            <CitySection
-              key={group.city}
+          {provinceGroups.map((group) => (
+            <ProvinceSection
+              key={group.province}
               group={group}
               searchQuery={searchQuery}
               statusFilter={statusFilter}
@@ -426,8 +426,8 @@ export default function SiteRepository() {
               onInventoryContextMenu={handleInventoryContextMenu}
               refreshToken={refreshToken}
               ref={(el) => {
-                if (el) sectionRefs.current.set(group.city, el)
-                else sectionRefs.current.delete(group.city)
+                if (el) sectionRefs.current.set(group.province, el)
+                else sectionRefs.current.delete(group.province)
               }}
             />
           ))}

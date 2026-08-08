@@ -47,10 +47,13 @@ class CustomerFilter(filters.FilterSet):
     """
 
     city = filters.CharFilter(method="filter_city")
+    # province è ora una colonna reale (crm/migrations/0010_customer_province.py):
+    # filtro diretto, niente hack JSON come per city.
+    province = filters.CharFilter(field_name="province", lookup_expr="icontains")
 
     class Meta:
         model = Customer
-        fields = ["status", "city"]
+        fields = ["status", "city", "province"]
 
     def filter_city(self, queryset, name, value):
         v = (value or "").strip()
@@ -149,6 +152,7 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
             "name",
             "display_name",
             "city",
+            "province",
             "primary_contact_id",
             "primary_contact_name",
             "primary_contact_email",
@@ -194,6 +198,7 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
         "display_name",
         "vat_number",
         "tax_code",
+        "province",
         "inventories__hostname",
         "inventories__name",
         "inventories__serial_number",
@@ -211,6 +216,7 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
         "name",
         "display_name",
         "city",
+        "province",
         "status_label",
         "status__label",
         "primary_contact_name",

@@ -6,6 +6,7 @@ export type CustomerRow = {
   name: string
   display_name: string
   city?: string | null
+  province?: string | null
   primary_contact_name?: string | null
   primary_contact_phone?: string | null
   status?: number | null
@@ -58,9 +59,8 @@ export type InventoryRow = {
   deleted_at?: string | null
 }
 
-export type CityGroup = {
-  city: string
-  province?: string | null
+export type ProvinceGroup = {
+  province: string
   customers: CustomerRow[]
   issueCount: number
 }

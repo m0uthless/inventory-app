@@ -115,8 +115,8 @@ export function MonoField({ value, sx }: { value?: string | null; sx?: object })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export function normalizeCity(city?: string | null): string {
-  return (city ?? 'Senza città').trim() || 'Senza città'
+export function normalizeProvince(province?: string | null): string {
+  return (province ?? 'Senza provincia').trim() || 'Senza provincia'
 }
 
 export function matchesSearch(q: string, ...fields: (string | null | undefined)[]): boolean {

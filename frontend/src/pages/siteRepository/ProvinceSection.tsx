@@ -6,15 +6,18 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 
-import type { CityGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
+import type { ProvinceGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
 import { FS, ICON } from './style'
 import { SignalChip, MetaTag } from './primitives'
 import { CustomerCard } from './CustomerCard'
 
-// ─── CitySection ──────────────────────────────────────────────────────────────
+// ─── ProvinceSection ────────────────────────────────────────────────────────
+// Rinominato da CitySection: il Site Repository raggruppa i clienti per
+// provincia (Customer.province, campo strutturato — vedi
+// crm/migrations/0010_customer_province.py), non più per città.
 
-type CitySectionProps = {
-  group: CityGroup
+type ProvinceSectionProps = {
+  group: ProvinceGroup
   searchQuery: string
   statusFilter: StatusFilter
   counts: Record<number, { assets: number | null; sites: number | null }>
@@ -35,10 +38,10 @@ type CitySectionProps = {
   refreshToken: number
 }
 
-export type CitySectionHandle = { open: () => void; close: () => void }
+export type ProvinceSectionHandle = { open: () => void; close: () => void }
 
-export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>(
-  function CitySection({
+export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceSectionProps>(
+  function ProvinceSection({
     group, searchQuery, statusFilter, counts, issueCounts, onOpenDrawer, onOpenVpn,
     onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
     canChangeCustomer, onEditCustomer, canChangeSite, onEditSite,
@@ -69,7 +72,7 @@ export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>
         transition: 'border-color 0.2s, border-width 0.1s',
         bgcolor: 'background.paper',
       }}>
-        {/* Header città — unico elemento a fondo pieno della pagina: massima densità informativa (elevazione) */}
+        {/* Header provincia — unico elemento a fondo pieno della pagina: massima densità informativa (elevazione) */}
         <Box
           role="button"
           tabIndex={0}
@@ -99,17 +102,12 @@ export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>
           <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: open ? 'rgba(255,255,255,0.75)' : 'primary.main', flexShrink: 0 }} />
 
           <Typography fontWeight={700} sx={{ fontSize: FS.section, color: open ? '#fff' : 'text.primary' }}>
-            {group.city}
+            {group.province}
           </Typography>
-          {group.province && (
-            <Typography sx={{ fontSize: FS.micro, color: open ? 'rgba(255,255,255,0.6)' : 'text.secondary', mt: '1px' }}>
-              {group.province}
-            </Typography>
-          )}
 
           <Box sx={{ flex: 1 }} />
 
-          {/* Issue attive in città — "segnale", sempre visibile quando presenti */}
+          {/* Issue attive in provincia — "segnale", sempre visibile quando presenti */}
           {group.issueCount > 0 && (
             <SignalChip
               tone="error"
