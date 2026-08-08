@@ -9,7 +9,7 @@ Le date sono in timezone Europe/Rome.
 
 ---
 
-### A
+### Added
 - Inserimento nuova funzionalità
 
 ## [0.8] - 2026-07-25
