@@ -167,3 +167,4 @@ pre-commit run --all-files
 Note:
 - gli hook FE usano `npm run format` e `npm run lint` dentro `frontend/`
 - la prima run può essere più lenta (download ambienti hook)
+// test
