@@ -1,11 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
 Tutte le modifiche rilevanti al progetto sono documentate qui.
 
 Formato ispirato a “Keep a Changelog” + SemVer.
 Le date sono in timezone Europe/Rome.
 
 ---
+
+### A
+- Inserimento nuova funzionalità
 
 ## [0.8] - 2026-07-25
 
