@@ -21,11 +21,10 @@ import {
   Tooltip as MuiTooltip,
   Typography,
 } from '@mui/material'
-import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
-import GridOnOutlinedIcon from '@mui/icons-material/GridOnOutlined'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
 
@@ -70,7 +69,6 @@ const CATEGORIES = [
   { value: 'biotron', label: 'Biotron' },
 ] as const
 
-const SERIES_COLORS = ['#0f6e56', '#185fa5', '#993c1d', '#993556', '#5f5e5a', '#854f0b']
 const TYPE_COLORS = ['#185fa5', '#0f6e56', '#854f0b', '#993556', '#5f5e5a', '#4b5fa0']
 
 function topTechnicianEmoji(count: number): string {
@@ -102,6 +100,7 @@ function KpiCard({ label, value, helper, accent, valueFontSize = '1.75rem' }: {
   return (
     <Box sx={{
       position: 'relative', overflow: 'hidden', borderRadius: '8px', flex: 1, minWidth: 0,
+      display: 'flex', flexDirection: 'column', justifyContent: 'center',
       p: { xs: '12px', sm: '14px 16px' },
       backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.62)} 0%, ${alpha(accent, 0.86)} 100%)`,
       border: `1px solid ${alpha(accent, 0.18)}`,
@@ -159,10 +158,14 @@ function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
     )
   }
 
-  // Le prime 4 voci per volume + un'eventuale fetta "Altri" per non affollare la legenda.
+  // Massimo 3 righe di legenda SEMPRE (comprese in "Altri" le voci oltre le
+  // prime 2 quando i Type sono più di 3): tiene la card della stessa altezza
+  // a prescindere da quanti Type ha la categoria (Philips ne ha 4, Biotron 3),
+  // evitando di dover forzare un'altezza fissa arbitraria sull'intera riga KPI.
   const sorted = [...rows].sort((a, b) => b.count - a.count)
-  const top = sorted.slice(0, 4)
-  const restCount = sorted.slice(4).reduce((s, r) => s + r.count, 0)
+  const maxTop = sorted.length > 3 ? 2 : 3
+  const top = sorted.slice(0, maxTop)
+  const restCount = sorted.slice(maxTop).reduce((s, r) => s + r.count, 0)
   const pieData: TypeBreakdownRow[] = restCount > 0 ? [...top, { id: -1, name: 'Altri', count: restCount }] : top
 
   return (
@@ -356,59 +359,46 @@ export function StatsMatrix({ periods, series, showRowTotal, rowTotalTooltip, ce
   )
 }
 
-// ─── Grafico a barre ────────────────────────────────────────────────────────
-
-function StatsBarChart({ periods, series }: { periods: StatsPeriod[]; series: StatsSeries[] }) {
-  const theme = useTheme()
-  if (series.length === 0) {
-    return <Typography sx={{ color: 'text.disabled', fontSize: 13, py: 4, textAlign: 'center' }}>Nessun dato per i filtri selezionati</Typography>
-  }
-
-  const chartData = periods.map((p, i) => {
-    const row: Record<string, number | string> = { period: p.label }
-    series.forEach((s) => { row[s.name] = s.counts[i] })
-    return row
-  })
-
-  return (
-    <>
-      <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
-          <XAxis dataKey="period" tick={{ fontSize: 10 }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={26} />
-          <Tooltip
-            contentStyle={{ borderRadius: 8, fontSize: 12, border: `1px solid ${theme.palette.divider}` }}
-            isAnimationActive={false}
-            cursor={{ fill: 'rgba(15,110,86,0.06)' }}
-          />
-          {series.map((s, i) => (
-            <Bar key={s.name} dataKey={s.name} fill={SERIES_COLORS[i % SERIES_COLORS.length]} radius={[3, 3, 0, 0]} />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-      <Stack direction="row" flexWrap="wrap" spacing={1.5} sx={{ mt: 1 }}>
-        {series.map((s, i) => (
-          <Stack key={s.name} direction="row" alignItems="center" spacing={0.6}>
-            <Box sx={{ width: 9, height: 9, borderRadius: 0.5, bgcolor: SERIES_COLORS[i % SERIES_COLORS.length] }} />
-            <Typography variant="caption" color="text.secondary">{s.name}</Typography>
-          </Stack>
-        ))}
-      </Stack>
-    </>
-  )
+// ─── Filtro Type client-side dentro una heatmap già caricata ────────────────
+// Ricalcola i conteggi per periodo/riga sommando solo i Type selezionati,
+// usando type_totals_by_period (già presente nella risposta per il tooltip
+// "Di cui EBIT"): nessuna chiamata API aggiuntiva. Righe che si azzerano del
+// tutto dopo il filtro vengono nascoste.
+function filterSeriesByTypes(data: StatsResponse, typeNames: string[]): StatsResponse {
+  if (typeNames.length === 0) return data
+  const series = data.series
+    .map((s) => {
+      const counts = data.periods.map((_, i) => {
+        const perPeriod = s.type_totals_by_period?.[i]
+        if (!perPeriod) return 0
+        return typeNames.reduce((sum, t) => sum + (perPeriod[t] ?? 0), 0)
+      })
+      return { ...s, counts }
+    })
+    .filter((s) => s.counts.some((c) => c > 0))
+  return { ...data, series }
 }
 
-// ─── Blocco tabella/grafico + legenda assenze (riusato per ogni tabella) ────
+// ─── Blocco tabella heatmap + legenda assenze (riusato per ogni tabella) ────
 
-function StatsTableBlock({ title, view, data, showRowTotal, rowTotalTooltip, cellTooltip }: {
+function StatsTableBlock({ title, data, showRowTotal, rowTotalTooltip, cellTooltip, typeFilterOptions }: {
   title?: string
-  view: 'chart' | 'matrix'
   data: StatsResponse
   showRowTotal?: boolean
   rowTotalTooltip?: (s: StatsSeries) => string | null | undefined
   cellTooltip?: (s: StatsSeries, periodIndex: number) => string | null | undefined
+  /** Se presente, mostra un chip per Type elencato per filtrare la heatmap
+   * (client-side, vedi filterSeriesByTypes). Nessun chip selezionato = vista
+   * combinata (comportamento invariato). */
+  typeFilterOptions?: string[]
 }) {
+  const [activeTypes, setActiveTypes] = React.useState<string[]>([])
+  const toggleType = (name: string) => {
+    setActiveTypes((prev) => (prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]))
+  }
+  const filterActive = activeTypes.length > 0
+  const shown = filterActive ? filterSeriesByTypes(data, activeTypes) : data
+
   return (
     <Box sx={{ bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
       {title && (
@@ -416,10 +406,32 @@ function StatsTableBlock({ title, view, data, showRowTotal, rowTotalTooltip, cel
           {title}
         </Typography>
       )}
-      {view === 'chart'
-        ? <StatsBarChart periods={data.periods} series={data.series} />
-        : <StatsMatrix periods={data.periods} series={data.series} showRowTotal={showRowTotal} rowTotalTooltip={rowTotalTooltip} cellTooltip={cellTooltip} />}
-      {view === 'matrix' && data.series.some((s) => s.absence_periods?.some(Boolean)) && (
+      {typeFilterOptions && typeFilterOptions.length > 0 && (
+        <Stack direction="row" spacing={0.5} sx={{ mb: 1 }}>
+          {typeFilterOptions.map((name) => (
+            <Chip
+              key={name}
+              size="small"
+              label={name}
+              clickable
+              onClick={() => toggleType(name)}
+              color={activeTypes.includes(name) ? 'primary' : 'default'}
+              variant={activeTypes.includes(name) ? 'filled' : 'outlined'}
+              sx={{ fontSize: '0.72rem' }}
+            />
+          ))}
+        </Stack>
+      )}
+      <StatsMatrix
+        periods={shown.periods}
+        series={shown.series}
+        showRowTotal={showRowTotal}
+        // Il tooltip "Di cui EBIT" ha senso solo sulla vista combinata: con un
+        // filtro attivo (es. solo L1) il sottoinsieme EBIT non è più pertinente.
+        rowTotalTooltip={filterActive ? undefined : rowTotalTooltip}
+        cellTooltip={filterActive ? undefined : cellTooltip}
+      />
+      {shown.series.some((s) => s.absence_periods?.some(Boolean)) && (
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1, flexWrap: 'wrap' }}>
           {(['malattia', 'ferie', 'altro'] as const).map((r) => (
             <Stack key={r} direction="row" alignItems="center" spacing={0.5}>
@@ -448,6 +460,11 @@ function StatsTableBlock({ title, view, data, showRowTotal, rowTotalTooltip, cel
 // questi Type (solo L1/PRIVATI/CDD) e non è toccato da questo split.
 const PHILIPS_MAIN_TYPES = ['L1', 'EBIT']
 const PHILIPS_SECONDARY_TYPES = ['AC', 'GEMELLI', 'RIS']
+// Biotron: seconda heatmap dedicata ai soli casi CDD, affiancata a quella
+// generale (vedi CategoryStatsPanel). BIOTRON_MAIN_TYPES alimenta i 2 chip
+// filtro L1/PRIVATI dentro la heatmap "Tutti i casi".
+const CDD_TYPE_NAME = 'CDD'
+const BIOTRON_MAIN_TYPES = ['L1', 'PRIVATI']
 
 // ─── Pannello statistiche per una singola categoria ──────────────────────────
 
@@ -463,17 +480,16 @@ function CategoryStatsPanel({ category, label, allUsers }: {
   const [month, setMonth]           = React.useState(new Date().getMonth() + 1)
   const [week, setWeek]             = React.useState<number | ''>('')
   const [assignedTo, setAssignedTo] = React.useState<number[]>([])
-  const [view, setView]             = React.useState<'chart' | 'matrix'>('matrix')
 
   const [typeRows, setTypeRows] = React.useState<CaseTypeOption[]>([])
-  // Chip Type manuali: solo Biotron (L1/PRIVATI/CDD). Per Philips lo split
-  // L1+EBIT / AC+GEMELLI+RIS è automatico in due tabelle separate, i chip
-  // non servono più (vedi PHILIPS_MAIN_TYPES/PHILIPS_SECONDARY_TYPES).
-  const [caseTypes, setCaseTypes] = React.useState<number[]>([])
+  // Tipo Biotron "CDD": non più selezionabile via chip, ha sempre una
+  // seconda heatmap dedicata affiancata a quella generale (vedi CDD_TYPE_NAME).
   const [data, setData] = React.useState<StatsResponse | null>(null)
   // Solo per Philips: dataset della tabella "L1 · EBIT" e "AC · GEMELLI · RIS".
   const [mainData, setMainData] = React.useState<StatsResponse | null>(null)
   const [secondaryData, setSecondaryData] = React.useState<StatsResponse | null>(null)
+  // Solo per Biotron: dataset della seconda heatmap, filtrata sul solo Type CDD.
+  const [cddData, setCddData] = React.useState<StatsResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
 
   // Tecnici assegnabili a questa categoria (stesso criterio del drawer di inserimento)
@@ -485,10 +501,6 @@ function CategoryStatsPanel({ category, label, allUsers }: {
       .catch(() => {})
   }, [category])
 
-  const toggleCaseType = (id: number) => {
-    setCaseTypes((prev) => prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id])
-  }
-
   const mainTypeIds = React.useMemo(
     () => typeRows.filter((t) => PHILIPS_MAIN_TYPES.includes(t.name)).map((t) => t.id),
     [typeRows],
@@ -497,20 +509,22 @@ function CategoryStatsPanel({ category, label, allUsers }: {
     () => typeRows.filter((t) => PHILIPS_SECONDARY_TYPES.includes(t.name)).map((t) => t.id),
     [typeRows],
   )
+  const cddTypeIds = React.useMemo(
+    () => typeRows.filter((t) => t.name === CDD_TYPE_NAME).map((t) => t.id),
+    [typeRows],
+  )
 
   const buildStatsParams = React.useCallback((overrideCaseTypeIds?: number[]): Record<string, string | number | number[]> => {
     const params: Record<string, string | number | number[]> = { year, granularity, category }
     if (granularity === 'day') params.month = month
     if (granularity === 'week' && week !== '') params.week = week
-    // Philips non usa più i chip manuali: ogni chiamata passa esplicitamente
-    // il set di Type che le serve (o nessuno, per il dataset KPI "tutti i Type").
-    const caseTypeIds = overrideCaseTypeIds !== undefined
-      ? overrideCaseTypeIds
-      : (category === 'biotron' ? caseTypes : [])
+    // Ogni chiamata passa esplicitamente il set di Type che le serve
+    // (o nessuno, per il dataset "tutti i Type").
+    const caseTypeIds = overrideCaseTypeIds ?? []
     if (caseTypeIds.length > 0) params.case_type = caseTypeIds
     if (assignedTo.length > 0) params.assigned_to = assignedTo
     return params
-  }, [category, year, granularity, month, week, caseTypes, assignedTo])
+  }, [category, year, granularity, month, week, assignedTo])
 
   // Per Philips servono i type_id di L1/EBIT/AC/GEMELLI/RIS (da typeRows)
   // prima di poter interrogare le due tabelle: senza aspettarli si
@@ -541,6 +555,18 @@ function CategoryStatsPanel({ category, label, allUsers }: {
         .finally(() => setLoading(false))
     }
   }, [philipsTypesReady, category, buildStatsParams, mainTypeIds, secondaryTypeIds, toast])
+
+  // Seconda heatmap Biotron, filtrata sul solo Type CDD: fetch indipendente,
+  // non blocca né è bloccata dal caricamento del dataset generale sopra.
+  React.useEffect(() => {
+    if (category !== 'biotron' || cddTypeIds.length === 0) {
+      setCddData(null)
+      return
+    }
+    api.get<StatsResponse>('/servicenow-cases/stats/', { params: buildStatsParams(cddTypeIds) })
+      .then((r) => setCddData(r.data))
+      .catch((e) => toast.error(apiErrorToMessage(e)))
+  }, [category, cddTypeIds, buildStatsParams, toast])
 
   const [exportingPdf, setExportingPdf] = React.useState(false)
 
@@ -594,103 +620,81 @@ function CategoryStatsPanel({ category, label, allUsers }: {
     <Stack spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
       <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{label}</Typography>
 
-      {/* Filtri dedicati alla categoria */}
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <TextField {...isSm} select label="Anno" value={year} onChange={(e) => setYear(Number(e.target.value))} sx={{ width: 100 }}>
-          {YEAR_OPTIONS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-        </TextField>
-
-        <TextField
-          {...isSm} select label="Tecnico" value={assignedTo}
-          InputLabelProps={{ shrink: true }}
-          onChange={(e) => {
-            const raw = e.target.value
-            const ids = typeof raw === 'string'
-              ? (raw === '' ? [] : raw.split(',').map(Number))
-              : (raw as number[])
-            setAssignedTo(ids)
-          }}
-          slotProps={{
-            select: {
-              multiple: true,
-              displayEmpty: true,
-              renderValue: (v) => {
-                const ids = v as number[]
-                if (ids.length === 0) return 'Tutti'
-                if (ids.length === 1) {
-                  const u = technicians.find((t) => t.id === ids[0])
-                  return u ? (u.full_name || u.username).trim() : String(ids[0])
-                }
-                return `${ids.length} tecnici`
-              },
-            },
-          }}
-          sx={{ width: 190 }}
-        >
-          {technicians.map((u) => (
-            <MenuItem key={u.id} value={u.id} dense>
-              <Checkbox size="small" checked={assignedTo.includes(u.id)} sx={{ p: 0.4, mr: 0.5 }} />
-              {(u.full_name || u.username).trim()}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <ToggleButtonGroup size="small" exclusive value={granularity} onChange={(_e, v) => v && setGranularity(v)}>
-          <ToggleButton value="month">Mensile</ToggleButton>
-          <ToggleButton value="week">Settimanale</ToggleButton>
-          <ToggleButton value="day">Giornaliera</ToggleButton>
-        </ToggleButtonGroup>
-
-        {/* Filtro contestuale: Mese (vista giornaliera) o Settimana (vista settimanale) */}
-        {granularity === 'day' && (
-          <TextField {...isSm} select label="Mese" value={month} onChange={(e) => setMonth(Number(e.target.value))} sx={{ width: 130 }}>
-            {MONTH_OPTIONS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
+      {/* Filtri dedicati alla categoria: card bianca per staccarli dallo
+          sfondo della pagina (altrimenti risultavano grigio su grigio). */}
+      <Box sx={{ bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+          <TextField {...isSm} select label="Anno" value={year} onChange={(e) => setYear(Number(e.target.value))} sx={{ width: 100 }}>
+            {YEAR_OPTIONS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
           </TextField>
-        )}
-        {granularity === 'week' && (
+
           <TextField
-            {...isSm} select label="Settimana" value={week}
-            onChange={(e) => setWeek(e.target.value === '' ? '' : Number(e.target.value))}
-            sx={{ width: 130 }}
+            {...isSm} select label="Tecnico" value={assignedTo}
+            InputLabelProps={{ shrink: true }}
+            onChange={(e) => {
+              const raw = e.target.value
+              const ids = typeof raw === 'string'
+                ? (raw === '' ? [] : raw.split(',').map(Number))
+                : (raw as number[])
+              setAssignedTo(ids)
+            }}
+            slotProps={{
+              select: {
+                multiple: true,
+                displayEmpty: true,
+                renderValue: (v) => {
+                  const ids = v as number[]
+                  if (ids.length === 0) return 'Tutti'
+                  if (ids.length === 1) {
+                    const u = technicians.find((t) => t.id === ids[0])
+                    return u ? (u.full_name || u.username).trim() : String(ids[0])
+                  }
+                  return `${ids.length} tecnici`
+                },
+              },
+            }}
+            sx={{ width: 190 }}
           >
-            <MenuItem value=""><em>Tutte</em></MenuItem>
-            {WEEK_OPTIONS.map((w) => <MenuItem key={w} value={w}>{`W${w}`}</MenuItem>)}
+            {technicians.map((u) => (
+              <MenuItem key={u.id} value={u.id} dense>
+                <Checkbox size="small" checked={assignedTo.includes(u.id)} sx={{ p: 0.4, mr: 0.5 }} />
+                {(u.full_name || u.username).trim()}
+              </MenuItem>
+            ))}
           </TextField>
-        )}
 
-        <ToggleButtonGroup size="small" exclusive value={view} onChange={(_e, v) => v && setView(v)}>
-          <ToggleButton value="chart"><BarChartOutlinedIcon sx={{ fontSize: 18 }} /></ToggleButton>
-          <ToggleButton value="matrix"><GridOnOutlinedIcon sx={{ fontSize: 18 }} /></ToggleButton>
-        </ToggleButtonGroup>
+          <ToggleButtonGroup size="small" exclusive value={granularity} onChange={(_e, v) => v && setGranularity(v)}>
+            <ToggleButton value="month">Mensile</ToggleButton>
+            <ToggleButton value="week">Settimanale</ToggleButton>
+            <ToggleButton value="day">Giornaliera</ToggleButton>
+          </ToggleButtonGroup>
 
-        <MuiTooltip title="Esporta PDF (riepilogo con i filtri correnti)">
-          <span>
-            <IconButton size="small" onClick={handleExportPdf} disabled={exportingPdf || loading}>
-              {exportingPdf ? <CircularProgress size={18} /> : <PictureAsPdfOutlinedIcon sx={{ fontSize: 18 }} />}
-            </IconButton>
-          </span>
-        </MuiTooltip>
-      </Stack>
+          {/* Filtro contestuale: Mese (vista giornaliera) o Settimana (vista settimanale) */}
+          {granularity === 'day' && (
+            <TextField {...isSm} select label="Mese" value={month} onChange={(e) => setMonth(Number(e.target.value))} sx={{ width: 130 }}>
+              {MONTH_OPTIONS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
+            </TextField>
+          )}
+          {granularity === 'week' && (
+            <TextField
+              {...isSm} select label="Settimana" value={week}
+              onChange={(e) => setWeek(e.target.value === '' ? '' : Number(e.target.value))}
+              sx={{ width: 130 }}
+            >
+              <MenuItem value=""><em>Tutte</em></MenuItem>
+              {WEEK_OPTIONS.map((w) => <MenuItem key={w} value={w}>{`W${w}`}</MenuItem>)}
+            </TextField>
+          )}
 
-      {/* Chip Type manuali: solo Biotron. Philips ha le due tabelle fisse
-          L1·EBIT e AC·GEMELLI·RIS, i chip non servono più. */}
-      {category === 'biotron' && (
-        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={0.5} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-          <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, mr: 0.25 }}>Type</Typography>
-          {typeRows.map((o) => (
-            <Chip
-              key={o.id}
-              size="small"
-              label={o.name}
-              clickable
-              onClick={() => toggleCaseType(o.id)}
-              color={caseTypes.includes(o.id) ? 'primary' : 'default'}
-              variant={caseTypes.includes(o.id) ? 'filled' : 'outlined'}
-              sx={{ fontSize: '0.72rem' }}
-            />
-          ))}
+          <MuiTooltip title="Esporta PDF (riepilogo con i filtri correnti)">
+            <span>
+              <IconButton size="small" onClick={handleExportPdf} disabled={exportingPdf || loading}>
+                {exportingPdf ? <CircularProgress size={18} /> : <PictureAsPdfOutlinedIcon sx={{ fontSize: 18 }} />}
+              </IconButton>
+            </span>
+          </MuiTooltip>
         </Stack>
-      )}
+      </Box>
 
       {loading || !dataReady || !data ? (
         <Stack alignItems="center" justifyContent="center" minHeight={160}>
@@ -712,11 +716,20 @@ function CategoryStatsPanel({ category, label, allUsers }: {
 
           {category === 'philips' && mainData && secondaryData ? (
             <>
-              <StatsTableBlock title="Casi L1 · EBIT" view={view} data={mainData} showRowTotal rowTotalTooltip={ebitTooltip} cellTooltip={ebitCellTooltip} />
-              <StatsTableBlock title="Casi AC · GEMELLI · RIS" view={view} data={secondaryData} showRowTotal />
+              <StatsTableBlock
+                title="Casi L1 · EBIT" data={mainData} showRowTotal
+                rowTotalTooltip={ebitTooltip} cellTooltip={ebitCellTooltip}
+                typeFilterOptions={PHILIPS_MAIN_TYPES}
+              />
+              <StatsTableBlock title="Casi AC · GEMELLI · RIS" data={secondaryData} showRowTotal />
+            </>
+          ) : category === 'biotron' ? (
+            <>
+              <StatsTableBlock title="Tutti i casi" data={data} typeFilterOptions={BIOTRON_MAIN_TYPES} />
+              {cddData && <StatsTableBlock title="Solo casi CDD" data={cddData} />}
             </>
           ) : (
-            <StatsTableBlock view={view} data={data} />
+            <StatsTableBlock data={data} />
           )}
         </>
       )}
