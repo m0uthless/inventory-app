@@ -4,7 +4,7 @@ Import massivo di record Inventory da un file Excel.
 Mappatura colonne Excel -> campi Inventory (verificata sul modello reale):
   Tipo         -> type      (FK core.InventoryType, lookup per "key"; creato se non esiste)
   Customer     -> customer  (FK crm.Customer, lookup per "code")
-  Sito         -> site      (FK crm.Site, lookup per "name" dentro il customer)
+  Sito         -> site      (FK crm.Site, lookup per "display_name" dentro il customer)
   Nome         -> name
   Hostname     -> hostname
   Knumber      -> knumber
@@ -119,7 +119,7 @@ class Command(BaseCommand):
             site_name = row_dict.get("Sito")
             site = None
             if site_name:
-                site = Site.objects.filter(customer=customer, name=site_name).first()
+                site = Site.objects.filter(customer=customer, display_name=site_name).first()
                 if site is None:
                     errors.append(
                         (i, label, f"Site '{site_name}' non trovato per il customer '{customer_code}'")
