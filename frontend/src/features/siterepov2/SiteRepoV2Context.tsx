@@ -17,6 +17,8 @@ type SiteRepoV2ContextValue = {
   setTotals: (customers: number, cities: number) => void
   groupBy: GroupByMode
   setGroupBy: (g: GroupByMode) => void
+  mapOpen: boolean
+  setMapOpen: (open: boolean) => void
 }
 
 export const SiteRepoV2Context = React.createContext<SiteRepoV2ContextValue>({
@@ -30,6 +32,8 @@ export const SiteRepoV2Context = React.createContext<SiteRepoV2ContextValue>({
   setTotals: () => {},
   groupBy: 'province',
   setGroupBy: () => {},
+  mapOpen: false,
+  setMapOpen: () => {},
 })
 
 export function SiteRepoV2Provider({ children }: { children: React.ReactNode }) {
@@ -39,6 +43,7 @@ export function SiteRepoV2Provider({ children }: { children: React.ReactNode }) 
   const [totalCities, setTotalCities] = React.useState(0)
   // Reset ad ogni sessione (niente persistenza): il default è sempre "provincia".
   const [groupBy, setGroupBy] = React.useState<GroupByMode>('province')
+  const [mapOpen, setMapOpen] = React.useState(false)
 
   const registerHandle = React.useCallback((h: SiteRepoV2Handle) => setHandle(h), [])
   const unregisterHandle = React.useCallback(() => setHandle(null), [])
@@ -53,6 +58,7 @@ export function SiteRepoV2Provider({ children }: { children: React.ReactNode }) 
       handle, registerHandle, unregisterHandle,
       totalCustomers, totalCities, setTotals,
       groupBy, setGroupBy,
+      mapOpen, setMapOpen,
     }}>
       {children}
     </SiteRepoV2Context.Provider>

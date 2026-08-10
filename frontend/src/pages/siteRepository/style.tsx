@@ -63,7 +63,7 @@ export function issuePriorityTone(priority?: string | null): Tone {
   }
 }
 
-export const COL_GRID = '160px 180px 180px 110px 150px 130px 130px 130px'
+export const COL_GRID = '160px 180px 180px 110px 140px 150px 130px 130px 130px'
 
 // ─── Scala tipografica ──────────────────────────────────────────────────────────
 //

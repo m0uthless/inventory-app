@@ -1,11 +1,13 @@
 import * as React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Alert, Box, Skeleton, Stack } from '@mui/material'
+import { Alert, Box, Dialog, DialogContent, DialogTitle, IconButton, Skeleton, Stack, Typography } from '@mui/material'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined'
 import VpnLockIcon from '@mui/icons-material/VpnLock'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
 import VpnModal from '../features/customers/VpnModal'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -21,11 +23,13 @@ import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
 import type { SiteRepoV2Handle } from '../features/siterepov2/SiteRepoV2Context'
+import { resolveItalianProvince } from '../data/italianProvinces'
 
 import type { CustomerRow, SiteRow, InventoryRow, LocationGroup, StatusFilter } from './siteRepository/types'
 import { normalizeProvince, normalizeCity, matchesStatusFilter } from './siteRepository/style'
 import { ProvinceSection, type ProvinceSectionHandle } from './siteRepository/ProvinceSection'
 import { CustomerInfoDrawer, SiteInfoDrawer } from './siteRepository/InfoDrawers'
+import { ItalyRegionMap } from './siteRepository/ItalyRegionMap'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -34,7 +38,7 @@ export default function SiteRepository() {
   const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
-  const { searchQuery, registerHandle, unregisterHandle, setTotals, groupBy } = useSiteRepoV2()
+  const { searchQuery, registerHandle, unregisterHandle, setTotals, groupBy, setGroupBy, mapOpen, setMapOpen } = useSiteRepoV2()
 
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
   const canChange      = hasPerm(PERMS.inventory.inventory.change)
@@ -268,6 +272,38 @@ export default function SiteRepository() {
   // Refs per Comprimi / Espandi tutto
   const sectionRefs = React.useRef<Map<string, ProvinceSectionHandle>>(new Map())
 
+  // Cartina Italia (ItalyRegionMap): dopo la selezione di una provincia si
+  // aspetta che locationGroups (ri)includa quella provincia — serve quando si
+  // passa da groupBy 'città' a 'provincia' nello stesso click — prima di
+  // aprire/scrollare la sezione corrispondente.
+  const [pendingProvinceScroll, setPendingProvinceScroll] = React.useState<string | null>(null)
+
+  const provinceCounts = React.useMemo(() => {
+    const map: Record<string, number> = {}
+    filteredCustomers.forEach((c) => {
+      const resolved = resolveItalianProvince(c.province)
+      if (!resolved) return
+      map[resolved.sigla] = (map[resolved.sigla] ?? 0) + 1
+    })
+    return map
+  }, [filteredCustomers])
+
+  const handleSelectProvinceFromMap = React.useCallback((sigla: string) => {
+    setMapOpen(false)
+    if (groupBy !== 'province') setGroupBy('province')
+    setPendingProvinceScroll(normalizeProvince(sigla))
+  }, [groupBy, setGroupBy, setMapOpen])
+
+  React.useEffect(() => {
+    if (!pendingProvinceScroll) return
+    const handle = sectionRefs.current.get(pendingProvinceScroll)
+    if (handle) {
+      handle.open()
+      handle.scrollIntoView()
+      setPendingProvinceScroll(null)
+    }
+  }, [pendingProvinceScroll, locationGroups])
+
   // Registra handle nel context (per toolbar in AppLayout)
   React.useEffect(() => {
     const h: SiteRepoV2Handle = {
@@ -418,8 +454,6 @@ export default function SiteRepository() {
               onOpenSite={openSiteDetail}
               canViewCustomer={canViewCustomer}
               canViewSite={canViewSite}
-              canChangeCustomer={canChangeCustomer}
-              onEditCustomer={editCustomerElsewhere}
               canChangeSite={canChangeSite}
               onEditSite={editSiteElsewhere}
               onCustomerContextMenu={handleCustomerContextMenu}
@@ -444,6 +478,24 @@ export default function SiteRepository() {
           customerName={vpnModalCustomer.display_name || vpnModalCustomer.name}
         />
       )}
+
+      {/* Cartina Italia per regione — naviga regione → provincia → apre/scrolla
+          la sezione provincia corrispondente (passando a groupBy 'provincia'
+          se necessario). */}
+      <Dialog open={mapOpen} onClose={() => setMapOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MapOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+            <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>Naviga per regione</Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setMapOpen(false)} aria-label="Chiudi">
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <ItalyRegionMap provinceCounts={provinceCounts} onSelectProvince={handleSelectProvinceFromMap} />
+        </DialogContent>
+      </Dialog>
 
       <InventoryDrawer
         open={drawerOpen}

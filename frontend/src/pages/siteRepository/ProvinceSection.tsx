@@ -32,8 +32,6 @@ type ProvinceSectionProps = {
   onOpenSite: (id: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
-  canChangeCustomer: boolean
-  onEditCustomer: (id: number) => void
   canChangeSite: boolean
   onEditSite: (id: number) => void
   onCustomerContextMenu: (customer: CustomerRow, e: React.MouseEvent) => void
@@ -42,19 +40,20 @@ type ProvinceSectionProps = {
   refreshToken: number
 }
 
-export type ProvinceSectionHandle = { open: () => void; close: () => void }
+export type ProvinceSectionHandle = { open: () => void; close: () => void; scrollIntoView: () => void }
 
 export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceSectionProps>(
   function ProvinceSection({
     group, searchQuery, statusFilter, counts, issueCounts, onOpenDrawer, onOpenVpn,
     onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
-    canChangeCustomer, onEditCustomer, canChangeSite, onEditSite,
+    canChangeSite, onEditSite,
     onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
     refreshToken,
   }, ref) {
     const theme = useTheme()
     const [open, setOpen] = React.useState(false)
     const contentId = React.useId()
+    const rootRef = React.useRef<HTMLDivElement>(null)
 
     // Auto-open se c'è una ricerca attiva
     React.useEffect(() => {
@@ -64,10 +63,13 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
     React.useImperativeHandle(ref, () => ({
       open:  () => setOpen(true),
       close: () => setOpen(false),
+      // Usato dalla cartina Italia (ItalyRegionMap): dopo aver selezionato una
+      // provincia, apre e scrolla la sezione corrispondente in vista.
+      scrollIntoView: () => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     }))
 
     return (
-      <Box sx={{
+      <Box ref={rootRef} sx={{
         mb: 2,
         border: '1px solid',
         borderColor: open ? theme.palette.primary.dark : 'divider',
@@ -150,8 +152,6 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
                 onOpenSite={onOpenSite}
                 canViewCustomer={canViewCustomer}
                 canViewSite={canViewSite}
-                canChangeCustomer={canChangeCustomer}
-                onEditCustomer={onEditCustomer}
                 canChangeSite={canChangeSite}
                 onEditSite={onEditSite}
                 onCustomerContextMenu={onCustomerContextMenu}

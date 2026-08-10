@@ -19,6 +19,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Added
 - supporto ai temi e aggiunta primo tema secondario navy
 - supporto alla procincia in customer e sites, con vista site-repository divisa per provincia e citta
+- Site Repository — Rimosso il bottone di modifica rapida sulla riga cliente (resta disponibile dal menu contestuale); il pulsante note ora apre un modal con il testo completo invece del tooltip troncato; aggiunta la colonna Modello nell'elenco inventario. Nuovo: cartina d'Italia cliccabile per regione/provincia per saltare rapidamente al cliente cercato.
 
 ## [0.8.1] - 2026-08-08
 

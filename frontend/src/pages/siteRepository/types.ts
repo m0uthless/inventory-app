@@ -53,6 +53,7 @@ export type InventoryRow = {
   site?: number | null
   site_name?: string | null
   knumber?: string | null
+  model?: string | null
   serial_number?: string | null
   has_active_issue?: boolean
   active_issue_priority?: string | null

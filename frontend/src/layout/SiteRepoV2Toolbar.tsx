@@ -1,6 +1,7 @@
 import { Box, Chip, IconButton, InputAdornment, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import ClearIconSR from '@mui/icons-material/Clear'
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
 
 import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
 import type { GroupByMode } from '../pages/siteRepository/types'
@@ -8,7 +9,7 @@ import type { GroupByMode } from '../pages/siteRepository/types'
 // ─── SiteRepository sticky toolbar ───────────────────────────────────────────
 
 export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
-  const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities, groupBy, setGroupBy } = useSiteRepoV2()
+  const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities, groupBy, setGroupBy, mapOpen, setMapOpen } = useSiteRepoV2()
 
   return (
     <Box sx={{
@@ -78,6 +79,16 @@ export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
       </ToggleButtonGroup>
 
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Chip
+          label="Mappa"
+          icon={<MapOutlinedIcon sx={{ fontSize: 16 }} />}
+          size="small"
+          clickable
+          color={mapOpen ? 'primary' : 'default'}
+          variant={mapOpen ? 'filled' : 'outlined'}
+          onClick={() => setMapOpen(!mapOpen)}
+          sx={{ fontWeight: 600, fontSize: '0.75rem', borderColor: 'divider' }}
+        />
         <Chip
           label="Comprimi tutto"
           size="small"
