@@ -22,8 +22,8 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
 import type { SiteRepoV2Handle } from '../features/siterepov2/SiteRepoV2Context'
 
-import type { CustomerRow, SiteRow, InventoryRow, ProvinceGroup, StatusFilter } from './siteRepository/types'
-import { normalizeProvince, matchesStatusFilter } from './siteRepository/style'
+import type { CustomerRow, SiteRow, InventoryRow, LocationGroup, StatusFilter } from './siteRepository/types'
+import { normalizeProvince, normalizeCity, matchesStatusFilter } from './siteRepository/style'
 import { ProvinceSection, type ProvinceSectionHandle } from './siteRepository/ProvinceSection'
 import { CustomerInfoDrawer, SiteInfoDrawer } from './siteRepository/InfoDrawers'
 
@@ -34,7 +34,7 @@ export default function SiteRepository() {
   const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
-  const { searchQuery, registerHandle, unregisterHandle, setTotals } = useSiteRepoV2()
+  const { searchQuery, registerHandle, unregisterHandle, setTotals, groupBy } = useSiteRepoV2()
 
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
   const canChange      = hasPerm(PERMS.inventory.inventory.change)
@@ -243,26 +243,27 @@ export default function SiteRepository() {
     [customers, statusFilter],
   )
 
-  const provinceGroups = React.useMemo<ProvinceGroup[]>(() => {
+  const locationGroups = React.useMemo<LocationGroup[]>(() => {
+    const noValueLabel = groupBy === 'province' ? 'Senza provincia' : 'Senza città'
     const map = new Map<string, CustomerRow[]>()
     filteredCustomers.forEach((c) => {
-      const province = normalizeProvince(c.province)
-      if (!map.has(province)) map.set(province, [])
-      map.get(province)!.push(c)
+      const label = groupBy === 'province' ? normalizeProvince(c.province) : normalizeCity(c.city)
+      if (!map.has(label)) map.set(label, [])
+      map.get(label)!.push(c)
     })
     return Array.from(map.entries())
-      .map(([province, custs]) => ({
-        province,
+      .map(([label, custs]) => ({
+        label,
         customers: custs,
-        // Somma delle issue attive di tutti i clienti della provincia
+        // Somma delle issue attive di tutti i clienti del gruppo
         issueCount: custs.reduce((sum, c) => sum + (issueCountsByCustomer[c.id] ?? 0), 0),
       }))
       .sort((a, b) => {
-        if (a.province === 'Senza provincia') return 1
-        if (b.province === 'Senza provincia') return -1
-        return a.province.localeCompare(b.province, 'it')
+        if (a.label === noValueLabel) return 1
+        if (b.label === noValueLabel) return -1
+        return a.label.localeCompare(b.label, 'it')
       })
-  }, [filteredCustomers, issueCountsByCustomer])
+  }, [filteredCustomers, issueCountsByCustomer, groupBy])
 
   // Refs per Comprimi / Espandi tutto
   const sectionRefs = React.useRef<Map<string, ProvinceSectionHandle>>(new Map())
@@ -279,8 +280,8 @@ export default function SiteRepository() {
 
   // Aggiorna contatori nella toolbar
   React.useEffect(() => {
-    setTotals(filteredCustomers.length, provinceGroups.length)
-  }, [filteredCustomers.length, provinceGroups.length, setTotals])
+    setTotals(filteredCustomers.length, locationGroups.length)
+  }, [filteredCustomers.length, locationGroups.length, setTotals])
 
   // VPN modal
   const [vpnModalOpen, setVpnModalOpen] = React.useState(false)
@@ -397,15 +398,15 @@ export default function SiteRepository() {
             </Box>
           ))}
         </Stack>
-      ) : provinceGroups.length === 0 ? (
+      ) : locationGroups.length === 0 ? (
         <Alert severity="info">
           {customers.length === 0 ? 'Nessun cliente trovato.' : 'Nessun risultato per i filtri selezionati.'}
         </Alert>
       ) : (
         <Stack spacing={0} sx={{ gap: 0 }}>
-          {provinceGroups.map((group) => (
+          {locationGroups.map((group) => (
             <ProvinceSection
-              key={group.province}
+              key={group.label}
               group={group}
               searchQuery={searchQuery}
               statusFilter={statusFilter}
@@ -426,8 +427,8 @@ export default function SiteRepository() {
               onInventoryContextMenu={handleInventoryContextMenu}
               refreshToken={refreshToken}
               ref={(el) => {
-                if (el) sectionRefs.current.set(group.province, el)
-                else sectionRefs.current.delete(group.province)
+                if (el) sectionRefs.current.set(group.label, el)
+                else sectionRefs.current.delete(group.label)
               }}
             />
           ))}

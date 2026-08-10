@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 
 import CustomFieldsEditor from '../../ui/CustomFieldsEditor'
+import ProvinceAutocomplete from '../../ui/ProvinceAutocomplete'
 import type { CustomerItem, LookupItem, SiteForm } from './types'
 
 type Props = {
@@ -134,14 +135,11 @@ export default function SiteDialog(props: Props) {
           </Stack>
 
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="Provincia"
+            <ProvinceAutocomplete
               value={form.province}
-              onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))}
+              onChange={(sigla) => setForm((f) => ({ ...f, province: sigla }))}
               error={Boolean(errors.province)}
-              helperText={errors.province || ''}
-              fullWidth
+              helperText={errors.province}
             />
             <TextField
               size="small"

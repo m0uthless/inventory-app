@@ -1,13 +1,14 @@
-import { Box, Chip, IconButton, InputAdornment, TextField, Typography } from '@mui/material'
+import { Box, Chip, IconButton, InputAdornment, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import ClearIconSR from '@mui/icons-material/Clear'
 
 import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
+import type { GroupByMode } from '../pages/siteRepository/types'
 
 // ─── SiteRepository sticky toolbar ───────────────────────────────────────────
 
 export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
-  const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities } = useSiteRepoV2()
+  const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities, groupBy, setGroupBy } = useSiteRepoV2()
 
   return (
     <Box sx={{
@@ -55,6 +56,27 @@ export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
         }}
       />
 
+      <ToggleButtonGroup
+        size="small"
+        value={groupBy}
+        exclusive
+        onChange={(_e, next: GroupByMode | null) => {
+          if (next) setGroupBy(next)
+        }}
+        sx={{
+          '& .MuiToggleButton-root': {
+            fontWeight: 600,
+            fontSize: '0.75rem',
+            textTransform: 'none',
+            px: 1.25,
+            py: 0.375,
+          },
+        }}
+      >
+        <ToggleButton value="province">Provincia</ToggleButton>
+        <ToggleButton value="city">Città</ToggleButton>
+      </ToggleButtonGroup>
+
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
         <Chip
           label="Comprimi tutto"
@@ -84,7 +106,7 @@ export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
           flexBasis: { xs: '100%', md: 'auto' },
         }}
       >
-        {totalCustomers} clienti · {totalCities} città
+        {totalCustomers} clienti · {totalCities} {groupBy === 'province' ? 'province' : 'città'}
       </Typography>
     </Box>
   )

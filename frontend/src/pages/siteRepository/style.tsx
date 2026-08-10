@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import type { Theme } from '@mui/material/styles'
+import { formatProvinceLabel } from '../../data/italianProvinces'
 import type { StatusFilter, Tone } from './types'
 
 // ─── Palette semantica (derivata dal tema) ─────────────────────────────────────
@@ -116,7 +117,16 @@ export function MonoField({ value, sx }: { value?: string | null; sx?: object })
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function normalizeProvince(province?: string | null): string {
-  return (province ?? 'Senza provincia').trim() || 'Senza provincia'
+  const raw = (province ?? '').trim()
+  if (!raw) return 'Senza provincia'
+  // "BO" o "Bologna" (dati storici pre-tendina, o inseriti a mano) vengono
+  // entrambi risolti allo stesso nome esteso "Bologna (BO)", così finiscono
+  // nello stesso gruppo indipendentemente da come è stato salvato il valore.
+  return formatProvinceLabel(raw)
+}
+
+export function normalizeCity(city?: string | null): string {
+  return (city ?? 'Senza città').trim() || 'Senza città'
 }
 
 export function matchesSearch(q: string, ...fields: (string | null | undefined)[]): boolean {

@@ -59,11 +59,13 @@ export type InventoryRow = {
   deleted_at?: string | null
 }
 
-export type ProvinceGroup = {
-  province: string
+export type LocationGroup = {
+  label: string
   customers: CustomerRow[]
   issueCount: number
 }
+
+export type GroupByMode = 'province' | 'city'
 
 export type StatusFilter = 'all' | 'attivo' | 'manutenzione' | 'inattivo'
 

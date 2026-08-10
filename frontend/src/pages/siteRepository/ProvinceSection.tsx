@@ -6,7 +6,7 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 
-import type { ProvinceGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
+import type { LocationGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
 import { FS, ICON } from './style'
 import { SignalChip, MetaTag } from './primitives'
 import { CustomerCard } from './CustomerCard'
@@ -15,9 +15,13 @@ import { CustomerCard } from './CustomerCard'
 // Rinominato da CitySection: il Site Repository raggruppa i clienti per
 // provincia (Customer.province, campo strutturato — vedi
 // crm/migrations/0010_customer_province.py), non più per città.
+// Aggiornato per essere agnostico rispetto al criterio di raggruppamento:
+// riceve un LocationGroup generico (group.label), che a monte (SiteRepository.tsx)
+// può essere costruito raggruppando per provincia o per città, a seconda del
+// toggle nella toolbar.
 
 type ProvinceSectionProps = {
-  group: ProvinceGroup
+  group: LocationGroup
   searchQuery: string
   statusFilter: StatusFilter
   counts: Record<number, { assets: number | null; sites: number | null }>
@@ -102,12 +106,12 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
           <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: open ? 'rgba(255,255,255,0.75)' : 'primary.main', flexShrink: 0 }} />
 
           <Typography fontWeight={700} sx={{ fontSize: FS.section, color: open ? '#fff' : 'text.primary' }}>
-            {group.province}
+            {group.label}
           </Typography>
 
           <Box sx={{ flex: 1 }} />
 
-          {/* Issue attive in provincia — "segnale", sempre visibile quando presenti */}
+          {/* Issue attive nel gruppo — "segnale", sempre visibile quando presenti */}
           {group.issueCount > 0 && (
             <SignalChip
               tone="error"

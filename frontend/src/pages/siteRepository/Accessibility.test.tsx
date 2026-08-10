@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CollapsibleSiteRow } from './CollapsibleSiteRow'
 import { ProvinceSection } from './ProvinceSection'
-import type { ProvinceGroup, SiteRow } from './types'
+import type { LocationGroup, SiteRow } from './types'
 
 // ─── CollapsibleSiteRow ─────────────────────────────────────────────────────
 
@@ -86,9 +86,9 @@ describe('CollapsibleSiteRow — accessibilità da tastiera (fix P2 8.3)', () =>
 
 // ─── ProvinceSection ────────────────────────────────────────────────────────
 
-function makeProvinceGroup(): ProvinceGroup {
+function makeProvinceGroup(): LocationGroup {
   return {
-    province: 'BO',
+    label: 'BO',
     issueCount: 0,
     customers: [],
   }

@@ -16,6 +16,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 - supporto ai temi e aggiunta primo tema secondario navy
+- supporto alla procincia in customer e sites, con vista site-repository divisa per provincia e citta
 
 ## [0.8.1] - 2026-08-08
 

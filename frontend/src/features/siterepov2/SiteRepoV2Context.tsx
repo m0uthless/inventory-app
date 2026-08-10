@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { GroupByMode } from '../../pages/siteRepository/types'
 
 export type SiteRepoV2Handle = {
   collapseAll: () => void
@@ -14,6 +15,8 @@ type SiteRepoV2ContextValue = {
   totalCustomers: number
   totalCities: number
   setTotals: (customers: number, cities: number) => void
+  groupBy: GroupByMode
+  setGroupBy: (g: GroupByMode) => void
 }
 
 export const SiteRepoV2Context = React.createContext<SiteRepoV2ContextValue>({
@@ -25,6 +28,8 @@ export const SiteRepoV2Context = React.createContext<SiteRepoV2ContextValue>({
   totalCustomers: 0,
   totalCities: 0,
   setTotals: () => {},
+  groupBy: 'province',
+  setGroupBy: () => {},
 })
 
 export function SiteRepoV2Provider({ children }: { children: React.ReactNode }) {
@@ -32,6 +37,8 @@ export function SiteRepoV2Provider({ children }: { children: React.ReactNode }) 
   const [handle, setHandle] = React.useState<SiteRepoV2Handle | null>(null)
   const [totalCustomers, setTotalCustomers] = React.useState(0)
   const [totalCities, setTotalCities] = React.useState(0)
+  // Reset ad ogni sessione (niente persistenza): il default è sempre "provincia".
+  const [groupBy, setGroupBy] = React.useState<GroupByMode>('province')
 
   const registerHandle = React.useCallback((h: SiteRepoV2Handle) => setHandle(h), [])
   const unregisterHandle = React.useCallback(() => setHandle(null), [])
@@ -45,6 +52,7 @@ export function SiteRepoV2Provider({ children }: { children: React.ReactNode }) 
       searchQuery, setSearchQuery,
       handle, registerHandle, unregisterHandle,
       totalCustomers, totalCities, setTotals,
+      groupBy, setGroupBy,
     }}>
       {children}
     </SiteRepoV2Context.Provider>
