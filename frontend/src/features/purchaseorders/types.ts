@@ -87,6 +87,19 @@ export const DOCUMENT_SLOT_LABEL: Record<DocumentSlot, string> = {
   invoice: 'Fattura',
 }
 
+// Punto 9: multi-PDF per tipo — un'entry può avere 0..N documenti per ciascun
+// DocumentSlot (offer/po/invoice), non più un solo file sovrascrivibile.
+export type PurchaseOrderDocument = {
+  id: number
+  kind: DocumentSlot
+  kind_label?: string
+  filename?: string | null
+  url?: string | null
+  uploaded_at: string
+  uploaded_by?: number | null
+  uploaded_by_username?: string | null
+}
+
 export type PurchaseOrderRow = {
   id: number
 
@@ -97,6 +110,8 @@ export type PurchaseOrderRow = {
   customer?: number | null
   customer_name?: string | null
   customer_code?: string | null
+  customer_placeholder?: string | null
+  is_customer_placeholder?: boolean
 
   purchase_order?: string | null
   invoice_number?: string | null
@@ -112,12 +127,7 @@ export type PurchaseOrderRow = {
   received_at?: string | null
   invoiced_at?: string | null
 
-  offer_document_name?: string | null
-  offer_document_url?: string | null
-  po_document_name?: string | null
-  po_document_url?: string | null
-  invoice_document_name?: string | null
-  invoice_document_url?: string | null
+  documents: PurchaseOrderDocument[]
 
   amount_mode: PurchaseOrderAmountMode
   amount_mode_label?: string
@@ -143,6 +153,7 @@ export type PurchaseOrderForm = {
   description: string
   client_name: string
   customer: number | ''
+  customer_placeholder: string
   purchase_order: string
   invoice_number: string
   kind: PurchaseOrderKind
@@ -160,6 +171,7 @@ export function emptyForm(): PurchaseOrderForm {
     description: '',
     client_name: '',
     customer: '',
+    customer_placeholder: '',
     purchase_order: '',
     invoice_number: '',
     kind: 'extra',

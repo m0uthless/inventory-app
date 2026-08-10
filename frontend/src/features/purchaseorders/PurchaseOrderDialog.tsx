@@ -2,11 +2,13 @@ import * as React from 'react'
 import {
   Alert,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -52,6 +54,16 @@ export default function PurchaseOrderDialog({
   onFormChange,
 }: PurchaseOrderDialogProps) {
   const previewAmount = form.amount_mode === 'giornate' ? computeGiornateAmount(form.days, form.daily_rate) : form.amount
+
+  // Punto 10: "Cliente collegato" può essere scelto dall'anagrafica oppure,
+  // se non ancora presente, inserito come testo libero (customer_placeholder).
+  // I due modi sono mutuamente esclusivi (vedi validate() sul backend).
+  const [useCustomerPlaceholder, setUseCustomerPlaceholder] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) setUseCustomerPlaceholder(Boolean(form.customer_placeholder))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -104,21 +116,63 @@ export default function PurchaseOrderDialog({
             fullWidth
           />
 
-          <FormControl size="small" fullWidth>
-            <InputLabel>Cliente collegato (opzionale)</InputLabel>
-            <Select
-              label="Cliente collegato (opzionale)"
-              value={form.customer}
-              onChange={(e) => onFormChange((f) => ({ ...f, customer: asId(e.target.value) }))}
-            >
-              <MenuItem value="">(nessuno)</MenuItem>
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.display_name || c.name || c.code || `Cliente #${c.id}`}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {useCustomerPlaceholder ? (
+            <TextField
+              size="small"
+              label="Cliente collegato (testo libero)"
+              value={form.customer_placeholder}
+              onChange={(e) => onFormChange((f) => ({ ...f, customer_placeholder: e.target.value }))}
+              error={Boolean(errors.customer_placeholder)}
+              helperText={
+                errors.customer_placeholder ||
+                'Cliente non ancora presente in anagrafica: verrà collegato in un secondo momento.'
+              }
+              fullWidth
+            />
+          ) : (
+            <FormControl size="small" fullWidth>
+              <InputLabel>Cliente collegato (opzionale)</InputLabel>
+              <Select
+                label="Cliente collegato (opzionale)"
+                value={form.customer}
+                onChange={(e) => onFormChange((f) => ({ ...f, customer: asId(e.target.value) }))}
+              >
+                <MenuItem value="">(nessuno)</MenuItem>
+                {customers.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.display_name || c.name || c.code || `Cliente #${c.id}`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          <FormControlLabel
+            sx={{ mt: -1, ml: 0 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={useCustomerPlaceholder}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setUseCustomerPlaceholder(checked)
+                  onFormChange((f) => ({
+                    ...f,
+                    // Passando al testo libero azzeriamo il cliente selezionato
+                    // (non applicabile); tornando all'anagrafica azzeriamo il
+                    // testo libero — mutuamente esclusivi anche lato client.
+                    customer: checked ? '' : f.customer,
+                    customer_placeholder: checked ? f.customer_placeholder : '',
+                  }))
+                }}
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Cliente non presente in DB
+              </Typography>
+            }
+          />
 
           <TextField
             size="small"

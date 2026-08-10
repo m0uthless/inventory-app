@@ -76,6 +76,16 @@ def invoice_document_upload_path(instance, filename):
     return f"purchase_orders/invoice_documents/{instance.pk or 'tmp'}/{filename}"
 
 
+class PurchaseOrderDocumentKind(models.TextChoices):
+    OFFER   = "offer",   "Offerta"
+    PO      = "po",      "Purchase Order"
+    INVOICE = "invoice", "Fattura"
+
+
+def purchase_order_document_upload_path(instance, filename):
+    return f"purchase_orders/documents/{instance.entry_id or 'tmp'}/{instance.kind}/{filename}"
+
+
 # ─── PurchaseOrderEntry ──────────────────────────────────────────────────────
 
 class PurchaseOrderEntry(TimeStampedModel):
@@ -87,6 +97,20 @@ class PurchaseOrderEntry(TimeStampedModel):
     customer        = models.ForeignKey(
         Customer, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="purchase_order_entries", verbose_name="Cliente",
+    )
+    # Cliente collegato (il destinatario del lavoro, diverso dal Committente
+    # che paga/commissiona — vedi client_name) quando non è ancora presente
+    # in anagrafica. Mutuamente esclusivo con `customer` (vedi
+    # PurchaseOrderEntrySerializer.validate). A differenza del pattern
+    # equivalente in issues.models (Issue.customer_placeholder), qui non
+    # serve un cliente sentinella: `customer` è già nullable.
+    customer_placeholder = models.CharField(
+        max_length=255, blank=True,
+        verbose_name="Cliente collegato (testo libero)",
+        help_text=(
+            "Nome del cliente su cui è stato eseguito il lavoro, quando non "
+            "è ancora presente in anagrafica. Alternativo al campo Cliente."
+        ),
     )
 
     purchase_order  = models.CharField(max_length=128, blank=True, verbose_name="Purchase Order")
@@ -106,15 +130,11 @@ class PurchaseOrderEntry(TimeStampedModel):
     received_at     = models.DateTimeField(null=True, blank=True, verbose_name="Data ricezione PO")
     invoiced_at     = models.DateTimeField(null=True, blank=True, verbose_name="Data fatturazione")
 
-    offer_document   = models.FileField(
-        upload_to=offer_document_upload_path, null=True, blank=True, verbose_name="PDF Offerta",
-    )
-    po_document      = models.FileField(
-        upload_to=po_document_upload_path, null=True, blank=True, verbose_name="PDF Purchase Order",
-    )
-    invoice_document = models.FileField(
-        upload_to=invoice_document_upload_path, null=True, blank=True, verbose_name="PDF Fattura",
-    )
+    # NOTA: i vecchi campi offer_document/po_document/invoice_document (un solo
+    # PDF per tipo, sovrascritto ad ogni upload) sono stati rimossi in favore
+    # del modello PurchaseOrderDocument (relazione "documents", Punto 9 —
+    # multi-PDF per tipo). Vedi purchaseorders/migrations/0004-0006: 0004 crea
+    # PurchaseOrderDocument, 0005 copia i file esistenti, 0006 rimuove i campi.
 
     # Importo
     amount_mode     = models.CharField(
@@ -167,6 +187,10 @@ class PurchaseOrderEntry(TimeStampedModel):
         return bool(self.invoice_number)
 
     @property
+    def is_customer_placeholder(self) -> bool:
+        return bool(self.customer_placeholder)
+
+    @property
     def is_editable(self) -> bool:
         """Descrizione e valori sono modificabili solo in stato INSERITO."""
         return self.status == PurchaseOrderStatus.INSERITO
@@ -177,3 +201,36 @@ class PurchaseOrderEntry(TimeStampedModel):
         if self.amount_mode == PurchaseOrderAmountMode.GIORNATE and self.days is not None and self.daily_rate is not None:
             self.amount = (self.days * self.daily_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         super().save(*args, **kwargs)
+
+
+# ─── PurchaseOrderDocument ───────────────────────────────────────────────────
+# Punto 9 (roadmap): prima un solo PDF per tipo (offer_document/po_document/
+# invoice_document su PurchaseOrderEntry, ora rimossi — vedi migrazioni 0004-
+# 0006), che veniva sovrascritto ad ogni nuovo upload. Ora ogni tipo ammette
+# più PDF: ogni upload aggiunge una riga invece di sostituire la precedente.
+
+class PurchaseOrderDocument(models.Model):
+    entry = models.ForeignKey(
+        PurchaseOrderEntry, on_delete=models.CASCADE, related_name="documents",
+    )
+    kind = models.CharField(max_length=16, choices=PurchaseOrderDocumentKind.choices)
+    file = models.FileField(upload_to=purchase_order_document_upload_path)
+    # Nome file originale al momento dell'upload: preservato anche se il file
+    # su disco viene rinominato da Django per evitare collisioni.
+    original_filename = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="+",
+    )
+
+    class Meta:
+        verbose_name = "Documento Purchase Order"
+        verbose_name_plural = "Documenti Purchase Order"
+        ordering = ["-uploaded_at"]
+        indexes = [
+            models.Index(fields=["entry", "kind"], name="po_doc_entry_kind_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.entry_id} — {self.kind} — {self.original_filename or self.file.name}"

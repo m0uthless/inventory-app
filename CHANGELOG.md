@@ -13,6 +13,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Changed
 - aggiunto supporto a maggiore dimensione dei widget notizie, task, task area e issues
 - cambiata navigabilità di site repository da città a provincia per un maggior ordinamento
+- aggiunta filtra tipo po, modifica struttura datagrid purchase order
 
 ### Added
 - supporto ai temi e aggiunta primo tema secondario navy
