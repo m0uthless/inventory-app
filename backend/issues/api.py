@@ -289,7 +289,7 @@ class IssueFilter(filters.FilterSet):
 
     def filter_hide_closed(self, queryset, name, value):
         if value:
-            return queryset.filter(status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS])
+            return queryset.filter(status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS, IssueStatus.WAITING])
         return queryset
 
     def filter_only_closed(self, queryset, name, value):
@@ -408,10 +408,13 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         counts = qs.aggregate(
             open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
             in_progress_count=Count("id", filter=Q(status=IssueStatus.IN_PROGRESS)),
+            waiting_count=Count("id", filter=Q(status=IssueStatus.WAITING)),
             resolved_count=Count("id", filter=Q(status=IssueStatus.RESOLVED)),
             closed_count=Count("id", filter=Q(status=IssueStatus.CLOSED)),
         )
-        counts["active_count"] = (counts["open_count"] or 0) + (counts["in_progress_count"] or 0)
+        counts["active_count"] = (
+            (counts["open_count"] or 0) + (counts["in_progress_count"] or 0) + (counts["waiting_count"] or 0)
+        )
 
         # Tempo medio di chiusura
         avg_row = (
