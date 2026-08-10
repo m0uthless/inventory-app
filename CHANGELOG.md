@@ -15,6 +15,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - cambiata navigabilità di site repository da città a provincia per un maggior ordinamento
 - aggiunta filtra tipo po, modifica struttura datagrid purchase order
 - CRM — Coerenza visiva dei drawer di dettaglio: il drawer Inventory ora usa lo stesso componente condiviso (hero con tab integrate, sezioni standard) di Customer/Site/Monitor, eliminando le differenze di stile (tab bar, larghezza, azioni) tra i moduli
+- Aggiunta in attesa da su issues, aggiuunto link a issue, minor fix su issues
 
 ### Added
 - supporto ai temi e aggiunta primo tema secondario navy

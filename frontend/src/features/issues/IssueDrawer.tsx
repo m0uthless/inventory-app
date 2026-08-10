@@ -56,6 +56,11 @@ export default function IssueDrawer({
           <Box sx={{ bgcolor: 'rgba(20,255,180,0.18)', color: '#a7f3d0', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(167,243,208,0.3)', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
             ● {STATUS_META[issue.status]?.label ?? issue.status}
           </Box>
+          {issue.status === 'waiting' && issue.waiting_reason_label ? (
+            <Box sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center' }}>
+              {issue.waiting_reason_label}
+            </Box>
+          ) : null}
           <Box sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center' }}>
             {issue.priority_label || issue.priority}
           </Box>
