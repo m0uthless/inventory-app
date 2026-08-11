@@ -7,8 +7,6 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
-## [0.8.2] - 2026-08-11
-
 ### Added
 - **[customers]** Colonna Provincia nella datagrid Customers (punto 6).
 - **[customers]** Campo `Customer.province` come campo strutturato (sostituisce la chiave JSON in custom_fields), con migrazione `0010_customer_province.py` (punto 4).
