@@ -37,6 +37,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
@@ -289,6 +290,7 @@ export default function Contacts() {
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<ContactDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
+  const [drawerTab, setDrawerTab] = React.useState(0)
 
   // delete/restore
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
@@ -366,6 +368,7 @@ export default function Contacts() {
     (id: number) => {
       setSelectedId(id)
       setDrawerOpen(true)
+      setDrawerTab(0)
       loadDetail(id)
       grid.setOpenId(id)
     },
@@ -621,6 +624,7 @@ export default function Contacts() {
 
     setSelectedId(id)
     setDrawerOpen(true)
+    setDrawerTab(0)
     loadDetail(id)
   }, [grid.openId, loadDetail])
 
@@ -791,6 +795,7 @@ export default function Contacts() {
         detail={detail}
         detailLoading={detailLoading}
         selectedId={selectedId}
+        drawerTab={drawerTab}
         canChange={canChange}
         canDelete={canDelete}
         deleteBusy={deleteBusy}
@@ -799,7 +804,8 @@ export default function Contacts() {
         onEdit={openEdit}
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
-        onCopied={() => toast.success('Copiato ✅')}
+        onTabChange={setDrawerTab}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
       />
 
       <ConfirmActionDialog

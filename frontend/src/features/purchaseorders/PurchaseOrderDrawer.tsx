@@ -34,7 +34,7 @@ type PurchaseOrderDrawerProps = {
   onEdit: () => void | Promise<void>
   onDelete: () => void
   onRestore: () => void | Promise<void>
-  onCopied: () => void
+  onCopy: (text: string) => void | Promise<void>
   onUploadDocument: (slot: DocumentSlot, file: File) => void
   onDeleteDocument: (docId: number) => void
 }
@@ -50,7 +50,7 @@ const DOCUMENT_SLOTS: DocumentSlot[] = ['offer', 'po', 'invoice']
 export default function PurchaseOrderDrawer({
   open, detail, detailLoading, selectedId,
   canChange, canDelete, deleteBusy, restoreBusy, uploadingSlot, deletingDocId,
-  onClose, onEdit, onDelete, onRestore, onCopied, onUploadDocument, onDeleteDocument,
+  onClose, onEdit, onDelete, onRestore, onCopy, onUploadDocument, onDeleteDocument,
 }: PurchaseOrderDrawerProps) {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [uploadType, setUploadType] = React.useState<DocumentSlot | ''>('')
@@ -96,7 +96,7 @@ export default function PurchaseOrderDrawer({
                 { label: 'Purchase Order', value: detail.purchase_order, mono: true, copy: true },
                 { label: 'N. Fattura', value: detail.invoice_number, mono: true, copy: true },
               ]}
-              onCopy={() => onCopied()}
+              onCopy={(v) => void onCopy(v)}
             />
           </DrawerSection>
 
@@ -108,7 +108,7 @@ export default function PurchaseOrderDrawer({
                 { label: 'Ricevuto il', value: detail.received_at ? formatItDate(detail.received_at.slice(0, 10)) : '' },
                 { label: 'Fatturato il', value: detail.invoiced_at ? formatItDate(detail.invoiced_at.slice(0, 10)) : '' },
               ]}
-              onCopy={() => onCopied()}
+              onCopy={(v) => void onCopy(v)}
             />
           </DrawerSection>
 
@@ -125,7 +125,7 @@ export default function PurchaseOrderDrawer({
                 { label: 'Importo', value: formatEuro(detail.amount) },
                 { label: 'Costi sostenuti', value: detail.costs_incurred ? formatEuro(detail.costs_incurred) : '—' },
               ]}
-              onCopy={() => onCopied()}
+              onCopy={(v) => void onCopy(v)}
             />
           </DrawerSection>
 

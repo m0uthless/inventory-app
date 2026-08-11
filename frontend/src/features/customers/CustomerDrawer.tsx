@@ -1,11 +1,10 @@
 import * as React from 'react'
-import { Box, Chip, CircularProgress, Stack, Typography } from '@mui/material'
+import { Box, Chip, Stack, Typography } from '@mui/material'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
-import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import { DrawerShell } from '@shared/ui/DrawerShell'
-import { DrawerSection, DrawerFieldList, DrawerEmptyState } from '@shared/ui/DrawerParts'
+import { DrawerSection, DrawerFieldList, DrawerAddressSection, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import LeafletMap from '../../ui/LeafletMap'
 import type { CustomerDetail } from './types'
 
@@ -28,6 +27,7 @@ type CustomerDrawerProps = {
   onDelete: () => void
   onRestore: () => void | Promise<void>
   onTabChange: (value: number) => void
+  onCopy?: (text: string) => void | Promise<void>
   sitesTabContent: React.ReactNode
   inventoriesTabContent: React.ReactNode
   driveTabContent: React.ReactNode
@@ -38,7 +38,7 @@ export default function CustomerDrawer({
   open, detail, detailLoading, selectedId, drawerTab,
   sitesCount, inventoriesCount, driveCount, address,
   canChange, canDelete, deleteBusy, restoreBusy,
-  onClose, onEdit, onDelete, onRestore, onTabChange,
+  onClose, onEdit, onDelete, onRestore, onTabChange, onCopy,
   sitesTabContent, inventoriesTabContent, driveTabContent, activityTabContent,
 }: CustomerDrawerProps) {
   return (
@@ -71,28 +71,21 @@ export default function CustomerDrawer({
           </DrawerSection>
 
           <DrawerSection icon={<MonitorOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Informazioni">
-            <DrawerFieldList rows={[
-              ...(detail.vat_number ? [{ label: 'P.IVA', value: detail.vat_number, mono: true }] : []),
-              ...(detail.custom_fields && typeof detail.custom_fields === 'object'
-                ? Object.entries(detail.custom_fields)
-                    .filter(([k, v]) => v !== '' && v !== null && v !== undefined && k.trim().toLowerCase() !== 'indirizzo')
-                    .map(([k, v]) => ({ label: k, value: String(v) }))
-                : []),
-            ]} />
+            <DrawerFieldList
+              rows={[
+                ...(detail.vat_number ? [{ label: 'P.IVA', value: detail.vat_number, mono: true, copy: true }] : []),
+                ...(detail.custom_fields && typeof detail.custom_fields === 'object'
+                  ? Object.entries(detail.custom_fields)
+                      .filter(([k, v]) => v !== '' && v !== null && v !== undefined && k.trim().toLowerCase() !== 'indirizzo')
+                      .map(([k, v]) => ({ label: k, value: String(v) }))
+                  : []),
+              ]}
+              onCopy={onCopy ? (v) => void onCopy(v) : undefined}
+            />
           </DrawerSection>
 
           {address ? (
-            <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
-              <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-                  <LocationOnOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Indirizzo
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>{address}</Typography>
-              </Box>
-              <Box sx={{ borderTop: '1px solid', borderColor: 'grey.100' }}>
-                <LeafletMap address={address} height={320} zoom={15} />
-              </Box>
-            </Box>
+            <DrawerAddressSection address={address} mapSlot={<LeafletMap address={address} height={320} zoom={15} />} />
           ) : null}
 
           <DrawerSection icon={<NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Note" variant="muted">
@@ -106,12 +99,7 @@ export default function CustomerDrawer({
       {drawerTab === 3 ? driveTabContent : null}
       {drawerTab === 4 ? activityTabContent : null}
 
-      {detailLoading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>Caricamento…</Typography>
-        </Stack>
-      ) : null}
+      {detailLoading ? <DrawerLoadingState /> : null}
     </DrawerShell>
   )
 }

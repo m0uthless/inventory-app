@@ -31,6 +31,7 @@ import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useCustomerKpis } from '../hooks/useCustomerKpis'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
@@ -1307,6 +1308,7 @@ export default function Customers() {
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
         onTabChange={setDrawerTab}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
         sitesTabContent={detail ? (
           <CustomerSitesTab
             customerId={detail.id}

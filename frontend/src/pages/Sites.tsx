@@ -38,6 +38,7 @@ import SiteDrawer from '../features/sites/SiteDrawer'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import type { KpiSpec } from '@shared/hooks/useDrawerKpis'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
@@ -108,22 +109,6 @@ type SiteForm = {
   notes: string
 }
 
-
-async function copyToClipboard(text: string) {
-  if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.position = 'fixed'
-    ta.style.left = '-9999px'
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-  }
-}
 
 type ContactMini = {
   id: number
@@ -521,7 +506,9 @@ const renderSiteCard: MobileCardRenderFn<SiteRow> = ({ row, onOpen }) => {
 }
 
 export default function Sites() {
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
+  const canChange = hasPerm(PERMS.crm.site.change)
+  const canDelete = hasPerm(PERMS.crm.site.delete)
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
@@ -1106,6 +1093,8 @@ export default function Sites() {
         onEdit={openEdit}
         onRestore={doRestore}
         onDeleteRequest={() => setDeleteDlgOpen(true)}
+        canChange={canChange}
+        canDelete={canDelete}
         restoreBusy={restoreBusy}
         deleteBusy={deleteBusy}
         onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}

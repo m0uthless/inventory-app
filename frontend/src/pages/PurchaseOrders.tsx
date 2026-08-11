@@ -41,6 +41,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
@@ -1008,7 +1009,7 @@ export default function PurchaseOrders() {
         onEdit={openEdit}
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
-        onCopied={() => toast.success('Copiato ✅')}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
         onUploadDocument={uploadDocument}
         onDeleteDocument={deleteDocument}
       />

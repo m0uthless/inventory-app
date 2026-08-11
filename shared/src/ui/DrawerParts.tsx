@@ -3,6 +3,7 @@
  *
  * DrawerSection   — card con bordo, titolo sezione uppercase e corpo
  * DrawerFieldRow  — riga label + valore (con eventuale copia clipboard)
+ * DrawerAddressSection — card indirizzo + slot mappa (Customer, Site)
  * DrawerEmptyState — messaggio quando il dettaglio non è disponibile
  * DrawerLoadingState — spinner + testo "Caricamento…"
  */
@@ -20,6 +21,7 @@ import {
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
 
 // ─── DrawerSection ────────────────────────────────────────────────────────────
 
@@ -207,6 +209,50 @@ export function DrawerFieldList({ rows, onCopy }: DrawerFieldListProps) {
         <DrawerFieldRow key={row.label} {...row} onCopy={onCopy} />
       ))}
     </Stack>
+  )
+}
+
+// ─── DrawerAddressSection ─────────────────────────────────────────────────────
+
+/**
+ * Card indirizzo + mappa, usata nei drawer di dettaglio che hanno una
+ * localizzazione fisica (Customer, Site). Il componente mappa vero e proprio
+ * (es. LeafletMap) resta responsabilità del chiamante e va passato via `mapSlot`,
+ * per non introdurre una dipendenza da librerie di mappe dentro `shared`.
+ */
+export interface DrawerAddressSectionProps {
+  /** Testo indirizzo già formattato (es. "Via Roma 1, Bologna") */
+  address: string
+  /** Nodo mappa (es. <LeafletMap address={address} height={320} zoom={15} />) */
+  mapSlot: React.ReactNode
+}
+
+export function DrawerAddressSection({ address, mapSlot }: DrawerAddressSectionProps) {
+  return (
+    <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
+      <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 700,
+            color: 'text.disabled',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            mb: 0.5,
+          }}
+        >
+          <LocationOnOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+          Indirizzo
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+          {address}
+        </Typography>
+      </Box>
+      <Box sx={{ borderTop: '1px solid', borderColor: 'grey.100' }}>{mapSlot}</Box>
+    </Box>
   )
 }
 
