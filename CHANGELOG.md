@@ -16,7 +16,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - **[dashboard]** Mappa Italia con confini reali ISTAT (choropleth SVG con drill-down province/capoluoghi), al posto del primo tentativo a cartogramma a griglia (scartato).
 - **[servicenow]** Export PDF statistiche ServiceNow (endpoint `stats-export-pdf` + pulsante in pagina).
 - **[ausl-bo]** Riordinamento colonne â†‘â†“ e upload certificato .p12 WiFi (testato e2e).
-- **[crm]** Tab "Attività" aggiunta a `SiteDrawer` e `ContactDrawer` (audit log già presente in backend, mancava solo il frontend) — punto 7.
+- **[crm]** Tab "AttivitÃ " aggiunta a `SiteDrawer` e `ContactDrawer` (audit log già presente in backend, mancava solo il frontend) — punto 7.
 
 
 ### Changed
