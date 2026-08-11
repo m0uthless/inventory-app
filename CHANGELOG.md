@@ -7,6 +7,9 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Fixed
+- conflitto --version con flag builtin Django in create_changelog_entry, rinominato in --release-version
+
 ## [0.8.2] - 2026-08-11
 
 ### Added
