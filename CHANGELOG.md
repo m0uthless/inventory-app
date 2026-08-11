@@ -16,7 +16,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - **[dashboard]** Mappa Italia con confini reali ISTAT (choropleth SVG con drill-down province/capoluoghi), al posto del primo tentativo a cartogramma a griglia (scartato).
 - **[servicenow]** Export PDF statistiche ServiceNow (endpoint `stats-export-pdf` + pulsante in pagina).
 - **[ausl-bo]** Riordinamento colonne â†‘â†“ e upload certificato .p12 WiFi (testato e2e).
-- **[crm]** Tab "AttivitÃ " aggiunta a `SiteDrawer` e `ContactDrawer` (audit log già presente in backend, mancava solo il frontend) — punto 7.
+- **[crm]** Tab "AttivitÃ " aggiunta a `SiteDrawer` e `ContactDrawer` (audit log giÃ  presente in backend, mancava solo il frontend) â€” punto 7.
 
 
 ### Changed
@@ -27,9 +27,9 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - **[site-repository]** Pulsante nota: da tooltip troncato a modale con testo completo.
 - **[crm]** Rimossi tutti i pulsanti azione (Apri cliente, Apri sito, Apri inventario, Lista filtrata) da `ContactDrawer` e `InventoryDrawer`, senza sostituzione.
 - **[crm]** Redesign visivo `InventoryDrawer`: accent colore per categoria con bordo laterale (`DrawerSection` esteso con prop `accent`: info/secondary/warning/success/neutral), angoli completamente arrotondati.
-- **[crm]** `SiteDrawer` migrato al pattern standard `canChange`/`canDelete` gestito da `DrawerShell`, rimossa la logica custom con `Can`/`ActionIconButton` — punto 7.
-- **[crm]** Estratto componente condiviso `DrawerAddressSection` (indirizzo + mappa), eliminata la duplicazione tra `CustomerDrawer` e `SiteDrawer` — punto 7.
-- **[crm]** Uniformati icone di sezione, campi copiabili (P.IVA in `CustomerDrawer`) e stato di caricamento (`DrawerLoadingState`) tra `CustomerDrawer`/`SiteDrawer`/`ContactDrawer` — punto 7.
+- **[crm]** `SiteDrawer` migrato al pattern standard `canChange`/`canDelete` gestito da `DrawerShell`, rimossa la logica custom con `Can`/`ActionIconButton` â€” punto 7.
+- **[crm]** Estratto componente condiviso `DrawerAddressSection` (indirizzo + mappa), eliminata la duplicazione tra `CustomerDrawer` e `SiteDrawer` â€” punto 7.
+- **[crm]** Uniformati icone di sezione, campi copiabili (P.IVA in `CustomerDrawer`) e stato di caricamento (`DrawerLoadingState`) tra `CustomerDrawer`/`SiteDrawer`/`ContactDrawer` â€” punto 7.
 - **[shared]** Nuova utility `copyToClipboard` in `shared/src/utils/clipboard.ts`, sostituisce l'implementazione duplicata locale in `Sites.tsx`.
 
 
@@ -37,8 +37,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - **[purchase-order]** Bug MUI X DataGrid: rimosso `headerAlign: 'right'` dalle colonne Importo/Costi sostenuti (causava il menu a tre puntini spostato a sinistra dell'etichetta).
 - **[crm]** Incoerenza font tra label credenziale e campi password in `SecretRow` (allineato a `variant="caption"` / `color: text.disabled` come `DrawerFieldRow`).
 - **[scripts]** `fix-push.sh`: non chiede piÃ¹ il numero di versione, lo calcola automaticamente come patch bump (es. 0.8.0 â†’ 0.8.1).
-- **[crm]** `ContactDrawer`: il pulsante "copia" mostrava il toast di successo ma non copiava realmente il valore negli appunti (callback che ignorava il testo) — ora copia correttamente.
-- **[purchase-order]** `PurchaseOrderDrawer`: stesso bug di `ContactDrawer` — il pulsante "copia" sui campi Purchase Order/N. Fattura mostrava conferma senza copiare nulla — corretto.
+- **[crm]** `ContactDrawer`: il pulsante "copia" mostrava il toast di successo ma non copiava realmente il valore negli appunti (callback che ignorava il testo) â€” ora copia correttamente.
+- **[purchase-order]** `PurchaseOrderDrawer`: stesso bug di `ContactDrawer` â€” il pulsante "copia" sui campi Purchase Order/N. Fattura mostrava conferma senza copiare nulla â€” corretto.
 
 ### Security
 - Nessuna modifica specifica di sicurezza in questo periodo.
