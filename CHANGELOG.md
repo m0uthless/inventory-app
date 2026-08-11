@@ -39,6 +39,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - **[scripts]** `fix-push.sh`: non chiede più il numero di versione, lo calcola automaticamente come patch bump (es. 0.8.0 → 0.8.1).
 - **[crm]** `ContactDrawer`: il pulsante "copia" mostrava il toast di successo ma non copiava realmente il valore negli appunti (callback che ignorava il testo) — ora copia correttamente.
 - **[purchase-order]** `PurchaseOrderDrawer`: stesso bug di `ContactDrawer` — il pulsante "copia" sui campi Purchase Order/N. Fattura mostrava conferma senza copiare nulla — corretto.
+- **[drive]** `DriveFileViewSet`: il parametro `root=true` non veniva applicato (a differenza di `DriveFolderViewSet`, che lo gestisce correttamente), quindi la vista root mostrava anche i file dentro le cartelle. Aggiunto filtro `folder__isnull=True` quando `root=true`.
 
 ### Security
 - Nessuna modifica specifica di sicurezza in questo periodo.
