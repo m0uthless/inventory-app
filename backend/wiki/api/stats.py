@@ -13,13 +13,28 @@ from wiki.models import WikiPage, WikiPageRating, WikiPageRevision, WikiQuery
 
 logger = logging.getLogger(__name__)
 
+
+def invalidate_wiki_stats_cache():
+    """Invalida la cache di WikiStatsView.
+
+    Va chiamata da qualunque punto che modifichi conteggi/aggregati coperti
+    dalla dashboard (create/update/destroy/restore di WikiPage): la cache ha
+    un TTL di 5 minuti, quindi senza invalidazione esplicita una pagina
+    appena cancellata (o creata/ripristinata) continuerebbe a comparire nei
+    totali per un massimo di 5 minuti.
+    """
+    from django.core.cache import cache
+    cache.delete(WikiStatsView.CACHE_KEY)
+
 class WikiStatsView(APIView):
     """Statistiche aggregate per la dashboard wiki.
 
     Il risultato viene cachato per WIKI_STATS_CACHE_TTL secondi (default 300)
     per evitare 8+ query aggregate ad ogni apertura della dashboard.
     La cache è condivisa tra tutti gli utenti (i dati non sono sensibili per
-    utente). Viene invalidata automaticamente allo scadere del TTL.
+    utente). Viene invalidata automaticamente allo scadere del TTL, e in modo
+    esplicito da wiki.api.pages ad ogni create/update/destroy/restore di una
+    WikiPage (vedi invalidate_wiki_stats_cache più sotto).
     """
 
     permission_classes = [IsAuthenticated]
@@ -91,7 +106,7 @@ class WikiStatsView(APIView):
 
             top_authors = (
                 WikiPageRevision.objects
-                .filter(saved_by__isnull=False)
+                .filter(saved_by__isnull=False, page__deleted_at__isnull=True)
                 .values("saved_by__id", "saved_by__first_name", "saved_by__last_name", "saved_by__username")
                 .annotate(edits=Count("id"))
                 .order_by("-edits", "saved_by__username")[:8]

@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Fixed
 - uso di displayname invece che name relativo al site per import inventory
+- fix wiki stats conteggio pagine
 
 ### Changed
 - aggiunto supporto a maggiore dimensione dei widget notizie, task, task area e issues

@@ -23,6 +23,7 @@ from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
 from wiki.models import WikiPage, WikiPageRating, WikiPageRevision
 from wiki.api.helpers import _markdown_to_html, _markdown_to_plain_text, _slug_is_available, _suggest_available_slug
+from wiki.api.stats import invalidate_wiki_stats_cache
 
 class WikiPageSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
@@ -263,6 +264,23 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         instance.kb_code = f"KB{instance.pk:07d}"
         instance.save(update_fields=["kb_code"])
         log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
+        invalidate_wiki_stats_cache()
+
+    def perform_destroy(self, instance):
+        super().perform_destroy(instance)
+        invalidate_wiki_stats_cache()
+
+    @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
+    def restore(self, request, pk=None):
+        response = super().restore(request, pk=pk)
+        invalidate_wiki_stats_cache()
+        return response
+
+    @action(detail=False, methods=["post"], permission_classes=[CanRestoreModelPermission])
+    def bulk_restore(self, request):
+        response = super().bulk_restore(request)
+        invalidate_wiki_stats_cache()
+        return response
 
     @action(detail=True, methods=["post"], url_path="view", permission_classes=[IsAuthenticated])
     def record_view(self, request, pk=None):
@@ -332,3 +350,4 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             )
             updated = serializer.save(updated_by=self.request.user)
         log_event(actor=self.request.user, action="update", instance=updated, request=self.request)
+        invalidate_wiki_stats_cache()
