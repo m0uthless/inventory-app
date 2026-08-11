@@ -1,13 +1,13 @@
 import * as React from 'react'
-import { Box, Collapse, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material'
+import { Box, Collapse, Dialog, DialogContent, DialogTitle, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import EditIcon from '@mui/icons-material/Edit'
 import NoteAltOutlinedIcon from '@mui/icons-material/NoteAltOutlined'
 import VpnLockIcon from '@mui/icons-material/VpnLock'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import StatusChip from '@shared/ui/StatusChip'
 
 import type { CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
@@ -31,8 +31,6 @@ type CustomerCardProps = {
   onOpenSite: (id: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
-  canChangeCustomer: boolean
-  onEditCustomer: (id: number) => void
   canChangeSite: boolean
   onEditSite: (id: number) => void
   onCustomerContextMenu: (customer: CustomerRow, e: React.MouseEvent) => void
@@ -46,13 +44,14 @@ type CustomerCardProps = {
 export function CustomerCard({
   customer, searchQuery, statusFilter, assetCount, siteCount, issueCount, onOpenDrawer, onOpenVpn,
   onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
-  canChangeCustomer, onEditCustomer, canChangeSite, onEditSite,
+  canChangeSite, onEditSite,
   onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
   rowIndex, isLast, refreshToken,
 }: CustomerCardProps) {
   const theme = useTheme()
   const [expanded, setExpanded] = React.useState(false)
   const [tab, setTab] = React.useState(0)
+  const [noteModalOpen, setNoteModalOpen] = React.useState(false)
   const contentId = React.useId()
 
   // Auto-open se c'è una ricerca attiva
@@ -141,27 +140,21 @@ export function CustomerCard({
                 />
               </Tooltip>
             )}
-            {canChangeCustomer && (
-              <Tooltip title="Modifica cliente" arrow>
-                <ActionButton
-                  tone="neutral"
-                  icon={<EditIcon />}
-                  ariaLabel="Modifica cliente"
-                  onClick={(e) => { e.stopPropagation(); onEditCustomer(customer.id) }}
-                />
-              </Tooltip>
-            )}
-
-            {/* Note — solo icona, tooltip con testo. Segnalazione soft (warning) */}
+            {/* Note — solo icona, click apre modal con il testo completo (niente più tooltip handover) */}
             {customer.notes && customer.notes.trim().length > 0 && (
-              <Tooltip title={customer.notes.length > 120 ? customer.notes.slice(0, 120) + '…' : customer.notes} arrow>
-                <Box sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
-                  bgcolor: alpha(theme.palette.warning.main, 0.10),
-                  border: `1px solid ${alpha(theme.palette.warning.main, 0.28)}`,
-                  cursor: 'default',
-                }}>
+              <Tooltip title="Note cliente" arrow>
+                <Box
+                  onClick={(e) => { e.stopPropagation(); setNoteModalOpen(true) }}
+                  sx={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
+                    bgcolor: alpha(theme.palette.warning.main, 0.10),
+                    border: `1px solid ${alpha(theme.palette.warning.main, 0.28)}`,
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                    '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.20) },
+                  }}
+                >
                   <NoteAltOutlinedIcon sx={{ fontSize: ICON.feature, color: theme.palette.warning.dark }} />
                 </Box>
               </Tooltip>
@@ -280,6 +273,27 @@ export function CustomerCard({
           )}
         </Box>
       </Collapse>
+
+      {/* Modal note cliente — sostituisce il vecchio tooltip handover: testo
+          completo, non troncato a 120 caratteri come nel tooltip. */}
+      <Dialog open={noteModalOpen} onClose={() => setNoteModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+            <NoteAltOutlinedIcon sx={{ fontSize: 20, color: theme.palette.warning.dark }} />
+            <Typography sx={{ fontWeight: 700, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Note — {customer.display_name || customer.name}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setNoteModalOpen(false)} aria-label="Chiudi">
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+            {customer.notes}
+          </Typography>
+        </DialogContent>
+      </Dialog>
     </Box>
   )
 }

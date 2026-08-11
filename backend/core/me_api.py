@@ -151,6 +151,7 @@ class MeAPIView(APIView):
                 "leave_area": leave_area_id,
                 "leave_area_label": leave_area_label,
                 "gender": profile.gender if profile is not None else None,
+                "theme": profile.theme if profile is not None else UserProfile.Theme.DEFAULT,
             },
         }
         return data
@@ -209,6 +210,19 @@ class MeAPIView(APIView):
                     return Response({"avatar": err}, status=status.HTTP_400_BAD_REQUEST)
                 new_avatar = raw
 
+        # theme: preferenza personale, whitelist sui valori ammessi (a differenza
+        # degli altri campi di UserProfile, qui è l'utente stesso a poterla scegliere)
+        new_theme = _UNSET
+        if "theme" in data:
+            raw_theme = data.get("theme")
+            valid_themes = {choice for choice, _ in UserProfile.Theme.choices}
+            if raw_theme not in valid_themes:
+                return Response(
+                    {"theme": f"Valore non valido. Ammessi: {', '.join(sorted(valid_themes))}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            new_theme = raw_theme
+
         # ── Fase 2: tutte le validazioni passate → salvataggio atomico ──────
 
         if new_email is not None:
@@ -226,6 +240,9 @@ class MeAPIView(APIView):
 
         if new_avatar is not _UNSET:
             profile.avatar = new_avatar
+
+        if new_theme is not _UNSET:
+            profile.theme = new_theme
 
         profile.save()
 

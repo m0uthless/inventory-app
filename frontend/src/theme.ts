@@ -13,13 +13,15 @@ export const theme = createTheme(
         dark: '#0a524d',
       },
       secondary: { 
-        main: '#0ea5e9', // Virata verso un azzurro/ottanio più brillante per contrasto
+        main: '#8b5cf6', // Violet-500: distinto sia da primary (teal) sia da info (blue)
+        light: '#ede9fe',
+        dark: '#5b21b6',
       },
       // --- COLORI SEMANTICI RAFFINATI (Per Chip e Alert) ---
       success: {
-        main: '#10b981',
-        light: '#d1fae5',
-        dark: '#065f46',
+        main: '#16a34a', // Green-600 puro: separato dalla tonalità teal di primary
+        light: '#dcfce7',
+        dark: '#166534',
       },
       warning: {
         main: '#f59e0b',
@@ -170,9 +172,9 @@ export const theme = createTheme(
             borderRadius: 8,
           },
           colorSuccess: { 
-            backgroundColor: '#d1fae5', 
-            color: '#065f46',
-            border: '1px solid rgba(16, 185, 129, 0.2)' 
+            backgroundColor: '#dcfce7', 
+            color: '#166534',
+            border: '1px solid rgba(22, 163, 74, 0.2)' 
           },
           colorWarning: { 
             backgroundColor: '#fef3c7', 
@@ -226,7 +228,7 @@ export const theme = createTheme(
             borderRadius: 8,
             border: '1px solid',
           },
-          standardSuccess: { borderColor: '#d1fae5' },
+          standardSuccess: { borderColor: '#dcfce7' },
           standardError: { borderColor: '#fee2e2' },
           standardWarning: { borderColor: '#fef3c7' },
           standardInfo: { borderColor: '#dbeafe' },

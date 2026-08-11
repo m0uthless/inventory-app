@@ -31,6 +31,7 @@ import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useCustomerKpis } from '../hooks/useCustomerKpis'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
@@ -58,6 +59,7 @@ type CustomerRow = {
 
   // Convenience/computed fields from API
   city?: string | null
+  province?: string | null
   primary_contact_id?: number | null
   primary_contact_name?: string | null
   primary_contact_email?: string | null
@@ -87,6 +89,7 @@ type CustomerForm = {
   display_name: string
   vat_number: string
   tax_code: string
+  province: string
   custom_fields: Record<string, unknown>
   notes: string
 }
@@ -598,6 +601,7 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<Custom
     ),
   },
   { field: 'city', headerName: 'Città', width: 170 },
+  { field: 'province', headerName: 'Provincia', width: 120 },
   {
     field: 'primary_contact_name',
     headerName: 'Contatto primario',
@@ -732,6 +736,7 @@ export default function Customers() {
       'display_name',
       'status_label',
       'city',
+      'province',
       'primary_contact_name',
       'vat_number',
       'tax_code',
@@ -832,6 +837,7 @@ export default function Customers() {
     display_name: '',
     vat_number: '',
     tax_code: '',
+    province: '',
     custom_fields: {},
     notes: '',
   })
@@ -1074,6 +1080,7 @@ export default function Customers() {
       display_name: '',
       vat_number: '',
       tax_code: '',
+      province: '',
       custom_fields: {},
       notes: '',
     })
@@ -1103,6 +1110,7 @@ export default function Customers() {
       display_name: detail.display_name ?? '',
       vat_number: detail.vat_number ?? '',
       tax_code: detail.tax_code ?? '',
+      province: detail.province ?? '',
       custom_fields: detail.custom_fields ?? {},
       notes: detail.notes ?? '',
     })
@@ -1129,6 +1137,7 @@ export default function Customers() {
       display_name: (form.display_name || '').trim() || form.name.trim(),
       vat_number: (form.vat_number || '').trim() || null,
       tax_code: (form.tax_code || '').trim() || null,
+      province: (form.province || '').trim() || null,
       custom_fields:
         form.custom_fields && Object.keys(form.custom_fields).length ? form.custom_fields : null,
       notes: (form.notes || '').trim() || null,
@@ -1299,6 +1308,7 @@ export default function Customers() {
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
         onTabChange={setDrawerTab}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
         sitesTabContent={detail ? (
           <CustomerSitesTab
             customerId={detail.id}

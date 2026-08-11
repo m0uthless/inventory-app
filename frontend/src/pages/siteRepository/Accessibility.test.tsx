@@ -2,8 +2,8 @@ import { fireEvent, screen } from '@testing-library/dom'
 import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CollapsibleSiteRow } from './CollapsibleSiteRow'
-import { CitySection } from './CitySection'
-import type { CityGroup, SiteRow } from './types'
+import { ProvinceSection } from './ProvinceSection'
+import type { LocationGroup, SiteRow } from './types'
 
 // ─── CollapsibleSiteRow ─────────────────────────────────────────────────────
 
@@ -84,22 +84,21 @@ describe('CollapsibleSiteRow — accessibilità da tastiera (fix P2 8.3)', () =>
   })
 })
 
-// ─── CitySection ────────────────────────────────────────────────────────────
+// ─── ProvinceSection ────────────────────────────────────────────────────────
 
-function makeCityGroup(): CityGroup {
+function makeProvinceGroup(): LocationGroup {
   return {
-    city: 'Bologna',
-    province: 'BO',
+    label: 'BO',
     issueCount: 0,
     customers: [],
   }
 }
 
-describe('CitySection — accessibilità da tastiera (fix P2 8.3)', () => {
+describe('ProvinceSection — accessibilità da tastiera (fix P2 8.3)', () => {
   it('si espande con Invio e collega aria-controls al contenuto', () => {
     render(
-      <CitySection
-        group={makeCityGroup()}
+      <ProvinceSection
+        group={makeProvinceGroup()}
         searchQuery=""
         statusFilter="all"
         counts={{}}
@@ -110,8 +109,6 @@ describe('CitySection — accessibilità da tastiera (fix P2 8.3)', () => {
         onOpenSite={vi.fn()}
         canViewCustomer={false}
         canViewSite={false}
-        canChangeCustomer={false}
-        onEditCustomer={vi.fn()}
         canChangeSite={false}
         onEditSite={vi.fn()}
         onCustomerContextMenu={vi.fn()}
@@ -121,7 +118,7 @@ describe('CitySection — accessibilità da tastiera (fix P2 8.3)', () => {
       />,
     )
 
-    const header = screen.getByRole('button', { name: /Bologna/ })
+    const header = screen.getByRole('button', { name: /BO/ })
     expect(header).toHaveAttribute('aria-expanded', 'false')
 
     const controlsId = header.getAttribute('aria-controls')

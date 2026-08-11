@@ -15,6 +15,7 @@ import {
 } from '@mui/material'
 
 import CustomFieldsEditor from '../../ui/CustomFieldsEditor'
+import ProvinceAutocomplete from '../../ui/ProvinceAutocomplete'
 import type { CustomerForm, LookupItem } from './types'
 
 const asId = (v: unknown): number | '' => {
@@ -147,11 +148,25 @@ export default function CustomerDialog({
             />
           </Stack>
 
+          <ProvinceAutocomplete
+            value={form.province}
+            onChange={(sigla) => {
+              onFormChange((f) => ({ ...f, province: sigla }))
+              onFieldErrorsChange((er) => {
+                const next = { ...er }
+                delete next.province
+                return next
+              })
+            }}
+            error={Boolean(errors.province)}
+            helperText={errors.province}
+          />
+
           <CustomFieldsEditor
             entity="customer"
             value={form.custom_fields}
             onChange={(v) => onFormChange((f) => ({ ...f, custom_fields: v }))}
-            mode="accordion"
+            mode="inline"
           />
 
           <TextField

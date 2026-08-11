@@ -24,6 +24,11 @@ class Customer(TimeStampedModel):
     tags = ArrayField(models.TextField(), null=True, blank=True)
     custom_fields = models.JSONField(null=True, blank=True)
 
+    # Promosso da custom field a colonna strutturata (era "provincia" nei
+    # custom_fields, vedi crm/migrations/0010_customer_province.py). Nome
+    # inglese per coerenza con Site.province, che già esisteva strutturato.
+    province = models.CharField(max_length=32, null=True, blank=True, verbose_name="Provincia")
+
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
 

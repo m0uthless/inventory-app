@@ -4,12 +4,10 @@ import {
   Box,
   Button,
   Chip,
-  FormControl,
   IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
 
@@ -38,12 +36,12 @@ import PurchaseOrderDialog from '../features/purchaseorders/PurchaseOrderDialog'
 import PurchaseOrderDrawer from '../features/purchaseorders/PurchaseOrderDrawer'
 import PurchaseOrderTransitionDialog, { type TransitionExtraFields } from '../features/purchaseorders/PurchaseOrderTransitionDialog'
 import PurchaseOrderKpis from '../features/purchaseorders/PurchaseOrderKpis'
-import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
 import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
@@ -85,6 +83,14 @@ type TransitionState = {
 }
 
 const KIND_LABEL: Record<string, string> = { ordinario: 'Ordinario', extra: 'Extra' }
+
+// Filtro tipo PO (vicino al selettore anni): 'all' = nessun filtro kind lato API.
+type KindFilterValue = 'all' | 'ordinario' | 'extra'
+const KIND_FILTER_OPTIONS: { value: KindFilterValue; label: string }[] = [
+  { value: 'all', label: 'Tutti' },
+  { value: 'ordinario', label: 'Ordinario' },
+  { value: 'extra', label: 'Extra' },
+]
 
 const cols: GridColDef<PurchaseOrderRow>[] = [
   {
@@ -143,7 +149,6 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     headerName: 'Importo',
     width: 130,
     align: 'right',
-    headerAlign: 'right',
     valueGetter: (v, row) => {
       void v
       return formatEuro(row.amount)
@@ -165,7 +170,6 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     headerName: 'Costi sostenuti',
     width: 130,
     align: 'right',
-    headerAlign: 'right',
     valueGetter: (v, row) => {
       void v
       return row.costs_incurred ? formatEuro(row.costs_incurred) : '—'
@@ -177,7 +181,9 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     width: 180,
     valueGetter: (v, row) => {
       void v
-      return row.customer_name || row.customer_code || '—'
+      // Cliente da anagrafica (display_name, già risolto lato backend) se
+      // collegato; altrimenti il Committente inserito a mano (Punto 10).
+      return row.customer_name || row.customer_code || row.client_name || '—'
     },
   },
 ]
@@ -263,8 +269,14 @@ export default function PurchaseOrders() {
     allowedOrderingFields: [
       'offer_date',
       'client_name',
+      'description',
+      'purchase_order',
       'kind',
+      'status',
       'amount',
+      'is_invoiced',
+      'costs_incurred',
+      'customer_name',
       'created_at',
       'updated_at',
     ],
@@ -274,6 +286,13 @@ export default function PurchaseOrders() {
   // Purchase Order sono divisi per anno (offer_date): anno corrente di default.
   const [year, setYear] = useUrlNumberParam('year', { defaultValue: CURRENT_YEAR })
   const effectiveYear = year === '' ? CURRENT_YEAR : year
+
+  // Filtro tipo PO (Tutti/Ordinario/Extra), vicino al selettore anni: filtra
+  // sia la lista (via querystring `kind`, già supportato dal filterset
+  // backend) sia i KPI (via `summary?kind=`).
+  const [kindFilterRaw, setKindFilterRaw] = useUrlStringParam('kind', { defaultValue: 'all' })
+  const kindFilter: KindFilterValue =
+    kindFilterRaw === 'ordinario' || kindFilterRaw === 'extra' ? kindFilterRaw : 'all'
 
   const [selectionModel, setSelectionModel] =
     React.useState<GridRowSelectionModel>(emptySelectionModel())
@@ -309,27 +328,26 @@ export default function PurchaseOrders() {
     return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
   }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
 
-  // filters (URL)
-  const [kindFilter, setKindFilter] = useUrlStringParam('kind')
-  const [statusFilter, setStatusFilter] = useUrlStringParam('status')
-  const [invoicedFilter, setInvoicedFilter] = useUrlStringParam('invoiced')
-  const [customerId, setCustomerId] = useUrlNumberParam('customer')
-
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
         search: grid.search,
         ordering: grid.ordering,
+        // "is_invoiced"/"customer_name" (colonne del datagrid) non sono campi
+        // DB reali sul backend: si traducono nei campi/relazioni sottostanti
+        // solo qui, al momento di costruire la querystring — grid.ordering e
+        // il sortModel visivo della grid restano sui nomi colonna originali.
+        orderingMap: {
+          is_invoiced: 'invoice_number',
+          customer_name: 'customer__display_name',
+        },
         page0: grid.paginationModel.page,
         pageSize: grid.paginationModel.pageSize,
         includeDeleted: grid.includeDeleted,
         onlyDeleted: grid.onlyDeleted,
         extra: {
           year: effectiveYear,
-          ...(kindFilter !== '' ? { kind: kindFilter } : {}),
-          ...(statusFilter !== '' ? { status: statusFilter } : {}),
-          ...(invoicedFilter !== '' ? { invoiced: invoicedFilter } : {}),
-          ...(customerId !== '' ? { customer: customerId } : {}),
+          ...(kindFilter !== 'all' ? { kind: kindFilter } : {}),
         },
       }),
     [
@@ -341,9 +359,6 @@ export default function PurchaseOrders() {
       grid.onlyDeleted,
       effectiveYear,
       kindFilter,
-      statusFilter,
-      invoicedFilter,
-      customerId,
     ],
   )
 
@@ -364,7 +379,10 @@ export default function PurchaseOrders() {
     setSummaryLoading(true)
     try {
       const res = await api.get<PurchaseOrderSummary>('/purchase-order-entries/summary/', {
-        params: { year: effectiveYear },
+        params: {
+          year: effectiveYear,
+          ...(kindFilter !== 'all' ? { kind: kindFilter } : {}),
+        },
       })
       setSummary(res.data)
     } catch (e) {
@@ -372,7 +390,7 @@ export default function PurchaseOrders() {
     } finally {
       setSummaryLoading(false)
     }
-  }, [effectiveYear, toast])
+  }, [effectiveYear, kindFilter, toast])
 
   React.useEffect(() => {
     loadSummary()
@@ -596,90 +614,6 @@ export default function PurchaseOrders() {
     return cols
   }, [])
 
-  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
-    kind: {
-      value: kindFilter,
-      label: 'Filtra per tipo',
-      onSet: (v) => setKindFilter(v as string, { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setKindFilter('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Tipo</InputLabel>
-          <Select
-            label="Tipo"
-            value={kindFilter}
-            onChange={(e) => setKindFilter(e.target.value, { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            <MenuItem value="ordinario">Ordinario</MenuItem>
-            <MenuItem value="extra">Extra</MenuItem>
-          </Select>
-        </FormControl>
-      ),
-    },
-    status: {
-      value: statusFilter,
-      label: 'Filtra per stato',
-      onSet: (v) => setStatusFilter(v as string, { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setStatusFilter('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Stato</InputLabel>
-          <Select
-            label="Stato"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value, { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            <MenuItem value="inserito">Inserito</MenuItem>
-            <MenuItem value="inviato">Inviato</MenuItem>
-            <MenuItem value="ricevuto">Ricevuto</MenuItem>
-            <MenuItem value="fatturato">Fatturato</MenuItem>
-          </Select>
-        </FormControl>
-      ),
-    },
-    is_invoiced: {
-      value: invoicedFilter,
-      label: 'Filtra per fatturazione',
-      onSet: (v) => setInvoicedFilter(v as string, { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setInvoicedFilter('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Fattura</InputLabel>
-          <Select
-            label="Fattura"
-            value={invoicedFilter}
-            onChange={(e) => setInvoicedFilter(e.target.value, { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            <MenuItem value="1">Fatturato</MenuItem>
-            <MenuItem value="0">Non fatturato</MenuItem>
-          </Select>
-        </FormControl>
-      ),
-    },
-    customer_name: {
-      value: customerId,
-      label: 'Filtra per cliente collegato',
-      onSet: (v) => setCustomerId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setCustomerId('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Cliente collegato</InputLabel>
-          <Select
-            label="Cliente collegato"
-            value={customerId === '' ? '' : String(customerId)}
-            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-      ),
-    },
-  }), [kindFilter, statusFilter, invoicedFilter, customerId, setKindFilter, setStatusFilter, setInvoicedFilter, setCustomerId, customers])
-
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
     return new URLSearchParams(loc.search).get('return')
@@ -777,12 +711,12 @@ export default function PurchaseOrders() {
   const uploadDocument = React.useCallback(
     async (slot: DocumentSlot, file: File) => {
       if (!selectedId) return
-      const fieldName = slot === 'offer' ? 'offer_document' : slot === 'po' ? 'po_document' : 'invoice_document'
       setUploadingSlot(slot)
       try {
         const fd = new FormData()
-        fd.append(fieldName, file)
-        await api.patch(`/purchase-order-entries/${selectedId}/`, fd, {
+        fd.append('kind', slot)
+        fd.append('file', file)
+        await api.post(`/purchase-order-entries/${selectedId}/documents/`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
         toast.success('Documento caricato ✅')
@@ -792,6 +726,26 @@ export default function PurchaseOrders() {
         toast.error(apiErrorToMessage(e))
       } finally {
         setUploadingSlot(null)
+      }
+    },
+    [selectedId, toast, loadDetail, reloadList],
+  )
+
+  const [deletingDocId, setDeletingDocId] = React.useState<number | null>(null)
+
+  const deleteDocument = React.useCallback(
+    async (docId: number) => {
+      if (!selectedId) return
+      setDeletingDocId(docId)
+      try {
+        await api.delete(`/purchase-order-entries/${selectedId}/documents/${docId}/`)
+        toast.success('Documento eliminato ✅')
+        await loadDetail(selectedId)
+        reloadList()
+      } catch (e) {
+        toast.error(apiErrorToMessage(e))
+      } finally {
+        setDeletingDocId(null)
       }
     },
     [selectedId, toast, loadDetail, reloadList],
@@ -848,6 +802,7 @@ export default function PurchaseOrders() {
       description: detail.description ?? '',
       client_name: detail.client_name ?? '',
       customer: detail.customer ?? '',
+      customer_placeholder: detail.customer_placeholder ?? '',
       purchase_order: detail.purchase_order ?? '',
       invoice_number: detail.invoice_number ?? '',
       kind: detail.kind,
@@ -886,6 +841,7 @@ export default function PurchaseOrders() {
       description: form.description.trim(),
       client_name: form.client_name.trim(),
       customer: form.customer === '' ? null : Number(form.customer),
+      customer_placeholder: form.customer_placeholder.trim(),
       purchase_order: form.purchase_order.trim(),
       invoice_number: form.invoice_number.trim(),
       kind: form.kind,
@@ -942,43 +898,62 @@ export default function PurchaseOrders() {
           q: grid.q,
           onQChange: grid.setQ,
           rightActions: (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.25,
-                bgcolor: 'rgba(241,245,249,0.9)',
-                border: '0.5px solid',
-                borderColor: 'divider',
-                borderRadius: 999,
-                px: 0.5,
-                height: 32,
-              }}
-            >
-              <IconButton
-                size="small"
-                aria-label="Anno precedente"
-                onClick={() => setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })}
+            <Stack direction="row" alignItems="center" gap={1}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.25,
+                  bgcolor: 'rgba(241,245,249,0.9)',
+                  border: '0.5px solid',
+                  borderColor: 'divider',
+                  borderRadius: 999,
+                  px: 0.5,
+                  height: 32,
+                }}
               >
-                <ChevronLeftIcon fontSize="small" />
-              </IconButton>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', minWidth: 52, textAlign: 'center' }}>
-                {effectiveYear}
-              </Typography>
-              <IconButton
+                <IconButton
+                  size="small"
+                  aria-label="Anno precedente"
+                  onClick={() => setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })}
+                >
+                  <ChevronLeftIcon fontSize="small" />
+                </IconButton>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', minWidth: 52, textAlign: 'center' }}>
+                  {effectiveYear}
+                </Typography>
+                <IconButton
+                  size="small"
+                  aria-label="Anno successivo"
+                  onClick={() => setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })}
+                >
+                  <ChevronRightIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              <ToggleButtonGroup
                 size="small"
-                aria-label="Anno successivo"
-                onClick={() => setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })}
+                exclusive
+                value={kindFilter}
+                onChange={(_e, v: KindFilterValue | null) => {
+                  if (!v) return
+                  setKindFilterRaw(v === 'all' ? '' : v, { patch: { page: 1 }, keepOpen: false })
+                }}
+                aria-label="Filtro tipo Purchase Order"
+                sx={{ height: 32, '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 } }}
               >
-                <ChevronRightIcon fontSize="small" />
-              </IconButton>
-            </Box>
+                {KIND_FILTER_OPTIONS.map((opt) => (
+                  <ToggleButton key={opt.value} value={opt.value} aria-label={opt.label}>
+                    {opt.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Stack>
           ),
         }}
         grid={{
           pageKey: 'purchase-orders',
           username: me?.username,
-          filterConfig,
 
           emptyState,
           rows,
@@ -1029,12 +1004,14 @@ export default function PurchaseOrders() {
         deleteBusy={deleteBusy}
         restoreBusy={restoreBusy}
         uploadingSlot={uploadingSlot}
+        deletingDocId={deletingDocId}
         onClose={closeDrawer}
         onEdit={openEdit}
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
-        onCopied={() => toast.success('Copiato ✅')}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
         onUploadDocument={uploadDocument}
+        onDeleteDocument={deleteDocument}
       />
 
       <ConfirmActionDialog

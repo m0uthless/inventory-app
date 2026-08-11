@@ -69,8 +69,17 @@ class IssuePriority(models.TextChoices):
 class IssueStatus(models.TextChoices):
     OPEN        = "open",        "Aperta"
     IN_PROGRESS = "in_progress", "In lavorazione"
+    WAITING     = "waiting",     "In attesa"
     RESOLVED    = "resolved",    "Risolta"
     CLOSED      = "closed",      "Chiusa"
+
+
+class IssueWaitingReason(models.TextChoices):
+    PHILIPS  = "philips",  "Philips"
+    ELCO     = "elco",     "Elco"
+    CLIENTE  = "cliente",  "Cliente"
+    EXPRIVIA = "exprivia", "Exprivia"
+    ALTRO    = "altro",    "Altro"
 
 
 # ─── Issue ────────────────────────────────────────────────────────────────────
@@ -129,6 +138,11 @@ class Issue(TimeStampedModel):
     status          = models.CharField(
         max_length=20, choices=IssueStatus.choices,
         default=IssueStatus.OPEN, verbose_name="Stato",
+    )
+    waiting_reason  = models.CharField(
+        max_length=20, choices=IssueWaitingReason.choices,
+        blank=True, verbose_name="In attesa di",
+        help_text="Obbligatorio quando lo stato è «In attesa».",
     )
 
     # Data apertura

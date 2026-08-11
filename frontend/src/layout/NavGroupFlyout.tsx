@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Box, List, Popover, Typography } from '@mui/material'
 
-import { SIDEBAR } from '../theme/tokens'
+import { useSidebarTokens } from '../theme/AppThemeProvider'
 import type { NavItem } from './appLayoutNav'
 
 // ─── Popover di flyout per un gruppo di nav (sidebar mini) ────────────────────
@@ -25,6 +25,7 @@ export function NavGroupFlyout({
   items: NavItem[]
   renderItem: (item: NavItem) => React.ReactNode
 }) {
+  const SIDEBAR = useSidebarTokens()
   return (
     <Popover
       open={open}

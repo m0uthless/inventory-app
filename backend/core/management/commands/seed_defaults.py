@@ -71,11 +71,14 @@ class Command(BaseCommand):
 
 
         # --- Custom field definitions (dynamic fields) ---
+        # "provincia" non è più qui: promosso a colonna strutturata
+        # Customer.province (vedi crm/migrations/0010_customer_province.py).
+        # Ripristinarlo qui resusciterebbe la CustomFieldDefinition
+        # disattivata da quella migration a ogni rerun del comando.
         customer_cfs = [
             ("indirizzo", "Indirizzo", "text", False, None, ["Indirizzo", "address"], 10),
             ("cap", "CAP", "text", False, None, ["CAP", "postal_code"], 20),
             ("citta", "Città", "text", False, None, ["Città", "city", "citta"], 30),
-            ("provincia", "Provincia", "text", False, None, ["Provincia", "prov"], 40),
         ]
         for key, label, field_type, required, options, aliases, sort_order in customer_cfs:
             CustomFieldDefinition.objects.update_or_create(

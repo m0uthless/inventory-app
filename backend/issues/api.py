@@ -14,6 +14,7 @@ from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
+from servicenow.models import ServiceNowCase
 
 User = get_user_model()
 
@@ -70,8 +71,10 @@ class IssueSerializer(serializers.ModelSerializer):
     created_by_full_name    = serializers.SerializerMethodField()
     priority_label          = serializers.CharField(source="get_priority_display",       read_only=True)
     status_label            = serializers.CharField(source="get_status_display",         read_only=True)
+    waiting_reason_label    = serializers.CharField(source="get_waiting_reason_display", read_only=True)
     comments_count          = serializers.SerializerMethodField()
     days_open               = serializers.SerializerMethodField()
+    servicenow_external_url = serializers.SerializerMethodField()
 
     def get_customer_name(self, obj):
         if obj.customer_placeholder:
@@ -113,6 +116,12 @@ class IssueSerializer(serializers.ModelSerializer):
     def get_comments_count(self, obj):
         return getattr(obj, "comments_count", 0)
 
+    def get_servicenow_external_url(self, obj):
+        # Valorizzato via annotazione (Subquery) sul queryset del ViewSet;
+        # fallback a None per contesti in cui il serializer è usato senza
+        # quell'annotazione (es. save() interni, test unitari isolati).
+        return getattr(obj, "servicenow_external_url", None)
+
     def get_days_open(self, obj):
         from datetime import date
         ref = obj.opened_at or obj.created_at.date()
@@ -152,6 +161,20 @@ class IssueSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"status": "Lo stato «Chiusa» viene impostato automaticamente dal sistema."}
             )
+
+        # ── Stato "In attesa": causale obbligatoria; altrimenti va svuotata ───
+        status_value = attrs.get("status", getattr(self.instance, "status", None))
+        if "waiting_reason" in attrs:
+            waiting_reason = attrs["waiting_reason"]
+        else:
+            waiting_reason = getattr(self.instance, "waiting_reason", "")
+        if status_value == IssueStatus.WAITING:
+            if not waiting_reason:
+                raise serializers.ValidationError(
+                    {"waiting_reason": "La causale è obbligatoria quando lo stato è «In attesa»."}
+                )
+        else:
+            attrs["waiting_reason"] = ""
 
         customer  = attrs.get("customer")  if "customer"  in attrs else getattr(self.instance, "customer",  None)
         site      = attrs.get("site")      if "site"      in attrs else getattr(self.instance, "site",      None)
@@ -220,9 +243,11 @@ class IssueSerializer(serializers.ModelSerializer):
             "created_by", "created_by_username", "created_by_full_name",
             "priority", "priority_label",
             "status", "status_label",
+            "waiting_reason", "waiting_reason_label",
             "opened_at", "closed_at", "days_open",
             "due_date",
             "comments_count",
+            "servicenow_external_url",
             "created_at", "updated_at", "deleted_at",
         ]
         read_only_fields = [
@@ -231,7 +256,8 @@ class IssueSerializer(serializers.ModelSerializer):
             "inventory_name", "inventory_knumber", "inventory_serial_number", "inventory_hostname",
             "assigned_to_username", "assigned_to_full_name", "assigned_to_avatar",
             "created_by_username", "created_by_full_name",
-            "priority_label", "status_label", "comments_count", "days_open", "closed_at",
+            "priority_label", "status_label", "waiting_reason_label",
+            "comments_count", "days_open", "closed_at", "servicenow_external_url",
         ]
         extra_kwargs = {
             # Obbligatorio a livello di modello (FK non-null): qui diventa
@@ -263,7 +289,7 @@ class IssueFilter(filters.FilterSet):
 
     def filter_hide_closed(self, queryset, name, value):
         if value:
-            return queryset.filter(status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS])
+            return queryset.filter(status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS, IssueStatus.WAITING])
         return queryset
 
     def filter_only_closed(self, queryset, name, value):
@@ -318,12 +344,21 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        from django.db.models import Count
+        from django.db.models import Count, OuterRef, Subquery
+        # servicenow_id è testo libero (non FK): il match con ServiceNowCase
+        # avviene per numero caso. Subquery invece di una join per evitare
+        # duplicazione righe issue in caso di più case con lo stesso numero
+        # (non dovrebbe accadere per case attivi, ma restiamo difensivi).
+        external_url_sq = ServiceNowCase.objects.filter(
+            number=OuterRef("servicenow_id"), deleted_at__isnull=True,
+        ).order_by("-created_at").values("external_url")[:1]
+
         qs = Issue.objects.select_related(
             "customer", "site", "inventory", "category",
             "assigned_to", "assigned_to__profile", "created_by",
         ).annotate(
-            comments_count=Count("comments")
+            comments_count=Count("comments"),
+            servicenow_external_url=Subquery(external_url_sq),
         )
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
@@ -373,10 +408,13 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         counts = qs.aggregate(
             open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
             in_progress_count=Count("id", filter=Q(status=IssueStatus.IN_PROGRESS)),
+            waiting_count=Count("id", filter=Q(status=IssueStatus.WAITING)),
             resolved_count=Count("id", filter=Q(status=IssueStatus.RESOLVED)),
             closed_count=Count("id", filter=Q(status=IssueStatus.CLOSED)),
         )
-        counts["active_count"] = (counts["open_count"] or 0) + (counts["in_progress_count"] or 0)
+        counts["active_count"] = (
+            (counts["open_count"] or 0) + (counts["in_progress_count"] or 0) + (counts["waiting_count"] or 0)
+        )
 
         # Tempo medio di chiusura
         avg_row = (

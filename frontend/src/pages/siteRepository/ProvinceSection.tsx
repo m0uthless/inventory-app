@@ -6,15 +6,22 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 
-import type { CityGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
+import type { LocationGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
 import { FS, ICON } from './style'
 import { SignalChip, MetaTag } from './primitives'
 import { CustomerCard } from './CustomerCard'
 
-// ─── CitySection ──────────────────────────────────────────────────────────────
+// ─── ProvinceSection ────────────────────────────────────────────────────────
+// Rinominato da CitySection: il Site Repository raggruppa i clienti per
+// provincia (Customer.province, campo strutturato — vedi
+// crm/migrations/0010_customer_province.py), non più per città.
+// Aggiornato per essere agnostico rispetto al criterio di raggruppamento:
+// riceve un LocationGroup generico (group.label), che a monte (SiteRepository.tsx)
+// può essere costruito raggruppando per provincia o per città, a seconda del
+// toggle nella toolbar.
 
-type CitySectionProps = {
-  group: CityGroup
+type ProvinceSectionProps = {
+  group: LocationGroup
   searchQuery: string
   statusFilter: StatusFilter
   counts: Record<number, { assets: number | null; sites: number | null }>
@@ -25,8 +32,6 @@ type CitySectionProps = {
   onOpenSite: (id: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
-  canChangeCustomer: boolean
-  onEditCustomer: (id: number) => void
   canChangeSite: boolean
   onEditSite: (id: number) => void
   onCustomerContextMenu: (customer: CustomerRow, e: React.MouseEvent) => void
@@ -35,19 +40,20 @@ type CitySectionProps = {
   refreshToken: number
 }
 
-export type CitySectionHandle = { open: () => void; close: () => void }
+export type ProvinceSectionHandle = { open: () => void; close: () => void; scrollIntoView: () => void }
 
-export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>(
-  function CitySection({
+export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceSectionProps>(
+  function ProvinceSection({
     group, searchQuery, statusFilter, counts, issueCounts, onOpenDrawer, onOpenVpn,
     onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
-    canChangeCustomer, onEditCustomer, canChangeSite, onEditSite,
+    canChangeSite, onEditSite,
     onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
     refreshToken,
   }, ref) {
     const theme = useTheme()
     const [open, setOpen] = React.useState(false)
     const contentId = React.useId()
+    const rootRef = React.useRef<HTMLDivElement>(null)
 
     // Auto-open se c'è una ricerca attiva
     React.useEffect(() => {
@@ -57,10 +63,13 @@ export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>
     React.useImperativeHandle(ref, () => ({
       open:  () => setOpen(true),
       close: () => setOpen(false),
+      // Usato dalla cartina Italia (ItalyRegionMap): dopo aver selezionato una
+      // provincia, apre e scrolla la sezione corrispondente in vista.
+      scrollIntoView: () => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     }))
 
     return (
-      <Box sx={{
+      <Box ref={rootRef} sx={{
         mb: 2,
         border: '1px solid',
         borderColor: open ? theme.palette.primary.dark : 'divider',
@@ -69,7 +78,7 @@ export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>
         transition: 'border-color 0.2s, border-width 0.1s',
         bgcolor: 'background.paper',
       }}>
-        {/* Header città — unico elemento a fondo pieno della pagina: massima densità informativa (elevazione) */}
+        {/* Header provincia — unico elemento a fondo pieno della pagina: massima densità informativa (elevazione) */}
         <Box
           role="button"
           tabIndex={0}
@@ -99,17 +108,12 @@ export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>
           <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: open ? 'rgba(255,255,255,0.75)' : 'primary.main', flexShrink: 0 }} />
 
           <Typography fontWeight={700} sx={{ fontSize: FS.section, color: open ? '#fff' : 'text.primary' }}>
-            {group.city}
+            {group.label}
           </Typography>
-          {group.province && (
-            <Typography sx={{ fontSize: FS.micro, color: open ? 'rgba(255,255,255,0.6)' : 'text.secondary', mt: '1px' }}>
-              {group.province}
-            </Typography>
-          )}
 
           <Box sx={{ flex: 1 }} />
 
-          {/* Issue attive in città — "segnale", sempre visibile quando presenti */}
+          {/* Issue attive nel gruppo — "segnale", sempre visibile quando presenti */}
           {group.issueCount > 0 && (
             <SignalChip
               tone="error"
@@ -148,8 +152,6 @@ export const CitySection = React.forwardRef<CitySectionHandle, CitySectionProps>
                 onOpenSite={onOpenSite}
                 canViewCustomer={canViewCustomer}
                 canViewSite={canViewSite}
-                canChangeCustomer={canChangeCustomer}
-                onEditCustomer={onEditCustomer}
                 canChangeSite={canChangeSite}
                 onEditSite={onEditSite}
                 onCustomerContextMenu={onCustomerContextMenu}

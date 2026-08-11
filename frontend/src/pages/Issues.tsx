@@ -9,6 +9,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Stack,
   TextField,
   Tooltip,
@@ -25,6 +26,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import LinkIcon from '@mui/icons-material/Link'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 
@@ -792,6 +794,7 @@ export default function Issues() {
       assigned_to_id: row.assigned_to ?? '',
       priority: row.priority,
       status: row.status,
+      waiting_reason: row.waiting_reason || '',
       opened_at: row.opened_at ?? '',
       due_date: row.due_date ?? '',
     })
@@ -867,6 +870,9 @@ export default function Issues() {
     } else if (!form.customer) {
       errors.customer = 'Il cliente è obbligatorio.'
     }
+    if (form.status === 'waiting' && !form.waiting_reason) {
+      errors.waiting_reason = 'La causale è obbligatoria quando lo stato è «In attesa».'
+    }
     if (Object.keys(errors).length) {
       setFormErrors(errors)
       return
@@ -882,6 +888,7 @@ export default function Issues() {
       assigned_to: form.assigned_to_id || null,
       priority: form.priority,
       status: form.status,
+      waiting_reason: form.status === 'waiting' ? form.waiting_reason : '',
       opened_at: form.opened_at || null,
       due_date: form.due_date || null,
     }
@@ -1188,17 +1195,16 @@ export default function Issues() {
       ),
     },
     {
-      field: 'id',
-      headerName: '#',
-      width: 72,
-      sortable: true,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.secondary', fontFamily: 'ui-monospace, monospace' }}>
-            #{row.id}
-          </Typography>
-        </Box>
-      ),
+      field: 'waiting_reason_label',
+      headerName: 'In attesa di',
+      width: 120,
+      sortable: false,
+      renderCell: ({ row }) =>
+        row.status === 'waiting' && row.waiting_reason_label ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+            <Chip size="small" label={row.waiting_reason_label} variant="outlined" />
+          </Box>
+        ) : null,
     },
     {
       field: 'title',
@@ -1217,26 +1223,43 @@ export default function Issues() {
     {
       field: 'servicenow_id',
       headerName: 'ServiceNow',
-      width: 130,
+      width: 150,
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
           {row.servicenow_id ? (
-            <Typography
-              onClick={(e) => {
-                e.stopPropagation()
-                void openServiceNowCaseDrawer(row.servicenow_id as string)
-              }}
-              sx={{
-                fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem',
-                cursor: resolvingServiceNowId === row.servicenow_id ? 'wait' : 'pointer',
-                color: 'primary.main',
-                opacity: resolvingServiceNowId === row.servicenow_id ? 0.5 : 1,
-                '&:hover': { textDecoration: 'underline' },
-              }}
-              noWrap
-            >
-              {row.servicenow_id}
-            </Typography>
+            <>
+              <Typography
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void openServiceNowCaseDrawer(row.servicenow_id as string)
+                }}
+                sx={{
+                  fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem',
+                  cursor: resolvingServiceNowId === row.servicenow_id ? 'wait' : 'pointer',
+                  color: 'primary.main',
+                  opacity: resolvingServiceNowId === row.servicenow_id ? 0.5 : 1,
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+                noWrap
+              >
+                {row.servicenow_id}
+              </Typography>
+              {row.servicenow_external_url ? (
+                <Tooltip title="Apri il case sul portale ServiceNow">
+                  <IconButton
+                    size="small"
+                    component="a"
+                    href={row.servicenow_external_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    sx={{ p: 0.25 }}
+                  >
+                    <OpenInNewIcon sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+            </>
           ) : (
             <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
           )}

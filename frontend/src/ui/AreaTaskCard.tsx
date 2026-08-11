@@ -5,6 +5,9 @@ import {
 } from '@mui/material'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
+import EditRoundedIcon from '@mui/icons-material/EditRounded'
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded'
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded'
 import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded'
@@ -94,6 +97,13 @@ export default function AreaTaskCard() {
   const [saving, setSaving] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
+  // Edit inline di un task esistente (titolo/descrizione/scadenza).
+  const [editingId, setEditingId] = React.useState<number | null>(null)
+  const [editForm, setEditForm] = React.useState<{ title: string; description: string; due_date: string }>({
+    title: '', description: '', due_date: '',
+  })
+  const [editSaving, setEditSaving] = React.useState(false)
+
   // Aree per il selettore (sola lettura sulle aree diverse dalla propria).
   React.useEffect(() => {
     api.get<{ results: AreaAoption[] } | AreaAoption[]>('/leave-areas/', { params: { page_size: 100 } })
@@ -170,6 +180,31 @@ export default function AreaTaskCard() {
     setTasks(prev => prev.filter(t => t.id !== id))
     try { await api.delete(`/area-tasks/${id}/`); window.dispatchEvent(new Event('area-task-changed')) }
     catch (e) { toast.error(apiErrorToMessage(e)); load(selectedArea) }
+  }
+
+  const startEdit = (task: AreaTask) => {
+    if (readOnly || !task.can_edit) return
+    setEditingId(task.id)
+    setEditForm({ title: task.title, description: task.description || '', due_date: task.due_date || '' })
+  }
+
+  const cancelEdit = () => setEditingId(null)
+
+  const saveEdit = async (id: number) => {
+    const title = editForm.title.trim()
+    if (!title || editSaving) return
+    setEditSaving(true)
+    const payload = { title, description: editForm.description.trim(), due_date: editForm.due_date || null }
+    try {
+      const r = await api.patch<AreaTask>(`/area-tasks/${id}/`, payload)
+      setTasks(prev => prev.map(t => t.id === id ? r.data : t))
+      setEditingId(null)
+      window.dispatchEvent(new Event('area-task-changed'))
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   const grouped = STATUS_ORDER.map(status => ({
@@ -286,7 +321,19 @@ export default function AreaTaskCard() {
                   )}
                   {items.map((task, i) => (
                     <Box key={task.id}>
-                      <TaskRow task={task} readOnly={readOnly} onCycle={cycleStatus} onDelete={deleteTask} />
+                      <TaskRow
+                        task={task}
+                        readOnly={readOnly}
+                        onCycle={cycleStatus}
+                        onDelete={deleteTask}
+                        editing={editingId === task.id}
+                        editForm={editForm}
+                        onEditFormChange={setEditForm}
+                        onStartEdit={startEdit}
+                        onSaveEdit={saveEdit}
+                        onCancelEdit={cancelEdit}
+                        editSaving={editSaving}
+                      />
                       {i < items.length - 1 && <Divider />}
                     </Box>
                   ))}
@@ -306,12 +353,83 @@ function TaskRow({
   readOnly,
   onCycle,
   onDelete,
+  editing,
+  editForm,
+  onEditFormChange,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  editSaving,
 }: {
   task: AreaTask
   readOnly: boolean
   onCycle: (t: AreaTask) => void
   onDelete: (id: number) => void
+  editing: boolean
+  editForm: { title: string; description: string; due_date: string }
+  onEditFormChange: (f: { title: string; description: string; due_date: string }) => void
+  onStartEdit: (t: AreaTask) => void
+  onSaveEdit: (id: number) => void
+  onCancelEdit: () => void
+  editSaving: boolean
 }) {
+  if (editing) {
+    return (
+      <Stack spacing={0.75} sx={{ px: 2, py: 1.25, bgcolor: 'action.hover' }}>
+        <InputBase
+          autoFocus
+          value={editForm.title}
+          onChange={e => onEditFormChange({ ...editForm, title: e.target.value })}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSaveEdit(task.id) }
+            if (e.key === 'Escape') onCancelEdit()
+          }}
+          placeholder="Titolo"
+          sx={{ fontSize: '0.82rem', fontWeight: 600 }}
+          inputProps={{ maxLength: 200 }}
+        />
+        <InputBase
+          value={editForm.description}
+          onChange={e => onEditFormChange({ ...editForm, description: e.target.value })}
+          onKeyDown={e => { if (e.key === 'Escape') onCancelEdit() }}
+          placeholder="Descrizione (opzionale)"
+          multiline
+          minRows={1}
+          maxRows={4}
+          sx={{ fontSize: '0.76rem', color: 'text.secondary' }}
+        />
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <TextField
+            type="date"
+            size="small"
+            value={editForm.due_date}
+            onChange={e => onEditFormChange({ ...editForm, due_date: e.target.value })}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 150, '& input': { fontSize: '0.78rem', py: 0.5 } }}
+          />
+          <Box sx={{ flex: 1 }} />
+          <Tooltip title="Annulla (Esc)">
+            <IconButton size="small" onClick={onCancelEdit} sx={{ color: 'text.disabled' }}>
+              <CloseRoundedIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Salva (Invio)">
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => onSaveEdit(task.id)}
+                disabled={!editForm.title.trim() || editSaving}
+                sx={{ color: 'primary.main' }}
+              >
+                <CheckRoundedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+      </Stack>
+    )
+  }
+
   return (
     <Stack
       direction="row"
@@ -319,7 +437,7 @@ function TaskRow({
       spacing={1.25}
       sx={{
         px: 2, py: 1,
-        '&:hover .task-delete': { opacity: readOnly ? 0 : 1 },
+        '&:hover .task-actions': { opacity: readOnly || !task.can_edit ? 0 : 1 },
         transition: 'background 0.12s',
         '&:hover': { bgcolor: readOnly ? 'transparent' : 'action.hover' },
       }}
@@ -333,7 +451,10 @@ function TaskRow({
         </Box>
       </Tooltip>
 
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box
+        sx={{ flex: 1, minWidth: 0, cursor: readOnly || !task.can_edit ? 'default' : 'pointer' }}
+        onClick={() => onStartEdit(task)}
+      >
         <Typography
           variant="body2"
           noWrap
@@ -345,6 +466,11 @@ function TaskRow({
         >
           {task.title}
         </Typography>
+        {task.description ? (
+          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }} noWrap display="block">
+            {task.description}
+          </Typography>
+        ) : null}
         {task.created_by_name && (
           <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.68rem' }}>
             {task.created_by_name}
@@ -354,15 +480,23 @@ function TaskRow({
 
       {dueChip(task.due_date)}
 
-      {!readOnly && (
-        <IconButton
-          size="small"
-          className="task-delete"
-          onClick={() => onDelete(task.id)}
-          sx={{ opacity: 0, transition: 'opacity 0.12s', color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-        >
-          <DeleteRoundedIcon sx={{ fontSize: 15 }} />
-        </IconButton>
+      {!readOnly && task.can_edit && (
+        <Stack direction="row" className="task-actions" sx={{ opacity: 0, transition: 'opacity 0.12s' }}>
+          <IconButton
+            size="small"
+            onClick={() => onStartEdit(task)}
+            sx={{ color: 'text.disabled', '&:hover': { color: 'primary.main' } }}
+          >
+            <EditRoundedIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => onDelete(task.id)}
+            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+          >
+            <DeleteRoundedIcon sx={{ fontSize: 15 }} />
+          </IconButton>
+        </Stack>
       )}
     </Stack>
   )

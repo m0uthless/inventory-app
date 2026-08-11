@@ -28,11 +28,14 @@ export type IssueRow = {
   priority_label: string
   status: string
   status_label: string
+  waiting_reason: string
+  waiting_reason_label: string | null
   opened_at: string | null
   closed_at: string | null
   due_date: string | null
   days_open: number
   comments_count: number
+  servicenow_external_url: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -82,6 +85,7 @@ export type IssueFormData = {
   assigned_to_id: number | ''
   priority: string
   status: string
+  waiting_reason: string
   opened_at: string
   due_date: string
 }
@@ -102,8 +106,17 @@ export const STATUS_META: Record<
 > = {
   open: { label: 'Aperta', color: 'error' },
   in_progress: { label: 'In lavorazione', color: 'warning' },
+  waiting: { label: 'In attesa', color: 'default' },
   resolved: { label: 'Risolta', color: 'success' },
   closed: { label: 'Chiusa', color: 'default' },
+}
+
+export const WAITING_REASON_META: Record<string, { label: string }> = {
+  philips: { label: 'Philips' },
+  elco: { label: 'Elco' },
+  cliente: { label: 'Cliente' },
+  exprivia: { label: 'Exprivia' },
+  altro: { label: 'Altro' },
 }
 
 type InventoryLabelSource =
@@ -181,6 +194,7 @@ export function createEmptyIssueForm(defaultAssignedToId?: number): IssueFormDat
     assigned_to_id: defaultAssignedToId ?? '',
     priority: 'medium',
     status: 'open',
+    waiting_reason: '',
     opened_at: todayIsoLocal(),
     due_date: '',
   }

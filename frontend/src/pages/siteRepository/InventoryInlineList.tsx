@@ -36,7 +36,7 @@ export function InventoryInlineList({
         borderBottom: '1px solid',
         borderColor: 'divider',
       }}>
-        {['TIPO', 'NOME', 'HOSTNAME', 'K#', 'SERIALE', 'STATO', 'IP LOCALE', 'IP SRSA'].map((h) => (
+        {['TIPO', 'NOME', 'HOSTNAME', 'K#', 'MODELLO', 'SERIALE', 'STATO', 'IP LOCALE', 'IP SRSA'].map((h) => (
           <Typography key={h}
             sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: '0.06em', fontSize: FS.micro }}>
             {h}
@@ -117,6 +117,9 @@ export function InventoryInlineList({
 
             {/* K# */}
             <MonoField value={row.knumber} />
+
+            {/* Modello */}
+            <MonoField value={row.model} />
 
             {/* Seriale */}
             <MonoField value={row.serial_number} />

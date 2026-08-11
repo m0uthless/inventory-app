@@ -22,6 +22,8 @@ from .models import (
     LOCKED_WHEN_NOT_INSERITO,
     PURCHASE_ORDER_STATUS_ORDER,
     PurchaseOrderAmountMode,
+    PurchaseOrderDocument,
+    PurchaseOrderDocumentKind,
     PurchaseOrderEntry,
     PurchaseOrderStatus,
     PurchaseOrderType,
@@ -31,11 +33,13 @@ DOCUMENT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB
 DOCUMENT_ALLOWED_EXTENSIONS = ["pdf"]
 DOCUMENT_ALLOWED_CONTENT_TYPES = ["application/pdf"]
 
-# Stato raggiunto -> (campo file, campo timestamp) popolati da quella transizione.
-STATUS_DOCUMENT_FIELD = {
-    PurchaseOrderStatus.INVIATO:   "offer_document",
-    PurchaseOrderStatus.RICEVUTO:  "po_document",
-    PurchaseOrderStatus.FATTURATO: "invoice_document",
+# Stato raggiunto -> kind del documento creato da quella transizione, e campo
+# timestamp popolato. Punto 9: ogni transizione crea una nuova riga
+# PurchaseOrderDocument (append), non sovrascrive più un campo singolo.
+STATUS_DOCUMENT_KIND = {
+    PurchaseOrderStatus.INVIATO:   PurchaseOrderDocumentKind.OFFER,
+    PurchaseOrderStatus.RICEVUTO:  PurchaseOrderDocumentKind.PO,
+    PurchaseOrderStatus.FATTURATO: PurchaseOrderDocumentKind.INVOICE,
 }
 STATUS_TIMESTAMP_FIELD = {
     PurchaseOrderStatus.INVIATO:   "sent_at",
@@ -55,10 +59,38 @@ def _validate_document(value):
     )
 
 
+# ─── PurchaseOrderDocument serializer ────────────────────────────────────────
+
+class PurchaseOrderDocumentSerializer(serializers.ModelSerializer):
+    kind_label           = serializers.CharField(source="get_kind_display", read_only=True)
+    filename             = serializers.SerializerMethodField()
+    url                  = serializers.SerializerMethodField()
+    uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True, default=None)
+
+    class Meta:
+        model = PurchaseOrderDocument
+        fields = [
+            "id", "kind", "kind_label", "filename", "url",
+            "uploaded_at", "uploaded_by", "uploaded_by_username",
+        ]
+        read_only_fields = fields
+
+    def get_filename(self, obj):
+        if obj.original_filename:
+            return obj.original_filename
+        return obj.file.name.rsplit("/", 1)[-1] if obj.file else None
+
+    def get_url(self, obj):
+        return build_action_url(
+            request=self.context.get("request"),
+            relative_path=f"/api/purchase-order-entries/{obj.entry_id}/documents/{obj.pk}/",
+        )
+
+
 # ─── Serializer ──────────────────────────────────────────────────────────────
 
 class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
-    customer_name       = serializers.CharField(source="customer.name", read_only=True, default=None)
+    customer_name       = serializers.SerializerMethodField()
     customer_code       = serializers.CharField(source="customer.code", read_only=True, default=None)
     kind_label          = serializers.CharField(source="get_kind_display",        read_only=True)
     amount_mode_label   = serializers.CharField(source="get_amount_mode_display", read_only=True)
@@ -66,13 +98,11 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source="created_by.username",   read_only=True, default=None)
     is_invoiced         = serializers.BooleanField(read_only=True)
     is_editable         = serializers.BooleanField(read_only=True)
+    is_customer_placeholder = serializers.BooleanField(read_only=True)
 
-    offer_document_name   = serializers.SerializerMethodField()
-    offer_document_url    = serializers.SerializerMethodField()
-    po_document_name      = serializers.SerializerMethodField()
-    po_document_url       = serializers.SerializerMethodField()
-    invoice_document_name = serializers.SerializerMethodField()
-    invoice_document_url  = serializers.SerializerMethodField()
+    # Punto 9: lista di documenti (0..N per tipo), non più un singolo file per
+    # tipo. Sola lettura qui: l'upload passa dall'azione dedicata `documents`.
+    documents = PurchaseOrderDocumentSerializer(many=True, read_only=True)
 
     class Meta:
         model  = PurchaseOrderEntry
@@ -81,15 +111,13 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
             "offer_date",
             "description",
             "client_name",
-            "customer", "customer_name", "customer_code",
+            "customer", "customer_name", "customer_code", "customer_placeholder", "is_customer_placeholder",
             "purchase_order",
             "invoice_number", "is_invoiced",
             "kind", "kind_label",
             "status", "status_label", "is_editable",
             "sent_at", "received_at", "invoiced_at",
-            "offer_document", "offer_document_name", "offer_document_url",
-            "po_document", "po_document_name", "po_document_url",
-            "invoice_document", "invoice_document_name", "invoice_document_url",
+            "documents",
             "amount_mode", "amount_mode_label",
             "days", "daily_rate", "amount",
             "costs_incurred",
@@ -104,54 +132,22 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
             "status", "status_label", "is_editable",
             "sent_at", "received_at", "invoiced_at",
             "is_invoiced",
+            "is_customer_placeholder",
+            "documents",
             "created_by", "created_by_username",
             "created_at", "updated_at", "deleted_at",
         ]
-        extra_kwargs = {
-            "offer_document":   {"write_only": True, "required": False, "allow_null": True},
-            "po_document":      {"write_only": True, "required": False, "allow_null": True},
-            "invoice_document": {"write_only": True, "required": False, "allow_null": True},
-        }
 
-    def validate_offer_document(self, value):
-        return _validate_document(value)
-
-    def validate_po_document(self, value):
-        return _validate_document(value)
-
-    def validate_invoice_document(self, value):
-        return _validate_document(value)
-
-    def _document_name(self, file_field):
-        if not file_field:
+    def get_customer_name(self, obj):
+        """Nome del cliente collegato: il testo libero (customer_placeholder)
+        ha priorità se presente — è mutuamente esclusivo col cliente vero e
+        proprio (vedi validate()). Altrimenti display_name del cliente reale
+        (fallback su name), o None se non c'è nessun collegamento."""
+        if obj.customer_placeholder:
+            return obj.customer_placeholder
+        if not obj.customer_id:
             return None
-        return file_field.name.rsplit("/", 1)[-1]
-
-    def _document_url(self, obj, file_field, action_name):
-        if not file_field:
-            return None
-        return build_action_url(
-            request=self.context.get("request"),
-            relative_path=f"/api/purchase-order-entries/{obj.pk}/{action_name}/",
-        )
-
-    def get_offer_document_name(self, obj):
-        return self._document_name(obj.offer_document)
-
-    def get_offer_document_url(self, obj):
-        return self._document_url(obj, obj.offer_document, "offer-document")
-
-    def get_po_document_name(self, obj):
-        return self._document_name(obj.po_document)
-
-    def get_po_document_url(self, obj):
-        return self._document_url(obj, obj.po_document, "po-document")
-
-    def get_invoice_document_name(self, obj):
-        return self._document_name(obj.invoice_document)
-
-    def get_invoice_document_url(self, obj):
-        return self._document_url(obj, obj.invoice_document, "invoice-document")
+        return obj.customer.display_name or obj.customer.name
 
     def validate(self, attrs):
         # ── Blocco campi descrizione/importo fuori dallo stato INSERITO ───────
@@ -194,6 +190,16 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
         if not customer and not (client_name or "").strip():
             raise serializers.ValidationError({"client_name": "Indica il committente (testo libero o cliente collegato)."})
 
+        # Cliente collegato: `customer` (anagrafica) e `customer_placeholder`
+        # (testo libero) sono mutuamente esclusivi — stesso concetto del
+        # pattern in issues.models, ma senza sentinella perché qui `customer`
+        # resta nullable.
+        placeholder = attrs.get("customer_placeholder", getattr(self.instance, "customer_placeholder", "")) or ""
+        if placeholder.strip() and customer:
+            raise serializers.ValidationError({
+                "customer_placeholder": "Non puoi indicare sia un cliente collegato che un testo libero: scegli uno dei due.",
+            })
+
         return attrs
 
 
@@ -233,9 +239,10 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
 
     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
-    può essere caricato dopo con un PATCH multipart sul campo corrispondente
-    (offer_document/po_document/invoice_document), servito poi dalle action
-    `offer-document`/`po-document`/`invoice-document`.
+    può essere caricato dopo (o in aggiunta) tramite POST multipart su
+    `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+    una sostituzione). Download e cancellazione del singolo PDF passano da
+    `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
     """
 
     # RestoreActionMixin: nessuna personalizzazione necessaria (created_by/
@@ -248,15 +255,26 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
     search_fields    = [
         "description", "client_name", "purchase_order",
         "invoice_number", "customer__name", "customer__display_name",
+        "customer_placeholder",
     ]
     ordering_fields  = [
         "offer_date", "created_at", "updated_at", "amount",
         "client_name", "kind", "amount_mode", "status", "deleted_at",
+        # Punto 8 (fix): mancavano queste colonne, cliccare il loro header
+        # nel datagrid non ordinava (ricadeva silenziosamente sul default).
+        "description", "purchase_order", "costs_incurred",
+        # "is_invoiced"/"customer_name" non sono campi DB reali (property e
+        # SerializerMethodField): il frontend li traduce nei campi veri
+        # sottostanti prima di inviare il parametro `ordering` (vedi
+        # PurchaseOrders.tsx, orderingMap passato a buildDrfListParams).
+        "invoice_number", "customer__display_name",
     ]
     ordering = ["-offer_date"]
 
     def get_queryset(self):
-        qs = PurchaseOrderEntry.objects.select_related("customer", "created_by", "updated_by")
+        qs = PurchaseOrderEntry.objects.select_related("customer", "created_by", "updated_by").prefetch_related(
+            "documents", "documents__uploaded_by",
+        )
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def _has_change_perm(self, request) -> bool:
@@ -279,8 +297,16 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         annua del totale in Euro (deciso in chat). `yoy_delta_pct` è `None`
         quando l'anno precedente non ha importi da confrontare (evita
         divisioni per zero / percentuali fuorvianti).
+
+        `?kind=` (opzionale, ordinario/extra) filtra i KPI per tipo di PO,
+        in coerenza col filtro di tipo del datagrid — se assente/valore non
+        valido i KPI restano calcolati su tutti i tipi.
         """
         base_qs = PurchaseOrderEntry.objects.filter(deleted_at__isnull=True)
+
+        kind_param = request.query_params.get("kind")
+        if kind_param in PurchaseOrderType.values:
+            base_qs = base_qs.filter(kind=kind_param)
 
         year_param = request.query_params.get("year")
         try:
@@ -318,8 +344,9 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
     def advance(self, request, pk=None):
         """Avanza di UN passo lo stato (inserito->inviato->ricevuto->fatturato).
 
-        Body multipart opzionale: `document` (PDF) viene salvato nel campo
-        corrispondente allo stato di destinazione.
+        Body multipart opzionale: `document` (PDF) viene aggiunto come nuovo
+        PurchaseOrderDocument del kind corrispondente allo stato di
+        destinazione (Punto 9: non sovrascrive documenti già caricati).
         """
         if not self._has_change_perm(request):
             return Response({"detail": "Permesso negato."}, status=status.HTTP_403_FORBIDDEN)
@@ -346,8 +373,13 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         uploaded = request.FILES.get("document")
         if uploaded:
             uploaded = _validate_document(uploaded)
-            field_name = STATUS_DOCUMENT_FIELD[new_status]
-            setattr(obj, field_name, uploaded)
+            PurchaseOrderDocument.objects.create(
+                entry=obj,
+                kind=STATUS_DOCUMENT_KIND[new_status],
+                file=uploaded,
+                original_filename=uploaded.name,
+                uploaded_by=request.user,
+            )
 
         obj.status = new_status
         setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], timezone.now())
@@ -394,22 +426,68 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         )
         return Response(self.get_serializer(obj).data)
 
-    # ── Documenti PDF ─────────────────────────────────────────────────────────
+    # ── Documenti PDF (Punto 9: multi-PDF per tipo) ───────────────────────────
 
-    @action(detail=True, methods=["get"], url_path="offer-document")
-    def offer_document_file(self, request, pk=None):
+    @action(detail=True, methods=["get", "post"], url_path="documents")
+    def documents(self, request, pk=None):
+        """GET: lista documenti dell'entry. POST (multipart): carica un nuovo
+        PDF — `kind` (offer/po/invoice) + `file`. Si aggiunge alla lista,
+        non sostituisce eventuali documenti dello stesso kind già presenti.
+        """
         obj = self.get_object()
-        filename = obj.offer_document.name.rsplit("/", 1)[-1] if obj.offer_document else None
-        return protected_media_response(file_field=obj.offer_document, disposition="inline", filename=filename)
 
-    @action(detail=True, methods=["get"], url_path="po-document")
-    def po_document_file(self, request, pk=None):
-        obj = self.get_object()
-        filename = obj.po_document.name.rsplit("/", 1)[-1] if obj.po_document else None
-        return protected_media_response(file_field=obj.po_document, disposition="inline", filename=filename)
+        if request.method == "GET":
+            qs = obj.documents.select_related("uploaded_by")
+            return Response(PurchaseOrderDocumentSerializer(qs, many=True, context={"request": request}).data)
 
-    @action(detail=True, methods=["get"], url_path="invoice-document")
-    def invoice_document_file(self, request, pk=None):
+        if not self._has_change_perm(request):
+            return Response({"detail": "Permesso negato."}, status=status.HTTP_403_FORBIDDEN)
+
+        kind = (request.data.get("kind") or "").strip()
+        if kind not in PurchaseOrderDocumentKind.values:
+            return Response({"kind": "Tipo documento non valido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response({"file": "Nessun file caricato."}, status=status.HTTP_400_BAD_REQUEST)
+        uploaded = _validate_document(uploaded)
+
+        doc = PurchaseOrderDocument.objects.create(
+            entry=obj, kind=kind, file=uploaded,
+            original_filename=uploaded.name, uploaded_by=request.user,
+        )
+        log_event(
+            actor=request.user, action="update", instance=obj,
+            changes={"document_added": {"from": None, "to": f"{kind}: {uploaded.name}"}},
+            request=request,
+        )
+        return Response(
+            PurchaseOrderDocumentSerializer(doc, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["get", "delete"], url_path=r"documents/(?P<doc_pk>\d+)")
+    def document_detail(self, request, pk=None, doc_pk=None):
+        """GET: scarica il PDF (inline). DELETE: rimuove il singolo documento."""
         obj = self.get_object()
-        filename = obj.invoice_document.name.rsplit("/", 1)[-1] if obj.invoice_document else None
-        return protected_media_response(file_field=obj.invoice_document, disposition="inline", filename=filename)
+        try:
+            doc = obj.documents.get(pk=doc_pk)
+        except PurchaseOrderDocument.DoesNotExist:
+            return Response({"detail": "Documento non trovato."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == "GET":
+            filename = doc.original_filename or (doc.file.name.rsplit("/", 1)[-1] if doc.file else None)
+            return protected_media_response(file_field=doc.file, disposition="inline", filename=filename)
+
+        if not self._has_change_perm(request):
+            return Response({"detail": "Permesso negato."}, status=status.HTTP_403_FORBIDDEN)
+
+        filename = doc.original_filename or doc.file.name
+        kind = doc.kind
+        doc.delete()
+        log_event(
+            actor=request.user, action="update", instance=obj,
+            changes={"document_removed": {"from": f"{kind}: {filename}", "to": None}},
+            request=request,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

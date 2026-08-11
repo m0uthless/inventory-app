@@ -6,6 +6,7 @@ export type CustomerRow = {
   name: string
   display_name: string
   city?: string | null
+  province?: string | null
   primary_contact_name?: string | null
   primary_contact_phone?: string | null
   status?: number | null
@@ -52,18 +53,20 @@ export type InventoryRow = {
   site?: number | null
   site_name?: string | null
   knumber?: string | null
+  model?: string | null
   serial_number?: string | null
   has_active_issue?: boolean
   active_issue_priority?: string | null
   deleted_at?: string | null
 }
 
-export type CityGroup = {
-  city: string
-  province?: string | null
+export type LocationGroup = {
+  label: string
   customers: CustomerRow[]
   issueCount: number
 }
+
+export type GroupByMode = 'province' | 'city'
 
 export type StatusFilter = 'all' | 'attivo' | 'manutenzione' | 'inattivo'
 

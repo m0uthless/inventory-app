@@ -43,6 +43,15 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     globals: true,
+    // @mui/x-data-grid importa il proprio CSS (index.css) a livello di modulo;
+    // senza questo, Vitest esternalizza il pacchetto per l'ambiente Node e
+    // fallisce con "Unknown file extension .css" al primo test che monta un
+    // vero <DataGrid> (nessun test lo faceva finora, da qui il gap).
+    server: {
+      deps: {
+        inline: ['@mui/x-data-grid'],
+      },
+    },
   },
   build: {
     rollupOptions: {

@@ -442,6 +442,9 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if customer:
             qs = qs.filter(customers__id=customer).distinct()
 
+        if (self.request.query_params.get("root") or "").lower() == "true":
+            qs = qs.filter(folder__isnull=True)
+
         return qs
 
     def perform_create(self, serializer):

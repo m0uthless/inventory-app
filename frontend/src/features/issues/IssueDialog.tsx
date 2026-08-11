@@ -22,6 +22,7 @@ import {
 import {
   PRIORITY_META,
   STATUS_META,
+  WAITING_REASON_META,
   issueInventoryLabel,
   type CategoryOption,
   type CustomerOption,
@@ -220,7 +221,16 @@ export default function IssueDialog({
               <Select
                 value={form.status}
                 label="Stato"
-                onChange={(e) => onFormChange((f) => ({ ...f, status: e.target.value }))}
+                onChange={(e) =>
+                  onFormChange((f) => ({
+                    ...f,
+                    status: e.target.value,
+                    // La causale ha senso solo con stato "In attesa": la
+                    // azzeriamo cambiando stato per evitare valori stantii
+                    // che poi il backend rifiuterebbe/ignorerebbe comunque.
+                    waiting_reason: e.target.value === 'waiting' ? f.waiting_reason : '',
+                  }))
+                }
               >
                 {Object.entries(STATUS_META)
                   .filter(([key]) => key !== 'closed')
@@ -232,6 +242,31 @@ export default function IssueDialog({
               </Select>
             </FormControl>
           </Stack>
+
+          {form.status === 'waiting' ? (
+            <FormControl size="small" fullWidth error={Boolean(errors.waiting_reason)}>
+              <InputLabel>In attesa di *</InputLabel>
+              <Select
+                value={form.waiting_reason}
+                label="In attesa di *"
+                onChange={(e) => onFormChange((f) => ({ ...f, waiting_reason: e.target.value }))}
+              >
+                <MenuItem value="">
+                  <em>Seleziona</em>
+                </MenuItem>
+                {Object.entries(WAITING_REASON_META).map(([key, value]) => (
+                  <MenuItem key={key} value={key}>
+                    {value.label}
+                  </MenuItem>
+                ))}
+              </Select>
+              {errors.waiting_reason ? (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                  {errors.waiting_reason}
+                </Typography>
+              ) : null}
+            </FormControl>
+          ) : null}
 
           <Stack direction="row" spacing={2}>
             <FormControl size="small" fullWidth>

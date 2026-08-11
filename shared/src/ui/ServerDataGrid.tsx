@@ -132,30 +132,41 @@ function CustomColumnMenu(props: GridColumnMenuProps & CustomColumnMenuExtraProp
 
   const currentSort = sortModel[0]?.field === colDef.field ? sortModel[0]?.sort : null
 
-  const handleSort = (dir: 'asc' | 'desc') => {
-    hideMenu?.({} as React.MouseEvent)
+  // BUG (segnalato): tutti e tre gli handler chiamavano hideMenu con un
+  // oggetto finto `{} as React.MouseEvent` invece del vero evento di click.
+  // MUI internamente fa `event.stopPropagation()` dentro hideMenu — su un
+  // oggetto senza quel metodo lancia un TypeError non catturato, che
+  // interrompe l'handler PRIMA che la riga successiva (onColumnVisibility-
+  // ModelChange / onOpenColumnPanel) venga eseguita. Risultato: "Nascondi
+  // colonna" e "Gestisci colonne" non facevano assolutamente nulla al click.
+  // Fix: inoltrare il vero evento ricevuto da ciascun MenuItem.
+  const handleSort = (e: React.MouseEvent, dir: 'asc' | 'desc') => {
+    hideMenu?.(e)
     onSortModelChange([{ field: colDef.field, sort: dir }])
   }
 
-  const handleHide = () => {
-    hideMenu?.({} as React.MouseEvent)
+  const handleHide = (e: React.MouseEvent) => {
+    hideMenu?.(e)
     onColumnVisibilityModelChange({ ...columnVisibilityModel, [colDef.field]: false })
   }
 
   const handleOpenPanel = (e: React.MouseEvent<HTMLElement>) => {
-    hideMenu?.({} as React.MouseEvent)
-    onOpenColumnPanel?.(e.currentTarget)
+    // Cattura l'anchor PRIMA di hideMenu: una volta chiuso il menu, il nodo
+    // DOM del MenuItem viene smontato e currentTarget diventerebbe inutilizzabile.
+    const anchor = e.currentTarget
+    hideMenu?.(e)
+    onOpenColumnPanel?.(anchor)
   }
 
   return (
     <Box id={id} role="menu" aria-labelledby={labelledby} {...(rest as object)}>
       {colDef.sortable !== false && <>
-        <MenuItem dense onClick={() => handleSort('asc')} selected={currentSort === 'asc'}
+        <MenuItem dense onClick={(e) => handleSort(e, 'asc')} selected={currentSort === 'asc'}
           role="menuitem">
           <ListItemIcon><ArrowUpwardIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Ordina A → Z</ListItemText>
         </MenuItem>
-        <MenuItem dense onClick={() => handleSort('desc')} selected={currentSort === 'desc'}
+        <MenuItem dense onClick={(e) => handleSort(e, 'desc')} selected={currentSort === 'desc'}
           role="menuitem">
           <ListItemIcon><ArrowDownwardIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Ordina Z → A</ListItemText>
@@ -200,9 +211,13 @@ function ColumnHeader({
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(null)
   const filterActive = Boolean(fc && fc.value !== '' && fc.value != null)
 
-  // Numero di icone destra: imbuto (se fc) + sempre spazio per il kebab MUI
-  const rightIcons = fc ? 2 : 1      // 1 = solo kebab-gap, 2 = imbuto + kebab-gap
-  const rightPad = rightIcons * 20   // 20px per icona
+  // Spazio riservato a destra del testo, SEMPRE per 2 icone (imbuto + kebab),
+  // indipendentemente da quali colonne del grid abbiano effettivamente un
+  // filterConfig. Prima era condizionale (fc ? 2 : 1): colonne senza filtro
+  // avevano meno padding, quindi il testo poteva estendersi più vicino ai "..."
+  // rispetto alle colonne con filtro — la stessa griglia mostrava distanze
+  // label↔kebab diverse da colonna a colonna. Costante = coerente ovunque.
+  const rightPad = 40  // 20px per icona × 2 slot (imbuto sempre riservato, kebab sempre riservato)
 
   return (
     <>

@@ -163,6 +163,19 @@ class UserProfile(models.Model):
         verbose_name="Genere",
         help_text="Usato per personalizzare i saluti (es. widget Meteo). Impostabile solo da admin.",
     )
+
+    class Theme(models.TextChoices):
+        DEFAULT = "default", "Predefinito (teal)"
+        NAVY = "navy", "Navy"
+
+    theme = models.CharField(
+        max_length=16, choices=Theme.choices, default=Theme.DEFAULT,
+        verbose_name="Tema interfaccia",
+        help_text="Tema grafico del frontend Archie. Preferenza personale, modificabile "
+                   "dall'utente stesso dal proprio profilo (a differenza degli altri campi "
+                   "di questo modello). Persiste cross-device essendo salvato lato server.",
+    )
+
     last_seen_changelog = models.ForeignKey(
         "core.ChangelogEntry",
         null=True, blank=True,

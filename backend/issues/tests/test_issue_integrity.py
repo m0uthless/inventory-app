@@ -141,6 +141,98 @@ def test_issue_create_rejects_inventory_from_different_site_even_same_customer()
     }
 
 
+def test_issue_create_status_waiting_requires_waiting_reason():
+    user = _make_user()
+    customer = _make_customer(user, "h")
+
+    client = _auth_client(user)
+    response = client.post(
+        "/api/issues/",
+        {
+            "title": "Issue in attesa senza causale",
+            "customer": customer.id,
+            "status": "waiting",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400, response.data
+    assert response.data == {
+        "waiting_reason": ["La causale è obbligatoria quando lo stato è «In attesa»."]
+    }
+
+
+def test_issue_create_status_waiting_with_reason_succeeds():
+    user = _make_user()
+    customer = _make_customer(user, "i")
+
+    client = _auth_client(user)
+    response = client.post(
+        "/api/issues/",
+        {
+            "title": "Issue in attesa con causale",
+            "customer": customer.id,
+            "status": "waiting",
+            "waiting_reason": "philips",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201, response.data
+    assert response.data["waiting_reason"] == "philips"
+    assert response.data["waiting_reason_label"] == "Philips"
+
+
+def test_issue_waiting_reason_cleared_when_status_not_waiting():
+    user = _make_user()
+    customer = _make_customer(user, "j")
+
+    client = _auth_client(user)
+    create_response = client.post(
+        "/api/issues/",
+        {
+            "title": "Issue che esce dallo stato in attesa",
+            "customer": customer.id,
+            "status": "waiting",
+            "waiting_reason": "cliente",
+        },
+        format="json",
+    )
+    assert create_response.status_code == 201, create_response.data
+    issue_id = create_response.data["id"]
+
+    response = client.patch(
+        f"/api/issues/{issue_id}/",
+        {"status": "in_progress"},
+        format="json",
+    )
+
+    assert response.status_code == 200, response.data
+    assert response.data["waiting_reason"] == ""
+
+
+def test_issue_hide_closed_filter_includes_waiting_status():
+    user = _make_user()
+    customer = _make_customer(user, "k")
+
+    client = _auth_client(user)
+    open_r = client.post("/api/issues/", {"title": "Aperta", "customer": customer.id, "status": "open"}, format="json")
+    waiting_r = client.post(
+        "/api/issues/",
+        {"title": "In attesa", "customer": customer.id, "status": "waiting", "waiting_reason": "cliente"},
+        format="json",
+    )
+    assert open_r.status_code == 201, open_r.data
+    assert waiting_r.status_code == 201, waiting_r.data
+
+    response = client.get("/api/issues/", {"hide_closed": "true", "customer": customer.id})
+    assert response.status_code == 200, response.data
+    results = response.data["results"] if isinstance(response.data, dict) else response.data
+    ids = {row["id"] for row in results}
+    assert open_r.data["id"] in ids
+    assert waiting_r.data["id"] in ids
+
+
 def test_issue_partial_update_rejects_cross_customer_site():
     user = _make_user()
     customer_a = _make_customer(user, "f")

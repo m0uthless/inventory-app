@@ -1,8 +1,9 @@
-import { Button, Stack, Typography } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
-import { buildQuery } from '@shared/utils/nav'
+import { Typography } from '@mui/material'
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
+import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
+import AuditEventsTab from '../../ui/AuditEventsTab'
 import type { ContactDetail } from './types'
 
 type ContactDrawerProps = {
@@ -10,6 +11,7 @@ type ContactDrawerProps = {
   detail: ContactDetail | null
   detailLoading: boolean
   selectedId: number | null
+  drawerTab: number
   canChange: boolean
   canDelete: boolean
   deleteBusy: boolean
@@ -18,7 +20,8 @@ type ContactDrawerProps = {
   onEdit: () => void | Promise<void>
   onDelete: () => void
   onRestore: () => void | Promise<void>
-  onCopied: () => void
+  onTabChange: (value: number) => void
+  onCopy?: (text: string) => void | Promise<void>
 }
 
 function customerLabel(d: ContactDetail | null) {
@@ -29,11 +32,10 @@ function siteLabel(d: ContactDetail | null) {
 }
 
 export default function ContactDrawer({
-  open, detail, detailLoading, selectedId,
+  open, detail, detailLoading, selectedId, drawerTab,
   canChange, canDelete, deleteBusy, restoreBusy,
-  onClose, onEdit, onDelete, onRestore, onCopied,
+  onClose, onEdit, onDelete, onRestore, onTabChange, onCopy,
 }: ContactDrawerProps) {
-  const navigate = useNavigate()
   const subtitle = [customerLabel(detail), siteLabel(detail)].filter(Boolean).join(' · ') || undefined
 
   return (
@@ -46,42 +48,34 @@ export default function ContactDrawer({
       title={detail?.name || (selectedId ? `Contatto #${selectedId}` : 'Contatto')}
       subtitle={subtitle} caption={detail?.department || undefined}
       loading={detailLoading}
+      tabs={['Dettagli', 'Attività']}
+      tabValue={drawerTab} onTabChange={onTabChange}
     >
       {detailLoading ? <DrawerLoadingState /> : detail ? (
         <>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-            {detail.customer ? (
-              <Button size="small" variant="outlined" onClick={() => navigate(`/customers${buildQuery({ open: detail.customer })}`)}>
-                Apri cliente
-              </Button>
-            ) : null}
-            {detail.site ? (
-              <Button size="small" variant="outlined" onClick={() => navigate(`/sites${buildQuery({ open: detail.site, customer: detail.customer ?? '' })}`)}>
-                Apri sito
-              </Button>
-            ) : null}
-            <Button size="small" variant="outlined" onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer ?? '', site: detail.site ?? '' })}`)}>
-              Apri inventario
-            </Button>
-          </Stack>
-          <DrawerSection title="Dati contatto">
-            <DrawerFieldList
-              rows={[
-                { label: 'Nome', value: detail.name },
-                { label: 'Email', value: detail.email, mono: true, copy: true },
-                { label: 'Telefono', value: detail.phone, mono: true, copy: true },
-                { label: 'Reparto', value: detail.department },
-                { label: 'Cliente', value: customerLabel(detail) },
-                { label: 'Sito', value: siteLabel(detail) },
-              ]}
-              onCopy={() => onCopied()}
-            />
-          </DrawerSection>
-          {detail.notes ? (
-            <DrawerSection title="Note" variant="muted">
-              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{detail.notes}</Typography>
-            </DrawerSection>
+          {drawerTab === 0 ? (
+            <>
+              <DrawerSection icon={<PersonOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Dati contatto">
+                <DrawerFieldList
+                  rows={[
+                    { label: 'Nome', value: detail.name },
+                    { label: 'Email', value: detail.email, mono: true, copy: true },
+                    { label: 'Telefono', value: detail.phone, mono: true, copy: true },
+                    { label: 'Reparto', value: detail.department },
+                    { label: 'Cliente', value: customerLabel(detail) },
+                    { label: 'Sito', value: siteLabel(detail) },
+                  ]}
+                  onCopy={onCopy ? (v) => void onCopy(v) : undefined}
+                />
+              </DrawerSection>
+              {detail.notes ? (
+                <DrawerSection icon={<NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Note" variant="muted">
+                  <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{detail.notes}</Typography>
+                </DrawerSection>
+              ) : null}
+            </>
           ) : null}
+          {drawerTab === 1 ? <AuditEventsTab appLabel="crm" model="contact" objectId={detail.id} /> : null}
         </>
       ) : <DrawerEmptyState />}
     </DrawerShell>

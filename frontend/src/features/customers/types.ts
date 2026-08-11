@@ -6,6 +6,7 @@ export type CustomerRow = {
   name: string
   display_name: string
   city?: string | null
+  province?: string | null
   primary_contact_id?: number | null
   primary_contact_name?: string | null
   primary_contact_email?: string | null
@@ -33,6 +34,7 @@ export type CustomerForm = {
   display_name: string
   vat_number: string
   tax_code: string
+  province: string
   custom_fields: Record<string, unknown>
   notes: string
 }

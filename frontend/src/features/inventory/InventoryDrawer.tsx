@@ -1,26 +1,16 @@
 import * as React from 'react'
 import {
   Box,
-  Button,
   Chip,
-  CircularProgress,
-  Drawer,
   IconButton,
-  LinearProgress,
   Stack,
-  Tab,
-  Tabs,
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useLocation, useNavigate } from 'react-router-dom'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import CloseIcon from '@mui/icons-material/Close'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import WifiOutlinedIcon from '@mui/icons-material/WifiOutlined'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
@@ -28,12 +18,13 @@ import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
-import { buildQuery } from '@shared/utils/nav'
-import { getInventoryTypeIcon } from '@shared/ui/inventoryTypeIcon'
+import { getInventoryTypeIcon, getInventoryTypeGradient } from '@shared/ui/inventoryTypeIcon'
 import AuditEventsTab from '../../ui/AuditEventsTab'
 import { isRecord } from '@shared/utils/guards'
 import { useToast } from '@shared/ui/toast'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
+import { DrawerShell } from '@shared/ui/DrawerShell'
+import { DrawerSection, DrawerFieldList, DrawerFieldRow, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 
 import type { InventoryDetail } from './types'
 
@@ -167,8 +158,8 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
 
   return (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
+      <Box sx={{ minWidth: 100, flexShrink: 0 }}>
+        <Typography variant="caption" sx={{ color: 'text.disabled' }}>{label}</Typography>
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
@@ -205,7 +196,6 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
   )
 }
 
-
 function InventoryTypeBadgeIcon(props: { typeKey?: string | null }) {
   return React.createElement(getInventoryTypeIcon(props.typeKey), {
     sx: { fontSize: 26, color: 'rgba(255,255,255,0.9)' },
@@ -229,516 +219,169 @@ export default function InventoryDrawer({
   onDelete,
   onRestore,
 }: InventoryDrawerProps) {
-  const navigate = useNavigate()
-  const loc = useLocation()
+
   const toast = useToast()
 
+  const handleCopy = async (value: string) => {
+    if (!value) return
+    await copyToClipboard(value)
+    toast.success('Copiato ✅')
+  }
+
+  // Riga secondaria sotto al titolo: nome (se diverso dall'hostname mostrato
+  // in titolo) + cliente/sito, sullo stesso pattern a una riga di
+  // Customer/Site/Monitor Drawer (subtitle singolo, niente righe multiple ad hoc).
+  const secondaryName = detail?.name && detail?.hostname && detail.name !== detail.hostname ? detail.name : null
+  const customerSite = [detail?.customer_name, detail?.site_display_name || detail?.site_name].filter(Boolean).join(' · ')
+  const subtitle = [secondaryName, customerSite].filter(Boolean).join(' · ') || undefined
+
+  const hasHardwareInfo = [detail?.manufacturer, detail?.model, detail?.warranty_end_date, ...Object.values(detail?.custom_fields ?? {})]
+    .some((value) => value !== '' && value !== null && value !== undefined)
+
+  const bareCloseButton = (
+    <Tooltip title="Chiudi">
+      <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.85)' }}>
+        <ArrowBackIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+  )
+
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 368 } } }}>
-      <Stack sx={{ height: '100%', overflow: 'hidden' }}>
-        <Box
-          sx={{
-            background: (theme) => `linear-gradient(140deg, ${theme.palette.primary.main} 0%, #0d9488 55%, #0e7490 100%)`,
-            px: 2.5,
-            pt: 2.25,
-            pb: 2.25,
-            position: 'relative',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              top: -44,
-              right: -44,
-              width: 130,
-              height: 130,
-              borderRadius: '50%',
-              bgcolor: 'rgba(255,255,255,0.06)',
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: -26,
-              left: 52,
-              width: 90,
-              height: 90,
-              borderRadius: '50%',
-              bgcolor: 'rgba(255,255,255,0.04)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}>
-            <Chip
-              size="small"
-              label={`● ${detail?.status_label ?? '—'}`}
-              sx={{
-                bgcolor: 'rgba(20,255,180,0.18)',
-                color: '#a7f3d0',
-                fontWeight: 700,
-                fontSize: 10,
-                letterSpacing: '0.07em',
-                border: '1px solid rgba(167,243,208,0.3)',
-                height: 22,
-              }}
-            />
-            <Stack direction="row" spacing={0.75}>
-              {canChange ? (
-                detail?.deleted_at ? (
-                  <ActionIconButton
-                    label="Ripristina"
-                    size="small"
-                    onClick={onRestore}
-                    disabled={!detail || restoreBusy}
-                    sx={{
-                      color: 'rgba(255,255,255,0.85)',
-                      bgcolor: 'rgba(255,255,255,0.12)',
-                      borderRadius: 1.5,
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                    }}
-                  >
-                    <RestoreFromTrashIcon fontSize="small" />
-                  </ActionIconButton>
-                ) : (
-                  <ActionIconButton
-                    label="Modifica"
-                    size="small"
-                    onClick={onEdit}
-                    disabled={!detail}
-                    sx={{
-                      color: 'rgba(255,255,255,0.85)',
-                      bgcolor: 'rgba(255,255,255,0.12)',
-                      borderRadius: 1.5,
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                    }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </ActionIconButton>
-                )
-              ) : null}
-              {canDelete && !detail?.deleted_at ? (
-                <ActionIconButton
-                  label="Elimina"
-                  size="small"
-                  onClick={onDelete}
-                  disabled={!detail || deleteBusy}
-                  sx={{
-                    color: 'rgba(255,255,255,0.85)',
-                    bgcolor: 'rgba(255,255,255,0.12)',
-                    borderRadius: 1.5,
-                    '&:hover': { bgcolor: 'rgba(239,68,68,0.28)', color: '#fca5a5' },
-                  }}
-                >
-                  <DeleteOutlineIcon fontSize="small" />
-                </ActionIconButton>
-              ) : null}
-              <ActionIconButton
-                label="Chiudi"
-                size="small"
-                onClick={onClose}
-                sx={{
-                  color: 'rgba(255,255,255,0.85)',
-                  bgcolor: 'rgba(255,255,255,0.12)',
-                  borderRadius: 1.5,
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' },
-                }}
-              >
-                <CloseIcon fontSize="small" />
-              </ActionIconButton>
-            </Stack>
-          </Stack>
-
-          <Box sx={{ position: 'relative', zIndex: 1 }}>
-            {detail?.deleted_at ? <Chip size="small" color="error" label="Eliminato" sx={{ mb: 0.75, height: 20, fontSize: 10 }} /> : null}
-            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 1,
-                  flexShrink: 0,
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  backdropFilter: 'blur(4px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <InventoryTypeBadgeIcon typeKey={detail?.type_key} />
-              </Box>
-              <Typography sx={{ color: '#fff', fontSize: 24, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
-                {detail?.hostname || detail?.name || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : 'Inventario')}
-              </Typography>
-            </Stack>
-            {detail?.name && detail?.hostname && detail.name !== detail.hostname ? (
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.70)', mt: 0.25 }}>
-                {detail.name}
-              </Typography>
-            ) : null}
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.58)' }}>
-              {[detail?.customer_name, detail?.site_display_name || detail?.site_name].filter(Boolean).join(' · ') || ' '}
-            </Typography>
-            {detail?.type_label ? (
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', display: 'block', mt: 0.25 }}>
-                {detail.type_label}
-              </Typography>
-            ) : null}
-          </Box>
-        </Box>
-
-        {detailLoading ? <LinearProgress sx={{ height: 2 }} /> : null}
-
-        <Tabs value={drawerTab} onChange={(_, value) => onTabChange(value)} sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0, px: 1 }}>
-          <Tab label="Dettagli" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-          <Tab label="Attività" sx={{ fontSize: 13, minWidth: 0, px: 1.5 }} />
-        </Tabs>
-
-        {drawerTab === 0 ? (
-          <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {detailLoading ? (
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2 }}>
-                <CircularProgress size={18} />
-                <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                  Caricamento…
-                </Typography>
-              </Stack>
-            ) : detail ? (
-              <>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() =>
-                      navigate(
-                        `/customers${buildQuery({ open: detail.customer, return: loc.pathname + loc.search })}`,
-                      )
-                    }
-                  >
-                    Apri cliente
-                  </Button>
-                  {detail.site ? (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() =>
-                        navigate(
-                          `/sites${buildQuery({
-                            customer: detail.customer,
-                            open: detail.site,
-                            return: loc.pathname + loc.search,
-                          })}`,
-                        )
-                      }
-                    >
-                      Apri sito
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer, site: detail.site ?? '' })}`)}
-                  >
-                    Lista filtrata
-                  </Button>
+    <DrawerShell
+      open={open} onClose={onClose} gradient={getInventoryTypeGradient(detail?.type_key)}
+      statusSlot={bareCloseButton}
+      canChange={canChange} canDelete={canDelete}
+      deleteBusy={deleteBusy} restoreBusy={restoreBusy} deleted={!!detail?.deleted_at}
+      onEdit={onEdit} onDelete={onDelete} onRestore={onRestore}
+      icon={<InventoryTypeBadgeIcon typeKey={detail?.type_key} />}
+      iconBare
+      heroWatermark={detail?.type_label ?? undefined}
+      title={detail?.hostname || detail?.name || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : 'Inventario')}
+      subtitle={subtitle}
+      loading={detailLoading}
+      tabs={['Dettagli', 'Attività']}
+      tabValue={drawerTab} onTabChange={onTabChange}
+    >
+      {drawerTab === 0 ? (
+        detailLoading ? <DrawerLoadingState /> :
+        !detail ? <DrawerEmptyState /> : (
+          <>
+            {detail.has_active_issue ? (
+              <Box sx={{ bgcolor: 'rgba(239, 68, 68, 0.10)', border: '1px solid', borderColor: 'rgba(239, 68, 68, 0.28)', borderRadius: 1, p: 1.75 }}>
+                <Stack direction="row" spacing={1} alignItems="flex-start">
+                  <WarningAmberRoundedIcon sx={{ color: 'error.main', mt: '2px' }} />
+                  <Box>
+                    <Typography sx={{ fontWeight: 800, color: 'error.main', lineHeight: 1.2 }}>
+                      Attenzione! C'è una issue collegata al sistema attualmente aperta.
+                    </Typography>
+                  </Box>
                 </Stack>
+              </Box>
+            ) : null}
 
-                {detail.has_active_issue ? (
-                  <Box sx={{ bgcolor: 'rgba(239, 68, 68, 0.10)', border: '1px solid', borderColor: 'rgba(239, 68, 68, 0.28)', borderRadius: 1, p: 1.75 }}>
-                    <Stack direction="row" spacing={1} alignItems="flex-start">
-                      <WarningAmberRoundedIcon sx={{ color: 'error.main', mt: '2px' }} />
-                      <Box>
-                        <Typography sx={{ fontWeight: 800, color: 'error.main', lineHeight: 1.2 }}>
-                          Attenzione! C'è una issue collegata al sistema attualmente aperta.
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Box>
+            {detail.knumber ? (
+              <DrawerSection title="K-Number">
+                <KNumberPlate knumber={detail.knumber} digits={9} />
+              </DrawerSection>
+            ) : null}
+
+            {[detail.name, detail.knumber, detail.serial_number, detail.site_display_name || detail.site_name].some(Boolean) ? (
+              <DrawerSection accent="info" icon={<FingerprintIcon sx={{ fontSize: 14, color: 'info.main' }} />} title="Identificazione">
+                <DrawerFieldList
+                  rows={[
+                    { label: 'Nome', value: detail.name, copy: true },
+                    { label: 'Sito', value: detail.site_display_name || detail.site_name },
+                    { label: 'K-number', value: detail.knumber, mono: true, copy: true },
+                    { label: 'Seriale', value: detail.serial_number, mono: true, copy: true },
+                  ]}
+                  onCopy={handleCopy}
+                />
+              </DrawerSection>
+            ) : null}
+
+            {[detail.hostname, detail.local_ip, detail.srsa_ip].some(Boolean) ? (
+              <DrawerSection accent="secondary" icon={<WifiOutlinedIcon sx={{ fontSize: 14, color: 'secondary.main' }} />} title="Rete">
+                <DrawerFieldList
+                  rows={[
+                    { label: 'Hostname', value: detail.hostname, mono: true, copy: true },
+                    { label: 'IP locale', value: detail.local_ip, mono: true, copy: true },
+                    { label: 'IP SRSA', value: detail.srsa_ip, mono: true, copy: true },
+                  ]}
+                  onCopy={handleCopy}
+                />
+              </DrawerSection>
+            ) : null}
+
+            {(canViewSecrets ? [detail.os_user, detail.os_pwd, detail.app_usr, detail.app_pwd, detail.vnc_pwd] : [detail.os_user, detail.app_usr]).some(Boolean) ? (
+              <DrawerSection accent="warning" icon={<LockOutlinedIcon sx={{ fontSize: 14, color: 'warning.main' }} />} title="Credenziali">
+                {!canViewSecrets ? (
+                  <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic', display: 'block', mb: 0.5 }}>
+                    Password non visibili (permessi insufficienti)
+                  </Typography>
                 ) : null}
+                <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
+                  <DrawerFieldRow label="Utente OS" value={detail.os_user} mono copy onCopy={handleCopy} labelMinWidth={100} />
+                  {canViewSecrets && detail.os_pwd ? (
+                    <Box sx={{ py: 0.75 }}>
+                      <SecretRow label="Password OS" value={detail.os_pwd} onCopy={() => void handleCopy(detail.os_pwd ?? '')} />
+                    </Box>
+                  ) : null}
+                  <DrawerFieldRow label="Utente App" value={detail.app_usr} mono copy onCopy={handleCopy} labelMinWidth={100} />
+                  {canViewSecrets && detail.app_pwd ? (
+                    <Box sx={{ py: 0.75 }}>
+                      <SecretRow label="Password App" value={detail.app_pwd} onCopy={() => void handleCopy(detail.app_pwd ?? '')} />
+                    </Box>
+                  ) : null}
+                  {canViewSecrets && detail.vnc_pwd ? (
+                    <Box sx={{ py: 0.75 }}>
+                      <SecretRow label="Password VNC" value={detail.vnc_pwd} onCopy={() => void handleCopy(detail.vnc_pwd ?? '')} />
+                    </Box>
+                  ) : null}
+                </Stack>
+              </DrawerSection>
+            ) : null}
 
-                {detail.knumber ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 1 }}>
-                      K-Number
-                    </Typography>
-                    <KNumberPlate knumber={detail.knumber} digits={9} />
-                  </Box>
-                ) : null}
+            {hasHardwareInfo ? (
+              <DrawerSection accent="success" icon={<MemoryOutlinedIcon sx={{ fontSize: 14, color: 'success.main' }} />} title="Hardware">
+                <DrawerFieldList
+                  rows={[
+                    { label: 'Produttore', value: detail.manufacturer },
+                    { label: 'Modello', value: detail.model },
+                    { label: 'Fine garanzia', value: detail.warranty_end_date, mono: true },
+                    ...(detail.custom_fields && isRecord(detail.custom_fields)
+                      ? Object.entries(detail.custom_fields)
+                          .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+                          .map(([key, value]) => ({ label: key, value: String(value) }))
+                      : []),
+                  ]}
+                />
+              </DrawerSection>
+            ) : null}
 
-                {[detail.name, detail.knumber, detail.serial_number, detail.site_display_name || detail.site_name].some(Boolean) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                      <FingerprintIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Identificazione
-                    </Typography>
-                    <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                      {[
-                        { label: 'Nome', value: detail.name, mono: false, copy: true },
-                        { label: 'Sito', value: detail.site_display_name || detail.site_name, mono: false, copy: false },
-                        { label: 'K-number', value: detail.knumber, mono: true, copy: true },
-                        { label: 'Seriale', value: detail.serial_number, mono: true, copy: true },
-                      ]
-                        .filter((row): row is typeof row & { value: string } => Boolean(row.value))
-                        .map((row) => (
-                          <Stack key={row.label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                            <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 80 }}>
-                              {row.label}
-                            </Typography>
-                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                              <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: row.mono ? 'monospace' : undefined, fontSize: row.mono ? 12 : undefined }}>
-                                {row.value}
-                              </Typography>
-                              {row.copy && row.value ? (
-                                <Tooltip title="Copia">
-                                  <IconButton
-                                    aria-label="Copia"
-                                    size="small"
-                                    onClick={async () => {
-                                      await copyToClipboard(row.value)
-                                      toast.success('Copiato ✅')
-                                    }}
-                                  >
-                                    <ContentCopyIcon sx={{ fontSize: 13 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              ) : null}
-                            </Stack>
-                          </Stack>
-                        ))}
-                    </Stack>
-                  </Box>
-                ) : null}
+            {detail.notes ? (
+              <DrawerSection accent="neutral" icon={<NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />} title="Note">
+                <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                  {detail.notes}
+                </Typography>
+              </DrawerSection>
+            ) : null}
 
-                {[detail.hostname, detail.local_ip, detail.srsa_ip].some(Boolean) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                      <WifiOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Rete
-                    </Typography>
-                    <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                      {[
-                        { label: 'Hostname', value: detail.hostname },
-                        { label: 'IP locale', value: detail.local_ip },
-                        { label: 'IP SRSA', value: detail.srsa_ip },
-                      ]
-                        .filter((row): row is typeof row & { value: string } => Boolean(row.value))
-                        .map((row) => (
-                          <Stack key={row.label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                            <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 80 }}>
-                              {row.label}
-                            </Typography>
-                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                              <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12 }}>
-                                {row.value}
-                              </Typography>
-                              <Tooltip title="Copia">
-                                <IconButton
-                                  aria-label="Copia"
-                                  size="small"
-                                  onClick={async () => {
-                                    await copyToClipboard(row.value)
-                                    toast.success('Copiato ✅')
-                                  }}
-                                >
-                                  <ContentCopyIcon sx={{ fontSize: 13 }} />
-                                </IconButton>
-                              </Tooltip>
-                            </Stack>
-                          </Stack>
-                        ))}
-                    </Stack>
-                  </Box>
-                ) : null}
+            {detail.tags && detail.tags.length > 0 ? (
+              <DrawerSection title="Tag" variant="muted">
+                <Stack direction="row" flexWrap="wrap" spacing={0.5}>
+                  {detail.tags.map((tag) => (
+                    <Chip key={tag} label={tag} size="small" variant="outlined" />
+                  ))}
+                </Stack>
+              </DrawerSection>
+            ) : null}
+          </>
+        )
+      ) : null}
 
-                {(canViewSecrets ? [detail.os_user, detail.os_pwd, detail.app_usr, detail.app_pwd, detail.vnc_pwd] : [detail.os_user, detail.app_usr]).some(Boolean) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                      <LockOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Credenziali
-                    </Typography>
-                    {!canViewSecrets ? (
-                      <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic', display: 'block', mb: 0.5 }}>
-                        Password non visibili (permessi insufficienti)
-                      </Typography>
-                    ) : null}
-                    <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                      {detail.os_user ? (
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                          <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 100 }}>
-                            Utente OS
-                          </Typography>
-                          <Stack direction="row" alignItems="center" spacing={0.5}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12 }}>
-                              {detail.os_user}
-                            </Typography>
-                            <Tooltip title="Copia">
-                              <IconButton
-                                aria-label="Copia"
-                                size="small"
-                                onClick={async () => {
-                                  if (!detail.os_user) return
-                                  await copyToClipboard(detail.os_user)
-                                  toast.success('Copiato ✅')
-                                }}
-                              >
-                                <ContentCopyIcon sx={{ fontSize: 13 }} />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </Stack>
-                      ) : null}
-                      {canViewSecrets && detail.os_pwd ? (
-                        <Box sx={{ py: 0.75 }}>
-                          <SecretRow
-                            label="Password OS"
-                            value={detail.os_pwd}
-                            onCopy={async () => {
-                              if (!detail.os_pwd) return
-                              await copyToClipboard(detail.os_pwd)
-                              toast.success('Copiato ✅')
-                            }}
-                          />
-                        </Box>
-                      ) : null}
-                      {detail.app_usr ? (
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                          <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 100 }}>
-                            Utente App
-                          </Typography>
-                          <Stack direction="row" alignItems="center" spacing={0.5}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12 }}>
-                              {detail.app_usr}
-                            </Typography>
-                            <Tooltip title="Copia">
-                              <IconButton
-                                aria-label="Copia"
-                                size="small"
-                                onClick={async () => {
-                                  if (!detail.app_usr) return
-                                  await copyToClipboard(detail.app_usr)
-                                  toast.success('Copiato ✅')
-                                }}
-                              >
-                                <ContentCopyIcon sx={{ fontSize: 13 }} />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </Stack>
-                      ) : null}
-                      {canViewSecrets && detail.app_pwd ? (
-                        <Box sx={{ py: 0.75 }}>
-                          <SecretRow
-                            label="Password App"
-                            value={detail.app_pwd}
-                            onCopy={async () => {
-                              if (!detail.app_pwd) return
-                              await copyToClipboard(detail.app_pwd)
-                              toast.success('Copiato ✅')
-                            }}
-                          />
-                        </Box>
-                      ) : null}
-                      {canViewSecrets && detail.vnc_pwd ? (
-                        <Box sx={{ py: 0.75 }}>
-                          <SecretRow
-                            label="Password VNC"
-                            value={detail.vnc_pwd}
-                            onCopy={async () => {
-                              if (!detail.vnc_pwd) return
-                              await copyToClipboard(detail.vnc_pwd)
-                              toast.success('Copiato ✅')
-                            }}
-                          />
-                        </Box>
-                      ) : null}
-                    </Stack>
-                  </Box>
-                ) : null}
-
-                {[detail.manufacturer, detail.model, detail.warranty_end_date, ...Object.values(detail.custom_fields ?? {})].some((value) => value !== '' && value !== null && value !== undefined) ? (
-                  <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-                      <MemoryOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Hardware
-                    </Typography>
-                    <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'grey.50' }} />}>
-                      {[
-                        { label: 'Produttore', value: detail.manufacturer },
-                        { label: 'Modello', value: detail.model },
-                        { label: 'Fine garanzia', value: detail.warranty_end_date, mono: true },
-                      ]
-                        .filter((row): row is typeof row & { value: string } => Boolean(row.value))
-                        .map((row) => (
-                          <Stack key={row.label} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                            <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 100 }}>
-                              {row.label}
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: row.mono ? 'monospace' : undefined, fontSize: row.mono ? 12 : undefined }}>
-                              {row.value}
-                            </Typography>
-                          </Stack>
-                        ))}
-                      {detail.custom_fields && isRecord(detail.custom_fields)
-                        ? Object.entries(detail.custom_fields)
-                            .filter(([, value]) => value !== '' && value !== null && value !== undefined)
-                            .map(([key, value]) => (
-                              <Stack key={key} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
-                                <Typography variant="caption" sx={{ color: 'text.disabled', minWidth: 100 }}>
-                                  {key}
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 600, maxWidth: 220, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {String(value)}
-                                </Typography>
-                              </Stack>
-                            ))
-                        : null}
-                    </Stack>
-                  </Box>
-                ) : null}
-
-                {detail.notes ? (
-                  <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
-                      <NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                      Note
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                      {detail.notes}
-                    </Typography>
-                  </Box>
-                ) : null}
-
-                {detail.tags && detail.tags.length > 0 ? (
-                  <Box sx={{ bgcolor: '#fafafa', border: '1px solid', borderColor: 'grey.100', borderRadius: 1, p: 1.75 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
-                      Tag
-                    </Typography>
-                    <Stack direction="row" flexWrap="wrap" spacing={0.5}>
-                      {detail.tags.map((tag) => (
-                        <Chip key={tag} label={tag} size="small" variant="outlined" />
-                      ))}
-                    </Stack>
-                  </Box>
-                ) : null}
-              </>
-            ) : (
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Nessun dettaglio disponibile.
-              </Typography>
-            )}
-          </Box>
-        ) : null}
-
-        {drawerTab === 1 && selectedId ? (
-          <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, py: 2 }}>
-            <AuditEventsTab appLabel="inventory" model="inventory" objectId={selectedId} />
-          </Box>
-        ) : null}
-      </Stack>
-    </Drawer>
+      {drawerTab === 1 && selectedId ? (
+        <AuditEventsTab appLabel="inventory" model="inventory" objectId={selectedId} />
+      ) : null}
+    </DrawerShell>
   )
 }

@@ -148,3 +148,27 @@ export function getInventoryTypeFamily(typeKey?: string | null): InventoryTypeFa
   if (!typeKey) return FAMILY_UNKNOWN
   return INVENTORY_TYPE_FAMILIES[typeKey] ?? FAMILY_UNKNOWN
 }
+
+// ─── Gradient hero per tipo device ──────────────────────────────────────────
+// Usato dall'hero di InventoryDrawer per colorare il banner in base alla
+// famiglia del tipo device (stessa mappa colori di Site Repository), invece
+// del teal fisso usato dagli altri drawer.
+
+function shadeHex(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const amt = Math.round(2.55 * percent)
+  let r = (num >> 16) + amt
+  let g = ((num >> 8) & 0x00ff) + amt
+  let b = (num & 0x0000ff) + amt
+  r = Math.max(Math.min(255, r), 0)
+  g = Math.max(Math.min(255, g), 0)
+  b = Math.max(Math.min(255, b), 0)
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1)
+}
+
+/** Gradient dell'hero del drawer Inventory, basato sul colore di famiglia del type_key (fallback teal se assente). */
+export function getInventoryTypeGradient(typeKey?: string | null): string {
+  if (!typeKey) return 'linear-gradient(140deg, #0f766e 0%, #0d9488 55%, #0e7490 100%)'
+  const { color } = getInventoryTypeFamily(typeKey)
+  return `linear-gradient(140deg, ${shadeHex(color, -30)} 0%, ${color} 55%, ${shadeHex(color, 22)} 100%)`
+}

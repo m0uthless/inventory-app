@@ -96,6 +96,7 @@ class InventoryListSerializer(serializers.ModelSerializer):
             "name",
             "hostname",
             "knumber",
+            "model",
             "serial_number",
             "type_key",
             "type_label",

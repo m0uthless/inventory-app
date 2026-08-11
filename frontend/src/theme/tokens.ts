@@ -47,6 +47,35 @@ export const spacing = {
 export type SpacingKey = keyof typeof spacing
 
 /**
+ * SidebarTokens — forma condivisa dei set di colori sidebar (SIDEBAR,
+ * SIDEBAR_NAVY, eventuali temi futuri). Tipizzato a `string` (non `as const`
+ * sui valori) apposta: due varianti con colori diversi devono restare
+ * strutturalmente compatibili tra loro, cosa che `typeof SIDEBAR` da solo
+ * non garantirebbe (cristallizzerebbe i valori letterali del teal).
+ */
+export type SidebarTokens = {
+  bgGradient: string
+  textMuted: string
+  textDefault: string
+  textStrong: string
+  textBright: string
+  accent: string
+  accentLight: string
+  accentBright: string
+  selectedBg: string
+  selectedBgHover: string
+  selectedBgStrong: string
+  selectedBgStronger: string
+  activeBorder: string
+  hoverBg: string
+  divider: string
+  chipBg: string
+  chipBorder: string
+  chipBgOpen: string
+  chipBorderOpen: string
+}
+
+/**
  * SIDEBAR — token di colore per la sidebar scura di AppLayout.
  *
  * Centralizzati qui per evitare valori hardcoded sparsi nel componente
@@ -54,7 +83,7 @@ export type SpacingKey = keyof typeof spacing
  *
  * Palette: sfondo deep teal scuro (#1e3a3a/#162f2c) con accenti teal-300 (#5eead4).
  */
-export const SIDEBAR = {
+export const SIDEBAR: SidebarTokens = {
   /** Sfondo del drawer (gradiente verticale) */
   bgGradient: 'linear-gradient(180deg, #1e3a3a 0%, #162f2c 100%)',
 
@@ -89,4 +118,47 @@ export const SIDEBAR = {
   chipBorder:'rgba(255,255,255,0.14)',
   chipBgOpen:'rgba(94,234,212,0.14)',
   chipBorderOpen:'rgba(94,234,212,0.24)',
+} as const
+
+/**
+ * SIDEBAR_NAVY — variante per il tema "Navy" (vedi theme.navy.ts).
+ *
+ * Stessa forma di SIDEBAR: sfondo blu navy molto scuro (coerente col nuovo
+ * primary #143475) con accenti blu vivo al posto del teal.
+ */
+export const SIDEBAR_NAVY: SidebarTokens = {
+  /** Sfondo del drawer (gradiente verticale) */
+  bgGradient: 'linear-gradient(180deg, #091735 0%, #060f21 100%)',
+
+  /** Colore base del testo nelle voci di navigazione */
+  textMuted:    'rgba(255,255,255,0.55)',
+  textDefault:  'rgba(255,255,255,0.78)',
+  textStrong:   'rgba(255,255,255,0.95)',
+  textBright:   '#ffffff',
+
+  /** Accento blu vivo: usato per selected state, icone attive, bordi */
+  accent:       '#4d8fdb',
+  accentLight:  '#a8c8ec',
+  accentBright: '#d6e6f7',
+
+  /** Sfondi per voci selezionate */
+  selectedBg:         'rgba(77,143,219,0.09)',
+  selectedBgHover:    'rgba(77,143,219,0.14)',
+  selectedBgStrong:   'rgba(77,143,219,0.20)',
+  selectedBgStronger: 'rgba(77,143,219,0.28)',
+
+  /** Bordo sinistro per la voce attiva */
+  activeBorder: '2px solid #4d8fdb',
+
+  /** Sfondo hover sulle voci non selezionate */
+  hoverBg: 'rgba(255,255,255,0.08)',
+
+  /** Divisori */
+  divider: 'rgba(255,255,255,0.08)',
+
+  /** Chip / badge nella sidebar */
+  chipBg:    'rgba(255,255,255,0.10)',
+  chipBorder:'rgba(255,255,255,0.14)',
+  chipBgOpen:'rgba(77,143,219,0.14)',
+  chipBorderOpen:'rgba(77,143,219,0.24)',
 } as const
