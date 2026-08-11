@@ -16,7 +16,7 @@ class Command(BaseCommand):
         cat section.md | docker compose -f docker-compose.yml \\
             -f docker-compose.dev.yml run --rm -T --entrypoint "" backend \\
             python manage.py create_changelog_entry \\
-            --version "0.8.1" --date "2026-08-11"
+            --release-version "0.8.1" --date "2026-08-11"
 
     Se non specificato, --title diventa "Versione {version}".
     Se una ChangelogEntry con la stessa version esiste già, il comando
@@ -26,7 +26,12 @@ class Command(BaseCommand):
     help = "Crea una ChangelogEntry dal body markdown passato su stdin."
 
     def add_arguments(self, parser):
-        parser.add_argument("--version", required=True, help="Es. 0.8.1")
+        # NB: il flag si chiama --release-version (non --version) perché
+        # Django's BaseCommand.create_parser() registra già un --version
+        # builtin (stampa la versione di Django) prima di chiamare
+        # add_arguments() — usare --version qui causa un conflitto argparse
+        # ("conflicting option string: --version") al momento del parsing.
+        parser.add_argument("--release-version", required=True, dest="version", help="Es. 0.8.1")
         parser.add_argument("--date", required=True, help="Formato YYYY-MM-DD")
         parser.add_argument("--title", default=None, help="Default: 'Versione {version}'")
         parser.add_argument(
