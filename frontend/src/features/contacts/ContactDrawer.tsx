@@ -1,6 +1,4 @@
-import { Button, Stack, Typography } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
-import { buildQuery } from '@shared/utils/nav'
+import { Typography } from '@mui/material'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import type { ContactDetail } from './types'
@@ -33,7 +31,6 @@ export default function ContactDrawer({
   canChange, canDelete, deleteBusy, restoreBusy,
   onClose, onEdit, onDelete, onRestore, onCopied,
 }: ContactDrawerProps) {
-  const navigate = useNavigate()
   const subtitle = [customerLabel(detail), siteLabel(detail)].filter(Boolean).join(' · ') || undefined
 
   return (
@@ -49,21 +46,6 @@ export default function ContactDrawer({
     >
       {detailLoading ? <DrawerLoadingState /> : detail ? (
         <>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-            {detail.customer ? (
-              <Button size="small" variant="outlined" onClick={() => navigate(`/customers${buildQuery({ open: detail.customer })}`)}>
-                Apri cliente
-              </Button>
-            ) : null}
-            {detail.site ? (
-              <Button size="small" variant="outlined" onClick={() => navigate(`/sites${buildQuery({ open: detail.site, customer: detail.customer ?? '' })}`)}>
-                Apri sito
-              </Button>
-            ) : null}
-            <Button size="small" variant="outlined" onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer ?? '', site: detail.site ?? '' })}`)}>
-              Apri inventario
-            </Button>
-          </Stack>
           <DrawerSection title="Dati contatto">
             <DrawerFieldList
               rows={[

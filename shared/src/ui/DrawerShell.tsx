@@ -219,6 +219,8 @@ export interface DrawerShellProps {
   title: string
   subtitle?: string
   caption?: string
+  /** Testo sfumato in trasparenza subito dopo la freccia indietro, allineato a sinistra (es. tipo/categoria). Opt-in. */
+  heroWatermark?: string
 
   // ── Hero: tab bar interna ──
   /**
@@ -268,6 +270,7 @@ export function DrawerShell({
   title,
   subtitle,
   caption,
+  heroWatermark,
   // tab
   tabs,
   tabValue = 0,
@@ -376,9 +379,23 @@ export function DrawerShell({
 
           {/* Riga 1: status + azioni */}
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}>
-            <Box sx={{ minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
               {resolvedStatusSlot}
-            </Box>
+              {heroWatermark ? (
+                <Typography
+                  aria-hidden="true"
+                  sx={{
+                    fontSize: 12, fontWeight: 700, lineHeight: 1,
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                    color: 'rgba(255,255,255,0.45)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    pointerEvents: 'none', userSelect: 'none',
+                  }}
+                >
+                  {heroWatermark}
+                </Typography>
+              ) : null}
+            </Stack>
             <Stack direction="row" spacing={0.75}>
               {resolvedActions}
             </Stack>

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Box, IconButton, Typography } from '@mui/material'
+import { Box, IconButton, Stack, Typography } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { alpha, useTheme } from '@mui/material/styles'
 
@@ -14,9 +14,11 @@ import { FS } from './style'
 // Cartina reale d'Italia (confini ISTAT semplificati, vedi data/italyMapGeo.ts
 // e data/italyProvinceGeo.ts): livello 1 mostra le 20 regioni come sagoma
 // geografica vera; click su una regione → drill-down nella vista zoomata di
-// quella regione con i confini reali delle sue province, un pallino + etichetta
-// per ciascuna (posizionati sul centroide del poligono, non sul municipio
-// esatto). Click su una provincia con clienti → richiama onSelectProvince.
+// quella regione con i confini reali delle sue province. A differenza del
+// livello 1, le province NON riportano il nome disegnato sopra la sagoma:
+// l'abbinamento nome↔provincia avviene tramite la lista a destra della
+// mappa, che si evidenzia in sincrono con l'hover sulla sagoma (e viceversa).
+// Click su una provincia con clienti (da mappa o da lista) → onSelectProvince.
 
 const REGION_NAME: Record<RegionId, string> = Object.fromEntries(
   ITALIAN_REGIONS.map((r) => [r.id, r.name]),
@@ -25,6 +27,18 @@ const REGION_NAME: Record<RegionId, string> = Object.fromEntries(
 const PROVINCE_NAME: Record<string, string> = Object.fromEntries(
   ITALIAN_PROVINCES.map((p) => [p.sigla, p.name]),
 )
+
+// Rimuove il riquadro di focus (rettangolo nero) che i browser disegnano di
+// default sugli elementi SVG focusabili dopo un click col mouse, mantenendo
+// però l'indicatore visibile per la navigazione da tastiera (:focus-visible).
+function MapFocusStyle({ accentColor }: { accentColor: string }) {
+  return (
+    <style>{`
+      .italy-map-shape { outline: none; }
+      .italy-map-shape:focus-visible { outline: 2px solid ${accentColor}; outline-offset: 1px; }
+    `}</style>
+  )
+}
 
 export function ItalyRegionMap({
   provinceCounts,
@@ -50,7 +64,8 @@ export function ItalyRegionMap({
   if (!selectedRegion) {
     return (
       <Box>
-        <Box sx={{ maxWidth: 420, mx: 'auto' }}>
+        <MapFocusStyle accentColor={theme.palette.primary.main} />
+        <Box sx={{ maxWidth: 380, mx: 'auto' }}>
           <svg viewBox={ITALY_MAP_VIEWBOX} width="100%" role="img" aria-label="Cartina d'Italia per regione">
             {ITALIAN_REGIONS.map((region) => {
               const count = regionCounts[region.id] ?? 0
@@ -65,6 +80,7 @@ export function ItalyRegionMap({
               return (
                 <path
                   key={region.id}
+                  className="italy-map-shape"
                   d={ITALY_REGION_PATHS[region.id]}
                   fill={fill}
                   stroke={theme.palette.common.white}
@@ -98,9 +114,13 @@ export function ItalyRegionMap({
 
   // ── Livello 2: drill-down province della regione selezionata ────────────
   const geo = ITALY_PROVINCE_GEO[selectedRegion]
+  const sortedProvinces = [...geo.provinces].sort((a, b) =>
+    (PROVINCE_NAME[a.sigla] ?? a.sigla).localeCompare(PROVINCE_NAME[b.sigla] ?? b.sigla, 'it'),
+  )
 
   return (
     <Box>
+      <MapFocusStyle accentColor={theme.palette.primary.main} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <IconButton size="small" onClick={() => setSelectedRegion(null)} aria-label="Torna alla cartina">
           <ArrowBackIcon fontSize="small" />
@@ -110,57 +130,106 @@ export function ItalyRegionMap({
         </Typography>
       </Box>
 
-      <Box sx={{ maxWidth: 420, mx: 'auto' }}>
-        <svg viewBox={geo.viewBox} width="100%" role="img" aria-label={`Province di ${REGION_NAME[selectedRegion]}`}>
-          {geo.provinces.map((p) => {
-            const count = provinceCounts[p.sigla] ?? 0
-            const hasCustomers = count > 0
-            const isHover = hoverId === p.sigla
-            const fill = isHover
-              ? alpha(theme.palette.primary.main, 0.45)
-              : hasCustomers
-                ? alpha(theme.palette.primary.main, 0.22)
-                : theme.palette.grey[50]
+      <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
+        <Box sx={{ flex: '0 1 300px', minWidth: 0 }}>
+          <svg viewBox={geo.viewBox} width="100%" role="img" aria-label={`Province di ${REGION_NAME[selectedRegion]}`}>
+            {geo.provinces.map((p) => {
+              const count = provinceCounts[p.sigla] ?? 0
+              const hasCustomers = count > 0
+              const isHover = hoverId === p.sigla
+              const fill = isHover
+                ? alpha(theme.palette.primary.main, 0.45)
+                : hasCustomers
+                  ? alpha(theme.palette.primary.main, 0.22)
+                  : theme.palette.grey[50]
 
-            return (
-              <g
-                key={p.sigla}
-                style={{ cursor: hasCustomers ? 'pointer' : 'default' }}
-                onClick={() => { if (hasCustomers) onSelectProvince(p.sigla) }}
-                onMouseEnter={() => setHoverId(p.sigla)}
-                onMouseLeave={() => setHoverId(null)}
-              >
-                <title>{`${PROVINCE_NAME[p.sigla] ?? p.sigla}${count ? ` — ${count} client${count === 1 ? 'e' : 'i'}` : ' — nessun cliente'}`}</title>
+              return (
                 <path
+                  key={p.sigla}
+                  className="italy-map-shape"
                   d={p.path}
                   fill={fill}
                   stroke={theme.palette.common.white}
                   strokeWidth={1}
-                  style={{ transition: 'fill 0.1s' }}
-                />
-                <circle
-                  cx={p.cx} cy={p.cy} r={3}
-                  fill={hasCustomers ? theme.palette.primary.dark : theme.palette.grey[400]}
-                />
-                <text
-                  x={p.cx} y={p.cy - 6}
-                  textAnchor="middle"
-                  fontSize={8}
-                  fontWeight={700}
-                  fill={hasCustomers ? theme.palette.primary.dark : theme.palette.text.disabled}
-                  style={{ pointerEvents: 'none' }}
+                  style={{ cursor: hasCustomers ? 'pointer' : 'default', transition: 'fill 0.1s' }}
+                  onClick={() => { if (hasCustomers) onSelectProvince(p.sigla) }}
+                  onMouseEnter={() => setHoverId(p.sigla)}
+                  onMouseLeave={() => setHoverId(null)}
+                  role={hasCustomers ? 'button' : undefined}
+                  tabIndex={hasCustomers ? 0 : undefined}
+                  aria-label={`${PROVINCE_NAME[p.sigla] ?? p.sigla}${count ? ` — ${count} client${count === 1 ? 'e' : 'i'}` : ' — nessun cliente'}`}
+                  onKeyDown={(e) => {
+                    if (hasCustomers && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      onSelectProvince(p.sigla)
+                    }
+                  }}
                 >
-                  {PROVINCE_NAME[p.sigla] ?? p.sigla}{count ? ` (${count})` : ''}
-                </text>
-              </g>
+                  <title>{`${PROVINCE_NAME[p.sigla] ?? p.sigla}${count ? ` — ${count} client${count === 1 ? 'e' : 'i'}` : ' — nessun cliente'}`}</title>
+                </path>
+              )
+            })}
+          </svg>
+        </Box>
+
+        {/* Lista province a destra: sostituisce le etichette disegnate sulla
+            mappa, evidenziata in sincrono con l'hover sulla sagoma SVG. */}
+        <Stack
+          spacing={0.25}
+          sx={{ flex: '1 1 auto', minWidth: 140, maxHeight: 340, overflowY: 'auto', pr: 0.5 }}
+        >
+          {sortedProvinces.map((p) => {
+            const count = provinceCounts[p.sigla] ?? 0
+            const hasCustomers = count > 0
+            const isHover = hoverId === p.sigla
+            return (
+              <Box
+                key={p.sigla}
+                onMouseEnter={() => setHoverId(p.sigla)}
+                onMouseLeave={() => setHoverId(null)}
+                onClick={() => { if (hasCustomers) onSelectProvince(p.sigla) }}
+                role={hasCustomers ? 'button' : undefined}
+                tabIndex={hasCustomers ? 0 : undefined}
+                onKeyDown={(e) => {
+                  if (hasCustomers && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault()
+                    onSelectProvince(p.sigla)
+                  }
+                }}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.75,
+                  px: 1, py: 0.5, borderRadius: 1,
+                  cursor: hasCustomers ? 'pointer' : 'default',
+                  bgcolor: isHover ? alpha(theme.palette.primary.main, 0.14) : 'transparent',
+                  transition: 'background-color 0.1s',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    bgcolor: hasCustomers ? theme.palette.primary.dark : theme.palette.grey[400],
+                  }}
+                />
+                <Typography
+                  noWrap
+                  sx={{
+                    fontSize: FS.body,
+                    fontWeight: isHover || hasCustomers ? 600 : 400,
+                    color: hasCustomers ? 'text.primary' : 'text.disabled',
+                  }}
+                >
+                  {PROVINCE_NAME[p.sigla] ?? p.sigla}
+                  {count ? ` (${count})` : ''}
+                </Typography>
+              </Box>
             )
           })}
-        </svg>
+        </Stack>
       </Box>
 
-      <Typography sx={{ fontSize: FS.body, color: 'text.secondary', textAlign: 'center', mt: 1 }}>
+      <Typography sx={{ fontSize: FS.body, color: 'text.secondary', textAlign: 'center', mt: 1.5 }}>
         {geo.provinces.some((p) => (provinceCounts[p.sigla] ?? 0) > 0)
-          ? 'Clicca una provincia evidenziata per aprirla nella lista.'
+          ? 'Clicca una provincia evidenziata (sulla mappa o in lista) per aprirla.'
           : 'Nessun cliente in questa regione.'}
       </Typography>
     </Box>

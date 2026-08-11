@@ -1,12 +1,13 @@
 import * as React from 'react'
 import {
   Box,
-  Button,
   Chip,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material'
-import { useLocation, useNavigate } from 'react-router-dom'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
@@ -17,8 +18,7 @@ import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
-import { buildQuery } from '@shared/utils/nav'
-import { getInventoryTypeIcon } from '@shared/ui/inventoryTypeIcon'
+import { getInventoryTypeIcon, getInventoryTypeGradient } from '@shared/ui/inventoryTypeIcon'
 import AuditEventsTab from '../../ui/AuditEventsTab'
 import { isRecord } from '@shared/utils/guards'
 import { useToast } from '@shared/ui/toast'
@@ -158,8 +158,8 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
 
   return (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
-      <Box sx={{ width: 120, opacity: 0.7 }}>
-        <Typography variant="body2">{label}</Typography>
+      <Box sx={{ minWidth: 100, flexShrink: 0 }}>
+        <Typography variant="caption" sx={{ color: 'text.disabled' }}>{label}</Typography>
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
@@ -219,8 +219,7 @@ export default function InventoryDrawer({
   onDelete,
   onRestore,
 }: InventoryDrawerProps) {
-  const navigate = useNavigate()
-  const loc = useLocation()
+
   const toast = useToast()
 
   const handleCopy = async (value: string) => {
@@ -239,17 +238,26 @@ export default function InventoryDrawer({
   const hasHardwareInfo = [detail?.manufacturer, detail?.model, detail?.warranty_end_date, ...Object.values(detail?.custom_fields ?? {})]
     .some((value) => value !== '' && value !== null && value !== undefined)
 
+  const bareCloseButton = (
+    <Tooltip title="Chiudi">
+      <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.85)' }}>
+        <ArrowBackIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+  )
+
   return (
     <DrawerShell
-      open={open} onClose={onClose} gradient="teal"
-      statusLabel={detail?.status_label ? `● ${detail.status_label}` : undefined}
+      open={open} onClose={onClose} gradient={getInventoryTypeGradient(detail?.type_key)}
+      statusSlot={bareCloseButton}
       canChange={canChange} canDelete={canDelete}
       deleteBusy={deleteBusy} restoreBusy={restoreBusy} deleted={!!detail?.deleted_at}
       onEdit={onEdit} onDelete={onDelete} onRestore={onRestore}
       icon={<InventoryTypeBadgeIcon typeKey={detail?.type_key} />}
+      iconBare
+      heroWatermark={detail?.type_label ?? undefined}
       title={detail?.hostname || detail?.name || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : 'Inventario')}
       subtitle={subtitle}
-      caption={detail?.type_label ?? undefined}
       loading={detailLoading}
       tabs={['Dettagli', 'Attività']}
       tabValue={drawerTab} onTabChange={onTabChange}
@@ -258,44 +266,6 @@ export default function InventoryDrawer({
         detailLoading ? <DrawerLoadingState /> :
         !detail ? <DrawerEmptyState /> : (
           <>
-            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() =>
-                  navigate(
-                    `/customers${buildQuery({ open: detail.customer, return: loc.pathname + loc.search })}`,
-                  )
-                }
-              >
-                Apri cliente
-              </Button>
-              {detail.site ? (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() =>
-                    navigate(
-                      `/sites${buildQuery({
-                        customer: detail.customer,
-                        open: detail.site,
-                        return: loc.pathname + loc.search,
-                      })}`,
-                    )
-                  }
-                >
-                  Apri sito
-                </Button>
-              ) : null}
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => navigate(`/inventory${buildQuery({ customer: detail.customer, site: detail.site ?? '' })}`)}
-              >
-                Lista filtrata
-              </Button>
-            </Stack>
-
             {detail.has_active_issue ? (
               <Box sx={{ bgcolor: 'rgba(239, 68, 68, 0.10)', border: '1px solid', borderColor: 'rgba(239, 68, 68, 0.28)', borderRadius: 1, p: 1.75 }}>
                 <Stack direction="row" spacing={1} alignItems="flex-start">
@@ -316,7 +286,7 @@ export default function InventoryDrawer({
             ) : null}
 
             {[detail.name, detail.knumber, detail.serial_number, detail.site_display_name || detail.site_name].some(Boolean) ? (
-              <DrawerSection icon={<FingerprintIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Identificazione">
+              <DrawerSection accent="info" icon={<FingerprintIcon sx={{ fontSize: 14, color: 'info.main' }} />} title="Identificazione">
                 <DrawerFieldList
                   rows={[
                     { label: 'Nome', value: detail.name, copy: true },
@@ -330,7 +300,7 @@ export default function InventoryDrawer({
             ) : null}
 
             {[detail.hostname, detail.local_ip, detail.srsa_ip].some(Boolean) ? (
-              <DrawerSection icon={<WifiOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Rete">
+              <DrawerSection accent="secondary" icon={<WifiOutlinedIcon sx={{ fontSize: 14, color: 'secondary.main' }} />} title="Rete">
                 <DrawerFieldList
                   rows={[
                     { label: 'Hostname', value: detail.hostname, mono: true, copy: true },
@@ -343,7 +313,7 @@ export default function InventoryDrawer({
             ) : null}
 
             {(canViewSecrets ? [detail.os_user, detail.os_pwd, detail.app_usr, detail.app_pwd, detail.vnc_pwd] : [detail.os_user, detail.app_usr]).some(Boolean) ? (
-              <DrawerSection icon={<LockOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Credenziali">
+              <DrawerSection accent="warning" icon={<LockOutlinedIcon sx={{ fontSize: 14, color: 'warning.main' }} />} title="Credenziali">
                 {!canViewSecrets ? (
                   <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic', display: 'block', mb: 0.5 }}>
                     Password non visibili (permessi insufficienti)
@@ -372,7 +342,7 @@ export default function InventoryDrawer({
             ) : null}
 
             {hasHardwareInfo ? (
-              <DrawerSection icon={<MemoryOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Hardware">
+              <DrawerSection accent="success" icon={<MemoryOutlinedIcon sx={{ fontSize: 14, color: 'success.main' }} />} title="Hardware">
                 <DrawerFieldList
                   rows={[
                     { label: 'Produttore', value: detail.manufacturer },
@@ -389,7 +359,7 @@ export default function InventoryDrawer({
             ) : null}
 
             {detail.notes ? (
-              <DrawerSection icon={<NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Note" variant="muted">
+              <DrawerSection accent="neutral" icon={<NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />} title="Note">
                 <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                   {detail.notes}
                 </Typography>

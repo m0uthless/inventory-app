@@ -18,9 +18,16 @@ import {
   type SxProps,
   type Theme,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 
 // ─── DrawerSection ────────────────────────────────────────────────────────────
+
+/** Accento colore opzionale per categorizzare visivamente una sezione (bordo sx + titolo colorati). */
+export type DrawerSectionAccent = 'info' | 'secondary' | 'warning' | 'success' | 'neutral'
+
+/** Colore per l'accento 'neutral' (Note e sezioni di testo libero non categorizzate). Allineato a text.secondary. */
+const NEUTRAL_ACCENT_COLOR = '#64748b'
 
 export interface DrawerSectionProps {
   /** Icona opzionale affiancata al titolo */
@@ -29,6 +36,8 @@ export interface DrawerSectionProps {
   title?: string
   /** Variante visiva: 'default' = sfondo leggermente più chiaro | 'muted' = ancora più sfumato */
   variant?: 'default' | 'muted'
+  /** Accento colore per categoria (bordo sinistro + titolo). Opt-in, retrocompatibile se omesso. */
+  accent?: DrawerSectionAccent
   children: React.ReactNode
   sx?: SxProps<Theme>
 }
@@ -37,11 +46,23 @@ export function DrawerSection({
   icon,
   title,
   variant = 'default',
+  accent,
   children,
   sx,
 }: DrawerSectionProps) {
   const bg = variant === 'muted' ? '#fafafa' : '#f8fafc'
   const border = variant === 'muted' ? 'grey.100' : 'grey.200'
+
+  const accentSx: SxProps<Theme> | undefined = accent
+    ? {
+        bgcolor: (theme: Theme) =>
+          accent === 'neutral' ? alpha(NEUTRAL_ACCENT_COLOR, 0.06) : alpha(theme.palette[accent].main, 0.08),
+        border: 'none',
+        borderLeft: '3px solid',
+        borderLeftColor: accent === 'neutral' ? NEUTRAL_ACCENT_COLOR : `${accent}.main`,
+        borderRadius: 1,
+      }
+    : undefined
 
   return (
     <Box
@@ -51,6 +72,7 @@ export function DrawerSection({
         borderColor: border,
         borderRadius: 1,
         p: 1.75,
+        ...accentSx,
         ...sx,
       }}
     >
@@ -59,7 +81,7 @@ export function DrawerSection({
           variant="caption"
           sx={{
             fontWeight: 700,
-            color: 'text.disabled',
+            color: accent ? (accent === 'neutral' ? 'text.secondary' : `${accent}.dark`) : 'text.disabled',
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             display: 'flex',

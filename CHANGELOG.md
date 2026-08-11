@@ -18,6 +18,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - CRM — Coerenza visiva dei drawer di dettaglio: il drawer Inventory ora usa lo stesso componente condiviso (hero con tab integrate, sezioni standard) di Customer/Site/Monitor, eliminando le differenze di stile (tab bar, larghezza, azioni) tra i moduli
 - Aggiunta in attesa da su issues, aggiuunto link a issue, minor fix su issues
 - cambiato filtro issues aperte per vedere anche in attesa
+- cambio drawer inventory
 
 ### Added
 - supporto ai temi e aggiunta primo tema secondario navy

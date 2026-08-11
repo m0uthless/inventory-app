@@ -482,7 +482,7 @@ export default function SiteRepository() {
       {/* Cartina Italia per regione — naviga regione → provincia → apre/scrolla
           la sezione provincia corrispondente (passando a groupBy 'provincia'
           se necessario). */}
-      <Dialog open={mapOpen} onClose={() => setMapOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={mapOpen} onClose={() => setMapOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <MapOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
