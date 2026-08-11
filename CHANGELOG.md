@@ -7,7 +7,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
-## [0.8.1] - 2026-08-11
+## [0.8.2] - 2026-08-11
 
 ### Added
 - **[customers]** Colonna Provincia nella datagrid Customers (punto 6).
