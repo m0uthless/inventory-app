@@ -156,8 +156,8 @@ def test_reset_password_returns_plaintext_once():
 
 # ── is_staff / is_superuser: solo un superuser può toccarli ────────────────
 
-def test_has_auslbo_access_flag():
-    from auslbo.models import AuslBoUserProfile
+def test_has_portal_access_flag():
+    from portal.models import PortalUserProfile
     from crm.models import Customer, CustomerStatus
 
     admin = _make_user(with_manage_users=True)
@@ -168,16 +168,17 @@ def test_has_auslbo_access_flag():
 
     with_access = _make_user()
     without_access = _make_user()
-    AuslBoUserProfile.objects.create(user=with_access, customer=customer)
+    profile = PortalUserProfile.objects.create(user=with_access, customer=customer)
+    profile.customers.add(customer)  # 0.9.0: il default deve essere tra gli assegnati
 
     resp = c.get("/api/admin-users/")
     assert resp.status_code == 200
     by_id = {row["id"]: row for row in resp.json()}
-    assert by_id[with_access.id]["has_auslbo_access"] is True
-    assert by_id[without_access.id]["has_auslbo_access"] is False
+    assert by_id[with_access.id]["has_portal_access"] is True
+    assert by_id[without_access.id]["has_portal_access"] is False
 
 
-# ── Accesso AUSL BO (dropdown + cliente) ────────────────────────────────────
+# ── Accesso Portal (dropdown + cliente) ────────────────────────────────────
 
 def _make_customer():
     from crm.models import Customer, CustomerStatus
@@ -186,8 +187,8 @@ def _make_customer():
     return Customer.objects.create(name=f"cust_{uuid.uuid4().hex[:6]}", status=status)
 
 
-def test_auslbo_access_read_creates_profile_and_grants_module_permission():
-    from auslbo.models import AuslBoUserProfile
+def test_portal_access_read_creates_profile_and_grants_module_permission():
+    from portal.models import PortalUserProfile
 
     admin = _make_user(with_manage_users=True)
     c = _client(admin)
@@ -196,48 +197,137 @@ def test_auslbo_access_read_creates_profile_and_grants_module_permission():
 
     resp = c.patch(
         f"/api/admin-users/{target.id}/",
-        data={"auslbo_access": {"level": "read", "customer_id": customer.id}},
+        data={"portal_access": {"level": "read", "customer_id": customer.id}},
         format="json",
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["has_auslbo_access"] is True
-    assert data["auslbo_profile"] == {"customer_id": customer.id, "customer_name": str(customer)}
-    assert data["direct_permissions"]["modules"]["auslbo"] == {"r": True, "w": False, "d": False}
+    assert data["has_portal_access"] is True
+    assert data["portal_profile"] == {"customer_id": customer.id, "customer_name": str(customer)}
+    assert data["direct_permissions"]["modules"]["portal"] == {"r": True, "w": False, "d": False}
 
-    profile = AuslBoUserProfile.objects.get(user=target)
+    profile = PortalUserProfile.objects.get(user=target)
     assert profile.customer_id == customer.id
 
 
-def test_auslbo_access_none_removes_profile():
-    from auslbo.models import AuslBoUserProfile
+def test_portal_access_none_removes_profile():
+    from portal.models import PortalUserProfile
 
     admin = _make_user(with_manage_users=True)
     c = _client(admin)
     target = _make_user()
     customer = _make_customer()
-    AuslBoUserProfile.objects.create(user=target, customer=customer)
+    profile = PortalUserProfile.objects.create(user=target, customer=customer)
+    profile.customers.add(customer)  # 0.9.0: il default deve essere tra gli assegnati
 
     resp = c.patch(
         f"/api/admin-users/{target.id}/",
-        data={"auslbo_access": {"level": "none"}},
+        data={"portal_access": {"level": "none"}},
         format="json",
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["has_auslbo_access"] is False
-    assert data["auslbo_profile"] is None
-    assert not AuslBoUserProfile.objects.filter(user=target).exists()
+    assert data["has_portal_access"] is False
+    assert data["portal_profile"] is None
+    assert not PortalUserProfile.objects.filter(user=target).exists()
 
 
-def test_auslbo_access_requires_customer_when_not_none():
+# ── 0.9.0 punto 6: multi-select clienti (customer_ids) ─────────────────────
+
+def test_portal_access_with_multiple_customer_ids_sets_all_assigned():
+    from portal.models import PortalUserProfile
+
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+    c1 = _make_customer()
+    c2 = _make_customer()
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"portal_access": {"level": "read", "customer_id": c1.id, "customer_ids": [c1.id, c2.id]}},
+        format="json",
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["portal_profile"]["customer_id"] == c1.id
+    assert {c["id"] for c in data["portal_profile"]["customers"]} == {c1.id, c2.id}
+
+    profile = PortalUserProfile.objects.get(user=target)
+    assert set(profile.customers.values_list("id", flat=True)) == {c1.id, c2.id}
+    assert profile.is_active is True
+
+
+def test_portal_access_default_must_be_among_customer_ids_or_added_automatically():
+    """Se il default (customer_id) non è incluso in customer_ids, viene
+    comunque aggiunto agli assegnati — altrimenti il profilo nascerebbe
+    bloccato (is_active=False) subito dopo la creazione da questo pannello."""
+    from portal.models import PortalUserProfile
+
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+    c1 = _make_customer()
+    c2 = _make_customer()
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"portal_access": {"level": "read", "customer_id": c1.id, "customer_ids": [c2.id]}},
+        format="json",
+    )
+    assert resp.status_code == 200
+
+    profile = PortalUserProfile.objects.get(user=target)
+    assert profile.customer_id == c1.id
+    assert set(profile.customers.values_list("id", flat=True)) == {c1.id, c2.id}
+    assert profile.is_active is True
+
+
+def test_portal_access_rejects_unknown_customer_id_in_customer_ids():
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+    c1 = _make_customer()
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"portal_access": {"level": "read", "customer_id": c1.id, "customer_ids": [c1.id, 999999]}},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "portal_access" in resp.json()
+
+
+def test_portal_access_backward_compatible_without_customer_ids():
+    """Il drawer non aggiornato manda solo customer_id (single-select):
+    deve continuare a funzionare come prima del punto 6."""
+    from portal.models import PortalUserProfile
+
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+    customer = _make_customer()
+
+    resp = c.patch(
+        f"/api/admin-users/{target.id}/",
+        data={"portal_access": {"level": "read", "customer_id": customer.id}},
+        format="json",
+    )
+    assert resp.status_code == 200
+
+    profile = PortalUserProfile.objects.get(user=target)
+    assert set(profile.customers.values_list("id", flat=True)) == {customer.id}
+    assert profile.is_active is True
+
+
+def test_portal_access_requires_customer_when_not_none():
     admin = _make_user(with_manage_users=True)
     c = _client(admin)
     target = _make_user()
 
     resp = c.patch(
         f"/api/admin-users/{target.id}/",
-        data={"auslbo_access": {"level": "full"}},
+        data={"portal_access": {"level": "full"}},
         format="json",
     )
     assert resp.status_code == 400
@@ -278,7 +368,7 @@ def test_philips_forces_technician_and_clears_group_and_permissions():
     assert data["profile"]["leave_area"] is None
     assert data["groups"] == []
     assert data["direct_permissions"]["modules"]["crm"] == {"r": False, "w": False, "d": False}
-    assert data["has_auslbo_access"] is False
+    assert data["has_portal_access"] is False
 
 
 def test_philips_lockdown_applies_even_when_only_saving_permessi_tab():

@@ -156,17 +156,17 @@ def login_view(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": "User disabled"}, status=403)
 
     # ── Verifica ambito ────────────────────────────────────────────────────
-    from auslbo.permissions import _can_access_archie, _is_auslbo_user
+    from portal.permissions import _can_access_archie, _is_portal_user
 
     can_archie = getattr(user, "is_superuser", False) or _can_access_archie(user)
-    is_portal  = _is_auslbo_user(user)
+    is_portal  = _is_portal_user(user)
 
     if ambito:
-        if ambito == "auslbo" and not is_portal:
+        if ambito == "portal" and not is_portal:
             _record_failed_attempt(username=username, ip_address=ip_address)
             _audit_failed_login(request, username=username, user_obj=user, reason="ambito_not_allowed")
             return JsonResponse(
-                {"detail": "Non sei autorizzato ad accedere al portale AUSL BO."},
+                {"detail": "Non sei autorizzato ad accedere al Portal."},
                 status=403,
             )
         if ambito == "site-repo" and not can_archie:
@@ -191,9 +191,9 @@ def login_view(request: HttpRequest) -> JsonResponse:
         pass
 
     # Restituisce anche l'ambito effettivo così il frontend sa dove redirigere.
-    effective_ambito = "auslbo" if (
+    effective_ambito = "portal" if (
         is_portal
-        and not can_archie  # utente esclusivamente portal → manda su AUSL BO
+        and not can_archie  # utente esclusivamente portal → manda su Portal
         and not ambito      # auto-detect solo se ambito non era specificato
     ) else (ambito or "site-repo")
 

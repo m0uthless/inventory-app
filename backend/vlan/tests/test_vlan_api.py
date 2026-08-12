@@ -1,5 +1,5 @@
 """Test per l'API di VlanViewSet: CRUD, permessi (matrice reale
-view/add/change/delete_vlan via AuslBoModelPermissions), e le action
+view/add/change/delete_vlan via PortalModelPermissions), e le action
 ip-pool / exclude-ip / unexclude-ip.
 """
 import pytest
@@ -105,9 +105,9 @@ def test_delete_vlan_is_now_a_soft_delete(api_client, superuser, customer_status
 
 
 def test_read_requires_view_permission(api_client, customer_status, site_status):
-    """FIX 2.5 (audit 2026-07): prima IsAuslBoEditor lasciava passare
+    """FIX 2.5 (audit 2026-07): prima IsPortalEditor lasciava passare
     qualunque GET a chiunque fosse interno o portale, senza controllare
-    vlan.view_vlan. Ora AuslBoModelPermissions lo richiede esplicitamente."""
+    vlan.view_vlan. Ora PortalModelPermissions lo richiede esplicitamente."""
     from django.contrib.auth.models import Permission
 
     internal_user = make_internal_user(can_edit=False)

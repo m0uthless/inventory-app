@@ -5,7 +5,7 @@
 - limiti di dimensione e content-type
 - download del certificato via endpoint protetto
 - soft-delete/restore
-- permessi (matrice reale view/add/change/delete_devicewifi via AuslBoModelPermissions)
+- permessi (matrice reale view/add/change/delete_devicewifi via PortalModelPermissions)
 - fix 2.4: pass_certificato nascosta senza device.view_wifi_secrets, scope tenant
 
 Segue le convenzioni già in uso in device/tests/ (helper locali, non le
@@ -48,13 +48,14 @@ def _internal_user(*, can_edit: bool):
     return user
 
 
-def _auslbo_user(customer, *, can_edit: bool = False, can_view_secrets: bool = False):
-    """Utente portale AUSL BO associato al customer indicato (fix 2.4:
+def _portal_user(customer, *, can_edit: bool = False, can_view_secrets: bool = False):
+    """Utente Portal associato al customer indicato (fix 2.4:
     DeviceWifiViewSet ora rispetta lo scope tenant)."""
-    from auslbo.models import AuslBoUserProfile
+    from portal.models import PortalUserProfile
 
-    user = User.objects.create_user(username=f"wifi_auslbo_{uuid.uuid4().hex[:6]}", password="pw")
-    AuslBoUserProfile.objects.create(user=user, customer=customer)
+    user = User.objects.create_user(username=f"wifi_portal_{uuid.uuid4().hex[:6]}", password="pw")
+    profile = PortalUserProfile.objects.create(user=user, customer=customer)
+    profile.customers.add(customer)  # 0.9.0: il default deve essere tra gli assegnati
     codenames = []
     if can_edit:
         codenames += ["view_devicewifi", "add_devicewifi", "change_devicewifi", "delete_devicewifi"]
@@ -330,7 +331,7 @@ def test_no_restore_action_exposed_for_wifi_detail():
 # ─── Permessi ────────────────────────────────────────────────────────────────
 
 def test_read_requires_view_permission():
-    """FIX 2.5 (audit 2026-07): prima IsAuslBoEditor lasciava passare
+    """FIX 2.5 (audit 2026-07): prima IsPortalEditor lasciava passare
     qualunque GET senza controllare device.view_devicewifi."""
     user = _superuser()
     device = _make_device(user, suffix="permread")
@@ -478,7 +479,7 @@ def test_portal_user_cannot_see_wifi_of_another_customer():
     )
     wifi_b_id = resp_b.data["id"]
 
-    portal_a = _auslbo_user(device_a.customer, can_edit=True, can_view_secrets=True)
+    portal_a = _portal_user(device_a.customer, can_edit=True, can_view_secrets=True)
     client = _auth_client(portal_a)
 
     # Lista: deve vedere solo il proprio.
@@ -505,7 +506,7 @@ def test_portal_user_cannot_create_wifi_for_device_of_another_customer():
         )[0],
     )
 
-    portal_user = _auslbo_user(other_customer, can_edit=True, can_view_secrets=True)
+    portal_user = _portal_user(other_customer, can_edit=True, can_view_secrets=True)
     client = _auth_client(portal_user)
 
     resp = client.post(

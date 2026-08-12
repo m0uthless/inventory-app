@@ -28,6 +28,7 @@ import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
 import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -1014,6 +1015,19 @@ export function AppLayout() {
           >
             <GroupOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
             Utenti e Gruppi
+          </MenuItem>
+        )}
+
+        {hasPerm('core.manage_users') && (
+          <MenuItem
+            onClick={() => {
+              setUserAnchorEl(null)
+              nav('/accesso-portal')
+            }}
+            sx={{ fontSize: 13, py: 0.9, px: 2, minHeight: 0, gap: 1.5 }}
+          >
+            <BusinessOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+            Accesso Portal
           </MenuItem>
         )}
 

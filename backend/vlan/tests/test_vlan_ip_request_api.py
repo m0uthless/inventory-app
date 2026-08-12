@@ -1,6 +1,6 @@
 """Test per VlanIpRequestViewSet: creazione (richiedente/stato automatici),
 validazioni (IP fuori subnet, customer mismatch), workflow approve/reject e
-permessi (approve/reject riservati a IsAdminAuslBo).
+permessi (approve/reject riservati a IsAdminPortal).
 """
 import pytest
 

@@ -2,10 +2,10 @@
  * DeviceReadContent — contenuto read-only del drawer Device.
  *
  * Renderizza le tab Dettagli / RIS-PACS / WiFi a partire da un DeviceReadDetail.
- * Nessuna dipendenza auslbo-specifica: riusabile in qualsiasi frontend ARCHIE.
+ * Nessuna dipendenza portal-specifica: riusabile in qualsiasi frontend ARCHIE.
  *
  * Usato in:
- *  - frontend-auslbo (AuslBoDeviceDrawer)
+ *  - frontend-portal (PortalDeviceDrawer)
  *  - frontend (futuro)
  */
 

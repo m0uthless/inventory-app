@@ -60,10 +60,10 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-# Livelli del menu a tendina "Accesso AUSL BO" nel drawer utente. Stessa scala
+# Livelli del menu a tendina "Accesso Portal" nel drawer utente. Stessa scala
 # usata per la matrice permessi (None/Read/Read+Write/Read+Write+Delete),
-# applicata qui al modulo "auslbo" (che rappresenta l'accesso al portal).
-AUSLBO_ACCESS_LEVELS: dict[str, dict[str, bool]] = {
+# applicata qui al modulo "portal" (che rappresenta l'accesso al portal).
+PORTAL_ACCESS_LEVELS: dict[str, dict[str, bool]] = {
     "none": {"r": False, "w": False, "d": False},
     "read": {"r": True, "w": False, "d": False},
     "read_write": {"r": True, "w": True, "d": False},
@@ -71,17 +71,17 @@ AUSLBO_ACCESS_LEVELS: dict[str, dict[str, bool]] = {
 }
 
 
-def _auslbo_profile_qs():
-    """Subquery per annotare se l'utente ha accesso al portal AUSL BO.
+def _portal_profile_qs():
+    """Subquery per annotare se l'utente ha accesso al Portal.
 
     Import lazy (dentro la funzione) per evitare dipendenze a livello di
-    modulo tra le app `core` e `auslbo` durante il caricamento di Django.
-    Accesso AUSL BO = esiste un AuslBoUserProfile per l'utente (vedi
-    auslbo/permissions.py::_is_auslbo_user, stessa unica condizione).
+    modulo tra le app `core` e `portal` durante il caricamento di Django.
+    Accesso Portal = esiste un PortalUserProfile per l'utente (vedi
+    portal/permissions.py::_is_portal_user, stessa unica condizione).
     """
-    from auslbo.models import AuslBoUserProfile
+    from portal.models import PortalUserProfile
 
-    return AuslBoUserProfile.objects.filter(user_id=OuterRef("pk"))
+    return PortalUserProfile.objects.filter(user_id=OuterRef("pk"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -137,8 +137,8 @@ class UserAdminSerializer(serializers.ModelSerializer):
     groups = serializers.SerializerMethodField()
     group_permissions = serializers.SerializerMethodField()
     direct_permissions = serializers.SerializerMethodField()
-    has_auslbo_access = serializers.BooleanField(read_only=True)
-    auslbo_profile = serializers.SerializerMethodField()
+    has_portal_access = serializers.BooleanField(read_only=True)
+    portal_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -156,8 +156,8 @@ class UserAdminSerializer(serializers.ModelSerializer):
             "groups",
             "group_permissions",
             "direct_permissions",
-            "has_auslbo_access",
-            "auslbo_profile",
+            "has_portal_access",
+            "portal_profile",
             "profile",
         ]
         read_only_fields = ["username", "date_joined", "last_login"]
@@ -174,14 +174,22 @@ class UserAdminSerializer(serializers.ModelSerializer):
     def get_direct_permissions(self, obj):
         return serialize_permission_state(obj.user_permissions.all())
 
-    def get_auslbo_profile(self, obj):
+    def get_portal_profile(self, obj):
         # getattr con default: se il reverse OneToOne non esiste, Django
         # solleva RelatedObjectDoesNotExist (sottoclasse anche di AttributeError,
         # quindi getattr(..., None) la intercetta correttamente).
-        profile = getattr(obj, "auslbo_profile", None)
+        profile = getattr(obj, "portal_profile", None)
         if profile is None:
             return None
-        return {"customer_id": profile.customer_id, "customer_name": str(profile.customer)}
+        return {
+            "customer_id": profile.customer_id,
+            "customer_name": str(profile.customer),
+            "is_active": profile.is_active,
+            # 0.9.0 punto 6: tutti i clienti assegnati (multi-select nel drawer).
+            "customers": [
+                {"id": c.id, "name": str(c)} for c in profile.customers.all().order_by("name")
+            ],
+        }
 
 
 class UserAdminWriteSerializer(serializers.Serializer):
@@ -199,12 +207,12 @@ class UserAdminWriteSerializer(serializers.Serializer):
     extra_permission_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
     profile = serializers.DictField(required=False)
     # {"level": "none"|"read"|"read_write"|"full", "customer_id": int|null}
-    auslbo_access = serializers.DictField(required=False)
+    portal_access = serializers.DictField(required=False)
 
 
 class UserAdminCreateSerializer(serializers.Serializer):
     """Payload di creazione utente. Riusa gli stessi campi "annidati"
-    (gruppi/permessi/profilo/auslbo) di `UserAdminWriteSerializer`, applicati
+    (gruppi/permessi/profilo/portal) di `UserAdminWriteSerializer`, applicati
     tramite `_apply_write` subito dopo la creazione della riga `User`."""
 
     username = serializers.CharField(max_length=150)
@@ -218,7 +226,7 @@ class UserAdminCreateSerializer(serializers.Serializer):
     extra_permission_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
     profile = serializers.DictField(required=False)
     # {"level": "none"|"read"|"read_write"|"full", "customer_id": int|null}
-    auslbo_access = serializers.DictField(required=False)
+    portal_access = serializers.DictField(required=False)
 
     def validate_username(self, value: str) -> str:
         value = value.strip()
@@ -256,9 +264,9 @@ class UserAdminViewSet(
     def get_queryset(self):
         return (
             User.objects.all()
-            .select_related("profile", "profile__leave_area", "auslbo_profile", "auslbo_profile__customer")
-            .prefetch_related("groups", "user_permissions")
-            .annotate(has_auslbo_access=Exists(_auslbo_profile_qs()))
+            .select_related("profile", "profile__leave_area", "portal_profile", "portal_profile__customer")
+            .prefetch_related("groups", "user_permissions", "portal_profile__customers")
+            .annotate(has_portal_access=Exists(_portal_profile_qs()))
             .order_by("username")
         )
 
@@ -290,7 +298,7 @@ class UserAdminViewSet(
         # Un utente Philips è automaticamente tecnico ServiceNow, non può
         # essere coordinatore ferie né segreteria rimborsi spese, non ha area
         # ferie, non appartiene a nessun gruppo e non ha permessi sui moduli
-        # Archie/AUSL BO. Enforced qui (non solo lato UI) così una chiamata
+        # Archie/Portal. Enforced qui (non solo lato UI) così una chiamata
         # diretta all'API non può aggirare il vincolo.
         incoming_profile = dict(data.get("profile") or {})
         if "is_philips" in incoming_profile:
@@ -309,7 +317,7 @@ class UserAdminViewSet(
                 "group_ids": [],
                 "module_permissions": {},
                 "extra_permission_ids": [],
-                "auslbo_access": {"level": "none"},
+                "portal_access": {"level": "none"},
             }
 
         if "group_ids" in data:
@@ -319,34 +327,53 @@ class UserAdminViewSet(
 
         module_permissions = dict(data.get("module_permissions") or {})
 
-        if "auslbo_access" in data:
-            access = data.get("auslbo_access") or {}
+        if "portal_access" in data:
+            access = data.get("portal_access") or {}
             level = access.get("level") or "none"
-            if level not in AUSLBO_ACCESS_LEVELS:
-                raise serializers.ValidationError({"auslbo_access": "Livello non valido."})
+            if level not in PORTAL_ACCESS_LEVELS:
+                raise serializers.ValidationError({"portal_access": "Livello non valido."})
             customer_id = access.get("customer_id")
+            # 0.9.0 punto 6: customer_ids = TUTTI i clienti assegnati (multi-select).
+            # Retrocompatibilità: se il client non lo manda ancora (drawer non
+            # aggiornato), si comporta come prima — un solo cliente assegnato,
+            # coincidente col default.
+            customer_ids = access.get("customer_ids")
+            if customer_ids is None:
+                customer_ids = [customer_id] if customer_id else []
 
-            from auslbo.models import AuslBoUserProfile
+            from portal.models import PortalUserProfile
 
             if level == "none":
-                AuslBoUserProfile.objects.filter(user=user).delete()
+                PortalUserProfile.objects.filter(user=user).delete()
             else:
                 if not customer_id:
                     raise serializers.ValidationError(
-                        {"auslbo_access": "Seleziona un cliente per abilitare l'accesso AUSL BO."}
+                        {"portal_access": "Seleziona un cliente di default per abilitare l'accesso Portal."}
                     )
                 from crm.models import Customer
 
-                if not Customer.objects.filter(pk=customer_id).exists():
-                    raise serializers.ValidationError({"auslbo_access": "Cliente non trovato."})
-                AuslBoUserProfile.objects.update_or_create(user=user, defaults={"customer_id": customer_id})
+                valid_ids = set(
+                    Customer.objects.filter(pk__in=[*customer_ids, customer_id]).values_list("id", flat=True)
+                )
+                if customer_id not in valid_ids:
+                    raise serializers.ValidationError({"portal_access": "Cliente di default non trovato."})
+                invalid_ids = set(customer_ids) - valid_ids
+                if invalid_ids:
+                    raise serializers.ValidationError({"portal_access": "Uno o più clienti assegnati non esistono."})
 
-            # Il livello scelto vale anche come RWD del modulo "auslbo": ha
-            # priorità su un eventuale module_permissions["auslbo"] inviato
-            # dal client (nel drawer il modulo "auslbo" non è editabile come
+                profile, _ = PortalUserProfile.objects.update_or_create(
+                    user=user, defaults={"customer_id": customer_id}
+                )
+                # Il default deve SEMPRE far parte degli assegnati, altrimenti
+                # il profilo nascerebbe già bloccato (is_active=False).
+                profile.customers.set({*customer_ids, customer_id})
+
+            # Il livello scelto vale anche come RWD del modulo "portal": ha
+            # priorità su un eventuale module_permissions["portal"] inviato
+            # dal client (nel drawer il modulo "portal" non è editabile come
             # riga separata, è rappresentato solo da questo controllo).
-            module_permissions["auslbo"] = AUSLBO_ACCESS_LEVELS[level]
-            changed_fields.append("auslbo_access")
+            module_permissions["portal"] = PORTAL_ACCESS_LEVELS[level]
+            changed_fields.append("portal_access")
 
         if module_permissions or "extra_permission_ids" in data:
             ids = compute_permission_ids(

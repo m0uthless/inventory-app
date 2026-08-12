@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     "drive",
     "issues",
     "feedback.apps.FeedbackConfig",
-    "auslbo.apps.AuslBoConfig",
+    "portal.apps.PortalConfig",
     "device.apps.DeviceConfig",
     "vlan.apps.VlanConfig",
     "servicenow.apps.ServicenowConfig",
@@ -285,7 +285,7 @@ CSRF_COOKIE_HTTPONLY = _env_bool("DJANGO_CSRF_COOKIE_HTTPONLY", default=False)
 SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
 
-# In produzione con più sottodomini (es. archie.biotron.it + auslbo.biotron.it)
+# In produzione con più sottodomini (es. archie.biotron.it + portal.biotron.it)
 # impostare DJANGO_SESSION_COOKIE_DOMAIN=.biotron.it per condividere la sessione.
 # In dev lasciare vuoto — stessa sessione su stesso host con porte diverse.
 _cookie_domain = os.getenv("DJANGO_SESSION_COOKIE_DOMAIN", "").strip()

@@ -7,6 +7,19 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Added
+- **[portal]** Multi-cliente per utente: `PortalUserProfile` ora ha, oltre al cliente di default, un M2M `customers` con tutti i clienti assegnabili. Il cliente attivo è risolto da sessione server-side (mai header/localStorage), con self-healing sul default se la sessione è assente o punta a un cliente non più assegnato.
+- **[portal]** Nuovo endpoint `POST /api/portal/switch-customer/` per cambiare il cliente attivo, con validazione contro i clienti assegnati; `GET /api/portal/me/` esteso con l'elenco `customers` completo.
+- **[portal]** Blocco esplicito dell'accesso (403 con messaggio dedicato) quando il cliente di default non è più tra gli assegnati, invece di un fallback silenzioso su un altro cliente — richiede riassegnazione da parte di un admin.
+- **[portal]** Dropdown di selezione cliente in topbar sul frontend Portal, visibile solo per gli utenti con più di un cliente assegnato.
+- **[admin]** Multi-select clienti nel drawer utente (sezione "Accesso Portal" in Utenti e Gruppi), con scelta del cliente di default tra quelli selezionati.
+- **[admin]** Nuova schermata "Accesso Portal" (voce di menu separata da "Utenti e Gruppi"): vista d'insieme utenti × clienti, ricerca, filtro per cliente, stato "Sospeso" in evidenza per i profili bloccati. Riusa il drawer utente esistente per la modifica.
+- **[portal]** Management command `rename_auslbo_to_portal`, idempotente: rinomina in-place lo storico DB dell'app `auslbo` (tabella, `ContentType`, `Permission`, `django_migrations`) senza invalidare i permessi già assegnati ai Gruppi in produzione.
+
+### Changed
+- **[portal]** Rename completo del modulo "AUSL BO" in "Portal": app backend `auslbo` → `portal`, frontend `frontend-auslbo` → `frontend-portal`, servizio Docker/target Caddy, endpoint `/api/auslbo/*` → `/api/portal/*`. Gruppo Django legacy rinominato automaticamente in `user_portal` al primo `post_migrate`.
+- **[portal]** Dominio pubblico da `auslbo.biotron.it` a `portal.biotron.it` (taglio netto, nessun redirect).
+
 ### Fixed
 - conflitto --version con flag builtin Django in create_changelog_entry, rinominato in --release-version
 

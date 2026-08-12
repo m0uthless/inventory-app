@@ -3,10 +3,10 @@
  *
  * Campi opzionali (?) riflettono le differenze tra i due frontend:
  *  - frontend interno espone customer_id, relazioni FK, timestamp
- *  - frontend-auslbo espone sottoinsieme read-only senza FK
+ *  - frontend-portal espone sottoinsieme read-only senza FK
  *
  * Usato in:
- *  - frontend-auslbo (AuslBoContactDrawer, AuslBoSiteDrawer)
+ *  - frontend-portal (PortalContactDrawer, PortalSiteDrawer)
  *  - frontend (ContactDrawer, SiteDrawer)
  */
 

@@ -20,7 +20,7 @@ import LogoutIcon from '@mui/icons-material/Logout'
  * sbloccare la sessione dopo un periodo di inattività (vedi useIdleTimer).
  *
  * Condivisa tra frontend Archie e frontend AUSL BO (fix "parità idle-lock",
- * audit 2026-07: prima esisteva solo in Archie, AUSLBO non aveva alcun
+ * audit 2026-07: prima esisteva solo in Archie, PORTAL non aveva alcun
  * blocco/logout automatico per inattività). Non dipende da un useAuth()
  * specifico: riceve i dati utente e le azioni via props.
  */

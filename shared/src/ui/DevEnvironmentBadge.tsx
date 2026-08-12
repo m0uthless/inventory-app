@@ -16,7 +16,7 @@ export const isDevEnvironment = import.meta.env.VITE_APP_ENV === 'development'
  * browser, cosi da distinguere le tab anche senza guardare lo schermo.
  *
  * Renderizza null in produzione: montarlo incondizionatamente in
- * AppLayout di entrambi i frontend (archie e auslbo).
+ * AppLayout di entrambi i frontend (archie e portal).
  */
 export default function DevEnvironmentBadge() {
   React.useEffect(() => {

@@ -4,7 +4,7 @@
  * Fotografia di sfondo:
  *   Copia un file immagine in:
  *     frontend/public/login-bg.jpg
- *     frontend-auslbo/public/login-bg.jpg
+ *     frontend-portal/public/login-bg.jpg
  *   Il componente la cerca automaticamente a /login-bg.jpg.
  *   Se il file non esiste mostra il gradiente blu di fallback.
  */
@@ -26,7 +26,7 @@ import DevEnvironmentBadge from './DevEnvironmentBadge'
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
-export type Ambito = 'archie' | 'auslbo'
+export type Ambito = 'archie' | 'portal'
 
 export interface AmbitoConfig {
   value: Ambito

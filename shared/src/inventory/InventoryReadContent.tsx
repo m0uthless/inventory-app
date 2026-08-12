@@ -8,7 +8,7 @@
  *  - credentialsSlot → iniettato tra Rete e Hardware (sezione credenziali frontend interno)
  *
  * Usato in:
- *  - frontend-auslbo (AuslBoInventoryDrawer) — senza slot
+ *  - frontend-portal (PortalInventoryDrawer) — senza slot
  *  - frontend (InventoryDrawer) — con header + credentialsSlot
  */
 

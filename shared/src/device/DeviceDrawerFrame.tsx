@@ -2,7 +2,7 @@
  * DeviceDrawerFrame — shell drawer condivisa per l'entità Device.
  *
  * Usata in:
- *  - frontend-auslbo (AuslBoDeviceDrawer, Device.tsx)
+ *  - frontend-portal (PortalDeviceDrawer, Device.tsx)
  *  - frontend (futuro: gestione device sul portale principale)
  *
  * Gestisce:

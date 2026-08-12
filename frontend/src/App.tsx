@@ -36,6 +36,7 @@ const RimborsoSpesePage = lazy(() => import('./pages/RimborsoSpesePage'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
 const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
 const UsersAdmin = lazy(() => import('./pages/UsersAdmin'))
+const PortalAccess = lazy(() => import('./pages/PortalAccess'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 import { RequireAuth } from './auth/RequireAuth'
@@ -226,6 +227,10 @@ const router = createBrowserRouter([
       {
         path: 'utenti',
         element: <RequirePerm perm="core.manage_users">{lazyEl(<UsersAdmin />)}</RequirePerm>,
+      },
+      {
+        path: 'accesso-portal',
+        element: <RequirePerm perm="core.manage_users">{lazyEl(<PortalAccess />)}</RequirePerm>,
       },
       { path: '*', element: lazyEl(<NotFound />) },
     ],

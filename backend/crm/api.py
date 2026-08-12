@@ -25,10 +25,10 @@ from core.integrity import raise_integrity_error_as_validation
 from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, RestoreActionMixin, PurgeActionMixin
 from core.restore_policy import split_restorable  # usato in ContactViewSet.bulk_restore()
-from auslbo.mixins import AuslBoScopedMixin, AuslBoTenantWriteMixin
-from auslbo.permissions import (
-    IsAuslBoUserOrInternal, CrmInventoryModelPermissions,
-    _is_auslbo_user, _is_internal_user,
+from portal.mixins import PortalScopedMixin, PortalTenantWriteMixin
+from portal.permissions import (
+    IsPortalUserOrInternal, CrmInventoryModelPermissions,
+    _is_portal_user, _is_internal_user,
 )
 from rest_framework.exceptions import PermissionDenied
 
@@ -176,13 +176,13 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
         ]
 
 
-class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
-    # Fix P0 6.6: un utente portale AUSL BO "puro" ora deve avere anche il
+    # Fix P0 6.6: un utente Portal "puro" ora deve avere anche il
     # permesso Django esplicito (view/add/change/delete_customer), non solo
     # essere autenticato. Gli utenti interni mantengono il comportamento
     # storico (CrmInventoryModelPermissions distingue i due casi).
-    permission_classes = [IsAuslBoUserOrInternal, CrmInventoryModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, CrmInventoryModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
     filterset_class = CustomerFilter
@@ -233,13 +233,13 @@ class CustomerViewSet(AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, S
 
     def _block_portal_write(self, request):
         """Fix P0 6.2: Customer rappresenta il tenant stesso, quindi non ha un
-        campo `customer` su cui applicare AuslBoTenantWriteMixin. Un utente
-        portale AUSL BO (non interno) non deve poter creare/eliminare
+        campo `customer` su cui applicare PortalTenantWriteMixin. Un utente
+        Portal (non interno) non deve poter creare/eliminare
         clienti, nemmeno il proprio, indipendentemente dai permessi Django
         che un gruppo gli assegni per errore sul modulo CRM."""
         user = getattr(request, "user", None)
-        if _is_auslbo_user(user) and not _is_internal_user(user):
-            raise PermissionDenied("Gli utenti del portale AUSL BO non possono creare o eliminare clienti.")
+        if _is_portal_user(user) and not _is_internal_user(user):
+            raise PermissionDenied("Gli utenti del Portal non possono creare o eliminare clienti.")
 
     def create(self, request, *args, **kwargs):
         """Convert DB integrity errors into 400 ValidationError."""
@@ -407,11 +407,11 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
         ]
 
 
-class SiteViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = SiteSerializer
-    # Fix P0 6.6: view/add/change/delete_site espliciti per il portale AUSL BO
+    # Fix P0 6.6: view/add/change/delete_site espliciti per il Portal
     # (gli utenti interni mantengono il comportamento storico).
-    permission_classes = [IsAuslBoUserOrInternal, CrmInventoryModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, CrmInventoryModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
     # Fix P0 6.2: per utenti portale "puri" forza customer=proprio tenant
@@ -494,11 +494,11 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 
-class ContactViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     # Fix P0 6.6: view/add/change/delete_contact espliciti per il portale
-    # AUSL BO (gli utenti interni mantengono il comportamento storico).
-    permission_classes = [IsAuslBoUserOrInternal, CrmInventoryModelPermissions]
+    # Portal (gli utenti interni mantengono il comportamento storico).
+    permission_classes = [IsPortalUserOrInternal, CrmInventoryModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
     # Fix P0 6.2: forza customer=proprio tenant per utenti portale "puri" e
