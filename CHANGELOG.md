@@ -7,6 +7,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-20
+
 ### Added
 - **[portal]** Multi-cliente per utente: `PortalUserProfile` ora ha, oltre al cliente di default, un M2M `customers` con tutti i clienti assegnabili. Il cliente attivo è risolto da sessione server-side (mai header/localStorage), con self-healing sul default se la sessione è assente o punta a un cliente non più assegnato.
 - **[portal]** Nuovo endpoint `POST /api/portal/switch-customer/` per cambiare il cliente attivo, con validazione contro i clienti assegnati; `GET /api/portal/me/` esteso con l'elenco `customers` completo.
