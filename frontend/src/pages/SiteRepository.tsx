@@ -8,6 +8,7 @@ import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumb
 import VpnLockIcon from '@mui/icons-material/VpnLock'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
+import GridOnOutlinedIcon from '@mui/icons-material/GridOnOutlined'
 import VpnModal from '../features/customers/VpnModal'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -97,6 +98,37 @@ export default function SiteRepository() {
   }, [navigate, location])
   const editInventoryElsewhere = React.useCallback((id: number) => {
     navigate(`/inventory${buildQuery({ open: id, return: location.pathname + location.search })}`)
+  }, [navigate, location])
+
+  // Export Excel (flat, cliente → siti → inventory) scoped a un solo
+  // cliente: stesso pattern download-via-blob di ServiceNowStats.tsx
+  // (handleExportPdf), qui però innescato dal menu contestuale invece che
+  // da un bottone di pagina (export "singolo cliente", non filtro pagina).
+  const exportCustomerExcel = React.useCallback(async (row: CustomerRow) => {
+    try {
+      const res = await api.get(`/customers/${row.id}/export-site-repository/`, { responseType: 'blob' })
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `site_repository_${row.code || row.id}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }, [toast])
+
+  // Bottone "Contatti" (visibile solo con più di un contatto collegato):
+  // deep-link a /contacts pre-filtrato, stesso pattern "return" delle altre
+  // deep-link di modifica sopra.
+  const openCustomerContacts = React.useCallback((customerId: number) => {
+    navigate(`/contacts${buildQuery({ customer: customerId, return: location.pathname + location.search })}`)
+  }, [navigate, location])
+  const openSiteContacts = React.useCallback((customerId: number, siteId: number) => {
+    navigate(`/contacts${buildQuery({ customer: customerId, site: siteId, return: location.pathname + location.search })}`)
   }, [navigate, location])
 
   const openIssueFromInventory = React.useCallback((row: InventoryRow, customerName: string) => {
@@ -328,12 +360,14 @@ export default function SiteRepository() {
   const [selectedId, setSelectedId]       = React.useState<number | null>(null)
   const [detail, setDetail]               = React.useState<InventoryDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
+  const [drawerTypeKeyHint, setDrawerTypeKeyHint] = React.useState<string | null>(null)
   const [drawerTab, setDrawerTab]         = React.useState(0)
   const [deleteBusy, setDeleteBusy]       = React.useState(false)
   const [restoreBusy, setRestoreBusy]     = React.useState(false)
 
-  const openDrawer = React.useCallback(async (id: number) => {
+  const openDrawer = React.useCallback(async (id: number, typeKeyHint?: string | null) => {
     setSelectedId(id); setDrawerTab(0); setDrawerOpen(true)
+    setDrawerTypeKeyHint(typeKeyHint ?? null)
     setDetailLoading(true); setDetail(null)
     try {
       const res = await api.get(`/inventories/${id}/`)
@@ -343,7 +377,9 @@ export default function SiteRepository() {
   }, [toast])
 
   const closeDrawer   = React.useCallback(() => setDrawerOpen(false), [])
-  const handleEdit    = React.useCallback(() => { /* gestito nella pagina Inventory */ }, [])
+  const handleEdit    = React.useCallback(() => {
+    if (selectedId) editInventoryElsewhere(selectedId)
+  }, [selectedId, editInventoryElsewhere])
 
   const handleDelete = React.useCallback(async () => {
     if (!selectedId) return
@@ -395,6 +431,8 @@ export default function SiteRepository() {
     const items: RowContextMenuItem[] = []
     if (canViewCustomer) items.push({ key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openCustomerDetail(row.id) })
     if (canChangeCustomer) items.push({ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => editCustomerElsewhere(row.id) })
+    // Stesso permesso di "Apri": l'export espone gli stessi dati visibili in-app.
+    if (canViewCustomer) items.push({ key: 'export-excel', label: 'Esporta Excel', icon: <GridOnOutlinedIcon fontSize="small" />, onClick: () => exportCustomerExcel(row) })
     if (row.has_vpn) items.push({ key: 'vpn', label: 'VPN', icon: <VpnLockIcon fontSize="small" sx={{ color: 'primary.main' }} />, onClick: () => openVpnModal(row), badge: 'configurata', badgeTone: 'success' })
     if (canDeleteCustomer) items.push({ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(ctxMenu), tone: 'danger' })
     return items
@@ -402,7 +440,7 @@ export default function SiteRepository() {
     ctxMenu, canChange, canDelete, canAddIssue, canViewSite, canChangeSite, canDeleteSite,
     canViewCustomer, canChangeCustomer, canDeleteCustomer, customers,
     openDrawer, editInventoryElsewhere, openIssueFromInventory,
-    openSiteDetail, editSiteElsewhere, openCustomerDetail, editCustomerElsewhere, openVpnModal,
+    openSiteDetail, editSiteElsewhere, openCustomerDetail, editCustomerElsewhere, openVpnModal, exportCustomerExcel,
   ])
 
   const deleteDialogCopy = React.useMemo(() => {
@@ -452,6 +490,8 @@ export default function SiteRepository() {
               onOpenVpn={openVpnModal}
               onOpenCustomer={openCustomerDetail}
               onOpenSite={openSiteDetail}
+              onOpenCustomerContacts={openCustomerContacts}
+              onOpenSiteContacts={openSiteContacts}
               canViewCustomer={canViewCustomer}
               canViewSite={canViewSite}
               canChangeSite={canChangeSite}
@@ -502,6 +542,7 @@ export default function SiteRepository() {
         detail={detail}
         detailLoading={detailLoading}
         selectedId={selectedId}
+        typeKeyHint={drawerTypeKeyHint}
         canViewSecrets={canViewSecrets}
         canChange={canChange}
         canDelete={canDelete}

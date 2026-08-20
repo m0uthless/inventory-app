@@ -1,9 +1,11 @@
 import * as React from 'react'
+import { useTheme, alpha } from '@mui/material/styles'
 import {
   Box, Stack, Typography, IconButton, CircularProgress, Tooltip,
   Collapse, Button,
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Divider, Paper, Chip,
+  Avatar, ToggleButton, ToggleButtonGroup, LinearProgress,
 } from '@mui/material'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -14,17 +16,22 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import HighlightOffIcon from '@mui/icons-material/HighlightOff'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
+import AddIcon from '@mui/icons-material/Add'
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
+
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import { committenteColor, type ColorTriple } from '../theme/statusTokens'
 
 import {
   type AbsenceRow, type AbsenceReason, type AbsenceStatus, type DayPart,
   type RosterRow, type RosterResponse, type HolidayRow,
   ABSENCE_REASONS, ABSENCE_STATUSES, DAY_PARTS, LEGEND,
   swatchFor, toISODate, daysInMonth, isWeekend, holidaysForArea,
-  indexAbsences, cellKey, MONTH_LABELS_IT, WEEKDAY_SHORT_IT,
+  indexAbsences, cellKey, MONTH_LABELS_IT, WEEKDAY_SHORT_IT, initialsOf, todayISO,
 } from '../features/pianoferie/pianoFerieShared'
 
 const AREA_OPEN_KEY = 'pianoferie_area_open'
@@ -101,7 +108,7 @@ function CellEditorDialog({ target, onClose, onSaved }: {
     try {
       if (existing) await api.patch(`/absences/${existing.id}/`, payload)
       else await api.post('/absences/', payload)
-      toast.success('Salvato ✅')
+      toast.success('Salvato')
       onSaved(); onClose()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -113,7 +120,7 @@ function CellEditorDialog({ target, onClose, onSaved }: {
     setBusy(true)
     try {
       await api.post(`/absences/${existing.id}/${action}/`)
-      toast.success(action === 'validate' ? 'Validata ✅' : 'Rifiutata')
+      toast.success(action === 'validate' ? 'Validata' : 'Rifiutata')
       onSaved(); onClose()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -125,7 +132,7 @@ function CellEditorDialog({ target, onClose, onSaved }: {
     setBusy(true)
     try {
       await api.delete(`/absences/${existing.id}/`)
-      toast.success('Rimossa ✅')
+      toast.success('Rimossa')
       onSaved(); onClose()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -219,7 +226,7 @@ function BulkEditorDialog({ target, onClose, onSaved }: {
       if (d.updated) parts.push(`${d.updated} aggiornate`)
       if (d.cleared) parts.push(`${d.cleared} svuotate`)
       if (d.skipped) parts.push(`${d.skipped} saltate`)
-      toast.success(parts.length ? parts.join(', ') + ' ✅' : 'Fatto ✅')
+      toast.success(parts.length ? parts.join(', ') : 'Fatto')
       onSaved(); onClose()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -315,17 +322,94 @@ function DayCell({ userId, iso, index, editable, blocked, isPartSelected, onDown
   )
 }
 
-// ─── Gruppo area ─────────────────────────────────────────────────────────────
+// ─── Riga persona (avatar + nome + celle giorno) ─────────────────────────────
+// Condivisa fra la vista "Team" (dentro AreaGroup) e la vista "Persona"
+// (lista piatta, vedi FlatPersonList) — stessa cella, stesso comportamento
+// di click/drag, cambia solo il contenitore attorno.
 
+const NAME_COL_W = 190
+
+function PersonRow({
+  u, days, index, editable, isPartSelected, onCellDown, onCellEnter, onHoverDay,
+  cellW, cellH, getBlockedSet, clientChipPalette,
+}: {
+  u: RosterRow
+  days: Date[]
+  index: Map<string, AbsenceRow>
+  editable: boolean
+  isPartSelected: (userId: number, iso: string, part: DayPart) => boolean
+  onCellDown: (u: RosterRow, iso: string, part: DayPart, existing: AbsenceRow | null) => void
+  onCellEnter: (u: RosterRow, iso: string, part: DayPart) => void
+  onHoverDay: (iso: string | null) => void
+  cellW: number
+  cellH: number
+  getBlockedSet: (areaId: number | null) => Set<string>
+  clientChipPalette: ColorTriple[]
+}) {
+  const theme = useTheme()
+  const [hovered, setHovered] = React.useState(false)
+  const ROW_HOVER_BG = alpha(theme.palette.primary.main, 0.07)
+  const blockedSet = getBlockedSet(u.area_id)
+  const avatarColor = committenteColor(u.name, clientChipPalette)
+  return (
+    <Box
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      sx={{ display: 'flex', alignItems: 'stretch', gap: '2px' }}
+    >
+      <Box sx={{
+        position: 'sticky', left: 0, zIndex: 1, width: NAME_COL_W, minWidth: NAME_COL_W,
+        display: 'flex', alignItems: 'center', gap: 0.75, px: 1,
+        bgcolor: hovered ? ROW_HOVER_BG : 'background.paper',
+        borderRight: '1px solid', borderColor: 'divider',
+      }}>
+        <Avatar sx={{
+          width: 24, height: 24, fontSize: '0.62rem', fontWeight: 700, flexShrink: 0,
+          bgcolor: avatarColor.bg, color: avatarColor.color, border: `1px solid ${avatarColor.border}`,
+        }}>
+          {initialsOf(u.name)}
+        </Avatar>
+        <Typography noWrap sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{u.name}</Typography>
+      </Box>
+      {days.map((d) => {
+        const iso = toISODate(d)
+        const blocked = blockedSet.has(iso)
+        return (
+          <Box
+            key={iso}
+            onMouseEnter={() => onHoverDay(iso)}
+            onMouseLeave={() => onHoverDay(null)}
+            sx={{
+              py: '1px',
+              bgcolor: hovered ? ROW_HOVER_BG : (isWeekend(d) ? 'action.hover' : 'transparent'),
+            }}
+          >
+            <DayCell
+              userId={u.id} iso={iso} index={index}
+              editable={editable} blocked={blocked}
+              isPartSelected={(part) => isPartSelected(u.id, iso, part)}
+              onDown={(part, existing) => onCellDown(u, iso, part, existing)}
+              onEnter={(part) => onCellEnter(u, iso, part)}
+              cellW={cellW} cellH={cellH}
+            />
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
+// ─── Gruppo area (vista "Team") ───────────────────────────────────────────────
 
 function AreaGroup({
-  areaLabel, users, days, blockedSet, index, canEditRow, open, onToggle,
+  areaLabel, users, days, getBlockedSet, index, canEditRow, open, onToggle,
   onCellDown, onCellEnter, isPartSelected, onHoverDay, cellW, cellH,
+  clientChipPalette,
 }: {
   areaLabel: string
   users: RosterRow[]
   days: Date[]
-  blockedSet: Set<string>
+  getBlockedSet: (areaId: number | null) => Set<string>
   index: Map<string, AbsenceRow>
   canEditRow: (userId: number) => boolean
   open: boolean
@@ -336,12 +420,8 @@ function AreaGroup({
   onHoverDay: (iso: string | null) => void
   cellW: number
   cellH: number
+  clientChipPalette: ColorTriple[]
 }) {
-  const nameColW = 190
-  // Riga sotto hover, per l'evidenziazione della riga (nome tecnico + celle
-  // giorno), analoga al fascio luminoso già presente per la colonna.
-  const [hoveredUserId, setHoveredUserId] = React.useState<number | null>(null)
-  const ROW_HOVER_BG = 'rgba(25,118,210,0.07)'
   return (
     <Box sx={{ mb: 1 }}>
       <Box
@@ -358,54 +438,53 @@ function AreaGroup({
       </Box>
       <Collapse in={open} timeout="auto" unmountOnExit>
         <Stack spacing="2px">
-          {users.map((u) => {
-            const editable = canEditRow(u.id)
-            const rowHovered = hoveredUserId === u.id
-            return (
-              <Box
-                key={u.id}
-                onMouseEnter={() => setHoveredUserId(u.id)}
-                onMouseLeave={() => setHoveredUserId((cur) => (cur === u.id ? null : cur))}
-                sx={{ display: 'flex', alignItems: 'stretch', gap: '2px' }}
-              >
-                <Box sx={{
-                  position: 'sticky', left: 0, zIndex: 1, width: nameColW, minWidth: nameColW,
-                  display: 'flex', alignItems: 'center', px: 1,
-                  bgcolor: rowHovered ? ROW_HOVER_BG : 'background.paper',
-                  borderRight: '1px solid', borderColor: 'divider',
-                }}>
-                  <Typography noWrap sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{u.name}</Typography>
-                </Box>
-                {days.map((d) => {
-                  const iso = toISODate(d)
-                  const blocked = blockedSet.has(iso)
-                  return (
-                    <Box
-                      key={iso}
-                      onMouseEnter={() => onHoverDay(iso)}
-                      onMouseLeave={() => onHoverDay(null)}
-                      sx={{
-                        py: '1px',
-                        bgcolor: rowHovered ? ROW_HOVER_BG : (isWeekend(d) ? 'action.hover' : 'transparent'),
-                      }}
-                    >
-                      <DayCell
-                        userId={u.id} iso={iso} index={index}
-                        editable={editable} blocked={blocked}
-                        isPartSelected={(part) => isPartSelected(u.id, iso, part)}
-                        onDown={(part, existing) => onCellDown(u, iso, part, existing)}
-                        onEnter={(part) => onCellEnter(u, iso, part)}
-                        cellW={cellW} cellH={cellH}
-                      />
-                    </Box>
-                  )
-                })}
-              </Box>
-            )
-          })}
+          {users.map((u) => (
+            <PersonRow
+              key={u.id} u={u} days={days} index={index}
+              editable={canEditRow(u.id)} isPartSelected={isPartSelected}
+              onCellDown={onCellDown} onCellEnter={onCellEnter} onHoverDay={onHoverDay}
+              cellW={cellW} cellH={cellH} getBlockedSet={getBlockedSet}
+              clientChipPalette={clientChipPalette}
+            />
+          ))}
         </Stack>
       </Collapse>
     </Box>
+  )
+}
+
+// ─── Lista piatta (vista "Persona") — stesse righe, senza raggruppamento ─────
+
+function FlatPersonList({
+  users, days, getBlockedSet, index, canEditRow,
+  onCellDown, onCellEnter, isPartSelected, onHoverDay, cellW, cellH,
+  clientChipPalette,
+}: {
+  users: RosterRow[]
+  days: Date[]
+  getBlockedSet: (areaId: number | null) => Set<string>
+  index: Map<string, AbsenceRow>
+  canEditRow: (userId: number) => boolean
+  onCellDown: (u: RosterRow, iso: string, part: DayPart, existing: AbsenceRow | null) => void
+  onCellEnter: (u: RosterRow, iso: string, part: DayPart) => void
+  isPartSelected: (userId: number, iso: string, part: DayPart) => boolean
+  onHoverDay: (iso: string | null) => void
+  cellW: number
+  cellH: number
+  clientChipPalette: ColorTriple[]
+}) {
+  return (
+    <Stack spacing="2px" sx={{ mb: 1 }}>
+      {users.map((u) => (
+        <PersonRow
+          key={u.id} u={u} days={days} index={index}
+          editable={canEditRow(u.id)} isPartSelected={isPartSelected}
+          onCellDown={onCellDown} onCellEnter={onCellEnter} onHoverDay={onHoverDay}
+          cellW={cellW} cellH={cellH} getBlockedSet={getBlockedSet}
+          clientChipPalette={clientChipPalette}
+        />
+      ))}
+    </Stack>
   )
 }
 
@@ -469,6 +548,26 @@ function SummaryPanel({ periodLabel, areaLabel, absences, pendingAbsences, roste
     }
   }, [absences])
 
+  // Ripartizione % delle ferie validate per area (solo ferie, solo
+  // validate — coerente con "Ferie validate" sopra). Mostrata solo se ci
+  // sono almeno 2 aree diverse rappresentate, altrimenti sarebbe sempre
+  // al 100% e non aggiungerebbe informazione.
+  const areaBreakdown = React.useMemo(() => {
+    const userArea = new Map<number, string>()
+    for (const u of roster) userArea.set(u.id, u.area_label || 'Senza area')
+    const half = new Map<string, number>()
+    for (const a of absences) {
+      if (a.reason !== 'ferie' || a.status !== 'validata') continue
+      const label = userArea.get(a.user) ?? 'Senza area'
+      half.set(label, (half.get(label) ?? 0) + 1)
+    }
+    const total = Array.from(half.values()).reduce((s, v) => s + v, 0)
+    if (total === 0) return []
+    return Array.from(half.entries())
+      .map(([label, h]) => ({ label, pct: Math.round((h / total) * 100) }))
+      .sort((a, b) => b.pct - a.pct)
+  }, [absences, roster])
+
   // Raggruppa le proposte per request_group: una selezione (click o
   // trascinamento) = UNA voce, validabile/rifiutabile con un solo click,
   // invece di una riga per ogni singola mezza giornata.
@@ -516,7 +615,7 @@ function SummaryPanel({ periodLabel, areaLabel, absences, pendingAbsences, roste
         // Riga singola senza request_group (dato storico): endpoint per-id.
         await Promise.all(g.ids.map((id) => api.post(`/absences/${id}/${action}/`)))
       }
-      toast.success(action === 'validate' ? 'Validato ✅' : 'Rifiutato')
+      toast.success(action === 'validate' ? 'Validato' : 'Rifiutato')
       onGroupResolved()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -526,7 +625,7 @@ function SummaryPanel({ periodLabel, areaLabel, absences, pendingAbsences, roste
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+    <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', mb: 0.25 }}>
         Riepilogo · {periodLabel}
       </Typography>
@@ -551,6 +650,20 @@ function SummaryPanel({ periodLabel, areaLabel, absences, pendingAbsences, roste
           <Typography variant="body2" sx={{ fontWeight: 700 }}>{stats.altreValidate}</Typography>
         </Stack>
       </Stack>
+
+      {areaBreakdown.length > 1 && (
+        <Stack spacing={1} sx={{ mb: 2 }}>
+          {areaBreakdown.map((row) => (
+            <Box key={row.label}>
+              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
+                <Typography variant="caption" color="text.secondary">{row.label}</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700 }}>{row.pct}%</Typography>
+              </Stack>
+              <LinearProgress variant="determinate" value={row.pct} sx={{ height: 6, borderRadius: 3 }} />
+            </Box>
+          ))}
+        </Stack>
+      )}
 
       {canEditAll && (
         <>
@@ -609,14 +722,190 @@ function SummaryPanel({ periodLabel, areaLabel, absences, pendingAbsences, roste
   )
 }
 
+// ─── Card "Assenti di oggi" ────────────────────────────────────────────────
+// Letta dalle `absences` del mese già caricate: visibile solo quando il
+// mese mostrato in griglia è quello corrente (altrimenti i dati di "oggi"
+// non sono in memoria) — non introduce nessuna chiamata API in più.
+
+function TodayAbsencesCard({ absences, clientChipPalette }: {
+  absences: AbsenceRow[]
+  clientChipPalette: ColorTriple[]
+}) {
+  const iso = todayISO()
+  const entries = React.useMemo(() => {
+    const byUser = new Map<number, AbsenceRow>()
+    for (const a of absences) {
+      if (a.date !== iso) continue
+      if (a.status !== 'validata' && a.status !== 'proposta') continue
+      const cur = byUser.get(a.user)
+      // Se un utente ha sia mattina che pomeriggio, tiene una sola voce;
+      // preferisce quella validata se presente.
+      if (!cur || (cur.status !== 'validata' && a.status === 'validata')) byUser.set(a.user, a)
+    }
+    return Array.from(byUser.values()).sort((a, b) => a.user_name.localeCompare(b.user_name))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [absences])
+
+  if (entries.length === 0) return null
+
+  const dateLabel = new Date(`${iso}T00:00:00`).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+      <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', mb: 1.25 }}>
+        Assenti di oggi · {dateLabel}
+      </Typography>
+      <Stack spacing={1}>
+        {entries.map((a) => {
+          const c = committenteColor(a.user_name, clientChipPalette)
+          const label = a.status === 'proposta' ? `${a.reason_label} (proposta)` : a.reason_label
+          return (
+            <Stack key={a.user} direction="row" alignItems="center" spacing={1}>
+              <Avatar sx={{
+                width: 22, height: 22, fontSize: '0.58rem', fontWeight: 700, flexShrink: 0,
+                bgcolor: c.bg, color: c.color, border: `1px solid ${c.border}`,
+              }}>
+                {initialsOf(a.user_name)}
+              </Avatar>
+              <Typography variant="body2" noWrap sx={{ flex: 1, fontWeight: 600 }}>{a.user_name}</Typography>
+              <Typography variant="caption" color={a.status === 'proposta' ? 'warning.main' : 'text.secondary'}>
+                {label}
+              </Typography>
+            </Stack>
+          )
+        })}
+      </Stack>
+    </Paper>
+  )
+}
+
+// ─── Card "Prossime festività" ─────────────────────────────────────────────
+
+function UpcomingHolidaysCard({ holidays }: { holidays: HolidayRow[] }) {
+  if (holidays.length === 0) return null
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+      <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', mb: 1.25 }}>Prossime festività</Typography>
+      <Stack spacing={1}>
+        {holidays.map((h) => (
+          <Stack key={h.id} direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="body2">{h.label}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {new Date(`${h.date}T00:00:00`).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+    </Paper>
+  )
+}
+
+// ─── "+ Nuova richiesta" — step 1 (persona + intervallo date + fascia) ──────
+// Step 2 riusa il BulkEditorDialog già esistente e invariato: questo dialog
+// si limita a costruire un BulkTarget e a passarlo al genitore.
+
+function NewRequestDialog({ open, onClose, roster, canEditAll, currentUserId, getBlockedSet, onNext }: {
+  open: boolean
+  onClose: () => void
+  roster: RosterRow[]
+  canEditAll: boolean
+  currentUserId: number | null
+  getBlockedSet: (areaId: number | null) => Set<string>
+  onNext: (target: BulkTarget) => void
+}) {
+  const toast = useToast()
+  const [userId, setUserId] = React.useState<number | ''>('')
+  const [dateFrom, setDateFrom] = React.useState('')
+  const [dateTo, setDateTo] = React.useState('')
+  const [dayPart, setDayPart] = React.useState<BulkDayPart>('entrambe')
+
+  React.useEffect(() => {
+    if (!open) return
+    setUserId(canEditAll ? '' : (currentUserId ?? ''))
+    setDateFrom(''); setDateTo(''); setDayPart('entrambe')
+  }, [open, canEditAll, currentUserId])
+
+  const sortedRoster = React.useMemo(
+    () => [...roster].sort((a, b) => a.name.localeCompare(b.name)),
+    [roster],
+  )
+
+  const submit = () => {
+    if (!userId) { toast.error('Seleziona una persona'); return }
+    if (!dateFrom || !dateTo) { toast.error('Seleziona un intervallo di date'); return }
+    if (dateTo < dateFrom) { toast.error('La data di fine è precedente a quella di inizio'); return }
+    const u = roster.find((r) => r.id === userId)
+    if (!u) return
+    const blocked = getBlockedSet(u.area_id)
+    const dates: string[] = []
+    const cursor = new Date(`${dateFrom}T00:00:00`)
+    const end = new Date(`${dateTo}T00:00:00`)
+    while (cursor <= end) {
+      const iso = toISODate(cursor)
+      if (!blocked.has(iso)) dates.push(iso)
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    if (dates.length === 0) { toast.error('Nessun giorno selezionabile nell\'intervallo (weekend/festività)'); return }
+    onNext({ userId: u.id, userName: u.name, dayPart, dates, editableReason: canEditAll })
+    onClose()
+  }
+
+  const currentUserName = roster.find((r) => r.id === currentUserId)?.name ?? ''
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ pb: 0.5 }}>Nuova richiesta</DialogTitle>
+      <DialogContent sx={{ pt: 2 }}>
+        <Stack spacing={2} sx={{ mt: 0.5 }}>
+          {canEditAll ? (
+            <TextField
+              select label="Persona" size="small" value={userId}
+              onChange={(e) => setUserId(e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              {sortedRoster.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+            </TextField>
+          ) : (
+            <TextField label="Persona" size="small" value={currentUserName} disabled />
+          )}
+          <Stack direction="row" spacing={1.5}>
+            <TextField
+              label="Dal" type="date" size="small" fullWidth value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Al" type="date" size="small" fullWidth value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }}
+            />
+          </Stack>
+          <TextField
+            select label="Fascia" size="small" value={dayPart}
+            onChange={(e) => setDayPart(e.target.value as BulkDayPart)}
+          >
+            <MenuItem value="entrambe">Giornata intera</MenuItem>
+            <MenuItem value="mattina">Mattina</MenuItem>
+            <MenuItem value="pomeriggio">Pomeriggio</MenuItem>
+          </TextField>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Annulla</Button>
+        <Button variant="contained" onClick={submit}>Avanti</Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 // ─── Pagina ──────────────────────────────────────────────────────────────────
 
 export default function PianoFerie() {
   const toast = useToast()
+  const theme = useTheme()
+  const statusTokens = useStatusTokens()
 
   const today = new Date()
   const [year, setYear] = React.useState(today.getFullYear())
   const [month, setMonth] = React.useState(today.getMonth())
+  const isCurrentMonth = year === today.getFullYear() && month === today.getMonth()
 
   const [roster, setRoster] = React.useState<RosterRow[]>([])
   const [canEditAll, setCanEditAll] = React.useState(false)
@@ -630,6 +919,24 @@ export default function PianoFerie() {
 
   const [editorTarget, setEditorTarget] = React.useState<EditorTarget | null>(null)
   const [bulkTarget, setBulkTarget] = React.useState<BulkTarget | null>(null)
+  const [newRequestOpen, setNewRequestOpen] = React.useState(false)
+
+  // Vista Team (raggruppata per area) vs Persona (lista piatta, senza
+  // raggruppamento).
+  const [viewMode, setViewMode] = React.useState<'team' | 'persona'>('team')
+
+  // Festività "vere" (anno reale corrente, non l'anno del mese in vista nel
+  // calendario) per la card "Prossime festività": caricate una volta sola,
+  // indipendenti dalla navigazione mese/anno che pilota `holidayRows`.
+  const [upcomingHolidays, setUpcomingHolidays] = React.useState<HolidayRow[]>([])
+  React.useEffect(() => {
+    const y = today.getFullYear()
+    const years = today.getMonth() >= 9 ? [y, y + 1] : [y]
+    Promise.all(years.map((yy) => api.get<HolidayRow[]>('/leave-holidays/', { params: { year: yy } })))
+      .then((results) => setUpcomingHolidays(results.flatMap((r) => r.data)))
+      .catch((e) => toast.error(apiErrorToMessage(e)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [areaOpen, setAreaOpen] = React.useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem(AREA_OPEN_KEY) || '{}') } catch { return {} }
@@ -708,6 +1015,22 @@ export default function PianoFerie() {
     }
     return Array.from(map.entries())
   }, [roster])
+
+  // Vista "Persona": stessa lista, ma piatta (nessun header di gruppo),
+  // ordinata per nome.
+  const flatUsers = React.useMemo(
+    () => [...roster].sort((a, b) => a.name.localeCompare(b.name)),
+    [roster],
+  )
+
+  const nextHolidays = React.useMemo(() => {
+    const iso = toISODate(today)
+    return [...upcomingHolidays]
+      .filter((h) => h.date >= iso)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 5)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upcomingHolidays])
 
   // Pannello statistiche: un coordinatore "puro" (non staff/superuser) vede
   // solo la propria area; chi ha anche accesso full (staff/superuser) vede
@@ -899,23 +1222,79 @@ export default function PianoFerie() {
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 2 }, pt: { xs: 1, md: 1.25 }, userSelect: drag ? 'none' : 'auto' }}>
-      {/* Controlli in alto a sinistra (il titolo pagina vive nella topbar) + legenda accanto */}
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }} flexWrap="wrap" rowGap={1}>
-        <IconButton size="small" onClick={goPrev}><ChevronLeftIcon /></IconButton>
-        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, minWidth: 130, textAlign: 'center' }}>{periodLabel}</Typography>
-        <IconButton size="small" onClick={goNext}><ChevronRightIcon /></IconButton>
-        <IconButton size="small" onClick={goToday} title="Oggi"><TodayIcon fontSize="small" /></IconButton>
-        <Divider flexItem orientation="vertical" sx={{ mx: 1 }} />
-        {LEGEND.map((l) => (
-          <Stack key={l.label} direction="row" alignItems="center" spacing={0.5}>
-            <Box sx={{ width: 12, height: 12, borderRadius: '3px', bgcolor: l.swatch.bg, border: '1px solid', borderColor: l.swatch.fg }} />
-            <Typography variant="caption" color="text.secondary">{l.label}</Typography>
-          </Stack>
-        ))}
-      </Stack>
-
       <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} alignItems="flex-start">
-        <Box sx={{ flexShrink: 0, minWidth: 0, maxWidth: '100%' }}>
+        <Box sx={{ flexShrink: 0, minWidth: 0, maxWidth: '100%', width: { xs: '100%', lg: 'auto' } }}>
+          {/* Card bianca — filtro mese + legenda. A destra (fuori dalla
+              card): vista Team/Persona, Esporta (placeholder), Nuova
+              richiesta. */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ mb: 1.5 }} flexWrap="wrap" rowGap={1}>
+            <Paper variant="outlined" sx={{ px: 1.5, py: 0.75 }}>
+              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" rowGap={1}>
+                <IconButton size="small" onClick={goPrev}><ChevronLeftIcon /></IconButton>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, minWidth: 130, textAlign: 'center' }}>{periodLabel}</Typography>
+                <IconButton size="small" onClick={goNext}><ChevronRightIcon /></IconButton>
+                <IconButton size="small" onClick={goToday} title="Oggi"><TodayIcon fontSize="small" /></IconButton>
+                <Divider flexItem orientation="vertical" sx={{ mx: 1 }} />
+                {LEGEND.map((l) => (
+                  <Stack key={l.label} direction="row" alignItems="center" spacing={0.5}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '3px', bgcolor: l.swatch.bg, border: '1px solid', borderColor: l.swatch.fg }} />
+                    <Typography variant="caption" color="text.secondary">{l.label}</Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Paper>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              {/* Toggle Team/Persona in stile "segmented pill": contenitore
+                  grigio arrotondato, opzione attiva = pillola bianca con
+                  ombra leggera — come nel mockup. */}
+              <ToggleButtonGroup
+                size="small" exclusive value={viewMode}
+                onChange={(_, v) => { if (v) setViewMode(v) }}
+                sx={{
+                  bgcolor: 'action.hover', borderRadius: 999, p: '3px', gap: '3px',
+                  '& .MuiToggleButtonGroup-grouped': {
+                    border: 0,
+                    borderRadius: '999px !important',
+                    textTransform: 'none',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    px: 1.5,
+                    py: 0.4,
+                    minHeight: 0,
+                    color: 'text.secondary',
+                  },
+                  '& .Mui-selected': {
+                    bgcolor: 'background.paper !important',
+                    color: 'text.primary',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  },
+                }}
+              >
+                <ToggleButton value="team">Team</ToggleButton>
+                <ToggleButton value="persona">Persona</ToggleButton>
+              </ToggleButtonGroup>
+              <Tooltip title="In arrivo" arrow>
+                <span>
+                  <Button
+                    size="small" variant="outlined" startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 16 }} />}
+                    disabled sx={{ fontSize: '0.72rem', py: 0.4, px: 1.25, minHeight: 0 }}
+                  >
+                    Esporta
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                size="small" variant="contained" color="primary" startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+                onClick={() => setNewRequestOpen(true)}
+                sx={{ fontSize: '0.72rem', py: 0.4, px: 1.25, minHeight: 0 }}
+              >
+                Nuova richiesta
+              </Button>
+            </Stack>
+          </Stack>
+
+          {/* Card bianca — SOLO il calendario (header giorni + righe). */}
+          <Paper variant="outlined" sx={{ p: 2 }}>
           {loading && roster.length === 0 ? (
             <Stack alignItems="center" py={6}><CircularProgress size={22} /></Stack>
           ) : (
@@ -928,8 +1307,8 @@ export default function PianoFerie() {
                   <Box sx={{
                     position: 'absolute', top: 0, bottom: 0,
                     left: `${192 + todayDayIndex * (cellW + 2)}px`, width: cellW,
-                    bgcolor: 'rgba(25,118,210,0.09)',
-                    border: '1px solid rgba(25,118,210,0.4)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.09),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.4)}`,
                     borderRadius: '4px', pointerEvents: 'none', zIndex: 0,
                   }} />
                 )}
@@ -940,8 +1319,8 @@ export default function PianoFerie() {
                   <Box sx={{
                     position: 'absolute', top: 0, bottom: 0,
                     left: `${192 + hoveredDayIndex * (cellW + 2)}px`, width: cellW,
-                    background: 'linear-gradient(180deg, rgba(25,118,210,0.20) 0%, rgba(25,118,210,0.07) 100%)',
-                    boxShadow: '0 0 12px 1px rgba(25,118,210,0.25)',
+                    background: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.20)} 0%, ${alpha(theme.palette.primary.main, 0.07)} 100%)`,
+                    boxShadow: `0 0 12px 1px ${alpha(theme.palette.primary.main, 0.25)}`,
                     borderRadius: '4px', pointerEvents: 'none', zIndex: 1,
                   }} />
                 )}
@@ -975,22 +1354,35 @@ export default function PianoFerie() {
                     )
                   })}
                 </Box>
-                {groups.map(([label, users]) => (
-                  <AreaGroup
-                    key={label}
-                    areaLabel={label}
-                    users={users} days={days} blockedSet={getBlockedSet(users[0]?.area_id ?? null)} index={index}
+                {viewMode === 'team' ? (
+                  groups.map(([label, users]) => (
+                    <AreaGroup
+                      key={label}
+                      areaLabel={label}
+                      users={users} days={days} getBlockedSet={getBlockedSet} index={index}
+                      canEditRow={canEditRow}
+                      open={areaOpen[label] !== false}
+                      onToggle={() => setAreaOpen((s) => ({ ...s, [label]: s[label] === false }))}
+                      onCellDown={onCellDown} onCellEnter={onCellEnter} isPartSelected={isPartSelected}
+                      onHoverDay={setHoveredIso}
+                      cellW={cellW} cellH={cellH}
+                      clientChipPalette={statusTokens.clientChipPalette}
+                    />
+                  ))
+                ) : (
+                  <FlatPersonList
+                    users={flatUsers} days={days} getBlockedSet={getBlockedSet} index={index}
                     canEditRow={canEditRow}
-                    open={areaOpen[label] !== false}
-                    onToggle={() => setAreaOpen((s) => ({ ...s, [label]: s[label] === false }))}
                     onCellDown={onCellDown} onCellEnter={onCellEnter} isPartSelected={isPartSelected}
                     onHoverDay={setHoveredIso}
                     cellW={cellW} cellH={cellH}
+                    clientChipPalette={statusTokens.clientChipPalette}
                   />
-                ))}
+                )}
               </Box>
             </Box>
           )}
+          </Paper>
 
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'left' }}>
             Click = ½ giornata · trascina lungo MAT (o POM) = solo quella fascia su più giorni · trascina toccando entrambe = giornata intera
@@ -1004,11 +1396,21 @@ export default function PianoFerie() {
             canEditAll={canEditAll} onOpenPending={openPendingFromSummary}
             onGroupResolved={reloadAll}
           />
+          {isCurrentMonth && (
+            <TodayAbsencesCard absences={absences} clientChipPalette={statusTokens.clientChipPalette} />
+          )}
+          <UpcomingHolidaysCard holidays={nextHolidays} />
         </Box>
       </Stack>
 
       <CellEditorDialog target={editorTarget} onClose={() => setEditorTarget(null)} onSaved={reloadAll} />
       <BulkEditorDialog target={bulkTarget} onClose={() => setBulkTarget(null)} onSaved={reloadAll} />
+      <NewRequestDialog
+        open={newRequestOpen} onClose={() => setNewRequestOpen(false)}
+        roster={roster} canEditAll={canEditAll} currentUserId={currentUserId}
+        getBlockedSet={getBlockedSet}
+        onNext={(target) => setBulkTarget(target)}
+      />
     </Box>
   )
 }

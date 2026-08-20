@@ -7,6 +7,7 @@ import { Box, Button, Stack } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import { DrawerShell } from '@shared/ui/DrawerShell'
+import { useKpiAccents } from '../../theme/AppThemeProvider'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import AuditEventsTab from '../../ui/AuditEventsTab'
 import type { MonitorRow } from '../../pages/Monitor'
@@ -15,6 +16,9 @@ import type { MonitorRow } from '../../pages/Monitor'
 
 function useStatoHex(): Record<string, string> {
   const theme = useTheme()
+  // 'rma' resta un grigio neutro fisso (Slate-400): nessun token del tema
+  // corrisponde a questa tonalità specifica, coerente con altri grigi
+  // "non ambigui" lasciati letterali altrove nel refactor (es. ServiceNowStats).
   return {
     in_uso:        theme.palette.success.main,
     da_installare: theme.palette.warning.main,
@@ -54,6 +58,7 @@ export default function MonitorDrawer({
   onNavigateToInventory,
 }: MonitorDrawerProps) {
   const theme = useTheme()
+  const kpiAccents = useKpiAccents()
   const STATO_HEX = useStatoHex()
   const color = STATO_HEX[detail?.stato ?? ''] ?? '#94a3b8'
   const isDeleted = !!detail?.deleted_at
@@ -73,7 +78,7 @@ export default function MonitorDrawer({
         size="small"
         variant="contained"
         endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-        sx={{ bgcolor: '#0d9488', color: theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: theme.palette.primary.main } }}
+        sx={{ bgcolor: kpiAccents.teal1, color: theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: theme.palette.primary.main } }}
         onClick={() => onNavigateToInventory(detail.inventory!)}
       >
         Apri workstation

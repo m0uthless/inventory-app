@@ -5,6 +5,12 @@ import { setApiToast, type ToastLevel } from '@shared/api/runtime'
 type Severity = 'success' | 'info' | 'warning' | 'error'
 type ToastState = { open: boolean; message: string; severity: Severity }
 
+// Colore principale del tema per i toast "positivi" (success/info); error e
+// warning restano sui colori semantici rosso/arancio di MUI, coerentemente
+// col principio già in uso nel progetto per cui quei colori sono riservati
+// agli stati di errore/attenzione reali (vedi KPI_ACCENTS).
+const THEME_COLOR_SEVERITIES: Severity[] = ['success', 'info']
+
 type ToastApi = {
   toast: (message: string, severity?: Severity) => void
   success: (message: string) => void
@@ -59,7 +65,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           onClose={() => setState((s) => ({ ...s, open: false }))}
           severity={state.severity}
           variant="filled"
-          sx={{ borderRadius: 1, alignItems: 'center' }}
+          sx={[
+            { borderRadius: 1, alignItems: 'center' },
+            THEME_COLOR_SEVERITIES.includes(state.severity) && {
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              '& .MuiAlert-icon': { color: 'primary.contrastText' },
+            },
+          ]}
         >
           {state.message}
         </Alert>

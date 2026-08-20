@@ -52,7 +52,9 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import RichEditor, { type QuillInstance } from '../ui/RichEditor'
 import WikiLinkedCustomersTab, { type WikiLink } from '../features/wiki/WikiLinkedCustomersTab'
 import WikiAttachmentsTab, { type WikiAttachment } from '../features/wiki/WikiAttachmentsTab'
-import WikiRevisionsTab, { type WikiRevision, PROSE_SX } from '../features/wiki/WikiRevisionsTab'
+import WikiRevisionsTab, { type WikiRevision, getProseSx } from '../features/wiki/WikiRevisionsTab'
+import { useWidgetAccents } from '../theme/AppThemeProvider'
+import { useTheme, alpha } from '@mui/material/styles'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,6 +143,8 @@ function WikiLinkDialog({
   const [q, setQ] = React.useState('')
   const [results, setResults] = React.useState<PageRow[]>([])
   const [loading, setLoading] = React.useState(false)
+  const widgetAccents = useWidgetAccents()
+  const theme = useTheme()
 
   React.useEffect(() => {
     if (!open) {
@@ -204,7 +208,7 @@ function WikiLinkDialog({
                 borderRadius: 1.5,
                 cursor: 'pointer',
                 border: '1px solid transparent',
-                '&:hover': { bgcolor: '#f0fdf9', borderColor: '#0f766e40' },
+                '&:hover': { bgcolor: widgetAccents.softTealBg, borderColor: alpha(theme.palette.primary.main, 0.25) },
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
@@ -359,6 +363,9 @@ export default function WikiPage() {
   const isNew = !id || id === 'new'
   const navigate = useNavigate()
   const toast = useToast()
+  const widgetAccents = useWidgetAccents()
+  const theme = useTheme()
+  const proseSx = getProseSx(widgetAccents)
 
   const [mode, setMode] = React.useState<Mode>('view')
   const [detail, setDetail] = React.useState<PageDetail | null>(null)
@@ -840,9 +847,9 @@ export default function WikiPage() {
                   height: 20,
                   fontSize: 10,
                   fontWeight: 800,
-                  bgcolor: '#f0fdf9',
+                  bgcolor: widgetAccents.softTealBg,
                   color: (theme) => theme.palette.primary.main,
-                  border: '1px solid #0f766e40',
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
                   fontFamily: 'monospace',
                 }}
               />
@@ -1298,7 +1305,7 @@ export default function WikiPage() {
           ) : (
             <Card variant="outlined" sx={{ borderRadius: 1, p: 3 }}>
               {renderHtml ? (
-                <Box dangerouslySetInnerHTML={{ __html: renderHtml }} sx={PROSE_SX} />
+                <Box dangerouslySetInnerHTML={{ __html: renderHtml }} sx={proseSx} />
               ) : (
                 <Typography color="text.disabled" fontSize={13} fontStyle="italic">
                   Nessun contenuto.

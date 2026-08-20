@@ -1,5 +1,7 @@
 import * as React from 'react'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import type { Theme } from '@mui/material/styles'
+import { alpha } from '@mui/material/styles'
 import {
   Box,
   Button,
@@ -44,6 +46,9 @@ import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import StatusChip from '@shared/ui/StatusChip'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import type { DomainStatusTokens } from '../theme/statusTokens'
+import { useThemeTokens } from '../theme/AppThemeProvider'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
 import CustomerDrawer from '../features/customers/CustomerDrawer'
@@ -96,10 +101,10 @@ type CustomerForm = {
 
 // Stile condiviso dai pulsanti "vai a sezione collegata" (Siti / Inventory / Drive)
 const navSectionButtonSx = {
-  bgcolor: '#0d9488',
+  bgcolor: (theme: Theme) => theme.palette.primary.main,
   color: (theme: Theme) => theme.palette.common.white,
   fontWeight: 600,
-  '&:hover': { bgcolor: (theme: Theme) => theme.palette.primary.main },
+  '&:hover': { bgcolor: (theme: Theme) => theme.palette.primary.dark },
 } as const
 
 type SiteMini = {
@@ -142,6 +147,7 @@ function CustomerSitesTab(props: {
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
+  const { gridZebraBase } = useThemeTokens()
 
   const params = React.useMemo(
     () =>
@@ -211,7 +217,7 @@ function CustomerSitesTab(props: {
               <ListItem
                 key={s.id}
                 disablePadding
-                sx={{ bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.03)' : 'transparent' }}
+                sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
               >
                 <ListItemButton
                   onClick={() => navigate(`/sites${buildQuery({ ...q, return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`)}
@@ -256,6 +262,7 @@ function CustomerInventoriesTab(props: {
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
+  const { gridZebraBase } = useThemeTokens()
 
   const params = React.useMemo(
     () =>
@@ -329,7 +336,7 @@ function CustomerInventoriesTab(props: {
               <ListItem
                 key={inv.id}
                 disablePadding
-                sx={{ bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.03)' : 'transparent' }}
+                sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
               >
                 <ListItemButton
                   onClick={() => navigate(`/inventory${buildQuery({ ...q, return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`)}
@@ -378,6 +385,7 @@ type DriveMini = {
 function CustomerDriveTab({ customerId }: { customerId: number }) {
   const toast = useToast()
   const navigate = useNavigate()
+  const { gridZebraBase } = useThemeTokens()
   const [items, setItems] = React.useState<DriveMini[]>([])
   const [loading, setLoading] = React.useState(false)
   const [total, setTotal] = React.useState(0)
@@ -496,7 +504,7 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
             <ListItem
               key={`${item.kind}-${item.id}`}
               disablePadding
-              sx={{ bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.03)' : 'transparent' }}
+              sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
             >
               <ListItemText
                 sx={{ px: 1.5, py: 0.75 }}
@@ -540,7 +548,7 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
   )
 }
 
-function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<CustomerRow>[] {
+function buildColumns(onVpnClick: (row: CustomerRow) => void, statusTokens: DomainStatusTokens): GridColDef<CustomerRow>[] {
   return [
   {
     field: 'id',
@@ -597,6 +605,7 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<Custom
       <StatusChip
         statusId={p.row.status ?? null}
         label={typeof p.value === 'string' ? p.value : '—'}
+        sx={{ fontWeight: 700 }}
       />
     ),
   },
@@ -620,11 +629,11 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<Custom
             icon={<WarningAmberRoundedIcon sx={{ fontSize: '0.95rem !important' }} />}
             label="Nessun contatto"
             sx={{
-              bgcolor: 'rgba(245, 158, 11, 0.12)',
-              color: '#9a6700',
-              border: '1px solid rgba(245, 158, 11, 0.18)',
+              bgcolor: statusTokens.noContactWarning.bg,
+              color: statusTokens.noContactWarning.color,
+              border: `1px solid ${statusTokens.noContactWarning.border}`,
               fontWeight: 600,
-              '& .MuiChip-icon': { color: '#d97706' },
+              '& .MuiChip-icon': { color: statusTokens.noContactWarning.iconColor },
             }}
           />
         )
@@ -649,15 +658,9 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<Custom
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
 
-const renderCustomerCard: MobileCardRenderFn<CustomerRow> = ({ row, onOpen }) => {
-  const sc = row.status != null ? ({
-    1: { bg: '#E0F2FE', fg: '#0369A1', border: '#BAE6FD' },
-    2: { bg: '#DCFCE7', fg: '#166534', border: '#BBF7D0' },
-    3: { bg: '#FEF9C3', fg: '#854D0E', border: '#FDE68A' },
-    4: { bg: '#FEE2E2', fg: '#991B1B', border: '#FECACA' },
-    5: { bg: '#EDE9FE', fg: '#5B21B6', border: '#DDD6FE' },
-    6: { bg: '#FFEDD5', fg: '#9A3412', border: '#FED7AA' },
-  } as Record<number, { bg: string; fg: string; border: string }>)[row.status] ?? null : null
+function makeRenderCustomerCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<CustomerRow> {
+  return ({ row, onOpen }) => {
+  const sc = row.status != null ? statusTokens.entityStatus[row.status] ?? null : null
 
   const meta: { label: string; value: string | null | undefined }[] = [
     { label: 'Contatto',  value: row.primary_contact_name },
@@ -688,7 +691,7 @@ const renderCustomerCard: MobileCardRenderFn<CustomerRow> = ({ row, onOpen }) =>
           {row.display_name || row.name}
         </Typography>
         {sc && row.status_label && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.fg, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.color, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
             {row.status_label}
           </Box>
         )}
@@ -717,15 +720,19 @@ const renderCustomerCard: MobileCardRenderFn<CustomerRow> = ({ row, onOpen }) =>
       )}
     </Box>
   )
+  }
 }
 
 
 // prettier-ignore
 export default function Customers() {
+  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
+  const statusTokens = useStatusTokens()
+  const renderCustomerCard = React.useMemo(() => makeRenderCustomerCard(statusTokens), [statusTokens])
   const canChange = hasPerm(PERMS.crm.customer.change)
   const canDelete = hasPerm(PERMS.crm.customer.delete)
 
@@ -960,7 +967,7 @@ export default function Customers() {
       setRestoreBusy(true)
       try {
         await api.post(`/customers/${id}/restore/`)
-        toast.success('Cliente ripristinato ✅')
+        toast.success('Cliente ripristinato')
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -1053,8 +1060,8 @@ export default function Customers() {
   }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openVpnModal, restoreBusy, restoreFromRow])
 
   const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
-    return buildColumns(openVpnModal)
-  }, [openVpnModal])
+    return buildColumns(openVpnModal, statusTokens)
+  }, [openVpnModal, statusTokens])
 
   // Configurazione filtri URL per il kebab menu delle colonne
   // If opened from global Search, we can return back to the Search results on close.
@@ -1149,12 +1156,12 @@ export default function Customers() {
       if (dlgMode === 'create') {
         const res = await api.post<CustomerDetail>('/customers/', payload)
         id = res.data.id
-        toast.success('Cliente creato ✅')
+        toast.success('Cliente creato')
       } else {
         if (!dlgId) return
         const res = await api.patch<CustomerDetail>(`/customers/${dlgId}/`, payload)
         id = res.data.id
-        toast.success('Cliente aggiornato ✅')
+        toast.success('Cliente aggiornato')
       }
 
       setDlgOpen(false)
@@ -1175,7 +1182,7 @@ export default function Customers() {
     setDeleteBusy(true)
     try {
       await api.delete(`/customers/${detail.id}/`)
-      toast.success('Cliente eliminato ✅')
+      toast.success('Cliente eliminato')
 
       // per poterlo vedere subito nel drawer dopo il delete:
       grid.setViewMode('all', { keepOpen: true })
@@ -1194,7 +1201,7 @@ export default function Customers() {
     setRestoreBusy(true)
     try {
       await api.post(`/customers/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi ✅`)
+      toast.success(`Ripristinati ${ids.length} elementi`)
       setSelectionModel(emptySelectionModel())
       reloadList()
       return true
@@ -1211,7 +1218,7 @@ export default function Customers() {
     setRestoreBusy(true)
     try {
       await api.post(`/customers/${detail.id}/restore/`)
-      toast.success('Cliente ripristinato ✅')
+      toast.success('Cliente ripristinato')
       reloadList()
       await loadDetail(detail.id)
     } catch (e) {
@@ -1254,14 +1261,7 @@ export default function Customers() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'rgba(69,127,121,0.10) !important',
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'rgba(69,127,121,0.14) !important',
-            },
+            ...zebraSx,
           },
         }}
       >
@@ -1308,7 +1308,7 @@ export default function Customers() {
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
         onTabChange={setDrawerTab}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
         sitesTabContent={detail ? (
           <CustomerSitesTab
             customerId={detail.id}

@@ -1,13 +1,18 @@
 import { Chip, type ChipProps } from '@mui/material'
 
-// Palette coerente con Customers (status_id -> colori)
+// Palette coerente con Customers/Sites (status_id -> colori).
+// Consolidamento colori 0.9.x: riassegnata in sync con
+// frontend/src/theme/statusTokens.ts → DomainStatusTokens.entityStatus
+// (quella è la fonte "principale" per Archie mobile; questa è la copia
+// condivisa consumata anche da Archie desktop e dal Portal — vanno
+// mantenute allineate a mano, shared/ non può importare da frontend/).
 const STATUS_STYLE_BY_ID: Record<number, { bg: string; fg: string }> = {
-  1: { bg: '#E0F2FE', fg: '#0369A1' }, // azzurro
-  2: { bg: '#DCFCE7', fg: '#166534' }, // verde
-  3: { bg: '#FEF9C3', fg: '#854D0E' }, // giallo
-  4: { bg: '#FEE2E2', fg: '#991B1B' }, // rosso
-  5: { bg: '#EDE9FE', fg: '#5B21B6' }, // viola
-  6: { bg: '#FFEDD5', fg: '#9A3412' }, // arancione
+  1: { bg: '#E0F2FE', fg: '#0369A1' }, // azzurro — invariato
+  2: { bg: '#E2E8F0', fg: '#334155' }, // slate — NUOVO (era verde)
+  3: { bg: '#DCFCE7', fg: '#166534' }, // verde — era 2
+  4: { bg: '#FEF9C3', fg: '#854D0E' }, // giallo — era 3
+  5: { bg: '#FEE2E2', fg: '#991B1B' }, // rosso — era 4
+  6: { bg: '#EDE9FE', fg: '#5B21B6' }, // viola — era 5 (l'arancio, ex-6, è stato rimosso)
 }
 
 function statusChipSx(statusId?: number | null) {

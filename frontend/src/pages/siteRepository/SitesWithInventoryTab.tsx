@@ -14,8 +14,9 @@ type SitesWithInventoryTabProps = {
   customerId: number
   searchQuery: string
   statusFilter: StatusFilter
-  onOpenDrawer: (id: number) => void
+  onOpenDrawer: (id: number, typeKeyHint?: string | null) => void
   onOpenSite: (id: number) => void
+  onOpenSiteContacts: (siteId: number) => void
   canViewSite: boolean
   canChangeSite: boolean
   onEditSite: (id: number) => void
@@ -27,7 +28,7 @@ type SitesWithInventoryTabProps = {
 }
 
 export function SitesWithInventoryTab({
-  customerId, searchQuery, statusFilter, onOpenDrawer, onOpenSite, canViewSite,
+  customerId, searchQuery, statusFilter, onOpenDrawer, onOpenSite, onOpenSiteContacts, canViewSite,
   canChangeSite, onEditSite,
   onSiteContextMenu, onInventoryContextMenu, refreshToken,
 }: SitesWithInventoryTabProps) {
@@ -129,6 +130,7 @@ export function SitesWithInventoryTab({
           statusFilter={statusFilter}
           onOpenDrawer={onOpenDrawer}
           onOpenSite={onOpenSite}
+          onOpenSiteContacts={() => onOpenSiteContacts(site.id)}
           canViewSite={canViewSite}
           canChangeSite={canChangeSite}
           onEditSite={onEditSite}

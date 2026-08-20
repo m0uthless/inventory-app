@@ -68,7 +68,8 @@ export default function CalendarCard() {
         flexDirection: 'column',
       }}
     >
-      {/* Fascia rossa top */}
+      {/* Fascia rossa top — metafora calendario da scrivania fisico, colore
+          fisso indipendente dal tema (come StickyNoteCard) */}
       <Box sx={{ height: 7, bgcolor: '#9b2020', flexShrink: 0 }} />
 
       {/* Header: Sabato ←→ Marzo / 2026 */}

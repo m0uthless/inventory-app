@@ -3,10 +3,10 @@
  *
  * Gestisce tutti i campi del DeviceFormState: dati base, flag (VLAN/WiFi/PACS/DoseSR),
  * sezione RIS/PACS (Autocomplete multi), sezione WiFi (IP, MAC, cert).
- * Nessuna dipendenza auslbo-specifica.
+ * Nessuna dipendenza portal-specifica.
  *
  * Usato in:
- *  - frontend-auslbo (AuslBoNewDeviceDrawer, Device.tsx)
+ *  - frontend-portal (PortalNewDeviceDrawer, Device.tsx)
  *  - frontend (futuro)
  */
 

@@ -1,10 +1,11 @@
 import * as React from 'react'
 import { alpha, useTheme } from '@mui/material/styles'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 
 import {
   Alert,
   Autocomplete,
-  Avatar,
+  Badge,
   Box,
   Button,
   Chip,
@@ -28,11 +29,13 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import LinkIcon from '@mui/icons-material/Link'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 
-import type { GridColDef } from '@mui/x-data-grid'
+import type { GridColDef, GridSortModel } from '@mui/x-data-grid'
 
 import { useAuth } from '../auth/AuthProvider'
+import { useKpiAccents } from '../theme/AppThemeProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -175,13 +178,11 @@ function inventoryLabel(item: InventoryLabelSource) {
 
 function IssuePriorityChip({ priority }: { priority: string }) {
   const m = PRIORITY_META[priority] ?? { label: priority, color: 'default' as const }
+  const dotColor = m.color === 'default' ? 'text.disabled' : `${m.color}.main`
   return (
-    <Chip
-      size="small"
-      label={m.label}
-      color={m.color}
-      variant={m.color === 'default' ? 'outlined' : 'filled'}
-    />
+    <Tooltip title={m.label}>
+      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
+    </Tooltip>
   )
 }
 
@@ -290,6 +291,7 @@ function fillChartBuckets(
 
 function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boolean }) {
   const theme = useTheme()
+  const kpiAccents = useKpiAccents()
   const toast = useToast()
   const [granularity, setGranularity] = React.useState<Granularity>('day')
   const [avgDaysGlobal, setAvgDaysGlobal] = React.useState<number | null>(null)
@@ -323,10 +325,10 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
   const avgLabel = avgDaysGlobal != null ? `${avgDaysGlobal.toFixed(1)} gg` : '—'
 
   const kpis = [
-    { label: 'Aperte',          value: open,       sub: `su ${rows.length} totali`,    accent: '#e24b4a' },
+    { label: 'Aperte',          value: open,       sub: `su ${rows.length} totali`,    accent: theme.palette.error.main },
     { label: 'In lavorazione',  value: inProg,     sub: 'in corso',                    accent: theme.palette.warning.main },
-    { label: 'Critiche aperte', value: critical,   sub: 'richiedono attenzione',       accent: '#6366f1' },
-    { label: 'Tempo medio',     value: avgLabel,   sub: 'su tutte le issue chiuse',    accent: '#14b8a6' },
+    { label: 'Critiche aperte', value: critical,   sub: critical > 0 ? 'richiedono attenzione' : 'nessuna criticità', accent: critical > 0 ? theme.palette.error.dark : theme.palette.success.main },
+    { label: 'Tempo medio',     value: avgLabel,   sub: 'su tutte le issue chiuse',    accent: kpiAccents.teal1 },
   ]
 
   const granularityOptions: { key: Granularity; label: string }[] = [
@@ -387,11 +389,11 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#E24B4A', flexShrink: 0 }} />
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: theme.palette.error.main, flexShrink: 0 }} />
                 <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>Aperte</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#16a34a', flexShrink: 0 }} />
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: theme.palette.success.main, flexShrink: 0 }} />
                 <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>Risolte/Chiuse</Typography>
               </Box>
             </Box>
@@ -421,39 +423,55 @@ function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boo
   )
 }
 
+// NOTA (color refactor 0.9.x): stile del grafico Recharts — eccezione
+// tecnica deliberata (non theme-aware, non duplicata altrove nell'app).
+// I colori "di significato" (aperte/chiuse) restano su theme.palette
+// (error/success), qui restano solo i grigi neutri di assi/griglia/tooltip,
+// centralizzati in un'unica costante per evitare 7 letterali sparsi nel file.
+const CHART_NEUTRAL = {
+  grid: 'rgba(0,0,0,0.06)',
+  axisLabel: '#888',
+  tooltipBg: '#fff',
+  tooltipBorder: 'rgba(0,0,0,0.12)',
+  tooltipShadow: 'rgba(0,0,0,0.08)',
+} as const
+
 function IssueAreaChart({ data, granularity }: { data: { label: string; opened: number; closed: number }[]; granularity: Granularity }) {
+  const theme = useTheme()
+  const openedColor = theme.palette.error.main
+  const closedColor = theme.palette.success.main
   const interval = granularity === 'day' ? 6 : 2
   return (
     <ResponsiveContainer width="100%" height={148}>
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
         <defs>
           <linearGradient id="issueAreaGradOpened" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#E24B4A" stopOpacity={0.25} />
-            <stop offset="95%" stopColor="#E24B4A" stopOpacity={0.03} />
+            <stop offset="5%"  stopColor={openedColor} stopOpacity={0.25} />
+            <stop offset="95%" stopColor={openedColor} stopOpacity={0.03} />
           </linearGradient>
           <linearGradient id="issueAreaGradClosed" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.22} />
-            <stop offset="95%" stopColor="#16a34a" stopOpacity={0.03} />
+            <stop offset="5%"  stopColor={closedColor} stopOpacity={0.22} />
+            <stop offset="95%" stopColor={closedColor} stopOpacity={0.03} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#888' }} tickLine={false} axisLine={false} interval={interval} />
-        <YAxis tick={{ fontSize: 10, fill: '#888' }} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL.grid} vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART_NEUTRAL.axisLabel }} tickLine={false} axisLine={false} interval={interval} />
+        <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL.axisLabel }} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
         <RechartsTooltip
           wrapperStyle={{ outline: 'none' }}
           contentStyle={{
-            background: '#fff',
-            border: '0.5px solid rgba(0,0,0,0.12)',
+            background: CHART_NEUTRAL.tooltipBg,
+            border: `0.5px solid ${CHART_NEUTRAL.tooltipBorder}`,
             borderRadius: 8,
             fontSize: 12,
             padding: '6px 10px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            boxShadow: `0 2px 8px ${CHART_NEUTRAL.tooltipShadow}`,
           }}
           formatter={(value: number, name: string) => [value, name === 'opened' ? 'Aperte' : 'Risolte/Chiuse'] as [number, string]}
-          labelStyle={{ color: '#888', marginBottom: 2 }}
+          labelStyle={{ color: CHART_NEUTRAL.axisLabel, marginBottom: 2 }}
         />
-        <Area type="monotone" dataKey="opened" stroke="#E24B4A" strokeWidth={2} fill="url(#issueAreaGradOpened)" dot={false} activeDot={{ r: 4, fill: '#E24B4A', strokeWidth: 0 }} />
-        <Area type="monotone" dataKey="closed" stroke="#16a34a" strokeWidth={2} fill="url(#issueAreaGradClosed)" dot={false} activeDot={{ r: 4, fill: '#16a34a', strokeWidth: 0 }} />
+        <Area type="monotone" dataKey="opened" stroke={openedColor} strokeWidth={2} fill="url(#issueAreaGradOpened)" dot={false} activeDot={{ r: 4, fill: openedColor, strokeWidth: 0 }} />
+        <Area type="monotone" dataKey="closed" stroke={closedColor} strokeWidth={2} fill="url(#issueAreaGradClosed)" dot={false} activeDot={{ r: 4, fill: closedColor, strokeWidth: 0 }} />
       </AreaChart>
     </ResponsiveContainer>
   )
@@ -464,6 +482,7 @@ function IssueAreaChart({ data, granularity }: { data: { label: string; opened: 
 
 // prettier-ignore
 export default function Issues() {
+  const zebraSx = useDataGridZebraSx()
   const loc = useLocation()
   const navigate = useNavigate()
   const { me } = useAuth()
@@ -484,6 +503,33 @@ export default function Issues() {
       assigned_to_full_name:  'assigned_to__last_name',
     },
   })
+
+  // "Giorni passati" è calcolato lato backend a partire da opened_at
+  // (SerializerMethodField, non ordinabile direttamente sul queryset).
+  // Mappiamo l'ordinamento della colonna su opened_at con direzione
+  // invertita (opened_at più vecchio ⇒ giorni passati maggiore) mantenendo
+  // localmente solo l'informazione per mostrare la freccetta sulla colonna
+  // giusta in intestazione.
+  const [daysOpenSortDir, setDaysOpenSortDir] = React.useState<'asc' | 'desc' | null>(null)
+
+  React.useEffect(() => {
+    if (grid.sortModel[0]?.field !== 'opened_at') setDaysOpenSortDir(null)
+  }, [grid.sortModel])
+
+  const handleSortModelChange = React.useCallback((model: GridSortModel) => {
+    const m = model[0]
+    if (m?.field === 'days_open') {
+      setDaysOpenSortDir(m.sort ?? null)
+      grid.onSortModelChange(m.sort ? [{ field: 'opened_at', sort: m.sort === 'asc' ? 'desc' : 'asc' }] : [])
+      return
+    }
+    setDaysOpenSortDir(null)
+    grid.onSortModelChange(model)
+  }, [grid])
+
+  const displaySortModel: GridSortModel = daysOpenSortDir
+    ? [{ field: 'days_open', sort: daysOpenSortDir }]
+    : grid.sortModel
 
   // ── Filtri extra ──────────────────────────────────────────────────────────
   const [filterStatus, setFilterStatus] = React.useState('')
@@ -1175,11 +1221,27 @@ export default function Issues() {
 
   const columns: GridColDef<IssueRow>[] = [
     {
+      field: 'opened_at',
+      headerName: 'Data apertura',
+      width: 130,
+      renderCell: ({ row }) => {
+        const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+            <Typography variant="body2">{d}</Typography>
+          </Box>
+        )
+      },
+    },
+    {
       field: 'priority',
       headerName: 'Priorità',
-      width: 110,
+      width: 64,
+      sortable: true,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
           <IssuePriorityChip priority={row.priority} />
         </Box>
       ),
@@ -1187,24 +1249,15 @@ export default function Issues() {
     {
       field: 'status',
       headerName: 'Stato',
-      width: 140,
+      width: 220,
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%' }}>
           <IssueStatusChip status={row.status} />
+          {row.status === 'waiting' && row.waiting_reason_label ? (
+            <Chip size="small" label={row.waiting_reason_label} variant="outlined" />
+          ) : null}
         </Box>
       ),
-    },
-    {
-      field: 'waiting_reason_label',
-      headerName: 'In attesa di',
-      width: 120,
-      sortable: false,
-      renderCell: ({ row }) =>
-        row.status === 'waiting' && row.waiting_reason_label ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Chip size="small" label={row.waiting_reason_label} variant="outlined" />
-          </Box>
-        ) : null,
     },
     {
       field: 'title',
@@ -1261,7 +1314,7 @@ export default function Issues() {
               ) : null}
             </>
           ) : (
-            <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
+            <Chip size="small" variant="outlined" label="Non collegato" sx={{ color: 'text.disabled', borderColor: 'divider' }} />
           )}
         </Box>
       ),
@@ -1271,16 +1324,15 @@ export default function Issues() {
       headerName: 'Cliente',
       width: 160,
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography
-            variant="body2"
-            noWrap
-            sx={row.is_customer_placeholder ? { fontStyle: 'italic', color: 'text.secondary' } : undefined}
-            title={row.is_customer_placeholder ? 'Cliente non presente in DB (testo libero)' : undefined}
-          >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%', minWidth: 0 }}>
+          <Typography variant="body2" noWrap>
             {row.customer_name}
-            {row.is_customer_placeholder ? ' *' : ''}
           </Typography>
+          {row.is_customer_placeholder ? (
+            <Tooltip title="Cliente non in Site Repository">
+              <InfoOutlinedIcon sx={{ color: 'text.disabled', fontSize: 16, flexShrink: 0 }} />
+            </Tooltip>
+          ) : null}
         </Box>
       ),
     },
@@ -1293,7 +1345,7 @@ export default function Issues() {
           {row.category_label ? (
             <Chip size="small" label={row.category_label} variant="outlined" />
           ) : (
-            <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
           )}
         </Box>
       ),
@@ -1303,27 +1355,11 @@ export default function Issues() {
       headerName: 'Assegnato a',
       width: 190,
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, height: '100%', minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
           {row.assigned_to_full_name ? (
-            <>
-              <Avatar
-                src={row.assigned_to_avatar || undefined}
-                sx={{
-                  width: 26,
-                  height: 26,
-                  fontSize: '0.74rem',
-                  bgcolor: 'rgba(15,118,110,0.12)',
-                  color: 'teal',
-                  border: '1px solid rgba(15,118,110,0.14)',
-                  flexShrink: 0,
-                }}
-              >
-                {initialsFromName(row.assigned_to_full_name)}
-              </Avatar>
-              <Typography variant="body2" noWrap>
-                {row.assigned_to_full_name}
-              </Typography>
-            </>
+            <Typography variant="body2" noWrap>
+              {row.assigned_to_full_name}
+            </Typography>
           ) : (
             <Chip size="small" variant="outlined" label="Non assegnata" sx={{ height: 24 }} />
           )}
@@ -1353,7 +1389,7 @@ export default function Issues() {
                 {d}
               </Typography>
             ) : (
-              <Typography variant="body2" sx={{ color: '#bbb' }}>—</Typography>
+              <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
             )}
           </Box>
         )
@@ -1362,42 +1398,36 @@ export default function Issues() {
     {
       field: 'comments_count',
       headerName: 'Commenti',
-      width: 110,
-      renderCell: ({ row }) => (
-        <Box
-          onClick={(e) => {
-            e.stopPropagation()
-            openDetail(row, 1)
-          }}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            width: '100%',
-            cursor: 'pointer',
-          }}
-        >
-          <Chip
-            size="small"
-            icon={<ChatBubbleOutlineIcon />}
-            label={row.comments_count ?? 0}
-            variant={row.comments_count ? 'filled' : 'outlined'}
-            color={row.comments_count ? 'primary' : 'default'}
-            sx={{ height: 24, '& .MuiChip-icon': { fontSize: 16 } }}
-          />
-        </Box>
-      ),
-    },
-    {
-      field: 'opened_at',
-      headerName: 'Data apertura',
-      width: 130,
+      width: 90,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: ({ row }) => {
-        const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
+        const count = row.comments_count ?? 0
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Typography variant="body2">{d}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%' }}>
+            <Tooltip title={count ? `${count} ${count === 1 ? 'commento' : 'commenti'}` : 'Nessun commento'}>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openDetail(row, 1)
+                }}
+                sx={{
+                  color: count ? 'primary.main' : 'text.disabled',
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, count ? 0.08 : 0),
+                  '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.16) },
+                }}
+              >
+                <Badge
+                  badgeContent={count || null}
+                  color="primary"
+                  max={99}
+                  sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 15, minWidth: 15, top: 1, right: 1 } }}
+                >
+                  <ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />
+                </Badge>
+              </IconButton>
+            </Tooltip>
           </Box>
         )
       },
@@ -1419,7 +1449,10 @@ export default function Issues() {
       field: 'days_open',
       headerName: 'Giorni passati',
       width: 120,
-      sortable: false,
+      // Campo calcolato lato backend (oggi - opened_at, SerializerMethodField):
+      // non esiste come colonna ordinabile sul queryset. Ordiniamo sfruttando
+      // opened_at (già ordinabile) con direzione invertita — vedi
+      // handleSortModelChange/displaySortModel più sotto.
       renderCell: ({ row }) => {
         const days = row.days_open ?? 0
         const color = days > 30 ? 'error.main' : days > 14 ? 'warning.main' : 'text.primary'
@@ -1443,6 +1476,12 @@ export default function Issues() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
+          alignRightActions: true,
+          rightActions: (
+            <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
+              Nuova issue
+            </Button>
+          ),
         }}
         grid={{
           pageKey: 'issues',
@@ -1454,8 +1493,8 @@ export default function Issues() {
           columns,
           paginationModel: grid.paginationModel,
           onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
+          sortModel: displaySortModel,
+          onSortModelChange: handleSortModelChange,
           onRowClick: (id) => {
             const row = rows.find((r) => r.id === id)
             if (row) openDetail(row, 0)
@@ -1464,8 +1503,7 @@ export default function Issues() {
           getRowClassName: (row) => (isClosedIssueRow(row) ? 'row-closed-issue' : undefined),
           sx: {
             cursor: 'pointer',
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
+            ...zebraSx,
             '& .row-closed-issue': { opacity: 0.5 },
             '& .row-closed-issue:hover': { opacity: 0.8 },
           },
@@ -1636,10 +1674,4 @@ export default function Issues() {
   )
 }
 
-function initialsFromName(name?: string | null) {
-  const raw = (name || '').trim()
-  if (!raw) return '—'
-  const parts = raw.split(/\s+/).filter(Boolean).slice(0, 2)
-  return parts.map((p) => p[0]?.toUpperCase() || '').join('') || raw.slice(0, 2).toUpperCase()
-}
 

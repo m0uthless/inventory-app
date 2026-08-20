@@ -5,7 +5,7 @@ import { LoginPage, type AmbitoConfig } from '@shared/ui/LoginPage'
 
 const AMBITI: AmbitoConfig[] = [
   { value: 'archie', label: 'Archie', color: '#0f766e', colorHover: '#0d5f58', colorLight: 'rgba(15,118,110,0.15)' },
-  { value: 'auslbo', label: 'AUSL BO', color: '#1A6BB5', colorHover: '#155a99', colorLight: 'rgba(26,107,181,0.15)' },
+  { value: 'portal', label: 'Portale Clienti', color: '#1A6BB5', colorHover: '#155a99', colorLight: 'rgba(26,107,181,0.15)' },
 ]
 
 describe('LoginPage accessibility (fix audit 2026-07)', () => {
@@ -23,16 +23,16 @@ describe('LoginPage accessibility (fix audit 2026-07)', () => {
     render(<LoginPage ambiti={AMBITI} onLogin={vi.fn()} />)
 
     const archieBtn = screen.getByRole('button', { name: 'Archie' })
-    const auslboBtn = screen.getByRole('button', { name: 'AUSL BO' })
+    const portalBtn = screen.getByRole('button', { name: 'Portale Clienti' })
     expect(archieBtn).toBeInTheDocument()
-    expect(auslboBtn).toBeInTheDocument()
+    expect(portalBtn).toBeInTheDocument()
 
     // Il primo ambito passato è selezionato di default.
     expect(archieBtn).toHaveAttribute('aria-pressed', 'true')
-    expect(auslboBtn).toHaveAttribute('aria-pressed', 'false')
+    expect(portalBtn).toHaveAttribute('aria-pressed', 'false')
 
-    fireEvent.click(auslboBtn)
-    expect(auslboBtn).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(portalBtn)
+    expect(portalBtn).toHaveAttribute('aria-pressed', 'true')
     expect(archieBtn).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -55,9 +55,9 @@ describe('LoginPage accessibility (fix audit 2026-07)', () => {
 
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'mario.rossi' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
-    fireEvent.click(screen.getByRole('button', { name: 'AUSL BO' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Portale Clienti' }))
     fireEvent.keyDown(screen.getByLabelText('Password'), { key: 'Enter' })
 
-    expect(onLogin).toHaveBeenCalledWith('mario.rossi', 'secret123', 'auslbo')
+    expect(onLogin).toHaveBeenCalledWith('mario.rossi', 'secret123', 'portal')
   })
 })

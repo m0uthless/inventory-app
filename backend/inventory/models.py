@@ -27,6 +27,11 @@ class Inventory(TimeStampedModel):
     local_ip = models.CharField(max_length=64, null=True, blank=True)
     srsa_ip = models.CharField(max_length=64, null=True, blank=True)
 
+    # 0.9.0: campi opzionali richiesti in scope consolidamento — posizione
+    # fisica dell'inventario (es. stanza/reparto) e telefono di riferimento.
+    location = models.CharField(max_length=255, null=True, blank=True, verbose_name="Posizione")
+    telefono = models.CharField(max_length=64, null=True, blank=True, verbose_name="Telefono")
+
     status = models.ForeignKey(InventoryStatus, on_delete=models.PROTECT)
 
     manufacturer = models.CharField(max_length=128, null=True, blank=True)

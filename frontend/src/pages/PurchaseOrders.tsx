@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
 
 import {
   Box,
@@ -61,15 +62,15 @@ import type {
 } from '../features/purchaseorders/types'
 import {
   CURRENT_YEAR,
-  STATUS_COLOR,
   STATUS_LABEL,
-  committenteColor,
   emptyForm,
   formatEuro,
   formatItDate,
   nextStatus,
   prevStatus,
 } from '../features/purchaseorders/types'
+import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
+import { useStatusTokens, useDataGridZebraSx } from '../theme/AppThemeProvider'
 
 type OpenCreateState = { openCreate?: boolean }
 
@@ -92,7 +93,12 @@ const KIND_FILTER_OPTIONS: { value: KindFilterValue; label: string }[] = [
   { value: 'extra', label: 'Extra' },
 ]
 
-const cols: GridColDef<PurchaseOrderRow>[] = [
+// `cols` era una costante a livello di modulo: STATUS_COLOR/committenteColor
+// leggevano una palette fissa, non theme-aware. Ora è una factory chiamata
+// dentro il componente (useMemo su statusTokens = useStatusTokens()), così
+// i colori seguono il tema attivo.
+function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrderRow>[] {
+  return [
   {
     field: 'offer_date',
     headerName: 'Data offerta',
@@ -109,7 +115,7 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     minWidth: 180,
     renderCell: (p) => {
       const name = p.value as string
-      const c = committenteColor(name)
+      const c = committenteColor(name, statusTokens.clientChipPalette)
       return <Chip size="small" label={name} sx={{ bgcolor: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontWeight: 600 }} />
     },
   },
@@ -134,7 +140,7 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     width: 130,
     renderCell: (p) => {
       const st = p.value as PurchaseOrderStatus
-      const c = STATUS_COLOR[st]
+      const c = statusTokens.purchaseOrder[st]
       return (
         <Chip
           size="small"
@@ -160,7 +166,7 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
     width: 130,
     renderCell: (p) =>
       p.value ? (
-        <Chip size="small" label="Fatturato" sx={{ bgcolor: 'rgba(16,185,129,0.10)', color: (theme) => theme.palette.success.dark, border: '0.5px solid rgba(16,185,129,0.28)' }} />
+        <Chip size="small" label="Fatturato" sx={{ bgcolor: statusTokens.purchaseOrder.fatturato.bg, color: statusTokens.purchaseOrder.fatturato.color, border: `0.5px solid ${statusTokens.purchaseOrder.fatturato.border}` }} />
       ) : (
         <Chip size="small" variant="outlined" label="Non fatturato" />
       ),
@@ -186,12 +192,15 @@ const cols: GridColDef<PurchaseOrderRow>[] = [
       return row.customer_name || row.customer_code || row.client_name || '—'
     },
   },
-]
+  ]
+}
 
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
+// Stesso motivo di buildColumns sopra: factory chiamata dentro il componente.
 
-const renderPurchaseOrderCard: MobileCardRenderFn<PurchaseOrderRow> = ({ row, onOpen }) => {
+function makeRenderPurchaseOrderCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<PurchaseOrderRow> {
+  return ({ row, onOpen }) => {
   const meta: { label: string; value: string | null | undefined }[] = [
     { label: 'Data offerta', value: formatItDate(row.offer_date) },
     { label: 'Purchase Order', value: row.purchase_order },
@@ -222,9 +231,9 @@ const renderPurchaseOrderCard: MobileCardRenderFn<PurchaseOrderRow> = ({ row, on
             label={row.client_name}
             sx={{
               height: 20, fontSize: '0.68rem', fontWeight: 600, maxWidth: '100%',
-              bgcolor: committenteColor(row.client_name).bg,
-              color: committenteColor(row.client_name).color,
-              border: `0.5px solid ${committenteColor(row.client_name).border}`,
+              bgcolor: committenteColor(row.client_name, statusTokens.clientChipPalette).bg,
+              color: committenteColor(row.client_name, statusTokens.clientChipPalette).color,
+              border: `0.5px solid ${committenteColor(row.client_name, statusTokens.clientChipPalette).border}`,
             }}
           />
           <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -235,7 +244,7 @@ const renderPurchaseOrderCard: MobileCardRenderFn<PurchaseOrderRow> = ({ row, on
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
             {formatEuro(row.amount)}
           </Typography>
-          <Box sx={{ fontSize: '0.62rem', fontWeight: 600, px: 0.75, py: 0.15, borderRadius: 20, whiteSpace: 'nowrap', mt: 0.25, bgcolor: STATUS_COLOR[row.status]?.bg, color: STATUS_COLOR[row.status]?.color, border: `0.5px solid ${STATUS_COLOR[row.status]?.border}` }}>
+          <Box sx={{ fontSize: '0.62rem', fontWeight: 600, px: 0.75, py: 0.15, borderRadius: 20, whiteSpace: 'nowrap', mt: 0.25, bgcolor: statusTokens.purchaseOrder[row.status]?.bg, color: statusTokens.purchaseOrder[row.status]?.color, border: `0.5px solid ${statusTokens.purchaseOrder[row.status]?.border}` }}>
             {STATUS_LABEL[row.status] || row.status}
           </Box>
         </Box>
@@ -253,11 +262,14 @@ const renderPurchaseOrderCard: MobileCardRenderFn<PurchaseOrderRow> = ({ row, on
       </Box>
     </Box>
   )
+  }
 }
 
 
 // prettier-ignore
 export default function PurchaseOrders() {
+  const statusTokens = useStatusTokens()
+  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const canChange = hasPerm(PERMS.purchaseorders.entry.change)
   const canDelete = hasPerm(PERMS.purchaseorders.entry.delete)
@@ -498,7 +510,7 @@ export default function PurchaseOrders() {
       setRestoreBusy(true)
       try {
         await api.post(`/purchase-order-entries/${id}/restore/`)
-        toast.success('Purchase Order ripristinato ✅')
+        toast.success('Purchase Order ripristinato')
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -611,8 +623,13 @@ export default function PurchaseOrders() {
   }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openTransition, restoreBusy, restoreFromRow, canChange])
 
   const columns = React.useMemo<GridColDef<PurchaseOrderRow>[]>(() => {
-    return cols
-  }, [])
+    return buildColumns(statusTokens)
+  }, [statusTokens])
+
+  const renderPurchaseOrderCard = React.useMemo(
+    () => makeRenderPurchaseOrderCard(statusTokens),
+    [statusTokens],
+  )
 
   // If opened from global Search, we can return back to the Search results on close.
   const returnTo = React.useMemo(() => {
@@ -647,7 +664,7 @@ export default function PurchaseOrders() {
     setRestoreBusy(true)
     try {
       await api.post(`/purchase-order-entries/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi ✅`)
+      toast.success(`Ripristinati ${ids.length} elementi`)
       setSelectionModel(emptySelectionModel())
       reloadList()
       return true
@@ -693,7 +710,7 @@ export default function PurchaseOrders() {
         } else {
           await api.post(`/purchase-order-entries/${id}/revert/`)
         }
-        toast.success('Stato aggiornato ✅')
+        toast.success('Stato aggiornato')
         setTransitionState(null)
         reloadList()
         if (selectedId === id) await loadDetail(id)
@@ -719,7 +736,7 @@ export default function PurchaseOrders() {
         await api.post(`/purchase-order-entries/${selectedId}/documents/`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
-        toast.success('Documento caricato ✅')
+        toast.success('Documento caricato')
         await loadDetail(selectedId)
         reloadList()
       } catch (e) {
@@ -739,7 +756,7 @@ export default function PurchaseOrders() {
       setDeletingDocId(docId)
       try {
         await api.delete(`/purchase-order-entries/${selectedId}/documents/${docId}/`)
-        toast.success('Documento eliminato ✅')
+        toast.success('Documento eliminato')
         await loadDetail(selectedId)
         reloadList()
       } catch (e) {
@@ -859,12 +876,12 @@ export default function PurchaseOrders() {
       if (dlgMode === 'create') {
         const res = await api.post<PurchaseOrderDetail>('/purchase-order-entries/', payload)
         id = res.data.id
-        toast.success('Purchase Order creato ✅')
+        toast.success('Purchase Order creato')
       } else {
         if (!dlgId) return
         const res = await api.patch<PurchaseOrderDetail>(`/purchase-order-entries/${dlgId}/`, payload)
         id = res.data.id
-        toast.success('Purchase Order aggiornato ✅')
+        toast.success('Purchase Order aggiornato')
       }
 
       setDlgOpen(false)
@@ -904,7 +921,7 @@ export default function PurchaseOrders() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 0.25,
-                  bgcolor: 'rgba(241,245,249,0.9)',
+                  bgcolor: (theme) => alpha(theme.palette.background.default, 0.9),
                   border: '0.5px solid',
                   borderColor: 'divider',
                   borderRadius: 999,
@@ -972,14 +989,7 @@ export default function PurchaseOrders() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'rgba(69,127,121,0.10) !important',
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'rgba(69,127,121,0.14) !important',
-            },
+            ...zebraSx,
           },
         }}
       >
@@ -1009,7 +1019,7 @@ export default function PurchaseOrders() {
         onEdit={openEdit}
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
         onUploadDocument={uploadDocument}
         onDeleteDocument={deleteDocument}
       />

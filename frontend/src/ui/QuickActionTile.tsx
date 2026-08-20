@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Box, Card, Tooltip, Typography } from '@mui/material'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
+import { SHARED } from '../theme/constants'
 
 type Props = {
   /** Icona del modulo, usata solo come watermark grande e trasparente sullo sfondo. */
@@ -79,9 +80,9 @@ export default function QuickActionTile({
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 0.5,
       }}>
-        <AddRoundedIcon sx={{ fontSize: 52, color: '#fff' }} />
+        <AddRoundedIcon sx={{ fontSize: 52, color: SHARED.pureWhite }} />
         <Typography variant="caption" fontWeight={800} sx={{
-          color: '#fff', fontSize: '0.78rem', letterSpacing: '0.02em',
+          color: SHARED.pureWhite, fontSize: '0.78rem', letterSpacing: '0.02em',
         }}>
           {label}
         </Typography>

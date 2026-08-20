@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
 import {
   Autocomplete,
   Box,
@@ -39,12 +40,14 @@ import { FileListRow } from './drive/FileListRow'
 import { CreateFolderDialog } from './drive/CreateFolderDialog'
 import { RenameDialog } from './drive/RenameDialog'
 import { MoveDialog } from './drive/MoveDialog'
+import { useWidgetAccents } from '../theme/AppThemeProvider'
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 // prettier-ignore
 export default function Drive() {
   const toast = useToast()
+  const widgetAccents = useWidgetAccents()
 
   const [folderId, setFolderId] = React.useState<number | null>(null)
   const [breadcrumb, setBreadcrumb] = React.useState<BreadcrumbItem[]>([])
@@ -234,7 +237,7 @@ export default function Drive() {
 
     setUploadProgress(null)
     if (failed) toast.error(`${failed} file non caricati.`)
-    else toast.success(`${total} file caricati ✅`)
+    else toast.success(`${total} file caricati`)
     void loadFolder(folderId, customerFilter)
   }
 
@@ -248,7 +251,7 @@ export default function Drive() {
         name: createFolderName.trim(),
         parent: folderId ?? null,
       })
-      toast.success('Cartella creata ✅')
+      toast.success('Cartella creata')
       setCreateFolderOpen(false)
       setCreateFolderName('')
       void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
@@ -275,7 +278,7 @@ export default function Drive() {
           ? `/drive-folders/${renameItem.data.id}/`
           : `/drive-files/${renameItem.data.id}/`
       await api.patch(url, { name: renameName.trim() })
-      toast.success('Rinominato ✅')
+      toast.success('Rinominato')
       setRenameItem(null)
       setDrawerItem(null)
       setSelectedId(null)
@@ -300,7 +303,7 @@ export default function Drive() {
           ? `/drive-folders/${deleteItem.data.id}/`
           : `/drive-files/${deleteItem.data.id}/`
       await api.delete(url)
-      toast.success('Eliminato ✅')
+      toast.success('Eliminato')
       setDeleteItem(null)
       setDrawerItem(null)
       setSelectedId(null)
@@ -339,7 +342,7 @@ export default function Drive() {
           : `/drive-files/${moveItem.data.id}/move/`
       const body = moveItem.kind === 'folder' ? { parent: moveTarget } : { folder: moveTarget }
       await api.post(url, body)
-      toast.success('Spostato ✅')
+      toast.success('Spostato')
       setMoveItem(null)
       setDrawerItem(null)
       setSelectedId(null)
@@ -357,7 +360,7 @@ export default function Drive() {
     const fileReqs = selectedFileIds.map((id) => api.delete(`/drive-files/${id}/`))
     try {
       await Promise.all([...folderReqs, ...fileReqs])
-      toast.success(`${selected.size} elementi eliminati ✅`)
+      toast.success(`${selected.size} elementi eliminati`)
     } catch {
       toast.error('Alcuni elementi non sono stati eliminati.')
     }
@@ -370,6 +373,9 @@ export default function Drive() {
   return (
     <Stack spacing={2}>
       {/* OneDrive disclaimer */}
+      {/* Il tint del box (blu Microsoft chiaro) è pensato per accompagnare
+          visivamente il logo OneDrive sotto — stessa eccezione strutturale
+          del logo stesso, non segue il tema di ARCHIE. */}
       <Box
         sx={{
           display: 'flex',
@@ -382,7 +388,9 @@ export default function Drive() {
           border: '1px solid #c2d4f8',
         }}
       >
-        {/* OneDrive logo SVG inline */}
+        {/* OneDrive logo SVG inline — colori brand ufficiali Microsoft
+            (#0078D4/#1490DF), eccezione strutturale al sistema di tema:
+            un logo di terze parti non può seguire il tema di ARCHIE. */}
         <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
           <svg width="22" height="16" viewBox="0 0 22 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8.5 13.5H18.5C19.88 13.5 21 12.38 21 11C21 9.74 20.09 8.69 18.89 8.52C18.96 8.18 19 7.84 19 7.5C19 5.01 16.99 3 14.5 3C13.23 3 12.08 3.52 11.26 4.36C10.7 3.53 9.76 3 8.7 3C7.04 3 5.66 4.21 5.44 5.8C4.06 6.16 3 7.42 3 8.9C3 10.63 4.37 12 6.1 12H8.5V13.5Z" fill="#0078D4"/>
@@ -449,7 +457,7 @@ export default function Drive() {
               {...params}
               placeholder="Filtra per cliente…"
               size="small"
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, bgcolor: '#fff' }, width: 210 }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, bgcolor: 'background.paper' }, width: 210 }}
             />
           )}
           noOptionsText="Nessun cliente"
@@ -465,7 +473,7 @@ export default function Drive() {
             borderColor: 'grey.200',
             borderRadius: 1.5,
             p: 0.25,
-            bgcolor: '#fff',
+            bgcolor: 'background.paper',
           }}
         >
           {(
@@ -482,7 +490,7 @@ export default function Drive() {
                 sx={{
                   borderRadius: 1.25,
                   bgcolor: viewMode === m ? 'primary.main' : 'transparent',
-                  color: viewMode === m ? '#fff' : 'grey.500',
+                  color: viewMode === m ? 'common.white' : 'grey.500',
                   '&:hover': { bgcolor: viewMode === m ? 'primary.dark' : 'grey.100' },
                 }}
               >
@@ -543,7 +551,7 @@ export default function Drive() {
       {uploadProgress && (
         <Box
           sx={{
-            bgcolor: '#f0fdf9',
+            bgcolor: widgetAccents.softTealBg,
             border: '1px solid',
             borderColor: 'primary.light',
             borderRadius: 1,
@@ -582,7 +590,7 @@ export default function Drive() {
               <Box
                 sx={{
                   height: 6,
-                  bgcolor: 'rgba(15,118,110,0.15)',
+                  bgcolor: (t) => alpha(t.palette.primary.main, 0.15),
                   borderRadius: 1,
                   overflow: 'hidden',
                 }}
@@ -602,7 +610,7 @@ export default function Drive() {
                 <Box
                   sx={{
                     height: 3,
-                    bgcolor: 'rgba(15,118,110,0.1)',
+                    bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
                     borderRadius: 1,
                     overflow: 'hidden',
                     mt: 0.5,
@@ -612,7 +620,7 @@ export default function Drive() {
                     sx={{
                       height: '100%',
                       width: `${uploadProgress.fileProgress}%`,
-                      bgcolor: 'rgba(15,118,110,0.5)',
+                      bgcolor: (t) => alpha(t.palette.primary.main, 0.5),
                       borderRadius: 1,
                       transition: 'width 0.15s ease',
                     }}
@@ -659,7 +667,7 @@ export default function Drive() {
           sx={{
             px: 2,
             py: 1.25,
-            bgcolor: '#f0fdf9',
+            bgcolor: widgetAccents.softTealBg,
             border: '1px solid',
             borderColor: 'primary.light',
             borderRadius: 1,
@@ -737,12 +745,12 @@ export default function Drive() {
                   borderRadius: 1,
                   p: 1.5,
                   cursor: 'pointer',
-                  bgcolor: '#fff',
+                  bgcolor: 'background.paper',
                   transition: 'all 0.13s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
-                  '&:hover': { bgcolor: '#f8fafc', borderColor: 'grey.300' },
+                  '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.300' },
                 }}
               >
                 <Typography sx={{ fontSize: 20, color: 'text.disabled', lineHeight: 1 }}>
@@ -784,7 +792,7 @@ export default function Drive() {
               borderColor: 'grey.200',
               borderRadius: 1,
               overflow: 'hidden',
-              bgcolor: '#fff',
+              bgcolor: 'background.paper',
             }}
           >
             {/* ".." back row — shown only when not in root */}
@@ -805,7 +813,7 @@ export default function Drive() {
                   borderColor: 'grey.100',
                   cursor: 'pointer',
                   transition: 'background 0.1s',
-                  '&:hover': { bgcolor: 'rgba(15,118,110,0.04)' },
+                  '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
                 }}
               >
                 <Box
@@ -875,7 +883,7 @@ export default function Drive() {
                 borderColor: 'grey.200',
                 borderRadius: 1,
                 overflow: 'hidden',
-                bgcolor: '#fff',
+                bgcolor: 'background.paper',
                 mb: 2,
               }}
             >
@@ -892,7 +900,7 @@ export default function Drive() {
                   px: 2,
                   py: 1,
                   cursor: 'pointer',
-                  '&:hover': { bgcolor: 'rgba(15,118,110,0.04)' },
+                  '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
                 }}
               >
                 <Box

@@ -39,9 +39,9 @@ services:
       args:
         VITE_APP_ENV: production
 
-  frontend-auslbo:
+  frontend-portal:
     build:
       context: .
-      dockerfile: frontend-auslbo/Dockerfile
+      dockerfile: frontend-portal/Dockerfile
       args:
         VITE_APP_ENV: production

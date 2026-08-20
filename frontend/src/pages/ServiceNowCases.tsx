@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import {
   Box,
   Button,
@@ -29,7 +30,10 @@ import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
 import CloseIcon from '@mui/icons-material/Close'
 
 import { useAuth } from '../auth/AuthProvider'
-import { theme } from '../theme'
+import { useTheme, alpha } from '@mui/material/styles'
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
+import { SHARED } from '../theme/constants'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isRecord } from '@shared/utils/guards'
 import type { GridColDef } from '@mui/x-data-grid'
@@ -88,33 +92,13 @@ export type ServiceNowCaseRow = {
 
 const SERVICENOW_CASES_PATH = '/servicenow-cases/' as const satisfies CollectionPath
 
-// ─── Chip priorità / stato ─────────────────────────────────────────────────
-
-const PRIORITY_COLOR: Record<string, { bg: string; fg: string; border: string }> = {
-  '1': { bg: 'rgba(239,68,68,0.10)',  fg: theme.palette.error.dark,  border: 'rgba(239,68,68,0.28)' },  // Critical
-  '2': { bg: 'rgba(245,158,11,0.10)', fg: theme.palette.warning.dark, border: 'rgba(245,158,11,0.28)' }, // High
-  '3': { bg: 'rgba(59,130,246,0.10)', fg: theme.palette.info.dark, border: 'rgba(59,130,246,0.28)' }, // Moderate
-  '4': { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' }, // Low
-}
-
-// Colore semantico del tema (coerente con Issues.tsx: Chip standard MUI,
-// palette pastello definita centralmente in theme.ts). Usato per i chip
-// nella DataGrid desktop; le mappe rgba sopra restano per i badge compatti
-// della mobile card.
-const PRIORITY_SEMANTIC: Record<string, 'error' | 'warning' | 'info' | 'default'> = {
-  '1': 'error',   // Critical
-  '2': 'warning', // High
-  '3': 'info',    // Moderate
-  '4': 'default', // Low
-}
-
-function SemanticChip({ label, color }: { label: string; color: 'error' | 'warning' | 'info' | 'success' | 'default' }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-      <Chip size="small" label={label} color={color} variant={color === 'default' ? 'outlined' : 'filled'} />
-    </Box>
-  )
-}
+// ─── Chip stato ─────────────────────────────────────────────────────────────
+// Priority rimosso dalla UI (0.9.0, non più rilevante per l'uso corrente):
+// il campo resta in modello/API lato backend (default 'Moderate', nessuna
+// migration), ma non è più mostrato né richiesto nel form. Il chip "Type"
+// che compariva senza colore ora usa lo stesso pattern hash-deterministico
+// di committenteColor() (PurchaseOrders.tsx / clientChipPalette), al posto
+// di PRIORITY_SEMANTIC/SemanticChip rimossi.
 
 // ─── Pannello Triage (casi di oggi per categoria/tecnico) ────────────────────
 
@@ -122,9 +106,14 @@ type TriageTechnician = { id: number | null; name: string; count: number; absent
 type TriageCategoryData = { total: number; technicians: TriageTechnician[] }
 type TriageResponse = { date: string; categories: Record<string, TriageCategoryData> }
 
-const TRIAGE_CATEGORIES = [
-  { value: 'philips', label: 'Philips', accent: theme.palette.primary.main, tint: 'rgba(15,118,110,0.08)' },
-  { value: 'biotron', label: 'Biotron', accent: theme.palette.secondary.main, tint: 'rgba(14,165,233,0.08)' },
+// I due "accent" delle categorie triage (philips/biotron) sono calcolati
+// dentro TriagePanel via useTheme(): prima erano un const a livello di
+// modulo con `theme.palette.primary/secondary.main` importati staticamente
+// da '../theme' — bug noto (mostra sempre i colori del tema default,
+// ignora). Vedi TriagePanel più sotto.
+const TRIAGE_CATEGORY_DEFS = [
+  { value: 'philips', label: 'Philips' },
+  { value: 'biotron', label: 'Biotron' },
 ] as const
 
 function initialsOf(name: string): string {
@@ -143,7 +132,7 @@ function TriageTechnicianRow({ t, accent, canManage, onManage }: {
       direction="row" alignItems="center" spacing={1}
       sx={{
         px: 0.75, py: 0.5, borderRadius: 1.5,
-        bgcolor: t.absent ? 'rgba(239,68,68,0.05)' : free ? 'transparent' : 'action.hover',
+        bgcolor: t.absent ? (theme) => alpha(theme.palette.error.main, 0.05) : free ? 'transparent' : 'action.hover',
         transition: 'background-color 0.15s',
         '&:hover .triage-manage-btn': { opacity: 1 },
       }}
@@ -152,7 +141,7 @@ function TriageTechnicianRow({ t, accent, canManage, onManage }: {
         width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '0.6rem', fontWeight: 700,
-        bgcolor: t.absent ? 'rgba(239,68,68,0.12)' : free ? 'action.selected' : `${accent}26`,
+        bgcolor: t.absent ? (theme) => alpha(theme.palette.error.main, 0.12) : free ? 'action.selected' : `${accent}26`,
         color: t.absent ? 'error.main' : free ? 'text.disabled' : accent,
       }}>
         {t.id === null ? '—' : initialsOf(t.name)}
@@ -163,7 +152,7 @@ function TriageTechnicianRow({ t, accent, canManage, onManage }: {
       {t.absent ? (
         <Chip
           size="small" label={t.absence_reason ?? 'Assente'}
-          sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(239,68,68,0.12)', color: 'error.main' }}
+          sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: (theme) => alpha(theme.palette.error.main, 0.12), color: 'error.main' }}
         />
       ) : free ? (
         <Typography variant="caption" sx={{ color: 'success.dark', fontWeight: 600, flexShrink: 0 }}>
@@ -172,7 +161,7 @@ function TriageTechnicianRow({ t, accent, canManage, onManage }: {
       ) : (
         <Box sx={{
           minWidth: 22, px: 0.6, py: 0.05, borderRadius: 10, textAlign: 'center', flexShrink: 0,
-          bgcolor: accent, color: '#fff', fontSize: '0.72rem', fontWeight: 700,
+          bgcolor: accent, color: SHARED.pureWhite, fontSize: '0.72rem', fontWeight: 700,
         }}>
           {t.count}
         </Box>
@@ -273,7 +262,7 @@ function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
       } else {
         await api.post('/servicenow-technician-absences/', { user: technician.id, date: dateVal, day_part: dayPart, reason, note })
       }
-      toast.success('Assenza registrata ✅')
+      toast.success('Assenza registrata')
       setDateVal(todayISO()); setDayPart('mattina'); setFullDay(true); setReason('ferie'); setNote('')
       reload()
       onSaved()
@@ -288,7 +277,7 @@ function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
     setDeletingId(id)
     try {
       await api.delete(`/servicenow-technician-absences/${id}/`)
-      toast.success('Assenza rimossa ✅')
+      toast.success('Assenza rimossa')
       reload()
       onSaved()
     } catch (e) {
@@ -381,9 +370,15 @@ function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
 }
 
 function TriagePanel({ refreshKey, canManage }: { refreshKey: number; canManage: boolean }) {
+  const theme = useTheme()
   const [data, setData] = React.useState<TriageResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [absenceTarget, setAbsenceTarget] = React.useState<TriageTechnician | null>(null)
+
+  const TRIAGE_CATEGORIES = React.useMemo(() => TRIAGE_CATEGORY_DEFS.map((d) => {
+    const accent = d.value === 'philips' ? theme.palette.primary.main : theme.palette.secondary.main
+    return { ...d, accent, tint: alpha(accent, 0.08) }
+  }), [theme])
 
   const reload = React.useCallback(() => {
     setLoading(true)
@@ -404,7 +399,7 @@ function TriagePanel({ refreshKey, canManage }: { refreshKey: number; canManage:
   return (
     <Box sx={{
       bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 1.5, p: 1.5,
-      backgroundImage: 'linear-gradient(135deg, rgba(15,118,110,0.03), rgba(14,165,233,0.03))',
+      backgroundImage: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)}, ${alpha(theme.palette.secondary.main, 0.03)})`,
     }}>
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 1.25 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Triage</Typography>
@@ -437,8 +432,9 @@ function TriagePanel({ refreshKey, canManage }: { refreshKey: number; canManage:
 
 // ─── Mobile card ──────────────────────────────────────────────────────────────
 
-const renderServiceNowCaseCard: MobileCardRenderFn<ServiceNowCaseRow> = ({ row, onOpen }) => {
-  const pc = PRIORITY_COLOR[row.priority]
+function makeRenderServiceNowCaseCard(clientChipPalette: DomainStatusTokens['clientChipPalette']): MobileCardRenderFn<ServiceNowCaseRow> {
+  return ({ row, onOpen }) => {
+  const tc = committenteColor(row.case_type_label, clientChipPalette)
   return (
     <Box
       onClick={() => onOpen(row.id)}
@@ -477,8 +473,7 @@ const renderServiceNowCaseCard: MobileCardRenderFn<ServiceNowCaseRow> = ({ row, 
       </Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
         {[
-          { label: 'Type', value: `${row.category_label} · ${row.case_type_label}` },
-          { label: 'Priorità', value: row.priority_label },
+          { label: 'Categoria', value: row.category_label },
           { label: 'Aperto il', value: formatOpenedAt(row) },
           { label: 'Assegnato a', value: row.assigned_to_full_name },
         ].map(({ label, value }) => (
@@ -490,29 +485,42 @@ const renderServiceNowCaseCard: MobileCardRenderFn<ServiceNowCaseRow> = ({ row, 
           </Box>
         ))}
       </Box>
-      {pc && (
-        <Box sx={{ alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: pc.bg, color: pc.fg, border: `0.5px solid ${pc.border}` }}>
-          {row.priority_label}
+      {row.case_type_label && (
+        <Box sx={{ alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: tc.bg, color: tc.color, border: `0.5px solid ${tc.border}` }}>
+          {row.case_type_label}
         </Box>
       )}
     </Box>
   )
+  }
 }
 
 // ─── Colonne DataGrid ─────────────────────────────────────────────────────────
 
-const COLUMNS: GridColDef<ServiceNowCaseRow>[] = [
+// `COLUMNS` era una costante a livello di modulo; ora è una factory chiamata
+// dentro il componente (useMemo su statusTokens = useStatusTokens()) perché
+// il chip "Type" usa committenteColor(), theme-aware, sullo stesso pattern
+// di PurchaseOrders.tsx (colonna "Committente").
+function buildColumns(clientChipPalette: DomainStatusTokens['clientChipPalette']): GridColDef<ServiceNowCaseRow>[] {
+  return [
   { field: 'number',  headerName: 'Numero', width: 130, renderCell: ({ value }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{value as string}</Box>
   ) },
   { field: 'account', headerName: 'Account', flex: 1, minWidth: 180 },
   { field: 'category_label', headerName: 'Categoria', width: 100 },
-  { field: 'case_type_label', headerName: 'Type', width: 100 },
   {
-    field: 'priority_label',
-    headerName: 'Priorità',
+    field: 'case_type_label',
+    headerName: 'Type',
     width: 130,
-    renderCell: ({ row }) => <SemanticChip label={row.priority_label} color={PRIORITY_SEMANTIC[row.priority] ?? 'default'} />,
+    renderCell: ({ row }) => {
+      if (!row.case_type_label) return null
+      const c = committenteColor(row.case_type_label, clientChipPalette)
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <Chip size="small" label={row.case_type_label} sx={{ bgcolor: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontWeight: 600 }} />
+        </Box>
+      )
+    },
   },
   {
     field: 'opened_date', headerName: 'Aperto il', width: 150,
@@ -543,13 +551,15 @@ const COLUMNS: GridColDef<ServiceNowCaseRow>[] = [
   },
   { field: 'assigned_to_full_name', headerName: 'Assegnato a', width: 160 },
   { field: 'short_description', headerName: 'Descrizione', flex: 1.4, minWidth: 200 },
-]
+  ]
+}
 
-const ALLOWED_ORDERING = ['number', 'account', 'priority', 'category', 'case_type__name', 'opened_date', 'created_at', 'updated_at', 'deleted_at'] as const
+const ALLOWED_ORDERING = ['number', 'account', 'category', 'case_type__name', 'opened_date', 'created_at', 'updated_at', 'deleted_at'] as const
 
 // ─── Pagina ServiceNow Case ───────────────────────────────────────────────────
 
 export default function ServiceNowCases() {
+  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -559,6 +569,15 @@ export default function ServiceNowCases() {
   const canDelete  = hasPerm(PERMS.servicenow.case.delete)
   const canCreate  = hasPerm(PERMS.servicenow.case.add)
   const canCreateIssue = hasPerm(PERMS.issues.issue.add)
+  const statusTokens = useStatusTokens()
+  const renderServiceNowCaseCard = React.useMemo(
+    () => makeRenderServiceNowCaseCard(statusTokens.clientChipPalette),
+    [statusTokens],
+  )
+  const columns = React.useMemo(
+    () => buildColumns(statusTokens.clientChipPalette),
+    [statusTokens],
+  )
 
   // Dialog "Import storico" (CSV → creazione bulk di case, vedi
   // ImportHistoricalDialog.tsx). Stessa permission 'add' della creazione
@@ -681,7 +700,6 @@ export default function ServiceNowCases() {
       const fd = new FormData()
       fd.append('number', form.number)
       fd.append('account', form.account)
-      fd.append('priority', form.priority)
       fd.append('category', form.category)
       if (form.case_type !== '') fd.append('case_type', String(form.case_type))
       if (form.opened_date) fd.append('opened_date', form.opened_date)
@@ -695,7 +713,7 @@ export default function ServiceNowCases() {
         await api.patch(itemPath(SERVICENOW_CASES_PATH, formTarget.id), fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
-        toast.success('ServiceNow Case aggiornato ✅')
+        toast.success('ServiceNow Case aggiornato')
         if (selectedId === formTarget.id) await loadDetail(formTarget.id)
         reloadList()
         setTriageRefreshKey((k) => k + 1)
@@ -703,7 +721,7 @@ export default function ServiceNowCases() {
         const res = await api.post<ServiceNowCaseRow>(SERVICENOW_CASES_PATH, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
-        toast.success('ServiceNow Case creato ✅')
+        toast.success('ServiceNow Case creato')
         reloadList()
         setTriageRefreshKey((k) => k + 1)
         openDrawer(res.data.id)
@@ -746,7 +764,7 @@ export default function ServiceNowCases() {
     setDeleteBusy(true)
     try {
       await api.delete(itemPath(SERVICENOW_CASES_PATH, detail.id))
-      toast.success('ServiceNow Case eliminato ✅')
+      toast.success('ServiceNow Case eliminato')
       grid.setViewMode('all', { keepOpen: true })
       reloadList()
       await loadDetail(detail.id, true)
@@ -766,7 +784,7 @@ export default function ServiceNowCases() {
     setRestoreBusy(true)
     try {
       await api.post(itemActionPath(SERVICENOW_CASES_PATH, detail.id, 'restore'))
-      toast.success('ServiceNow Case ripristinato ✅')
+      toast.success('ServiceNow Case ripristinato')
       reloadList()
       await loadDetail(detail.id)
     } catch (e) {
@@ -804,7 +822,7 @@ export default function ServiceNowCases() {
             setRestoreBusy(true)
             try {
               await api.post(itemActionPath(SERVICENOW_CASES_PATH, row.id, 'restore'))
-              toast.success('ServiceNow Case ripristinato ✅')
+              toast.success('ServiceNow Case ripristinato')
               reloadList()
             } catch (e) { toast.error(apiErrorToMessage(e)) }
             finally { setRestoreBusy(false) }
@@ -892,7 +910,7 @@ export default function ServiceNowCases() {
           username: me?.username,
           emptyState,
           rows,
-          columns: COLUMNS,
+          columns,
           loading,
           rowCount,
           paginationModel: grid.paginationModel,
@@ -906,8 +924,7 @@ export default function ServiceNowCases() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
+            ...zebraSx,
           },
         }}
       />

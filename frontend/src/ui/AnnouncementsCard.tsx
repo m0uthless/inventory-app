@@ -14,7 +14,7 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../auth/AuthProvider'
-import { theme } from '../theme'
+import { useTheme, alpha } from '@mui/material/styles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category = 'news' | 'warning' | 'maintenance'
@@ -29,11 +29,10 @@ type Announcement = {
 }
 
 // ─── Category config ──────────────────────────────────────────────────────────
-const CAT: Record<Category, { label: string; color: string; bg: string; chipColor: 'default' | 'warning' | 'info' }> = {
-  news:        { label: 'News',         color: theme.palette.info.main,    bg: 'rgba(2,132,199,0.07)',   chipColor: 'info' },
-  warning:     { label: 'Avviso',       color: theme.palette.warning.main, bg: 'rgba(234,88,12,0.07)',   chipColor: 'warning' },
-  maintenance: { label: 'Manutenzione', color: '#7c3aed', bg: 'rgba(124,58,237,0.07)', chipColor: 'default' },
-}
+// Era un const a livello di modulo con `theme.palette.X` da import statico —
+// bug noto (colori sempre-default anche su). Ora calcolato dentro
+// AnnouncementsCard via useTheme() (vedi sotto).
+type CatConfig = Record<Category, { label: string; color: string; bg: string; chipColor: 'default' | 'warning' | 'info' }>
 
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -44,10 +43,12 @@ function InlineForm({
   initial,
   onSave,
   onCancel,
+  cat,
 }: {
   initial?: Partial<Announcement>
   onSave: (data: { title: string; body: string; category: Category }) => Promise<void>
   onCancel: () => void
+  cat: CatConfig
 }) {
   const [title,    setTitle]    = React.useState(initial?.title    ?? '')
   const [body,     setBody]     = React.useState(initial?.body     ?? '')
@@ -71,7 +72,7 @@ function InlineForm({
             onChange={e => setCategory(e.target.value as Category)}
             sx={{ fontSize: '0.78rem', height: 30, minWidth: 130 }}
           >
-            {Object.entries(CAT).map(([k, v]) => (
+            {Object.entries(cat).map(([k, v]) => (
               <MenuItem key={k} value={k} sx={{ fontSize: '0.78rem' }}>{v.label}</MenuItem>
             ))}
           </Select>
@@ -116,6 +117,13 @@ function InlineForm({
 export default function AnnouncementsCard() {
   const { me } = useAuth()
   const isStaff = me?.is_staff || me?.is_superuser || false
+  const theme = useTheme()
+
+  const CAT: CatConfig = React.useMemo(() => ({
+    news:        { label: 'News',         color: theme.palette.info.main,    bg: alpha(theme.palette.info.main, 0.07),    chipColor: 'info' },
+    warning:     { label: 'Avviso',       color: theme.palette.warning.main, bg: alpha(theme.palette.warning.main, 0.07), chipColor: 'warning' },
+    maintenance: { label: 'Manutenzione', color: theme.palette.secondary.main, bg: alpha(theme.palette.secondary.main, 0.07), chipColor: 'default' },
+  }), [theme])
 
   const [items,    setItems]    = React.useState<Announcement[]>([])
   const [loading,  setLoading]  = React.useState(true)
@@ -193,6 +201,7 @@ export default function AnnouncementsCard() {
         <InlineForm
           onSave={handleCreate}
           onCancel={() => setAdding(false)}
+          cat={CAT}
         />
       )}
 
@@ -212,7 +221,7 @@ export default function AnnouncementsCard() {
         ) : (
           <Stack divider={<Divider />}>
             {items.map(item => {
-              const cat = CAT[item.category] ?? CAT.news
+              const catInfo = CAT[item.category] ?? CAT.news
               const isEditing = editId === item.id
 
               if (isEditing) {
@@ -222,6 +231,7 @@ export default function AnnouncementsCard() {
                     initial={item}
                     onSave={data => handleUpdate(item.id, data)}
                     onCancel={() => setEditId(null)}
+                    cat={CAT}
                   />
                 )
               }
@@ -231,8 +241,8 @@ export default function AnnouncementsCard() {
                   key={item.id}
                   sx={{
                     px: 2, py: 1.5,
-                    borderLeft: `3px solid ${cat.color}`,
-                    bgcolor: cat.bg,
+                    borderLeft: `3px solid ${catInfo.color}`,
+                    bgcolor: catInfo.bg,
                     '&:hover .ann-actions': { opacity: 1 },
                     position: 'relative',
                   }}
@@ -242,8 +252,8 @@ export default function AnnouncementsCard() {
                       <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap">
                         <Chip
                           size="small"
-                          label={cat.label}
-                          color={cat.chipColor}
+                          label={catInfo.label}
+                          color={catInfo.chipColor}
                           sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }}
                         />
                         <Typography variant="body2" fontWeight={700} sx={{ fontSize: '0.82rem' }}>

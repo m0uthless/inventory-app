@@ -99,7 +99,7 @@ export default function AuditEventsTab({
           size="small"
           variant="contained"
           endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-          sx={{ bgcolor: '#0d9488', color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.main } }}
+          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
           onClick={() =>
             navigate(
               `/audit${buildQuery({ app_label: appLabel, model, object_id: String(objectId) })}`,

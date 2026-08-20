@@ -13,6 +13,7 @@ import {
 } from '@mui/material'
 
 import type { GridColDef } from '@mui/x-data-grid'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 
 import { api } from '@shared/api/client'
 import { buildDrfListParams } from '@shared/api/drf'
@@ -185,6 +186,7 @@ const renderAuditCard: MobileCardRenderFn<AuditEvent> = ({ row, onOpen }) => (
 
 // prettier-ignore
 export default function Audit() {
+  const zebraSx = useDataGridZebraSx()
   const toast = useToast()
 
   const grid = useServerGrid({
@@ -453,16 +455,7 @@ export default function Audit() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': {
-              backgroundColor: 'rgba(69,127,121,0.03)',
-            },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'rgba(69,127,121,0.10) !important',
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'rgba(69,127,121,0.14) !important',
-            },
+            ...zebraSx,
           },
         }}
         mobileCard={renderAuditCard}

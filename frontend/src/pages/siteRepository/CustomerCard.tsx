@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Box, Collapse, Dialog, DialogContent, DialogTitle, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import NoteAltOutlinedIcon from '@mui/icons-material/NoteAltOutlined'
 import VpnLockIcon from '@mui/icons-material/VpnLock'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
@@ -9,14 +10,30 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import StatusChip from '@shared/ui/StatusChip'
+import { isRecord } from '@shared/utils/guards'
 
 import type { CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
 import { FS, ICON, MonoField } from './style'
 import { MetaTag, ActionButton, CountStat } from './primitives'
 import { SitesWithInventoryTab } from './SitesWithInventoryTab'
 import { InventoryFlatTab } from './InventoryFlatTab'
+import { ContactsListModal } from './ContactsListModal'
 
 // ─── CustomerCard ─────────────────────────────────────────────────────────────
+
+// Stessa logica di estrazione usata in InfoDrawers.tsx (CustomerInfoDrawer):
+// l'indirizzo del cliente non è un campo strutturato ma vive dentro
+// custom_fields sotto la chiave "indirizzo" (case-insensitive).
+function customerAddressFromRow(customer: CustomerRow): string | null {
+  const cf = customer.custom_fields ?? null
+  if (!isRecord(cf)) return null
+  const key = Object.keys(cf).find((k) => k.trim().toLowerCase() === 'indirizzo')
+  if (!key) return null
+  const v = cf[key]
+  if (typeof v !== 'string' || !v.trim()) return null
+  const parts = [v.trim(), customer.city?.trim()].filter(Boolean)
+  return parts.join(', ')
+}
 
 type CustomerCardProps = {
   customer: CustomerRow
@@ -25,10 +42,12 @@ type CustomerCardProps = {
   assetCount: number | null
   siteCount: number | null
   issueCount: number
-  onOpenDrawer: (id: number) => void
+  onOpenDrawer: (id: number, typeKeyHint?: string | null) => void
   onOpenVpn: (customer: CustomerRow) => void
   onOpenCustomer: (id: number) => void
   onOpenSite: (id: number) => void
+  onOpenCustomerContacts: (customerId: number) => void
+  onOpenSiteContacts: (customerId: number, siteId: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
   canChangeSite: boolean
@@ -43,7 +62,7 @@ type CustomerCardProps = {
 
 export function CustomerCard({
   customer, searchQuery, statusFilter, assetCount, siteCount, issueCount, onOpenDrawer, onOpenVpn,
-  onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
+  onOpenCustomer, onOpenSite, onOpenCustomerContacts, onOpenSiteContacts, canViewCustomer, canViewSite,
   canChangeSite, onEditSite,
   onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
   rowIndex, isLast, refreshToken,
@@ -52,6 +71,7 @@ export function CustomerCard({
   const [expanded, setExpanded] = React.useState(false)
   const [tab, setTab] = React.useState(0)
   const [noteModalOpen, setNoteModalOpen] = React.useState(false)
+  const [contactsModalOpen, setContactsModalOpen] = React.useState(false)
   const contentId = React.useId()
 
   // Auto-open se c'è una ricerca attiva
@@ -61,6 +81,7 @@ export function CustomerCard({
   }, [searchQuery])
 
   const zebraBg = rowIndex % 2 === 0 ? 'background.paper' : alpha(theme.palette.primary.main, 0.025)
+  const addressLine = React.useMemo(() => customerAddressFromRow(customer), [customer])
 
   return (
     <Box sx={{
@@ -96,7 +117,7 @@ export function CustomerCard({
         }}
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
             <Typography fontWeight={600} sx={{
               fontSize: FS.title,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -107,39 +128,38 @@ export function CustomerCard({
             {(customer.tags ?? []).length > 0 && (
               <MetaTag label={(customer.tags ?? [])[0]} sx={{ flexShrink: 0 }} />
             )}
-            <StatusChip statusId={customer.status ?? undefined} label={customer.status_label} size="small" sx={{ flexShrink: 0 }} />
+            <StatusChip statusId={customer.status ?? undefined} label={customer.status_label} size="small" sx={{ flexShrink: 0, fontWeight: 700 }} />
+            {customer.primary_contact_name && (
+              <Typography
+                onClick={canViewCustomer ? (e) => { e.stopPropagation(); onOpenCustomer(customer.id) } : undefined}
+                sx={{
+                  fontSize: FS.micro,
+                  color: canViewCustomer ? 'primary.main' : 'text.secondary',
+                  cursor: canViewCustomer ? 'pointer' : 'default',
+                  minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  ...(canViewCustomer ? { '&:hover': { textDecoration: 'underline' } } : {}),
+                }}
+              >
+                {customer.primary_contact_name}
+                {customer.primary_contact_phone ? ` · ${customer.primary_contact_phone}` : ''}
+              </Typography>
+            )}
           </Box>
-          {customer.primary_contact_name && (
-            <Typography
-              onClick={canViewCustomer ? (e) => { e.stopPropagation(); onOpenCustomer(customer.id) } : undefined}
-              sx={{
-                fontSize: FS.micro,
-                color: canViewCustomer ? 'primary.main' : 'text.secondary',
-                cursor: canViewCustomer ? 'pointer' : 'default',
-                width: 'fit-content',
-                ...(canViewCustomer ? { '&:hover': { textDecoration: 'underline' } } : {}),
-              }}
-            >
-              {customer.primary_contact_name}
-              {customer.primary_contact_phone ? ` · ${customer.primary_contact_phone}` : ''}
+          {addressLine && (
+            <Typography color="text.secondary" sx={{
+              fontSize: FS.micro,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
+            }}>
+              {addressLine}
             </Typography>
           )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
 
-          {/* Pulsanti azione — stessa dimensione, raggruppati */}
+          {/* Pulsanti azione — Note/VPN, senza Info (spostato accanto al conteggio asset) */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-            {canViewCustomer && (
-              <Tooltip title="Apri scheda cliente" arrow>
-                <ActionButton
-                  tone="info"
-                  icon={<InfoOutlinedIcon />}
-                  ariaLabel="Info cliente"
-                  onClick={(e) => { e.stopPropagation(); onOpenCustomer(customer.id) }}
-                />
-              </Tooltip>
-            )}
             {/* Note — solo icona, click apre modal con il testo completo (niente più tooltip handover) */}
             {customer.notes && customer.notes.trim().length > 0 && (
               <Tooltip title="Note cliente" arrow>
@@ -192,7 +212,8 @@ export function CustomerCard({
             />
           )}
 
-          {/* Contatori siti/asset — spinti tutto a destra, subito prima dell'expand */}
+          {/* Contatori siti/asset — spinti tutto a destra, subito prima dell'expand.
+              Info e Contatti spostati qui accanto al conteggio asset. */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto', flexShrink: 0 }}>
             <CountStat
               value={siteCount ?? '—'}
@@ -206,6 +227,26 @@ export function CustomerCard({
               tooltip="Vai agli asset"
               onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(siteCount ? 1 : 0) }}
             />
+            {(customer.contacts_count ?? 0) > 1 && (
+              <Tooltip title="Contatti collegati" arrow>
+                <ActionButton
+                  tone="neutral"
+                  icon={<GroupsOutlinedIcon />}
+                  ariaLabel="Contatti cliente"
+                  onClick={(e) => { e.stopPropagation(); setContactsModalOpen(true) }}
+                />
+              </Tooltip>
+            )}
+            {canViewCustomer && (
+              <Tooltip title="Apri scheda cliente" arrow>
+                <ActionButton
+                  tone="info"
+                  icon={<InfoOutlinedIcon />}
+                  ariaLabel="Info cliente"
+                  onClick={(e) => { e.stopPropagation(); onOpenCustomer(customer.id) }}
+                />
+              </Tooltip>
+            )}
           </Box>
 
           <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ ml: 0.25 }}>
@@ -231,12 +272,21 @@ export function CustomerCard({
               <Tabs
                 value={tab}
                 onChange={(_, v: number) => setTab(v)}
+                textColor="primary"
+                indicatorColor="primary"
                 sx={{
                   px: 2, minHeight: 36,
                   borderBottom: '1px solid', borderColor: 'divider',
                   '& .MuiTab-root': {
                     minHeight: 36, fontSize: FS.label, fontWeight: 700,
                     letterSpacing: '0.06em', textTransform: 'uppercase', py: 0,
+                    color: 'text.secondary',
+                  },
+                  '& .MuiTab-root.Mui-selected': {
+                    color: 'primary.main',
+                  },
+                  '& .MuiTabs-indicator': {
+                    bgcolor: 'primary.main',
                   },
                 }}
               >
@@ -251,6 +301,7 @@ export function CustomerCard({
                   statusFilter={statusFilter}
                   onOpenDrawer={onOpenDrawer}
                   onOpenSite={onOpenSite}
+                  onOpenSiteContacts={(siteId) => onOpenSiteContacts(customer.id, siteId)}
                   canViewSite={canViewSite}
                   canChangeSite={canChangeSite}
                   onEditSite={onEditSite}
@@ -294,6 +345,14 @@ export function CustomerCard({
           </Typography>
         </DialogContent>
       </Dialog>
+
+      <ContactsListModal
+        open={contactsModalOpen}
+        onClose={() => setContactsModalOpen(false)}
+        title={`Contatti — ${customer.display_name || customer.name}`}
+        customerId={customer.id}
+        onViewAll={() => { setContactsModalOpen(false); onOpenCustomerContacts(customer.id) }}
+      />
     </Box>
   )
 }

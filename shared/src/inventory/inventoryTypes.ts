@@ -1,14 +1,14 @@
 /**
  * Tipi condivisi per l'entità Inventory.
  *
- * InventoryReadDetail — sottoinsieme read-only comune tra frontend e frontend-auslbo.
+ * InventoryReadDetail — sottoinsieme read-only comune tra frontend e frontend-portal.
  * Non include credenziali (os_pwd, app_pwd, vnc_pwd) che sono solo nel frontend interno.
  *
  * I campi opzionali (?) riflettono il fatto che i due frontend espongono
  * sottoinsiemi leggermente diversi dell'API inventory.
  *
  * Usato in:
- *  - frontend-auslbo (AuslBoInventoryDrawer)
+ *  - frontend-portal (PortalInventoryDrawer)
  *  - frontend (InventoryDrawer — tab Dettagli)
  */
 

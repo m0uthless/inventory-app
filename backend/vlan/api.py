@@ -13,8 +13,8 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
-from auslbo.mixins import AuslBoScopedMixin, AuslBoTenantWriteMixin
-from auslbo.permissions import IsAuslBoUserOrInternal, IsAuslBoEditor, AuslBoModelPermissions, _can_edit_auslbo
+from portal.mixins import PortalScopedMixin, PortalTenantWriteMixin
+from portal.permissions import IsPortalUserOrInternal, IsPortalEditor, PortalModelPermissions, _can_edit_portal
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin, PurgeActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from crm.models import Site
@@ -25,7 +25,7 @@ from vlan.models import (
     validate_subnet_matches_network, validate_gateway_in_network,
 )
 
-VLAN_MANAGER_GROUP = "auslbo_editor"  # kept for reference, logic now in AuslBoModelPermissions
+VLAN_MANAGER_GROUP = "portal_editor"  # kept for reference, logic now in PortalModelPermissions
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -196,17 +196,17 @@ class IpPoolEntrySerializer(serializers.Serializer):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VlanViewSet(
-    AuslBoTenantWriteMixin,
-    AuslBoScopedMixin,
+    PortalTenantWriteMixin,
+    PortalScopedMixin,
     PurgeActionMixin,
     RestoreActionMixin,
     SoftDeleteAuditMixin,
     viewsets.ModelViewSet,
 ):
     serializer_class = VlanSerializer
-    # Fix 2.5: sostituisce IsAuslBoEditor (controllava solo device.change_device
+    # Fix 2.5: sostituisce IsPortalEditor (controllava solo device.change_device
     # per QUALSIASI scrittura) con la matrice reale view/add/change/delete_vlan.
-    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["customer", "site", "vlan_id"]
     search_fields = ["name", "network", "gateway", "lan"]
@@ -478,9 +478,9 @@ class VlanIpRequestSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class IsAdminAuslBo(IsAuslBoEditor):
+class IsAdminPortal(IsPortalEditor):
     """Approvazione/rifiuto richieste: superuser o permesso vlan.change_vlaniprequest."""
-    message = "Solo gli amministratori AUSL BO possono approvare le richieste."
+    message = "Solo gli amministratori Portal possono approvare le richieste."
 
     def has_permission(self, request, view) -> bool:
         if not request.user or not getattr(request.user, "is_authenticated", False):
@@ -490,11 +490,11 @@ class IsAdminAuslBo(IsAuslBoEditor):
         return request.user.has_perm("vlan.change_vlaniprequest")
 
 
-class VlanIpRequestViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class VlanIpRequestViewSet(PortalTenantWriteMixin, PortalScopedMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class   = VlanIpRequestSerializer
-    # Fix 2.5: sostituisce IsAuslBoEditor con la matrice reale
+    # Fix 2.5: sostituisce IsPortalEditor con la matrice reale
     # view/add/change/delete_vlaniprequest.
-    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields   = ["customer", "vlan", "stato", "modalita"]
     search_fields      = ["ip", "aetitle"]
@@ -531,7 +531,7 @@ class VlanIpRequestViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDelete
         serializer.save()
 
     @action(detail=True, methods=["post"], url_path="approve",
-            permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
+            permission_classes=[IsPortalUserOrInternal, IsAdminPortal])
     def approve(self, request, pk=None):
         """Approva una richiesta pendente (richiede permesso vlan.change_vlaniprequest).
 
@@ -558,7 +558,7 @@ class VlanIpRequestViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDelete
         return Response(VlanIpRequestSerializer(req, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="reject",
-            permission_classes=[IsAuslBoUserOrInternal, IsAdminAuslBo])
+            permission_classes=[IsPortalUserOrInternal, IsAdminPortal])
     def reject(self, request, pk=None):
         """Rifiuta una richiesta pendente (richiede permesso vlan.change_vlaniprequest).
 
@@ -588,18 +588,18 @@ class VlanIpRequestViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDelete
 class CustomerRispacsViewSet(viewsets.ReadOnlyModelViewSet):
     """Restituisce i sistemi RIS/PACS collegati ai device del customer autenticato."""
     serializer_class   = RispacsLiteSerializer
-    # Fix P0 6.3: prima bastava essere utente AUSL BO/interno per leggere,
+    # Fix P0 6.3: prima bastava essere utente Portal/interno per leggere,
     # senza richiedere esplicitamente device.view_rispacs come per
     # RispacsViewSet (il registro globale).
-    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
     filter_backends    = [SearchFilter]
     search_fields      = ["name", "ip", "aetitle"]
 
     def get_queryset(self):
-        from auslbo.permissions import _get_auslbo_customer_id, _is_auslbo_user
+        from portal.permissions import _get_portal_customer_id, _is_portal_user
         user = self.request.user
-        if _is_auslbo_user(user):
-            customer_id = _get_auslbo_customer_id(user)
+        if _is_portal_user(user):
+            customer_id = _get_portal_customer_id(self.request)
         else:
             # utente interno: filtra per customer passato come query param
             customer_id = self.request.query_params.get("customer")

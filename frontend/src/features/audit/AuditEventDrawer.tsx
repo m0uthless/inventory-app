@@ -3,6 +3,7 @@
  * Estratto dall'inline di Audit.tsx.
  */
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
 import { Box, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 
@@ -152,7 +153,7 @@ function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 function SectionBox({ icon, title, children }: { icon?: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <Box sx={{ bgcolor: '#f8fafc', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
+    <Box sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.200', borderRadius: 1, p: 1.75 }}>
       <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
         {icon}{title}
       </Typography>
@@ -242,7 +243,7 @@ export default function AuditEventDrawer({ open, onClose, detail, detailLoading,
           </SectionBox>
 
           {isMetadataSummary(detail.metadata_summary) ? (
-            <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
               <Box sx={{ px: 1.75, pt: 1.5, pb: 1.0 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75 }}>
                   <HistoryEduOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Metadati
@@ -262,7 +263,7 @@ export default function AuditEventDrawer({ open, onClose, detail, detailLoading,
           ) : null}
 
           {detail.action === 'update' && hasVisibleAuditDiffs(detail.changes) ? (
-            <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
               <Box sx={{ px: 1.75, pt: 1.5, pb: 1.0 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75 }}>
                   <NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Modifiche
@@ -270,9 +271,9 @@ export default function AuditEventDrawer({ open, onClose, detail, detailLoading,
               </Box>
               <Box sx={{ borderTop: '1px solid', borderColor: 'grey.100', px: 1.75, py: 1.25,
                 '& .MuiTableCell-root': { fontSize: 13, borderColor: 'grey.100', verticalAlign: 'top', fontFamily: 'inherit' },
-                '& .MuiTableHead-root .MuiTableCell-root': { fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'text.disabled', bgcolor: '#f8fafc' },
+                '& .MuiTableHead-root .MuiTableCell-root': { fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'text.disabled', bgcolor: 'grey.50' },
                 '& .MuiTableBody-root .MuiTableCell-root:first-of-type': { fontWeight: 700, color: 'text.primary' },
-                '& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': { bgcolor: 'rgba(15,118,110,0.03)' },
+                '& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': { bgcolor: (t) => alpha(t.palette.primary.main, 0.03) },
               }}>
                 <AuditDiffTable changes={detail.changes as Record<string, { from: unknown; to: unknown }>} emptyLabel="Nessuna differenza registrata." />
               </Box>

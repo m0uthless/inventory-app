@@ -13,7 +13,7 @@ type InventoryTabProps = {
   customerId: number
   searchQuery: string
   statusFilter: StatusFilter
-  onOpenDrawer: (id: number) => void
+  onOpenDrawer: (id: number, typeKeyHint?: string | null) => void
   onInventoryContextMenu: (row: InventoryRow, e: React.MouseEvent) => void
   refreshToken: number
 }

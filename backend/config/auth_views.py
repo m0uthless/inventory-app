@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict
 
 from django.conf import settings
@@ -156,17 +157,17 @@ def login_view(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": "User disabled"}, status=403)
 
     # ── Verifica ambito ────────────────────────────────────────────────────
-    from auslbo.permissions import _can_access_archie, _is_auslbo_user
+    from portal.permissions import _can_access_archie, _is_portal_user
 
     can_archie = getattr(user, "is_superuser", False) or _can_access_archie(user)
-    is_portal  = _is_auslbo_user(user)
+    is_portal  = _is_portal_user(user)
 
     if ambito:
-        if ambito == "auslbo" and not is_portal:
+        if ambito == "portal" and not is_portal:
             _record_failed_attempt(username=username, ip_address=ip_address)
             _audit_failed_login(request, username=username, user_obj=user, reason="ambito_not_allowed")
             return JsonResponse(
-                {"detail": "Non sei autorizzato ad accedere al portale AUSL BO."},
+                {"detail": "Non sei autorizzato ad accedere al Portal."},
                 status=403,
             )
         if ambito == "site-repo" and not can_archie:
@@ -191,11 +192,26 @@ def login_view(request: HttpRequest) -> JsonResponse:
         pass
 
     # Restituisce anche l'ambito effettivo così il frontend sa dove redirigere.
-    effective_ambito = "auslbo" if (
+    effective_ambito = "portal" if (
         is_portal
-        and not can_archie  # utente esclusivamente portal → manda su AUSL BO
+        and not can_archie  # utente esclusivamente portal → manda su Portal
         and not ambito      # auto-detect solo se ambito non era specificato
     ) else (ambito or "site-repo")
+
+    # 0.9.0: fissa l'ambito in sessione server-side (mai da un header per
+    # request — stesso principio dello scope cliente in portal/permissions.py).
+    # Serve a distinguere, per un utente "dual-profile" (accesso interno
+    # Archie + profilo Portal), da quale frontend ha fatto login: solo così
+    # PortalScopedMixin può scoparlo sul cliente attivo quando opera dal
+    # Portal, pur lasciandolo libero di amministrare tutti i clienti quando
+    # opera dal gestionale Archie principale con lo stesso account.
+    from portal.permissions import SESSION_AMBITO_KEY
+    request.session[SESSION_AMBITO_KEY] = effective_ambito
+
+    # Baseline per SessionIdleTimeoutMiddleware: sia al primo login sia al
+    # "riautenticati" fatto da LockScreen.onSubmitPassword (stessa vista),
+    # azzera il conteggio di inattività.
+    request.session["last_activity"] = time.time()
 
     return JsonResponse({"detail": "ok", "ambito": effective_ambito})
 

@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material'
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 
 import AddIcon from '@mui/icons-material/Add'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
@@ -61,15 +62,11 @@ const RESULT_LABEL: Record<string, string> = {
   ok: 'OK', ko: 'KO', partial: 'Parziale', not_planned: 'Non prevista',
 }
 
-const GRID_SX = {
+const GRID_SX_BASE = {
   '--DataGrid-rowHeight': '24px',
   '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
-  '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-  '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: 'rgba(69,127,121,0.10) !important' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: 'rgba(69,127,121,0.14) !important' },
   '& .row-actions': { opacity: 0, pointerEvents: 'none', transition: 'opacity 140ms ease' },
   '& .MuiDataGrid-row:hover .row-actions': { opacity: 1, pointerEvents: 'auto' },
   '@media (hover: none), (pointer: coarse)': { '& .row-actions': { opacity: 1, pointerEvents: 'auto' } },
@@ -78,6 +75,7 @@ const GRID_SX = {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function Rapportini() {
+  const zebraSx = useDataGridZebraSx()
   const toast = useToast()
   const { me, hasPerm } = useAuth()
   const { exporting, exportCsv } = useExportCsv()
@@ -193,7 +191,7 @@ export default function Rapportini() {
       await api.post(`/maintenance-events/${ev.id}/upload-pdf/`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      toast.success('PDF caricato ✅')
+      toast.success('PDF caricato')
       reload()
     } catch (err) { toast.error(apiErrorToMessage(err)) }
     pendingPdfEventRef.current = null
@@ -202,7 +200,7 @@ export default function Rapportini() {
   const deletePdf = React.useCallback(async (ev: EventRow) => {
     try {
       await api.delete(`/maintenance-events/${ev.id}/delete-pdf/`)
-      toast.success('PDF eliminato ✅')
+      toast.success('PDF eliminato')
       reload()
     } catch (err) { toast.error(apiErrorToMessage(err)) }
   }, [reload, toast])
@@ -210,7 +208,7 @@ export default function Rapportini() {
   const setNotPlanned = React.useCallback(async (ev: EventRow) => {
     try {
       await api.patch(`/maintenance-events/${ev.id}/set-not-planned/`)
-      toast.success('Segnato come "Non prevista" ✅')
+      toast.success('Segnato come "Non prevista"')
       reload()
     } catch (err) { toast.error(apiErrorToMessage(err)) }
   }, [reload, toast])
@@ -227,7 +225,7 @@ export default function Rapportini() {
       const results = await Promise.allSettled(targets.map(ev => api.post(`/maintenance-events/${ev.id}/reset/`)))
       const ok = results.filter(r => r.status === 'fulfilled').length
       const fail = results.filter(r => r.status === 'rejected').length
-      if (fail === 0) toast.success(ok === 1 ? 'Manutenzione resettata ✅' : `${ok} manutenzioni resettate ✅`)
+      if (fail === 0) toast.success(ok === 1 ? 'Manutenzione resettata' : `${ok} manutenzioni resettate`)
       else toast.warning(`${ok} riuscite, ${fail} fallite`)
       setResetDlg(null)
       setResetMulti(null)
@@ -496,7 +494,7 @@ export default function Rapportini() {
       )
       const ok = results.filter(r => r.status === 'fulfilled').length
       const fail = results.filter(r => r.status === 'rejected').length
-      if (fail === 0) toast.success(`PDF caricato su ${ok} rapportini ✅`)
+      if (fail === 0) toast.success(`PDF caricato su ${ok} rapportini`)
       else toast.warning(`${ok} riusciti, ${fail} falliti`)
       if (!fromCtx) clearSelection()
       reload()
@@ -655,7 +653,7 @@ export default function Rapportini() {
             const row = rows.find(r => r.id === id)
             if (row?.pdf_url) setPdfViewer({ url: row.pdf_url, knumber: row.inventory_knumber ?? row.inventory_hostname ?? String(row.id) })
           },
-          sx: GRID_SX,
+          sx: { ...GRID_SX_BASE, ...zebraSx },
         }}
       >
         <Can perm={PERMS.maintenance.event.add}>

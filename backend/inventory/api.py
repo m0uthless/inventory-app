@@ -18,8 +18,8 @@ from core.crypto import decrypt
 from core.integrity import raise_integrity_error_as_validation
 from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, RestoreActionMixin, PurgeActionMixin
-from auslbo.mixins import AuslBoScopedMixin, AuslBoTenantWriteMixin
-from auslbo.permissions import IsAuslBoUserOrInternal, CrmInventoryModelPermissions
+from portal.mixins import PortalScopedMixin, PortalTenantWriteMixin
+from portal.permissions import IsPortalUserOrInternal, CrmInventoryModelPermissions
 
 
 class DecryptedSecretField(serializers.CharField):
@@ -104,6 +104,8 @@ class InventoryListSerializer(serializers.ModelSerializer):
             "status_label",
             "local_ip",
             "srsa_ip",
+            "location",
+            "telefono",
             "updated_at",
             "deleted_at",
             "has_active_issue",
@@ -170,6 +172,8 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
             "hostname",
             "local_ip",
             "srsa_ip",
+            "location",
+            "telefono",
 
             "type",
             "type_key",
@@ -271,11 +275,11 @@ class InventoryWriteSerializer(InventoryDetailSerializer):
         }
 
 
-class InventoryViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = InventoryWriteSerializer
     # Fix P0 6.6: view/add/change/delete_inventory espliciti per il portale
-    # AUSL BO (gli utenti interni mantengono il comportamento storico).
-    permission_classes = [IsAuslBoUserOrInternal, CrmInventoryModelPermissions]
+    # Portal (gli utenti interni mantengono il comportamento storico).
+    permission_classes = [IsPortalUserOrInternal, CrmInventoryModelPermissions]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
     # Fix P0 6.2: forza customer=proprio tenant per utenti portale "puri" e

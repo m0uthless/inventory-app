@@ -1,12 +1,17 @@
 /**
- * LoginPage — pagina di login condivisa tra frontend Archie e frontend AUSL BO.
+ * LoginPage — pagina di login condivisa tra frontend Archie e frontend Portal.
  *
- * Fotografia di sfondo:
- *   Copia un file immagine in:
- *     frontend/public/login-bg.jpg
- *     frontend-auslbo/public/login-bg.jpg
- *   Il componente la cerca automaticamente a /login-bg.jpg.
- *   Se il file non esiste mostra il gradiente blu di fallback.
+ * Sfondo (rotazione automatica):
+ *   Copia una o più immagini in:
+ *     frontend/public/login-bg-1.jpg, login-bg-2.jpg, ...
+ *     frontend-portal/public/login-bg-1.jpg, login-bg-2.jpg, ...
+ *   Il componente le cerca automaticamente in sequenza contigua a partire da
+ *   login-bg-1.jpg (fino a un massimo di BG_ROTATION_MAX) e, se ne trova 2 o
+ *   più, le fa ruotare con dissolvenza incrociata ogni BG_ROTATION_INTERVAL_MS
+ *   (default 5s). Con una sola immagine numerata non c'è rotazione, resta
+ *   fissa. Retrocompatibilità: se non esiste nessuna login-bg-N.jpg, ricade
+ *   sulla singola immagine storica /login-bg.jpg. Se non esiste nulla, mostra
+ *   il gradiente blu di fallback.
  */
 import * as React from 'react'
 import {
@@ -26,7 +31,7 @@ import DevEnvironmentBadge from './DevEnvironmentBadge'
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
-export type Ambito = 'archie' | 'auslbo'
+export type Ambito = 'archie' | 'portal'
 
 export interface AmbitoConfig {
   value: Ambito
@@ -45,6 +50,56 @@ export interface LoginPageProps {
 }
 
 const BG_PHOTO = '/login-bg.jpg'
+
+// ─── Rotazione sfondo login ─────────────────────────────────────────────────
+// Convenzione: login-bg-1.jpg, login-bg-2.jpg, ... in public/ (per ciascun
+// frontend). Vengono provate in parallelo fino al primo numero mancante
+// (sequenza contigua a partire da 1). Se non ne esiste nessuna, si ricade
+// sulla singola immagine storica /login-bg.jpg; se manca anche quella,
+// gradiente di fallback. Con una sola immagine trovata non c'è rotazione.
+const BG_ROTATION_MAX = 12
+const BG_ROTATION_INTERVAL_MS = 5000
+const BG_CROSSFADE_MS = 1400
+
+function probeImage(src: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => resolve(true)
+    img.onerror = () => resolve(false)
+    img.src = src
+  })
+}
+
+/** null = probing in corso, [] = nessuna immagine trovata, [...] = elenco pronto */
+function useLoginBackgrounds(): string[] | null {
+  const [images, setImages] = React.useState<string[] | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+    const candidates = Array.from(
+      { length: BG_ROTATION_MAX },
+      (_, i) => `/login-bg-${i + 1}.jpg`
+    )
+    Promise.all(candidates.map(probeImage)).then(async (results) => {
+      if (cancelled) return
+      const found: string[] = []
+      for (let i = 0; i < results.length; i++) {
+        if (!results[i]) break
+        found.push(candidates[i])
+      }
+      if (found.length > 0) {
+        setImages(found)
+        return
+      }
+      // Retrocompatibilità: nessuna immagine numerata, provo la singola storica
+      const legacyOk = await probeImage(BG_PHOTO)
+      if (!cancelled) setImages(legacyOk ? [BG_PHOTO] : [])
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  return images
+}
 
 // ─── Field ────────────────────────────────────────────────────────────────────
 // Fix accessibilità (audit 2026-07): label associata al campo tramite
@@ -210,9 +265,18 @@ export function LoginPage({
   const [username, setUsername] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [showPwd, setShowPwd] = React.useState(false)
-  const [photoBroken, setPhotoBroken] = React.useState(false)
+  const backgrounds = useLoginBackgrounds()
+  const [bgIndex, setBgIndex] = React.useState(0)
 
   const current = ambiti.find((a) => a.value === ambito) ?? ambiti[0]
+
+  React.useEffect(() => {
+    if (!backgrounds || backgrounds.length < 2) return
+    const id = window.setInterval(() => {
+      setBgIndex((i) => (i + 1) % backgrounds.length)
+    }, BG_ROTATION_INTERVAL_MS)
+    return () => window.clearInterval(id)
+  }, [backgrounds])
 
   const handleSubmit = () => {
     if (!username || !password) return
@@ -233,24 +297,41 @@ export function LoginPage({
     }}>
       <DevEnvironmentBadge />
 
-      {/* ── Sfondo a tutto schermo ── */}
-      {!photoBroken ? (
-        <Box
-          component="img"
-          src={BG_PHOTO}
-          alt=""
-          onError={() => setPhotoBroken(true)}
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center',
-          }}
-        />
+      {/* ── Sfondo a tutto schermo (rotazione con dissolvenza incrociata) ── */}
+      {backgrounds && backgrounds.length > 0 ? (
+        <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          {backgrounds.map((src, i) => {
+            const isActive = i === bgIndex
+            return (
+              <Box
+                key={src}
+                component="img"
+                src={src}
+                alt=""
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                  opacity: isActive ? 1 : 0,
+                  transition: `opacity ${BG_CROSSFADE_MS}ms ease-in-out`,
+                  willChange: 'opacity',
+                }}
+              />
+            )
+          })}
+        </Box>
+      ) : backgrounds === null ? (
+        /* Probing in corso: gradiente come stato iniziale per evitare flash */
+        <Box sx={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(160deg,#0B3D6B 0%,#1A6BB5 55%,#4A90D9 100%)',
+        }} />
       ) : (
-        /* Fallback gradiente */
+        /* Nessuna immagine trovata: fallback gradiente */
         <Box sx={{
           position: 'absolute',
           inset: 0,

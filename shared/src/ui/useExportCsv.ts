@@ -79,7 +79,7 @@ export function useExportCsv() {
         document.body.removeChild(link)
         URL.revokeObjectURL(link.href)
 
-        toast.success(`Esportati ${rows.length} record ✅`)
+        toast.success(`Esportati ${rows.length} record`)
       } catch {
         toast.error("Errore durante l'esportazione.")
       } finally {

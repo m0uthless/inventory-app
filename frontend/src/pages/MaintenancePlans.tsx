@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react'
 import { useTheme } from '@mui/material/styles'
+import { useDataGridZebraSx, useStatusTokens } from '../theme/AppThemeProvider'
 import {
   Box,
   Button,
@@ -97,16 +98,14 @@ function DueBadge({ dateStr }: { dateStr: string }) {
   return <Chip size="small" label={dateStr} color="default" variant="outlined" sx={{ height: 22, fontSize: '0.72rem' }} />
 }
 
-const GRID_SX = {
+// Zebra striping (colore) è ora theme-aware — vedi useDataGridZebraSx()
+// (theme/AppThemeProvider.tsx), composto al punto di consumo con questa
+// base fissa (densità riga, non legata al tema).
+const GRID_SX_BASE = {
   '--DataGrid-rowHeight': '24px',
   '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
-  '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-  '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: 'rgba(69,127,121,0.10) !important' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: 'rgba(69,127,121,0.14) !important' },
-
 } as const
 
 async function fetchComputedDueDate(scheduleType: string, intervalValue: number | '', intervalUnit: string, fixedMonth: number | '', fixedDay: number | ''): Promise<string | null> {
@@ -125,6 +124,8 @@ const PLAN0: PlanForm = { customer: '', inventory_types: [], title: '', schedule
 
 export default function MaintenancePlans() {
   const theme = useTheme()
+  const statusTokens = useStatusTokens()
+  const zebraSx = useDataGridZebraSx()
   const { me } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -218,8 +219,8 @@ export default function MaintenancePlans() {
     setDlgSave(true); setDlgErrors({})
     try {
       let id: number
-      if (dlgMode === 'create') { const r = await api.post<PlanRow>('/maintenance-plans/', payload); id = r.data.id; toast.success('Piano creato ✅') }
-      else { const r = await api.patch<PlanRow>(`/maintenance-plans/${dlgId}/`, payload); id = r.data.id; toast.success('Piano aggiornato ✅') }
+      if (dlgMode === 'create') { const r = await api.post<PlanRow>('/maintenance-plans/', payload); id = r.data.id; toast.success('Piano creato') }
+      else { const r = await api.patch<PlanRow>(`/maintenance-plans/${dlgId}/`, payload); id = r.data.id; toast.success('Piano aggiornato') }
       setDlgOpen(false); reload(); setDrawerPlanId(id)
     } catch (e) {
       const fe = apiErrorToFieldErrors(e)
@@ -230,12 +231,12 @@ export default function MaintenancePlans() {
 
   const doDelete = async () => {
     if (!delDlg) return; setDelBusy(true)
-    try { await api.delete(`/maintenance-plans/${delDlg.id}/`); toast.success('Piano eliminato ✅'); setDelDlg(null); reload() }
+    try { await api.delete(`/maintenance-plans/${delDlg.id}/`); toast.success('Piano eliminato'); setDelDlg(null); reload() }
     catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDelBusy(false) }
   }
 
   const doRestore = React.useCallback(async (plan: PlanRow) => {
-    try { await api.post(`/maintenance-plans/${plan.id}/restore/`); toast.success('Piano ripristinato ✅'); reload() }
+    try { await api.post(`/maintenance-plans/${plan.id}/restore/`); toast.success('Piano ripristinato'); reload() }
     catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [reload, toast])
 
@@ -329,6 +330,14 @@ export default function MaintenancePlans() {
 
     const now = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
 
+    // NOTA (color refactor 0.9.x): il template sotto genera un documento HTML
+    // stampabile a sé stante (finestra separata, solo per window.print()), non
+    // una view live dell'app — per questo i grigi/neutrali restano hardcoded
+    // (coerenza della stampa a prescindere dal tema attivo dell'utente), mentre
+    // i colori di brand/stato che DEVONO seguire il tema attivo (primary,
+    // success/warning, divider, text) restano interpolati da `theme.palette.*`
+    // come già erano. Eccezione deliberata, non dimenticanza — vedi anche
+    // RESULT_STYLE sopra, che già segue questa stessa convenzione.
     const html = `<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"/>
 <title>Report — ${plan.title}</title>
 <style>
@@ -508,10 +517,10 @@ export default function MaintenancePlans() {
               sx={{
                 height: 22, fontSize: '0.72rem', fontWeight: 600,
                 ...(isArchived
-                  ? { bgcolor: 'rgba(148,163,184,0.15)', color: theme.palette.text.secondary, border: '1px solid rgba(148,163,184,0.35)' }
+                  ? { bgcolor: statusTokens.maintenancePlanStatus.archived.bg, color: theme.palette.text.secondary, border: `1px solid ${statusTokens.maintenancePlanStatus.archived.border}` }
                   : isCompleted
-                  ? { bgcolor: 'rgba(34,197,94,0.12)',   color: theme.palette.success.dark, border: '1px solid rgba(34,197,94,0.35)' }
-                  : { bgcolor: 'rgba(234,179,8,0.12)',   color: theme.palette.warning.dark, border: '1px solid rgba(234,179,8,0.35)' }),
+                  ? { bgcolor: statusTokens.maintenancePlanStatus.completed.bg, color: theme.palette.success.dark, border: `1px solid ${statusTokens.maintenancePlanStatus.completed.border}` }
+                  : { bgcolor: statusTokens.maintenancePlanStatus.inProgress.bg, color: theme.palette.warning.dark, border: `1px solid ${statusTokens.maintenancePlanStatus.inProgress.border}` }),
               }}
             />
           </Box>
@@ -525,7 +534,7 @@ export default function MaintenancePlans() {
         const completed = p.row.completed_count ?? 0
         const pct       = total > 0 ? Math.round(completed / total * 100) : 0
         const color     = pct === 100 ? theme.palette.success.main : pct >= 50 ? theme.palette.warning.main : theme.palette.error.main
-        const trackClr  = pct === 100 ? 'rgba(34,197,94,0.15)' : pct >= 50 ? 'rgba(234,179,8,0.15)' : 'rgba(220,38,38,0.12)'
+        const trackClr  = pct === 100 ? statusTokens.maintenancePlanStatus.completed.bg : pct >= 50 ? statusTokens.maintenancePlanStatus.inProgress.bg : statusTokens.maintenancePlanStatus.atRisk.bg
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', height: '100%' }}>
             <Box sx={{ flex: 1, height: 6, bgcolor: trackClr, borderRadius: 3, overflow: 'hidden' }}>
@@ -616,7 +625,7 @@ export default function MaintenancePlans() {
           sortModel: grid.sortModel, onSortModelChange: grid.onSortModelChange,
           onRowClick: id => setDrawerPlanId(id),
           onRowContextMenu: handleRowContextMenu,
-          sx: GRID_SX,
+          sx: { ...GRID_SX_BASE, ...zebraSx },
         }}
       >
         <Can perm={PERMS.maintenance.plan.add}>

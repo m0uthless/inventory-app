@@ -1,4 +1,5 @@
 import { Box, Button, Typography } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import { useNavigate } from 'react-router-dom'
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied'
 
@@ -15,7 +16,7 @@ export default function NotFound() {
         minHeight: '100vh',
         gap: 2,
         px: 3,
-        background: 'linear-gradient(160deg, #f0fdfa 0%, #f8fafc 100%)',
+        background: (theme) => `linear-gradient(160deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${theme.palette.background.default} 100%)`,
       }}
     >
       {/* Numero 404 grande */}
@@ -26,7 +27,7 @@ export default function NotFound() {
             fontWeight: 800,
             lineHeight: 1,
             letterSpacing: '-0.04em',
-            background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, #0ea5a4 100%)`,
+            background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             userSelect: 'none',

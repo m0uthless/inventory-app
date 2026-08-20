@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
 import { Box, ButtonBase, IconButton, Menu, MenuItem, Typography } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
@@ -36,7 +37,7 @@ export function FileCard({
   return (
     <Box
       sx={{
-        bgcolor: selected ? 'rgba(15,118,110,0.07)' : '#fff',
+        bgcolor: (t) => selected ? alpha(t.palette.primary.main, 0.07) : t.palette.background.paper,
         border: '1px solid',
         borderColor: selected ? 'primary.main' : 'grey.200',
         borderRadius: 1,
@@ -48,7 +49,7 @@ export function FileCard({
         gap: 1.25,
         position: 'relative',
         '&:hover': {
-          bgcolor: selected ? 'rgba(15,118,110,0.09)' : '#f8fafc',
+          bgcolor: (t) => selected ? alpha(t.palette.primary.main, 0.09) : 'grey.50',
           borderColor: selected ? 'primary.main' : 'grey.300',
           boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
           '& .file-menu-btn': { opacity: 1 },

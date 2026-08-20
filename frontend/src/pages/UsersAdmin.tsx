@@ -1,5 +1,7 @@
 import * as React from 'react'
-import { theme } from '../theme'
+import { useTheme, alpha } from '@mui/material/styles'
+import { useDataGridZebraSx, useStatusTokens } from '../theme/AppThemeProvider'
+import { SHARED } from '../theme/constants'
 import {
   Alert,
   Avatar,
@@ -59,11 +61,9 @@ import {
   type AdminUserCreateResponse,
 } from '../types/adminUsers'
 
-const TEAL = theme.palette.primary.main
-
-type LeaveAreaOption = { id: number; label: string }
+export type LeaveAreaOption = { id: number; label: string }
 type CustomerOption = { id: number; label: string }
-type UserTabId = 'anagrafica' | 'permessi'
+export type UserTabId = 'anagrafica' | 'permessi'
 const USER_TAB_IDS: UserTabId[] = ['anagrafica', 'permessi']
 
 function fmtDateTime(iso?: string | null) {
@@ -97,7 +97,7 @@ function toIdLabel(v: unknown, labelKeys: string[]): { id: number; label: string
   return { id, label: String(id) }
 }
 
-// Stesso criterio del backend (auslbo/permissions.py::_can_access_archie):
+// Stesso criterio del backend (portal/permissions.py::_can_access_archie):
 // superuser, oppure permesso core.access_archie da gruppo o diretto.
 function hasArchieAccess(u: AdminUserRow): boolean {
   if (u.is_superuser) return true
@@ -221,6 +221,7 @@ function PermissionMatrix(props: {
   disabled?: boolean
 }) {
   const { modules, groupState, value, onChange, extraGroupSet, extraValueSet, onToggleExtra, sectionTitle, disabled } = props
+  const TEAL = useTheme().palette.primary.main
   const modulesWithExtras = modules.filter((m) => m.extra_permissions.length > 0)
 
   return (
@@ -296,7 +297,7 @@ function ResetPasswordResultDialog({ result, onClose }: { result: ResetPasswordR
   }
   return (
     <Box
-      sx={{ position: 'fixed', inset: 0, zIndex: 2000, bgcolor: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
+      sx={{ position: 'fixed', inset: 0, zIndex: 2000, bgcolor: SHARED.overlay.blackScrim, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
       onClick={onClose}
     >
       <Box onClick={(e) => e.stopPropagation()} sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 3, maxWidth: 420, width: '100%', boxShadow: 8 }}>
@@ -574,7 +575,7 @@ function CreateGroupDialog(props: {
 }
 
 // ─── Drawer utente ──────────────────────────────────────────────────────────
-function UserDrawer(props: {
+export function UserDrawer(props: {
   open: boolean
   user: AdminUserRow | null
   groups: AdminGroupRow[]
@@ -584,8 +585,12 @@ function UserDrawer(props: {
   onClose: () => void
   onSaved: (updated: AdminUserRow) => void
   onDeleted: (id: number) => void
+  /** Tab su cui aprire il drawer (default 'anagrafica'). Usato dalla
+   * schermata "Gestione accesso Portal" per aprire direttamente sul tab
+   * Permessi/Accesso Portal invece dell'anagrafica. */
+  initialTab?: UserTabId
 }) {
-  const { open, user, groups, modules, leaveAreas, currentUserId, onClose, onSaved, onDeleted } = props
+  const { open, user, groups, modules, leaveAreas, currentUserId, onClose, onSaved, onDeleted, initialTab } = props
   const toast = useToast()
   const [tab, setTab] = React.useState<UserTabId>('anagrafica')
   const [saving, setSaving] = React.useState(false)
@@ -613,15 +618,18 @@ function UserDrawer(props: {
   const [moduleDirect, setModuleDirect] = React.useState<Record<string, ModuleRwd>>({})
   const [extraDirect, setExtraDirect] = React.useState<Set<string>>(new Set())
 
-  const [auslboLevel, setAuslboLevel] = React.useState<RwdLevel>('none')
-  const [auslboCustomer, setAuslboCustomer] = React.useState<CustomerOption | null>(null)
+  const [portalLevel, setPortalLevel] = React.useState<RwdLevel>('none')
+  // 0.9.0 punto 6: multi-select. portalCustomers = TUTTI i clienti assegnati,
+  // portalDefaultId = quale di questi è il default (mostrato al login).
+  const [portalCustomers, setPortalCustomers] = React.useState<CustomerOption[]>([])
+  const [portalDefaultId, setPortalDefaultId] = React.useState<number | null>(null)
   const [customerInput, setCustomerInput] = React.useState('')
   const [customerOptions, setCustomerOptions] = React.useState<CustomerOption[]>([])
   const [customerLoading, setCustomerLoading] = React.useState(false)
 
   React.useEffect(() => {
     if (!user) return
-    setTab('anagrafica')
+    setTab(initialTab ?? 'anagrafica')
     setFirstName(user.first_name || '')
     setLastName(user.last_name || '')
     setEmail(user.email || '')
@@ -637,12 +645,20 @@ function UserDrawer(props: {
     setLeaveArea(user.profile.leave_area ?? '')
     setBirthDate(user.profile.birth_date ?? '')
     setGender(user.profile.gender ?? '')
-    setAuslboLevel(rwdToLevel(user.direct_permissions.modules['auslbo']))
-    setAuslboCustomer(
-      user.auslbo_profile ? { id: user.auslbo_profile.customer_id, label: user.auslbo_profile.customer_name } : null,
-    )
+    setPortalLevel(rwdToLevel(user.direct_permissions.modules['portal']))
+    if (user.portal_profile) {
+      const assigned: CustomerOption[] =
+        user.portal_profile.customers.length > 0
+          ? user.portal_profile.customers.map((c) => ({ id: c.id, label: c.name }))
+          : [{ id: user.portal_profile.customer_id, label: user.portal_profile.customer_name }] // fallback profili pre-0.9.0
+      setPortalCustomers(assigned)
+      setPortalDefaultId(user.portal_profile.customer_id)
+    } else {
+      setPortalCustomers([])
+      setPortalDefaultId(null)
+    }
     setCustomerInput('')
-  }, [user])
+  }, [user, initialTab])
 
   // Ricerca cliente per l'Autocomplete "Cliente collegato" (debounce 300ms).
   React.useEffect(() => {
@@ -687,20 +703,20 @@ function UserDrawer(props: {
     [user],
   )
 
-  const archieModules = React.useMemo(() => modules.filter((m) => !m.is_auslbo_dedicated), [modules])
-  // "auslbo" non è mostrato come riga separata: è rappresentato dal controllo "Accesso AUSL BO".
-  const auslboModules = React.useMemo(
-    () => modules.filter((m) => m.is_auslbo_dedicated && m.app_label !== 'auslbo'),
+  const archieModules = React.useMemo(() => modules.filter((m) => !m.is_portal_dedicated), [modules])
+  // "portal" non è mostrato come riga separata: è rappresentato dal controllo "Accesso Portal".
+  const portalModules = React.useMemo(
+    () => modules.filter((m) => m.is_portal_dedicated && m.app_label !== 'portal'),
     [modules],
   )
 
   if (!user) return null
 
-  const auslboGroupFloor = rwdToLevel(user.group_permissions.modules['auslbo'])
+  const portalGroupFloor = rwdToLevel(user.group_permissions.modules['portal'])
 
   // Un utente Philips è un profilo circoscritto esclusivamente all'app
   // ServiceNow: diventa automaticamente tecnico, e gruppo/permessi Archie/
-  // AUSL BO vengono azzerati e bloccati (enforced anche lato backend).
+  // Portal vengono azzerati e bloccati (enforced anche lato backend).
   const handlePhilipsChange = (checked: boolean) => {
     setIsPhilips(checked)
     if (checked) {
@@ -711,8 +727,9 @@ function UserDrawer(props: {
       setGroupIds([])
       setModuleDirect({})
       setExtraDirect(new Set())
-      setAuslboLevel('none')
-      setAuslboCustomer(null)
+      setPortalLevel('none')
+      setPortalCustomers([])
+      setPortalDefaultId(null)
     }
   }
 
@@ -746,8 +763,8 @@ function UserDrawer(props: {
   }
 
   const savePermessi = async () => {
-    if (auslboLevel !== 'none' && !auslboCustomer) {
-      toast.error("Seleziona un cliente per abilitare l'accesso AUSL BO.")
+    if (portalLevel !== 'none' && (portalCustomers.length === 0 || !portalDefaultId)) {
+      toast.error("Seleziona almeno un cliente (e il cliente di default) per abilitare l'accesso Portal.")
       return
     }
     setSaving(true)
@@ -758,7 +775,11 @@ function UserDrawer(props: {
       const res = await api.patch(`/admin-users/${user.id}/`, {
         module_permissions: moduleDirect,
         extra_permission_ids,
-        auslbo_access: { level: auslboLevel, customer_id: auslboCustomer?.id ?? null },
+        portal_access: {
+          level: portalLevel,
+          customer_id: portalDefaultId,
+          customer_ids: portalCustomers.map((c) => c.id),
+        },
       })
       onSaved(res.data as AdminUserRow)
       toast.success('Permessi aggiornati.')
@@ -819,7 +840,7 @@ function UserDrawer(props: {
       gradient="teal"
       width={420}
       icon={
-        <Avatar src={user.profile.avatar || undefined} sx={{ width: 38, height: 38, fontSize: 14, fontWeight: 800, bgcolor: 'rgba(255,255,255,0.22)', color: '#fff' }}>
+        <Avatar src={user.profile.avatar || undefined} sx={{ width: 38, height: 38, fontSize: 14, fontWeight: 800, bgcolor: alpha(SHARED.pureWhite, 0.22), color: SHARED.pureWhite }}>
           {!user.profile.avatar && initials(user)}
         </Avatar>
       }
@@ -890,7 +911,7 @@ function UserDrawer(props: {
               {isPhilips && (
                 <Typography sx={{ fontSize: 11.5, color: 'text.secondary', ml: 5.5, mt: -0.5 }}>
                   Profilo circoscritto a ServiceNow: tecnico attivato in automatico; coordinatore ferie, segreteria
-                  rimborsi, area ferie, gruppo e permessi Archie/AUSL BO bloccati a "Nessuno".
+                  rimborsi, area ferie, gruppo e permessi Archie/Portal bloccati a "Nessuno".
                 </Typography>
               )}
               <FormControlLabel
@@ -983,7 +1004,7 @@ function UserDrawer(props: {
         <Stack spacing={2}>
           {isPhilips && (
             <Alert severity="info" sx={{ fontSize: 12 }}>
-              Profilo Philips: circoscritto a ServiceNow. Permessi Archie e accesso AUSL BO bloccati a "Nessuno".
+              Profilo Philips: circoscritto a ServiceNow. Permessi Archie e accesso Portal bloccati a "Nessuno".
             </Alert>
           )}
 
@@ -1006,37 +1027,81 @@ function UserDrawer(props: {
             disabled={isPhilips}
           />
 
-          <DrawerSection title="Accesso AUSL BO">
+          <DrawerSection title="Accesso Portal">
             <ModuleRwdSelect
               label="Livello di accesso"
-              value={auslboLevel}
-              floorLevel={auslboGroupFloor}
-              onChange={setAuslboLevel}
+              value={portalLevel}
+              floorLevel={portalGroupFloor}
+              onChange={setPortalLevel}
               disabled={isPhilips}
             />
-            {auslboLevel !== 'none' && (
-              <Autocomplete
-                sx={{ mt: 1.5 }}
-                size="small"
-                options={customerOptions}
-                loading={customerLoading}
-                inputValue={customerInput}
-                onInputChange={(_, v) => setCustomerInput(v)}
-                value={auslboCustomer}
-                onChange={(_, v) => setAuslboCustomer(v)}
-                getOptionLabel={(o) => o.label}
-                isOptionEqualToValue={(a, b) => a.id === b.id}
-                filterOptions={(x) => x}
-                renderInput={(params) => (
-                  <TextField {...params} label="Cliente collegato" placeholder="Cerca cliente…" required error={!auslboCustomer} />
+            {portalLevel !== 'none' && (
+              <Alert severity="info" sx={{ mt: 1.5, fontSize: 12 }}>
+                Questo controllo abilita solo l'accesso al portale e i clienti
+                selezionabili. Per far vedere Device/Inventario/VLAN all'utente,
+                assegna i permessi anche su quei moduli nella sezione "Permessi
+                ARCHIE" qui sopra — non è automatico.
+              </Alert>
+            )}
+            {portalLevel !== 'none' && (
+              <>
+                <Autocomplete
+                  multiple
+                  sx={{ mt: 1.5 }}
+                  size="small"
+                  options={customerOptions}
+                  loading={customerLoading}
+                  inputValue={customerInput}
+                  onInputChange={(_, v) => setCustomerInput(v)}
+                  value={portalCustomers}
+                  onChange={(_, list) => {
+                    setPortalCustomers(list)
+                    // Se il default non è più tra i selezionati, ricade sul
+                    // primo rimasto (o si azzera se la lista è vuota) — mai
+                    // lasciare un default "orfano" fuori dalla selezione.
+                    if (!list.some((c) => c.id === portalDefaultId)) {
+                      setPortalDefaultId(list.length > 0 ? list[0].id : null)
+                    }
+                  }}
+                  getOptionLabel={(o) => o.label}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  filterOptions={(x) => x}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Clienti assegnati"
+                      placeholder="Cerca cliente…"
+                      required
+                      error={portalCustomers.length === 0}
+                    />
+                  )}
+                />
+                {portalCustomers.length > 0 && (
+                  <TextField
+                    select
+                    sx={{ mt: 1.5 }}
+                    size="small"
+                    fullWidth
+                    label="Cliente di default"
+                    helperText="Mostrato al login e usato come fallback per lo scope Portal."
+                    value={portalDefaultId ?? ''}
+                    onChange={(e) => setPortalDefaultId(Number(e.target.value))}
+                    error={!portalDefaultId}
+                  >
+                    {portalCustomers.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 )}
-              />
+              </>
             )}
           </DrawerSection>
 
-          {auslboLevel !== 'none' && auslboModules.length > 0 && (
+          {portalLevel !== 'none' && portalModules.length > 0 && (
             <PermissionMatrix
-              modules={auslboModules}
+              modules={portalModules}
               groupState={user.group_permissions.modules}
               value={moduleDirect}
               onChange={(app, level) => setModuleDirect((prev) => ({ ...prev, [app]: LEVEL_TO_RWD[level] }))}
@@ -1050,7 +1115,7 @@ function UserDrawer(props: {
                   return next
                 })
               }
-              sectionTitle="AUSL BO — moduli dedicati"
+              sectionTitle="Portal — moduli dedicati"
             />
           )}
 
@@ -1203,18 +1268,15 @@ function GroupDrawer(props: {
 }
 
 // ─── Pagina principale ──────────────────────────────────────────────────────
-const GRID_ZEBRA_SX = {
+const GRID_ZEBRA_SX_BASE = {
   '--DataGrid-rowHeight': '32px',
   '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
-  '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-  '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: 'rgba(69,127,121,0.10) !important' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: 'rgba(69,127,121,0.14) !important' },
 } as const
 
 export default function UsersAdmin() {
+  const zebraSx = useDataGridZebraSx()
   const { me } = useAuth()
   const toast = useToast()
   const [mainTab, setMainTab] = React.useState<'utenti' | 'gruppi'>('utenti')
@@ -1255,6 +1317,7 @@ export default function UsersAdmin() {
 
   const usersGrid = useLocalGrid<AdminUserRow>(users, ['username', 'first_name', 'last_name', 'email'])
   const groupsGrid = useLocalGrid<AdminGroupRow>(groups, ['name'])
+  const statusTokens = useStatusTokens()
 
   const userColumns: GridColDef<AdminUserRow>[] = [
     {
@@ -1263,9 +1326,9 @@ export default function UsersAdmin() {
       width: 140,
       valueGetter: (_v, row) => row.username,
       renderCell: (p) => (
-        <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(0,0,0,0.62)' }}>
+        <Box component="span" sx={{ fontSize: 13, fontFamily: 'monospace', color: 'text.secondary' }}>
           {p.row.username}
-        </span>
+        </Box>
       ),
     },
     {
@@ -1287,7 +1350,7 @@ export default function UsersAdmin() {
           )}
           {p.row.profile.is_functional_account && (
             <Tooltip title="Account funzionale: non compare in Triage / vista assenze">
-              <Chip label="FUNZ." size="small" sx={{ fontSize: 9.5, height: 18, fontWeight: 700, bgcolor: (theme) => theme.palette.background.default, color: '#475569' }} />
+              <Chip label="FUNZ." size="small" sx={{ fontSize: 9.5, height: 18, fontWeight: 700, bgcolor: (theme) => theme.palette.background.default, color: 'text.secondary' }} />
             </Tooltip>
           )}
         </Stack>
@@ -1300,17 +1363,20 @@ export default function UsersAdmin() {
       width: 100,
       sortable: false,
       valueGetter: (_v, row) => row.profile.is_philips,
-      renderCell: (p) => (
+      renderCell: (p) => {
+        const badge = p.row.profile.is_philips ? statusTokens.companyBadge.philips : statusTokens.companyBadge.biotron
+        return (
         <Chip
           label={p.row.profile.is_philips ? 'PHILIPS' : 'BIOTRON'}
           size="small"
           sx={{
             fontSize: 10.5, height: 22, fontWeight: 700,
-            bgcolor: p.row.profile.is_philips ? '#E0F2FE' : '#E2E8F0',
-            color: p.row.profile.is_philips ? '#075985' : '#334155',
+            bgcolor: badge.bg,
+            color: badge.color,
           }}
         />
-      ),
+        )
+      },
     },
     {
       field: 'leave_area',
@@ -1320,7 +1386,7 @@ export default function UsersAdmin() {
       valueGetter: (_v, row) => row.profile.leave_area_name,
       renderCell: (p) => {
         if (p.row.profile.is_philips || !p.row.profile.leave_area_name) {
-          return <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)' }}>—</span>
+          return <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>—</Box>
         }
         return <Chip label={p.row.profile.leave_area_name} size="small" sx={{ fontSize: 11, height: 20 }} />
       },
@@ -1334,7 +1400,7 @@ export default function UsersAdmin() {
       renderCell: (p) => (
         <Stack direction="row" spacing={0.5} flexWrap="wrap">
           {p.row.groups.length === 0 ? (
-            <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>—</span>
+            <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>—</Box>
           ) : (
             p.row.groups.map((g) => <Chip key={g.id} label={g.name} size="small" sx={{ fontSize: 11, height: 20 }} />)
           )}
@@ -1352,7 +1418,7 @@ export default function UsersAdmin() {
       renderCell: (p) =>
         p.row.profile.is_servicenow_technician ? (
           <Tooltip title="Tecnico ServiceNow">
-            <CheckCircleIcon sx={{ fontSize: 18, color: '#16A34A' }} />
+            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
           </Tooltip>
         ) : null,
     },
@@ -1367,21 +1433,21 @@ export default function UsersAdmin() {
       renderCell: (p) =>
         hasArchieAccess(p.row) ? (
           <Tooltip title="Ha accesso al frontend Archie">
-            <CheckCircleIcon sx={{ fontSize: 18, color: '#16A34A' }} />
+            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
           </Tooltip>
         ) : null,
     },
     {
-      field: 'has_auslbo_access',
-      headerName: 'AUSL BO',
+      field: 'has_portal_access',
+      headerName: 'Portal',
       width: 90,
       align: 'center',
       headerAlign: 'center',
       sortable: false,
       renderCell: (p) =>
-        p.row.has_auslbo_access ? (
-          <Tooltip title="Ha accesso al portal AUSL BO">
-            <CheckCircleIcon sx={{ fontSize: 18, color: '#16A34A' }} />
+        p.row.has_portal_access ? (
+          <Tooltip title="Ha accesso al Portal">
+            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
           </Tooltip>
         ) : null,
     },
@@ -1421,7 +1487,7 @@ export default function UsersAdmin() {
         return (
           <Stack direction="row" spacing={0.5} flexWrap="wrap">
             {active.length === 0 ? (
-              <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>Nessuno</span>
+              <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>Nessuno</Box>
             ) : (
               <>
                 {active.slice(0, 4).map((label) => (
@@ -1468,7 +1534,7 @@ export default function UsersAdmin() {
             sortModel: usersGrid.sortModel,
             onSortModelChange: usersGrid.onSortModelChange,
             onRowClick: (id) => setSelectedUser(users.find((u) => u.id === id) || null),
-            sx: GRID_ZEBRA_SX,
+            sx: { ...GRID_ZEBRA_SX_BASE, ...zebraSx },
           }}
         />
       ) : (
@@ -1496,7 +1562,7 @@ export default function UsersAdmin() {
             sortModel: groupsGrid.sortModel,
             onSortModelChange: groupsGrid.onSortModelChange,
             onRowClick: (id) => setSelectedGroup(groups.find((g) => g.id === id) || null),
-            sx: GRID_ZEBRA_SX,
+            sx: { ...GRID_ZEBRA_SX_BASE, ...zebraSx },
           }}
         />
       )}

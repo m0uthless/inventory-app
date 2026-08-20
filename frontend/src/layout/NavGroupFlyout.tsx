@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { Box, List, Popover, Typography } from '@mui/material'
 
-import { useSidebarTokens } from '../theme/AppThemeProvider'
+import { useSidebarTokens, useWidgetAccents } from '../theme/AppThemeProvider'
+import { alpha } from '@mui/material/styles'
 import type { NavItem } from './appLayoutNav'
 
 // ─── Popover di flyout per un gruppo di nav (sidebar mini) ────────────────────
@@ -26,6 +27,7 @@ export function NavGroupFlyout({
   renderItem: (item: NavItem) => React.ReactNode
 }) {
   const SIDEBAR = useSidebarTokens()
+  const widgetAccents = useWidgetAccents()
   return (
     <Popover
       open={open}
@@ -49,7 +51,7 @@ export function NavGroupFlyout({
           background: SIDEBAR.bgGradient,
           color: (theme) => theme.palette.common.white,
           boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)',
-          border: '1px solid rgba(94,234,212,0.12)',
+          border: `1px solid ${alpha(widgetAccents.mintAccent, 0.12)}`,
         },
       }}
     >

@@ -20,7 +20,7 @@ from core.admin_users_api import (
 from config.search_api import SearchAPIView
 from config.system_stats_api import HealthAPIView, SystemStatsView
 
-from auslbo.api import AuslBoMeView, AuslBoConfigView
+from portal.api import PortalMeView, PortalConfigView, PortalSwitchCustomerView
 
 from core.api import (
     CustomerStatusViewSet,
@@ -196,9 +196,10 @@ urlpatterns = [
     # Pannello "Utenti e Gruppi"
     path("api/admin/permission-modules/", PermissionModulesView.as_view()),
 
-    # AUSL BO
-    path("api/auslbo/me/", AuslBoMeView.as_view(), name="auslbo-me"),
-    path("api/auslbo/config/", AuslBoConfigView.as_view(), name="auslbo-config"),
+    # Portal
+    path("api/portal/me/", PortalMeView.as_view(), name="portal-me"),
+    path("api/portal/config/", PortalConfigView.as_view(), name="portal-config"),
+    path("api/portal/switch-customer/", PortalSwitchCustomerView.as_view(), name="portal-switch-customer"),
 
     # Public status endpoints
     path("api/health/", HealthAPIView.as_view()),

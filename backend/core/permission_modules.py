@@ -49,16 +49,16 @@ MODULE_LABELS: dict[str, str] = {
     "attendance": "Presenze & Ferie",
     "expenses": "Note Spese",
     "purchaseorders": "Purchase Order",
-    "auslbo": "Portale AUSL BO",
+    "portal": "Portale Clienti",
     "core": "Core / Sistema",
     "custom_fields": "Campi Personalizzati",
     "audit": "Audit Log",
 }
 
-# app_label esclusivi del portale AUSL BO: non hanno equivalente sul frontend
+# app_label esclusivi del Portal: non hanno equivalente sul frontend
 # Archie principale (vedi TODO ARCHIE punto 3: Device/VLAN restano esclusivi
-# di AUSL BO). "auslbo" è il modulo che rappresenta l'accesso al portal stesso.
-AUSLBO_DEDICATED_APPS: frozenset[str] = frozenset({"auslbo", "device", "vlan"})
+# di Portal). "portal" è il modulo che rappresenta l'accesso al portal stesso.
+PORTAL_DEDICATED_APPS: frozenset[str] = frozenset({"portal", "device", "vlan"})
 
 _STANDARD_ACTIONS = ("view", "add", "change", "delete")
 
@@ -115,7 +115,7 @@ def get_permission_modules() -> list[dict]:
             "app_label": app_label,
             "label": label,
             "extra_permissions": extras_by_app.get(app_label, []),
-            "is_auslbo_dedicated": app_label in AUSLBO_DEDICATED_APPS,
+            "is_portal_dedicated": app_label in PORTAL_DEDICATED_APPS,
         })
     return modules
 

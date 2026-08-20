@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { Avatar, Box, Card, Skeleton, Stack, Typography } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { useTheme, alpha } from '@mui/material/styles'
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded'
 import { api } from '@shared/api/client'
+import { useWidgetAccents, useKpiAccents } from '../theme/AppThemeProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,12 +24,11 @@ type Props = {
 }
 
 // ─── Confetti (deterministici, nessun random a ogni render) ───────────────────
+// Posizione/dimensione/timing restano fissi in tutti i temi; solo il colore
+// (CONFETTI_COLORS, via WidgetAccents.confetti) cambia con Temp.
 
-const CONFETTI_COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6']
-
-const CONFETTI = Array.from({ length: 16 }, (_, i) => ({
+const CONFETTI_LAYOUT = Array.from({ length: 16 }, (_, i) => ({
   id: i,
-  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
   left: `${5 + (i * 6.1) % 90}%`,
   size: 5 + (i * 3) % 6,
   delay: `${(i * 0.31) % 2.4}s`,
@@ -41,6 +41,12 @@ const CONFETTI = Array.from({ length: 16 }, (_, i) => ({
 
 export default function ContributorCard({ contributor: contributorProp }: Props) {
   const theme = useTheme()
+  const widgetAccents = useWidgetAccents()
+  const kpiAccents = useKpiAccents()
+  const confetti = React.useMemo(
+    () => CONFETTI_LAYOUT.map((c, i) => ({ ...c, color: widgetAccents.confetti[i % widgetAccents.confetti.length] })),
+    [widgetAccents],
+  )
   const isControlled = contributorProp !== undefined
 
   const [contributor, setContributor] = React.useState<ContributorData | null>(
@@ -74,9 +80,12 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
         borderRadius: 1,
         height: '100%',
         minHeight: 240,
-        background: `linear-gradient(160deg, #0d4f4a 0%, ${theme.palette.primary.main} 55%, #0a3d38 100%)`,
-        border: '1px solid rgba(94,234,212,0.25)',
-        boxShadow: '0 14px 34px rgba(15,118,110,0.28)',
+        // Gradiente sui toni teal derivato da KPI_ACCENTS (useKpiAccents(),
+        // theme-aware). Prima era hex fisso indipendente dal tema — vedi
+        // 0.9.0: allineato a QuickActionsPairCard, stessa richiesta.
+        background: `linear-gradient(160deg, ${kpiAccents.teal2} 0%, ${kpiAccents.teal1} 55%, ${kpiAccents.teal2} 100%)`,
+        border: `1px solid ${alpha(kpiAccents.teal1, 0.3)}`,
+        boxShadow: `0 14px 34px ${alpha(kpiAccents.teal2, 0.35)}`,
       }}
     >
       {/* Keyframes coriandoli */}
@@ -89,7 +98,7 @@ export default function ContributorCard({ contributor: contributorProp }: Props)
       `}</style>
 
       {/* Coriandoli */}
-      {!loading && contributor && CONFETTI.map(c => (
+      {!loading && contributor && confetti.map(c => (
         <Box
           key={c.id}
           sx={{

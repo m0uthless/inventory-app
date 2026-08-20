@@ -44,11 +44,12 @@ def _internal_user(*, perms: list[str] | None = None):
     return user
 
 
-def _auslbo_user(customer, *, perms: list[str] | None = None):
-    from auslbo.models import AuslBoUserProfile
+def _portal_user(customer, *, perms: list[str] | None = None):
+    from portal.models import PortalUserProfile
 
-    user = User.objects.create_user(username=f"rispacs_auslbo_{uuid.uuid4().hex[:6]}", password="pw")
-    AuslBoUserProfile.objects.create(user=user, customer=customer)
+    user = User.objects.create_user(username=f"rispacs_portal_{uuid.uuid4().hex[:6]}", password="pw")
+    profile = PortalUserProfile.objects.create(user=user, customer=customer)
+    profile.customers.add(customer)  # 0.9.0: il default deve essere tra gli assegnati
     if perms:
         user.user_permissions.add(*Permission.objects.filter(codename__in=perms))
     return user
@@ -84,7 +85,7 @@ def test_portal_user_can_read_global_rispacs_registry():
     Rispacs.objects.create(name="PACS Centrale", ip="10.90.0.10", port=104, aetitle="PACSCTR")
 
     device_a = _make_device(admin, suffix="rispacsreada")
-    reader = _auslbo_user(device_a.customer, perms=["view_rispacs"])
+    reader = _portal_user(device_a.customer, perms=["view_rispacs"])
     resp = _auth_client(reader).get("/api/rispacs/")
     assert resp.status_code == 200
     assert resp.data["count"] == 1
@@ -96,7 +97,7 @@ def test_portal_user_cannot_create_global_rispacs_entry():
     i clienti."""
     admin = _superuser()
     device_a = _make_device(admin, suffix="rispacswriteblocka")
-    portal_user = _auslbo_user(
+    portal_user = _portal_user(
         device_a.customer,
         perms=["view_rispacs", "add_rispacs", "change_rispacs", "delete_rispacs"],
     )
@@ -139,7 +140,7 @@ def test_portal_user_sees_only_own_customer_device_rispacs_links():
     link_a = DeviceRispacs.objects.create(device=device_a, rispacs=rispacs)
     link_b = DeviceRispacs.objects.create(device=device_b, rispacs=rispacs)
 
-    portal_a = _auslbo_user(device_a.customer, perms=["view_devicerispacs"])
+    portal_a = _portal_user(device_a.customer, perms=["view_devicerispacs"])
     client = _auth_client(portal_a)
 
     resp = client.get("/api/device-rispacs/")
@@ -159,7 +160,7 @@ def test_portal_user_cannot_link_rispacs_to_device_of_another_customer():
     )[0]
     other_customer = Customer.objects.create(name="AltroTenant", status=other_customer_status)
 
-    portal_user = _auslbo_user(
+    portal_user = _portal_user(
         other_customer,
         perms=["view_devicerispacs", "add_devicerispacs", "change_devicerispacs"],
     )

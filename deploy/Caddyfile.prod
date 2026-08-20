@@ -22,7 +22,7 @@ archie.biotron.it {
     }
 }
 
-auslbo.biotron.it {
+portal.biotron.it {
     encode gzip zstd
 
     handle /api/* {
@@ -42,6 +42,6 @@ auslbo.biotron.it {
     }
 
     handle {
-        reverse_proxy frontend-auslbo:80
+        reverse_proxy frontend-portal:80
     }
 }

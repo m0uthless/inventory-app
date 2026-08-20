@@ -17,7 +17,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import type { DocumentSlot, PurchaseOrderDetail } from './types'
-import { DOCUMENT_SLOT_LABEL, STATUS_LABEL, committenteColor, formatEuro, formatItDate } from './types'
+import { DOCUMENT_SLOT_LABEL, STATUS_LABEL, formatEuro, formatItDate } from './types'
+import { committenteColor } from '../../theme/statusTokens'
+import { useStatusTokens } from '../../theme/AppThemeProvider'
 
 type PurchaseOrderDrawerProps = {
   open: boolean
@@ -52,6 +54,7 @@ export default function PurchaseOrderDrawer({
   canChange, canDelete, deleteBusy, restoreBusy, uploadingSlot, deletingDocId,
   onClose, onEdit, onDelete, onRestore, onCopy, onUploadDocument, onDeleteDocument,
 }: PurchaseOrderDrawerProps) {
+  const statusTokens = useStatusTokens()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [uploadType, setUploadType] = React.useState<DocumentSlot | ''>('')
 
@@ -81,9 +84,9 @@ export default function PurchaseOrderDrawer({
                 size="small"
                 label={detail.client_name}
                 sx={{
-                  bgcolor: committenteColor(detail.client_name).bg,
-                  color: committenteColor(detail.client_name).color,
-                  border: `0.5px solid ${committenteColor(detail.client_name).border}`,
+                  bgcolor: committenteColor(detail.client_name, statusTokens.clientChipPalette).bg,
+                  color: committenteColor(detail.client_name, statusTokens.clientChipPalette).color,
+                  border: `0.5px solid ${committenteColor(detail.client_name, statusTokens.clientChipPalette).border}`,
                   fontWeight: 600,
                 }}
               />

@@ -24,7 +24,7 @@ export type PermissionModule = {
   app_label: string
   label: string // etichetta italiana leggibile
   extra_permissions: ExtraPermissionDef[]
-  is_auslbo_dedicated: boolean // true per auslbo/device/vlan (esclusivi del portal AUSL BO)
+  is_portal_dedicated: boolean // true per portal/device/vlan (esclusivi del Portal)
 }
 
 export type AdminGroupRow = {
@@ -49,7 +49,12 @@ export type AdminUserProfile = {
 
 export type AdminUserGroupRef = { id: number; name: string }
 
-export type AuslboProfileRef = { customer_id: number; customer_name: string }
+export type PortalProfileRef = {
+  customer_id: number
+  customer_name: string
+  is_active: boolean // 0.9.0 punto 4: false se il default non è più tra i clienti assegnati
+  customers: { id: number; name: string }[] // 0.9.0 punto 6: tutti i clienti assegnati
+}
 
 export type AdminUserRow = {
   id: number
@@ -65,15 +70,19 @@ export type AdminUserRow = {
   groups: AdminUserGroupRef[]
   group_permissions: PermissionState
   direct_permissions: PermissionState
-  has_auslbo_access: boolean
-  auslbo_profile: AuslboProfileRef | null
+  has_portal_access: boolean
+  portal_profile: PortalProfileRef | null
   profile: AdminUserProfile
 }
 
 /** Livello del menu a tendina permessi/accesso AUSL BO. */
 export type RwdLevel = 'none' | 'read' | 'read_write' | 'full'
 
-export type AuslboAccessPayload = { level: RwdLevel; customer_id: number | null }
+export type PortalAccessPayload = {
+  level: RwdLevel
+  customer_id: number | null // cliente di DEFAULT
+  customer_ids: number[] // 0.9.0 punto 6: TUTTI i clienti assegnati (multi-select)
+}
 
 export type AdminUserWritePayload = Partial<{
   first_name: string
@@ -83,7 +92,7 @@ export type AdminUserWritePayload = Partial<{
   group_ids: number[]
   module_permissions: Record<string, ModuleRwd>
   extra_permission_ids: number[]
-  auslbo_access: AuslboAccessPayload
+  portal_access: PortalAccessPayload
   profile: Partial<{
     is_philips: boolean
     is_servicenow_technician: boolean

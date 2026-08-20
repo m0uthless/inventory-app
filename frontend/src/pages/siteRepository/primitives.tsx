@@ -6,6 +6,7 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import type { Tone } from './types'
 import { FS, ICON, toneColors, issuePriorityTone, copyText, MonoField } from './style'
+import { SHARED } from '../../theme/constants'
 
 // ─── SignalChip — badge "segnale" ──────────────────────────────────────────────
 
@@ -29,10 +30,10 @@ export function SignalChip({
         label={label}
         sx={{
           height: 22, fontSize: FS.label, fontWeight: 700,
-          bgcolor: 'rgba(255,255,255,0.16)', color: '#fff',
-          border: '1px solid rgba(255,255,255,0.32)',
+          bgcolor: alpha(SHARED.pureWhite, 0.16), color: SHARED.pureWhite,
+          border: `1px solid ${alpha(SHARED.pureWhite, 0.32)}`,
           '& .MuiChip-label': { px: 0.75 },
-          '& .MuiChip-icon': { color: '#fff', fontSize: ICON.inline, ml: '4px' },
+          '& .MuiChip-icon': { color: SHARED.pureWhite, fontSize: ICON.inline, ml: '4px' },
           ...sx,
         }}
       />
@@ -76,12 +77,12 @@ export function MetaTag({
         onClick={onClick}
         sx={{
           height: 22, fontSize: FS.label, fontWeight: 700,
-          bgcolor: 'transparent', color: 'rgba(255,255,255,0.92)',
-          borderColor: 'rgba(255,255,255,0.32)',
+          bgcolor: 'transparent', color: alpha(SHARED.pureWhite, 0.92),
+          borderColor: alpha(SHARED.pureWhite, 0.32),
           cursor: onClick ? 'pointer' : 'default',
           '& .MuiChip-label': { px: 0.75 },
-          '& .MuiChip-icon': { color: 'rgba(255,255,255,0.85)', fontSize: ICON.inline, ml: '4px' },
-          ...(onClick ? { '&:hover': { bgcolor: 'rgba(255,255,255,0.14)' } } : {}),
+          '& .MuiChip-icon': { color: alpha(SHARED.pureWhite, 0.85), fontSize: ICON.inline, ml: '4px' },
+          ...(onClick ? { '&:hover': { bgcolor: alpha(SHARED.pureWhite, 0.14) } } : {}),
           ...sx,
         }}
       />

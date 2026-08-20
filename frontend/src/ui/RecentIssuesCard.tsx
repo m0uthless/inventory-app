@@ -5,14 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { PRIORITY_META } from '../features/issues/types'
 import type { IssueRow } from '../features/issues/types'
-import { theme } from '../theme'
-
-const PRIORITY_BAR: Record<string, string> = {
-  critical: theme.palette.error.main,
-  high:     '#ed6c02',
-  medium:   '#0288d1',
-  low:      theme.palette.text.secondary,
-}
+import { useTheme } from '@mui/material/styles'
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
@@ -26,10 +19,18 @@ function timeAgo(dateStr: string): string {
 
 export default function RecentIssuesCard() {
   const navigate = useNavigate()
+  const theme = useTheme()
   const [issues, setIssues]       = React.useState<IssueRow[]>([])
   const [totalOpen, setTotalOpen] = React.useState<number>(0)
   const [critical, setCritical]   = React.useState<number>(0)
   const [loading, setLoading]     = React.useState(true)
+
+  const PRIORITY_BAR: Record<string, string> = React.useMemo(() => ({
+    critical: theme.palette.error.main,
+    high:     theme.palette.warning.main,
+    medium:   theme.palette.info.main,
+    low:      theme.palette.text.secondary,
+  }), [theme])
 
   React.useEffect(() => {
     api.get<{ results: IssueRow[]; count: number }>('/issues/', {

@@ -19,9 +19,9 @@ from core.mixins import SoftDeleteAuditMixin, CustomFieldsValidationMixin, Resto
 from core.media import build_action_url, protected_media_response
 from core.uploads import validate_upload
 from vlan.models import Vlan
-from auslbo.mixins import AuslBoScopedMixin, AuslBoTenantWriteMixin
-from auslbo.permissions import (
-    IsAuslBoUserOrInternal, AuslBoModelPermissions, IsInternalOrReadOnly,
+from portal.mixins import PortalScopedMixin, PortalTenantWriteMixin
+from portal.permissions import (
+    IsPortalUserOrInternal, PortalModelPermissions, IsInternalOrReadOnly,
 )
 
 
@@ -118,7 +118,7 @@ class RispacsViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
     interni da portale. Ora:
     - la lettura richiede `device.view_rispacs` (chiunque, interno o
-      portale, via AuslBoModelPermissions);
+      portale, via PortalModelPermissions);
     - le scritture richiedono ANCHE l'accesso interno Archie
       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
     Gli utenti portale che devono solo consultare i sistemi collegati ai
@@ -127,7 +127,7 @@ class RispacsViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     """
 
     serializer_class = RispacsSerializer
-    permission_classes = [IsAuslBoUserOrInternal, IsInternalOrReadOnly, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, IsInternalOrReadOnly, PortalModelPermissions]
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ["name", "ip", "aetitle"]
     ordering_fields = ["name", "ip", "aetitle", "port", "updated_at"]
@@ -161,17 +161,17 @@ class DeviceRispacsSerializer(serializers.ModelSerializer):
         }
 
 
-class DeviceRispacsViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, viewsets.ModelViewSet):
+class DeviceRispacsViewSet(PortalTenantWriteMixin, PortalScopedMixin, viewsets.ModelViewSet):
     """Tabella associativa Device↔RIS/PACS.
 
     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
-    né `AuslBoScopedMixin` né `permission_classes` espliciti, quindi un
+    né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
     utente portale con un permesso Django sufficiente poteva leggere/creare
     collegamenti per device di QUALSIASI customer, non solo il proprio.
     """
 
     serializer_class = DeviceRispacsSerializer
-    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["device", "rispacs"]
     ordering = ["rispacs__name"]
@@ -287,17 +287,17 @@ class DeviceWifiSerializer(WifiSecretPermissionMixin, serializers.ModelSerialize
         return super().validate(attrs)
 
 
-class DeviceWifiViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
+class DeviceWifiViewSet(PortalTenantWriteMixin, PortalScopedMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     """Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
-    AuslBoScopedMixin) — un utente portale poteva leggere/scaricare il
+    PortalScopedMixin) — un utente portale poteva leggere/scaricare il
     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
     della password."""
 
     serializer_class = DeviceWifiSerializer
-    # Fix 2.5: sostituisce IsAuslBoEditor con la matrice reale
+    # Fix 2.5: sostituisce IsPortalEditor con la matrice reale
     # view/add/change/delete_devicewifi.
-    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["device"]
@@ -313,7 +313,7 @@ class DeviceWifiViewSet(AuslBoTenantWriteMixin, AuslBoScopedMixin, SoftDeleteAud
 
     @action(detail=True, methods=["get"], url_path="certificato")
     def certificato(self, request, pk=None):
-        # self.get_object() passa da filter_queryset() -> AuslBoScopedMixin:
+        # self.get_object() passa da filter_queryset() -> PortalScopedMixin:
         # un utente portale non può più scaricare il certificato di un
         # device di un altro customer (prima restituiva 200 per qualunque id).
         wifi = self.get_object()
@@ -521,17 +521,17 @@ class DeviceDetailSerializer(CustomFieldsValidationMixin, serializers.ModelSeria
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DeviceViewSet(
-    AuslBoTenantWriteMixin,
-    AuslBoScopedMixin,
+    PortalTenantWriteMixin,
+    PortalScopedMixin,
     PurgeActionMixin,
     RestoreActionMixin,
     SoftDeleteAuditMixin,
     viewsets.ModelViewSet,
 ):
     serializer_class = DeviceDetailSerializer
-    # Fix 2.5: sostituisce IsAuslBoEditor (solo device.change_device per
+    # Fix 2.5: sostituisce IsPortalEditor (solo device.change_device per
     # QUALSIASI scrittura) con la matrice reale view/add/change/delete_device.
-    permission_classes = [IsAuslBoUserOrInternal, AuslBoModelPermissions]
+    permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
     filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
     # Fix 2.2: per utenti portale "puri" forza customer=proprio tenant e

@@ -65,7 +65,7 @@ export default function CustomerDrawer({
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{detail.primary_contact_email || ''}</Typography>
               </Box>
               {detail.primary_contact_phone ? (
-                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: (theme) => theme.palette.primary.main, border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
+                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: 'success.light', color: (theme) => theme.palette.primary.main, border: '1px solid', borderColor: 'success.main', fontWeight: 600, fontSize: 11 }} />
               ) : null}
             </Stack>
           </DrawerSection>

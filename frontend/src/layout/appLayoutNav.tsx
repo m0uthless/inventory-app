@@ -157,6 +157,7 @@ const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
   ['/purchase-orders',        'PURCHASE ORDERS'],
   ['/bug-feature',            'BUG / FEATURE'],
   ['/utenti',                 'UTENTI E GRUPPI'],
+  ['/accesso-portal',         'ACCESSO PORTAL'],
   ['/audit',                  'AUDIT'],
   ['/drive',                  'DRIVE'],
   ['/trash',                  'CESTINO'],

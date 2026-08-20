@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
+import { alpha } from '@mui/material/styles'
 
 import {
   Box,
@@ -165,7 +167,7 @@ const renderContactCard: MobileCardRenderFn<ContactRow> = ({ row, onOpen }) => {
           )}
         </Box>
         {row.is_primary && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: 'rgba(16,185,129,0.10)', color: (theme) => theme.palette.success.dark, border: '0.5px solid rgba(16,185,129,0.28)', whiteSpace: 'nowrap' }}>
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: (theme) => alpha(theme.palette.success.main, 0.10), color: (theme) => theme.palette.success.dark, border: (theme) => `0.5px solid ${alpha(theme.palette.success.main, 0.28)}`, whiteSpace: 'nowrap' }}>
             Primario
           </Box>
         )}
@@ -188,6 +190,7 @@ const renderContactCard: MobileCardRenderFn<ContactRow> = ({ row, onOpen }) => {
 
 // prettier-ignore
 export default function Contacts() {
+  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const canChange = hasPerm(PERMS.crm.contact.change)
   const canDelete  = hasPerm(PERMS.crm.contact.delete)
@@ -406,7 +409,7 @@ export default function Contacts() {
       setRestoreBusy(true)
       try {
         await api.post(`/contacts/${id}/restore/`)
-        toast.success('Contatto ripristinato ✅')
+        toast.success('Contatto ripristinato')
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -565,7 +568,7 @@ export default function Contacts() {
     setRestoreBusy(true)
     try {
       await api.post(`/contacts/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi ✅`)
+      toast.success(`Ripristinati ${ids.length} elementi`)
       setSelectionModel(emptySelectionModel())
       reloadList()
       return true
@@ -713,12 +716,12 @@ export default function Contacts() {
       if (dlgMode === 'create') {
         const res = await api.post<ContactDetail>('/contacts/', payload)
         id = res.data.id
-        toast.success('Contatto creato ✅')
+        toast.success('Contatto creato')
       } else {
         if (!dlgId) return
         const res = await api.patch<ContactDetail>(`/contacts/${dlgId}/`, payload)
         id = res.data.id
-        toast.success('Contatto aggiornato ✅')
+        toast.success('Contatto aggiornato')
       }
 
       setDlgOpen(false)
@@ -768,14 +771,7 @@ export default function Contacts() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'rgba(69,127,121,0.10) !important',
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'rgba(69,127,121,0.14) !important',
-            },
+            ...zebraSx,
           },
         }}
       >
@@ -805,7 +801,7 @@ export default function Contacts() {
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
         onTabChange={setDrawerTab}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
       />
 
       <ConfirmActionDialog

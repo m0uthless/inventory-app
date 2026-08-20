@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
+import { SHARED } from '../../theme/constants'
 import {
   Box,
   Chip,
@@ -44,6 +46,11 @@ type InventoryDrawerProps = {
   onEdit: () => void | Promise<void>
   onDelete: () => void
   onRestore: () => void | Promise<void>
+  /** Tipo noto già al click (dalla riga in lista), prima che arrivi il
+   * dettaglio completo — evita il flash del colore hero (default teal
+   * finché detail?.type_key non è disponibile). Opzionale: i chiamanti che
+   * non lo passano mantengono il comportamento precedente. */
+  typeKeyHint?: string | null
 }
 
 async function copyToClipboard(text: string) {
@@ -55,6 +62,9 @@ function KNumberPlate(props: { knumber: string; digits?: number }) {
   const { knumber, digits = 9 } = props
   const clean = (knumber ?? '').replace(/\D/g, '')
   const padded = clean.slice(-digits).padStart(digits, '0')
+  // Replica realistica della targhetta fisica Philips K-Number: il blu è il
+  // brand blue Philips reale, non un colore dell'app — eccezione intenzionale
+  // (stessa natura del logo OneDrive in Drive.tsx), resta fisso cross-tema.
   const blue = '#1e56ff'
   const strokeW = 6
   const leftPad = 22
@@ -198,7 +208,7 @@ function SecretRow(props: { label: string; value?: string | null; onCopy?: () =>
 
 function InventoryTypeBadgeIcon(props: { typeKey?: string | null }) {
   return React.createElement(getInventoryTypeIcon(props.typeKey), {
-    sx: { fontSize: 26, color: 'rgba(255,255,255,0.9)' },
+    sx: { fontSize: 26, color: alpha(SHARED.pureWhite, 0.9) },
   })
 }
 
@@ -218,14 +228,20 @@ export default function InventoryDrawer({
   onEdit,
   onDelete,
   onRestore,
+  typeKeyHint,
 }: InventoryDrawerProps) {
 
   const toast = useToast()
 
+  // Finché il dettaglio non è arrivato usa il tipo già noto dal click in
+  // lista (typeKeyHint), così hero/icona sono corrette da subito invece di
+  // partire dal gradiente di default e "saltare" a quello giusto.
+  const effectiveTypeKey = detail?.type_key ?? typeKeyHint
+
   const handleCopy = async (value: string) => {
     if (!value) return
     await copyToClipboard(value)
-    toast.success('Copiato ✅')
+    toast.success('Copiato')
   }
 
   // Riga secondaria sotto al titolo: nome (se diverso dall'hostname mostrato
@@ -240,7 +256,7 @@ export default function InventoryDrawer({
 
   const bareCloseButton = (
     <Tooltip title="Chiudi">
-      <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.85)' }}>
+      <IconButton size="small" onClick={onClose} sx={{ color: alpha(SHARED.pureWhite, 0.85) }}>
         <ArrowBackIcon fontSize="small" />
       </IconButton>
     </Tooltip>
@@ -248,12 +264,12 @@ export default function InventoryDrawer({
 
   return (
     <DrawerShell
-      open={open} onClose={onClose} gradient={getInventoryTypeGradient(detail?.type_key)}
+      open={open} onClose={onClose} gradient={getInventoryTypeGradient(effectiveTypeKey)}
       statusSlot={bareCloseButton}
       canChange={canChange} canDelete={canDelete}
       deleteBusy={deleteBusy} restoreBusy={restoreBusy} deleted={!!detail?.deleted_at}
       onEdit={onEdit} onDelete={onDelete} onRestore={onRestore}
-      icon={<InventoryTypeBadgeIcon typeKey={detail?.type_key} />}
+      icon={<InventoryTypeBadgeIcon typeKey={effectiveTypeKey} />}
       iconBare
       heroWatermark={detail?.type_label ?? undefined}
       title={detail?.hostname || detail?.name || detail?.knumber || (selectedId ? `Inventario #${selectedId}` : 'Inventario')}
@@ -267,7 +283,7 @@ export default function InventoryDrawer({
         !detail ? <DrawerEmptyState /> : (
           <>
             {detail.has_active_issue ? (
-              <Box sx={{ bgcolor: 'rgba(239, 68, 68, 0.10)', border: '1px solid', borderColor: 'rgba(239, 68, 68, 0.28)', borderRadius: 1, p: 1.75 }}>
+              <Box sx={{ bgcolor: (t) => alpha(t.palette.error.main, 0.10), border: '1px solid', borderColor: (t) => alpha(t.palette.error.main, 0.28), borderRadius: 1, p: 1.75 }}>
                 <Stack direction="row" spacing={1} alignItems="flex-start">
                   <WarningAmberRoundedIcon sx={{ color: 'error.main', mt: '2px' }} />
                   <Box>
@@ -293,6 +309,8 @@ export default function InventoryDrawer({
                     { label: 'Sito', value: detail.site_display_name || detail.site_name },
                     { label: 'K-number', value: detail.knumber, mono: true, copy: true },
                     { label: 'Seriale', value: detail.serial_number, mono: true, copy: true },
+                    { label: 'Posizione', value: detail.location, copy: true },
+                    { label: 'Telefono', value: detail.telefono, copy: true },
                   ]}
                   onCopy={handleCopy}
                 />

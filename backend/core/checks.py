@@ -1,6 +1,6 @@
 """Django system checks custom del progetto.
 
-Fix 2.12 (audit 2026-07): i frontend ARCHIE e AUSL BO possono autenticare su
+Fix 2.12 (audit 2026-07): i frontend ARCHIE e Portal possono autenticare su
 un dominio e redirigere all'altro. Senza SESSION_COOKIE_DOMAIN impostato su
 un dominio condiviso (es. .biotron.it), la sessione resta host-only e
 l'utente perde l'autenticazione passando da un frontend all'altro.
@@ -25,8 +25,8 @@ def check_cross_subdomain_session_config(app_configs, **kwargs):
             Warning(
                 "SESSION_COOKIE_DOMAIN non impostato in produzione.",
                 hint=(
-                    "Se ARCHIE e il portale AUSL BO girano su sottodomini diversi "
-                    "(es. archie.biotron.it e auslbo.biotron.it) e condividono "
+                    "Se ARCHIE e il Portal girano su sottodomini diversi "
+                    "(es. archie.biotron.it e portal.biotron.it) e condividono "
                     "l'autenticazione, imposta DJANGO_SESSION_COOKIE_DOMAIN=.biotron.it "
                     "nell'env di produzione, altrimenti la sessione resta host-only "
                     "e un redirect tra i due domini perde il login. Se i due "

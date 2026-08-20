@@ -137,13 +137,21 @@ SHORTDESC_FALLBACK_Y_TOLERANCE_CHARS = 2.5
 LOW_RES_OVERLAP_DEDUP_RATIO    = 0.4  # quota minima di area sovrapposta per considerare
                                        # due rilevazioni la stessa parola fisica
 
-# Glifi "icona" ricorrenti (lente di ricerca, freccine, ecc.) che Tesseract a
-# volte legge come parole isolate a sé stanti, tipicamente accanto ai campi
-# con lookup. Vengono scartati come CANDIDATI valore fin dalla ricostruzione
-# geometrica (non solo ripuliti in coda), perché possono comparire anche
-# all'inizio del valore (es. dopo un upscale che li rende visibili come
-# parola separata) — non solo alla fine.
-ICON_ARTIFACT_RE = re.compile(r"^[|Q©~»«•×✓✔›‹°®\[\]]+\.?$")
+# Glifi "icona" ricorrenti (lente di ricerca, freccine, tooltip info, ecc.)
+# che Tesseract a volte legge come parole isolate a sé stanti, tipicamente
+# accanto ai campi con lookup o al pallino "(i)" di aiuto che ServiceNow
+# affianca a quasi ogni label. Vengono scartati come CANDIDATI valore fin
+# dalla ricostruzione geometrica (non solo ripuliti in coda), perché possono
+# comparire anche all'inizio del valore (es. dopo un upscale che li rende
+# visibili come parola separata) — non solo alla fine.
+#
+# '@' incluso perché è la lettura più frequente dell'icona tooltip "(i)"
+# circolare (osservato empiricamente su più screenshot): senza questo filtro
+# finisce nei value_words come prima "parola" del campo, davanti al valore
+# vero, e ne rompe il parsing — sintomo tipico: 'Priority' letto ma
+# _parse_priority non trova la cifra iniziale attesa perché il testo grezzo
+# comincia con '@' invece che con '1'..'4'.
+ICON_ARTIFACT_RE = re.compile(r"^[|Q©~»«•×✓✔›‹°®@\[\]]+\.?$")
 
 # Segnale geometrico complementare al testo: le icone lette male hanno quasi
 # sempre un'altezza molto maggiore del testo reale del form (osservato
@@ -587,8 +595,11 @@ def extract_servicenow_fields(pil_image: Image.Image) -> ServiceNowExtractResult
         result.warnings.append("Campo 'Number' non riconosciuto, verificare manualmente.")
     if not result.account:
         result.warnings.append("Campo 'Account' non riconosciuto, verificare manualmente.")
-    if not result.priority:
-        result.warnings.append("Campo 'Priority' non riconosciuto, verificare manualmente.")
+    # Priority non è più un campo visibile/obbligatorio nel form (0.9.0,
+    # rimosso dalla UI su richiesta esplicita): l'estrazione resta (viene
+    # comunque salvato un default lato modello se non riconosciuto), ma non
+    # ha più senso avvisare l'utente di "verificare manualmente" un campo
+    # che il form non gli mostra più.
     if not result.opened_date:
         result.warnings.append("Campo 'Opened' non riconosciuto o data non parsabile, verificare manualmente.")
     if not result.short_description:

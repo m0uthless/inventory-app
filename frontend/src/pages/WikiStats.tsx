@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
+import { SHARED } from '../theme/constants'
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined'
 import CodeRoundedIcon from '@mui/icons-material/CodeRounded'
 import StarRoundedIcon from '@mui/icons-material/StarRounded'
@@ -19,6 +20,8 @@ import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
 import ContributorCard, { type ContributorData } from '../ui/ContributorCard'
+import { useKpiAccents } from '../theme/AppThemeProvider'
+import { PRESET_COLORS } from '../ui/wikiCategoryColors'
 
 type Totals = {
   total: number
@@ -72,7 +75,13 @@ type Stats = {
   total_queries: number
 }
 
-const FALLBACK_COLORS = ['#0f766e', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#16a34a', '#64748b']
+// Palette fissa per il fallback colore categoria/pagina: stessa natura delle
+// swatch scelte dall'utente in WikiCategoryManager (color picker) — un colore
+// "scelto" deve restare stabile a prescindere dal tema attivo, non theme-aware.
+// Sottoinsieme di WikiCategoryManager.PRESET_COLORS (stesso ordine, senza
+// dc2626/0891b2) — derivato da lì invece di essere ridefinito, per non avere
+// due palette "categoria wiki" indipendenti che potrebbero divergere.
+const FALLBACK_COLORS = PRESET_COLORS.filter(c => c !== '#dc2626' && c !== '#0891b2')
 
 function fmtDate(value: string | null | undefined) {
   if (!value) return '—'
@@ -376,7 +385,7 @@ function TopQueriesCard({ queries, navigate }: { queries: TopQuery[]; navigate: 
                   sx={{
                     width: 22, height: 22, borderRadius: 999,
                     display: 'grid', placeItems: 'center',
-                    bgcolor: 'rgba(15,118,110,0.1)', color: 'primary.main',
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1), color: 'primary.main',
                     fontWeight: 800, fontSize: 11, flexShrink: 0,
                   }}
                 >
@@ -424,6 +433,7 @@ function TopQueriesCard({ queries, navigate }: { queries: TopQuery[]; navigate: 
 
 export default function WikiStats() {
   const theme = useTheme()
+  const kpiAccents = useKpiAccents()
   const toast = useToast()
   const navigate = useNavigate()
   const [stats, setStats] = React.useState<Stats | null>(null)
@@ -463,9 +473,9 @@ export default function WikiStats() {
           gap: 2,
         }}
       >
-        <StatKpiCard icon={<ArticleOutlinedIcon sx={{ fontSize: 22 }} />} label="Totale pagine" value={totals.total.toLocaleString('it-IT')} helper={`${totals.published} pubblicate · ${totals.drafts} bozze`} accent="#ea580c" />
-        <StatKpiCard icon={<VisibilityIcon sx={{ fontSize: 22 }} />} label="Visualizzazioni" value={totals.total_views.toLocaleString('it-IT')} helper="Somma delle aperture registrate sulle pagine Wiki" accent="#0284c7" />
-        <StatKpiCard icon={<CodeRoundedIcon sx={{ fontSize: 22 }} />} label="Totale query" value={total_queries.toLocaleString('it-IT')} helper="Query salvate nella libreria Wiki" accent="#7c3aed" />
+        <StatKpiCard icon={<ArticleOutlinedIcon sx={{ fontSize: 22 }} />} label="Totale pagine" value={totals.total.toLocaleString('it-IT')} helper={`${totals.published} pubblicate · ${totals.drafts} bozze`} accent={kpiAccents.teal1} />
+        <StatKpiCard icon={<VisibilityIcon sx={{ fontSize: 22 }} />} label="Visualizzazioni" value={totals.total_views.toLocaleString('it-IT')} helper="Somma delle aperture registrate sulle pagine Wiki" accent={kpiAccents.teal2} />
+        <StatKpiCard icon={<CodeRoundedIcon sx={{ fontSize: 22 }} />} label="Totale query" value={total_queries.toLocaleString('it-IT')} helper="Query salvate nella libreria Wiki" accent={kpiAccents.violet1} />
       </Box>
 
       <Box
@@ -563,7 +573,7 @@ export default function WikiStats() {
                   <Stack key={author.user_id} spacing={0.55}>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
                       <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-                        <Box sx={{ width: 22, height: 22, borderRadius: 999, bgcolor: FALLBACK_COLORS[index % FALLBACK_COLORS.length], display: 'grid', placeItems: 'center', color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                        <Box sx={{ width: 22, height: 22, borderRadius: 999, bgcolor: FALLBACK_COLORS[index % FALLBACK_COLORS.length], display: 'grid', placeItems: 'center', color: SHARED.pureWhite, fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
                           {index + 1}
                         </Box>
                         <Typography variant="body2" fontWeight={600} noWrap>

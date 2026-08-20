@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     "drive",
     "issues",
     "feedback.apps.FeedbackConfig",
-    "auslbo.apps.AuslBoConfig",
+    "portal.apps.PortalConfig",
     "device.apps.DeviceConfig",
     "vlan.apps.VlanConfig",
     "servicenow.apps.ServicenowConfig",
@@ -82,6 +82,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     CSRF_MIDDLEWARE,
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.SessionIdleTimeoutMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -202,7 +203,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.8.2",
+    "VERSION": "0.9.0",
 }
 
 REST_FRAMEWORK = {
@@ -285,12 +286,51 @@ CSRF_COOKIE_HTTPONLY = _env_bool("DJANGO_CSRF_COOKIE_HTTPONLY", default=False)
 SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
 
-# In produzione con più sottodomini (es. archie.biotron.it + auslbo.biotron.it)
-# impostare DJANGO_SESSION_COOKIE_DOMAIN=.biotron.it per condividere la sessione.
-# In dev lasciare vuoto — stessa sessione su stesso host con porte diverse.
+# NOTA 0.9.0: NON impostare DJANGO_SESSION_COOKIE_DOMAIN=.biotron.it per
+# condividere la sessione tra archie.biotron.it e portal.biotron.it.
+# Da quando lo scope per cliente di un utente "dual-profile" dipende
+# dall'ambito fissato in sessione al login (vedi portal/permissions.py,
+# _bypasses_portal_scope), un cookie condiviso tra i due sottodomini rompe
+# quel meccanismo: la sessione può essere stata aperta dall'uno o
+# dall'altro frontend, quindi l'ambito non riflette più in modo affidabile
+# da dove l'utente sta operando adesso. Ogni sottodominio deve avere il
+# proprio cookie di sessione separato (default: variabile vuota/assente).
+# Deciso il 2026-08-13 dopo aver riscontrato il problema in produzione.
+# In dev la variabile resta comunque irrilevante ai fini del problema:
+# frontend e frontend-portal sono sullo stesso host con porte diverse, e i
+# cookie non distinguono le porte — condivideranno sempre la sessione. Per
+# testare bene l'ambito in dev usare finestre anonime separate per i due
+# frontend, non affidarsi a questa variabile.
 _cookie_domain = os.getenv("DJANGO_SESSION_COOKIE_DOMAIN", "").strip()
 SESSION_COOKIE_DOMAIN = _cookie_domain or None
 CSRF_COOKIE_DOMAIN = _cookie_domain or None
+
+# 0.9.0: timeout di inattività differenziati per ambito (site-repo = Archie
+# principale, portal = Portal), enforced server-side da
+# core.middleware.SessionIdleTimeoutMiddleware — vedi quel file per il
+# motivo per cui il solo timer client-side (useIdleTimer) non basta.
+# "lock": oltre questo tempo di inattività il frontend deve richiedere di
+# nuovo la password (LockScreen) prima di continuare a mostrare/scrivere
+# dati, ma la sessione resta viva (il login già fatto non si perde).
+# "logout": oltre questo tempo la sessione viene invalidata (flush) e serve
+# un login completo. Il Portal, esposto a clienti esterni su dati clinici,
+# ha timeout più stretti di Archie per default.
+# 0.9.0 (richiesta successiva): LockScreen disattivata per Archie — soglia di
+# lock allineata a quella di logout, così il ramo "idle_lock" della middleware
+# non scatta mai per l'ambito site-repo e si va dritti al logout automatico
+# dopo 1h di inattività. Portal non è toccato (resta lock a 10min/logout 30min).
+SESSION_IDLE_LOCK_SECONDS = {
+    "site-repo": int(os.getenv("DJANGO_SESSION_IDLE_LOCK_SECONDS_ARCHIE", "3600")),  # = logout, lock disabilitato
+    "portal": int(os.getenv("DJANGO_SESSION_IDLE_LOCK_SECONDS_PORTAL", "600")),      # 10 min
+}
+SESSION_IDLE_LOGOUT_SECONDS = {
+    "site-repo": int(os.getenv("DJANGO_SESSION_IDLE_LOGOUT_SECONDS_ARCHIE", "3600")),  # 60 min
+    "portal": int(os.getenv("DJANGO_SESSION_IDLE_LOGOUT_SECONDS_PORTAL", "1800")),     # 30 min
+}
+# Ambito di fallback per le sessioni senza SESSION_AMBITO_KEY (es. sessioni
+# aperte prima di questa modifica): usa i timeout più permissivi di Archie,
+# stesso principio del fallback già scelto in _bypasses_portal_scope.
+SESSION_IDLE_DEFAULT_AMBITO = "site-repo"
 SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
 SECURE_CONTENT_TYPE_NOSNIFF = _env_bool("DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True)
 SECURE_REFERRER_POLICY = os.getenv("DJANGO_SECURE_REFERRER_POLICY", "same-origin")

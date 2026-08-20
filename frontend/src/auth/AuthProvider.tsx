@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { api } from '@shared/api/client'
-import { setUnauthorizedHandler } from '@shared/api/runtime'
+import { setUnauthorizedHandler, setIdleLockHandler, type IdleLockUserInfo } from '@shared/api/runtime'
 import { createAuthBroadcast, type AuthBroadcast } from '@shared/auth/authBroadcast'
 
 export type Me = {
@@ -20,7 +20,7 @@ export type Me = {
     leave_area?: number | null
     leave_area_label?: string | null
     gender?: 'M' | 'F' | null
-    theme?: 'default' | 'navy' | null
+    theme?: 'default' | null
   }
 }
 
@@ -35,6 +35,10 @@ type AuthCtx = {
   locked: boolean
   lock: () => void
   unlock: () => void
+  /** 0.9.0: dati minimi utente dal 401 idle_lock, per la LockScreen quando
+   * `me` è ancora vuoto (refresh di pagina prima di qualunque /me/ riuscita
+   * in questa sessione del browser). */
+  idleLockUser: IdleLockUserInfo | null
 }
 
 const AuthContext = React.createContext<AuthCtx | null>(null)
@@ -50,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = React.useState<Me | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [locked, setLocked] = React.useState(false)
+  const [idleLockUser, setIdleLockUser] = React.useState<IdleLockUserInfo | null>(null)
 
   // Fix P2 9: sincronizza lock/unlock/logout con le altre schede della
   // stessa app aperte nello stesso browser (vedi shared/src/auth/authBroadcast.ts).
@@ -85,11 +90,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => setUnauthorizedHandler(null)
   }, [])
 
+  React.useEffect(() => {
+    setIdleLockHandler((userInfo) => {
+      if (userInfo) setIdleLockUser(userInfo)
+      lock()
+    })
+    return () => setIdleLockHandler(null)
+  }, [lock])
+
   const refreshMe = React.useCallback(async () => {
     try {
       const res = await api.get<Me>('/me/')
       setMe(res.data)
-    } catch {
+      setIdleLockUser(null)
+    } catch (err) {
+      const axiosErr = err as { response?: { status?: number; data?: { code?: string } } }
+      if (axiosErr.response?.status === 401 && axiosErr.response.data?.code === 'idle_lock') {
+        // Sessione bloccata per inattività, non scaduta: non è un logout,
+        // non tocchiamo `me`. L'interceptor axios ha già attivato lock().
+        return
+      }
       setMe(null)
     }
   }, [])
@@ -137,7 +157,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <AuthContext.Provider value={{ me, loading, refreshMe, login, logout, hasPerm, inGroup, locked, lock, unlock }}>
+    <AuthContext.Provider
+      value={{ me, loading, refreshMe, login, logout, hasPerm, inGroup, locked, lock, unlock, idleLockUser }}
+    >
       {children}
     </AuthContext.Provider>
   )

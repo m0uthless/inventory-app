@@ -2,6 +2,8 @@ import {
   Avatar, Box, CircularProgress, Divider, IconButton,
   Stack, TextField, Tooltip, Typography,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
+import { SHARED } from '../../theme/constants'
 import { Link as RouterLink } from 'react-router-dom'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -12,6 +14,7 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import { inventoryDrawerPath } from '../../utils/entityPaths'
+import { useWidgetAccents } from '../../theme/AppThemeProvider'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
 import { DrawerShell, HERO_ICON_BTN_SX, HERO_ICON_BTN_DELETE_SX } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList } from '@shared/ui/DrawerParts'
@@ -37,11 +40,29 @@ type IssueDrawerProps = {
   onSendComment: () => void
 }
 
+// Badge bianco translucido su hero colorata — costante cross-tema (bianco su
+// sfondo colorato funziona a prescindere dall'hue), prima duplicato identico
+// 2 volte nel file.
+const HERO_WHITE_BADGE_SX = {
+  bgcolor: alpha(SHARED.pureWhite, 0.12),
+  color: alpha(SHARED.pureWhite, 0.85),
+  fontWeight: 700,
+  fontSize: 10,
+  letterSpacing: '0.07em',
+  border: `1px solid ${alpha(SHARED.pureWhite, 0.2)}`,
+  borderRadius: '4px',
+  px: 1,
+  py: 0.25,
+  display: 'inline-flex',
+  alignItems: 'center',
+} as const
+
 export default function IssueDrawer({
   open, issue, detailTab, comments, commentsLoading,
   newComment, sendingComment, onClose, onEdit, onDelete,
   onDetailTabChange, onNewCommentChange, onSendComment,
 }: IssueDrawerProps) {
+  const widgetAccents = useWidgetAccents()
 
   // Status slot personalizzato: ArrowBack + badge status + badge priorità
   const statusSlot = (
@@ -53,15 +74,15 @@ export default function IssueDrawer({
       </Tooltip>
       {issue ? (
         <>
-          <Box sx={{ bgcolor: 'rgba(20,255,180,0.18)', color: '#a7f3d0', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(167,243,208,0.3)', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+          <Box sx={{ bgcolor: widgetAccents.newBadgeBg, color: widgetAccents.mintAccentLight, fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: `1px solid ${widgetAccents.newBadgeBorder}`, borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
             ● {STATUS_META[issue.status]?.label ?? issue.status}
           </Box>
           {issue.status === 'waiting' && issue.waiting_reason_label ? (
-            <Box sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center' }}>
+            <Box sx={HERO_WHITE_BADGE_SX}>
               {issue.waiting_reason_label}
             </Box>
           ) : null}
-          <Box sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 10, letterSpacing: '0.07em', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', px: 1, py: 0.25, display: 'inline-flex', alignItems: 'center' }}>
+          <Box sx={HERO_WHITE_BADGE_SX}>
             {issue.priority_label || issue.priority}
           </Box>
         </>

@@ -28,20 +28,16 @@ import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
 import { PERMS } from '../auth/perms'
-import { theme } from '../theme'
+import { useTheme, alpha } from '@mui/material/styles'
+import { useWidgetAccents } from '../theme/AppThemeProvider'
 import {
   type AbsenceRow, type AbsenceTechnician, type AbsenceReason, type DayPart,
-  ABSENCE_REASONS, ABSENCE_REASON_COLORS, ABSENCE_HOURLY_COLOR, DAY_PART_OPTIONS,
+  ABSENCE_REASONS, getAbsenceReasonColors, ABSENCE_HOURLY_COLOR, DAY_PART_OPTIONS,
   formatItTime, startOfWeek, addDays, toISODate, findAbsence,
   validateAbsencePayload,
 } from '../features/servicenow/absenceShared'
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven']
-
-const CATEGORY_SECTIONS = [
-  { value: 'philips' as const, label: 'Philips', accent: theme.palette.primary.main, tint: 'rgba(15,118,110,0.06)' },
-  { value: 'biotron' as const, label: 'Biotron', accent: theme.palette.secondary.main, tint: 'rgba(14,165,233,0.06)' },
-]
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -125,7 +121,7 @@ function AbsenceEditorDialog({ target, absences, onClose, onSaved }: {
           time_from: hourly ? timeFrom : null, time_to: hourly ? timeTo : null,
         })
       }
-      toast.success(existing ? 'Assenza aggiornata ✅' : 'Assenza registrata ✅')
+      toast.success(existing ? 'Assenza aggiornata' : 'Assenza registrata')
       onSaved()
       onClose()
     } catch (e) {
@@ -140,7 +136,7 @@ function AbsenceEditorDialog({ target, absences, onClose, onSaved }: {
     setDeleting(true)
     try {
       await api.delete(`/servicenow-technician-absences/${existing.id}/`)
-      toast.success('Assenza rimossa ✅')
+      toast.success('Assenza rimossa')
       onSaved()
       onClose()
     } catch (e) {
@@ -240,6 +236,8 @@ function DayPartPill({ dayPart, absence, canManage, onAdd, onEdit }: {
   onAdd: () => void
   onEdit: (a: AbsenceRow) => void
 }) {
+  const accents = useWidgetAccents()
+  const reasonColors = getAbsenceReasonColors(accents)
   const short = DAY_PART_OPTIONS.find((d) => d.value === dayPart)!.short
 
   if (!absence) {
@@ -260,7 +258,7 @@ function DayPartPill({ dayPart, absence, canManage, onAdd, onEdit }: {
     )
   }
 
-  const colors = absence.is_hourly ? ABSENCE_HOURLY_COLOR : ABSENCE_REASON_COLORS[absence.reason]
+  const colors = absence.is_hourly ? ABSENCE_HOURLY_COLOR : reasonColors[absence.reason]
   const label = absence.is_hourly
     ? `${formatItTime(absence.time_from)}-${formatItTime(absence.time_to)}`
     : absence.reason_label
@@ -355,6 +353,13 @@ function CategorySection({ label, accent, tint, technicians, absences, weekDays,
 // ─── Pagina ─────────────────────────────────────────────────────────────────
 
 export default function ServiceNowAbsences() {
+  const theme = useTheme()
+  const accents = useWidgetAccents()
+  const reasonColors = getAbsenceReasonColors(accents)
+  const categorySections = [
+    { value: 'philips' as const, label: 'Philips', accent: theme.palette.primary.main, tint: alpha(theme.palette.primary.main, 0.06) },
+    { value: 'biotron' as const, label: 'Biotron', accent: theme.palette.secondary.main, tint: alpha(theme.palette.secondary.main, 0.06) },
+  ]
   const toast = useToast()
   const { hasPerm } = useAuth()
   const canManage = hasPerm(PERMS.servicenow.case.change)
@@ -408,7 +413,7 @@ export default function ServiceNowAbsences() {
         <Stack alignItems="center" py={6}><CircularProgress size={22} /></Stack>
       ) : (
         <Stack spacing={2}>
-          {CATEGORY_SECTIONS.map((c) => (
+          {categorySections.map((c) => (
             <CategorySection
               key={c.value}
               label={c.label} accent={c.accent} tint={c.tint}
@@ -425,7 +430,7 @@ export default function ServiceNowAbsences() {
       <Stack direction="row" spacing={2} sx={{ mt: 2, flexWrap: 'wrap' }}>
         {ABSENCE_REASONS.map((r) => (
           <Stack key={r.value} direction="row" alignItems="center" spacing={0.5}>
-            <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: ABSENCE_REASON_COLORS[r.value].bg }} />
+            <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: reasonColors[r.value].bg }} />
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>{r.label}</Typography>
           </Stack>
         ))}

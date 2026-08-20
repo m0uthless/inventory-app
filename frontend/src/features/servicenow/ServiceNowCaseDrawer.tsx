@@ -54,7 +54,6 @@ export default function ServiceNowCaseDrawer({
       gradient="teal"
       title={title}
       subtitle={subtitle}
-      caption={detail?.priority_label}
       loading={detailLoading}
       canChange={canChange && !isDeleted}
       canDelete={canDelete && !isDeleted}
@@ -91,7 +90,6 @@ export default function ServiceNowCaseDrawer({
                 { label: 'Account', value: detail.account },
                 { label: 'Categoria', value: detail.category_label },
                 { label: 'Type', value: detail.case_type_label },
-                { label: 'Priorità', value: detail.priority_label },
                 { label: 'Aperto il', value: formatOpenedAt(detail) },
               ]} />
               {detail.external_url && (

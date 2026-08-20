@@ -1,4 +1,5 @@
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import FolderIcon from '@mui/icons-material/Folder'
 
 import type { DrawerItem, DriveFolder } from './types'
@@ -34,7 +35,7 @@ export function MoveDialog({
               py: 1,
               borderRadius: 1.5,
               cursor: 'pointer',
-              bgcolor: target === null ? 'rgba(15,118,110,0.08)' : 'transparent',
+              bgcolor: (t) => target === null ? alpha(t.palette.primary.main, 0.08) : 'transparent',
               border: '1px solid',
               borderColor: target === null ? 'primary.main' : 'transparent',
               display: 'flex',
@@ -56,13 +57,13 @@ export function MoveDialog({
                 py: 1,
                 borderRadius: 1.5,
                 cursor: 'pointer',
-                bgcolor: target === f.id ? 'rgba(15,118,110,0.08)' : 'transparent',
+                bgcolor: (t) => target === f.id ? alpha(t.palette.primary.main, 0.08) : 'transparent',
                 border: '1px solid',
                 borderColor: target === f.id ? 'primary.main' : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
-                '&:hover': { bgcolor: 'rgba(15,118,110,0.04)' },
+                '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
               }}
             >
               <FolderIcon sx={{ fontSize: 18, color: 'warning.main' }} />

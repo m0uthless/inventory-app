@@ -13,7 +13,11 @@ export function fmtDate(ts?: string | null) {
   })
 }
 
-// Mappa tipo file → colore, condivisa da FileTypeIcon e fileIconBg
+// Mappa tipo file → colore, condivisa da FileTypeIcon e fileIconBg.
+// ECCEZIONE STRUTTURALE al sistema di tema (stesso trattamento di
+// INVENTORY_TYPE_FAMILIES): è una legenda di classificazione file
+// (immagine=verde, pdf=rosso, altro=blu), resta fissa in ogni tema per
+// non rompere l'associazione visiva imparata dall'utente.
 const FILE_TYPE_COLOR = {
   image: { bg: '#f0fdf4', fg: '#16a34a' },
   pdf: { bg: '#fff1f2', fg: '#dc2626' },

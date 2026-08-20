@@ -6,7 +6,8 @@
  */
 import * as React from 'react'
 import { alpha, useTheme } from '@mui/material/styles'
-import { theme } from '../theme'
+import type { Theme } from '@mui/material/styles'
+import { useKpiAccents, useWidgetAccents } from '../theme/AppThemeProvider'
 import {
   Box,
   Checkbox,
@@ -69,7 +70,9 @@ const CATEGORIES = [
   { value: 'biotron', label: 'Biotron' },
 ] as const
 
-const TYPE_COLORS = ['#185fa5', '#0f6e56', '#854f0b', '#993556', '#5f5e5a', '#4b5fa0']
+// Palette categorica per il donut "Casi per Type": stesso ruolo decorativo
+// di WidgetAccents.categoryAccents (assegna N colori distinti senza
+// significato semantico) — riusato invece di duplicare una palette simile.
 
 function topTechnicianEmoji(count: number): string {
   if (count <= 0) return '😌'
@@ -145,6 +148,7 @@ function KpiCard({ label, value, helper, accent, valueFontSize = '1.75rem' }: {
 
 function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
   const theme = useTheme()
+  const { categoryAccents: TYPE_COLORS } = useWidgetAccents()
   const total = rows.reduce((s, r) => s + r.count, 0)
 
   if (total === 0) {
@@ -202,12 +206,18 @@ function TypeMiniDonut({ rows }: { rows: TypeBreakdownRow[] }) {
 }
 
 // ─── Motivo assenza → lettera/colore cella heatmap ───────────────────────────
-
-const ABSENCE_CELL_STYLE: Record<AbsenceReasonCode, { letter: string; bg: string; fg: string }> = {
-  malattia:  { letter: 'I', bg: theme.palette.error.main, fg: theme.palette.common.white },  // rosso
-  ferie:     { letter: 'H', bg: theme.palette.info.main, fg: theme.palette.common.white },  // azzurro
-  trasferta: { letter: 'T', bg: '#9ca3af', fg: theme.palette.text.primary },  // grigio (come Altro)
-  altro:     { letter: 'T', bg: '#9ca3af', fg: theme.palette.text.primary },  // grigio
+// Era un const a livello di modulo con `theme.palette.X` da import statico —
+// bug noto (colori sempre-default anche su, rilevante soprattutto
+// per info.main che diverge in tutti e 3 i temi). Ora una funzione che
+// richiede il tema come parametro, chiamata dentro i componenti via
+// useTheme() (StatsMatrix e StatsTableBlock, che condividono la legenda).
+function getAbsenceCellStyle(theme: Theme): Record<AbsenceReasonCode, { letter: string; bg: string; fg: string }> {
+  return {
+    malattia:  { letter: 'I', bg: theme.palette.error.main, fg: theme.palette.common.white },  // rosso
+    ferie:     { letter: 'H', bg: theme.palette.info.main, fg: theme.palette.common.white },  // azzurro
+    trasferta: { letter: 'T', bg: '#9ca3af', fg: theme.palette.text.primary },  // grigio (come Altro)
+    altro:     { letter: 'T', bg: '#9ca3af', fg: theme.palette.text.primary },  // grigio
+  }
 }
 
 // ─── Matrice heatmap ────────────────────────────────────────────────────────
@@ -222,16 +232,20 @@ export function StatsMatrix({ periods, series, showRowTotal, rowTotalTooltip, ce
   /** Testo del tooltip mostrato su una singola cella (tecnico × periodo), es. "Di cui EBIT: 1" per quel giorno. null/undefined = nessun tooltip per quella cella. */
   cellTooltip?: (s: StatsSeries, periodIndex: number) => string | null | undefined
 }) {
+  const theme = useTheme()
+  const ABSENCE_CELL_STYLE = React.useMemo(() => getAbsenceCellStyle(theme), [theme])
   const max = Math.max(1, ...series.flatMap((s) => s.counts))
 
   const colorFor = (v: number) => {
     if (v === 0) return { bg: 'transparent', fg: 'text.disabled' }
     const ratio = v / max
+    // Scala intensità dinamica: alpha crescente su primary.main del tema
+    // attivo, ultimo stop a piena saturazione con testo a contrasto.
     const stops = [
-      { t: 0.15, bg: '#E1F5EE', fg: '#04342C' },
-      { t: 0.40, bg: '#9FE1CB', fg: '#04342C' },
-      { t: 0.70, bg: '#5DCAA5', fg: '#04342C' },
-      { t: 1.00, bg: '#0F6E56', fg: '#E1F5EE' },
+      { t: 0.15, bg: alpha(theme.palette.primary.main, 0.12), fg: theme.palette.primary.dark },
+      { t: 0.40, bg: alpha(theme.palette.primary.main, 0.35), fg: theme.palette.primary.dark },
+      { t: 0.70, bg: alpha(theme.palette.primary.main, 0.65), fg: theme.palette.getContrastText(theme.palette.primary.main) },
+      { t: 1.00, bg: theme.palette.primary.main, fg: theme.palette.getContrastText(theme.palette.primary.main) },
     ]
     const stop = stops.find((s) => ratio <= s.t) ?? stops[stops.length - 1]
     return { bg: stop.bg, fg: stop.fg }
@@ -392,6 +406,8 @@ function StatsTableBlock({ title, data, showRowTotal, rowTotalTooltip, cellToolt
    * combinata (comportamento invariato). */
   typeFilterOptions?: string[]
 }) {
+  const theme = useTheme()
+  const ABSENCE_CELL_STYLE = React.useMemo(() => getAbsenceCellStyle(theme), [theme])
   const [activeTypes, setActiveTypes] = React.useState<string[]>([])
   const toggleType = (name: string) => {
     setActiveTypes((prev) => (prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]))
@@ -473,6 +489,8 @@ function CategoryStatsPanel({ category, label, allUsers }: {
   label: string
   allUsers: UserOption[]
 }) {
+  const theme = useTheme()
+  const kpiAccents = useKpiAccents()
   const toast = useToast()
 
   const [year, setYear]             = React.useState(CURRENT_YEAR)
@@ -709,7 +727,7 @@ function CategoryStatsPanel({ category, label, allUsers }: {
               label="Tecnico top"
               value={data.kpi.top_technician ? `${data.kpi.top_technician.name} ${topTechnicianEmoji(data.kpi.top_technician.count)}` : '—'}
               helper={data.kpi.top_technician ? `${data.kpi.top_technician.count} casi` : 'Nessun dato'}
-              accent={category === 'philips' ? '#6366f1' : theme.palette.warning.main}
+              accent={category === 'philips' ? kpiAccents.violet1 : theme.palette.warning.main}
               valueFontSize="0.9rem"
             />
           </Stack>

@@ -33,12 +33,12 @@ import { useToast } from '@shared/ui/toast'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import {
   MONTH_NAMES_IT,
-  STATUS_COLORS,
   STATUS_LABELS,
   formatEuro,
   type ExpenseReportRow,
   type ExpenseReportStatus,
 } from '../features/expenses/expensesShared'
+import { useStatusTokens } from '../theme/AppThemeProvider'
 
 type Meta = { is_secretary: boolean; user_id: number; km_rate: string | null }
 
@@ -56,6 +56,7 @@ function nowYearMonth(): { year: number; month: number } {
 }
 
 export default function RimborsoSpese() {
+  const statusTokens = useStatusTokens()
   const toast = useToast()
   const navigate = useNavigate()
 
@@ -192,7 +193,7 @@ export default function RimborsoSpese() {
             </TableHead>
             <TableBody>
               {rows.map((row) => {
-                const colors = STATUS_COLORS[row.status]
+                const colors = statusTokens.expenseReport[row.status]
                 return (
                   <TableRow
                     key={row.id} hover sx={{ cursor: 'pointer' }}
@@ -204,7 +205,7 @@ export default function RimborsoSpese() {
                     <TableCell>
                       <Chip
                         size="small" label={STATUS_LABELS[row.status]}
-                        sx={{ bgcolor: colors.bg, color: colors.fg, border: `1px solid ${colors.border}`, fontWeight: 700 }}
+                        sx={{ bgcolor: colors.bg, color: colors.color, border: `1px solid ${colors.border}`, fontWeight: 700 }}
                       />
                     </TableCell>
                     <TableCell align="right">{formatEuro(row.total_due)}</TableCell>

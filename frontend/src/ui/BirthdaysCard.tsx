@@ -1,7 +1,9 @@
 import * as React from 'react'
 import { Avatar, AvatarGroup, Box, Card, Skeleton, Stack, Typography } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import CakeRoundedIcon from '@mui/icons-material/CakeRounded'
 import { api } from '@shared/api/client'
+import { useKpiAccents } from '../theme/AppThemeProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,7 @@ const BALLOONS = Array.from({ length: 7 }, (_, i) => ({
 // palloncini; altrimenti stato vuoto sobrio.
 
 export default function BirthdaysCard() {
+  const kpiAccents = useKpiAccents()
   const [data, setData]       = React.useState<BirthdaysData | null>(null)
   const [loading, setLoading] = React.useState(true)
 
@@ -73,9 +76,12 @@ export default function BirthdaysCard() {
         borderRadius: 1,
         height: '100%',
         minHeight: 240,
-        background: 'linear-gradient(160deg, #831843 0%, #be185d 55%, #6b1548 100%)',
-        border: '1px solid rgba(244,114,182,0.28)',
-        boxShadow: '0 14px 34px rgba(190,24,93,0.28)',
+        // Gradiente sui toni violet derivato da KPI_ACCENTS (useKpiAccents(),
+        // theme-aware). Prima era magenta hex fisso indipendente dal tema —
+        // vedi 0.9.0: card in linea con ContributorCard (teal) su richiesta.
+        background: `linear-gradient(160deg, ${kpiAccents.violet2} 0%, ${kpiAccents.violet1} 55%, ${kpiAccents.violet2} 100%)`,
+        border: `1px solid ${alpha(kpiAccents.violet1, 0.3)}`,
+        boxShadow: `0 14px 34px ${alpha(kpiAccents.violet2, 0.35)}`,
       }}
     >
       <style>{`

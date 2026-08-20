@@ -81,7 +81,7 @@ function LangChip({ label, color, textColor }: { label: string | null; color: st
   const theme = useTheme()
   if (!label) return null
   const bg = color ?? theme.palette.background.default
-  const text = textColor ?? '#475569'
+  const text = textColor ?? theme.palette.text.secondary
   return (
     <Chip
       label={label}
@@ -149,10 +149,10 @@ function QueryFormDialog({ open, initial, languages, onClose, onSaved }: {
       }
       if (isEdit) {
         await api.patch(`/wiki-queries/${initial!.id}/`, payload)
-        toast.success('Query aggiornata ✅')
+        toast.success('Query aggiornata')
       } else {
         await api.post('/wiki-queries/', payload)
-        toast.success('Query creata ✅')
+        toast.success('Query creata')
       }
       onSaved(); onClose()
     } catch (e) {

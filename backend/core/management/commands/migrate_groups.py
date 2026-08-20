@@ -7,7 +7,8 @@ from django.core.management.base import BaseCommand
 # Rinomina: vecchio nome → nuovo nome (solo legacy, non crea nuovi gruppi)
 RENAMES = {
     "viewer":       "user",
-    "auslbo_users": "user_auslbo",
+    "auslbo_users": "user_portal",  # nome legacy pre-0.8.x
+    "user_auslbo":  "user_portal",  # nome intermedio pre-rename 0.9.0 (auslbo → portal)
 }
 
 
@@ -44,5 +45,5 @@ class Command(BaseCommand):
             "\nI gruppi di ARCHIE vengono gestiti da Django Admin.\n"
             "Assegna il permesso 'core.access_archie' al gruppo che deve\n"
             "accedere al frontend Archie principale.\n"
-            "L'accesso al portal AUSL BO è controllato dal profilo AuslBoUserProfile.\n"
+            "L'accesso al Portal è controllato dal profilo PortalUserProfile.\n"
         )

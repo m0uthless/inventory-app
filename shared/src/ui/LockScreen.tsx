@@ -20,7 +20,7 @@ import LogoutIcon from '@mui/icons-material/Logout'
  * sbloccare la sessione dopo un periodo di inattività (vedi useIdleTimer).
  *
  * Condivisa tra frontend Archie e frontend AUSL BO (fix "parità idle-lock",
- * audit 2026-07: prima esisteva solo in Archie, AUSLBO non aveva alcun
+ * audit 2026-07: prima esisteva solo in Archie, PORTAL non aveva alcun
  * blocco/logout automatico per inattività). Non dipende da un useAuth()
  * specifico: riceve i dati utente e le azioni via props.
  */
@@ -47,9 +47,9 @@ export default function LockScreen({
   onSubmitPassword,
   onUnlock,
   onLogout,
-  accentFrom = '#0a3d38',
-  accentVia = '#0f766e',
-  accentTo = '#134e4a',
+  accentFrom = '#0a524d', // = primary.dark (mirrato, era un teal custom #0a3d38)
+  accentVia = '#0f766e',  // = primary.main (invariato)
+  accentTo = '#0a524d',   // = primary.dark (mirrato, era un teal custom #134e4a)
 }: LockScreenProps) {
   const [password, setPassword]   = React.useState('')
   const [showPwd, setShowPwd]     = React.useState(false)
@@ -221,7 +221,7 @@ export default function LockScreen({
               '&.Mui-focused fieldset': { borderColor: alpha('#fff', 0.7) },
             },
             '& .MuiInputBase-input::placeholder': { color: alpha('#fff', 0.45) },
-            '& .MuiFormHelperText-root': { color: '#fca5a5', fontWeight: 600 },
+            '& .MuiFormHelperText-root': { color: '#fca5a5', fontWeight: 600 }, // rosso chiaro per contrasto su sfondo scuro — non deriva da error.main/light (troppo scuro/pallido su questo sfondo), scelta intenzionale
           }}
         />
 

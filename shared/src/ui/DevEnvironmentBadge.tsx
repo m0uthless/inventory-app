@@ -16,7 +16,7 @@ export const isDevEnvironment = import.meta.env.VITE_APP_ENV === 'development'
  * browser, cosi da distinguere le tab anche senza guardare lo schermo.
  *
  * Renderizza null in produzione: montarlo incondizionatamente in
- * AppLayout di entrambi i frontend (archie e auslbo).
+ * AppLayout di entrambi i frontend (archie e portal).
  */
 export default function DevEnvironmentBadge() {
   React.useEffect(() => {
@@ -62,29 +62,6 @@ export default function DevEnvironmentBadge() {
         aria-hidden
         style={{ ...commonBarStyle, top: 0, bottom: 0, right: 0, width: barThickness }}
       />
-      {/* Etichetta ambiente, angolo alto-destra, sempre visibile */}
-      <div
-        aria-hidden
-        style={{
-          position: 'fixed',
-          top: 10,
-          right: 10,
-          zIndex: 2000,
-          pointerEvents: 'none',
-          background: '#f59e0b',
-          color: '#1e1b16',
-          fontWeight: 800,
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          padding: '3px 10px',
-          borderRadius: 999,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          userSelect: 'none',
-        }}
-      >
-        AMBIENTE DI SVILUPPO
-      </div>
     </>
   )
 }

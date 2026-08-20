@@ -11,6 +11,7 @@
 import * as React from 'react'
 import { Box, CircularProgress, Typography } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
+import { SHARED } from '../theme/constants'
 
 interface Props {
   address: string
@@ -157,7 +158,7 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
           className: '',
           html: `<div style="width:28px;height:28px;border-radius:50% 50% 50% 0;
             background:${theme.palette.primary.main};transform:rotate(-45deg);
-            border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);"></div>`,
+            border:3px solid ${SHARED.pureWhite};box-shadow:0 2px 8px rgba(0,0,0,0.25);"></div>`,
           iconSize: [28, 28],
           iconAnchor: [14, 28],
         } as Record<string, unknown>)
@@ -198,7 +199,7 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: '#f8fafc',
+            bgcolor: 'grey.50',
           }}
         >
           <CircularProgress size={24} sx={{ color: theme.palette.primary.main }} />
@@ -212,7 +213,7 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: '#f8fafc',
+            bgcolor: 'grey.50',
             flexDirection: 'column',
             gap: 0.5,
           }}

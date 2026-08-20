@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Box, Collapse, IconButton, Typography } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
@@ -10,6 +10,8 @@ import type { LocationGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } 
 import { FS, ICON } from './style'
 import { SignalChip, MetaTag } from './primitives'
 import { CustomerCard } from './CustomerCard'
+import { SHARED } from '../../theme/constants'
+import { SIDEBAR } from '../../theme/tokens'
 
 // ─── ProvinceSection ────────────────────────────────────────────────────────
 // Rinominato da CitySection: il Site Repository raggruppa i clienti per
@@ -26,10 +28,12 @@ type ProvinceSectionProps = {
   statusFilter: StatusFilter
   counts: Record<number, { assets: number | null; sites: number | null }>
   issueCounts: Record<number, number>
-  onOpenDrawer: (id: number) => void
+  onOpenDrawer: (id: number, typeKeyHint?: string | null) => void
   onOpenVpn: (customer: CustomerRow) => void
   onOpenCustomer: (id: number) => void
   onOpenSite: (id: number) => void
+  onOpenCustomerContacts: (customerId: number) => void
+  onOpenSiteContacts: (customerId: number, siteId: number) => void
   canViewCustomer: boolean
   canViewSite: boolean
   canChangeSite: boolean
@@ -45,7 +49,7 @@ export type ProvinceSectionHandle = { open: () => void; close: () => void; scrol
 export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceSectionProps>(
   function ProvinceSection({
     group, searchQuery, statusFilter, counts, issueCounts, onOpenDrawer, onOpenVpn,
-    onOpenCustomer, onOpenSite, canViewCustomer, canViewSite,
+    onOpenCustomer, onOpenSite, onOpenCustomerContacts, onOpenSiteContacts, canViewCustomer, canViewSite,
     canChangeSite, onEditSite,
     onCustomerContextMenu, onSiteContextMenu, onInventoryContextMenu,
     refreshToken,
@@ -100,14 +104,14 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
             '&:hover': { bgcolor: open ? theme.palette.primary.dark : 'grey.50' },
             '&:focus-visible': {
               outline: '2px solid',
-              outlineColor: open ? '#fff' : theme.palette.primary.main,
+              outlineColor: open ? SHARED.pureWhite : theme.palette.primary.main,
               outlineOffset: -2,
             },
           }}
         >
-          <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: open ? 'rgba(255,255,255,0.75)' : 'primary.main', flexShrink: 0 }} />
+          <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: open ? alpha(SHARED.pureWhite, 0.75) : 'primary.main', flexShrink: 0 }} />
 
-          <Typography fontWeight={700} sx={{ fontSize: FS.section, color: open ? '#fff' : 'text.primary' }}>
+          <Typography fontWeight={700} sx={{ fontSize: FS.section, color: open ? SIDEBAR.textDefault : 'text.primary' }}>
             {group.label}
           </Typography>
 
@@ -129,7 +133,7 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
             label={`${group.customers.length} client${group.customers.length !== 1 ? 'i' : 'e'}`}
           />
 
-          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ ml: 0.25, color: open ? '#fff' : 'text.secondary' }}>
+          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ ml: 0.25, color: open ? SHARED.pureWhite : 'text.secondary' }}>
             {open ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
           </IconButton>
         </Box>
@@ -150,6 +154,8 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
                 onOpenVpn={onOpenVpn}
                 onOpenCustomer={onOpenCustomer}
                 onOpenSite={onOpenSite}
+                onOpenCustomerContacts={onOpenCustomerContacts}
+                onOpenSiteContacts={onOpenSiteContacts}
                 canViewCustomer={canViewCustomer}
                 canViewSite={canViewSite}
                 canChangeSite={canChangeSite}

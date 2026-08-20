@@ -68,7 +68,13 @@ export const ABSENCE_STATUSES: { value: AbsenceStatus; label: string }[] = [
 
 type Swatch = { bg: string; fg: string }
 
-// Colore cella = f(reason, status), rispecchia la legenda dell'Excel:
+// ECCEZIONE STRUTTURALE al sistema di tema (refactoring colori 0.9.x,
+// confermata esplicitamente): colore cella = f(reason, status), rispecchia
+// la legenda dell'Excel usata da HR — resta fisso in ogni tema
+//  per non rompere l'associazione già imparata da chi
+// usa lo strumento. STESSA legenda (reason → colore) esiste in forma
+// leggermente diversa in `features/servicenow/absenceShared.ts`: da
+// unificare in un secondo momento, non in questo incremento.
 //   ferie proposta → giallo · ferie validata → verde · malattia → rosso
 //   104 → rosa · training → azzurro/indaco · trasferta → blu · altro → grigio
 const FERIE_PROPOSTA: Swatch = { bg: 'rgba(245,197,24,0.28)', fg: '#8a6d0b' }   // giallo
@@ -148,6 +154,14 @@ export function indexAbsences(rows: AbsenceRow[]): Map<string, AbsenceRow> {
 
 export function cellKey(userId: number, iso: string, part: DayPart): string {
   return `${userId}|${iso}|${part}`
+}
+
+/** Iniziali (1-2 lettere) da un nome completo, per gli avatar del roster. */
+export function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 // ─── Festività ───────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@
         reverse_proxy backend_nginx:80
     }
     handle {
-        reverse_proxy frontend-auslbo:80 {
+        reverse_proxy frontend-portal:80 {
             header_up Host {host}
         }
     }

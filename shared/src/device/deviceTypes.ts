@@ -2,7 +2,7 @@
  * Tipi condivisi per l'entità Device.
  *
  * Usati in:
- *  - frontend-auslbo (drawer, form, pagina Device)
+ *  - frontend-portal (drawer, form, pagina Device)
  *  - frontend (futuro: gestione device sul portale principale)
  *
  * Non dipende da API, React o MUI — puro TypeScript.
