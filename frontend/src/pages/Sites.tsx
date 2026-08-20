@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import {
   Box,
   Button,
@@ -52,6 +53,8 @@ import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import StatusChip from '@shared/ui/StatusChip'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import type { DomainStatusTokens } from '../theme/statusTokens'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -183,7 +186,7 @@ function SiteContactsTab(props: {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.main } }}
+          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
           onClick={() =>
             navigate(
               `/contacts${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
@@ -299,7 +302,7 @@ function SiteInventoriesTab(props: {
         <Button
           size="small"
           variant="contained"
-          sx={{ bgcolor: '#0d9488', color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.main } }}
+          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
           onClick={() =>
             navigate(
               `/inventory${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
@@ -366,7 +369,8 @@ function SiteInventoriesTab(props: {
   )
 }
 
-const cols: GridColDef<SiteRow>[] = [
+function buildColumns(statusTokens: DomainStatusTokens): GridColDef<SiteRow>[] {
+  return [
   {
     field: 'display_name',
     headerName: 'Sito',
@@ -406,11 +410,11 @@ const cols: GridColDef<SiteRow>[] = [
             icon={<WarningAmberRoundedIcon sx={{ fontSize: '0.95rem !important' }} />}
             label="Nessun contatto"
             sx={{
-              bgcolor: 'rgba(245, 158, 11, 0.12)',
-              color: '#9a6700',
-              border: '1px solid rgba(245, 158, 11, 0.18)',
+              bgcolor: statusTokens.noContactWarning.bg,
+              color: statusTokens.noContactWarning.color,
+              border: `1px solid ${statusTokens.noContactWarning.border}`,
               fontWeight: 600,
-              '& .MuiChip-icon': { color: '#d97706' },
+              '& .MuiChip-icon': { color: statusTokens.noContactWarning.iconColor },
             }}
           />
         )
@@ -434,10 +438,13 @@ const cols: GridColDef<SiteRow>[] = [
       <StatusChip
         statusId={p.row.status ?? null}
         label={typeof p.value === 'string' ? p.value : '—'}
+        sx={{ fontWeight: 700 }}
       />
     ),
   },
-]
+  ]
+}
+
 
 
 const SITE_KPI_SPECS: KpiSpec[] = [
@@ -447,15 +454,9 @@ const SITE_KPI_SPECS: KpiSpec[] = [
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
 
-const renderSiteCard: MobileCardRenderFn<SiteRow> = ({ row, onOpen }) => {
-  const sc = row.status != null ? ({
-    1: { bg: '#E0F2FE', fg: '#0369A1', border: '#BAE6FD' },
-    2: { bg: '#DCFCE7', fg: '#166534', border: '#BBF7D0' },
-    3: { bg: '#FEF9C3', fg: '#854D0E', border: '#FDE68A' },
-    4: { bg: '#FEE2E2', fg: '#991B1B', border: '#FECACA' },
-    5: { bg: '#EDE9FE', fg: '#5B21B6', border: '#DDD6FE' },
-    6: { bg: '#FFEDD5', fg: '#9A3412', border: '#FED7AA' },
-  } as Record<number, { bg: string; fg: string; border: string }>)[row.status] ?? null : null
+function makeRenderSiteCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<SiteRow> {
+  return ({ row, onOpen }) => {
+  const sc = row.status != null ? statusTokens.entityStatus[row.status] ?? null : null
 
   const meta: { label: string; value: string | null | undefined }[] = [
     { label: 'Cliente',   value: row.customer_display_name || row.customer_name },
@@ -485,7 +486,7 @@ const renderSiteCard: MobileCardRenderFn<SiteRow> = ({ row, onOpen }) => {
           {row.display_name || row.name}
         </Typography>
         {sc && row.status_label && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.fg, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.color, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
             {row.status_label}
           </Box>
         )}
@@ -503,15 +504,19 @@ const renderSiteCard: MobileCardRenderFn<SiteRow> = ({ row, onOpen }) => {
       </Box>
     </Box>
   )
+  }
 }
 
 export default function Sites() {
+  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const canChange = hasPerm(PERMS.crm.site.change)
   const canDelete = hasPerm(PERMS.crm.site.delete)
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
+  const statusTokens = useStatusTokens()
+  const renderSiteCard = React.useMemo(() => makeRenderSiteCard(statusTokens), [statusTokens])
   const grid = useServerGrid({
     defaultOrdering: 'display_name',
     allowedOrderingFields: [
@@ -696,7 +701,7 @@ export default function Sites() {
     setDeleteBusy(true)
     try {
       await api.delete(`/sites/${selectedId}/`)
-      toast.success('Sito eliminato ✅')
+      toast.success('Sito eliminato')
       setDeleteDlgOpen(false)
       closeDrawer()
       grid.setViewMode('all', { keepOpen: true })
@@ -715,7 +720,7 @@ export default function Sites() {
     setRestoreBusy(true)
     try {
       await api.post(`/sites/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi ✅`)
+      toast.success(`Ripristinati ${ids.length} elementi`)
       setSelectionModel(emptySelectionModel())
       reloadList()
       return true
@@ -733,7 +738,7 @@ export default function Sites() {
     setRestoreBusy(true)
     try {
       await api.post(`/sites/${selectedId}/restore/`)
-      toast.success('Sito ripristinato ✅')
+      toast.success('Sito ripristinato')
       await loadDetail(selectedId)
       reloadList()
     } catch (e) {
@@ -806,7 +811,7 @@ export default function Sites() {
       setRestoreBusy(true)
       try {
         await api.post(`/sites/${id}/restore/`)
-        toast.success('Sito ripristinato ✅')
+        toast.success('Sito ripristinato')
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -887,8 +892,8 @@ export default function Sites() {
   }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, restoreBusy, restoreFromRow])
 
   const columns = React.useMemo<GridColDef<SiteRow>[]>(() => {
-    return cols
-  }, [])
+    return buildColumns(statusTokens)
+  }, [statusTokens])
 
   const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
     customer_display_name: {
@@ -1001,12 +1006,12 @@ export default function Sites() {
       if (dlgMode === 'create') {
         const res = await api.post<SiteDetail>('/sites/', payload)
         id = res.data.id
-        toast.success('Sito creato ✅')
+        toast.success('Sito creato')
       } else {
         if (!dlgId) return
         const res = await api.patch<SiteDetail>(`/sites/${dlgId}/`, payload)
         id = res.data.id
-        toast.success('Sito aggiornato ✅')
+        toast.success('Sito aggiornato')
       }
 
       setDlgOpen(false)
@@ -1057,14 +1062,7 @@ export default function Sites() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'rgba(69,127,121,0.10) !important',
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'rgba(69,127,121,0.14) !important',
-            },
+            ...zebraSx,
           },
         }}
       >
@@ -1097,7 +1095,7 @@ export default function Sites() {
         canDelete={canDelete}
         restoreBusy={restoreBusy}
         deleteBusy={deleteBusy}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato ✅') }}
+        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
         contactsTabContent={detail ? (
           <SiteContactsTab
             customerId={detail.customer ?? 0}

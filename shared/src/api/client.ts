@@ -1,6 +1,6 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 
-import { apiToast, handleUnauthorized } from './runtime'
+import { apiToast, handleUnauthorized, handleIdleLock, type IdleLockUserInfo } from './runtime'
 
 // NOTE: nginx proxy /api -> backend
 export const api = axios.create({
@@ -52,12 +52,27 @@ api.interceptors.response.use(
   (err) => {
     const status = (err as { response?: { status?: number } })?.response?.status
     const url = String((err as { config?: { url?: unknown } })?.config?.url || '')
+    const code = (err as { response?: { data?: { code?: unknown } } })?.response?.data?.code
 
     const isAuthEndpoint =
       url.includes('/auth/login/') ||
       url.includes('/auth/logout/') ||
       url.includes('/auth/csrf/') ||
       url.includes('/me/')
+
+    // 0.9.0: 401 "idle_lock" (SessionIdleTimeoutMiddleware) — la sessione è
+    // ancora valida, va solo mostrata la LockScreen, non un logout/redirect.
+    // A differenza del 401 generico sotto, qui NON escludiamo /me/: è
+    // proprio la chiamata che l'app rifà al mount/refresh, ed è il caso che
+    // ha originato questo fix (refresh bypassava il blocco per inattività).
+    const isStrictAuthEndpoint =
+      url.includes('/auth/login/') || url.includes('/auth/logout/') || url.includes('/auth/csrf/')
+    if (status === 401 && code === 'idle_lock' && !isStrictAuthEndpoint) {
+      const userInfo = (err as { response?: { data?: { user?: IdleLockUserInfo } } })?.response?.data
+        ?.user
+      handleIdleLock(userInfo)
+      return Promise.reject(err)
+    }
 
     if (status === 401 && !isAuthEndpoint) {
       if (!handling401) {

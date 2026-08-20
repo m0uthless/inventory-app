@@ -41,9 +41,10 @@ import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
+import { useStatusTokens, useWidgetAccents } from '../theme/AppThemeProvider'
+import { useTheme, alpha } from '@mui/material/styles'
 import {
   CATEGORY_ORDER,
-  STATUS_COLORS,
   STATUS_LABELS,
   formatEuro,
   formatItDate,
@@ -57,13 +58,37 @@ type ExtractResponse = { amount: string | null; date: string | null; warnings: s
 type Meta = { is_secretary: boolean; user_id: number; km_rate: string | null }
 
 // ─── Stile "foglio" — bordi sottili neri come una griglia Excel ─────────────
+// La pagina imita l'aspetto di un foglio di calcolo (bordi, intestazione,
+// evidenziazione celle modificabili), ora derivato dal tema attivo invece di
+// hex fissi: bordo/intestazione seguono divider/background.default (identici
+// nei 3 temi ma theme-aware per coerenza), editableCellSx usa davvero
+// WidgetAccents.mintAccent (varia in temp). Calcolati dentro il componente
+// (vedi RimborsoSpesePage) perché serve accesso a useTheme()/useWidgetAccents().
 
-const sheetBorder = '1px solid #333'
-const cellSx = { border: sheetBorder, px: 1, py: 0.5, verticalAlign: 'middle' as const, overflow: 'hidden' as const }
-const headCellSx = { ...cellSx, fontWeight: 700, fontSize: 11, letterSpacing: '0.03em', bgcolor: '#f3f4f6' }
-// Celle dove il tecnico può scrivere: piccolo highlight teal (coerente col tema) per segnalarlo a colpo d'occhio.
-const editableCellSx = { bgcolor: 'rgba(94, 234, 212, 0.14)' }
-const tableSx = { width: '100%', tableLayout: 'fixed' as const, borderCollapse: 'collapse' as const, bgcolor: '#fff', fontSize: 13 }
+type SheetStyles = {
+  sheetBorder: string
+  cellSx: { border: string; px: number; py: number; verticalAlign: 'middle'; overflow: 'hidden' }
+  headCellSx: { border: string; px: number; py: number; verticalAlign: 'middle'; overflow: 'hidden'; fontWeight: number; fontSize: number; letterSpacing: string; bgcolor: string }
+  editableCellSx: { bgcolor: string }
+  tableSx: { width: string; tableLayout: 'fixed'; borderCollapse: 'collapse'; bgcolor: string; fontSize: number }
+}
+
+function useSheetStyles(): SheetStyles {
+  const theme = useTheme()
+  const widgetAccents = useWidgetAccents()
+  return React.useMemo(() => {
+    const sheetBorder = `1px solid ${theme.palette.text.primary}`
+    const cellSx = { border: sheetBorder, px: 1, py: 0.5, verticalAlign: 'middle' as const, overflow: 'hidden' as const }
+    return {
+      sheetBorder,
+      cellSx,
+      headCellSx: { ...cellSx, fontWeight: 700, fontSize: 11, letterSpacing: '0.03em', bgcolor: theme.palette.background.default },
+      // Celle dove il tecnico può scrivere: piccolo highlight mint (WidgetAccents, theme-aware) per segnalarlo a colpo d'occhio.
+      editableCellSx: { bgcolor: alpha(widgetAccents.mintAccent, 0.14) },
+      tableSx: { width: '100%', tableLayout: 'fixed' as const, borderCollapse: 'collapse' as const, bgcolor: theme.palette.background.paper, fontSize: 13 },
+    }
+  }, [theme, widgetAccents])
+}
 
 function euroOrBlank(value: string | number | null | undefined): string {
   const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0)
@@ -97,6 +122,8 @@ function CellInput({
 }
 
 export default function RimborsoSpesePage() {
+  const statusTokens = useStatusTokens()
+  const { sheetBorder, cellSx, headCellSx, editableCellSx, tableSx } = useSheetStyles()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const toast = useToast()
@@ -269,7 +296,7 @@ export default function RimborsoSpesePage() {
   }
   if (!report) return null
 
-  const colors = STATUS_COLORS[report.status]
+  const colors = statusTokens.expenseReport[report.status]
   const totalKm = kmItem ? kmItem.km_trips.reduce((s, t) => s + t.km, 0) : 0
 
   return (
@@ -283,7 +310,7 @@ export default function RimborsoSpesePage() {
           <Typography variant="h6" fontWeight={800}>Nota spese {report.number}</Typography>
           <Chip
             size="small" label={STATUS_LABELS[report.status]}
-            sx={{ bgcolor: colors.bg, color: colors.fg, border: `1px solid ${colors.border}`, fontWeight: 700 }}
+            sx={{ bgcolor: colors.bg, color: colors.color, border: `1px solid ${colors.border}`, fontWeight: 700 }}
           />
           {busy || loading ? <CircularProgress size={16} /> : null}
         </Stack>

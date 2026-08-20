@@ -3,24 +3,16 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { LoginPage, type AmbitoConfig, type Ambito } from '@shared/ui/LoginPage'
 import { useAuth } from '../auth/AuthProvider'
 import { api } from '@shared/api/client'
-import { theme } from '../theme'
+import { useTheme, alpha } from '@mui/material/styles'
 
-const AMBITI: AmbitoConfig[] = [
-  {
-    value: 'archie',
-    label: 'ARCHIE',
-    color: theme.palette.primary.main,
-    colorHover: theme.palette.primary.dark,
-    colorLight: 'rgba(15,118,110,0.12)',
-  },
-  {
-    value: 'portal',
-    label: 'Portale Clienti',
-    color: '#1A6BB5',
-    colorHover: '#155C9E',
-    colorLight: 'rgba(26,107,181,0.12)',
-  },
-]
+// AMBITI era un const a livello di modulo con `theme.palette.primary.X` da
+// import statico — bug noto, ma di fatto innocuo qui: prima del login
+// AppThemeProvider non ha un utente da cui leggere la preferenza tema e
+// ricade sempre sul tema default (vedi AppThemeProvider.tsx), quindi
+// useTheme() risolverebbe comunque allo stesso valore. Sistemato per
+// coerenza e per non lasciare un pattern-bug nel codice.
+// 'portal' (Portale Clienti) ha colori brand propri e distinti, non legati
+// al tema Archie — eccezione intenzionale (prodotto diverso).
 
 // URL del portale Portal (da variabile Vite, con fallback)
 const PORTAL_URL = (import.meta.env.VITE_PORTAL_URL as string | undefined) ?? 'http://localhost:8081'
@@ -28,6 +20,24 @@ const PORTAL_URL = (import.meta.env.VITE_PORTAL_URL as string | undefined) ?? 'h
 export default function Login() {
   const { refreshMe } = useAuth()
   const navigate = useNavigate()
+  const theme = useTheme()
+  const AMBITI: AmbitoConfig[] = React.useMemo(() => [
+    {
+      value: 'archie',
+      label: 'ARCHIE',
+      color: theme.palette.primary.main,
+      colorHover: theme.palette.primary.dark,
+      colorLight: alpha(theme.palette.primary.main, 0.12),
+    },
+    {
+      value: 'portal',
+      label: 'Portale Clienti',
+      color: '#1A6BB5',
+      colorHover: '#155C9E',
+      colorLight: 'rgba(26,107,181,0.12)',
+    },
+  ], [theme])
+
   const location = useLocation()
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
 

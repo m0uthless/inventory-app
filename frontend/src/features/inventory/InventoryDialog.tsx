@@ -276,6 +276,27 @@ export default function InventoryDialog({
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
             <TextField
               size="small"
+              label="Posizione"
+              value={form.location}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, location: e.target.value }))}
+              fullWidth
+              disabled={isFieldDisabled('location')}
+              helperText={fieldHelpText('location')}
+            />
+            <TextField
+              size="small"
+              label="Telefono"
+              value={form.telefono}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, telefono: e.target.value }))}
+              fullWidth
+              disabled={isFieldDisabled('telefono')}
+              helperText={fieldHelpText('telefono')}
+            />
+          </Stack>
+
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+            <TextField
+              size="small"
               label="Utente OS"
               value={form.os_user}
               onChange={(e) => onFormChange((prev) => ({ ...prev, os_user: e.target.value }))}

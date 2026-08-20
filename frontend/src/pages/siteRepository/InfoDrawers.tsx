@@ -63,7 +63,7 @@ export function CustomerInfoDrawer({
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{detail.primary_contact_email || ''}</Typography>
               </Box>
               {detail.primary_contact_phone ? (
-                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: (theme) => theme.palette.primary.main, border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
+                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: 'success.light', color: (theme) => theme.palette.primary.main, border: '1px solid', borderColor: 'success.main', fontWeight: 600, fontSize: 11 }} />
               ) : null}
             </Stack>
           </DrawerSection>
@@ -91,7 +91,7 @@ export function CustomerInfoDrawer({
           ) : null}
 
           {address ? (
-            <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
               <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
                   <LocationOnOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Indirizzo
@@ -161,13 +161,13 @@ export function SiteInfoDrawer({
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>{detail.primary_contact_email || ''}</Typography>
               </Box>
               {detail.primary_contact_phone ? (
-                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: '#f0fdf4', color: (theme) => theme.palette.primary.main, border: '1px solid #bbf7d0', fontWeight: 600, fontSize: 11 }} />
+                <Chip size="small" label={detail.primary_contact_phone} sx={{ bgcolor: 'success.light', color: (theme) => theme.palette.primary.main, border: '1px solid', borderColor: 'success.main', fontWeight: 600, fontSize: 11 }} />
               ) : null}
             </Stack>
           </DrawerSection>
 
           {siteAddress ? (
-            <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
               <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
                   <LocationOnOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />Indirizzo

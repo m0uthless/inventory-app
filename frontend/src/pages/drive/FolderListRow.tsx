@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
 import { IconButton, ButtonBase, Checkbox, Menu, MenuItem, Typography } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
@@ -56,9 +57,9 @@ export function FolderListRow({
         py: 1,
         borderBottom: idx < total - 1 ? '1px solid' : 'none',
         borderColor: 'grey.100',
-        bgcolor: idx % 2 === 1 ? 'rgba(15,118,110,0.015)' : '#fff',
+        bgcolor: (t) => idx % 2 === 1 ? alpha(t.palette.primary.main, 0.015) : t.palette.background.paper,
         transition: 'background 0.1s',
-        '&:hover': { bgcolor: 'rgba(15,118,110,0.04)', '& .folder-row-menu': { opacity: 1 } },
+        '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.04), '& .folder-row-menu': { opacity: 1 } },
         '&:focus-visible': {
           outline: '2px solid',
           outlineColor: 'primary.main',

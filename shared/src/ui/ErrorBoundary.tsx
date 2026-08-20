@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   borderRadius: 6,
                   padding: '0.75rem 1rem',
                   fontSize: '0.78rem',
-                  color: '#dc2626',
+                  color: '#ef4444', // = theme.palette.error.main (mirrato: shared/ non può importare frontend/src/theme.ts)
                   overflow: 'auto',
                   marginBottom: '1.5rem',
                   maxHeight: 160,
@@ -111,7 +111,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   padding: '0.5rem 1.25rem',
                   borderRadius: 6,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #0f766e, #0ea5a4)',
+                  background: 'linear-gradient(135deg, #0f766e, #45a59d)', // = primary.main → primary.light (mirrato)
                   color: '#fff',
                   cursor: 'pointer',
                   fontWeight: 500,

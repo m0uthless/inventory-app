@@ -23,6 +23,9 @@
  *   xl  = 32px  — padding pagina desktop, gap sezioni maggiori
  */
 
+import { SHARED } from './constants'
+import { alpha } from '@mui/material/styles'
+
 type SpacingToken = {
   /** Valore in unità MUI (base 8px) — usare in `sx={{ p: ... }}` */
   mui: number
@@ -47,11 +50,9 @@ export const spacing = {
 export type SpacingKey = keyof typeof spacing
 
 /**
- * SidebarTokens — forma condivisa dei set di colori sidebar (SIDEBAR,
- * SIDEBAR_NAVY, eventuali temi futuri). Tipizzato a `string` (non `as const`
- * sui valori) apposta: due varianti con colori diversi devono restare
- * strutturalmente compatibili tra loro, cosa che `typeof SIDEBAR` da solo
- * non garantirebbe (cristallizzerebbe i valori letterali del teal).
+ * SidebarTokens — forma dei token di colore per la sidebar. Tipizzato a
+ * `string` (non `as const` sui valori) apposta, per restare aperto a
+ * eventuali temi futuri senza cristallizzare i valori letterali del teal.
  */
 export type SidebarTokens = {
   bgGradient: string
@@ -62,6 +63,12 @@ export type SidebarTokens = {
   accent: string
   accentLight: string
   accentBright: string
+  /** Tripla "r,g,b" di `accent`, per comporre overlay rgba() ad-hoc (es. `rgba(${accentRgb},0.22)`)
+   *  senza dover aggiungere un nuovo campo dedicato per ogni alpha usata in AppLayout. */
+  accentRgb: string
+  /** Colore icona per lo stato "selezionato forte" (nested Mui-selected) — leggermente
+   *  più chiaro/acceso di accentLight, usato solo lì. */
+  accentIconStrong: string
   selectedBg: string
   selectedBgHover: string
   selectedBgStrong: string
@@ -97,6 +104,8 @@ export const SIDEBAR: SidebarTokens = {
   accent:       '#5eead4',   // teal-300
   accentLight:  '#a7f3d0',   // teal-200
   accentBright: '#d9fffa',   // teal-100
+  accentRgb:    '94,234,212',
+  accentIconStrong: '#99f6e4',
 
   /** Sfondi per voci selezionate */
   selectedBg:         'rgba(94,234,212,0.09)',
@@ -121,44 +130,104 @@ export const SIDEBAR: SidebarTokens = {
 } as const
 
 /**
- * SIDEBAR_NAVY — variante per il tema "Navy" (vedi theme.navy.ts).
+ * KpiAccents — accenti "categorici" usati nelle card KPI (PurchaseOrderKpis,
+ * Issues, WikiStats, ServiceNowStats, MonitorDrawer) per distinguere
+ * visivamente metriche che NON rappresentano uno stato semantico. Stati
+ * semantici veri (es. "Critiche aperte" in Issues.tsx) vanno letti
+ * direttamente da theme.palette.error/warning/success — non da qui.
  *
- * Stessa forma di SIDEBAR: sfondo blu navy molto scuro (coerente col nuovo
- * primary #143475) con accenti blu vivo al posto del teal.
+ * Consolidamento colori 0.9.x: solo 2 famiglie di colore (teal = primary,
+ * violet = secondary), ciascuna con 3 sfumature (1 = main, 2 = dark/strong,
+ * 3 = variante chiara) per le pagine che vogliono più accenti nella stessa
+ * famiglia invece di introdurre un'altra hue. Numerati (non "Strong"/"Light")
+ * apposta per essere comunicabili a voce tra pagine ("usa violet3 qui").
  */
-export const SIDEBAR_NAVY: SidebarTokens = {
-  /** Sfondo del drawer (gradiente verticale) */
-  bgGradient: 'linear-gradient(180deg, #091735 0%, #060f21 100%)',
+export type KpiAccents = {
+  /** = theme.palette.primary.main */
+  teal1: string
+  /** = theme.palette.primary.dark */
+  teal2: string
+  /** = theme.palette.primary.light */
+  teal3: string
+  /** = theme.palette.secondary.main */
+  violet1: string
+  /** = theme.palette.secondary.dark */
+  violet2: string
+  /**
+   * Variante chiara "sibling" di teal3. NON deriva da
+   * theme.palette.secondary.light (#ede9fe): quel valore è pensato per tinte
+   * di sfondo, troppo pallido per una barra accento/icona leggibile. Violet-400
+   * scelto come equivalente percettivo di primary.light.
+   */
+  violet3: string
+}
 
-  /** Colore base del testo nelle voci di navigazione */
-  textMuted:    'rgba(255,255,255,0.55)',
-  textDefault:  'rgba(255,255,255,0.78)',
-  textStrong:   'rgba(255,255,255,0.95)',
-  textBright:   '#ffffff',
+/**
+ * GRID_ZEBRA_BASE — colore base (senza alpha) per lo zebra striping delle
+ * MuiDataGrid, duplicato identico (rgb(69,127,121) fisso) in 14 pagine
+ * diverse. Centralizzato qui e composto con `alpha()` nel punto di consumo
+ * (vedi theme/dataGridZebraSx.ts). Valore storico esatto (#457f79 =
+ * rgb(69,127,121)), nessun cambio visivo.
+ */
+export const GRID_ZEBRA_BASE = '#457f79'
 
-  /** Accento blu vivo: usato per selected state, icone attive, bordi */
-  accent:       '#4d8fdb',
-  accentLight:  '#a8c8ec',
-  accentBright: '#d6e6f7',
+export const KPI_ACCENTS: KpiAccents = {
+  teal1:   '#0f766e', // = theme.palette.primary.main
+  teal2:   '#0a524d', // = theme.palette.primary.dark
+  teal3:   '#45a59d', // = theme.palette.primary.light
+  violet1: '#8b5cf6', // = theme.palette.secondary.main
+  violet2: SHARED.categorical.violet.text, // = theme.palette.secondary.dark
+  violet3: '#a78bfa', // violet-400, vedi nota nel tipo sopra
+} as const
 
-  /** Sfondi per voci selezionate */
-  selectedBg:         'rgba(77,143,219,0.09)',
-  selectedBgHover:    'rgba(77,143,219,0.14)',
-  selectedBgStrong:   'rgba(77,143,219,0.20)',
-  selectedBgStronger: 'rgba(77,143,219,0.28)',
+/**
+ * WidgetAccents — colori "fuori tema" trovati in chip/badge/widget vari
+ * (AuditActionChip, badge assenza "training", status viola in Sites/
+ * Customers, badge "new", sfondi teal-50, confetti ContributorCard,
+ * categorie Wiki). Non sono semantici (non sono success/warning/error/info)
+ * né gestiti dal sistema KpiAccents — servono a distinguere elementi
+ * categorici o decorativi.
+ */
+export type WidgetAccents = {
+  /** Chip/badge viola: sfondo, testo, bordo (AuditActionChip usa un bordo
+   *  leggermente diverso da quello degli status-map Sites/Customers). */
+  violetBg: string
+  violetText: string
+  violetBorderChip: string
+  violetBorderStatus: string
+  /** Badge assenza "training" (absenceShared) */
+  trainingBadgeBg: string
+  trainingBadgeText: string
+  /** Accent mint/teal brillante riusato fuori dalla sidebar (badge "new",
+   *  gradiente AppLayout, WikiRevisionsTab, RichEditor code block) — deriva
+   *  da SIDEBAR.accent/accentLight, non più ridichiarato come hex separato
+   *  (era duplicato letterale — stesso trattamento del viola). */
+  mintAccent: string
+  mintAccentLight: string
+  mintAccentBright: string
+  newBadgeBg: string
+  newBadgeBorder: string
+  /** Sfondo teal-50 molto chiaro (hover card Drive/WikiPage/FolderCard) */
+  softTealBg: string
+  /** Confetti ContributorCard — 7 colori */
+  confetti: string[]
+  /** Categorie Wiki (fallback quando la pagina non ha un colore custom) — 8 colori */
+  categoryAccents: string[]
+}
 
-  /** Bordo sinistro per la voce attiva */
-  activeBorder: '2px solid #4d8fdb',
-
-  /** Sfondo hover sulle voci non selezionate */
-  hoverBg: 'rgba(255,255,255,0.08)',
-
-  /** Divisori */
-  divider: 'rgba(255,255,255,0.08)',
-
-  /** Chip / badge nella sidebar */
-  chipBg:    'rgba(255,255,255,0.10)',
-  chipBorder:'rgba(255,255,255,0.14)',
-  chipBgOpen:'rgba(77,143,219,0.14)',
-  chipBorderOpen:'rgba(77,143,219,0.24)',
+export const WIDGET_ACCENTS: WidgetAccents = {
+  violetBg: SHARED.categorical.violet.bg,
+  violetText: SHARED.categorical.violet.text,
+  violetBorderChip: SHARED.categorical.violet.borderChip,
+  violetBorderStatus: SHARED.categorical.violet.borderStatus,
+  trainingBadgeBg: 'rgba(124,58,237,0.14)',
+  trainingBadgeText: SHARED.categorical.violet.text,
+  mintAccent: SIDEBAR.accent,
+  mintAccentLight: SIDEBAR.accentLight,
+  mintAccentBright: SIDEBAR.accentBright,
+  newBadgeBg: alpha(SIDEBAR.accent, 0.18),
+  newBadgeBorder: alpha(SIDEBAR.accentLight, 0.3),
+  softTealBg: '#f0fdf9',
+  confetti: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6'],
+  categoryAccents: ['#0f766e', '#3b82f6', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#10b981', '#f97316'],
 } as const

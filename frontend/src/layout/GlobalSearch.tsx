@@ -4,6 +4,8 @@ import { Box, IconButton, InputAdornment, TextField } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import ClearIcon from '@mui/icons-material/Clear'
 import { useSidebarTokens } from '../theme/AppThemeProvider'
+import { alpha } from '@mui/material/styles'
+import { SHARED } from '../theme/constants'
 
 type Props = {
   /** Called when the easter-egg trigger word is typed, instead of navigating. */
@@ -67,10 +69,10 @@ export default function GlobalSearch({ onEggTrigger }: Props) {
             '& .MuiOutlinedInput-root': {
               borderRadius: 1,
               backgroundColor: SIDEBAR.chipBg,
-              color: '#fff',
-              '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.6)' },
-              '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.8)' },
+              color: SHARED.pureWhite,
+              '& fieldset': { borderColor: alpha(SHARED.pureWhite, 0.3) },
+              '&:hover fieldset': { borderColor: alpha(SHARED.pureWhite, 0.6) },
+              '&.Mui-focused fieldset': { borderColor: alpha(SHARED.pureWhite, 0.8) },
               '& .MuiInputAdornment-root svg': { color: SIDEBAR.textDefault },
               '& input::placeholder': { color: SIDEBAR.textMuted, opacity: 1 },
             },

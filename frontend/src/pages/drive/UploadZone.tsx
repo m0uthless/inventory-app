@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
 import { Box, ButtonBase, Typography } from '@mui/material'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 
@@ -56,10 +57,10 @@ export function UploadZone({ onFiles }: { onFiles: (files: FileList) => void }) 
         width: '100%',
         justifyContent: 'flex-start',
         textAlign: 'left',
-        background: over ? 'rgba(15,118,110,0.04)' : '#fafafa',
+        background: (t) => over ? alpha(t.palette.primary.main, 0.04) : t.palette.grey[50],
         transition: 'all 0.15s',
         mb: 2.5,
-        '&:hover': { borderColor: 'primary.main', background: 'rgba(15,118,110,0.03)' },
+        '&:hover': { borderColor: 'primary.main', background: (t) => alpha(t.palette.primary.main, 0.03) },
         '&:focus-visible': {
           outline: '2px solid',
           outlineColor: 'primary.main',

@@ -30,6 +30,9 @@ export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
       // override AppBar color inheritance
       '& .MuiInputBase-root': { color: 'text.primary' },
       '& .MuiIconButton-root': { color: 'text.secondary !important' },
+      // override AppBar color inheritance — il valore rgba(0,0,0,0.23) è il
+      // default MUI stesso per OutlinedInput in light mode (tutti e 3 i temi
+      // sono mode:'light'), qui usato per ripristinarlo esplicitamente.
       '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23) !important' },
     }}>
       {/* Spacer sidebar — allinea al contenuto della pagina */}

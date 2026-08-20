@@ -26,6 +26,15 @@ type Props = {
   /** Right-side extra actions (e.g. export button) */
   rightActions?: ReactNode
 
+  /**
+   * In modalità compact, di default il box delle azioni (children/createButton/
+   * rightActions/reset) segue subito la searchbar. Alcune pagine (es. Issues
+   * con "Nuova issue") vogliono invece SOLO le rightActions ancorate al bordo
+   * destro della toolbar, lasciando children (es. filtri) dove sono: opt-in
+   * esplicito per non alterare il comportamento delle altre pagine.
+   */
+  alignRightActions?: boolean
+
   searchLabel?: string
   resetLabel?: string
 }
@@ -46,6 +55,7 @@ export default function ListToolbar(props: Props) {
     children,
     createButton,
     rightActions,
+    alignRightActions = false,
     searchLabel = 'Cerca',
     resetLabel = 'Reimposta',
     compact = false,
@@ -104,6 +114,7 @@ export default function ListToolbar(props: Props) {
           alignItems: 'center',
           gap: 1,
           width: { xs: '100%', md: 'auto' },
+          flexGrow: { md: alignRightActions ? 1 : 0 },
           ml: { md: compact ? 0 : 'auto' },
           justifyContent: { xs: 'flex-start', md: 'flex-start' },
           flexWrap: 'wrap',
@@ -135,6 +146,7 @@ export default function ListToolbar(props: Props) {
               flexDirection: 'row',
               rowGap: 1,
               columnGap: 1,
+              ml: alignRightActions ? { md: 'auto' } : undefined,
               '& > *': {
                 display: 'flex',
                 alignItems: 'center',

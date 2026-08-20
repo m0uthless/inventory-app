@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from portal.permissions import _is_portal_user, _is_internal_user, _get_portal_customer_id
+from portal.permissions import _is_portal_user, _get_portal_customer_id, _bypasses_portal_scope
 
 # Mappa: basename del router → campo (anche con lookup "__") verso Customer.
 # Aggiorna questa mappa quando aggiungi nuovi modelli accessibili dal portale.
@@ -34,10 +34,18 @@ class PortalScopedMixin:
     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
     sul queryset già costruito dal ViewSet.
 
-    Comportamento (deciso SOLO da identità/permessi server-side, MAI da un
-    header inviato dal client — vedi fix 2.1 audit 2026-07):
-    - utente con accesso interno Archie (`core.access_archie` o superuser)
-      → nessuno scope, vede tutto, anche se ha anche un profilo Portal;
+    Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+    server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+    2026-07, esteso 0.9.0 con la distinzione per ambito):
+    - superuser → nessuno scope, sempre (override di sistema);
+    - utente con accesso interno Archie (`core.access_archie`), che ha
+      fatto login con ambito "site-repo" (Archie principale) → nessuno
+      scope, vede tutto, anche se ha anche un profilo Portal;
+    - stesso utente interno, ma con la sessione aperta con ambito "portal"
+      (login dal Portal) → SCOPATO come un utente Portal puro: può
+      amministrare tutti i clienti dal frontend Archie, ma resta
+      differenziato per cliente quando opera dal Portal (vedi
+      `_bypasses_portal_scope` in portal/permissions.py);
     - utente Portal "puro" (profilo attivo, nessun accesso interno)
       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
         header presente o assente nella richiesta;
@@ -54,9 +62,9 @@ class PortalScopedMixin:
             return qs
 
         # Utente con accesso interno Archie (anche se ha pure un profilo
-        # Portal): non viene scopato. Questa decisione è presa SOLO in base
-        # ai permessi Django reali dell'utente, mai da un header client.
-        if _is_internal_user(user):
+        # Portal): non viene scopato SOLO se non ha fatto login con
+        # ambito="portal" per la sessione corrente. Vedi _bypasses_portal_scope.
+        if _bypasses_portal_scope(self.request):
             return qs
 
         customer_id = _get_portal_customer_id(self.request)
@@ -93,8 +101,9 @@ class PortalTenantWriteMixin:
             combaciare con quello dell'utente portale (es. "site", "vlan",
             "device").
 
-    Per gli utenti con accesso interno (`_is_internal_user`) il mixin non
-    applica alcun vincolo: possono scrivere su qualunque customer, come oggi.
+    Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+    superuser, o interni Archie con sessione ambito != "portal") il mixin
+    non applica alcun vincolo: possono scrivere su qualunque customer.
     """
 
     tenant_owned_field: str | None = "customer"
@@ -102,7 +111,7 @@ class PortalTenantWriteMixin:
 
     def _portal_customer_id(self):
         user = getattr(self.request, "user", None)
-        if not _is_portal_user(user) or _is_internal_user(user):
+        if not _is_portal_user(user) or _bypasses_portal_scope(self.request):
             return None
         return _get_portal_customer_id(self.request)
 

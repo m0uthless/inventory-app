@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { theme } from '../theme'
+import { alpha, useTheme } from '@mui/material/styles'
 import {
   Box,
   Button,
@@ -22,6 +22,8 @@ import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumb
 
 import { Can } from '../auth/Can'
 import { useAuth } from '../auth/AuthProvider'
+import { useStatusTokens, useDataGridZebraSx } from '../theme/AppThemeProvider'
+import type { DomainStatusTokens, InventoryStatusKey } from '../theme/statusTokens'
 
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
@@ -51,15 +53,20 @@ import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMe
 
 type LookupItem = { id: number; label: string; key?: string }
 
-const ISSUE_PRIORITY_COLOR: Record<string, string> = {
-  critical: theme.palette.error.main,
-  high:     '#f97316',
-  medium:   '#f59e0b',
-  low:      theme.palette.text.secondary,
-}
-
+// FIX (refactoring colori 0.9.x): ISSUE_PRIORITY_COLOR leggeva `import { theme }
+// from '../theme'` statico — bug reale, non solo cosmetico: il tema `temp` ha
+// error.main diverso dal default (#dc2626 vs #ef4444), quindi 'critical' mostrava
+// il rosso sbagliato sotto quel tema. Ora calcolato dentro il componente via
+// useTheme().
 function ActiveIssueWarningIcon({ priority }: { priority?: string | null }) {
-  const color = ISSUE_PRIORITY_COLOR[priority ?? ''] ?? ISSUE_PRIORITY_COLOR.medium
+  const theme = useTheme()
+  const priorityColor: Record<string, string> = {
+    critical: theme.palette.error.main,
+    high:     '#f97316',
+    medium:   '#f59e0b',
+    low:      theme.palette.text.secondary,
+  }
+  const color = priorityColor[priority ?? ''] ?? priorityColor.medium
   const label = priority === 'critical' ? 'Issue critica aperta'
     : priority === 'high' ? 'Issue alta priorità aperta'
     : priority === 'low' ? 'Issue a bassa priorità aperta'
@@ -94,6 +101,8 @@ type InventoryRow = {
   status_label?: string | null
   local_ip?: string | null
   srsa_ip?: string | null
+  location?: string | null
+  telefono?: string | null
   notes?: string | null
   updated_at?: string | null
   deleted_at?: string | null
@@ -120,6 +129,8 @@ type InventoryDetail = {
   hostname?: string | null
   local_ip?: string | null
   srsa_ip?: string | null
+  location?: string | null
+  telefono?: string | null
 
   type?: number | null
   type_key?: string | null
@@ -163,6 +174,8 @@ type InventoryForm = {
   hostname: string
   local_ip: string
   srsa_ip: string
+  location: string
+  telefono: string
 
   os_user: string
   os_pwd: string
@@ -189,6 +202,8 @@ type InventoryFieldName =
   | 'hostname'
   | 'local_ip'
   | 'srsa_ip' // rete
+  | 'location'
+  | 'telefono' // logistica
   | 'os_user'
   | 'os_pwd' // credenziali OS
   | 'app_usr'
@@ -228,7 +243,11 @@ const TYPE_DISABLED_FIELDS: Partial<Record<string, InventoryFieldName[]>> = {
 
 
 
-const cols: GridColDef<InventoryRow>[] = [
+// `cols` era una costante di modulo: STATUS_COLOR leggeva una palette fissa
+// (via `theme` statico, stesso bug di ISSUE_PRIORITY_COLOR sopra). Ora è una
+// factory chiamata dentro il componente (useMemo su statusTokens = useStatusTokens()).
+function buildColumns(statusTokens: DomainStatusTokens): GridColDef<InventoryRow>[] {
+  return [
   {
     field: 'type_label',
     headerName: 'Tipo',
@@ -248,9 +267,9 @@ const cols: GridColDef<InventoryRow>[] = [
                 height: 22,
                 fontSize: '0.72rem',
                 fontWeight: 600,
-                bgcolor: 'rgba(15,118,110,0.08)',
+                bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
                 color: 'text.primary',
-                border: '1px solid rgba(15,118,110,0.18)',
+                border: (t) => `1px solid ${alpha(t.palette.primary.main, 0.18)}`,
                 '& .MuiChip-label': { px: 0.75 },
                 maxWidth: '100%',
               }}
@@ -277,10 +296,9 @@ const cols: GridColDef<InventoryRow>[] = [
     width: 140,
     renderCell: (p) => {
       const label  = p.value as string | null
-      const key    = p.row?.status_key ?? ''
+      const key    = (p.row?.status_key ?? '') as InventoryStatusKey
       if (!label) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
-      // Mappa key → colore chip (STATUS_COLOR, definita più sotto e condivisa con la card mobile)
-      const c = STATUS_COLOR[key] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+      const c = statusTokens.inventory[key] ?? { bg: 'rgba(100,116,139,0.08)', color: '#475569', border: 'rgba(100,116,139,0.20)' }
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           <Chip
@@ -291,7 +309,7 @@ const cols: GridColDef<InventoryRow>[] = [
               fontSize: '0.72rem',
               fontWeight: 600,
               bgcolor: c.bg,
-              color: c.fg,
+              color: c.color,
               border: `1px solid ${c.border}`,
               '& .MuiChip-label': { px: 0.75 },
             }}
@@ -302,23 +320,17 @@ const cols: GridColDef<InventoryRow>[] = [
   },
   { field: 'local_ip', headerName: 'IP locale', width: 160 },
   { field: 'srsa_ip', headerName: 'IP SRSA', width: 160 },
-]
+  ]
+}
 
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
+// Stesso motivo di buildColumns sopra: factory chiamata dentro il componente.
 
-const STATUS_COLOR: Record<string, { bg: string; fg: string; border: string }> = {
-  in_use:      { bg: 'rgba(16,185,129,0.10)',  fg: theme.palette.success.dark, border: 'rgba(16,185,129,0.28)' },
-  maintenance: { bg: 'rgba(245,158,11,0.10)',  fg: theme.palette.warning.dark, border: 'rgba(245,158,11,0.28)' },
-  repair:      { bg: 'rgba(239,68,68,0.10)',   fg: theme.palette.error.dark, border: 'rgba(239,68,68,0.28)'  },
-  spare:       { bg: 'rgba(99,102,241,0.10)',  fg: '#3730a3', border: 'rgba(99,102,241,0.28)' },
-  retired:     { bg: 'rgba(148,163,184,0.12)', fg: theme.palette.text.secondary, border: 'rgba(148,163,184,0.30)' },
-  storage:     { bg: 'rgba(148,163,184,0.12)', fg: theme.palette.text.secondary, border: 'rgba(148,163,184,0.30)' },
-}
-
-const renderInventoryCard: MobileCardRenderFn<InventoryRow> = ({ row, onOpen }) => {
+function makeRenderInventoryCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<InventoryRow> {
+  return ({ row, onOpen }) => {
   const TypeIcon = getInventoryTypeIcon(row.type_key)
-  const sc = STATUS_COLOR[row.status_key ?? ''] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+  const sc = statusTokens.inventory[(row.status_key ?? '') as InventoryStatusKey] ?? { bg: 'rgba(100,116,139,0.08)', color: '#475569', border: 'rgba(100,116,139,0.20)' }
 
   const meta: { label: string; value: string | null | undefined; mono?: boolean }[] = [
     { label: 'Cliente',  value: row.customer_name },
@@ -357,7 +369,7 @@ const renderInventoryCard: MobileCardRenderFn<InventoryRow> = ({ row, onOpen }) 
           )}
         </Box>
         {row.status_label && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.fg, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.color, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
             {row.status_label}
           </Box>
         )}
@@ -384,11 +396,14 @@ const renderInventoryCard: MobileCardRenderFn<InventoryRow> = ({ row, onOpen }) 
       )}
     </Box>
   )
+  }
 }
 
 
 // prettier-ignore
 export default function Inventory() {
+  const statusTokens = useStatusTokens()
+  const zebraSx = useDataGridZebraSx()
   const toast = useToast()
   const { hasPerm, me } = useAuth()
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
@@ -529,6 +544,8 @@ export default function Inventory() {
     hostname: '',
     local_ip: '',
     srsa_ip: '',
+    location: '',
+    telefono: '',
     os_user: '',
     os_pwd: '',
     app_usr: '',
@@ -707,7 +724,7 @@ export default function Inventory() {
       setRestoreBusy(true)
       try {
         await api.post(itemActionPath(INVENTORIES_PATH, id, 'restore'))
-        toast.success('Inventario ripristinato ✅')
+        toast.success('Inventario ripristinato')
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -824,8 +841,13 @@ export default function Inventory() {
   ])
 
   const columns = React.useMemo<GridColDef<InventoryRow>[]>(() => {
-    return cols
-  }, [])
+    return buildColumns(statusTokens)
+  }, [statusTokens])
+
+  const renderInventoryCard = React.useMemo(
+    () => makeRenderInventoryCard(statusTokens),
+    [statusTokens],
+  )
 
   // Configurazione filtri URL per il kebab/imbuto delle colonne
   const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
@@ -917,6 +939,8 @@ export default function Inventory() {
       hostname: '',
       local_ip: '',
       srsa_ip: '',
+      location: '',
+      telefono: '',
       os_user: '',
       os_pwd: '',
       app_usr: '',
@@ -962,6 +986,8 @@ export default function Inventory() {
       hostname: detail.hostname ?? '',
       local_ip: detail.local_ip ?? '',
       srsa_ip: detail.srsa_ip ?? '',
+      location: detail.location ?? '',
+      telefono: detail.telefono ?? '',
       os_user: detail.os_user ?? '',
       os_pwd: detail.os_pwd ?? '',
       app_usr: detail.app_usr ?? '',
@@ -1001,6 +1027,8 @@ export default function Inventory() {
       hostname: (form.hostname || '').trim() || null,
       local_ip: (form.local_ip || '').trim() || null,
       srsa_ip: (form.srsa_ip || '').trim() || null,
+      location: (form.location || '').trim() || null,
+      telefono: (form.telefono || '').trim() || null,
 
       os_user: (form.os_user || '').trim() || null,
       os_pwd: (form.os_pwd || '').trim() || null,
@@ -1024,12 +1052,12 @@ export default function Inventory() {
       if (dlgMode === 'create') {
         const res = await api.post<InventoryDetail>(INVENTORIES_PATH, payload)
         id = res.data.id
-        toast.success('Inventario creato ✅')
+        toast.success('Inventario creato')
       } else {
         if (!dlgId) return
         const res = await api.patch<InventoryDetail>(itemPath(INVENTORIES_PATH, dlgId), payload)
         id = res.data.id
-        toast.success('Inventario aggiornato ✅')
+        toast.success('Inventario aggiornato')
       }
 
       setDlgOpen(false)
@@ -1051,7 +1079,7 @@ export default function Inventory() {
     setDeleteBusy(true)
     try {
       await api.delete(itemPath(INVENTORIES_PATH, detail.id))
-      toast.success('Inventario eliminato ✅')
+      toast.success('Inventario eliminato')
 
       // per poterlo vedere subito nel drawer dopo il delete:
       grid.setViewMode('all', { keepOpen: true })
@@ -1071,7 +1099,7 @@ export default function Inventory() {
     setRestoreBusy(true)
     try {
       await api.post(collectionActionPath(INVENTORIES_PATH, 'bulk_restore'), { ids })
-      toast.success(`Ripristinati ${ids.length} elementi ✅`)
+      toast.success(`Ripristinati ${ids.length} elementi`)
       setSelectionModel(emptySelectionModel())
       reloadList()
       return true
@@ -1089,7 +1117,7 @@ export default function Inventory() {
     setRestoreBusy(true)
     try {
       await api.post(itemActionPath(INVENTORIES_PATH, detail.id, 'restore'))
-      toast.success('Inventario ripristinato ✅')
+      toast.success('Inventario ripristinato')
       reloadList()
       await loadDetail(detail.id)
     } catch (e) {
@@ -1130,14 +1158,7 @@ export default function Inventory() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'rgba(69,127,121,0.10) !important',
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'rgba(69,127,121,0.14) !important',
-            },
+            ...zebraSx,
           },
         }}
       >

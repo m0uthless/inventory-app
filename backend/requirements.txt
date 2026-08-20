@@ -15,6 +15,10 @@ django-redis>=5.4
 python-magic>=0.4
 pytesseract>=0.3.10
 requests>=2.31
+# openpyxl: era sotto "dev / CI tooling" (usato solo da import_inventory,
+# comando locale) — ora è anche dipendenza runtime dell'API (export Excel
+# Site Repository, crm/api.py CustomerViewSet.export_site_repository).
+openpyxl>=3.1
 
 # testing
 pytest>=8.0
@@ -23,4 +27,3 @@ pytest-django>=4.8
 # dev / CI tooling
 mypy>=1.10
 types-bleach>=6.1
-openpyxl>=3.1

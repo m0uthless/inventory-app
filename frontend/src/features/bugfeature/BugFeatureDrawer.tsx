@@ -3,13 +3,14 @@
  * Estratto dall'inline di BugFeature.tsx.
  */
 import { Box, Button, IconButton, Link, Stack, Tooltip, Typography } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
-import type { Theme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DoneAllIcon from '@mui/icons-material/DoneAll'
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined'
 import LaunchOutlinedIcon from '@mui/icons-material/LaunchOutlined'
-import { DrawerShell } from '@shared/ui/DrawerShell'
+import { DrawerShell, HERO_ICON_BTN_SX } from '@shared/ui/DrawerShell'
+import { useStatusTokens } from '../../theme/AppThemeProvider'
+import type { DomainStatusTokens } from '../../theme/statusTokens'
 
 export type ReportKind = 'bug' | 'feature'
 export type ReportStatus = 'open' | 'resolved' | 'rejected'
@@ -50,13 +51,14 @@ function formatDateTime(value?: string | null) {
 
 function KindChip({ kind }: { kind: ReportKind }) {
   const isBug = kind === 'bug'
+  const theme = useTheme()
   return (
     <Box component="span" sx={{
       display: 'inline-flex', alignItems: 'center', px: 1, py: 0.25,
       borderRadius: 1, fontSize: '0.72rem', fontWeight: 700,
-      bgcolor: isBug ? 'rgba(185,28,28,0.12)' : 'rgba(15,118,110,0.12)',
-      color: isBug ? (theme) => theme.palette.error.dark : (theme) => theme.palette.primary.main,
-      border: `1px solid ${isBug ? 'rgba(185,28,28,0.25)' : 'rgba(15,118,110,0.25)'}`,
+      bgcolor: alpha(isBug ? theme.palette.error.main : theme.palette.primary.main, 0.12),
+      color: isBug ? theme.palette.error.dark : theme.palette.primary.main,
+      border: `1px solid ${alpha(isBug ? theme.palette.error.main : theme.palette.primary.main, 0.25)}`,
     }}>
       {isBug ? '🐛 Bug' : '✨ Feature'}
     </Box>
@@ -64,32 +66,18 @@ function KindChip({ kind }: { kind: ReportKind }) {
 }
 
 function StatusChip({ status }: { status: ReportStatus }) {
-  const config = {
-    open: {
-      label: '⏳ Aperta',
-      bgcolor: 'rgba(234,179,8,0.12)',
-      border: 'rgba(234,179,8,0.3)',
-      color: (theme: Theme) => theme.palette.warning.dark,
-    },
-    resolved: {
-      label: '✅ Resolved',
-      bgcolor: 'rgba(16,185,129,0.12)',
-      border: 'rgba(16,185,129,0.3)',
-      color: (theme: Theme) => theme.palette.success.dark,
-    },
-    rejected: {
-      label: '⛔ Rifiutata',
-      bgcolor: 'rgba(239,68,68,0.12)',
-      border: 'rgba(239,68,68,0.3)',
-      color: (theme: Theme) => theme.palette.error.dark,
-    },
-  } as const
+  const statusTokens = useStatusTokens()
+  const config: Record<ReportStatus, { label: string } & DomainStatusTokens['bugFeatureStatus']['open']> = {
+    open:     { label: '⏳ Aperta', ...statusTokens.bugFeatureStatus.open },
+    resolved: { label: '✅ Resolved', ...statusTokens.bugFeatureStatus.resolved },
+    rejected: { label: '⛔ Rifiutata', ...statusTokens.bugFeatureStatus.rejected },
+  }
   const c = config[status]
   return (
     <Box component="span" sx={{
       display: 'inline-flex', alignItems: 'center', px: 1, py: 0.25,
       borderRadius: 1, fontSize: '0.72rem', fontWeight: 700,
-      bgcolor: c.bgcolor,
+      bgcolor: c.bg,
       color: c.color,
       border: `1px solid ${c.border}`,
     }}>
@@ -112,6 +100,11 @@ export default function BugFeatureDrawer({
 }: BugFeatureDrawerProps) {
   const theme = useTheme()
   const isBug = selected?.kind === 'bug'
+  // Gradiente bicromo (stessa struttura di ContributorCard.tsx, eccezione
+  // confermata): stop di apertura/chiusura letterali attorno a un colore
+  // derivato dal tema, per distinguere visivamente bug (rosso→arancio,
+  // "allarme") da feature (teal→ciano, "novità"). Non a piena aderenza al
+  // tema per scelta, come ContributorCard.
   const gradient = isBug
     ? `linear-gradient(135deg, ${theme.palette.error.dark} 0%, #dc2626 60%, #f97316 100%)`
     : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, #0d9488 55%, #0891b2 100%)`
@@ -120,7 +113,7 @@ export default function BugFeatureDrawer({
     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
       <Tooltip title="Chiudi">
         <IconButton size="small" onClick={onClose}
-          sx={{ color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
+          sx={HERO_ICON_BTN_SX}>
           <ArrowBackIcon fontSize="small" />
         </IconButton>
       </Tooltip>
@@ -179,7 +172,7 @@ export default function BugFeatureDrawer({
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     Rifiutata il {formatDateTime(selected.rejected_at)} da {selected.rejected_by_full_name || selected.rejected_by_username || '—'}.
                   </Typography>
-                  <Box sx={{ bgcolor: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 1, p: 1.5 }}>
+                  <Box sx={{ bgcolor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.25)}`, borderRadius: 1, p: 1.5 }}>
                     <Typography variant="caption" sx={{ color: 'error.dark', fontWeight: 700, display: 'block', mb: 0.5 }}>
                       Motivazione del rifiuto
                     </Typography>
@@ -220,7 +213,7 @@ export default function BugFeatureDrawer({
             {selected.screenshot_url ? (
               <Stack spacing={1.5} sx={{ mt: 1.25 }}>
                 <Box component="img" src={selected.screenshot_url} alt="Screenshot allegato"
-                  sx={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: '#fff' }} />
+                  sx={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }} />
                 <Link href={selected.screenshot_url} target="_blank" rel="noreferrer" underline="hover"
                   sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, width: 'fit-content' }}>
                   Apri immagine completa <LaunchOutlinedIcon sx={{ fontSize: 16 }} />

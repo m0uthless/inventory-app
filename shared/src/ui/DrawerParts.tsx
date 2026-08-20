@@ -28,7 +28,9 @@ import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
 /** Accento colore opzionale per categorizzare visivamente una sezione (bordo sx + titolo colorati). */
 export type DrawerSectionAccent = 'info' | 'secondary' | 'warning' | 'success' | 'neutral'
 
-/** Colore per l'accento 'neutral' (Note e sezioni di testo libero non categorizzate). Allineato a text.secondary. */
+/** Colore per l'accento 'neutral' (Note e sezioni di testo libero non categorizzate).
+ *  = theme.palette.text.secondary, mirrato come letterale: shared/ non può
+ *  importare frontend/src/theme.ts (dipendenza nella direzione sbagliata). */
 const NEUTRAL_ACCENT_COLOR = '#64748b'
 
 export interface DrawerSectionProps {

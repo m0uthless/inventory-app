@@ -118,7 +118,7 @@ export default function CustomFieldsDisplay(props: {
                     size="small"
                     onClick={async () => {
                       await copyToClipboard(r.value)
-                      toast.success('Copiato ✅')
+                      toast.success('Copiato')
                     }}
                   >
                     <ContentCopyIcon fontSize="inherit" />

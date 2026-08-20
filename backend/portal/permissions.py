@@ -66,6 +66,13 @@ def _can_edit_portal(user) -> bool:
 
 SESSION_ACTIVE_CUSTOMER_KEY = "portal_active_customer_id"
 
+# 0.9.0: ambito con cui l'utente ha fatto login ("portal" o "site-repo"),
+# fissato in sessione da login_view (config/auth_views.py) al momento del
+# login e mai modificabile da una request successiva. Serve a
+# _bypasses_portal_scope() per distinguere, per gli utenti "dual-profile",
+# da quale frontend l'utente sta operando in QUESTA sessione.
+SESSION_AMBITO_KEY = "ambito"
+
 
 def _get_portal_customer_id(request) -> int | None:
     """Risolve il cliente ATTIVO dell'utente portale per la request corrente.
@@ -106,6 +113,38 @@ def _is_internal_user(user) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return _can_access_archie(user)
+
+
+def _bypasses_portal_scope(request) -> bool:
+    """True se la request NON deve essere scopata per cliente sui moduli
+    Portal-scoped (device/vlan/crm/inventory — vedi PortalScopedMixin).
+
+    Un utente "dual-profile" (ha sia `core.access_archie` sia un profilo
+    Portal attivo, es. un amministratore che usa entrambi i frontend) deve
+    poter amministrare TUTTI i clienti quando opera dal frontend Archie
+    principale, ma restare scopato sul cliente attivo quando opera dal
+    Portal con lo stesso account.
+
+    La distinzione si basa sull'`ambito` fissato in sessione al login
+    (`SESSION_AMBITO_KEY`, scritto da login_view — MAI da un header o
+    parametro della request corrente, stesso principio dello scope cliente):
+    - ambito == "portal"  → bypass NEGATO, l'utente interno viene scopato
+      come un utente Portal puro;
+    - qualunque altro valore (incl. sessioni precedenti a questa modifica,
+      senza ambito salvato) → bypass CONCESSO, comportamento storico
+      invariato per non rompere sessioni già aperte.
+
+    is_superuser resta un override di sistema assoluto, indipendente
+    dall'ambito.
+    """
+    user = getattr(request, "user", None)
+    if getattr(user, "is_superuser", False):
+        return True
+    if not _is_internal_user(user):
+        return False
+    session = getattr(request, "session", None)
+    ambito = session.get(SESSION_AMBITO_KEY) if session is not None else None
+    return ambito != "portal"
 
 
 # ─── Permission classes DRF ───────────────────────────────────────────────────

@@ -82,6 +82,9 @@ export default function StickyNoteCard() {
         flexDirection: 'column',
         borderRadius: 1,
         overflow: 'hidden',
+        // Eccezione intenzionale: metafora "post-it giallo" — colore carta e
+        // testo neri fissi indipendenti dal tema, come la fascia rossa di
+        // CalendarCard.
         bgcolor: '#fff8b8',
         backgroundImage: 'linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)',
         backgroundSize: '100% 28px',

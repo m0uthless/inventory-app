@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import {
   Alert,
   Box,
@@ -165,6 +166,7 @@ function ResolutionStatusChip({ status, label }: { status: ReportStatus; label: 
 
 
 export default function BugFeaturePage() {
+  const zebraSx = useDataGridZebraSx()
   const loc = useLocation()
   const navigate = useNavigate()
   const toast = useToast()
@@ -610,10 +612,7 @@ export default function BugFeaturePage() {
       borderColor: 'divider',
       px: 0.5,
     },
-    '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-    '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-    '& .MuiDataGrid-row.Mui-selected': { backgroundColor: 'rgba(69,127,121,0.10) !important' },
-    '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: 'rgba(69,127,121,0.14) !important' },
+    ...zebraSx,
   } as const
 
   const emptyState = isResolvedPage

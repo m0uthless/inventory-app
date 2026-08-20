@@ -1,7 +1,9 @@
 import * as React from 'react'
 import { api } from '@shared/api/client'
-import { setUnauthorizedHandler } from '@shared/api/runtime'
+import { setUnauthorizedHandler, setIdleLockHandler, type IdleLockUserInfo } from '@shared/api/runtime'
 import { createAuthBroadcast, type AuthBroadcast } from '@shared/auth/authBroadcast'
+import { useToast } from '@shared/ui/toast'
+import { apiErrorToMessage } from '@shared/api/error'
 
 // Tipo ritornato da /api/portal/me/
 export type PortalCustomerRef = {
@@ -45,6 +47,11 @@ type AuthCtx = {
   locked: boolean
   lock: () => void
   unlock: () => void
+  /** 0.9.0: dati minimi utente ricevuti dal 401 idle_lock, usati dalla
+   * LockScreen quando `me` è ancora vuoto (es. subito dopo un refresh di
+   * pagina, prima che qualunque /me/ sia mai andata a buon fine in questa
+   * sessione del browser). */
+  idleLockUser: IdleLockUserInfo | null
 }
 
 const AuthContext = React.createContext<AuthCtx | null>(null)
@@ -57,9 +64,11 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const toast = useToast()
   const [me, setMe] = React.useState<PortalMe | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [locked, setLocked] = React.useState(false)
+  const [idleLockUser, setIdleLockUser] = React.useState<IdleLockUserInfo | null>(null)
   const [blockedMessage, setBlockedMessage] = React.useState<string | null>(null)
   const [switchingCustomer, setSwitchingCustomer] = React.useState(false)
 
@@ -97,13 +106,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => setUnauthorizedHandler(null)
   }, [])
 
+  React.useEffect(() => {
+    // 0.9.0: 401 idle_lock (SessionIdleTimeoutMiddleware) — sessione ancora
+    // valida, va solo mostrata la LockScreen (stesso overlay del timer
+    // client-side, ma questo scatta anche dopo un refresh, che prima
+    // bypassava completamente il blocco).
+    setIdleLockHandler((userInfo) => {
+      if (userInfo) setIdleLockUser(userInfo)
+      lock()
+    })
+    return () => setIdleLockHandler(null)
+  }, [lock])
+
   const refreshMe = React.useCallback(async () => {
     try {
       const res = await api.get<PortalMe>('/portal/me/')
       setMe(res.data)
       setBlockedMessage(null)
+      // Se avevamo un fallback da idle_lock ed è arrivato un /me/ valido
+      // (es. dopo lo sblocco), non ci serve più: `me` ha già tutto.
+      setIdleLockUser(null)
     } catch (err) {
-      const axiosErr = err as { response?: { status?: number; data?: { blocked?: boolean; detail?: string } } }
+      const axiosErr = err as {
+        response?: { status?: number; data?: { blocked?: boolean; detail?: string; code?: string } }
+      }
+      if (axiosErr.response?.status === 401 && axiosErr.response.data?.code === 'idle_lock') {
+        // Sessione bloccata per inattività, non scaduta: NON è un logout,
+        // non tocchiamo `me` (potrebbe già avere dati utili) né
+        // blockedMessage. L'interceptor axios ha già attivato lock() con
+        // i dati minimi utente per la LockScreen.
+        return
+      }
       if (axiosErr.response?.status === 403 && axiosErr.response.data?.blocked) {
         // Profilo Portal esistente ma bloccato (0.9.0 punto 4): l'utente è
         // autenticato, non lo si manda al login, si mostra il motivo.
@@ -116,21 +149,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const switchCustomer = React.useCallback(async (customerId: number) => {
-    setSwitchingCustomer(true)
-    try {
-      await api.post('/portal/switch-customer/', { customer_id: customerId })
-      // Nessuna cache dati centralizzata (niente react-query): il modo
-      // affidabile per far ripartire ogni pagina con lo scope del nuovo
-      // cliente, senza dover verificare le dipendenze di ogni singolo
-      // componente, è un reload completo. Il backend ha già aggiornato
-      // la sessione, quindi al ricaricamento tutto riparte già scoped
-      // correttamente.
-      window.location.reload()
-    } finally {
-      setSwitchingCustomer(false)
-    }
-  }, [])
+  const switchCustomer = React.useCallback(
+    async (customerId: number) => {
+      setSwitchingCustomer(true)
+      try {
+        await api.post('/portal/switch-customer/', { customer_id: customerId })
+        // Nessuna cache dati centralizzata (niente react-query): il modo
+        // affidabile per far ripartire ogni pagina con lo scope del nuovo
+        // cliente, senza dover verificare le dipendenze di ogni singolo
+        // componente, è un reload completo. Il backend ha già aggiornato
+        // la sessione, quindi al ricaricamento tutto riparte già scoped
+        // correttamente.
+        window.location.reload()
+      } catch (e) {
+        // Bug corretto: prima, se questa chiamata falliva (rete, sessione
+        // scaduta, cliente non più assegnato nel frattempo), l'errore
+        // spariva in una promise non gestita — il menu si chiudeva senza
+        // che il cliente attivo cambiasse, e senza alcun avviso visibile.
+        // Sembrava che il cambio cliente "non facesse niente".
+        toast.error(apiErrorToMessage(e))
+        setSwitchingCustomer(false)
+      }
+    },
+    [toast],
+  )
 
   React.useEffect(() => {
     ;(async () => {
@@ -165,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ me, loading, login, logout, refreshMe, switchCustomer, switchingCustomer, blockedMessage, locked, lock, unlock }}
+      value={{ me, loading, login, logout, refreshMe, switchCustomer, switchingCustomer, blockedMessage, locked, lock, unlock, idleLockUser }}
     >
       {children}
     </AuthContext.Provider>

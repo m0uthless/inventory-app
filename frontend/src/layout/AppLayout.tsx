@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { alpha } from '@mui/material/styles'
+import { SHARED } from '../theme/constants'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   AppBar,
@@ -37,7 +39,7 @@ import GlobalSearch from './GlobalSearch'
 import NotificationsBell from './NotificationsBell'
 import AppSpeedDial from './AppSpeedDial'
 import MobileBottomNavArchie from './MobileBottomNavArchie'
-import { useSidebarTokens } from '../theme/AppThemeProvider'
+import { useSidebarTokens, useThemeConstants } from '../theme/AppThemeProvider'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '@shared/ui/LockScreen'
 import DevEnvironmentBadge from '@shared/ui/DevEnvironmentBadge'
@@ -128,14 +130,21 @@ function DashboardEditToggleMenuItem({ isDashboardRoute, onClose }: { isDashboar
 }
 
 export function AppLayout() {
-  const { me, login, logout, hasPerm, locked, lock, unlock } = useAuth()
+  const { me, login, logout, hasPerm, locked, unlock } = useAuth()
   const SIDEBAR = useSidebarTokens()
+  const themeConstants = useThemeConstants()
 
+  // 0.9.0 (richiesta successiva): LockScreen disattivata su Archie — niente
+  // più blocco per inattività, si passa direttamente al logout automatico
+  // dopo 1h. onLock è no-op (invece di `lock`) così il ramo lock dell'hook
+  // resta innocuo; il backend è stato allineato in config/settings.py
+  // (SESSION_IDLE_LOCK_SECONDS["site-repo"] = SESSION_IDLE_LOGOUT_SECONDS)
+  // così anche il 401 idle_lock server-side non scatta più per Archie.
   const { resetAfterUnlock } = useIdleTimer({
-    lockAfterMs:   15 * 60 * 1000, // 15 minuti → lock screen
+    lockAfterMs:   60 * 60 * 1000, // allineato al logout, di fatto inutilizzato
     logoutAfterMs: 60 * 60 * 1000, // 60 minuti → logout automatico
     enabled: Boolean(me),
-    onLock: lock,
+    onLock: () => {},
     onLogout: async () => {
       try {
         await api.post('/auth/logout/')
@@ -446,8 +455,8 @@ export function AppLayout() {
                 color: (theme) => theme.palette.common.white,
                 borderLeft: SIDEBAR.activeBorder,
                 pl: isMini ? 1 : '10px',
-                boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.22)',
-                '& .MuiListItemIcon-root': { color: '#99f6e4' },
+                boxShadow: `inset 0 0 0 1px rgba(${SIDEBAR.accentRgb},0.22)`,
+                '& .MuiListItemIcon-root': { color: SIDEBAR.accentIconStrong },
               }
             : isGroupParent
               ? {
@@ -455,11 +464,11 @@ export function AppLayout() {
                   color: SIDEBAR.accentBright,
                   borderLeft: SIDEBAR.activeBorder,
                   pl: isMini ? 1 : '10px',
-                  boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.16)',
-                  '& .MuiListItemIcon-root': { color: '#99f6e4' },
+                  boxShadow: `inset 0 0 0 1px rgba(${SIDEBAR.accentRgb},0.16)`,
+                  '& .MuiListItemIcon-root': { color: SIDEBAR.accentIconStrong },
                 }
               : {
-                  background: 'linear-gradient(90deg, rgba(94,234,212,0.2), rgba(94,234,212,0.07))',
+                  background: `linear-gradient(90deg, rgba(${SIDEBAR.accentRgb},0.2), rgba(${SIDEBAR.accentRgb},0.07))`,
                   color: SIDEBAR.accentLight,
                   borderLeft: SIDEBAR.activeBorder,
                   pl: isMini ? 1 : '10px',
@@ -468,11 +477,11 @@ export function AppLayout() {
           '&.Mui-selected:hover': {
             background: nested || isGroupParent
               ? undefined
-              : 'linear-gradient(90deg, rgba(94,234,212,0.28), rgba(94,234,212,0.12))',
+              : `linear-gradient(90deg, rgba(${SIDEBAR.accentRgb},0.28), rgba(${SIDEBAR.accentRgb},0.12))`,
             backgroundColor: nested
               ? SIDEBAR.chipBorderOpen
               : isGroupParent
-                ? 'rgba(94,234,212,0.18)'
+                ? `rgba(${SIDEBAR.accentRgb},0.18)`
                 : undefined,
           },
         }}
@@ -495,9 +504,9 @@ export function AppLayout() {
                     px: 0.6,
                     py: 0.15,
                     borderRadius: 0.75,
-                    bgcolor: 'rgba(245,158,11,0.18)',
+                    bgcolor: (theme) => alpha(theme.palette.warning.main, 0.18),
                     color: (theme) => theme.palette.warning.main,
-                    border: '1px solid rgba(245,158,11,0.28)',
+                    border: (theme) => `1px solid ${alpha(theme.palette.warning.main, 0.28)}`,
                     lineHeight: 1.6,
                     flexShrink: 0,
                   }}
@@ -566,7 +575,7 @@ export function AppLayout() {
               sx={{
                 fontWeight: 900,
                 letterSpacing: '0.28em',
-                background: 'linear-gradient(135deg, #5eead4, #a7f3d0)',
+                background: `linear-gradient(135deg, ${SIDEBAR.accent}, ${SIDEBAR.accentLight})`,
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
@@ -585,7 +594,7 @@ export function AppLayout() {
           <IconButton
             onClick={() => setDesktopOpen((v) => !v)}
             aria-label="Toggle sidebar"
-            sx={{ color: SIDEBAR.textMuted, '&:hover': { color: 'rgba(255,255,255,0.9)' } }}
+            sx={{ color: SIDEBAR.textMuted, '&:hover': { color: alpha(SHARED.pureWhite, 0.9) } }}
           >
             {isMini ? <MenuIcon /> : <ChevronLeftIcon />}
           </IconButton>
@@ -730,8 +739,8 @@ export function AppLayout() {
                           px: 0.75,
                           py: 0.75,
                           borderRadius: 1,
-                          backgroundColor: 'rgba(94,234,212,0.08)',
-                          boxShadow: 'inset 0 0 0 1px rgba(94,234,212,0.1)',
+                          backgroundColor: `rgba(${SIDEBAR.accentRgb},0.08)`,
+                          boxShadow: `inset 0 0 0 1px rgba(${SIDEBAR.accentRgb},0.1)`,
                         }}
                       >
                         <List disablePadding sx={{ display: 'grid', gap: 0.35 }}>
@@ -797,7 +806,7 @@ export function AppLayout() {
           right: 0,
           flexDirection: 'column',
           '& .MuiIconButton-root': { color: SIDEBAR.textStrong },
-          '& .MuiIconButton-root:hover': { color: (theme) => theme.palette.common.white, backgroundColor: 'rgba(255,255,255,0.12)' },
+          '& .MuiIconButton-root:hover': { color: (theme) => theme.palette.common.white, backgroundColor: alpha(SHARED.pureWhite, 0.12) },
           '& .MuiInputBase-root': { color: (theme) => theme.palette.common.white },
         }}
       >
@@ -1126,7 +1135,7 @@ export function AppLayout() {
         onClick={() => setEggOpen(false)}
         sx={{
           zIndex: (t) => t.zIndex.modal + 20,
-          bgcolor: 'rgba(0,0,0,0.45)',
+          bgcolor: themeConstants.overlay.blackScrim,
           backdropFilter: 'blur(2px)',
         }}
       >

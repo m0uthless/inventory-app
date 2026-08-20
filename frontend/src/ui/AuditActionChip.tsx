@@ -1,5 +1,8 @@
 import { Chip } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
+import { useWidgetAccents, useStatusTokens } from '../theme/AppThemeProvider'
+import type { WidgetAccents } from '../theme/tokens'
+import type { DomainStatusTokens } from '../theme/statusTokens'
 
 export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout' | string
 
@@ -7,7 +10,7 @@ type ChipDef =
   | { label: string; color: 'success' | 'info' | 'error' | 'warning' | 'default'; sx?: never }
   | { label: string; color?: never; sx: SxProps<Theme> }
 
-function actionToChip(action: AuditAction): ChipDef {
+function actionToChip(action: AuditAction, accents: WidgetAccents, statusTokens: DomainStatusTokens): ChipDef {
   const a = (action || '').toLowerCase()
   switch (a) {
     case 'create':
@@ -22,9 +25,9 @@ function actionToChip(action: AuditAction): ChipDef {
       return {
         label: 'Login',
         sx: {
-          bgcolor: '#ede9fe',
-          color: '#5b21b6',
-          border: '1px solid #c4b5fd',
+          bgcolor: accents.violetBg,
+          color: accents.violetText,
+          border: `1px solid ${accents.violetBorderChip}`,
           fontWeight: 700,
         },
       }
@@ -32,9 +35,9 @@ function actionToChip(action: AuditAction): ChipDef {
       return {
         label: 'Login fallito',
         sx: {
-          bgcolor: '#fce7f3',
-          color: '#9d174d',
-          border: '1px solid #f9a8d4',
+          bgcolor: statusTokens.auditAction.login_failed.bg,
+          color: statusTokens.auditAction.login_failed.color,
+          border: `1px solid ${statusTokens.auditAction.login_failed.border}`,
           fontWeight: 700,
         },
       }
@@ -42,9 +45,9 @@ function actionToChip(action: AuditAction): ChipDef {
       return {
         label: 'Logout',
         sx: {
-          bgcolor: '#f0f9ff',
-          color: '#0369a1',
-          border: '1px solid #bae6fd',
+          bgcolor: statusTokens.auditAction.logout.bg,
+          color: statusTokens.auditAction.logout.color,
+          border: `1px solid ${statusTokens.auditAction.logout.border}`,
           fontWeight: 700,
         },
       }
@@ -55,7 +58,9 @@ function actionToChip(action: AuditAction): ChipDef {
 
 export default function AuditActionChip(props: { action: AuditAction; size?: 'small' | 'medium' }) {
   const { action, size = 'small' } = props
-  const def = actionToChip(action)
+  const accents = useWidgetAccents()
+  const statusTokens = useStatusTokens()
+  const def = actionToChip(action, accents, statusTokens)
 
   if (def.sx) {
     return <Chip size={size} label={def.label} variant="filled" sx={def.sx} />

@@ -4,6 +4,8 @@
  * Features: lista, crea, modifica, elimina, riordina (sort_order), emoji picker, color picker.
  */
 import * as React from 'react'
+import { SHARED } from '../theme/constants'
+import { PRESET_COLORS } from './wikiCategoryColors'
 import {
   Box,
   Button,
@@ -30,7 +32,12 @@ import CheckIcon from '@mui/icons-material/Check'
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
-import { theme } from '../theme'
+import { useTheme } from '@mui/material/styles'
+// NOTA (color refactor 0.9.x): prima c'era `import { theme } from '../theme'`
+// a livello di modulo — bug noto (risolve sempre al tema DEFAULT statico,
+// a prescindere dal tema attivo dell'utente; sotto il colore
+// pre-selezionato per una nuova categoria restava teal invece di seguire
+// il tema attivo). Sostituito con `useTheme()` dentro CategoryFormDialog.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,19 +53,10 @@ export type WikiCategory = {
 type ApiPage<T> = { count: number; results: T[] }
 
 // ── Palette colori predefiniti ────────────────────────────────────────────────
-
-const PRESET_COLORS = [
-  '#0f766e', // teal
-  '#0284c7', // blue
-  '#7c3aed', // violet
-  '#db2777', // pink
-  '#dc2626', // red
-  '#ea580c', // orange
-  '#ca8a04', // yellow
-  '#16a34a', // green
-  '#0891b2', // cyan
-  '#64748b', // slate
-]
+// Eccezione intenzionale: sono le swatch che l'utente sceglie per la categoria
+// (persistite in `color`), devono restare stabili a prescindere dal tema.
+// Spostata in wikiCategoryColors.ts (anche per uso da WikiStats.tsx) per non
+// esportare una costante da un file di componente (react-refresh warning).
 
 // ── Emoji veloci per categoria ────────────────────────────────────────────────
 
@@ -141,7 +139,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
               '&:hover': { transform: 'scale(1.15)' },
             }}
           >
-            {value === c && <CheckIcon sx={{ fontSize: 14, color: '#fff' }} />}
+            {value === c && <CheckIcon sx={{ fontSize: 14, color: SHARED.pureWhite }} />}
           </Box>
         ))}
         {/* Custom hex input */}
@@ -267,12 +265,13 @@ type FormState = {
   color: string
 }
 
-const EMPTY_FORM: FormState = {
+/** Base senza `color`: il colore default segue il tema attivo, va risolto
+ *  dentro il componente via `useTheme()` (vedi CategoryFormDialog). */
+const EMPTY_FORM_BASE: Omit<FormState, 'color'> = {
   name: '',
   description: '',
   sort_order: '0',
   emoji: '📄',
-  color: theme.palette.primary.main,
 }
 
 function CategoryFormDialog({
@@ -286,8 +285,9 @@ function CategoryFormDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const theme = useTheme()
   const toast = useToast()
-  const [form, setForm] = React.useState<FormState>(EMPTY_FORM)
+  const [form, setForm] = React.useState<FormState>({ ...EMPTY_FORM_BASE, color: theme.palette.primary.main })
   const [saving, setSaving] = React.useState(false)
 
   React.useEffect(() => {
@@ -301,9 +301,9 @@ function CategoryFormDialog({
         color: initial.color || theme.palette.primary.main,
       })
     } else {
-      setForm(EMPTY_FORM)
+      setForm({ ...EMPTY_FORM_BASE, color: theme.palette.primary.main })
     }
-  }, [open, initial])
+  }, [open, initial, theme])
 
   const set = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
 

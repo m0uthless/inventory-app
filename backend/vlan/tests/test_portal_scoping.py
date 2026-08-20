@@ -7,8 +7,12 @@ server-side:
   SEMPRE scopato sul proprio customer, con o senza header, con o senza
   header manomesso/omesso;
 - utente interno (core.access_archie o superuser) → mai scopato;
-- utente "duale" (profilo Portal + accesso interno) → mai scopato, per
-  decisione esplicita del 2026-07-25 (vede tutto da Archie).
+- utente "duale" (profilo Portal + accesso interno) → NON scopato se la
+  sessione non ha ambito="portal" (default, o login con ambito="site-repo"
+  dal frontend Archie principale); SCOPATO come un utente Portal puro se
+  la sessione ha ambito="portal" (0.9.0, login dal frontend Portal — vedi
+  _bypasses_portal_scope in portal/permissions.py e login_view in
+  config/auth_views.py).
 """
 import pytest
 
@@ -109,9 +113,14 @@ def test_internal_user_sees_everything_regardless_of_header(api_client, customer
 
 
 def test_dual_profile_user_sees_everything(api_client, customer_status, site_status):
-    """Utente con SIA profilo Portal SIA accesso interno: per decisione
-    esplicita (2026-07-25) non viene scopato, vede tutti i customer —
-    indipendentemente dall'header."""
+    """Utente con SIA profilo Portal SIA accesso interno, SENZA ambito
+    "portal" fissato in sessione (es. force_authenticate nei test, o
+    login dal frontend Archie principale con ambito="site-repo"): non
+    viene scopato, vede tutti i customer — comportamento storico
+    (decisione 2026-07-25), invariato dal fix 0.9.0 dell'ambito.
+    force_authenticate non passa da login_view, quindi la sessione non ha
+    mai SESSION_AMBITO_KEY: è esattamente il caso "ambito assente" di
+    _bypasses_portal_scope, che deve continuare a bypassare lo scope."""
     customer_a = make_customer(None, customer_status, "duala")
     customer_b = make_customer(None, customer_status, "dualb")
     site_a = make_site(None, customer_a, site_status, "duala")
@@ -128,6 +137,48 @@ def test_dual_profile_user_sees_everything(api_client, customer_status, site_sta
     assert resp.status_code == 200
     customer_ids = {v["customer"] for v in resp.data["results"]}
     assert customer_ids == {customer_a.id, customer_b.id}
+
+
+def test_dual_profile_user_is_scoped_when_session_ambito_is_portal(api_client, customer_status, site_status):
+    """0.9.0: stesso utente "duale" del test sopra, ma con la sessione che
+    dichiara ambito="portal" (come dopo un vero login dal frontend Portal,
+    vedi login_view in config/auth_views.py): deve essere scopato sul
+    proprio customer esattamente come un utente Portal puro, pur
+    mantenendo `core.access_archie` per operare senza scope quando invece
+    fa login dal frontend Archie principale (ambito="site-repo",
+    verificato dal test precedente)."""
+    customer_a = make_customer(None, customer_status, "dualportala")
+    customer_b = make_customer(None, customer_status, "dualportalb")
+    site_a = make_site(None, customer_a, site_status, "dualportala")
+    site_b = make_site(None, customer_b, site_status, "dualportalb")
+    _make_vlan(customer_a, site_a, vlan_id=819, network="10.59.0.0/29",
+               subnet="255.255.255.248", gateway="10.59.0.1")
+    _make_vlan(customer_b, site_b, vlan_id=820, network="10.60.0.0/29",
+               subnet="255.255.255.248", gateway="10.60.0.1")
+
+    dual_user = make_dual_user(customer_a)
+    api_client.force_authenticate(user=dual_user)
+
+    # force_authenticate non passa da login_view: simuliamo esplicitamente
+    # l'ambito di sessione che login_view fisserebbe per un vero login Portal.
+    session = api_client.session
+    session["ambito"] = "portal"
+    session.save()
+    api_client.cookies["sessionid"] = session.session_key
+
+    resp = api_client.get("/api/vlans/")
+    assert resp.status_code == 200
+    customer_ids = {v["customer"] for v in resp.data["results"]}
+    assert customer_ids == {customer_a.id}
+
+    # Lo stesso utente, con ambito "site-repo" (Archie principale), torna
+    # a vedere tutto: la scelta è per-sessione, non per-utente.
+    session["ambito"] = "site-repo"
+    session.save()
+    resp2 = api_client.get("/api/vlans/")
+    assert resp2.status_code == 200
+    customer_ids2 = {v["customer"] for v in resp2.data["results"]}
+    assert customer_ids2 == {customer_a.id, customer_b.id}
 
 
 def test_portal_scoping_applies_to_vlan_ip_requests_too(api_client, customer_status, site_status):

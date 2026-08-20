@@ -101,7 +101,7 @@ function isSelected(currentPath: string, itemPath: string) {
 
 export function AppLayout() {
   const theme = useTheme()
-  const { me, login, logout, locked, lock, unlock, switchCustomer, switchingCustomer } = useAuth()
+  const { me, login, logout, locked, lock, unlock, switchCustomer, switchingCustomer, idleLockUser } = useAuth()
   const nav = useNavigate()
   const loc = useLocation()
   const [customerAnchorEl, setCustomerAnchorEl] = React.useState<null | HTMLElement>(null)
@@ -163,10 +163,19 @@ export function AppLayout() {
 
   const displayName = React.useMemo(() => {
     const u = me?.user
-    if (!u) return ''
-    const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
-    return name || u.username
-  }, [me])
+    if (u) {
+      const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
+      return name || u.username
+    }
+    // Fallback 0.9.0: dopo un refresh con sessione già in idle_lock, `me`
+    // non è mai stato popolato in questa sessione del browser — usa i dati
+    // minimi arrivati col 401 idle_lock (vedi AuthProvider.idleLockUser).
+    if (idleLockUser) {
+      const name = [idleLockUser.first_name, idleLockUser.last_name].filter(Boolean).join(' ').trim()
+      return name || idleLockUser.username
+    }
+    return ''
+  }, [me, idleLockUser])
 
   const pageTitle = React.useMemo(() => {
     const path = loc.pathname
@@ -614,10 +623,10 @@ export function AppLayout() {
       </Suspense>
       <LockScreen
         open={locked}
-        username={me?.user.username ?? ''}
+        username={me?.user.username ?? idleLockUser?.username ?? ''}
         displayName={displayName || 'Utente'}
-        avatarUrl={me?.user.avatar}
-        onSubmitPassword={(password) => login(me?.user.username ?? '', password)}
+        avatarUrl={me?.user.avatar ?? idleLockUser?.avatar}
+        onSubmitPassword={(password) => login(me?.user.username ?? idleLockUser?.username ?? '', password)}
         onUnlock={handleUnlock}
         onLogout={logout}
         accentFrom={theme.palette.primary.dark}

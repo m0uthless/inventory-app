@@ -1,4 +1,8 @@
+import io
+import re
+
 from django.utils import timezone
+from django.http import HttpResponse
 from django.db import IntegrityError, transaction
 from django.db.models import OuterRef, Subquery, F, Exists, Count, IntegerField
 from django.db.models import TextField
@@ -68,12 +72,12 @@ class CustomerFilter(filters.FilterSet):
             Q(city__icontains=v)  # usa l'annotazione già presente nel queryset
         )
 
-def _count_subquery(related_qs, *, distinct=False):
-    """Conta le righe di `related_qs` per il Customer corrente, come subquery.
+def _count_subquery(related_qs, *, distinct=False, group_field="customer_id"):
+    """Conta le righe di `related_qs` per la entita' corrente, come subquery.
 
-    Raggruppa per customer e prende il singolo valore aggregato. Coalesce a 0
-    perche' un cliente senza righe correlate produce NULL, non 0, e il frontend
-    si aspetta un numero.
+    Raggruppa per `group_field` (default "customer_id") e prende il singolo
+    valore aggregato. Coalesce a 0 perche' un'entita' senza righe correlate
+    produce NULL, non 0, e il frontend si aspetta un numero.
 
     `distinct=True` va usato quando `related_qs` contiene un filtro su una
     relazione che moltiplica le righe (es. inventory filtrati per issue: un
@@ -83,7 +87,7 @@ def _count_subquery(related_qs, *, distinct=False):
     aggregated = (
         related_qs
         .order_by()                       # azzera l'ordinamento di default: romperebbe il GROUP BY
-        .values("customer_id")
+        .values(group_field)
         .annotate(c=Count("pk", distinct=distinct))
         .values("c")[:1]
     )
@@ -116,6 +120,10 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
     # totale sites_count).
     sites_with_assets_count = serializers.IntegerField(read_only=True, default=0)
     active_issue_count = serializers.IntegerField(read_only=True, default=0)
+    # Numero di contatti collegati al cliente (0.9.0: mostra il bottone
+    # "Contatti" nel Site Repository solo quando ce n'e' più di uno, dato
+    # che il primo è già esposto via primary_contact_*).
+    contacts_count = serializers.IntegerField(read_only=True, default=0)
 
     # Chiavi riconosciute per "città" nei custom_fields (allineate con la Coalesce nel queryset).
     _CITY_KEYS = frozenset({"city", "citta", "città", "Città", "Citta"})
@@ -168,6 +176,7 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
             "sites_count",
             "sites_with_assets_count",
             "active_issue_count",
+            "contacts_count",
             "tags",
             "custom_fields",
             "created_at",
@@ -354,9 +363,119 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
                 # distinct=True conta gli inventory, non le issue.
                 distinct=True,
             ),
+            # Contatti collegati al cliente (qualunque site, incluso NULL):
+            # alimenta il bottone "Contatti" nel Site Repository.
+            contacts_count=_count_subquery(
+                Contact.objects.filter(
+                    customer_id=OuterRef("pk"), deleted_at__isnull=True,
+                )
+            ),
         )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    # ── Export Excel flat (cliente → siti → inventory) ─────────────────────
+    # Export scoped a UN SOLO cliente (azione detail=True): "Esporta Excel"
+    # nel menu contestuale del cliente in Site Repository. Un'unica riga per
+    # asset di inventario (denormalizzato: colonne cliente/sito ripetute su
+    # ogni riga), pensato per essere aperto/filtrato/pivotato direttamente in
+    # Excel. Le credenziali dell'asset (os_pwd/app_pwd/vnc_pwd) NON vengono
+    # mai incluse, indipendentemente dal permesso view_secrets: un file xlsx
+    # gira via email/chat molto più facilmente di una schermata in-app.
+    @action(detail=True, methods=["get"], url_path="export-site-repository")
+    def export_site_repository(self, request, pk=None):
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font
+            from openpyxl.utils import get_column_letter
+        except Exception as e:
+            return Response({"detail": f"Excel export dependency missing: {e}"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+        customer = self.get_object()
+
+        sites = list(
+            Site.objects.filter(customer=customer, deleted_at__isnull=True)
+            .select_related("status")
+            .order_by("name")
+        )
+        site_by_id = {s.id: s for s in sites}
+
+        inventories = list(
+            Inventory.objects.filter(customer=customer, deleted_at__isnull=True)
+            .select_related("status", "type", "site")
+            .order_by("site__name", "name")
+        )
+
+        headers = [
+            "Cliente codice", "Cliente nome", "Cliente città", "Cliente provincia", "Cliente stato",
+            "Sito nome", "Sito indirizzo", "Sito città", "Sito provincia", "Sito stato",
+            "Asset nome", "Asset tipo", "K-Number", "Numero seriale", "Hostname",
+            "IP locale", "IP SRSA", "Produttore", "Modello", "Asset stato",
+            "Scadenza garanzia", "Note",
+        ]
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Site Repository"
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        ws.freeze_panes = "A2"
+
+        def site_cols(site):
+            if site is None:
+                return ["", "", "", "", ""]
+            return [
+                site.name or "",
+                site.address_line1 or "",
+                site.city or "",
+                site.province or "",
+                site.status.label if site.status_id else "",
+            ]
+
+        customer_cols = [
+            customer.code or "",
+            customer.name or "",
+            customer.city or "",  # annotato da get_queryset() (Coalesce su custom_fields), presente anche via get_object()
+            customer.province or "",
+            customer.status.label if customer.status_id else "",
+        ]
+
+        if inventories:
+            for inv in inventories:
+                ws.append(customer_cols + site_cols(inv.site) + [
+                    inv.name or "",
+                    inv.type.label if inv.type_id else "",
+                    inv.knumber or "",
+                    inv.serial_number or "",
+                    inv.hostname or "",
+                    inv.local_ip or "",
+                    inv.srsa_ip or "",
+                    inv.manufacturer or "",
+                    inv.model or "",
+                    inv.status.label if inv.status_id else "",
+                    inv.warranty_end_date.isoformat() if inv.warranty_end_date else "",
+                    inv.notes or "",
+                ])
+        else:
+            # Nessun asset: almeno una riga per cliente/sito, altrimenti il
+            # cliente sparirebbe del tutto dall'export.
+            for site in sites or [None]:
+                ws.append(customer_cols + site_cols(site) + ["", "", "", "", "", "", "", "", "", "", "", ""])
+
+        for i, _ in enumerate(headers, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = 18
+
+        buf = io.BytesIO()
+        wb.save(buf)
+
+        filename = re.sub(r"[^A-Za-z0-9._-]+", "_", f"site_repository_{customer.code or customer.id}_{timezone.now():%Y%m%d}.xlsx")
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return resp
 
 
 
@@ -377,6 +496,10 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
     primary_contact_name  = serializers.CharField(read_only=True, allow_null=True)
     primary_contact_email = serializers.CharField(read_only=True, allow_null=True)
     primary_contact_phone = serializers.CharField(read_only=True, allow_null=True)
+    # Numero di contatti collegati al sito: mostra il bottone "Contatti" nel
+    # Site Repository solo quando ce n'è più di uno (il primo è già esposto
+    # via primary_contact_*), stessa semantica di Customer.contacts_count.
+    contacts_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Site
@@ -399,6 +522,7 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
             "primary_contact_name",
             "primary_contact_email",
             "primary_contact_phone",
+            "contacts_count",
             "notes",
             "custom_fields",
             "created_at",
@@ -454,6 +578,10 @@ class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, R
             primary_contact_name=Subquery(primary_contact_qs.values("name")[:1]),
             primary_contact_email=Subquery(primary_contact_qs.values("email")[:1]),
             primary_contact_phone=Subquery(primary_contact_qs.values("phone")[:1]),
+            contacts_count=_count_subquery(
+                Contact.objects.filter(site_id=OuterRef("pk"), deleted_at__isnull=True),
+                group_field="site_id",
+            ),
         )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))

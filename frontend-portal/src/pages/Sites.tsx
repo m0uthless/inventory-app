@@ -121,7 +121,7 @@ const cols: GridColDef<SiteRow>[] = [
     headerName: 'Stato',
     width: 170,
     renderCell: (p) => (
-      <StatusChip statusId={p.row.status ?? null} label={typeof p.value === 'string' ? p.value : '—'} />
+      <StatusChip statusId={p.row.status ?? null} label={typeof p.value === 'string' ? p.value : '—'} sx={{ fontWeight: 700 }} />
     ),
   },
 ]

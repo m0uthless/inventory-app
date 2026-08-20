@@ -107,7 +107,7 @@ def test_strip_icon_artifacts_all_artifact_falls_back_to_original():
 
 # ─── _is_icon_artifact ────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("text", ["|", "Q", "©", "Q.", "||"])
+@pytest.mark.parametrize("text", ["|", "Q", "©", "Q.", "||", "@", "@."])
 def test_is_icon_artifact_true_for_known_glyphs(text):
     assert _is_icon_artifact(text) is True
 
@@ -132,6 +132,29 @@ def test_find_value_words_skips_leading_icon_artifact():
         words, label, y_tolerance=2.0, max_label_gap=50.0, max_word_gap=10.0,
     )
     assert [w.text for w in value_words] == ["ACME", "Hospital"]
+
+
+def test_find_value_words_skips_leading_info_icon_misread_as_at():
+    # Caso reale: l'icona tooltip "(i)" di ServiceNow, quando letta male da
+    # Tesseract, produce quasi sempre un token '@' isolato tra la label e il
+    # valore vero (osservato su Priority, Account, Short Description — tutte
+    # le label hanno questa icona a fianco). Senza il filtro, '@' finirebbe
+    # come prima "parola" del valore e romperebbe _parse_priority (si aspetta
+    # una cifra 1-4 come primo carattere).
+    label = _Word(text="Priority", left=0, top=0, right=60, bottom=10)
+    icon  = _Word(text="@", left=65, top=0, right=75, bottom=10)
+    v1    = _Word(text="3", left=90, top=0, right=100, bottom=10)
+    v2    = _Word(text="-", left=103, top=0, right=110, bottom=10)
+    v3    = _Word(text="Moderate", left=113, top=0, right=170, bottom=10)
+    words = [label, icon, v1, v2, v3]
+
+    value_words = _find_value_words_for_label(
+        words, label, y_tolerance=2.0, max_label_gap=50.0, max_word_gap=20.0,
+    )
+    assert [w.text for w in value_words] == ["3", "-", "Moderate"]
+
+    raw = " ".join(w.text for w in value_words)
+    assert _parse_priority(raw) == ("3", "3 - Moderate")
 
 
 def test_find_value_words_skips_icon_artifact_between_value_words():
@@ -172,7 +195,7 @@ def test_find_value_words_keeps_short_real_word_despite_anomalous_height():
 
 @pytest.mark.parametrize(
     "text",
-    ["Descrption|", "Description", "descr", "2", "|", "©"],
+    ["Descrption|", "Description", "descr", "2", "|", "©", "@"],
 )
 def test_is_probable_label_or_icon_fragment_true(text):
     word = _Word(text=text, left=0, top=0, right=20, bottom=10)

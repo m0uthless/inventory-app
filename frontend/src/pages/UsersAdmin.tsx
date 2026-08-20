@@ -1,5 +1,7 @@
 import * as React from 'react'
-import { theme } from '../theme'
+import { useTheme, alpha } from '@mui/material/styles'
+import { useDataGridZebraSx, useStatusTokens } from '../theme/AppThemeProvider'
+import { SHARED } from '../theme/constants'
 import {
   Alert,
   Avatar,
@@ -58,8 +60,6 @@ import {
   type ResetPasswordResponse,
   type AdminUserCreateResponse,
 } from '../types/adminUsers'
-
-const TEAL = theme.palette.primary.main
 
 export type LeaveAreaOption = { id: number; label: string }
 type CustomerOption = { id: number; label: string }
@@ -221,6 +221,7 @@ function PermissionMatrix(props: {
   disabled?: boolean
 }) {
   const { modules, groupState, value, onChange, extraGroupSet, extraValueSet, onToggleExtra, sectionTitle, disabled } = props
+  const TEAL = useTheme().palette.primary.main
   const modulesWithExtras = modules.filter((m) => m.extra_permissions.length > 0)
 
   return (
@@ -296,7 +297,7 @@ function ResetPasswordResultDialog({ result, onClose }: { result: ResetPasswordR
   }
   return (
     <Box
-      sx={{ position: 'fixed', inset: 0, zIndex: 2000, bgcolor: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
+      sx={{ position: 'fixed', inset: 0, zIndex: 2000, bgcolor: SHARED.overlay.blackScrim, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
       onClick={onClose}
     >
       <Box onClick={(e) => e.stopPropagation()} sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 3, maxWidth: 420, width: '100%', boxShadow: 8 }}>
@@ -839,7 +840,7 @@ export function UserDrawer(props: {
       gradient="teal"
       width={420}
       icon={
-        <Avatar src={user.profile.avatar || undefined} sx={{ width: 38, height: 38, fontSize: 14, fontWeight: 800, bgcolor: 'rgba(255,255,255,0.22)', color: '#fff' }}>
+        <Avatar src={user.profile.avatar || undefined} sx={{ width: 38, height: 38, fontSize: 14, fontWeight: 800, bgcolor: alpha(SHARED.pureWhite, 0.22), color: SHARED.pureWhite }}>
           {!user.profile.avatar && initials(user)}
         </Avatar>
       }
@@ -1034,6 +1035,14 @@ export function UserDrawer(props: {
               onChange={setPortalLevel}
               disabled={isPhilips}
             />
+            {portalLevel !== 'none' && (
+              <Alert severity="info" sx={{ mt: 1.5, fontSize: 12 }}>
+                Questo controllo abilita solo l'accesso al portale e i clienti
+                selezionabili. Per far vedere Device/Inventario/VLAN all'utente,
+                assegna i permessi anche su quei moduli nella sezione "Permessi
+                ARCHIE" qui sopra — non è automatico.
+              </Alert>
+            )}
             {portalLevel !== 'none' && (
               <>
                 <Autocomplete
@@ -1259,18 +1268,15 @@ function GroupDrawer(props: {
 }
 
 // ─── Pagina principale ──────────────────────────────────────────────────────
-const GRID_ZEBRA_SX = {
+const GRID_ZEBRA_SX_BASE = {
   '--DataGrid-rowHeight': '32px',
   '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
-  '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-  '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: 'rgba(69,127,121,0.10) !important' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: 'rgba(69,127,121,0.14) !important' },
 } as const
 
 export default function UsersAdmin() {
+  const zebraSx = useDataGridZebraSx()
   const { me } = useAuth()
   const toast = useToast()
   const [mainTab, setMainTab] = React.useState<'utenti' | 'gruppi'>('utenti')
@@ -1311,6 +1317,7 @@ export default function UsersAdmin() {
 
   const usersGrid = useLocalGrid<AdminUserRow>(users, ['username', 'first_name', 'last_name', 'email'])
   const groupsGrid = useLocalGrid<AdminGroupRow>(groups, ['name'])
+  const statusTokens = useStatusTokens()
 
   const userColumns: GridColDef<AdminUserRow>[] = [
     {
@@ -1319,9 +1326,9 @@ export default function UsersAdmin() {
       width: 140,
       valueGetter: (_v, row) => row.username,
       renderCell: (p) => (
-        <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(0,0,0,0.62)' }}>
+        <Box component="span" sx={{ fontSize: 13, fontFamily: 'monospace', color: 'text.secondary' }}>
           {p.row.username}
-        </span>
+        </Box>
       ),
     },
     {
@@ -1343,7 +1350,7 @@ export default function UsersAdmin() {
           )}
           {p.row.profile.is_functional_account && (
             <Tooltip title="Account funzionale: non compare in Triage / vista assenze">
-              <Chip label="FUNZ." size="small" sx={{ fontSize: 9.5, height: 18, fontWeight: 700, bgcolor: (theme) => theme.palette.background.default, color: '#475569' }} />
+              <Chip label="FUNZ." size="small" sx={{ fontSize: 9.5, height: 18, fontWeight: 700, bgcolor: (theme) => theme.palette.background.default, color: 'text.secondary' }} />
             </Tooltip>
           )}
         </Stack>
@@ -1356,17 +1363,20 @@ export default function UsersAdmin() {
       width: 100,
       sortable: false,
       valueGetter: (_v, row) => row.profile.is_philips,
-      renderCell: (p) => (
+      renderCell: (p) => {
+        const badge = p.row.profile.is_philips ? statusTokens.companyBadge.philips : statusTokens.companyBadge.biotron
+        return (
         <Chip
           label={p.row.profile.is_philips ? 'PHILIPS' : 'BIOTRON'}
           size="small"
           sx={{
             fontSize: 10.5, height: 22, fontWeight: 700,
-            bgcolor: p.row.profile.is_philips ? '#E0F2FE' : '#E2E8F0',
-            color: p.row.profile.is_philips ? '#075985' : '#334155',
+            bgcolor: badge.bg,
+            color: badge.color,
           }}
         />
-      ),
+        )
+      },
     },
     {
       field: 'leave_area',
@@ -1376,7 +1386,7 @@ export default function UsersAdmin() {
       valueGetter: (_v, row) => row.profile.leave_area_name,
       renderCell: (p) => {
         if (p.row.profile.is_philips || !p.row.profile.leave_area_name) {
-          return <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)' }}>—</span>
+          return <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>—</Box>
         }
         return <Chip label={p.row.profile.leave_area_name} size="small" sx={{ fontSize: 11, height: 20 }} />
       },
@@ -1390,7 +1400,7 @@ export default function UsersAdmin() {
       renderCell: (p) => (
         <Stack direction="row" spacing={0.5} flexWrap="wrap">
           {p.row.groups.length === 0 ? (
-            <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>—</span>
+            <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>—</Box>
           ) : (
             p.row.groups.map((g) => <Chip key={g.id} label={g.name} size="small" sx={{ fontSize: 11, height: 20 }} />)
           )}
@@ -1408,7 +1418,7 @@ export default function UsersAdmin() {
       renderCell: (p) =>
         p.row.profile.is_servicenow_technician ? (
           <Tooltip title="Tecnico ServiceNow">
-            <CheckCircleIcon sx={{ fontSize: 18, color: '#16A34A' }} />
+            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
           </Tooltip>
         ) : null,
     },
@@ -1423,7 +1433,7 @@ export default function UsersAdmin() {
       renderCell: (p) =>
         hasArchieAccess(p.row) ? (
           <Tooltip title="Ha accesso al frontend Archie">
-            <CheckCircleIcon sx={{ fontSize: 18, color: '#16A34A' }} />
+            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
           </Tooltip>
         ) : null,
     },
@@ -1437,7 +1447,7 @@ export default function UsersAdmin() {
       renderCell: (p) =>
         p.row.has_portal_access ? (
           <Tooltip title="Ha accesso al Portal">
-            <CheckCircleIcon sx={{ fontSize: 18, color: '#16A34A' }} />
+            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
           </Tooltip>
         ) : null,
     },
@@ -1477,7 +1487,7 @@ export default function UsersAdmin() {
         return (
           <Stack direction="row" spacing={0.5} flexWrap="wrap">
             {active.length === 0 ? (
-              <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>Nessuno</span>
+              <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>Nessuno</Box>
             ) : (
               <>
                 {active.slice(0, 4).map((label) => (
@@ -1524,7 +1534,7 @@ export default function UsersAdmin() {
             sortModel: usersGrid.sortModel,
             onSortModelChange: usersGrid.onSortModelChange,
             onRowClick: (id) => setSelectedUser(users.find((u) => u.id === id) || null),
-            sx: GRID_ZEBRA_SX,
+            sx: { ...GRID_ZEBRA_SX_BASE, ...zebraSx },
           }}
         />
       ) : (
@@ -1552,7 +1562,7 @@ export default function UsersAdmin() {
             sortModel: groupsGrid.sortModel,
             onSortModelChange: groupsGrid.onSortModelChange,
             onRowClick: (id) => setSelectedGroup(groups.find((g) => g.id === id) || null),
-            sx: GRID_ZEBRA_SX,
+            sx: { ...GRID_ZEBRA_SX_BASE, ...zebraSx },
           }}
         />
       )}

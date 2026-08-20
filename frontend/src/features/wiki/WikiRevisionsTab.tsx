@@ -24,6 +24,8 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 
 import { Can } from '../../auth/Can'
 import { PERMS } from '../../auth/perms'
+import { useWidgetAccents } from '../../theme/AppThemeProvider'
+import type { WidgetAccents } from '../../theme/tokens'
 
 export type WikiRevision = {
   id: number
@@ -36,7 +38,8 @@ export type WikiRevision = {
 }
 
 // Stile per il rendering del contenuto renderizzato (usato anche dal tab "Contenuto" in WikiPage.tsx)
-export const PROSE_SX = {
+export function getProseSx(accents: WidgetAccents) {
+  return {
   '& h1': { fontSize: 24, fontWeight: 800, mt: 2, mb: 1, letterSpacing: '-0.02em' },
   '& h2': { fontSize: 20, fontWeight: 700, mt: 1.75, mb: 0.75 },
   '& h3': { fontSize: 16, fontWeight: 700, mt: 1.5, mb: 0.5 },
@@ -52,10 +55,13 @@ export const PROSE_SX = {
     py: 0.25,
   },
   '& pre': {
+    // Blocco codice: stessa convenzione di RichEditor.tsx (eccezione
+    // confermata) — sfondo scuro fisso indipendente dal tema, è stile del
+    // CONTENUTO renderizzato, non del chrome dell'app.
     fontFamily: 'monospace',
     fontSize: 12.5,
     bgcolor: '#1a2421',
-    color: '#a7f3d0',
+    color: accents.mintAccentLight,
     p: 2,
     borderRadius: 1,
     overflow: 'auto',
@@ -76,7 +82,9 @@ export const PROSE_SX = {
   '& hr': { border: 'none', borderTop: '1px solid', borderColor: 'divider', my: 2 },
   '& a': { color: 'primary.main' },
   '& img': { maxWidth: '100%', borderRadius: 1, my: 1 },
+  // Evidenziazione <mark>: stile CONTENUTO (stessa famiglia RichEditor), fissa.
   '& mark': { bgcolor: '#fef9c3', borderRadius: '2px', px: 0.5 },
+  }
 }
 
 export default function WikiRevisionsTab({
@@ -98,6 +106,8 @@ export default function WikiRevisionsTab({
   previewRevLoading: boolean
   onClosePreview: () => void
 }) {
+  const widgetAccents = useWidgetAccents()
+  const proseSx = getProseSx(widgetAccents)
   return (
     <>
       <Stack spacing={2}>
@@ -236,7 +246,7 @@ export default function WikiRevisionsTab({
                 <CircularProgress size={28} />
               </Stack>
             ) : (
-              <Box dangerouslySetInnerHTML={{ __html: previewRevHtml }} sx={PROSE_SX} />
+              <Box dangerouslySetInnerHTML={{ __html: previewRevHtml }} sx={proseSx} />
             ))}
         </DialogContent>
         <DialogActions sx={{ px: 2.5, py: 1.5 }}>

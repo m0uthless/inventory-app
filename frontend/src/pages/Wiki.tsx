@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { SHARED } from '../theme/constants'
 import {
   Box,
   Button,
@@ -36,6 +37,7 @@ import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
 import FilterChip from '@shared/ui/FilterChip'
 import { useAuth } from '../auth/AuthProvider'
 import WikiCategoryManager from '../ui/WikiCategoryManager'
+import { useWidgetAccents } from '../theme/AppThemeProvider'
 
 type Category = { id: number; name: string; sort_order: number; emoji?: string; color?: string }
 
@@ -64,7 +66,6 @@ type ApiPage<T> = { count: number; results: T[] }
 type ViewMode = 'grid' | 'list'
 type SortValue = 'title' | '-updated_at' | '-average_rating' | '-view_count' | '-created_at'
 
-const ACCENTS = ['#0f766e', '#3b82f6', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#10b981', '#f97316']
 const SORT_OPTIONS: { value: SortValue; label: string }[] = [
   { value: 'title', label: 'Titolo A-Z' },
   { value: '-updated_at', label: 'Aggiornate di recente' },
@@ -105,8 +106,9 @@ function WikiCard({
   categoryMap: Record<number, Category>
   onClick: () => void
 }) {
+  const widgetAccents = useWidgetAccents()
   const cat = page.category ? categoryMap[page.category] : null
-  const accent = cat?.color ?? ACCENTS[(page.category ?? 0) % ACCENTS.length]
+  const accent = cat?.color ?? widgetAccents.categoryAccents[(page.category ?? 0) % widgetAccents.categoryAccents.length]
   const emoji = cat?.emoji ?? '📄'
   const tags = (page.tags ?? []).slice(0, 3)
 
@@ -286,8 +288,9 @@ function WikiListRow({
   categoryMap: Record<number, Category>
   onClick: () => void
 }) {
+  const widgetAccents = useWidgetAccents()
   const cat = page.category ? categoryMap[page.category] : null
-  const accent = cat?.color ?? ACCENTS[(page.category ?? 0) % ACCENTS.length]
+  const accent = cat?.color ?? widgetAccents.categoryAccents[(page.category ?? 0) % widgetAccents.categoryAccents.length]
   const emoji = cat?.emoji ?? '📄'
   const tags = (page.tags ?? []).slice(0, 4)
 
@@ -672,7 +675,7 @@ export default function Wiki() {
                   },
                   '& .MuiToggleButton-root.Mui-selected': {
                     bgcolor: 'primary.main',
-                    color: '#fff',
+                    color: SHARED.pureWhite,
                     '&:hover': { bgcolor: 'primary.dark' },
                   },
                   '& .MuiToggleButton-root:not(.Mui-selected):hover': { bgcolor: 'grey.100' },

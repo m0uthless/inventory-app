@@ -47,9 +47,9 @@ export default function LockScreen({
   onSubmitPassword,
   onUnlock,
   onLogout,
-  accentFrom = '#0a3d38',
-  accentVia = '#0f766e',
-  accentTo = '#134e4a',
+  accentFrom = '#0a524d', // = primary.dark (mirrato, era un teal custom #0a3d38)
+  accentVia = '#0f766e',  // = primary.main (invariato)
+  accentTo = '#0a524d',   // = primary.dark (mirrato, era un teal custom #134e4a)
 }: LockScreenProps) {
   const [password, setPassword]   = React.useState('')
   const [showPwd, setShowPwd]     = React.useState(false)
@@ -221,7 +221,7 @@ export default function LockScreen({
               '&.Mui-focused fieldset': { borderColor: alpha('#fff', 0.7) },
             },
             '& .MuiInputBase-input::placeholder': { color: alpha('#fff', 0.45) },
-            '& .MuiFormHelperText-root': { color: '#fca5a5', fontWeight: 600 },
+            '& .MuiFormHelperText-root': { color: '#fca5a5', fontWeight: 600 }, // rosso chiaro per contrasto su sfondo scuro — non deriva da error.main/light (troppo scuro/pallido su questo sfondo), scelta intenzionale
           }}
         />
 

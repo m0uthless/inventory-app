@@ -1,9 +1,18 @@
 import * as React from 'react'
 import { Box, CircularProgress, Typography } from '@mui/material'
 import { useAuth } from '../auth/AuthProvider'
+import { WEATHER_SKY_PALETTE, type WeatherCondition } from './weatherPalette'
+
+// NOTA (refactoring colori 0.9.x): questo componente è un'illustrazione
+// decorativa (cielo/sole/luna/pioggia/neve) intenzionalmente ISOLATA dal
+// sistema di tema — resta identica sotto default/navy/temp. La palette
+// principale (cielo/terreno per condizione) vive in `./weatherPalette.ts`;
+// i colori puntuali delle singole forme SVG sotto (raggi del sole, crateri
+// lunari, goccia di pioggia, fulmine, colline...) restano invece qui inline
+// per non introdurre rischio in un refactoring puramente cromatico — sono
+// anch'essi parte della stessa eccezione, non colori "dimenticati".
 
 // ─── Open-Meteo WMO weather code → condition ─────────────────────────────────
-type WeatherCondition = 'clear' | 'partly_cloudy' | 'cloudy' | 'rain' | 'snow' | 'thunder'
 
 function wmoToCondition(code: number): WeatherCondition {
   if (code === 0)                        return 'clear'
@@ -15,42 +24,7 @@ function wmoToCondition(code: number): WeatherCondition {
   return 'cloudy'
 }
 
-// ─── Theme palette per condizione ────────────────────────────────────────────
-// Gradiente cielo a 3 stop (più atmosferico) + colore "glow" dell'orizzonte
-// (una fascia di luce calda/fredda molto tenue appena sopra le colline, che
-// dà profondità alla scena senza appesantirla).
-const THEMES: Record<
-  WeatherCondition,
-  {
-    isDay: { sky: string[]; ground: string; horizonGlow: string }
-    isNight: { sky: string[]; ground: string; horizonGlow: string }
-  }
-> = {
-  clear: {
-    isDay:   { sky: ['#5AA9E6', '#8FCBEE', '#CBEBFA'], ground: '#4a7c59', horizonGlow: '#FFE9B0' },
-    isNight: { sky: ['#050b22', '#0f1f45', '#25406e'], ground: '#1c3327', horizonGlow: '#3a5a8c' },
-  },
-  partly_cloudy: {
-    isDay:   { sky: ['#78B9E8', '#A9D6F0', '#DDF0FA'], ground: '#5a8a6a', horizonGlow: '#FFF3C4' },
-    isNight: { sky: ['#0c1730', '#182b52', '#2e4877'], ground: '#1f3a2c', horizonGlow: '#3f5f8f' },
-  },
-  cloudy: {
-    isDay:   { sky: ['#94A6AE', '#B7C4CA', '#DCE4E7'], ground: '#607d6a', horizonGlow: '#E8EEF0' },
-    isNight: { sky: ['#1c262b', '#2a363c', '#3c4a51'], ground: '#20302a', horizonGlow: '#4a5a60' },
-  },
-  rain: {
-    isDay:   { sky: ['#526B7A', '#6E8A99', '#93AAB6'], ground: '#3d5c4a', horizonGlow: '#B8C8CE' },
-    isNight: { sky: ['#101820', '#1a2732', '#263844'], ground: '#182620', horizonGlow: '#33454e' },
-  },
-  snow: {
-    isDay:   { sky: ['#B9D2E0', '#D3E6F0', '#F0F8FC'], ground: '#c8dce8', horizonGlow: '#FFFFFF' },
-    isNight: { sky: ['#141f30', '#22344a', '#3a5068'], ground: '#5c7889', horizonGlow: '#7fa0b8' },
-  },
-  thunder: {
-    isDay:   { sky: ['#333B47', '#4A5460', '#63707C'], ground: '#2e3d30', horizonGlow: '#8892a0' },
-    isNight: { sky: ['#07090f', '#12151e', '#1e2330'], ground: '#141d18', horizonGlow: '#2a3040' },
-  },
-}
+const THEMES = WEATHER_SKY_PALETTE
 
 const CONDITION_ICON: Record<WeatherCondition, string> = {
   clear: '☀️',

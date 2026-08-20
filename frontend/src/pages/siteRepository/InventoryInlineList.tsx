@@ -7,6 +7,7 @@ import { getInventoryTypeIcon, getInventoryTypeFamily } from '@shared/ui/invento
 import type { InventoryRow } from './types'
 import { FS, ICON, COL_GRID, MonoField, toneColors, inventoryStatusTone, issuePriorityTone } from './style'
 import { SignalChip, IpCell, ActiveIssueIcon } from './primitives'
+import { SHARED } from '../../theme/constants'
 
 // ─── InventoryInlineList ──────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ export function InventoryInlineList({
   onRowContextMenu,
 }: {
   rows: InventoryRow[]
-  onOpenDrawer: (id: number) => void
+  onOpenDrawer: (id: number, typeKeyHint?: string | null) => void
   onRowContextMenu: (row: InventoryRow, e: React.MouseEvent) => void
 }) {
   const theme = useTheme()
@@ -36,7 +37,7 @@ export function InventoryInlineList({
         borderBottom: '1px solid',
         borderColor: 'divider',
       }}>
-        {['TIPO', 'NOME', 'HOSTNAME', 'K#', 'MODELLO', 'SERIALE', 'STATO', 'IP LOCALE', 'IP SRSA'].map((h) => (
+        {['TIPO', 'NOME', 'POSIZIONE', 'TELEFONO', 'HOSTNAME', 'K#', 'MODELLO', 'SERIALE', 'STATO', 'IP LOCALE', 'IP SRSA'].map((h) => (
           <Typography key={h}
             sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: '0.06em', fontSize: FS.micro }}>
             {h}
@@ -54,7 +55,7 @@ export function InventoryInlineList({
         return (
           <Box
             key={row.id}
-            onClick={() => onOpenDrawer(row.id)}
+            onClick={() => onOpenDrawer(row.id, row.type_key)}
             onContextMenu={(e) => { e.preventDefault(); onRowContextMenu(row, e) }}
             sx={{
               display: 'grid',
@@ -79,11 +80,11 @@ export function InventoryInlineList({
                     display: 'inline-flex', alignItems: 'center', gap: 0.5,
                     width: 132, height: 22, px: 1, borderRadius: '6px',
                     bgcolor: typeFamily.color,
-                    color: '#fff',
+                    color: SHARED.pureWhite,
                   }}>
-                    <TypeIcon sx={{ fontSize: `${ICON.inline}px !important`, color: '#fff', flexShrink: 0 }} />
+                    <TypeIcon sx={{ fontSize: `${ICON.inline}px !important`, color: SHARED.pureWhite, flexShrink: 0 }} />
                     <Typography sx={{
-                      fontSize: FS.micro, fontWeight: 600, color: '#fff',
+                      fontSize: FS.micro, fontWeight: 600, color: SHARED.pureWhite,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {typeLabel}
@@ -101,6 +102,22 @@ export function InventoryInlineList({
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {row.name || '—'}
+            </Typography>
+
+            {/* Posizione */}
+            <Typography sx={{
+              fontSize: FS.body, color: 'text.secondary',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {row.location || '—'}
+            </Typography>
+
+            {/* Telefono */}
+            <Typography sx={{
+              fontSize: FS.body, color: 'text.secondary',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {row.telefono || '—'}
             </Typography>
 
             {/* Hostname */}

@@ -230,7 +230,7 @@ function SezioneSicurezza() {
     try {
       await api.post('/me/change-password/', { old_password: oldPwd, new_password: newPwd, new_password2: newPwd2 })
       setOldPwd(''); setNewPwd(''); setNewPwd2('')
-      setSuccessMsg('Password aggiornata con successo.'); toast.success('Password aggiornata ✅')
+      setSuccessMsg('Password aggiornata con successo.'); toast.success('Password aggiornata')
     } catch (e: unknown) {
       const mapped: Record<string, string> = {}
       if (isRecord(e)) {

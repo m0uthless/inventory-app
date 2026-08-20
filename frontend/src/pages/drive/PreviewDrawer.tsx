@@ -60,7 +60,7 @@ export function PreviewDrawer({
         item.kind === 'folder' ? `/drive-folders/${item.data.id}/` : `/drive-files/${item.data.id}/`
       await api.patch(url, { customers: newAssigned.map((c) => c.id) })
       item.data.customers = newAssigned.map((c) => c.id)
-      toast.success('Clienti aggiornati ✅')
+      toast.success('Clienti aggiornati')
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -102,7 +102,7 @@ export function PreviewDrawer({
       ]
 
   const sectionCardSx = {
-    bgcolor: '#fff',
+    bgcolor: 'background.paper',
     border: '1px solid',
     borderColor: 'grey.200',
     borderRadius: 1,
@@ -129,7 +129,7 @@ export function PreviewDrawer({
               display: 'flex',
               flexDirection: 'column',
               gap: 1.5,
-              bgcolor: '#f8fafc',
+              bgcolor: 'grey.50',
             }}
           >
             {file && file.is_image ? (
@@ -151,7 +151,7 @@ export function PreviewDrawer({
                   sx={{
                     borderTop: '1px solid',
                     borderColor: 'grey.100',
-                    bgcolor: '#fff',
+                    bgcolor: 'background.paper',
                     minHeight: 220,
                     display: 'flex',
                     alignItems: 'center',
@@ -386,6 +386,8 @@ export function PreviewDrawer({
               onClick={() => setPdfOpen(false)}
             />
           </Stack>
+          {/* Sfondo grigio scuro standard "viewer PDF" (come i lettori PDF
+              nativi dei browser): eccezione intenzionale, non segue il tema. */}
           <Box sx={{ flex: 1, minHeight: 0, bgcolor: '#525659' }}>
             <iframe
               src={`/api/drive-files/${file.id}/preview/`}

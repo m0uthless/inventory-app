@@ -418,12 +418,12 @@ export default function Trash() {
           calls.push(api.post(r.restoreEndpoint, { ids }))
         }
         await Promise.all(calls)
-        if (restored > 0) toast.success(`Ripristinati ${restored} elementi ✅`)
+        if (restored > 0) toast.success(`Ripristinati ${restored} elementi`)
         if (skipped > 0) toast.warning(`Saltati ${skipped} elementi (permessi mancanti).`)
       } else {
         const ids = selectedByType[typeKey]
         await api.post(cfg!.restoreEndpoint, { ids })
-        toast.success(`Ripristinati ${selectedCount} elementi ✅`)
+        toast.success(`Ripristinati ${selectedCount} elementi`)
       }
       setSelectionModel(emptySelectionModel())
       load()
@@ -475,7 +475,7 @@ export default function Trash() {
         handleResp(resp.data)
       }
 
-      if (purged > 0) toast.success(`Eliminati definitivamente ${purged} elementi ✅`)
+      if (purged > 0) toast.success(`Eliminati definitivamente ${purged} elementi`)
       if (blockedCount > 0) {
         const extra = blockedReasons.length ? ` ${blockedReasons[0]}` : ''
         toast.warning(`Bloccati ${blockedCount} elementi.${extra}`)
@@ -508,7 +508,7 @@ export default function Trash() {
     setRestoreBusy(true)
     try {
       await api.post(rcfg.restoreEndpoint, { ids: [row.id] })
-      toast.success('Elemento ripristinato ✅')
+      toast.success('Elemento ripristinato')
       load()
       return true
     } catch (e) {
@@ -528,7 +528,7 @@ export default function Trash() {
       const payload = (resp.data && typeof resp.data === 'object') ? (resp.data as Record<string, unknown>) : {}
       const count = typeof payload.count === 'number' ? payload.count : 0
       const blocked = Array.isArray(payload.blocked) ? payload.blocked : []
-      if (count > 0) toast.success('Elemento eliminato definitivamente ✅')
+      if (count > 0) toast.success('Elemento eliminato definitivamente')
       if (blocked.length > 0) {
         const first = blocked[0]
         const reason =

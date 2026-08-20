@@ -10,6 +10,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile'
 
 import { Can } from '../../auth/Can'
 import { PERMS } from '../../auth/perms'
+import { SHARED } from '../../theme/constants'
 
 export type WikiAttachment = {
   id: number
@@ -128,7 +129,7 @@ export default function WikiAttachmentsTab({
                     sx={{
                       position: 'absolute',
                       inset: 0,
-                      bgcolor: 'rgba(0,0,0,0.45)',
+                      bgcolor: SHARED.overlay.blackScrim,
                       opacity: 0,
                       transition: 'opacity 0.15s',
                     }}
@@ -138,7 +139,7 @@ export default function WikiAttachmentsTab({
                         <IconButton
                           aria-label="Elimina"
                           size="small"
-                          sx={{ color: '#fff' }}
+                          sx={{ color: SHARED.pureWhite }}
                           onClick={() => onDelete(a.id)}
                         >
                           <DeleteForeverIcon sx={{ fontSize: 18 }} />

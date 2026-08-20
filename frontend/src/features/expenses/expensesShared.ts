@@ -1,5 +1,4 @@
 // Tipi e costanti condivise per il modulo Rimborso Spese.
-import { theme } from '../../theme'
 
 export type ExpenseCategory =
   | 'treni'
@@ -50,12 +49,8 @@ export const STATUS_LABELS: Record<ExpenseReportStatus, string> = {
   rifiutata: 'Rifiutata',
 }
 
-export const STATUS_COLORS: Record<ExpenseReportStatus, { bg: string; fg: string; border: string }> = {
-  bozza:     { bg: 'rgba(148,163,184,0.14)', fg: '#475569', border: 'rgba(148,163,184,0.32)' },
-  inviata:   { bg: 'rgba(59,130,246,0.10)',  fg: theme.palette.info.dark, border: 'rgba(59,130,246,0.28)' },
-  validata:  { bg: 'rgba(34,197,94,0.12)',   fg: '#166534', border: 'rgba(34,197,94,0.30)' },
-  rifiutata: { bg: 'rgba(239,68,68,0.10)',   fg: theme.palette.error.dark, border: 'rgba(239,68,68,0.28)' },
-}
+// STATUS_COLORS è stato spostato in theme/statusTokens.ts (DomainStatusTokens.expenseReport)
+// per essere theme-aware — consumarlo via useStatusTokens().expenseReport.
 
 export type ExpenseReceiptRow = {
   id: number

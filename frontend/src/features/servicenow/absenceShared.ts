@@ -1,3 +1,5 @@
+import type { WidgetAccents } from '../../theme/tokens'
+
 // Tipi e helper condivisi per la gestione delle assenze tecnici ServiceNow.
 // Usati sia dal dialog per-tecnico nel pannello Triage (ServiceNowCases.tsx)
 // sia dalla pagina calendario "Assenze tecnici" (ServiceNowAbsences.tsx).
@@ -44,13 +46,24 @@ export const ABSENCE_REASONS: { value: AbsenceReason; label: string }[] = [
   { value: 'altro',        label: 'Altro' },
 ]
 
-export const ABSENCE_REASON_COLORS: Record<AbsenceReason, { bg: string; fg: string }> = {
-  ferie:        { bg: 'rgba(99,153,34,0.14)',   fg: '#3b6d11' },
-  malattia:     { bg: 'rgba(226,75,74,0.14)',   fg: '#a32d2d' },
-  permesso_104: { bg: 'rgba(219,39,119,0.14)',  fg: '#9d174d' },
-  training:     { bg: 'rgba(124,58,237,0.14)',  fg: '#5b21b6' },
-  trasferta:    { bg: 'rgba(55,138,221,0.14)',  fg: '#185fa5' },
-  altro:        { bg: 'rgba(136,135,128,0.16)', fg: '#5f5e5a' },
+/**
+ * Colori badge per motivo assenza. "training" usa un colore fuori dalla
+ * palette semantica (era viola fisso) — per questo dipende dal tema attivo
+ * (vedi WidgetAccents.trainingBadgeBg/Text); gli altri motivi restano fissi
+ * in tutti i temi (confermato esplicitamente, refactoring colori 0.9.x).
+ * STESSA legenda (motivo → colore) esiste in forma leggermente diversa in
+ * `features/pianoferie/pianoFerieShared.ts`: da unificare in un secondo
+ * momento, non in questo incremento.
+ */
+export function getAbsenceReasonColors(accents: WidgetAccents): Record<AbsenceReason, { bg: string; fg: string }> {
+  return {
+    ferie:        { bg: 'rgba(99,153,34,0.14)',   fg: '#3b6d11' },
+    malattia:     { bg: 'rgba(226,75,74,0.14)',   fg: '#a32d2d' },
+    permesso_104: { bg: 'rgba(219,39,119,0.14)',  fg: '#9d174d' },
+    training:     { bg: accents.trainingBadgeBg,  fg: accents.trainingBadgeText },
+    trasferta:    { bg: 'rgba(55,138,221,0.14)',  fg: '#185fa5' },
+    altro:        { bg: 'rgba(136,135,128,0.16)', fg: '#5f5e5a' },
+  }
 }
 
 export const ABSENCE_HOURLY_COLOR = { bg: 'rgba(186,117,23,0.16)', fg: '#854f0b' }

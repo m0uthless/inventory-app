@@ -1,9 +1,20 @@
+import * as React from 'react'
 import { fireEvent, screen } from '@testing-library/dom'
 import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CollapsibleSiteRow } from './CollapsibleSiteRow'
 import { ProvinceSection } from './ProvinceSection'
 import type { LocationGroup, SiteRow } from './types'
+import { ToastProvider } from '@shared/ui/toast'
+
+// CollapsibleSiteRow (e ProvinceSection, che lo contiene indirettamente)
+// montano sempre ContactsListModal — anche a dialog chiuso i suoi hook
+// (incluso useToast) vengono eseguiti, quindi i render dei test vanno
+// avvolti in ToastProvider per non far esplodere "useToast must be used
+// within ToastProvider".
+function renderWithToast(ui: React.ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>)
+}
 
 // ─── CollapsibleSiteRow ─────────────────────────────────────────────────────
 
@@ -25,7 +36,7 @@ function makeSite(): SiteRow {
 
 describe('CollapsibleSiteRow — accessibilità da tastiera (fix P2 8.3)', () => {
   it('si espande e si richiude con Invio/Spazio dalla tastiera', () => {
-    render(
+    renderWithToast(
       <CollapsibleSiteRow
         site={makeSite()}
         allInventory={[]}
@@ -33,6 +44,7 @@ describe('CollapsibleSiteRow — accessibilità da tastiera (fix P2 8.3)', () =>
         statusFilter="all"
         onOpenDrawer={vi.fn()}
         onOpenSite={vi.fn()}
+        onOpenSiteContacts={vi.fn()}
         canViewSite={false}
         canChangeSite={false}
         onEditSite={vi.fn()}
@@ -56,7 +68,7 @@ describe('CollapsibleSiteRow — accessibilità da tastiera (fix P2 8.3)', () =>
   })
 
   it('il pulsante decorativo espandi/comprimi non è raggiungibile da tastiera (evita doppio tab stop)', () => {
-    const { container } = render(
+    const { container } = renderWithToast(
       <CollapsibleSiteRow
         site={makeSite()}
         allInventory={[]}
@@ -64,6 +76,7 @@ describe('CollapsibleSiteRow — accessibilità da tastiera (fix P2 8.3)', () =>
         statusFilter="all"
         onOpenDrawer={vi.fn()}
         onOpenSite={vi.fn()}
+        onOpenSiteContacts={vi.fn()}
         canViewSite={false}
         canChangeSite={false}
         onEditSite={vi.fn()}
@@ -96,7 +109,7 @@ function makeProvinceGroup(): LocationGroup {
 
 describe('ProvinceSection — accessibilità da tastiera (fix P2 8.3)', () => {
   it('si espande con Invio e collega aria-controls al contenuto', () => {
-    render(
+    renderWithToast(
       <ProvinceSection
         group={makeProvinceGroup()}
         searchQuery=""
@@ -107,6 +120,8 @@ describe('ProvinceSection — accessibilità da tastiera (fix P2 8.3)', () => {
         onOpenVpn={vi.fn()}
         onOpenCustomer={vi.fn()}
         onOpenSite={vi.fn()}
+        onOpenCustomerContacts={vi.fn()}
+        onOpenSiteContacts={vi.fn()}
         canViewCustomer={false}
         canViewSite={false}
         canChangeSite={false}

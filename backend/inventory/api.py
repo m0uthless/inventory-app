@@ -104,6 +104,8 @@ class InventoryListSerializer(serializers.ModelSerializer):
             "status_label",
             "local_ip",
             "srsa_ip",
+            "location",
+            "telefono",
             "updated_at",
             "deleted_at",
             "has_active_issue",
@@ -170,6 +172,8 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
             "hostname",
             "local_ip",
             "srsa_ip",
+            "location",
+            "telefono",
 
             "type",
             "type_key",

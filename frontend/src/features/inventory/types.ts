@@ -20,6 +20,8 @@ export type InventoryRow = {
   status_label?: string | null
   local_ip?: string | null
   srsa_ip?: string | null
+  location?: string | null
+  telefono?: string | null
   notes?: string | null
   updated_at?: string | null
   deleted_at?: string | null
@@ -40,6 +42,8 @@ export type InventoryDetail = {
   hostname?: string | null
   local_ip?: string | null
   srsa_ip?: string | null
+  location?: string | null
+  telefono?: string | null
   type?: number | null
   type_key?: string | null
   type_label?: string | null
@@ -85,6 +89,8 @@ export type InventoryForm = {
   hostname: string
   local_ip: string
   srsa_ip: string
+  location: string
+  telefono: string
   os_user: string
   os_pwd: string
   app_usr: string
@@ -102,6 +108,8 @@ export type InventoryFieldName =
   | 'hostname'
   | 'local_ip'
   | 'srsa_ip'
+  | 'location'
+  | 'telefono'
   | 'os_user'
   | 'os_pwd'
   | 'app_usr'

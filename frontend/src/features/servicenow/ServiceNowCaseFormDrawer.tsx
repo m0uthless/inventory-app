@@ -43,7 +43,6 @@ function nowHHMM(): string {
 export type ServiceNowCaseForm = {
   number: string
   account: string
-  priority: string
   category: string
   case_type: number | ''
   opened_date: string      // ISO "YYYY-MM-DD" o ''
@@ -56,13 +55,6 @@ export type ServiceNowCaseForm = {
 type UserOption = { id: number; username: string; full_name?: string; is_philips: boolean; is_servicenow_technician: boolean }
 type CaseTypeOption = { id: number; name: string; category: string }
 
-const PRIORITY_OPTIONS = [
-  { value: '1', label: '1 - Critical' },
-  { value: '2', label: '2 - High' },
-  { value: '3', label: '3 - Moderate' },
-  { value: '4', label: '4 - Low' },
-]
-
 const CATEGORY_OPTIONS = [
   { value: 'philips', label: 'Philips' },
   { value: 'biotron', label: 'Biotron' },
@@ -71,7 +63,6 @@ const CATEGORY_OPTIONS = [
 const EMPTY_FORM: ServiceNowCaseForm = {
   number: '',
   account: '',
-  priority: '3',
   category: 'biotron',
   case_type: '',
   opened_date: '',
@@ -138,7 +129,6 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
       setForm({
         number: initial.number,
         account: initial.account,
-        priority: initial.priority,
         category: initial.category,
         case_type: initial.case_type,
         opened_date: initial.opened_date ?? '',
@@ -280,7 +270,6 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
           ...prev,
           number: d.number ?? prev.number,
           account: d.account ?? prev.account,
-          priority: d.priority ?? prev.priority,
           opened_date,
           opened_time,
           short_description: d.short_description ?? prev.short_description,
@@ -289,7 +278,7 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
       if (d.warnings?.length) {
         setExtractWarnings(d.warnings)
       } else {
-        toast.success('Campi estratti dallo screenshot ✅ — controlla e correggi se serve')
+        toast.success('Campi estratti dallo screenshot — controlla e correggi se serve')
       }
     } catch (err) {
       toast.error(apiErrorToMessage(err))
@@ -335,7 +324,7 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
   const subtitle = isEdit ? initial!.account : undefined
 
   const canSave = Boolean(
-    form.number.trim() && form.account.trim() && form.priority && form.category && form.case_type !== '',
+    form.number.trim() && form.account.trim() && form.category && form.case_type !== '',
   ) && (!form.opened_date || Boolean(form.opened_time)) && !extracting
 
   return (
@@ -434,25 +423,18 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
           </ToggleButtonGroup>
         </FormField>
 
-        {/* Type + Priorità */}
-        <Stack direction="row" spacing={1}>
-          <FormField label="Type *">
-            <TextField
-              {...isSm}
-              select
-              value={form.case_type}
-              onChange={(e) => set('case_type', Number(e.target.value))}
-              error={form.case_type === ''}
-            >
-              {caseTypeOptions.map((o) => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
-            </TextField>
-          </FormField>
-          <FormField label="Priorità *">
-            <TextField {...isSm} select value={form.priority} onChange={(e) => set('priority', e.target.value)}>
-              {PRIORITY_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
-            </TextField>
-          </FormField>
-        </Stack>
+        {/* Type */}
+        <FormField label="Type *">
+          <TextField
+            {...isSm}
+            select
+            value={form.case_type}
+            onChange={(e) => set('case_type', Number(e.target.value))}
+            error={form.case_type === ''}
+          >
+            {caseTypeOptions.map((o) => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </TextField>
+        </FormField>
 
         {/* Data + ora apertura */}
         <Stack direction="row" spacing={1}>

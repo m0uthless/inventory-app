@@ -6,6 +6,7 @@ import RemoveIcon from '@mui/icons-material/Remove'
 
 import type { PurchaseOrderSummary } from './types'
 import { formatEuro } from './types'
+import { useKpiAccents } from '../../theme/AppThemeProvider'
 
 type PurchaseOrderKpisProps = {
   year: number
@@ -20,13 +21,14 @@ function formatDeltaPct(pct: number): string {
 
 export default function PurchaseOrderKpis({ year, summary, loading }: PurchaseOrderKpisProps) {
   const theme = useTheme()
+  const kpiAccents = useKpiAccents()
 
   const hasYoy = summary?.previous_year != null && summary?.previous_year_amount != null
   const deltaPct = summary?.yoy_delta_pct ?? null
 
   // Verde se in crescita, rosso se in calo, grigio se invariato/non disponibile
   // (deciso in chat: confronto Totale in Euro vs anno precedente).
-  const yoyAccent = deltaPct == null ? theme.palette.text.secondary : deltaPct > 0 ? '#16a34a' : deltaPct < 0 ? '#dc2626' : theme.palette.text.secondary
+  const yoyAccent = deltaPct == null ? theme.palette.text.secondary : deltaPct > 0 ? theme.palette.success.main : deltaPct < 0 ? theme.palette.error.main : theme.palette.text.secondary
   const YoyIcon = deltaPct == null || deltaPct === 0 ? RemoveIcon : deltaPct > 0 ? ArrowUpwardIcon : ArrowDownwardIcon
 
   const yoySub = !hasYoy
@@ -34,9 +36,9 @@ export default function PurchaseOrderKpis({ year, summary, loading }: PurchaseOr
     : `vs ${formatEuro(summary!.previous_year_amount)} nel ${summary!.previous_year}`
 
   const kpis = [
-    { label: 'Totale Purchase Order', value: summary ? formatEuro(summary.total_amount) : '—', sub: `valore economico nel ${year}`, accent: '#0d9488' },
+    { label: 'Totale Purchase Order', value: summary ? formatEuro(summary.total_amount) : '—', sub: `valore economico nel ${year}`, accent: kpiAccents.teal1 },
     { label: 'Da inviare',            value: summary?.to_send ?? '—', sub: 'stato "Inserito"', accent: theme.palette.warning.main },
-    { label: 'In attesa',             value: summary?.waiting ?? '—', sub: 'inviato o ricevuto, in attesa di riscontro', accent: '#6366f1' },
+    { label: 'In attesa',             value: summary?.waiting ?? '—', sub: 'inviato o ricevuto, in attesa di riscontro', accent: kpiAccents.violet1 },
     {
       label: `Variazione vs ${year - 1}`,
       value: deltaPct != null ? formatDeltaPct(deltaPct) : '—',

@@ -166,7 +166,6 @@ class UserProfile(models.Model):
 
     class Theme(models.TextChoices):
         DEFAULT = "default", "Predefinito (teal)"
-        NAVY = "navy", "Navy"
 
     theme = models.CharField(
         max_length=16, choices=Theme.choices, default=Theme.DEFAULT,

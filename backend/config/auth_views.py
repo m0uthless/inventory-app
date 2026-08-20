@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict
 
 from django.conf import settings
@@ -196,6 +197,21 @@ def login_view(request: HttpRequest) -> JsonResponse:
         and not can_archie  # utente esclusivamente portal → manda su Portal
         and not ambito      # auto-detect solo se ambito non era specificato
     ) else (ambito or "site-repo")
+
+    # 0.9.0: fissa l'ambito in sessione server-side (mai da un header per
+    # request — stesso principio dello scope cliente in portal/permissions.py).
+    # Serve a distinguere, per un utente "dual-profile" (accesso interno
+    # Archie + profilo Portal), da quale frontend ha fatto login: solo così
+    # PortalScopedMixin può scoparlo sul cliente attivo quando opera dal
+    # Portal, pur lasciandolo libero di amministrare tutti i clienti quando
+    # opera dal gestionale Archie principale con lo stesso account.
+    from portal.permissions import SESSION_AMBITO_KEY
+    request.session[SESSION_AMBITO_KEY] = effective_ambito
+
+    # Baseline per SessionIdleTimeoutMiddleware: sia al primo login sia al
+    # "riautenticati" fatto da LockScreen.onSubmitPassword (stessa vista),
+    # azzera il conteggio di inattività.
+    request.session["last_activity"] = time.time()
 
     return JsonResponse({"detail": "ok", "ambito": effective_ambito})
 

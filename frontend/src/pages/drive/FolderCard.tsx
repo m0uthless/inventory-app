@@ -9,6 +9,7 @@ import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
 
 import type { DriveFolder } from './types'
 import { fmtDate } from './style'
+import { useWidgetAccents } from '../../theme/AppThemeProvider'
 
 // ─── Folder Card ──────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export function FolderCard({
   onLinkCustomers: () => void
 }) {
   const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null)
+  const widgetAccents = useWidgetAccents()
 
   return (
     <ButtonBase
@@ -38,7 +40,7 @@ export function FolderCard({
         display: 'block',
         width: '100%',
         textAlign: 'left',
-        bgcolor: '#fff',
+        bgcolor: 'background.paper',
         border: '1px solid',
         borderColor: 'grey.200',
         borderRadius: 1,
@@ -47,7 +49,7 @@ export function FolderCard({
         transition: 'all 0.13s',
         position: 'relative',
         '&:hover': {
-          bgcolor: '#f0fdf9',
+          bgcolor: widgetAccents.softTealBg,
           borderColor: 'primary.light',
           boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
           '& .folder-menu-btn': { opacity: 1 },

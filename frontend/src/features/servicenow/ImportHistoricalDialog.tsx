@@ -145,7 +145,7 @@ export default function ImportHistoricalDialog({ open, onClose, onImported }: Pr
       })
       setResult(res.data)
       if (res.data.created > 0) {
-        toast.success(`${res.data.created} case importati ✅`)
+        toast.success(`${res.data.created} case importati`)
         onImported()
       } else {
         toast.error('Nessun case importato: controlla il dettaglio delle righe.')

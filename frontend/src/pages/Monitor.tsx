@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import {
   Box,
   Chip,
@@ -23,7 +24,8 @@ import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
-import { theme } from '../theme'
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import type { DomainStatusTokens } from '../theme/statusTokens'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
@@ -52,13 +54,9 @@ export type MonitorRow = {
 const MONITORS_PATH = '/monitors/' as const satisfies CollectionPath
 
 // ─── Chip stato ───────────────────────────────────────────────────────────────
-
-const STATO_COLOR: Record<string, { bg: string; fg: string; border: string }> = {
-  in_uso:        { bg: 'rgba(16,185,129,0.10)',  fg: theme.palette.success.dark, border: 'rgba(16,185,129,0.28)' },
-  da_installare: { bg: 'rgba(245,158,11,0.10)',  fg: theme.palette.warning.dark, border: 'rgba(245,158,11,0.28)' },
-  guasto:        { bg: 'rgba(239,68,68,0.10)',   fg: theme.palette.error.dark, border: 'rgba(239,68,68,0.28)'  },
-  rma:           { bg: 'rgba(148,163,184,0.12)', fg: '#475569', border: 'rgba(148,163,184,0.30)' },
-}
+// STATO_COLOR era qui, con `theme.palette.X.dark` da import statico — spostato
+// in DomainStatusTokens.monitor/monitorFallback (theme/statusTokens.ts), letto
+// via useStatusTokens() dentro il componente (vedi makeRenderMonitorCard).
 
 // Colore semantico del tema (coerente con Issues.tsx: Chip standard MUI,
 // palette pastello definita centralmente in theme.ts).
@@ -80,8 +78,9 @@ function StatoChip({ stato, label }: { stato: string; label: string }) {
 
 // ─── Mobile card ──────────────────────────────────────────────────────────────
 
-const renderMonitorCard: MobileCardRenderFn<MonitorRow> = ({ row, onOpen }) => {
-  const c = STATO_COLOR[row.stato] ?? { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'rgba(100,116,139,0.20)' }
+function makeRenderMonitorCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<MonitorRow> {
+  return ({ row, onOpen }) => {
+  const c = statusTokens.monitor[row.stato as keyof DomainStatusTokens['monitor']] ?? statusTokens.monitorFallback
   return (
     <Box
       onClick={() => onOpen(row.id)}
@@ -99,7 +98,7 @@ const renderMonitorCard: MobileCardRenderFn<MonitorRow> = ({ row, onOpen }) => {
           </Typography>
           <Typography variant="caption" color="text.secondary">{row.tipo_label}</Typography>
         </Box>
-        <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: c.bg, color: c.fg, border: `0.5px solid ${c.border}`, whiteSpace: 'nowrap' }}>
+        <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: c.bg, color: c.color, border: `0.5px solid ${c.border}`, whiteSpace: 'nowrap' }}>
           {row.stato_label}
         </Box>
       </Box>
@@ -120,6 +119,7 @@ const renderMonitorCard: MobileCardRenderFn<MonitorRow> = ({ row, onOpen }) => {
       </Box>
     </Box>
   )
+  }
 }
 
 // ─── Colonne DataGrid ─────────────────────────────────────────────────────────
@@ -165,6 +165,7 @@ const ALLOWED_ORDERING = ['produttore', 'modello', 'seriale', 'stato', 'tipo', '
 // ─── Pagina Monitor ───────────────────────────────────────────────────────────
 
 export default function Monitor() {
+  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -172,6 +173,8 @@ export default function Monitor() {
 
   const canChange = hasPerm(PERMS.inventory.monitor.change)
   const canDelete  = hasPerm(PERMS.inventory.monitor.delete)
+  const statusTokens = useStatusTokens()
+  const renderMonitorCard = React.useMemo(() => makeRenderMonitorCard(statusTokens), [statusTokens])
 
   const grid = useServerGrid({
     defaultOrdering: 'produttore',
@@ -267,12 +270,12 @@ export default function Monitor() {
     try {
       if (formTarget) {
         await api.patch(itemPath(MONITORS_PATH, formTarget.id), form)
-        toast.success('Monitor aggiornato ✅')
+        toast.success('Monitor aggiornato')
         if (selectedId === formTarget.id) await loadDetail(formTarget.id)
         reloadList()
       } else {
         const res = await api.post<MonitorRow>(MONITORS_PATH, form)
-        toast.success('Monitor creato ✅')
+        toast.success('Monitor creato')
         reloadList()
         openDrawer(res.data.id)
       }
@@ -301,7 +304,7 @@ export default function Monitor() {
     setDeleteBusy(true)
     try {
       await api.delete(itemPath(MONITORS_PATH, detail.id))
-      toast.success('Monitor eliminato ✅')
+      toast.success('Monitor eliminato')
       grid.setViewMode('all', { keepOpen: true })
       reloadList()
       await loadDetail(detail.id, true)
@@ -321,7 +324,7 @@ export default function Monitor() {
     setRestoreBusy(true)
     try {
       await api.post(itemActionPath(MONITORS_PATH, detail.id, 'restore'))
-      toast.success('Monitor ripristinato ✅')
+      toast.success('Monitor ripristinato')
       reloadList()
       await loadDetail(detail.id)
     } catch (e) {
@@ -359,7 +362,7 @@ export default function Monitor() {
             setRestoreBusy(true)
             try {
               await api.post(itemActionPath(MONITORS_PATH, row.id, 'restore'))
-              toast.success('Monitor ripristinato ✅')
+              toast.success('Monitor ripristinato')
               reloadList()
             } catch (e) { toast.error(apiErrorToMessage(e)) }
             finally { setRestoreBusy(false) }
@@ -413,8 +416,7 @@ export default function Monitor() {
             '--DataGrid-headerHeight': '35px',
             '& .MuiDataGrid-cell': { py: 0.25 },
             '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
+            ...zebraSx,
           },
         }}
       />

@@ -42,6 +42,7 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import Portal from '@mui/material/Portal'
 import { alpha, useTheme } from '@mui/material/styles'
+import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { Can } from '../auth/Can'
@@ -106,17 +107,11 @@ function DueBadge({ dateStr }: { dateStr: string }) {
 const RESULT_COLOR: Record<string, 'success' | 'error' | 'warning' | 'default'> = { ok: 'success', ko: 'error', partial: 'warning', not_planned: 'default' }
 const RESULT_LABEL: Record<string, string> = { ok: 'OK', ko: 'KO', partial: 'Parziale', not_planned: 'Non prevista' }
 
-const GRID_SX = {
+const GRID_SX_BASE = {
   '--DataGrid-rowHeight': '24px',
   '--DataGrid-headerHeight': '35px',
   '& .MuiDataGrid-cell': { py: 0.25 },
   '& .MuiDataGrid-columnHeader': { py: 0.75 },
-  '& .MuiDataGrid-row:nth-of-type(even)': { backgroundColor: 'rgba(69,127,121,0.03)' },
-  '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(69,127,121,0.06)' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: 'rgba(69,127,121,0.10) !important' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: 'rgba(69,127,121,0.14) !important' },
-  '& .row-overdue': { bgcolor: 'rgba(239,68,68,0.04) !important' },
-  '& .row-overdue:hover': { bgcolor: 'rgba(239,68,68,0.08) !important' },
 } as const
 
 const DW = { xs: '100%', sm: 416 } as const
@@ -221,7 +216,7 @@ export function DueDateOverrideDialog({ open, row, onClose, onSaved }: {
           due_date_override: date,
         })
       }
-      toast.success('Scadenza personalizzata salvata ✅')
+      toast.success('Scadenza personalizzata salvata')
       window.dispatchEvent(new CustomEvent('maintenance-due-date-changed'))
       onSaved()
       onClose()
@@ -237,7 +232,7 @@ export function DueDateOverrideDialog({ open, row, onClose, onSaved }: {
     setSaving(true)
     try {
       await api.post(`/maintenance-plan-inventories/${row.plan_inventory_id}/reset-override/`)
-      toast.success('Scadenza ripristinata alla data del piano ✅')
+      toast.success('Scadenza ripristinata alla data del piano')
       window.dispatchEvent(new CustomEvent('maintenance-due-date-changed'))
       onSaved()
       onClose()
@@ -340,6 +335,7 @@ export function RapportinoDialog({ open, context, techs, onClose, onSaved }: {
   onClose: () => void; onSaved: () => void
 }) {
   const toast = useToast()
+  const theme = useTheme()
   const pdfInputRef = React.useRef<HTMLInputElement>(null)
   const pdfFileRef = React.useRef<File | null>(null)  // File stored in ref, never in React state
   const [pdfFileName, setPdfFileName] = React.useState<string | null>(null)
@@ -420,7 +416,7 @@ export function RapportinoDialog({ open, context, techs, onClose, onSaved }: {
         const results = await Promise.allSettled(context.siblingOverdue.map(row => api.post('/maintenance-events/', buildFd(row.inventory_id))))
         const ok = results.filter(r => r.status === 'fulfilled').length
         const fail = results.filter(r => r.status === 'rejected').length
-        if (fail === 0) toast.success(`${ok} rapportini creati ✅`)
+        if (fail === 0) toast.success(`${ok} rapportini creati`)
         else toast.warning(`${ok} creati, ${fail} falliti`)
       } else if (isContextual && context && context.rows.length > 1) {
         // Multi-selezione: stesso form per tutti gli inventory selezionati
@@ -434,11 +430,11 @@ export function RapportinoDialog({ open, context, techs, onClose, onSaved }: {
         )
         const ok = results.filter(r => r.status === 'fulfilled').length
         const fail = results.filter(r => r.status === 'rejected').length
-        if (fail === 0) toast.success(`${ok} rapportini creati ✅`)
+        if (fail === 0) toast.success(`${ok} rapportini creati`)
         else toast.warning(`${ok} creati, ${fail} falliti`)
       } else {
         await api.post('/maintenance-events/', buildFd(Number(form.inventory)))
-        toast.success('Rapportino creato ✅')
+        toast.success('Rapportino creato')
       }
       onSaved(); onClose()
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setSaving(false) }
@@ -549,7 +545,7 @@ export function RapportinoDialog({ open, context, techs, onClose, onSaved }: {
             )}
           </Stack>
           {isContextual && siblingsCount > 1 && (
-            <Box sx={{ bgcolor: bulkMode ? 'rgba(15,118,110,0.06)' : 'action.hover', borderRadius: 1.5, px: 1.5, py: 1.25, border: '1px solid', borderColor: bulkMode ? 'primary.main' : 'divider', transition: 'all 140ms ease' }}>
+            <Box sx={{ bgcolor: bulkMode ? alpha(theme.palette.primary.main, 0.06) : 'action.hover', borderRadius: 1.5, px: 1.5, py: 1.25, border: '1px solid', borderColor: bulkMode ? 'primary.main' : 'divider', transition: 'all 140ms ease' }}>
               <FormControlLabel
                 control={<Checkbox checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} size="small" color="primary" />}
                 label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Applica a tutti gli inventory scaduti di questo piano{' '}<Chip size="small" label={`${siblingsCount} items`} color="primary" sx={{ height: 20, fontSize: '0.72rem', ml: 0.5 }} /></Typography>}
@@ -586,6 +582,7 @@ export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore 
   const [events, setEvents] = React.useState<EventRow[]>([])
   const [loading, setLoading] = React.useState(false)
   const toast = useToast()
+  const theme = useTheme()
 
   React.useEffect(() => {
     if (!planId) { setDetail(null); setEvents([]); return }
@@ -674,7 +671,7 @@ export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore 
       {detail ? (
         <>
           {/* Stats nell'hero-like area */}
-          <Box sx={{ mx: -2.5, mt: -2, mb: 0, px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'rgba(15,118,110,0.04)' }}>
+          <Box sx={{ mx: -2.5, mt: -2, mb: 0, px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha(theme.palette.primary.main, 0.04) }}>
             <Stack direction="row" spacing={1}>
               {[
                 { label: 'Prossima scad.', value: detail.next_due_date ?? '—' },
@@ -762,6 +759,7 @@ export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore 
 
 export default function Maintenance() {
   const theme = useTheme()
+  const zebraSx = useDataGridZebraSx()
   const { me } = useAuth()
   const toast = useToast()
   const { exporting, exportCsv } = useExportCsv()
@@ -919,7 +917,7 @@ export default function Maintenance() {
         result:       'not_planned',
         tech:         null,
       })
-      toast.success('Segnata come "Non prevista" ✅')
+      toast.success('Segnata come "Non prevista"')
       load()
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1182,8 +1180,11 @@ export default function Maintenance() {
           getRowId: (row) => (row as any).id,
           height: 420,
           sx: {
-            ...GRID_SX,
-            '& .MuiDataGrid-row.row-overdue': { bgcolor: 'rgba(239,68,68,0.04) !important' },
+            ...GRID_SX_BASE,
+            ...zebraSx,
+            '& .row-overdue': { bgcolor: `${alpha(theme.palette.error.main, 0.04)} !important` },
+            '& .row-overdue:hover': { bgcolor: `${alpha(theme.palette.error.main, 0.08)} !important` },
+            '& .MuiDataGrid-row.row-overdue': { bgcolor: `${alpha(theme.palette.error.main, 0.04)} !important` },
           },
         }}
       />

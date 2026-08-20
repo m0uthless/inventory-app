@@ -15,6 +15,10 @@ export type CustomerRow = {
   has_vpn?: boolean | null
   tags?: string[] | null
   notes?: string | null
+  custom_fields?: Record<string, unknown> | null
+  // Contatti collegati al cliente: mostra il bottone "Contatti" solo se > 1
+  // (il primo è già esposto via primary_contact_*).
+  contacts_count?: number
   // Contatori annotati dal backend (crm/api.py, _count_subquery).
   assets_count?: number
   sites_count?: number
@@ -34,6 +38,7 @@ export type SiteRow = {
   primary_contact_name?: string | null
   primary_contact_email?: string | null
   primary_contact_phone?: string | null
+  contacts_count?: number
   status?: number | null
   status_label?: string | null
   customer?: number | null
@@ -45,6 +50,8 @@ export type InventoryRow = {
   name: string
   local_ip?: string | null
   srsa_ip?: string | null
+  location?: string | null
+  telefono?: string | null
   type_key?: string | null
   type_label?: string | null
   status_key?: string | null
