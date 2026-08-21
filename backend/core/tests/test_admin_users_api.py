@@ -203,7 +203,19 @@ def test_portal_access_read_creates_profile_and_grants_module_permission():
     assert resp.status_code == 200
     data = resp.json()
     assert data["has_portal_access"] is True
-    assert data["portal_profile"] == {"customer_id": customer.id, "customer_name": str(customer)}
+    # 0.9.1: portal_profile include anche "is_active" e "customers" (lista
+    # multi-cliente, 0.9.0 punto 6) — l'asserzione qui era ferma alla forma
+    # a 2 chiavi precedente a quella funzionalità, non aggiornata quando
+    # get_portal_profile() è stato esteso. Con solo customer_id nel payload
+    # (nessun customer_ids esplicito), l'unico cliente assegnato è lo
+    # stesso customer di default (vedi _apply_write: customer_ids
+    # default a [customer_id] quando assente).
+    assert data["portal_profile"] == {
+        "customer_id": customer.id,
+        "customer_name": str(customer),
+        "is_active": True,
+        "customers": [{"id": customer.id, "name": str(customer)}],
+    }
     assert data["direct_permissions"]["modules"]["portal"] == {"r": True, "w": False, "d": False}
 
     profile = PortalUserProfile.objects.get(user=target)

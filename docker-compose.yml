@@ -65,16 +65,22 @@ services:
       - media:/app/media
 
   backend_nginx:
-    image: nginx:1.27-alpine
+    # Fase 6 (0.9.1, audit 2026-08-19): `nginx:1.27-alpine` standard crea
+    # /var/cache/nginx/client_temp a runtime assumendo un master process
+    # root — con `user: "101:101"` forzato falliva su mkdir() Permission
+    # denied. `nginxinc/nginx-unprivileged` è l'immagine ufficiale NGINX Inc.
+    # pensata apposta per questo caso: PID file, cache dir e permessi già
+    # configurati per l'utente non-root, stesso uid/gid 101.
+    image: nginxinc/nginx-unprivileged:1.27-alpine
     restart: unless-stopped
     expose:
-      - "80"
+      - "8080"
     depends_on:
       backend:
         condition: service_healthy
         restart: true
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --header='X-Forwarded-Proto: https' -O - http://127.0.0.1/api/health/ >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "wget -q --header='X-Forwarded-Proto: https' -O - http://127.0.0.1:8080/api/health/ >/dev/null 2>&1"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -90,12 +96,12 @@ services:
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
     expose:
-      - "80"
+      - "8080"
     depends_on:
       backend_nginx:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/healthz >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/healthz >/dev/null 2>&1"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -107,12 +113,12 @@ services:
       dockerfile: frontend-portal/Dockerfile
     restart: unless-stopped
     expose:
-      - "80"
+      - "8080"
     depends_on:
       backend_nginx:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/healthz >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/healthz >/dev/null 2>&1"]
       interval: 15s
       timeout: 5s
       retries: 10

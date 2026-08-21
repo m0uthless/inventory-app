@@ -26,6 +26,7 @@ from audit.utils import log_event, to_change_value_for_field
 from core.media import build_action_url, protected_media_response
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from servicenow.models import (
     ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory,
 )
@@ -251,7 +252,8 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
     """
     serializer_class   = SnTechnicianAbsenceSerializer
-    permission_classes = [SnAbsencePermission]
+    # 0.9.1 (WP-03): permission_classes esplicite -> estese qui.
+    permission_classes = [SnAbsencePermission, IsInternalOrPortalDedicatedApp]
     http_method_names  = ["get", "post", "patch", "delete", "head", "options"]
     pagination_class   = None
     filter_backends    = [DjangoFilterBackend]

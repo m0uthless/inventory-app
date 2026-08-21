@@ -37,6 +37,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import { api } from '@shared/api/client'
+import { escapeHtml } from '@shared/utils/html'
 import type { PlanRow } from './maintenanceTypes'
 import { buildDrfListParams } from '@shared/api/drf'
 import { apiErrorToFieldErrors, apiErrorToMessage } from '@shared/api/error'
@@ -302,18 +303,22 @@ export default function MaintenancePlans() {
       const result   = ev?.result as ResultKey | undefined
       const styleCss = result ? (RESULT_STYLE[result] ?? RESULT_STYLE.not_planned) : ''
       const badge    = result
-        ? `<span style="${styleCss};padding:2px 7px;border-radius:3px;font-size:9.5px;font-weight:700">${RESULT_IT[result] ?? result}</span>`
+        ? `<span style="${styleCss};padding:2px 7px;border-radius:3px;font-size:9.5px;font-weight:700">${escapeHtml(RESULT_IT[result] ?? result)}</span>`
         : `<span style="background:#fff3e0;color:#b45309;padding:2px 7px;border-radius:3px;font-size:9.5px;font-weight:700">—</span>`
       const siteName = inv.site_name ?? inv.site_display_name ?? '—'
+      // 0.9.1 (WP-04, archie-maintenancexss, SEC-008): knumber/name/
+      // siteName/type_label/tech_name/notes sono tutti campi testo libero
+      // (inventario, sito, tecnico, note evento) — vanno sempre escapati
+      // prima di finire in questo template scritto via document.write.
       return `<tr>
-        <td class="mono">${inv.knumber ?? '—'}</td>
-        <td>${inv.name ?? '—'}</td>
-        <td class="muted">${siteName}</td>
-        <td class="muted">${inv.type_label ?? '—'}</td>
-        <td class="center">${ev ? fmtDate(ev.performed_at) : '—'}</td>
-        <td class="muted">${ev?.tech_name ?? '—'}</td>
+        <td class="mono">${escapeHtml(inv.knumber) || '—'}</td>
+        <td>${escapeHtml(inv.name) || '—'}</td>
+        <td class="muted">${escapeHtml(siteName)}</td>
+        <td class="muted">${escapeHtml(inv.type_label) || '—'}</td>
+        <td class="center">${ev ? escapeHtml(fmtDate(ev.performed_at)) : '—'}</td>
+        <td class="muted">${escapeHtml(ev?.tech_name) || '—'}</td>
         <td class="center">${badge}</td>
-        <td class="muted small">${ev?.notes ?? ''}</td>
+        <td class="muted small">${escapeHtml(ev?.notes)}</td>
       </tr>`
     }).join('')
 
@@ -339,7 +344,7 @@ export default function MaintenancePlans() {
     // come già erano. Eccezione deliberata, non dimenticanza — vedi anche
     // RESULT_STYLE sopra, che già segue questa stessa convenzione.
     const html = `<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"/>
-<title>Report — ${plan.title}</title>
+<title>Report — ${escapeHtml(plan.title)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1e293b;background:#fff}
@@ -410,14 +415,14 @@ export default function MaintenancePlans() {
 
   <div class="hdr">
     <div class="hdr-left">
-      <div class="sub">${plan.customer_code ?? ''} &nbsp;·&nbsp; ${plan.customer_name ?? ''}</div>
-      <h1>${plan.title}</h1>
+      <div class="sub">${escapeHtml(plan.customer_code) || ''} &nbsp;·&nbsp; ${escapeHtml(plan.customer_name) || ''}</div>
+      <h1>${escapeHtml(plan.title)}</h1>
       <div class="tags" style="margin-top:8px">
         <span class="${isCompleted ? 'status-ok' : 'status-wip'}">${isCompleted ? '✓ Completato' : '◑ In corso'}</span>
-        <span class="tag">${scheduleLabel}</span>
-        <span class="tag">Scad. ${plan.next_due_date ?? '—'}</span>
-        ${plan.last_done_date ? `<span class="tag">Ultima eseg. ${plan.last_done_date}</span>` : ''}
-        <span class="tag">${(plan.inventory_type_labels ?? []).join(', ') || '—'}</span>
+        <span class="tag">${escapeHtml(scheduleLabel)}</span>
+        <span class="tag">Scad. ${escapeHtml(plan.next_due_date) || '—'}</span>
+        ${plan.last_done_date ? `<span class="tag">Ultima eseg. ${escapeHtml(plan.last_done_date)}</span>` : ''}
+        <span class="tag">${escapeHtml((plan.inventory_type_labels ?? []).join(', ')) || '—'}</span>
       </div>
     </div>
     <div class="hdr-right">inventory-app<br/>Report Piano #${plan.id}<br/>${now}</div>
@@ -454,7 +459,7 @@ export default function MaintenancePlans() {
     <span class="prog-pct" style="color:${barColor}">${completedCount} / ${coveredCount}</span>
   </div>
 
-  ${plan.notes ? `<div class="notes">${plan.notes}</div>` : ''}
+  ${plan.notes ? `<div class="notes">${escapeHtml(plan.notes)}</div>` : ''}
 
   <div class="sec">Inventory — ${sortedInv.length} dispositivi ordinati per KNumber</div>
   ${sortedInv.length === 0
@@ -470,7 +475,7 @@ export default function MaintenancePlans() {
   }
 
   <div class="footer">
-    <span>Piano #${plan.id} &nbsp;·&nbsp; ${plan.customer_name ?? ''} &nbsp;·&nbsp; ${scheduleLabel}</span>
+    <span>Piano #${plan.id} &nbsp;·&nbsp; ${escapeHtml(plan.customer_name) || ''} &nbsp;·&nbsp; ${escapeHtml(scheduleLabel)}</span>
     <span>inventory-app &nbsp;·&nbsp; ${now}</span>
   </div>
 

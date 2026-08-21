@@ -1,0 +1,29 @@
+Django>=5.0,<6.0
+djangorestframework>=3.15
+django-filter>=24.2
+psycopg[binary]>=3.1
+django-cors-headers>=4.3
+drf-spectacular>=0.27
+django-import-export>=4.1
+Pillow>=10.0
+cryptography>=42.0
+Markdown>=3.6
+reportlab>=4.0
+bleach>=6.1
+gunicorn>=22.0
+django-redis>=5.4
+python-magic>=0.4
+pytesseract>=0.3.10
+requests>=2.31
+# openpyxl: era sotto "dev / CI tooling" (usato solo da import_inventory,
+# comando locale) — ora è anche dipendenza runtime dell'API (export Excel
+# Site Repository, crm/api.py CustomerViewSet.export_site_repository).
+openpyxl>=3.1
+
+# testing
+pytest>=8.0
+pytest-django>=4.8
+
+# dev / CI tooling
+mypy>=1.10
+types-bleach>=6.1

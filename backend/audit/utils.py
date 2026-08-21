@@ -148,10 +148,22 @@ def _client_ip_from_meta(meta: dict[str, Any]) -> tuple[str | None, str | None]:
       - AUDIT_TRUST_X_FORWARDED_FOR=True
         OR
       - AUDIT_TRUSTED_PROXIES=["127.0.0.1", ...] and have REMOTE_ADDR match one.
+
+    0.9.1 (WP-04, archie-realiplimit — audit 2026-08-19, SEC-007): se
+    nessuno dei due è configurato (default out-of-the-box), prima si
+    ricadeva su REMOTE_ADDR, che dietro backend_nginx è sempre l'IP del
+    container nginx, non del client — l'audit registrava lo stesso IP per
+    chiunque. Ora c'è un fallback aggiuntivo su X-Real-IP, che
+    backend_nginx imposta in modo affidabile a $remote_addr dopo averlo
+    risolto con real_ip_module (vedi nginx/backend.conf). È sicuro
+    fidarsene senza configurazione esplicita perché anche il backend
+    Django non è mai raggiungibile se non passando da backend_nginx
+    (docker-compose.yml: "backend" ha solo "expose", mai "ports").
     """
 
     remote_addr = _parse_ip(str(meta.get("REMOTE_ADDR") or "")) if meta else None
     xff_raw = (meta.get("HTTP_X_FORWARDED_FOR") or "").strip() if meta else ""
+    real_ip_header = _parse_ip(str(meta.get("HTTP_X_REAL_IP") or "")) if meta else None
 
     trust_xff = bool(getattr(settings, "AUDIT_TRUST_X_FORWARDED_FOR", False))
     if not trust_xff:
@@ -163,6 +175,9 @@ def _client_ip_from_meta(meta: dict[str, Any]) -> tuple[str | None, str | None]:
         first = xff_raw.split(",")[0].strip()
         ip = _parse_ip(first) or remote_addr
         return ip, xff_raw
+
+    if real_ip_header:
+        return real_ip_header, xff_raw or None
 
     return remote_addr, xff_raw or None
 
@@ -262,6 +277,42 @@ def _request_metadata(request: Request | None) -> dict[str, Any]:
     return data
 
 
+def _sanitize_change_entry(field_name: str, entry: Any) -> Any:
+    """Sanitizza il valore di un singolo campo dentro `changes`.
+
+    `entry` è tipicamente {"from": x, "to": y} o {"before": x, "after": y}.
+    Se il field_name è sensibile mascheriamo OGNI valore dentro l'entry
+    (qualunque sia la forma), preservando le chiavi note (from/to,
+    before/after) invece di collassare tutto in un blob unico — così la UI
+    dell'audit continua a mostrare "che è cambiato qualcosa", solo con i
+    valori oscurati anziché in chiaro.
+    """
+    if SENSITIVE_FIELD_RE.search(str(field_name)):
+        if isinstance(entry, dict):
+            return {str(k): _mask_value(v) for k, v in entry.items()}
+        return _mask_value(entry)
+    return to_change_value_for_field(field_name, entry)
+
+
+def sanitize_changes(changes: dict[str, Any] | None) -> dict[str, Any]:
+    """Sanitizza l'intero dizionario `changes` prima del salvataggio,
+    indipendentemente da come il chiamante lo ha costruito.
+
+    0.9.1 (SEC-001, contenimento completo — audit 2026-08-19):
+    to_change_value_for_field/build_changes esistevano già, ma erano
+    "opt-in" — un chiamante che costruiva `changes` a mano (come
+    CustomerVpnAccessViewSet.create, che usava validated_data grezzo)
+    poteva bypassarli senza che nessuno se ne accorgesse, salvando segreti
+    in chiaro nell'audit. Ora la sanitizzazione avviene qui, in un solo
+    punto, per OGNI evento salvato da log_event — i chiamanti che già
+    usavano build_changes() restano compatibili (mascheratura idempotente:
+    un valore già "••••" resta "••••").
+    """
+    if not changes:
+        return {}
+    return {str(k): _sanitize_change_entry(str(k), v) for k, v in changes.items()}
+
+
 def log_event(
     actor,
     action: str,
@@ -283,6 +334,8 @@ def log_event(
         meta.update(metadata)
     meta = _sanitize_metadata(meta)
 
+    sanitized_changes = sanitize_changes(changes)
+
     path = meta.get("path") or None
     method = meta.get("method") or None
     ip_address = meta.get("ip") or None
@@ -296,7 +349,7 @@ def log_event(
             object_id=str(getattr(instance, "pk", "")) if instance is not None else "",
             object_repr=str(instance) if instance is not None else "",
             subject=(subject or ""),
-            changes=changes or {},
+            changes=sanitized_changes,
             metadata=meta,
             path=path,
             method=method,

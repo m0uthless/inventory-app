@@ -6,6 +6,7 @@ import * as React from 'react'
 import { Box, CircularProgress } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useWidgetAccents } from '../theme/AppThemeProvider'
+import { ALLOWED_FORMATS } from './richEditorFormats'
 
 interface Props {
   value: string
@@ -256,6 +257,7 @@ export default function RichEditor({
         theme: 'snow',
         placeholder,
         readOnly,
+        formats: ALLOWED_FORMATS,
         modules: {
           toolbar: readOnly
             ? false

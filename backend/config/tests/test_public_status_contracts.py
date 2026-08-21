@@ -43,8 +43,17 @@ class TestPublicStatusContracts:
         res = client.get('/api/health/')
 
         assert res.status_code == 200
-        assert res.json() == {
-            'status': 'ok',
-            'database': 'ok',
-            'version': '0.5.0',
-        }
+        data = res.json()
+        assert data['status'] == 'ok'
+        assert data['database'] == 'ok'
+        # 0.9.1 (WP-01, audit 2026-08-19): NON asserire più un valore di
+        # versione hardcoded ("0.5.0"), che era già disallineato dalla vera
+        # fonte di verità (SPECTACULAR_SETTINGS["VERSION"] in settings.py,
+        # oggi != "0.5.0") e avrebbe reso questo test permanentemente rosso
+        # o richiesto un aggiornamento manuale ad ogni release. La singola
+        # fonte di verità resta settings.py (vedi anche il commento in
+        # config/system_stats_api.py, fix "versione prodotto disallineata"
+        # dell'audit 2026-07): qui verifichiamo solo che l'endpoint esponga
+        # esattamente quella stessa fonte, non un valore duplicato.
+        from django.conf import settings
+        assert data['version'] == settings.SPECTACULAR_SETTINGS.get("VERSION")

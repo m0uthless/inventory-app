@@ -41,7 +41,13 @@ def test_portal_user_sees_only_own_customer_with_header(api_client, customer_sta
     _make_vlan(customer_b, site_b, vlan_id=802, network="10.42.0.0/29",
                subnet="255.255.255.248", gateway="10.42.0.1")
 
-    portal_user = make_portal_user(customer_a)
+    # 0.9.1: mancava view_vlan — richiesto da PortalModelPermissions per
+    # QUALUNQUE GET (introdotto da Fix 2.5, audit 2026-07, successivo a
+    # questo file di test — mai propagato qui). Il test verifica lo SCOPE,
+    # non i permessi granulari, quindi basta il permesso di lettura minimo
+    # (non can_edit=True, che concederebbe anche scrittura non necessaria
+    # a questo scenario).
+    portal_user = make_portal_user(customer_a, extra_perms=["view_vlan"])
     api_client.force_authenticate(user=portal_user)
 
     resp = api_client.get("/api/vlans/", HTTP_X_PORTAL_CUSTOMER="1")
@@ -63,7 +69,7 @@ def test_portal_user_sees_only_own_customer_without_header(api_client, customer_
     _make_vlan(customer_b, site_b, vlan_id=804, network="10.44.0.0/29",
                subnet="255.255.255.248", gateway="10.44.0.1")
 
-    portal_user = make_portal_user(customer_a)
+    portal_user = make_portal_user(customer_a, extra_perms=["view_vlan"])
     api_client.force_authenticate(user=portal_user)
 
     resp = api_client.get("/api/vlans/")  # nessun header
@@ -84,7 +90,7 @@ def test_portal_user_sees_only_own_customer_with_forged_header(api_client, custo
     _make_vlan(customer_b, site_b, vlan_id=816, network="10.56.0.0/29",
                subnet="255.255.255.248", gateway="10.56.0.1")
 
-    portal_user = make_portal_user(customer_a)
+    portal_user = make_portal_user(customer_a, extra_perms=["view_vlan"])
     api_client.force_authenticate(user=portal_user)
 
     resp = api_client.get("/api/vlans/", HTTP_X_PORTAL_CUSTOMER="qualunque-cosa")
@@ -130,7 +136,7 @@ def test_dual_profile_user_sees_everything(api_client, customer_status, site_sta
     _make_vlan(customer_b, site_b, vlan_id=818, network="10.58.0.0/29",
                subnet="255.255.255.248", gateway="10.58.0.1")
 
-    dual_user = make_dual_user(customer_a)
+    dual_user = make_dual_user(customer_a, can_edit=True)
     api_client.force_authenticate(user=dual_user)
 
     resp = api_client.get("/api/vlans/")  # nessun header
@@ -156,7 +162,7 @@ def test_dual_profile_user_is_scoped_when_session_ambito_is_portal(api_client, c
     _make_vlan(customer_b, site_b, vlan_id=820, network="10.60.0.0/29",
                subnet="255.255.255.248", gateway="10.60.0.1")
 
-    dual_user = make_dual_user(customer_a)
+    dual_user = make_dual_user(customer_a, can_edit=True)
     api_client.force_authenticate(user=dual_user)
 
     # force_authenticate non passa da login_view: simuliamo esplicitamente
@@ -193,7 +199,7 @@ def test_portal_scoping_applies_to_vlan_ip_requests_too(api_client, customer_sta
     VlanIpRequest.objects.create(customer=customer_a, vlan=vlan_a, ip="10.47.0.2", modalita="pacs")
     VlanIpRequest.objects.create(customer=customer_b, vlan=vlan_b, ip="10.48.0.2", modalita="pacs")
 
-    portal_user = make_portal_user(customer_a)
+    portal_user = make_portal_user(customer_a, extra_perms=["view_vlaniprequest"])
     api_client.force_authenticate(user=portal_user)
 
     # Senza header: prima del fix 2.1 avrebbe visto entrambi i customer.

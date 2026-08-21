@@ -24,6 +24,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import CanRestoreModelPermission, IsAuthenticatedDjangoModelPermissions
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from core.mixins import SoftDeleteAuditMixin
 from core.soft_delete import apply_soft_delete_filters
 from audit.utils import log_event
@@ -234,7 +235,14 @@ class DriveFileSerializer(serializers.ModelSerializer):
 
 class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = DriveFolderSerializer
-    permission_classes = [IsAuthenticatedDjangoModelPermissions]
+    # 0.9.1 (WP-03, archie-portalboundary): dichiarava esplicitamente lo
+    # stesso permission_classes del vecchio default globale — questo
+    # significava che il nuovo IsInternalOrPortalDedicatedApp aggiunto al
+    # default in settings.py NON si applicava qui (permission_classes
+    # esplicite sovrascrivono il default, non si sommano). Aggiunta
+    # esplicitamente anche qui per chiudere lo stesso buco su Drive
+    # (SEC-002/VER-001 + VER-002 "ACL Drive" nell'audit 2026-08-19).
+    permission_classes = [IsAuthenticatedDjangoModelPermissions, IsInternalOrPortalDedicatedApp]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["parent", "customers"]
     search_fields = ["name", "notes"]
@@ -420,7 +428,8 @@ class DriveFolderViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
 class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = DriveFileSerializer
-    permission_classes = [IsAuthenticatedDjangoModelPermissions]
+    # 0.9.1 (WP-03): vedi commento identico su DriveFolderViewSet sopra.
+    permission_classes = [IsAuthenticatedDjangoModelPermissions, IsInternalOrPortalDedicatedApp]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["folder", "customers"]

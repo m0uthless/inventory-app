@@ -13,7 +13,18 @@ pytestmark = pytest.mark.django_db
 
 
 def _make_case_type(category=ServiceNowCaseCategory.BIOTRON, name=None):
-    return ServiceNowCaseType.objects.create(category=category, name=name or f"TT{uuid.uuid4().hex[:8]}")
+    # 0.9.1: get_or_create invece di create — la migration 0005 semina già
+    # ServiceNowCaseType reali (es. category="philips", name="L1", tra gli
+    # altri: EBIT/RIS/AC/GEMELLI per Philips, PRIVATI/CDD per Biotron), MAI
+    # rollbackati tra un test e l'altro (dato di migration, non di test).
+    # I test che passano un `name` esplicito plausibile (es. "L1") possono
+    # collidere con quel seed e violare ux_servicenow_case_type_category_name
+    # con un create() diretto. get_or_create rende l'helper sicuro in
+    # entrambi i casi (name esplicito o UUID casuale) senza cambiare il
+    # comportamento per le chiamate esistenti.
+    return ServiceNowCaseType.objects.get_or_create(
+        category=category, name=name or f"TT{uuid.uuid4().hex[:8]}",
+    )[0]
 
 
 def _case_payload(case_type, number=None, **overrides):

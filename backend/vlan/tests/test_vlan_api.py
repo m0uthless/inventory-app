@@ -117,6 +117,10 @@ def test_read_requires_view_permission(api_client, customer_status, site_status)
     assert resp.status_code == 403
 
     internal_user.user_permissions.add(Permission.objects.get(codename="view_vlan"))
+    # 0.9.1: cache permessi Django sull'istanza User (stesso motivo di
+    # device/tests/test_wifi_certificate_e2e.py) — serve un'istanza fresca.
+    internal_user = type(internal_user).objects.get(pk=internal_user.pk)
+    api_client.force_authenticate(user=internal_user)
     resp = api_client.get("/api/vlans/")
     assert resp.status_code == 200
 

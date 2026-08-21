@@ -138,8 +138,20 @@ def test_approve_already_approved_request_returns_400(api_client, superuser, cus
 
 def test_approve_requires_admin_permission(api_client, customer_status, site_status):
     """Un utente interno che può leggere/scrivere le VLAN (device.change_device)
-    ma non ha vlan.change_vlanIprequest non può approvare le richieste."""
-    internal_user = make_internal_user(can_edit=True)
+    ma non ha vlan.change_vlanIprequest non può approvare le richieste.
+
+    0.9.1: make_internal_user(can_edit=True) concede ANCHE
+    change_vlaniprequest (è in _FULL_CRUD_CODENAMES) — con can_edit=True
+    puro questo test non testava più il caso negativo che dice di testare
+    (mascherato finora dal crash FOR UPDATE sistemato separatamente, che
+    faceva fallire la richiesta con un errore 500 prima ancora di
+    arrivare al controllo permessi). Usiamo can_edit=False + extra_perms
+    mirati: device/vlan in scrittura, MA non vlaniprequest.
+    """
+    internal_user = make_internal_user(can_edit=False, extra_perms=[
+        "view_device", "add_device", "change_device", "delete_device",
+        "view_vlan", "add_vlan", "change_vlan", "delete_vlan",
+    ])
     api_client.force_authenticate(user=internal_user)
     customer = make_customer(internal_user, customer_status)
     site = make_site(internal_user, customer, site_status)

@@ -2,10 +2,22 @@ import os
 from django.conf import settings
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 
 from core.models import TimeStampedModel
 from core.crypto import encrypt
 from crm.models import Customer, Site
+
+
+# API-001 (0.9.1, audit 2026-08-19): il campo mac_address di DeviceWifi
+# dichiarava il formato atteso solo nell'help_text ("AA:BB:CC:DD:EE:FF") ma
+# non lo validava — un client API poteva salvare qualunque stringa fino a
+# 17 caratteri. Accetta sia ':' che '-' come separatore (entrambi comuni
+# nei tool di rete/export), esadecimale maiuscolo o minuscolo.
+mac_address_validator = RegexValidator(
+    regex=r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$",
+    message="MAC address non valido. Formato atteso: AA:BB:CC:DD:EE:FF (o con separatore '-').",
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +244,7 @@ class DeviceWifi(TimeStampedModel):
         blank=True,
         verbose_name="MAC Address",
         help_text="Formato: AA:BB:CC:DD:EE:FF",
+        validators=[mac_address_validator],
     )
     certificato = models.FileField(
         upload_to=_wifi_cert_upload_path,

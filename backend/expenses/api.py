@@ -15,7 +15,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -29,6 +29,7 @@ from audit.utils import log_event, to_change_value_for_field
 from core.media import build_action_url, protected_media_response
 from core.mixins import SoftDeleteAuditMixin
 from core.uploads import validate_upload
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 from .models import (
     EXPENSE_CATEGORY_ORDER,
@@ -116,7 +117,8 @@ class TechnicianKmRatePermission(BasePermission):
 
 class TechnicianKmRateViewSet(viewsets.ModelViewSet):
     serializer_class = TechnicianKmRateSerializer
-    permission_classes = [TechnicianKmRatePermission]
+    # 0.9.1 (WP-03): permission_classes esplicite -> estese qui.
+    permission_classes = [TechnicianKmRatePermission, IsInternalOrPortalDedicatedApp]
     pagination_class = None
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
@@ -471,7 +473,8 @@ class ExpenseReportViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     dedicate (submit/validate/reject), non da PATCH diretto su `status`."""
 
     serializer_class = ExpenseReportSerializer
-    permission_classes = [ExpenseReportPermission]
+    # 0.9.1 (WP-03): permission_classes esplicite -> estese qui.
+    permission_classes = [ExpenseReportPermission, IsInternalOrPortalDedicatedApp]
     pagination_class = None
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
     filter_backends = [DjangoFilterBackend]
@@ -508,22 +511,31 @@ class ExpenseReportViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        try:
-            instance = serializer.save(
-                user=self.request.user,
-                created_by=self.request.user,
-                updated_by=self.request.user,
-            )
-        except IntegrityError:
-            raise serializers.ValidationError("Esiste già una nota spese per questo mese.")
+        # 0.9.1 (WP-05, archie-atomicworkflows — audit 2026-08-19,
+        # REL-001): prima il report e le 12 voci fisse erano due
+        # operazioni separate senza transaction.atomic() — se bulk_create
+        # falliva dopo che il report era già stato creato (es. errore DB
+        # transitorio), restava un ExpenseReport "orfano" senza nessuna
+        # delle 12 voci fisse attese, che rompe ogni assunzione del resto
+        # del modulo (submit controlla obj.items.exclude(amount=0), il
+        # frontend si aspetta sempre 12 righe in ordine fisso, ecc.).
+        with transaction.atomic():
+            try:
+                instance = serializer.save(
+                    user=self.request.user,
+                    created_by=self.request.user,
+                    updated_by=self.request.user,
+                )
+            except IntegrityError:
+                raise serializers.ValidationError("Esiste già una nota spese per questo mese.")
 
-        ExpenseItem.objects.bulk_create([
-            ExpenseItem(
-                report=instance, category=cat,
-                created_by=self.request.user, updated_by=self.request.user,
-            )
-            for cat in EXPENSE_CATEGORY_ORDER
-        ])
+            ExpenseItem.objects.bulk_create([
+                ExpenseItem(
+                    report=instance, category=cat,
+                    created_by=self.request.user, updated_by=self.request.user,
+                )
+                for cat in EXPENSE_CATEGORY_ORDER
+            ])
 
         changes = {
             k: {"from": None, "to": to_change_value_for_field(k, v)}

@@ -207,6 +207,14 @@ class VlanViewSet(
     # Fix 2.5: sostituisce IsPortalEditor (controllava solo device.change_device
     # per QUALSIASI scrittura) con la matrice reale view/add/change/delete_vlan.
     permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]
+    # 0.9.1: Vlan non ha un campo updated_by (a differenza di Contact/
+    # Customer/Inventory) — senza questo, RestoreActionMixin._restore_obj
+    # (default restore_has_updated_by=True) tentava
+    # obj.save(update_fields=["deleted_at", "updated_by", "updated_at"])
+    # con "updated_by" inesistente sul modello, sollevando un ValueError
+    # ("fields do not exist...") mai notato perché la suite di test non
+    # girava con successo end-to-end fino ad ora.
+    restore_has_updated_by = False
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["customer", "site", "vlan_id"]
     search_fields = ["name", "network", "gateway", "lan"]
@@ -543,8 +551,20 @@ class VlanIpRequestViewSet(PortalTenantWriteMixin, PortalScopedMixin, SoftDelete
         `stato` già cambiato dalla prima.
         """
         with transaction.atomic():
+            # 0.9.1: select_related("site", "device_type", "manufacturer",
+            # "approvato_da", ...) include FK nullable -> Django genera
+            # LEFT OUTER JOIN per quei campi. Postgres rifiuta SELECT ...
+            # FOR UPDATE quando la query include un JOIN nullable di questo
+            # tipo ("FOR UPDATE cannot be applied to the nullable side of
+            # an outer join") — bug preesistente mai notato perché questo
+            # path non era mai stato eseguito con successo in test.
+            # of=("self",) dice a Postgres di bloccare SOLO la riga di
+            # VlanIpRequest, non le tabelle collegate via JOIN — è
+            # esattamente quello che serve qui (il lock protegge solo
+            # `stato`), quindi risolve senza perdere i vantaggi di
+            # select_related sul resto della query.
             req: VlanIpRequest = get_object_or_404(
-                self.filter_queryset(self.get_queryset()).select_for_update(), pk=pk
+                self.filter_queryset(self.get_queryset()).select_for_update(of=("self",)), pk=pk
             )
             if req.stato != VlanIpRequest.Stato.PENDING:
                 return Response(
@@ -565,8 +585,9 @@ class VlanIpRequestViewSet(PortalTenantWriteMixin, PortalScopedMixin, SoftDelete
         Fix P0 6.5: stesso lock di approve() per evitare race condition.
         """
         with transaction.atomic():
+            # 0.9.1: stesso motivo/fix di approve() sopra (of=("self",)).
             req: VlanIpRequest = get_object_or_404(
-                self.filter_queryset(self.get_queryset()).select_for_update(), pk=pk
+                self.filter_queryset(self.get_queryset()).select_for_update(of=("self",)), pk=pk
             )
             if req.stato != VlanIpRequest.Stato.PENDING:
                 return Response(

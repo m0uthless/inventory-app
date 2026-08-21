@@ -38,3 +38,14 @@ prod-sync.sh
 # frontend
 frontend/node_modules/
 frontend/dist/
+
+# 0.9.1 (WP-04, archie-secretartifacts — audit 2026-08-19, SEC-009):
+# backend/import_files/ è pensata come cartella di lavoro locale per file
+# di import manuale (es. inventory.xlsx con dati reali di clienti/
+# credenziali per il comando import_inventory). Non deve MAI essere
+# committata: un file dimenticato qui è finito nell'audit come credenziali
+# VNC/OS in chiaro (rimosso in Fase 0 di questa roadmap). L'unica eccezione
+# è un README che spiega la cartella stessa.
+backend/import_files/*
+!backend/import_files/.gitkeep
+!backend/import_files/README.md

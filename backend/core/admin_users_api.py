@@ -49,6 +49,7 @@ from rest_framework.views import APIView
 from audit.utils import log_event
 from core.models import UserProfile
 from core.permissions import HasManageUsersPermission
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from core.permission_modules import (
     MODULE_LABELS,
     compute_permission_ids,
@@ -89,7 +90,7 @@ def _portal_profile_qs():
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PermissionModulesView(APIView):
-    permission_classes = [IsAuthenticated, HasManageUsersPermission]
+    permission_classes = [IsAuthenticated, HasManageUsersPermission, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         return Response(get_permission_modules(), status=status.HTTP_200_OK)
@@ -258,7 +259,7 @@ class UserAdminViewSet(
 
     queryset = User.objects.all()  # sovrascritto da get_queryset()
     serializer_class = UserAdminSerializer
-    permission_classes = [IsAuthenticated, HasManageUsersPermission]
+    permission_classes = [IsAuthenticated, HasManageUsersPermission, IsInternalOrPortalDedicatedApp]
     pagination_class = None
 
     def get_queryset(self):
@@ -467,7 +468,15 @@ class UserAdminViewSet(
             subject=f"Gestione utenti: modificato {instance.username}",
         )
 
-        instance.refresh_from_db()
+        # 0.9.1: refresh_from_db() ricarica solo i campi concreti del
+        # modello, MAI le annotazioni della queryset (has_portal_access è
+        # un Exists(...) calcolato in get_queryset(), non un campo — vedi
+        # sopra). Dopo refresh_from_db() l'istanza aveva quindi ancora il
+        # valore di has_portal_access calcolato PRIMA della modifica
+        # (es. "portal_access": {"level": "read"} appena applicato, ma
+        # has_portal_access nella risposta ancora False). Ri-fetchando
+        # dalla stessa queryset annotata si rifà anche il calcolo.
+        instance = self.get_queryset().get(pk=instance.pk)
         out_serializer = self.get_serializer(instance)
         return Response(out_serializer.data)
 
@@ -667,7 +676,7 @@ class GroupAdminViewSet(
 
     queryset = Group.objects.all().prefetch_related("permissions").order_by("name")
     serializer_class = GroupAdminSerializer
-    permission_classes = [IsAuthenticated, HasManageUsersPermission]
+    permission_classes = [IsAuthenticated, HasManageUsersPermission, IsInternalOrPortalDedicatedApp]
     pagination_class = None
 
     @transaction.atomic

@@ -186,6 +186,35 @@ class IsInternalUser(BasePermission):
         return _is_internal_user(request.user)
 
 
+class IsInternalUserStrictAmbito(BasePermission):
+    """Come IsInternalUser, ma nega esplicitamente le sessioni con
+    ambito=="portal" (0.9.1, contenimento SEC-001/SEC-002 in attesa della
+    barriera centrale Portal/Archie completa — vedi Fase 2 roadmap).
+
+    Un utente "dual-profile" (ha sia core.access_archie sia un profilo
+    Portal attivo) che ha fatto login dal Portal non deve poter raggiungere
+    endpoint interni particolarmente sensibili (es. Audit) nella stessa
+    sessione, anche se possiede il permesso Django.
+
+    Stessa semantica di _bypasses_portal_scope: is_superuser resta un
+    override di sistema assoluto, indipendente dall'ambito; le sessioni
+    senza SESSION_AMBITO_KEY (precedenti a questa modifica) NON sono
+    considerate ambito "portal" e quindi passano, per non rompere sessioni
+    già aperte.
+    """
+    message = "Accesso riservato agli utenti interni in ambito Archie."
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        if getattr(user, "is_superuser", False):
+            return True
+        if not _is_internal_user(user):
+            return False
+        session = getattr(request, "session", None)
+        ambito = session.get(SESSION_AMBITO_KEY) if session is not None else None
+        return ambito != "portal"
+
+
 class IsPortalUserOrInternal(BasePermission):
     """Accesso per utenti Portal o utenti interni Archie."""
     message = "Autenticazione richiesta."
@@ -222,6 +251,71 @@ class IsArchieAdmin(BasePermission):
         if getattr(user, "is_superuser", False):
             return True
         return bool(user.has_perm("core.access_archie"))
+
+
+class IsInternalOrPortalDedicatedApp(BasePermission):
+    """Permission di default a livello di progetto (0.9.1, WP-03 —
+    archie-portalboundary, audit 2026-08-19, finding SEC-002/VER-001).
+
+    Aggiunta al DEFAULT_PERMISSION_CLASSES accanto a
+    IsAuthenticatedDjangoModelPermissions (non la sostituisce: entrambe
+    devono passare, sono in AND). Riusa PORTAL_DEDICATED_APPS
+    (core/permission_modules.py), la stessa allowlist già usata dal
+    pannello "Utenti e Gruppi" per capire quali moduli sono Portal-dedicati
+    (oggi: portal, device, vlan).
+
+    Comportamento:
+    - utente interno (ambito di sessione != "portal", incl. sessioni senza
+      SESSION_AMBITO_KEY) o superuser → sempre consentito, ESATTAMENTE il
+      comportamento storico di IsAuthenticatedDjangoModelPermissions da
+      solo. Nessuna regressione per lo staff.
+    - sessione con ambito == "portal" → negato su qualunque ViewSet che
+      finisce per usare il default globale (cioè non dichiara proprie
+      permission_classes). I ViewSet CRM/Inventory/Device/VLAN che il
+      Portal usa legittimamente dichiarano SEMPRE permission_classes
+      esplicite (IsPortalUserOrInternal + ...), quindi DRF ignora questo
+      default per loro e non vengono toccati da questa classe.
+
+    Perché qui e non "aggiungere permission_classes ai 40 ViewSet aperti":
+    un domani un nuovo ViewSet senza permission_classes esplicite nasce
+    già chiuso al Portal by default — bisogna scegliere esplicitamente di
+    aprirlo, non il contrario (che è la causa radice di SEC-002/VER-001).
+    """
+    message = "Modulo non disponibile per il Portal."
+
+    def has_permission(self, request, view) -> bool:
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+
+        session = getattr(request, "session", None)
+        ambito = session.get(SESSION_AMBITO_KEY) if session is not None else None
+        if ambito != "portal":
+            return True
+
+        from core.permission_modules import PORTAL_DEDICATED_APPS
+
+        # Stesso pattern usato internamente da DRF's DjangoModelPermissions
+        # (rest_framework.permissions._queryset): ogni ViewSet registrato
+        # via router ha queryset o get_queryset(), quindi qui non serve
+        # altro fallback. Le sole APIView "custom" del progetto (me/,
+        # portal/*, search/, drive-files/upload/, ecc.) dichiarano TUTTE
+        # permission_classes esplicite (verificato riga per riga in questa
+        # sessione) — non arrivano mai qui, DRF ignora il default globale
+        # per loro.
+        if hasattr(view, "get_queryset"):
+            try:
+                queryset = view.get_queryset()
+            except Exception:
+                queryset = getattr(view, "queryset", None)
+        else:
+            queryset = getattr(view, "queryset", None)
+
+        model = getattr(queryset, "model", None)
+        app_label = getattr(getattr(model, "_meta", None), "app_label", None)
+        return app_label in PORTAL_DEDICATED_APPS
 
 
 # ─── Matrice permessi R/W/D reale per Device/VLAN/Rispacs ─────────────────────

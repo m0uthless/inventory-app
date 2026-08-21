@@ -7,10 +7,13 @@ on:
 
 jobs:
   frontend:
+    strategy:
+      matrix:
+        app: [frontend, frontend-portal]
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: ${{ matrix.app }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,10 +22,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: ESLint
         run: npm run lint
@@ -35,6 +38,39 @@ jobs:
 
       - name: Frontend build
         run: npm run build
+
+      # Fase 6 (0.9.1, audit 2026-08-19): scan CVE in pipeline. Fallisce la
+      # build su qualunque vulnerabilità nota nelle dipendenze di produzione
+      # (--omit=dev: i tool di build/test locali non finiscono in un
+      # bundle servito, e tenerli fuori evita falsi allarmi su vitest/vite
+      # che cambiano spesso e non sono mai eseguiti in produzione), TRANNE
+      # l'eccezione nota e già accettata: quill (1 LOW, nessuna versione
+      # corretta disponibile a monte — mitigata con formats: allowlist,
+      # vedi RichEditor.tsx). Qualunque altra vulnerabilità fa fallire la CI.
+      - name: npm audit (CVE scan, dipendenze di produzione)
+        run: |
+          npm audit --omit=dev --json > audit-report.json || true
+          python3 -c "
+          import json, sys
+          ALLOWED = {'quill'}
+          d = json.load(open('audit-report.json'))
+          unexpected = {k: v['severity'] for k, v in d.get('vulnerabilities', {}).items() if k not in ALLOWED}
+          if unexpected:
+              print('Vulnerabilita\' NON in allowlist trovate:', unexpected)
+              sys.exit(1)
+          print('OK: nessuna vulnerabilita\' oltre alle eccezioni note (', ALLOWED, ')')
+          "
+
+      # SBOM in formato CycloneDX, un artifact per app frontend.
+      - name: Generate SBOM (CycloneDX)
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.app }}
+          path: ${{ matrix.app }}/sbom.cdx.json
+          retention-days: 90
 
   backend:
     runs-on: ubuntu-latest
@@ -51,6 +87,33 @@ jobs:
 
       - name: Static type check (mypy)
         run: docker compose $COMPOSE_FILES run --rm backend python -m mypy --config-file mypy.ini .
+
+      # Fase 6 (0.9.1, audit 2026-08-19): scan CVE sulle dipendenze Python
+      # pinnate/hashate (backend/requirements.txt, archie-fase6). Gira
+      # sull'host CI, non nel container, per non appesantire l'immagine
+      # runtime con un tool che serve solo in CI.
+      - name: Set up Python (per pip-audit)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: pip-audit (CVE scan backend)
+        run: |
+          pip install --quiet pip-audit
+          pip-audit -r backend/requirements.txt
+
+      # SBOM in formato CycloneDX per le dipendenze Python.
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          pip install --quiet cyclonedx-bom
+          cyclonedx-py requirements backend/requirements.txt --output-file backend/sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend
+          path: backend/sbom.cdx.json
+          retention-days: 90
 
       - name: Start database
         run: docker compose $COMPOSE_FILES up -d db redis

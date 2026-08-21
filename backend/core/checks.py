@@ -1,9 +1,15 @@
 """Django system checks custom del progetto.
 
-Fix 2.12 (audit 2026-07): i frontend ARCHIE e Portal possono autenticare su
-un dominio e redirigere all'altro. Senza SESSION_COOKIE_DOMAIN impostato su
-un dominio condiviso (es. .biotron.it), la sessione resta host-only e
-l'utente perde l'autenticazione passando da un frontend all'altro.
+Fix 2.12 (audit 2026-07): il check nasceva per segnalare l'assenza di
+SESSION_COOKIE_DOMAIN quando ARCHIE e Portal condividono l'autenticazione
+tra sottodomini. Quella premessa non vale più: dal 2026-08-13 (vedi nota in
+config/settings.py accanto a SESSION_COOKIE_DOMAIN) è stato deciso il
+contrario — un cookie di sessione CONDIVISO tra i sottodomini rompe il
+meccanismo di ambito multi-customer del Portal (l'ambito riflette da quale
+frontend è stato fatto login, e con un cookie condiviso quell'informazione
+non è più affidabile). Il check ora fa l'opposto di prima: segnala se
+SESSION_COOKIE_DOMAIN risulta impostato in produzione, perché è quello il
+caso da evitare (ARCH-001, audit 2026-08-19, Fase 6).
 
 Questi check girano SEMPRE (anche in `manage.py check` senza `--deploy`) ma
 segnalano solo in produzione (DEBUG=False), e sono WARNING non ERROR: non
@@ -20,18 +26,19 @@ def check_cross_subdomain_session_config(app_configs, **kwargs):
 
     warnings = []
 
-    if not settings.SESSION_COOKIE_DOMAIN:
+    if settings.SESSION_COOKIE_DOMAIN:
         warnings.append(
             Warning(
-                "SESSION_COOKIE_DOMAIN non impostato in produzione.",
+                "SESSION_COOKIE_DOMAIN è impostato in produzione.",
                 hint=(
-                    "Se ARCHIE e il Portal girano su sottodomini diversi "
-                    "(es. archie.biotron.it e portal.biotron.it) e condividono "
-                    "l'autenticazione, imposta DJANGO_SESSION_COOKIE_DOMAIN=.biotron.it "
-                    "nell'env di produzione, altrimenti la sessione resta host-only "
-                    "e un redirect tra i due domini perde il login. Se i due "
-                    "frontend NON condividono sessione, questo warning è "
-                    "atteso e puoi ignorarlo."
+                    "Decisione del 2026-08-13: ARCHIE e il Portal NON devono "
+                    "condividere il cookie di sessione tra sottodomini, perché "
+                    "l'ambito multi-customer del Portal dipende dal frontend "
+                    "da cui è stato fatto login (vedi portal/permissions.py, "
+                    "_bypasses_portal_scope). Un DJANGO_SESSION_COOKIE_DOMAIN "
+                    "condiviso (es. .biotron.it) rompe questo meccanismo. "
+                    "Lascia la variabile vuota/non impostata, salvo un nuovo "
+                    "cambio di decisione esplicito su come gestire l'ambito."
                 ),
                 id="core.W001",
             )
