@@ -7,8 +7,6 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
-## [0.9.1] - 2026-08-21
-
 Rilascio dedicato a un giro di verifica e rafforzamento della sicurezza, a seguito di un audit esterno indipendente.
 
 ### Added
