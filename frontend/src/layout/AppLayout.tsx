@@ -1076,6 +1076,18 @@ export function AppLayout() {
         }}
         open
       >
+        {/* eslint-disable-next-line react-hooks/refs -- `drawer` è una funzione
+            helper (non un componente React, da cui la minuscola) invocata
+            direttamente durante il render invece che come <Drawer .../>. Il
+            linter/React Compiler segnala in modo prudenziale che "accede a un
+            ref" perché il suo corpo referenzia clearFlyoutCloseTimer/
+            scheduleFlyoutClose (che leggono flyoutCloseTimer.current) — ma
+            quella lettura avviene SOLO dentro le closure di onClick/
+            onMouseEnter/onMouseLeave, mai in modo sincrono durante
+            l'esecuzione di drawer() stesso, quindi è sicuro secondo le regole
+            React reali. Il fix "vero" (estrarre drawer in un componente top-
+            level con ~25 prop) è un refactor a rischio non banale su un file
+            senza test — volutamente rimandato, vedi nota Fase 6/roadmap. */}
         {drawer(mini)}
       </Drawer>
 
@@ -1094,6 +1106,7 @@ export function AppLayout() {
         }}
         sx={{ display: { xs: 'block', md: 'none' } }}
       >
+        {/* eslint-disable-next-line react-hooks/refs -- vedi nota sopra */}
         {drawer(false)}
       </Drawer>
 

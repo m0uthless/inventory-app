@@ -18,10 +18,20 @@ class Inventory(TimeStampedModel):
     type = models.ForeignKey(InventoryType, on_delete=models.PROTECT, null=False, blank=False)
 
     os_user = models.CharField(max_length=128, null=True, blank=True)
-    os_pwd = models.CharField(max_length=128, null=True, blank=True)
+    # 0.9.1 (WP-05, archie-dataconstraints — audit 2026-08-19, DATA-001):
+    # erano max_length=128, ma il valore salvato è CIFRATO (Fernet, non il
+    # plaintext) — un token Fernet per un plaintext di 32+ caratteri supera
+    # già 128 caratteri (verificato: 31 caratteri in chiaro -> 125
+    # caratteri cifrati, ok; 32 caratteri in chiaro -> 145, overflow).
+    # Qualunque password/passphrase moderna abbastanza robusta (32+
+    # caratteri, comune con un password manager) falliva il salvataggio
+    # con un errore Postgres poco chiaro. 512 allinea questi tre campi
+    # allo stesso dimensionamento già usato per CustomerVpnAccess.password
+    # e DeviceWifi.pass_certificato, entrambi cifrati allo stesso modo.
+    os_pwd = models.CharField(max_length=512, null=True, blank=True)
     app_usr = models.CharField(max_length=128, null=True, blank=True)
-    app_pwd = models.CharField(max_length=128, null=True, blank=True)
-    vnc_pwd = models.CharField(max_length=128, null=True, blank=True)
+    app_pwd = models.CharField(max_length=512, null=True, blank=True)
+    vnc_pwd = models.CharField(max_length=512, null=True, blank=True)
 
     hostname = models.CharField(max_length=255, null=True, blank=True)
     local_ip = models.CharField(max_length=64, null=True, blank=True)
@@ -59,7 +69,28 @@ class Inventory(TimeStampedModel):
             models.Index(fields=["site", "deleted_at"], name="inv_site_del_idx"),
             models.Index(fields=["updated_at"], name="inv_updated_at_idx"),
         ]
-        constraints = []
+        constraints = [
+            # 0.9.1 (WP-05, archie-dataconstraints — audit 2026-08-19,
+            # DATA-002): SOLO serial_number, non knumber. Confermato con
+            # Fede: più inventory possono legittimamente condividere lo
+            # stesso knumber (es. un host fisico e le sue macchine
+            # virtuali) — un vincolo di unicità su knumber sarebbe
+            # SBAGLIATO, coerente con la migration 0007/0008 che lo aveva
+            # rimosso deliberatamente in passato. serial_number resta
+            # invece un identificativo hardware fisico, deve restare
+            # univoco: qui aggiungiamo il vincolo DB che manca, a
+            # completare il controllo applicativo già presente in
+            # InventoryDetailSerializer.validate() (che da solo è una
+            # classica TOCTOU sotto richieste concorrenti). Il blocco
+            # applicativo su knumber duplicato in validate() (righe
+            # ~254-260) NON è stato toccato in questa patch — resta in
+            # piedi in attesa che Fede verifichi se va rimosso anche lì.
+            models.UniqueConstraint(
+                fields=["serial_number"],
+                condition=models.Q(deleted_at__isnull=True, serial_number__isnull=False),
+                name="ux_inventories_serial_active",
+            ),
+        ]
 
     def clean(self):
         if self.site_id and self.site.customer_id != self.customer_id:

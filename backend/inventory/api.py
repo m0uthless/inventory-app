@@ -251,13 +251,12 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
                     {"serial_number": "Serial number già presente su un inventario attivo."}
                 )
 
-        knumber = attrs.get("knumber") if "knumber" in attrs else None
-        if knumber:
-            qs = Inventory.objects.filter(deleted_at__isnull=True, knumber=knumber)
-            if instance_pk:
-                qs = qs.exclude(pk=instance_pk)
-            if qs.exists():
-                raise serializers.ValidationError({"knumber": "K-number già presente su un inventario attivo."})
+        # NOTA DATA-002 (0.9.1, archie-dataconstraints, confermato con Fede):
+        # il knumber NON è univoco per design — un host fisico e le sue
+        # macchine virtuali possono legittimamente condividere lo stesso
+        # K-number. Coerente con la rimozione deliberata del vincolo DB
+        # (migration 0007/0008) e con la migration 0013 che ha reintrodotto
+        # SOLO il vincolo su serial_number. Blocco applicativo rimosso.
 
         # custom_fields: delegato a CustomFieldsValidationMixin.validate()
         attrs = super().validate(attrs)
@@ -343,7 +342,6 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
             raise_integrity_error_as_validation(
                 e,
                 constraint_map={
-                    "ux_inventories_knumber_active": {"knumber": "K-number già presente su un inventario attivo."},
                     "ux_inventories_serial_active": {"serial_number": "Serial number già presente su un inventario attivo."},
                 },
             )
@@ -357,7 +355,6 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
             raise_integrity_error_as_validation(
                 e,
                 constraint_map={
-                    "ux_inventories_knumber_active": {"knumber": "K-number già presente su un inventario attivo."},
                     "ux_inventories_serial_active": {"serial_number": "Serial number già presente su un inventario attivo."},
                 },
             )

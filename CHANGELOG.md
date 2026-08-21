@@ -7,6 +7,31 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-21
+
+Rilascio dedicato a un giro di verifica e rafforzamento della sicurezza, a seguito di un audit esterno indipendente.
+
+### Added
+- Validato meglio il formato dell'indirizzo MAC nei dispositivi WiFi, per evitare valori non validi.
+
+### Fixed
+- Risolto un problema che poteva impedire il salvataggio di password molto lunghe su un inventario.
+- Impedita la creazione di due inventari attivi con lo stesso numero di serie; confermato invece che host fisico e relative macchine virtuali possono continuare a condividere lo stesso K-number.
+- Corretto un caso raro in cui due modifiche contemporanee potevano lasciare più di un contatto "primario" su uno stesso cliente o sito.
+- Corretto un caso raro in cui un errore durante il salvataggio poteva lasciare un rapportino spese incompleto.
+- Corretto un problema simile sugli ordini di acquisto: caricamento del documento e avanzamento di stato restano sempre allineati.
+- Risolti gli ultimi avvisi tecnici residui segnalati dagli strumenti di controllo del codice frontend — nessun impatto per l'utente.
+
+### Security
+- Rafforzati i controlli di accesso tra l'area interna (ARCHIE) e il Portal clienti: un utente del Portal non può più vedere dati riservati all'area interna.
+- Bloccato il download diretto di ricevute spese e documenti degli ordini di acquisto senza passare dal login.
+- Corretta una falla che avrebbe potuto permettere di inserire contenuto dannoso nei campi di testo dei piani di manutenzione.
+- Il registro storico delle attività (audit) ora nasconde sempre le password e altri dati sensibili, anche negli eventi già registrati in passato.
+- Le cartelle del Drive ora ereditano correttamente le restrizioni di accesso dalle cartelle superiori: una sottocartella senza restrizioni proprie, dentro una cartella riservata, non è più visibile a chi non dovrebbe.
+- Rimosso dal progetto un file che conteneva dati reali (indirizzi IP, password) e che non doveva trovarsi lì.
+- Aggiornate diverse librerie di terze parti con vulnerabilità note, sia sul backend che su entrambi i frontend.
+- Backend e frontend ora girano con permessi limitati invece che con privilegi da amministratore di sistema, per ridurre l'impatto di eventuali problemi di sicurezza futuri.
+
 ## [0.9.0] - 2026-08-20
 
 ### Added

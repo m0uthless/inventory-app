@@ -134,6 +134,31 @@ class Contact(TimeStampedModel):
             # Used by primary contact enforcement: customer+site+is_primary+deleted_at
             models.Index(fields=["customer", "site", "is_primary", "deleted_at"], name="contact_primary_idx"),
         ]
+        constraints = [
+            # 0.9.1 (WP-05, archie-dataconstraints — audit 2026-08-19,
+            # DATA-003): "un solo contatto primario per customer/site" era
+            # garantito SOLO in application code (ContactViewSet.
+            # _enforce_primary, eseguito DOPO il save, in una query
+            # separata non atomica) — due richieste concorrenti che
+            # impostano is_primary=True su due contatti diversi per lo
+            # stesso customer/site potevano risultare entrambe primarie.
+            # Due constraint separati (non uno solo su customer+site)
+            # perché in SQL standard NULL non è mai uguale a un altro
+            # NULL: un singolo UniqueConstraint su (customer, site) non
+            # avrebbe impedito due contatti primari con site=NULL per lo
+            # stesso customer (il caso "contatto a livello customer, non
+            # legato a un site specifico").
+            models.UniqueConstraint(
+                fields=["customer"],
+                condition=models.Q(is_primary=True, deleted_at__isnull=True, site__isnull=True),
+                name="ux_contact_one_primary_per_customer_no_site",
+            ),
+            models.UniqueConstraint(
+                fields=["customer", "site"],
+                condition=models.Q(is_primary=True, deleted_at__isnull=True, site__isnull=False),
+                name="ux_contact_one_primary_per_customer_site",
+            ),
+        ]
 
 
 class CustomerVpnAccess(TimeStampedModel):

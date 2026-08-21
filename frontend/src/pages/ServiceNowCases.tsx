@@ -394,7 +394,7 @@ function TriagePanel({ refreshKey, canManage }: { refreshKey: number; canManage:
     const d = data?.date ? new Date(`${data.date}T00:00:00`) : new Date()
     const label = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
     return label.charAt(0).toUpperCase() + label.slice(1)
-  }, [data?.date])
+  }, [data])
 
   return (
     <Box sx={{

@@ -21,6 +21,7 @@ import uuid
 
 from core.mixins import RestoreActionMixin, SoftDeleteAuditMixin
 from audit.utils import log_event, to_change_value_for_field
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 from .models import Absence, AbsenceReason, AbsenceStatus, DayPart, Holiday, LeaveArea
 
@@ -200,7 +201,8 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
     """
 
     serializer_class   = AbsenceSerializer
-    permission_classes = [AbsencePermission]
+    # 0.9.1 (WP-03): permission_classes esplicite -> estese qui.
+    permission_classes = [AbsencePermission, IsInternalOrPortalDedicatedApp]
     http_method_names  = ["get", "post", "patch", "delete", "head", "options"]
     pagination_class   = None
     filter_backends    = [DjangoFilterBackend]

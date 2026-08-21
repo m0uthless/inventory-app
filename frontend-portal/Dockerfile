@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Installa dipendenze di frontend-portal
 COPY frontend-portal/package*.json ./frontend-portal/
-RUN cd frontend-portal && npm install --legacy-peer-deps
+RUN cd frontend-portal && npm ci --legacy-peer-deps
 
 # Copia shared/ e crea symlink node_modules so che tsc trovi react/@mui ecc.
 COPY shared/ ./shared/
@@ -21,6 +21,9 @@ COPY frontend-portal/ ./frontend-portal/
 RUN cd frontend-portal && npm run build
 
 # serve
-FROM nginx:1.27-alpine
+# Fase 6 (0.9.1, audit 2026-08-19, fix post-staging): vedi frontend/Dockerfile
+# per la spiegazione — stessa immagine nginxinc/nginx-unprivileged.
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY frontend-portal/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend-portal/dist /usr/share/nginx/html
+EXPOSE 8080

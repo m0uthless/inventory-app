@@ -13,3 +13,11 @@ media
 .gitignore
 .vscode
 .DS_Store
+
+# 0.9.1 (WP-04, archie-secretartifacts — audit 2026-08-19, SEC-009): vedi
+# backend/import_files/README.md. Anche se questa cartella fosse mai
+# tracciata da Git per errore, non deve comunque finire dentro l'immagine
+# Docker del backend.
+import_files/*
+!import_files/.gitkeep
+!import_files/README.md

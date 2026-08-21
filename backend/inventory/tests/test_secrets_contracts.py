@@ -52,6 +52,14 @@ def inventory_record(db):
 def _user_with_inventory_perms(*codenames: str):
     User = get_user_model()
     user = User.objects.create_user(username=f"ops-{uuid4().hex[:8]}", password="ops")
+    # 0.9.1: mancava core.access_archie. InventoryViewSet usa
+    # IsPortalUserOrInternal (portal.permissions), che richiede un profilo
+    # Portal attivo OPPURE core.access_archie — un utente con SOLI permessi
+    # a livello di modello (view_inventory ecc., concessi sotto) senza
+    # nessuno dei due viene comunque respinto a monte, prima ancora che
+    # PortalModelPermissions/CrmInventoryModelPermissions controlli i
+    # permessi granulari che questo helper stesso concede.
+    user.user_permissions.add(Permission.objects.get(codename="access_archie"))
     perms = Permission.objects.filter(content_type__app_label="inventory", codename__in=codenames)
     user.user_permissions.add(*perms)
     return user

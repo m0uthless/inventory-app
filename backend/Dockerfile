@@ -33,15 +33,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq5 libmagic1 tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Fase 6 (0.9.1, audit 2026-08-19): utente non-root dedicato invece di girare
+# come root a runtime. UID/GID 1000 fissi (non auto-assegnati) così i volumi
+# Docker montati restano coerenti tra rebuild dell'immagine.
+RUN groupadd --gid 1000 appuser \
+    && useradd --uid 1000 --gid appuser --home-dir /home/appuser --create-home --shell /usr/sbin/nologin appuser
 
-COPY . /app
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+ENV PATH=/home/appuser/.local/bin:$PATH
+ENV HOME=/home/appuser
+
+COPY --chown=appuser:appuser . /app
 
 EXPOSE 8000
 
 # Run collectstatic/migrate hooks before starting the server.
 # NOTE: we intentionally execute the script from /app so that the
 # docker-compose bind mount (./backend:/app) updates the entrypoint in dev.
+#
+# NB: NON impostiamo `USER appuser` qui. L'entrypoint deve partire come root
+# per poter allineare i permessi dei volumi Docker montati (datafiles,
+# staticfiles, media — vedi entrypoint.sh) su installazioni già esistenti i
+# cui contenuti sono root-owned dalle immagini precedenti (pre-0.9.1, dove
+# il container girava interamente come root). Dopo l'allineamento,
+# entrypoint.sh droppa i privilegi con `su` prima di eseguire gunicorn:
+# il processo applicativo NON gira mai come root.
 ENTRYPOINT ["sh", "/app/entrypoint.sh"]
 

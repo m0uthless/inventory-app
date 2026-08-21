@@ -57,17 +57,22 @@ def _make_customer(user) -> Customer:
 
 
 def _make_contact(customer, user, *, is_primary: bool = False, deleted: bool = False) -> Contact:
-    c = Contact.objects.create(
+    # 0.9.1: deleted_at va passato DIRETTAMENTE alla create(), non impostato
+    # con un save() separato subito dopo — altrimenti, per una frazione di
+    # transazione, il contatto esiste con is_primary=True E deleted_at=NULL
+    # (attivo), che con il nuovo vincolo DB
+    # ux_contact_one_primary_per_customer_no_site (0.9.1, DATA-003) va in
+    # conflitto se esiste già un altro primario attivo per lo stesso
+    # customer — esattamente il caso di questo file di test, che crea
+    # apposta un primario attivo E uno eliminato per lo stesso customer.
+    return Contact.objects.create(
         customer=customer,
         name=f"Contact_{uuid.uuid4().hex[:4]}",
         is_primary=is_primary,
+        deleted_at=timezone.now() if deleted else None,
         created_by=user,
         updated_by=user,
     )
-    if deleted:
-        c.deleted_at = timezone.now()
-        c.save(update_fields=["deleted_at"])
-    return c
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from audit.models import AuditEvent
 from config.ui_paths import build_entity_path
+from portal.permissions import IsInternalUserStrictAmbito, PortalModelPermissions
 
 
 class AuditEventSerializer(serializers.ModelSerializer):
@@ -116,6 +117,14 @@ class AuditEventFilter(filters.FilterSet):
 
 
 class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
+    # 0.9.1 (contenimento SEC-001/SEC-002): l'audit non è più coperto dal
+    # default IsAuthenticatedDjangoModelPermissions (che per GET/HEAD non
+    # richiede alcun permesso Django, solo autenticazione). Richiede ora
+    # esplicitamente sessione interna Archie fuori ambito Portal +
+    # permesso Django audit.view_auditevent. La sanitizzazione del
+    # contenuto (SEC-001, masking password VPN) resta un intervento
+    # separato lato log_event, non ancora incluso in questa patch.
+    permission_classes = [IsInternalUserStrictAmbito, PortalModelPermissions]
     queryset = AuditEvent.objects.select_related("actor", "content_type")
     serializer_class = AuditEventSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 
 from attendance.models import LeaveArea
 from audit.utils import log_event, to_change_value_for_field, to_primitive
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 from core.models import (
     AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
@@ -160,7 +161,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     """
     queryset           = Announcement.objects.select_related('created_by').all()
     serializer_class   = AnnouncementSerializer
-    permission_classes = [IsAuthenticated, IsStaffOrReadOnly]
+    permission_classes = [IsAuthenticated, IsStaffOrReadOnly, IsInternalOrPortalDedicatedApp]
     ordering           = ['-created_at']
 
     def perform_create(self, serializer):
@@ -206,7 +207,7 @@ class ChangelogEntryViewSet(viewsets.ModelViewSet):
     """
     queryset           = ChangelogEntry.objects.select_related('created_by').all()
     serializer_class   = ChangelogEntrySerializer
-    permission_classes = [IsAuthenticated, IsStaffOrReadOnly]
+    permission_classes = [IsAuthenticated, IsStaffOrReadOnly, IsInternalOrPortalDedicatedApp]
     ordering           = ['-date', '-id']
 
     def perform_create(self, serializer):
@@ -275,7 +276,7 @@ class UserTaskViewSet(viewsets.ModelViewSet):
     Ogni utente vede e gestisce solo i propri task.
     """
     serializer_class   = UserTaskSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get_queryset(self):
         return UserTask.objects.filter(user=self.request.user)
@@ -351,7 +352,7 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
     un ripristino esposto in UI: serve come salvaguardia/audit trail.
     """
     serializer_class   = AreaTaskSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get_queryset(self):
         qs = AreaTask.objects.select_related('area', 'created_by').filter(deleted_at__isnull=True)
@@ -509,7 +510,7 @@ class DashboardWidgetSerializer(serializers.ModelSerializer):
 class DashboardWidgetViewSet(viewsets.ReadOnlyModelViewSet):
     """Catalogo dei widget disponibili (statico, non editabile da UI)."""
     serializer_class   = DashboardWidgetSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
     queryset            = DashboardWidget.objects.filter(is_active=True).order_by('sort_order', 'id')
 
 
@@ -542,7 +543,7 @@ class UserDashboardLayoutViewSet(viewsets.ModelViewSet):
     dopo ogni modifica in modalità "Personalizza".
     """
     serializer_class   = UserDashboardLayoutSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get_queryset(self):
         return (
@@ -619,7 +620,7 @@ class DefaultDashboardLayoutViewSet(viewsets.ReadOnlyModelViewSet):
     scrittura passa solo dall'azione `set_mine`, riservata ai superuser.
     """
     serializer_class   = DefaultDashboardLayoutSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
     queryset            = DefaultDashboardLayout.objects.select_related('widget')
 
     @action(detail=False, methods=['post'])

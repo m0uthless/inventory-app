@@ -23,7 +23,7 @@ from crm.models import Customer, Site, Contact, CustomerVpnAccess
 from inventory.models import Inventory
 from issues.models import IssueStatus
 from core.crypto import decrypt
-from audit.utils import log_event, to_change_value_for_field, to_primitive
+from audit.utils import build_changes, log_event, to_change_value_for_field, to_primitive
 from core.soft_delete import apply_soft_delete_filters
 from core.integrity import raise_integrity_error_as_validation
 from core.permissions import CanPurgeModelPermission, CanRestoreModelPermission
@@ -654,6 +654,37 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
     ]
     ordering = ["-is_primary", "name"]
 
+    _PRIMARY_CONSTRAINT_MAP = {
+        # 0.9.1 (DATA-003): backstop per il raro caso di due richieste
+        # concorrenti che impostano is_primary=True per lo STESSO
+        # customer/site quando ancora NESSUN primario esiste — in quel
+        # caso _demote_other_primaries non ha nulla da demuovere/da cui
+        # serializzarsi (0 righe interessate da entrambe le UPDATE), e
+        # sono i due INSERT successivi a competere: il vincolo DB
+        # respinge il secondo con IntegrityError, che altrimenti
+        # diventerebbe un 500 invece di un 400 comprensibile.
+        "ux_contact_one_primary_per_customer_no_site": {
+            "is_primary": "Esiste già un contatto primario per questo cliente (senza sito specifico)."
+        },
+        "ux_contact_one_primary_per_customer_site": {
+            "is_primary": "Esiste già un contatto primario per questo cliente/sito."
+        },
+    }
+
+    def create(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                return super().create(request, *args, **kwargs)
+        except IntegrityError as e:
+            raise_integrity_error_as_validation(e, constraint_map=self._PRIMARY_CONSTRAINT_MAP)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                return super().update(request, *args, **kwargs)
+        except IntegrityError as e:
+            raise_integrity_error_as_validation(e, constraint_map=self._PRIMARY_CONSTRAINT_MAP)
+
     def get_queryset(self):
         qs = Contact.objects.select_related("customer", "site")
 
@@ -666,22 +697,26 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
 
     @action(detail=True, methods=['post'], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
-        # Override: dopo il restore standard ri-applica la policy is_primary.
+        # 0.9.1 (DATA-003): demote PRIMA del restore, non dopo — stesso
+        # motivo di perform_create/perform_update sopra (il vincolo DB non
+        # deve mai essere violato nemmeno transitoriamente).
         obj = self.get_object()
         from core.restore_policy import get_restore_block_reason
         reason = get_restore_block_reason(obj)
         if reason:
             return Response({'detail': reason}, status=status.HTTP_409_CONFLICT)
-        self._restore_obj(obj, request)
-        self._enforce_primary(obj)
+        with transaction.atomic():
+            if obj.is_primary:
+                self._demote_other_primaries(obj.customer, obj.site, exclude_id=obj.id)
+            self._restore_obj(obj, request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['post'], permission_classes=[CanRestoreModelPermission])
     def bulk_restore(self, request):
         """Restore multiple soft-deleted Contact objects.
         Body: {"ids": [1,2,3]} (or a raw list).
-        Uses QuerySet.update() to avoid N+1; runs _enforce_primary only on
-        restored contacts that are is_primary=True (typically very few).
+        Uses QuerySet.update() to avoid N+1; demote PRIMA del restore
+        bulk (0.9.1, DATA-003), non dopo — stesso motivo di restore().
         """
         from django.utils import timezone as tz
         payload = request.data
@@ -694,12 +729,13 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
         restored_ids = [obj.id for obj in restorable]
         if restored_ids:
             now = tz.now()
-            Contact.objects.filter(id__in=restored_ids).update(
-                deleted_at=None, updated_by=request.user, updated_at=now
-            )
-            # _enforce_primary only on restored contacts that are primary (business logic invariant)
-            for obj in Contact.objects.filter(id__in=restored_ids, is_primary=True):
-                self._enforce_primary(obj)
+            with transaction.atomic():
+                for obj in restorable:
+                    if obj.is_primary:
+                        self._demote_other_primaries(obj.customer, obj.site, exclude_id=obj.id)
+                Contact.objects.filter(id__in=restored_ids).update(
+                    deleted_at=None, updated_by=request.user, updated_at=now
+                )
 
         log_event(
             actor=request.user, action='restore', instance=None,
@@ -709,20 +745,42 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
         return Response({'restored': restored_ids, 'count': len(restored_ids), 'blocked': blocked, 'blocked_count': len(blocked)}, status=status.HTTP_200_OK)
 
 
-    def _enforce_primary(self, instance):
-        if not instance.is_primary:
-            return
-        Contact.objects.filter(
-            customer=instance.customer,
-            site=instance.site,
+    def _demote_other_primaries(self, customer, site, *, exclude_id=None):
+        """Demuove eventuali altri contatti primari per lo stesso
+        customer/site, PRIMA di salvare il nuovo/aggiornato contatto
+        primario, nella stessa transazione atomica (0.9.1, DATA-003).
+
+        Rimpiazza il vecchio _enforce_primary, che girava DOPO il save in
+        una query separata non atomica — con il nuovo vincolo DB
+        (ux_contact_one_primary_per_customer_*) un save "nuovo primario
+        prima, demote dopo" violerebbe il constraint nell'istante tra i
+        due passi. Invertendo l'ordine (demote prima, poi save) il
+        constraint non viene mai violato nemmeno transitoriamente, e la
+        UPDATE stessa (che prende un lock riga per riga) serializza le
+        richieste concorrenti sullo stesso customer/site: la seconda
+        richiesta a committare vede lo stato aggiornato dalla prima ed è
+        lei stessa a fare l'ultima demote, quindi resta un solo primario
+        anche sotto concorrenza — "ultimo che scrive vince", mai zero né
+        due primari.
+        """
+        qs = Contact.objects.filter(
+            customer=customer,
+            site=site,
             deleted_at__isnull=True,
             is_primary=True,
-        ).exclude(id=instance.id).update(is_primary=False)
+        )
+        if exclude_id is not None:
+            qs = qs.exclude(id=exclude_id)
+        qs.update(is_primary=False)
 
     def perform_create(self, serializer):
-        # Override per eseguire _enforce_primary dopo il salvataggio.
-        instance = serializer.save(created_by=self.request.user, updated_by=self.request.user)
-        self._enforce_primary(instance)
+        is_primary = serializer.validated_data.get('is_primary', False)
+        customer = serializer.validated_data.get('customer')
+        site = serializer.validated_data.get('site')
+        with transaction.atomic():
+            if is_primary:
+                self._demote_other_primaries(customer, site)
+            instance = serializer.save(created_by=self.request.user, updated_by=self.request.user)
         changes = {
             k: {'from': None, 'to': to_change_value_for_field(k, v)}
             for k, v in (serializer.validated_data or {}).items()
@@ -730,11 +788,15 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
         log_event(actor=self.request.user, action='create', instance=instance, changes=changes, request=self.request)
 
     def perform_update(self, serializer):
-        # Override per eseguire _enforce_primary dopo il salvataggio.
         instance_before = serializer.instance
         changes = self._changes_from_validated(instance_before, serializer.validated_data)
-        instance = serializer.save(updated_by=self.request.user)
-        self._enforce_primary(instance)
+        is_primary = serializer.validated_data.get('is_primary', instance_before.is_primary)
+        customer = serializer.validated_data.get('customer', instance_before.customer)
+        site = serializer.validated_data.get('site', instance_before.site)
+        with transaction.atomic():
+            if is_primary:
+                self._demote_other_primaries(customer, site, exclude_id=instance_before.id)
+            instance = serializer.save(updated_by=self.request.user)
         log_event(actor=self.request.user, action='update', instance=instance, changes=changes or None, request=self.request)
 
 # -------------------------
@@ -865,9 +927,20 @@ class CustomerVpnAccessViewSet(viewsets.ViewSet):
         serializer = self._serializer(instance, data=request.data, partial=True, request=request)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        before = {f: getattr(instance, f) for f in serializer.validated_data}
+        before = {f: getattr(instance, f, None) for f in serializer.validated_data}
         instance = serializer.save(updated_by=request.user)
-        log_event(actor=request.user, action="update", instance=instance, request=request)
+        # 0.9.1 (bug trovato durante il fix SEC-001, non collegato alla
+        # sanitizzazione: `before` veniva calcolato e mai usato, quindi il
+        # PATCH non registrava alcun diff nell'audit — solo l'evento
+        # "update" senza changes). log_event/_sanitize_changes maschera
+        # ora centralmente i campi sensibili, quindi è sicuro loggare il
+        # diff reale anche per un campo come "password".
+        after = {f: getattr(instance, f, None) for f in serializer.validated_data}
+        log_event(
+            actor=request.user, action="update", instance=instance,
+            changes=build_changes(before, after),
+            request=request,
+        )
         return Response(self._serializer(instance, request=request).data)
 
     def destroy(self, request, customer_pk=None):

@@ -49,9 +49,24 @@ def _audit_failed_login(request: HttpRequest, username: str, user_obj=None, *, r
 def _client_ip(request: HttpRequest) -> str:
     """Restituisce l'IP del client in modo sicuro.
 
-    Usa REMOTE_ADDR come fonte canonica — è l'IP impostato da nginx/proxy
-    direttamente sulla connessione TCP e non può essere falsificato dal client.
+    0.9.1 (WP-04, archie-realiplimit — audit 2026-08-19, SEC-007): PRIMA
+    usava REMOTE_ADDR come "fonte canonica impostata da nginx/proxy
+    direttamente sulla connessione TCP" — vero solo se Django riceve la
+    connessione TCP direttamente. Qui Django sta dietro backend_nginx
+    (proxy_pass), quindi REMOTE_ADDR era SEMPRE l'IP del container nginx
+    stesso, identico per ogni utente: il rate-limit per IP sul login era
+    di fatto un unico bucket condiviso da tutti, non un limite per client.
+
+    Ora preferiamo X-Real-IP, che backend_nginx imposta a $remote_addr
+    DOPO averlo risolto correttamente tramite real_ip_module (vedi
+    nginx/backend.conf). Fidarsi di X-Real-IP qui è sicuro perché anche
+    il backend Django non è mai raggiungibile direttamente dall'esterno
+    (docker-compose.yml: il servizio "backend" ha solo "expose", mai
+    "ports" — l'unico modo di raggiungerlo è passare da backend_nginx).
     """
+    real_ip = (request.META.get("HTTP_X_REAL_IP") or "").strip()
+    if real_ip:
+        return real_ip
     return (request.META.get("REMOTE_ADDR") or "unknown").strip() or "unknown"
 
 

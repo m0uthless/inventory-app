@@ -9,6 +9,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from audit.utils import log_event
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from core.media import build_action_url, protected_media_response
 from core.permissions import user_has_model_perm
 from core.uploads import validate_upload
@@ -209,7 +210,9 @@ class ReportRequestViewSet(
     viewsets.GenericViewSet,
 ):
     serializer_class = ReportRequestSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # 0.9.1 (WP-03): permission_classes esplicite -> il default globale
+    # non si applica, va esteso qui esplicitamente.
+    permission_classes = [permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = ReportRequest.objects.select_related('created_by', 'resolved_by').order_by('-created_at')
     filterset_class = ReportRequestFilter

@@ -203,7 +203,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.9.0",
+    "VERSION": "0.9.1",
 }
 
 REST_FRAMEWORK = {
@@ -215,6 +215,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "core.permissions.IsAuthenticatedDjangoModelPermissions",
+        # 0.9.1 (WP-03, archie-portalboundary — audit 2026-08-19,
+        # SEC-002/VER-001): barriera centrale Portal/Archie. Si somma
+        # (AND) alla riga sopra, non la sostituisce — vedi il docstring
+        # della classe per il razionale completo.
+        "portal.permissions.IsInternalOrPortalDedicatedApp",
     ],
     # NB: DRF legge dai settings solo PAGE_SIZE. PAGE_SIZE_QUERY_PARAM e
     # MAX_PAGE_SIZE non sono chiavi di settings ma attributi di classe del

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from django_filters import rest_framework as filters
@@ -371,20 +372,35 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
             obj.invoice_number = invoice_num
 
         uploaded = request.FILES.get("document")
-        if uploaded:
-            uploaded = _validate_document(uploaded)
-            PurchaseOrderDocument.objects.create(
-                entry=obj,
-                kind=STATUS_DOCUMENT_KIND[new_status],
-                file=uploaded,
-                original_filename=uploaded.name,
-                uploaded_by=request.user,
-            )
+        # 0.9.1 (WP-05, archie-atomicworkflows — audit 2026-08-19,
+        # REL-002): il documento caricato e l'avanzamento di stato erano
+        # due save() separati senza transaction.atomic() — se obj.save()
+        # falliva DOPO che il documento era già stato creato (es. una
+        # validazione che scatta più avanti, un errore DB transitorio),
+        # restava un PurchaseOrderDocument taggato per il nuovo stato ma
+        # con l'entry ancora nello stato vecchio: metadati inconsistenti,
+        # un documento "ricevuto" su un PO che risulta ancora "inviato".
+        # NOTA: transaction.atomic() protegge solo lo stato DB, non il
+        # file scritto su storage da PurchaseOrderDocument.objects.create
+        # — un file orfano su disco in caso di rollback resta un rischio
+        # residuo minore (nessun impatto di sicurezza/integrità dati,
+        # solo spazio disco), non risolvibile lato Django senza un
+        # meccanismo di storage transazionale a parte.
+        with transaction.atomic():
+            if uploaded:
+                uploaded = _validate_document(uploaded)
+                PurchaseOrderDocument.objects.create(
+                    entry=obj,
+                    kind=STATUS_DOCUMENT_KIND[new_status],
+                    file=uploaded,
+                    original_filename=uploaded.name,
+                    uploaded_by=request.user,
+                )
 
-        obj.status = new_status
-        setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], timezone.now())
-        obj.updated_by = request.user
-        obj.save()
+            obj.status = new_status
+            setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], timezone.now())
+            obj.updated_by = request.user
+            obj.save()
 
         log_event(
             actor=request.user, action="update", instance=obj,

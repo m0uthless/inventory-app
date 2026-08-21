@@ -9,6 +9,7 @@ from custom_fields.models import CustomFieldDefinition
 from audit.utils import log_event, to_change_value_for_field
 from core.soft_delete import TRUTHY, apply_soft_delete_filters
 from core.restore_actions import SoftDeleteRestoreActionsMixin
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 
 class CustomFieldDefinitionSerializer(serializers.ModelSerializer):
@@ -61,7 +62,8 @@ class CustomFieldDefinitionViewSet(SoftDeleteRestoreActionsMixin, viewsets.Model
     restore_permission = "custom_fields.change_customfielddefinition"
     queryset = CustomFieldDefinition.objects.all()
     serializer_class = CustomFieldDefinitionSerializer
-    permission_classes = [CustomFieldDefinitionPermission]
+    # 0.9.1 (WP-03): permission_classes esplicite -> estese qui.
+    permission_classes = [CustomFieldDefinitionPermission, IsInternalOrPortalDedicatedApp]
 
     def get_queryset(self):
         qs = CustomFieldDefinition.objects.all()

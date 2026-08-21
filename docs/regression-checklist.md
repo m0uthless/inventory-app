@@ -81,6 +81,9 @@ make test-frontend
 - Verify each result opens the expected module or drawer.
 - Verify empty search does not show stale results.
 - Verify Drive results only appear for users allowed by group ACL.
+- Verify Drive ACL is inherited: a subfolder with no ACL of its own, nested
+  inside a group-restricted folder, is NOT visible to users outside that
+  group (VER-002, 0.9.1).
 
 ### Wiki
 - Open a page containing formatted content.

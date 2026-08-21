@@ -95,6 +95,44 @@ def _p12_file(name="cert.p12", content=b"fake-cert-bytes", content_type="applica
 
 # ─── Flusso completo di creazione ──────────────────────────────────────────
 
+def test_rejects_invalid_mac_address_format():
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    admin = _superuser()
+    device = _make_device(admin, suffix="macfmt1")
+    wifi = DeviceWifi(device=device, mac_address="not-a-mac-address")
+    with pytest.raises(DjangoValidationError):
+        wifi.full_clean()
+
+
+def test_rejects_invalid_mac_address_via_api():
+    admin = _superuser()
+    client = _auth_client(admin)
+
+    device = _make_device(admin, suffix="macfmt2", wifi=False)
+    resp = client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "mac_address": "ZZ:ZZ:ZZ:ZZ:ZZ:ZZ"},
+        format="json",
+    )
+    assert resp.status_code == 400, resp.data
+    assert "mac_address" in resp.data
+
+
+def test_accepts_mac_address_with_dash_separator_via_api():
+    admin = _superuser()
+    client = _auth_client(admin)
+
+    device = _make_device(admin, suffix="macfmt3", wifi=False)
+    resp = client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "mac_address": "AA-BB-CC-DD-EE-FF"},
+        format="json",
+    )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["mac_address"] == "AA-BB-CC-DD-EE-FF"
+
+
 def test_create_wifi_detail_full_multipart_flow():
     user = _superuser()
     client = _auth_client(user)
@@ -343,6 +381,13 @@ def test_read_requires_view_permission():
     assert resp.status_code == 403
 
     reader.user_permissions.add(Permission.objects.get(codename="view_devicewifi"))
+    # 0.9.1: Django cachea i permessi sull'istanza User (_perm_cache) al
+    # primo has_perm() chiamato — la request precedente l'ha già popolata
+    # con "nessun permesso". Serve un'istanza fresca per far leggere il
+    # nuovo permesso appena concesso, altrimenti il secondo client.get()
+    # userebbe ancora la cache (falso 403).
+    reader = type(reader).objects.get(pk=reader.pk)
+    client.force_authenticate(user=reader)
     resp = client.get(f"/api/device-wifi/{wifi.id}/")
     assert resp.status_code == 200
 
@@ -460,6 +505,10 @@ def test_certificato_download_requires_secrets_permission():
     assert resp.status_code == 403
 
     reader.user_permissions.add(Permission.objects.get(codename="view_wifi_secrets"))
+    # 0.9.1: stesso motivo del test sopra (test_read_requires_view_permission)
+    # — cache permessi Django sull'istanza User, serve un'istanza fresca.
+    reader = type(reader).objects.get(pk=reader.pk)
+    client.force_authenticate(user=reader)
     resp = client.get(f"/api/device-wifi/{wifi_id}/certificato/")
     assert resp.status_code == 200
 
