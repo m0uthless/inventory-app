@@ -14,6 +14,25 @@ if not DEBUG and (not SECRET_KEY or SECRET_KEY == "dev-secret-change-me"):
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 AUDIT_STRICT = os.getenv("AUDIT_STRICT", "0") == "1"
 
+# --- Email / SMTP ---
+# Nessun trigger applicativo nuovo in questa versione: resta l'unico punto di
+# invio esistente (reset password admin, vedi core/admin_users_api.py). Senza
+# EMAIL_HOST configurato si usa il backend console (le email finiscono nei
+# log del container invece di tentare una connessione SMTP destinata a
+# fallire) — utile in dev/staging finché non arrivano le credenziali reali.
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1") == "1"
+    EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "0") == "1"
+    EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "archie@biotron.it")
+
 
 def _env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
@@ -40,6 +59,7 @@ INSTALLED_APPS = [
 
     "audit.apps.AuditConfig",
     "custom_fields",
+    "notifications.apps.NotificationsConfig",
     "core",
     "crm",
     "inventory",

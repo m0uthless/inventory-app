@@ -209,7 +209,10 @@ export default function AppSpeedDial() {
       direction="up"
       sx={{
         position: 'fixed',
-        display: { xs: 'none', md: 'inline-flex' },
+        // 0.9.5: FAB rimosso in versione desktop (le azioni rapide passano
+        // ai singoli bottoni di pagina, valutati caso per caso), resta
+        // solo su mobile dove non c'è spazio in toolbar per equivalenti.
+        display: { xs: 'inline-flex', md: 'none' },
         bottom: { xs: 16, md: 20 },
         right: { xs: 16, md: 24 },
         zIndex: (t) => t.zIndex.appBar - 1,

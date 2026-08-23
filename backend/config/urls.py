@@ -41,6 +41,7 @@ from core.api import (
     BirthdaysView,
 )
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
+from notifications.api import NotificationViewSet
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
 from drive.api import DriveFileUploadView, DriveFileViewSet, DriveFolderViewSet
@@ -109,6 +110,7 @@ router.register(r"announcements", AnnouncementViewSet, basename="announcement")
 router.register(r"changelog-entries", ChangelogEntryViewSet, basename="changelog-entry")
 router.register(r"user-tasks", UserTaskViewSet, basename="user-task")
 router.register(r"area-tasks", AreaTaskViewSet, basename="area-task")
+router.register(r"notifications", NotificationViewSet, basename="notification")
 router.register(r"dashboard-widgets", DashboardWidgetViewSet, basename="dashboard-widget")
 router.register(r"dashboard-layout", UserDashboardLayoutViewSet, basename="dashboard-layout")
 router.register(r"dashboard-default-layout", DefaultDashboardLayoutViewSet, basename="dashboard-default-layout")

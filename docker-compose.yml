@@ -138,6 +138,11 @@ services:
           fi;
         fi &&
         echo '[cron] Avvio scheduler close_resolved_issues (ogni ora)' &&
+        echo '[cron] Avvio scheduler refresh_notifications (ogni 15 minuti)' &&
+        ( while true; do
+          python manage.py refresh_notifications;
+          sleep 900;
+        done ) &
         while true; do
           python manage.py close_resolved_issues;
           sleep 3600;
