@@ -31,7 +31,7 @@ if EMAIL_HOST:
     EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "archie@biotron.it")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@biotron.it")
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
