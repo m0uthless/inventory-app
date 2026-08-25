@@ -29,12 +29,10 @@ from __future__ import annotations
 
 import logging
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.db.models.deletion import ProtectedError
@@ -47,6 +45,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from audit.utils import log_event
+from core.emails import send_templated_email
 from core.models import UserProfile
 from core.permissions import HasManageUsersPermission
 from portal.permissions import IsInternalOrPortalDedicatedApp
@@ -571,23 +570,15 @@ class UserAdminViewSet(
         email_sent = False
         email_error = None
         if user.email:
-            try:
-                send_mail(
-                    subject="ARCHIE — Password reimpostata",
-                    message=(
-                        f"Ciao {user.first_name or user.username},\n\n"
-                        f"La tua password ARCHIE è stata reimpostata da un amministratore.\n"
-                        f"Nuova password temporanea: {new_password}\n\n"
-                        f"Ti consigliamo di cambiarla al primo accesso."
-                    ),
-                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None) or "archie@biotron.it",
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-                email_sent = True
-            except Exception as exc:  # SMTP non ancora configurato: non bloccare il reset
-                email_error = str(exc)
-                logger.warning("Invio email reset password fallito per %s: %s", user.username, exc)
+            email_sent, email_error = send_templated_email(
+                template_name="emails/password_reset.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "nuova_password": new_password,
+                },
+                subject="ARCHIE — Password reimpostata",
+                recipient_list=[user.email],
+            )
 
         log_event(
             actor=request.user,
