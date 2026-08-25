@@ -22,3 +22,57 @@ def test_brand_for_module_non_portal_defaults_to_archie():
 def test_brand_for_module_does_not_match_unrelated_prefix():
     # "portalx" non è il package "portal": non deve fare match per prefisso stringa.
     assert _brand_for_module("portalx.api") == "archie"
+
+
+from django.core import mail
+from django.test import override_settings
+
+from core.emails import send_templated_email
+
+
+@override_settings(DEFAULT_FROM_EMAIL="noreply@biotron.it")
+def test_send_templated_email_from_non_portal_module_uses_archie_brand():
+    # Questo test file vive in core/tests/, quindi il modulo chiamante è
+    # "core.tests.test_emails" → non inizia per "portal." → brand "archie".
+    sent, error = send_templated_email(
+        template_name="emails/_test_probe.html",
+        context={"nome": "Mario"},
+        subject="Test Archie",
+        recipient_list=["mario@example.com"],
+    )
+    assert sent is True
+    assert error is None
+    assert len(mail.outbox) == 1
+
+    msg = mail.outbox[0]
+    assert msg.subject == "Test Archie"
+    assert msg.to == ["mario@example.com"]
+    assert msg.from_email == "ARCHIE <noreply@biotron.it>"
+
+    html_body = msg.alternatives[0][0]
+    assert msg.alternatives[0][1] == "text/html"
+    assert "ARCHIE" in html_body
+    assert "Ciao Mario, questo è un contenuto di prova." in html_body
+
+    # Fallback plain-text auto-generato da strip_tags(): niente tag HTML,
+    # ma il testo del contenuto è presente.
+    assert "<p" not in msg.body
+    assert "Ciao Mario, questo è un contenuto di prova." in msg.body
+
+
+def test_send_templated_email_returns_false_and_message_on_failure(monkeypatch):
+    def _raise_on_send(self, fail_silently=False):
+        raise RuntimeError("SMTP non raggiungibile")
+
+    monkeypatch.setattr(
+        "django.core.mail.EmailMultiAlternatives.send", _raise_on_send
+    )
+
+    sent, error = send_templated_email(
+        template_name="emails/_test_probe.html",
+        context={"nome": "Mario"},
+        subject="Test Archie",
+        recipient_list=["mario@example.com"],
+    )
+    assert sent is False
+    assert error == "SMTP non raggiungibile"
