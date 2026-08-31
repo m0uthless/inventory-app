@@ -60,6 +60,21 @@ def test_send_templated_email_from_non_portal_module_uses_archie_brand():
     assert "Ciao Mario, questo è un contenuto di prova." in msg.body
 
 
+@override_settings(DEFAULT_FROM_EMAIL="noreply@biotron.it")
+def test_send_templated_email_plain_text_unescapes_html_entities():
+    sent, error = send_templated_email(
+        template_name="emails/_test_probe.html",
+        context={"nome": "D'Angelo & Co"},
+        subject="Test entities",
+        recipient_list=["mario@example.com"],
+    )
+    assert sent is True
+    msg = mail.outbox[-1]
+    html_body = msg.alternatives[0][0]
+    assert "D&#x27;Angelo &amp; Co" in html_body  # HTML stays escaped (autoescape correctly on)
+    assert "D'Angelo & Co" in msg.body  # plain-text is unescaped, readable
+
+
 def test_send_templated_email_returns_false_and_message_on_failure(monkeypatch):
     def _raise_on_send(self, fail_silently=False):
         raise RuntimeError("SMTP non raggiungibile")

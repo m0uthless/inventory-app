@@ -27,8 +27,6 @@ delete fallisce con un errore 400 leggibile invece di un 500.
 """
 from __future__ import annotations
 
-import logging
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
@@ -55,8 +53,6 @@ from core.permission_modules import (
     get_permission_modules,
     serialize_permission_state,
 )
-
-logger = logging.getLogger(__name__)
 
 User = get_user_model()
 

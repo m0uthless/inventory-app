@@ -8,6 +8,7 @@ nessun parametro di branding esplicito.
 """
 from __future__ import annotations
 
+import html
 import inspect
 import logging
 from email.utils import formataddr
@@ -44,7 +45,6 @@ def send_templated_email(
     context: dict,
     subject: str,
     recipient_list: list[str],
-    fail_silently: bool = False,
 ) -> tuple[bool, str | None]:
     """Renderizza `template_name` (un template che fa
     `{% extends base_template %}` + `{% block content %}`) e invia
@@ -75,7 +75,7 @@ def send_templated_email(
 
     try:
         html_body = render_to_string(template_name, render_context)
-        plain_body = strip_tags(html_body)
+        plain_body = html.unescape(strip_tags(html_body))
         from_email = formataddr((_BRAND_DISPLAY_NAME[brand], settings.DEFAULT_FROM_EMAIL))
 
         message = EmailMultiAlternatives(
@@ -85,7 +85,7 @@ def send_templated_email(
             to=recipient_list,
         )
         message.attach_alternative(html_body, "text/html")
-        message.send(fail_silently=fail_silently)
+        message.send()
     except Exception as exc:
         logger.warning("Invio email template=%s a %s fallito: %s", template_name, recipient_list, exc)
         return False, str(exc)
