@@ -1,0 +1,31 @@
+{% extends base_template %}
+{% block content %}
+<p>Ciao {{ nome_utente }},</p>
+<p>Ci sono nuove scadenze che potrebbero interessarti su ARCHIE:</p>
+
+{% if maintenance_items %}
+<p style="margin:20px 0 8px;font-weight:bold;">Manutenzioni in scadenza</p>
+<ul style="margin:0 0 16px;padding-left:20px;">
+  {% for item in maintenance_items %}
+  <li style="margin-bottom:8px;">
+    <strong>{{ item.title }}</strong>{% if item.subtitle %} — {{ item.subtitle }}{% endif %}<br>
+    <span style="color:#6b7280;">Scadenza: {{ item.event_date|date:"d/m/Y" }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if area_task_items %}
+<p style="margin:20px 0 8px;font-weight:bold;">Task di area in scadenza</p>
+<ul style="margin:0 0 16px;padding-left:20px;">
+  {% for item in area_task_items %}
+  <li style="margin-bottom:8px;">
+    <strong>{{ item.title }}</strong>{% if item.subtitle %} — {{ item.subtitle }}{% endif %}<br>
+    <span style="color:#6b7280;">Scadenza: {{ item.event_date|date:"d/m/Y" }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<p>Accedi ad ARCHIE per maggiori dettagli.</p>
+{% endblock %}

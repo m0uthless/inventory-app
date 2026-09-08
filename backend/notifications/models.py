@@ -46,6 +46,17 @@ class Notification(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    last_emailed_event_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text=(
+            "event_date per cui è già stata inviata l'email digest di "
+            "refresh_notifications. Usato per non reinviare l'email a ogni "
+            "refresh: si reinvia solo quando event_date cambia rispetto a "
+            "questo valore."
+        ),
+    )
+
     class Meta:
         verbose_name = "Notifica"
         verbose_name_plural = "Notifiche"

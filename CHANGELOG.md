@@ -12,6 +12,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 - Le email inviate dall'applicazione (a partire dal reset password amministrativo) usano ora un layout HTML brandizzato (Archie o Portal a seconda del contesto), con testo alternativo in chiaro generato automaticamente.
+- Il job periodico delle notifiche (manutenzioni e task di area in scadenza) invia ora anche un'email digest agli utenti con indirizzo email valorizzato, oltre alla notifica in-app. Un'unica email per utente per ciclo, inviata solo su notifiche nuove o con scadenza cambiata rispetto all'ultima email già inviata (nessun invio ripetuto sulla stessa scadenza a ogni refresh).
 
 ## [0.9.1] - 2026-08-21
 

@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory
 
+from core.emails import send_templated_email
 from core.models import AreaTask
 from maintenance.api.plans import MaintenancePlanViewSet
 from notifications.models import Notification, NotificationType
@@ -32,6 +33,13 @@ class Command(BaseCommand):
     Le notifiche non lette diventate non più valide (scadenza rientrata, task
     completato...) vengono cancellate. Quelle già lette restano come storico.
 
+    Oltre alla notifica in-app, per chi ha una email valorizzata viene inviata
+    una email digest (via `core.emails.send_templated_email`, un'unica email
+    per utente per run con l'elenco delle scadenze) quando una notifica è
+    nuova o quando la sua `event_date` è cambiata rispetto all'ultima email
+    già inviata (`last_emailed_event_date`) — così non si spamma a ogni
+    refresh di 15 minuti sulla stessa scadenza invariata.
+
     Pensato per girare periodicamente via il servizio `cron` in
     docker-compose (ogni 15 minuti, vedi entrypoint).
     """
@@ -46,8 +54,8 @@ class Command(BaseCommand):
             User.objects.filter(is_active=True, portal_profile__isnull=True)
         )
 
-        maint_keys = self._sync_maintenance_due(recipients, today, in_30)
-        area_keys = self._sync_area_tasks_due(recipients)
+        maint_keys, maint_to_email = self._sync_maintenance_due(recipients, today, in_30)
+        area_keys, area_to_email = self._sync_area_tasks_due(recipients)
 
         stale_maint = Notification.objects.filter(
             is_read=False, notification_type=NotificationType.MAINTENANCE_DUE,
@@ -59,10 +67,13 @@ class Command(BaseCommand):
         stale_maint.delete()
         stale_area.delete()
 
+        emailed = self._send_digest_emails(maint_to_email, area_to_email)
+
         self.stdout.write(self.style.SUCCESS(
             f"[notifications] manutenzione: {len(maint_keys)} attive · "
             f"task area: {len(area_keys)} attive · "
-            f"{removed} notifiche non lette rimosse (non più valide)."
+            f"{removed} notifiche non lette rimosse (non più valide) · "
+            f"{emailed} email digest inviate."
         ))
 
     def _sync_maintenance_due(self, recipients, today, in_30):
@@ -76,7 +87,14 @@ class Command(BaseCommand):
         response = view(request)
         rows = response.data.get("results", []) if hasattr(response, "data") else []
 
+        last_emailed = {
+            (rid, key): sent for rid, key, sent in Notification.objects
+            .filter(notification_type=NotificationType.MAINTENANCE_DUE)
+            .values_list("recipient_id", "source_key", "last_emailed_event_date")
+        }
+
         seen_keys = set()
+        to_email = []
         for row in rows:
             source_key = f"{row['plan_id']}:{row['inventory_id']}"
             seen_keys.add(source_key)
@@ -92,7 +110,7 @@ class Command(BaseCommand):
             if not event_date:
                 continue
             for user in recipients:
-                Notification.objects.update_or_create(
+                notif, _ = Notification.objects.update_or_create(
                     recipient=user,
                     notification_type=NotificationType.MAINTENANCE_DUE,
                     source_key=source_key,
@@ -103,7 +121,9 @@ class Command(BaseCommand):
                         "event_date": event_date,
                     },
                 )
-        return seen_keys
+                if last_emailed.get((user.id, source_key)) != notif.event_date:
+                    to_email.append(notif)
+        return seen_keys, to_email
 
     def _sync_area_tasks_due(self, recipients):
         tomorrow = timezone.localdate() + timedelta(days=1)
@@ -117,7 +137,14 @@ class Command(BaseCommand):
         for task in tasks:
             tasks_by_area.setdefault(task.area_id, []).append(task)
 
+        last_emailed = {
+            (rid, key): sent for rid, key, sent in Notification.objects
+            .filter(notification_type=NotificationType.AREA_TASK_DUE)
+            .values_list("recipient_id", "source_key", "last_emailed_event_date")
+        }
+
         seen_keys = set()
+        to_email = []
         for user in recipients:
             area_id = getattr(getattr(user, "profile", None), "leave_area_id", None)
             if not area_id:
@@ -125,7 +152,7 @@ class Command(BaseCommand):
             for task in tasks_by_area.get(area_id, []):
                 source_key = str(task.id)
                 seen_keys.add(source_key)
-                Notification.objects.update_or_create(
+                notif, _ = Notification.objects.update_or_create(
                     recipient=user,
                     notification_type=NotificationType.AREA_TASK_DUE,
                     source_key=source_key,
@@ -136,4 +163,51 @@ class Command(BaseCommand):
                         "event_date": task.due_date,
                     },
                 )
-        return seen_keys
+                if last_emailed.get((user.id, source_key)) != notif.event_date:
+                    to_email.append(notif)
+        return seen_keys, to_email
+
+    def _send_digest_emails(self, maint_to_email, area_to_email) -> int:
+        by_recipient: dict = {}
+        for notif in maint_to_email:
+            group = by_recipient.setdefault(
+                notif.recipient_id, {"maintenance": [], "area_task": [], "all": []}
+            )
+            group["maintenance"].append(notif)
+            group["all"].append(notif)
+        for notif in area_to_email:
+            group = by_recipient.setdefault(
+                notif.recipient_id, {"maintenance": [], "area_task": [], "all": []}
+            )
+            group["area_task"].append(notif)
+            group["all"].append(notif)
+
+        if not by_recipient:
+            return 0
+
+        users = User.objects.in_bulk(by_recipient.keys())
+        sent = 0
+        for recipient_id, group in by_recipient.items():
+            user = users.get(recipient_id)
+            if not user or not user.email:
+                continue
+            ok, error = send_templated_email(
+                template_name="emails/notifications_digest.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "maintenance_items": group["maintenance"],
+                    "area_task_items": group["area_task"],
+                },
+                subject="ARCHIE — Nuove scadenze",
+                recipient_list=[user.email],
+            )
+            if ok:
+                sent += 1
+                for notif in group["all"]:
+                    notif.last_emailed_event_date = notif.event_date
+                Notification.objects.bulk_update(group["all"], ["last_emailed_event_date"])
+            else:
+                self.stderr.write(self.style.WARNING(
+                    f"[notifications] invio digest a {user.email} fallito: {error}"
+                ))
+        return sent
