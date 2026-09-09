@@ -154,6 +154,33 @@ def test_reset_password_returns_plaintext_once():
     assert target.check_password(body["password"])
 
 
+def test_reset_password_sends_branded_email_with_new_password(settings):
+    from django.core import mail
+
+    # Esplicito, indipendente dall'ambiente: DEFAULT_FROM_EMAIL può essere
+    # sovrascritto in .env.dev (es. workaround per un relay SMTP locale) —
+    # il test verifica il comportamento del codice, non il valore ambiente.
+    settings.DEFAULT_FROM_EMAIL = "noreply@biotron.it"
+
+    admin = _make_user(with_manage_users=True)
+    c = _client(admin)
+    target = _make_user()
+
+    resp = c.post(f"/api/admin-users/{target.id}/reset-password/")
+    body = resp.json()
+
+    assert body["email_sent"] is True
+    assert body["email_error"] is None
+    assert len(mail.outbox) == 1
+
+    msg = mail.outbox[0]
+    assert msg.to == [target.email]
+    assert msg.from_email == "ARCHIE <noreply@biotron.it>"
+    html_body = msg.alternatives[0][0]
+    assert body["password"] in html_body
+    assert body["password"] in msg.body  # fallback plain-text
+
+
 # ── is_staff / is_superuser: solo un superuser può toccarli ────────────────
 
 def test_has_portal_access_flag():

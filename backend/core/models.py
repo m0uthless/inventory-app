@@ -494,3 +494,27 @@ class StickyNote(models.Model):
     def __str__(self):
         return f"{self.user} — {self.widget.key} ({self.x},{self.y} {self.w}x{self.h})"
 
+
+class ScheduledJobRun(models.Model):
+    """Marker minimale "ultima esecuzione riuscita" per job schedulati via il
+    loop shell del container `cron` (docker-compose.yml), che non ha un vero
+    scheduler con granularità giornaliera — solo `sleep` tra un giro e
+    l'altro. Un comando che deve girare una sola volta al giorno (es.
+    `send_deadline_digest`) verifica qui se `last_run_date` è già oggi prima
+    di eseguire, invece di affidarsi al timing del loop (che gira ogni
+    15 minuti e potrebbe altrimenti eseguire più volte nella finestra, es.
+    dopo un riavvio del container).
+
+    `job_name` è una chiave libera (nome del management command); non FK a
+    nulla, vive per tutta la vita del progetto.
+    """
+    job_name      = models.CharField(max_length=100, unique=True)
+    last_run_date = models.DateField()
+
+    class Meta:
+        verbose_name = 'Esecuzione job schedulato'
+        verbose_name_plural = 'Esecuzioni job schedulati'
+
+    def __str__(self):
+        return f"{self.job_name} — {self.last_run_date}"
+
