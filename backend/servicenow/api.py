@@ -23,6 +23,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
 from audit.utils import log_event, to_change_value_for_field
+from core.emails import send_templated_email
 from core.media import build_action_url, protected_media_response
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
@@ -453,6 +454,29 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
         # Best-effort: un fallimento della notifica non deve mai far fallire
         # la creazione del case (vedi servicenow/notifications.py).
         notify_teams_new_case(case)
+        self._notify_assignee_email(case)
+
+    def _notify_assignee_email(self, case):
+        """Email dedicata all'assegnatario del nuovo case, se presente e con
+        email valorizzata. Canale indipendente da Teams (send_templated_email
+        non solleva mai eccezioni): niente broadcast, solo l'assegnatario."""
+        assignee = case.assigned_to
+        if assignee is None or not assignee.email:
+            return
+        type_label = f"{case.get_category_display()} · {case.case_type.name}" if case.case_type_id else "—"
+        send_templated_email(
+            template_name="emails/servicenow_case_assigned.html",
+            context={
+                "nome_utente": assignee.first_name or assignee.username,
+                "case_number": case.number,
+                "account": case.account,
+                "type_label": type_label,
+                "priority_label": case.get_priority_display(),
+                "short_description": case.short_description,
+            },
+            subject=f"ARCHIE — Case ServiceNow assegnato: {case.number}",
+            recipient_list=[assignee.email],
+        )
 
     @action(detail=False, methods=["get"], url_path="notification-settings")
     def notification_settings(self, request):

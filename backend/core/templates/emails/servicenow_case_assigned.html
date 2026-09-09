@@ -1,0 +1,11 @@
+{% extends base_template %}
+{% block content %}
+<p>Ciao {{ nome_utente }},</p>
+<p>Ti è stato assegnato un nuovo case ServiceNow:</p>
+<p style="margin:20px 0;padding:16px;background-color:#f4f6f5;border-radius:6px;">
+  <strong>{{ case_number }}</strong> — {{ account }}<br>
+  <span style="color:#6b7280;">Tipo: {{ type_label }} · Priorità: {{ priority_label }}</span>
+  {% if short_description %}<br><br>{{ short_description }}{% endif %}
+</p>
+<p>Accedi ad ARCHIE per maggiori dettagli.</p>
+{% endblock %}
