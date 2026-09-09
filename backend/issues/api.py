@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
 from audit.utils import log_event, to_change_value_for_field
+from core.emails import send_templated_email
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
@@ -17,6 +18,12 @@ from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_p
 from servicenow.models import ServiceNowCase
 
 User = get_user_model()
+
+
+def _issue_customer_display(issue) -> str:
+    if issue.customer_placeholder:
+        return issue.customer_placeholder
+    return issue.customer.name if issue.customer_id else "—"
 
 
 # ─── Lookup: IssueCategory ───────────────────────────────────────────────────
@@ -374,14 +381,17 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             changes={"title": {"from": None, "to": to_change_value_for_field("title", issue.title)}},
             request=self.request,
         )
+        self._notify_issue_created(issue)
+        self._notify_assignment_change(old_assigned_to_id=None, issue=issue)
 
     # ── perform_update override ───────────────────────────────────────────────
 
     def perform_update(self, serializer):
         """Audit diff limitato a status e priority — i campi chiave per i report."""
         old = serializer.instance
-        old_status   = old.status
-        old_priority = old.priority
+        old_status       = old.status
+        old_priority     = old.priority
+        old_assigned_to_id = old.assigned_to_id
         issue = serializer.save()
         changes = {}
         if old_status   != issue.status:   changes["status"]   = {"from": old_status,   "to": issue.status}
@@ -393,6 +403,58 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             changes=changes or None,
             request=self.request,
         )
+        self._notify_assignment_change(old_assigned_to_id=old_assigned_to_id, issue=issue)
+
+    # ── email: nuova issue / riassegnazione ─────────────────────────────────
+
+    def _notify_issue_created(self, issue):
+        """Broadcast a tutti i tecnici assegnabili (stessa regola di assigned_to)."""
+        technicians = User.objects.filter(
+            is_active=True,
+            profile__is_servicenow_technician=True,
+            profile__is_philips=False,
+        ).exclude(email="")
+        for user in technicians:
+            send_templated_email(
+                template_name="emails/issue_created.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "issue_title": issue.title,
+                    "customer_name": _issue_customer_display(issue),
+                    "priority_label": issue.get_priority_display(),
+                    "description": issue.description,
+                },
+                subject=f"ARCHIE — Nuova issue: {issue.title}",
+                recipient_list=[user.email],
+            )
+
+    def _notify_assignment_change(self, *, old_assigned_to_id, issue):
+        """Email solo tra due utenti reali: niente email su disassegnazione
+        (assigned_to svuotato), sì su primo assegnamento e su riassegnazione."""
+        new_assigned_to_id = issue.assigned_to_id
+        if old_assigned_to_id == new_assigned_to_id or new_assigned_to_id is None:
+            return
+
+        recipient_ids = {new_assigned_to_id}
+        if old_assigned_to_id is not None:
+            recipient_ids.add(old_assigned_to_id)
+
+        for user in User.objects.filter(id__in=recipient_ids).exclude(email=""):
+            send_templated_email(
+                template_name="emails/issue_assigned.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "issue_title": issue.title,
+                    "customer_name": _issue_customer_display(issue),
+                    "is_new_owner": user.id == new_assigned_to_id,
+                },
+                subject=(
+                    f"ARCHIE — Issue assegnata a te: {issue.title}"
+                    if user.id == new_assigned_to_id
+                    else f"ARCHIE — Issue riassegnata: {issue.title}"
+                ),
+                recipient_list=[user.email],
+            )
 
     # ── summary ──────────────────────────────────────────────────────────────
 

@@ -1,0 +1,14 @@
+{% extends base_template %}
+{% block content %}
+<p>Ciao {{ nome_utente }},</p>
+{% if is_new_owner %}
+<p>Ti è stata assegnata questa issue:</p>
+{% else %}
+<p>Non sei più assegnatario di questa issue (riassegnata ad un altro tecnico):</p>
+{% endif %}
+<p style="margin:20px 0;padding:16px;background-color:#f4f6f5;border-radius:6px;">
+  <strong>{{ issue_title }}</strong><br>
+  <span style="color:#6b7280;">Cliente: {{ customer_name }}</span>
+</p>
+<p>Accedi ad ARCHIE per maggiori dettagli.</p>
+{% endblock %}
