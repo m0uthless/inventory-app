@@ -154,8 +154,13 @@ def test_reset_password_returns_plaintext_once():
     assert target.check_password(body["password"])
 
 
-def test_reset_password_sends_branded_email_with_new_password():
+def test_reset_password_sends_branded_email_with_new_password(settings):
     from django.core import mail
+
+    # Esplicito, indipendente dall'ambiente: DEFAULT_FROM_EMAIL può essere
+    # sovrascritto in .env.dev (es. workaround per un relay SMTP locale) —
+    # il test verifica il comportamento del codice, non il valore ambiente.
+    settings.DEFAULT_FROM_EMAIL = "noreply@biotron.it"
 
     admin = _make_user(with_manage_users=True)
     c = _client(admin)

@@ -139,8 +139,13 @@ services:
         fi &&
         echo '[cron] Avvio scheduler close_resolved_issues (ogni ora)' &&
         echo '[cron] Avvio scheduler refresh_notifications (ogni 15 minuti)' &&
+        echo '[cron] Avvio scheduler send_deadline_digest (check ogni 15 minuti, invia una volta al giorno alle 8:00 locali)' &&
         ( while true; do
           python manage.py refresh_notifications;
+          sleep 900;
+        done ) &
+        ( while true; do
+          python manage.py send_deadline_digest;
           sleep 900;
         done ) &
         while true; do
