@@ -1,29 +1,24 @@
 <!DOCTYPE html>
-<html lang="it">
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background-color:#f4f6f5;font-family:Arial,Helvetica,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f5;padding:24px 0;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
-          <tr>
-            <td style="background-color:#0f766e;padding:20px 32px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:0.5px;">ARCHIE</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px;color:#1a1a1a;font-size:14px;line-height:1.6;">
-              {% block content %}{% endblock %}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px;background-color:#f4f6f5;color:#6b7280;font-size:12px;">
-              Biotron S.p.A. — ARCHIE, piattaforma interna di gestione asset.
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+<html lang="it" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><title>ARCHIE · Biotron</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<style>
+body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}
+@media screen and (max-width:620px){.outer{padding:16px 8px!important}.pad{padding-left:22px!important;padding-right:22px!important}.hero-title{font-size:29px!important;line-height:33px!important}.hero-copy{width:65%!important}.hero-art{width:35%!important}.mascot{width:104px!important;height:104px!important}.content-pad{padding:24px 18px!important}.meta-col{display:block!important;width:auto!important;padding:0 0 14px!important}.brand-note{font-size:9px!important;letter-spacing:1px!important}}
+</style></head>
+<body style="margin:0;padding:0;background-color:#e8eeeb;font-family:Arial,Helvetica,sans-serif;color:#203b36;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8eeeb" style="width:100%;background-color:#e8eeeb;"><tr><td class="outer" align="center" style="padding:36px 12px;">
+<!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background-color:#ffffff;border-radius:18px;box-shadow:0 12px 32px #ccd8d2;">
+<tr><td class="pad" bgcolor="#0a524d" style="padding:21px 32px;background-color:#0a524d;border-radius:18px 18px 0 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:23px;line-height:28px;font-weight:bold;letter-spacing:2px;color:#ffffff;">ARCHIE<span style="color:#c5d7a6;">.</span></td><td align="right" class="brand-note" style="font-size:10px;line-height:16px;letter-spacing:1.6px;color:#ffffff;">BIOTRON<br><span style="color:#d2e6df;font-size:9px;letter-spacing:1px;">GESTIONE ASSET</span></td></tr></table>
+</td></tr>
+{% block archie_hero %}{% endblock %}
+<tr><td class="pad" bgcolor="#f0f5f2" style="padding:28px 32px 32px;background-color:#f0f5f2;">
+{% block archie_content %}{% block content %}{% endblock %}{% endblock %}
+</td></tr>
+<tr><td class="pad" style="padding:23px 32px;border-top:1px solid #dae5df;background-color:#ffffff;border-radius:0 0 18px 18px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="4" bgcolor="#0a524d" style="width:4px;background-color:#0a524d;"></td><td style="padding-left:14px;"><p style="margin:0 0 4px;font-size:11px;line-height:16px;letter-spacing:1.3px;font-weight:bold;color:#0a524d;">BIOTRON S.p.A.</p><p style="margin:0;font-size:11px;line-height:17px;color:#61736b;">ARCHIE · Piattaforma interna di gestione asset.</p></td></tr></table>
+</td></tr></table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr></table></body></html>

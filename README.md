@@ -7,7 +7,7 @@ App web per la gestione di **Clienti**, **Siti**, **Contatti** e **Inventari** (
 - **Runtime**: Docker Compose + Nginx (proxy + static/media)
 
 ## Versione
-- Current: **0.9.2**
+- Current: **0.9.3**
 - OpenAPI: `/api/schema/` (e `/api/docs/`)
 - Health: `/api/health/` (backend) e `/healthz` (frontend)
 
