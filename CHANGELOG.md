@@ -7,6 +7,9 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Fixed
+- allega le immagini inline (cid:) referenziate dai template email
+
 ## [0.9.3] - 2026-09-09
 
 ## [0.9.2] - 2026-09-09
