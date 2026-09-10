@@ -24,6 +24,7 @@ from audit.utils import log_event, to_change_value_for_field
 from portal.permissions import IsInternalOrPortalDedicatedApp
 
 from .models import Absence, AbsenceReason, AbsenceStatus, DayPart, Holiday, LeaveArea
+from .notifications import notify_leave_request_submitted, notify_leave_request_resolved
 
 User = get_user_model()
 
@@ -256,6 +257,7 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
         }
         log_event(actor=self.request.user, action="create", instance=instance,
                   changes=changes, request=self.request)
+        notify_leave_request_submitted([instance])
 
     def perform_update(self, serializer):
         instance_before = serializer.instance
@@ -275,6 +277,7 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
         obj.validated_at = timezone.now()
         obj.updated_by = request.user
         obj.save(update_fields=["status", "validated_by", "validated_at", "updated_by", "updated_at"])
+        notify_leave_request_resolved([obj], actor=request.user)
         return Response(self.get_serializer(obj).data)
 
     @action(detail=True, methods=["post"], url_path="reject")
@@ -287,6 +290,7 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
         obj.validated_at = timezone.now()
         obj.updated_by = request.user
         obj.save(update_fields=["status", "validated_by", "validated_at", "updated_by", "updated_at"])
+        notify_leave_request_resolved([obj], actor=request.user)
         return Response(self.get_serializer(obj).data)
 
     def _resolve_group(self, request, new_status):
@@ -311,6 +315,11 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
             obj.save(update_fields=["status", "validated_by", "validated_at", "updated_by", "updated_at"])
             log_event(actor=request.user, action="update", instance=obj, request=request)
             updated_ids.append(obj.id)
+        if updated_ids:
+            notify_leave_request_resolved(
+                list(Absence.objects.filter(id__in=updated_ids).select_related("user")),
+                actor=request.user,
+            )
         return Response({"updated": len(updated_ids), "ids": updated_ids})
 
     @action(detail=False, methods=["post"], url_path="validate-group")
@@ -426,6 +435,11 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
                     )
                     log_event(actor=request.user, action="create", instance=obj, request=request)
                     created += 1
+
+        if (created or updated) and status_val == AbsenceStatus.PROPOSTA:
+            notify_leave_request_submitted(
+                list(Absence.objects.filter(request_group=group_id).select_related("user"))
+            )
 
         return Response({"created": created, "updated": updated, "cleared": cleared, "skipped": skipped})
 

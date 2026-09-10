@@ -7,6 +7,10 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Added
+- Il Piano Ferie invia ora email: quando un dipendente invia una richiesta di ferie i coordinatori (e i superuser) ricevono un'email di notifica; quando la richiesta viene validata o rifiutata il dipendente ne riceve l'esito via email. Un'unica email per richiesta, anche se copre più giorni.
+- Il modulo Bug & Feature invia ora email: alla nuova segnalazione a chi può gestirla, e a ogni cambio di stato (risolta/rifiutata/riaperta) al segnalatore, con la motivazione in caso di rifiuto.
+
 ### Fixed
 - allega le immagini inline (cid:) referenziate dai template email
 
