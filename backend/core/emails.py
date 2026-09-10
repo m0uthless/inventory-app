@@ -11,7 +11,10 @@ from __future__ import annotations
 import html
 import inspect
 import logging
+import re
+from email.mime.image import MIMEImage
 from email.utils import formataddr
+from pathlib import Path
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -19,6 +22,29 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
+
+# I template email (rifatti graficamente, con mascotte) referenziano le
+# immagini come `<img src="cid:archie-<nome>@biotron.email">`: vanno allegate
+# all'email come parti MIME inline con quel Content-ID, altrimenti il client
+# mostra un'immagine rotta. Convenzione: cid `archie-issue_created@biotron.email`
+# → file `core/templates/assets/archie_issue_created.png`.
+_ASSETS_DIR = Path(__file__).resolve().parent / "templates" / "assets"
+_CID_RE = re.compile(r"cid:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)")
+
+
+def _inline_images_for(html_body: str) -> list[tuple[str, Path]]:
+    """(content_id, path) per ogni riferimento `cid:` nell'HTML che trova un
+    file corrispondente in `templates/assets/`. Un asset mancante viene
+    loggato e saltato: l'email parte comunque (senza quell'immagine)."""
+    found: list[tuple[str, Path]] = []
+    for cid in dict.fromkeys(_CID_RE.findall(html_body)):
+        local_part = cid.split("@", 1)[0]
+        path = _ASSETS_DIR / f"{local_part.replace('-', '_')}.png"
+        if path.is_file():
+            found.append((cid, path))
+        else:
+            logger.warning("Immagine inline non trovata per cid=%s (atteso: %s)", cid, path)
+    return found
 
 _BRAND_DISPLAY_NAME = {
     "archie": "ARCHIE",
@@ -85,6 +111,17 @@ def send_templated_email(
             to=recipient_list,
         )
         message.attach_alternative(html_body, "text/html")
+
+        inline_images = _inline_images_for(html_body)
+        for cid, path in inline_images:
+            img = MIMEImage(path.read_bytes())
+            img.add_header("Content-ID", f"<{cid}>")
+            img.add_header("Content-Disposition", "inline", filename=path.name)
+            message.attach(img)
+        if inline_images:
+            # multipart/related: lega i cid: dell'HTML alle immagini allegate.
+            message.mixed_subtype = "related"
+
         message.send()
     except Exception as exc:
         logger.warning("Invio email template=%s a %s fallito: %s", template_name, recipient_list, exc)

@@ -75,6 +75,56 @@ def test_send_templated_email_plain_text_unescapes_html_entities():
     assert "D'Angelo & Co" in msg.body  # plain-text is unescaped, readable
 
 
+def _image_cids(msg):
+    return [
+        part.get("Content-ID")
+        for part in msg.message().walk()
+        if part.get_content_maintype() == "image"
+    ]
+
+
+@override_settings(DEFAULT_FROM_EMAIL="noreply@biotron.it")
+def test_send_templated_email_attaches_inline_image_referenced_by_cid():
+    sent, error = send_templated_email(
+        template_name="emails/issue_assigned.html",
+        context={
+            "nome_utente": "Mario",
+            "issue_title": "Server KO",
+            "customer_name": "ACME",
+            "is_new_owner": True,
+        },
+        subject="Test cid",
+        recipient_list=["mario@example.com"],
+    )
+    assert sent is True and error is None
+
+    msg = mail.outbox[-1]
+    assert msg.mixed_subtype == "related"
+    assert "<archie-issue_assigned@biotron.email>" in _image_cids(msg)
+
+
+@override_settings(DEFAULT_FROM_EMAIL="noreply@biotron.it")
+def test_send_templated_email_missing_inline_asset_does_not_fail(monkeypatch, tmp_path):
+    # Directory asset vuota: il cid del template non trova nessun file.
+    monkeypatch.setattr("core.emails._ASSETS_DIR", tmp_path)
+
+    sent, error = send_templated_email(
+        template_name="emails/issue_assigned.html",
+        context={
+            "nome_utente": "Mario",
+            "issue_title": "X",
+            "customer_name": "Y",
+            "is_new_owner": True,
+        },
+        subject="Test asset mancante",
+        recipient_list=["mario@example.com"],
+    )
+    assert sent is True and error is None
+
+    msg = mail.outbox[-1]
+    assert _image_cids(msg) == []  # nessuna immagine, ma l'email è partita
+
+
 def test_send_templated_email_returns_false_and_message_on_failure(monkeypatch):
     def _raise_on_send(self, fail_silently=False):
         raise RuntimeError("SMTP non raggiungibile")
