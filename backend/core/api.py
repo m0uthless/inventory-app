@@ -37,6 +37,7 @@ class UserListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     is_philips = serializers.SerializerMethodField()
     is_servicenow_technician = serializers.SerializerMethodField()
+    leave_area = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
@@ -53,9 +54,15 @@ class UserListSerializer(serializers.ModelSerializer):
         except Exception:
             return True
 
+    def get_leave_area(self, obj):
+        try:
+            return obj.profile.leave_area_id
+        except Exception:
+            return None
+
     class Meta:
         model  = User
-        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician"]
+        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician", "leave_area"]
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -63,7 +70,11 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return User.objects.select_related("profile").filter(is_active=True).order_by("first_name", "last_name", "username")
+        qs = User.objects.select_related("profile").filter(is_active=True).order_by("first_name", "last_name", "username")
+        leave_area = self.request.query_params.get("leave_area")
+        if leave_area and leave_area.isdigit():
+            qs = qs.filter(profile__leave_area_id=int(leave_area))
+        return qs
 
 
 class CustomerStatusLookupSerializer(serializers.ModelSerializer):

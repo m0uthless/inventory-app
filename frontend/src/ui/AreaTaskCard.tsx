@@ -1,60 +1,42 @@
 import * as React from 'react'
 import {
-  Box, Card, Chip, Divider, IconButton, InputBase, MenuItem, Select,
+  Avatar, Box, Card, Chip, Divider, IconButton, InputBase, MenuItem, Select,
   Stack, TextField, Tooltip, Typography,
 } from '@mui/material'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
-import EditRoundedIcon from '@mui/icons-material/EditRounded'
-import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded'
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded'
 import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded'
+import PauseCircleOutlineRoundedIcon from '@mui/icons-material/PauseCircleOutlineRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import AttachFileIcon from '@mui/icons-material/AttachFile'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
+import AreaTaskDetail from '../features/areatasks/AreaTaskDetail'
+import {
+  PRIORITY_META, STATUS_META, STATUS_ORDER, personInitials,
+  type AreaTaskRow, type TaskStatus,
+} from '../features/areatasks/types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type AreaOption = { id: number; label: string }
 
-type Status = 'da_fare' | 'in_corso' | 'completato'
-
-type AreaAoption = { id: number; label: string }
-
-type AreaTask = {
-  id: number
-  area: number
-  area_label: string
-  title: string
-  description: string
-  status: Status
-  due_date: string | null
-  created_by: number | null
-  created_by_name: string | null
-  created_at: string
-  completed_at: string | null
-  can_edit: boolean
-}
-
-const STATUS_ORDER: Status[] = ['da_fare', 'in_corso', 'completato']
-const STATUS_LABEL: Record<Status, string> = {
-  da_fare: 'Da fare',
-  in_corso: 'In corso',
-  completato: 'Completato',
-}
-// Ciclo di avanzamento: click sull'icona di stato → passa allo stato successivo.
-const NEXT_STATUS: Record<Status, Status> = {
+// Ciclo rapido dall'icona di stato: "In attesa" si imposta dal dialog di modifica.
+const NEXT_STATUS: Record<TaskStatus, TaskStatus> = {
   da_fare: 'in_corso',
   in_corso: 'completato',
+  in_attesa: 'in_corso',
   completato: 'da_fare',
 }
 
-function StatusIcon({ status, sx }: { status: Status; sx?: object }) {
-  if (status === 'completato') return <CheckCircleRoundedIcon sx={{ fontSize: 18, color: 'success.main', ...sx }} />
-  if (status === 'in_corso') return <PlayCircleOutlineRoundedIcon sx={{ fontSize: 18, color: 'warning.main', ...sx }} />
-  return <RadioButtonUncheckedRoundedIcon sx={{ fontSize: 18, color: 'text.disabled', ...sx }} />
+function StatusIcon({ status }: { status: TaskStatus }) {
+  if (status === 'completato') return <CheckCircleRoundedIcon sx={{ fontSize: 18, color: 'success.main' }} />
+  if (status === 'in_corso') return <PlayCircleOutlineRoundedIcon sx={{ fontSize: 18, color: 'warning.main' }} />
+  if (status === 'in_attesa') return <PauseCircleOutlineRoundedIcon sx={{ fontSize: 18, color: 'info.main' }} />
+  return <RadioButtonUncheckedRoundedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
 }
 
 function dueChip(due_date: string | null) {
@@ -79,8 +61,6 @@ function dueChip(due_date: string | null) {
   )
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
-
 export default function AreaTaskCard() {
   const { me } = useAuth()
   const toast = useToast()
@@ -88,33 +68,22 @@ export default function AreaTaskCard() {
   const myAreaId = me?.profile?.leave_area ?? null
   const myAreaLabel = me?.profile?.leave_area_label ?? null
 
-  const [areas, setAreas] = React.useState<AreaAoption[]>([])
+  const [areas, setAreas] = React.useState<AreaOption[]>([])
   const [selectedArea, setSelectedArea] = React.useState<number | null>(null)
-  const [tasks, setTasks] = React.useState<AreaTask[]>([])
+  const [tasks, setTasks] = React.useState<AreaTaskRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [input, setInput] = React.useState('')
   const [dueDate, setDueDate] = React.useState('')
   const [saving, setSaving] = React.useState(false)
+  const [openId, setOpenId] = React.useState<number | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // Edit inline di un task esistente (titolo/descrizione/scadenza).
-  const [editingId, setEditingId] = React.useState<number | null>(null)
-  const [editForm, setEditForm] = React.useState<{ title: string; description: string; due_date: string }>({
-    title: '', description: '', due_date: '',
-  })
-  const [editSaving, setEditSaving] = React.useState(false)
-
-  // Aree per il selettore (sola lettura sulle aree diverse dalla propria).
   React.useEffect(() => {
-    api.get<{ results: AreaAoption[] } | AreaAoption[]>('/leave-areas/', { params: { page_size: 100 } })
-      .then(r => {
-        const list = Array.isArray(r.data) ? r.data : r.data.results
-        setAreas(list)
-      })
+    api.get<{ results: AreaOption[] } | AreaOption[]>('/leave-areas/', { params: { page_size: 100 } })
+      .then((r) => setAreas(Array.isArray(r.data) ? r.data : r.data.results))
       .catch(() => {})
   }, [])
 
-  // Default: la propria area appena nota da /me/.
   React.useEffect(() => {
     if (myAreaId && selectedArea === null) setSelectedArea(myAreaId)
   }, [myAreaId, selectedArea])
@@ -122,16 +91,15 @@ export default function AreaTaskCard() {
   const load = React.useCallback((areaId: number | null) => {
     if (!areaId) { setTasks([]); setLoading(false); return }
     setLoading(true)
-    api.get<{ results: AreaTask[] } | AreaTask[]>('/area-tasks/', { params: { area: areaId, page_size: 100 } })
-      .then(r => {
-        const list = Array.isArray(r.data) ? r.data : r.data.results
-        setTasks(list)
-      })
+    api.get<{ results: AreaTaskRow[] } | AreaTaskRow[]>('/area-tasks/', { params: { area: areaId, page_size: 100 } })
+      .then((r) => setTasks(Array.isArray(r.data) ? r.data : r.data.results))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
   React.useEffect(() => { load(selectedArea) }, [selectedArea, load])
+
+  const notify = () => window.dispatchEvent(new Event('area-task-changed'))
 
   const isOwnArea = selectedArea !== null && selectedArea === myAreaId
   const isSuperuser = Boolean(me?.is_superuser)
@@ -142,19 +110,18 @@ export default function AreaTaskCard() {
     if (!title || saving || readOnly) return
     setSaving(true)
     try {
-      const r = await api.post<AreaTask>('/area-tasks/', {
+      const r = await api.post<AreaTaskRow>('/area-tasks/', {
         title,
         due_date: dueDate || null,
         // Rilevante solo per i superuser (possono creare in un'area diversa
-        // dalla propria): per gli utenti normali il backend forza comunque
-        // la propria area, ignorando questo valore.
+        // dalla propria): per gli utenti normali il backend forza la propria area.
         area: selectedArea ?? undefined,
       })
-      setTasks(prev => [r.data, ...prev])
+      setTasks((prev) => [r.data, ...prev])
       setInput('')
       setDueDate('')
       inputRef.current?.focus()
-      window.dispatchEvent(new Event('area-task-changed'))
+      notify()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -162,65 +129,37 @@ export default function AreaTaskCard() {
     }
   }
 
-  const cycleStatus = async (task: AreaTask) => {
+  const cycleStatus = async (task: AreaTaskRow) => {
     if (readOnly || !task.can_edit) return
     const nextStatus = NEXT_STATUS[task.status]
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: nextStatus } : t))
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)))
     try {
-      await api.patch(`/area-tasks/${task.id}/`, { status: nextStatus })
-      window.dispatchEvent(new Event('area-task-changed'))
+      const r = await api.patch<AreaTaskRow>(`/area-tasks/${task.id}/`, { status: nextStatus })
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? r.data : t)))
+      notify()
     } catch (e) {
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)))
       toast.error(apiErrorToMessage(e))
     }
   }
 
   const deleteTask = async (id: number) => {
     if (readOnly) return
-    setTasks(prev => prev.filter(t => t.id !== id))
-    try { await api.delete(`/area-tasks/${id}/`); window.dispatchEvent(new Event('area-task-changed')) }
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+    try { await api.delete(`/area-tasks/${id}/`); notify() }
     catch (e) { toast.error(apiErrorToMessage(e)); load(selectedArea) }
   }
 
-  const startEdit = (task: AreaTask) => {
-    if (readOnly || !task.can_edit) return
-    setEditingId(task.id)
-    setEditForm({ title: task.title, description: task.description || '', due_date: task.due_date || '' })
-  }
-
-  const cancelEdit = () => setEditingId(null)
-
-  const saveEdit = async (id: number) => {
-    const title = editForm.title.trim()
-    if (!title || editSaving) return
-    setEditSaving(true)
-    const payload = { title, description: editForm.description.trim(), due_date: editForm.due_date || null }
-    try {
-      const r = await api.patch<AreaTask>(`/area-tasks/${id}/`, payload)
-      setTasks(prev => prev.map(t => t.id === id ? r.data : t))
-      setEditingId(null)
-      window.dispatchEvent(new Event('area-task-changed'))
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setEditSaving(false)
-    }
-  }
-
-  const grouped = STATUS_ORDER.map(status => ({
-    status,
-    items: tasks.filter(t => t.status === status),
-  }))
+  const grouped = STATUS_ORDER.map((status) => ({ status, items: tasks.filter((t) => t.status === status) }))
+  const openTask = tasks.find((t) => t.id === openId) ?? null
 
   return (
     <Card
       variant="outlined"
       sx={{ borderRadius: 1, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}
     >
-      {/* Header */}
       <Box sx={{
-        px: 2, py: 1.5,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,
+        px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,
         borderBottom: '1px solid', borderColor: 'divider',
       }}>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
@@ -230,11 +169,11 @@ export default function AreaTaskCard() {
         <Select
           size="small"
           value={selectedArea ?? ''}
-          onChange={e => setSelectedArea(e.target.value ? Number(e.target.value) : null)}
+          onChange={(e) => setSelectedArea(e.target.value ? Number(e.target.value) : null)}
           displayEmpty
           sx={{ fontSize: '0.78rem', minWidth: 140, '& .MuiSelect-select': { py: 0.5 } }}
         >
-          {areas.map(a => (
+          {areas.map((a) => (
             <MenuItem key={a.id} value={a.id} sx={{ fontSize: '0.82rem' }}>
               {a.label}{a.id === myAreaId ? ' (mia)' : ''}
             </MenuItem>
@@ -244,9 +183,7 @@ export default function AreaTaskCard() {
 
       {readOnly && (
         <Box sx={{ px: 2, py: 0.75, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" color="text.disabled">
-            Sola lettura — non fai parte di quest'area
-          </Typography>
+          <Typography variant="caption" color="text.disabled">Sola lettura — non fai parte di quest'area</Typography>
         </Box>
       )}
 
@@ -258,43 +195,32 @@ export default function AreaTaskCard() {
         </Box>
       )}
 
-      {/* Input aggiunta */}
       {!readOnly && (
         <Box sx={{
-          px: 2, py: 1,
-          display: 'flex', alignItems: 'center', gap: 0.75,
-          borderBottom: '1px solid', borderColor: 'divider',
-          bgcolor: 'action.hover',
+          px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 0.75,
+          borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'action.hover',
         }}>
           <InputBase
             inputRef={inputRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') addTask() }}
-            placeholder={`Aggiungi un task per ${isOwnArea ? (myAreaLabel ?? 'la tua area') : (areas.find(a => a.id === selectedArea)?.label ?? 'quest\'area')}...`}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addTask() }}
+            placeholder={`Aggiungi un task per ${isOwnArea ? (myAreaLabel ?? 'la tua area') : (areas.find((a) => a.id === selectedArea)?.label ?? 'quest\'area')}...`}
             sx={{ flex: 1, fontSize: '0.82rem', color: 'text.primary' }}
             inputProps={{ maxLength: 200 }}
           />
           <TextField
-            type="date"
-            size="small"
-            value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
+            type="date" size="small" value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150, '& input': { fontSize: '0.78rem', py: 0.5 } }}
           />
-          <IconButton
-            size="small"
-            onClick={addTask}
-            disabled={!input.trim() || saving}
-            sx={{ color: 'primary.main' }}
-          >
+          <IconButton size="small" onClick={() => void addTask()} disabled={!input.trim() || saving} sx={{ color: 'primary.main' }}>
             <AddRoundedIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Box>
       )}
 
-      {/* Lista task */}
       <Box sx={{ flex: 1, overflowY: 'auto' }}>
         {loading ? (
           <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -315,7 +241,7 @@ export default function AreaTaskCard() {
                   {gi > 0 && (
                     <Box sx={{ px: 2, py: 0.5, bgcolor: 'action.hover', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider' }}>
                       <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        {STATUS_LABEL[status]}
+                        {STATUS_META[status].label}
                       </Typography>
                     </Box>
                   )}
@@ -326,13 +252,7 @@ export default function AreaTaskCard() {
                         readOnly={readOnly}
                         onCycle={cycleStatus}
                         onDelete={deleteTask}
-                        editing={editingId === task.id}
-                        editForm={editForm}
-                        onEditFormChange={setEditForm}
-                        onStartEdit={startEdit}
-                        onSaveEdit={saveEdit}
-                        onCancelEdit={cancelEdit}
-                        editSaving={editSaving}
+                        onOpen={(t) => setOpenId(t.id)}
                       />
                       {i < items.length - 1 && <Divider />}
                     </Box>
@@ -343,93 +263,29 @@ export default function AreaTaskCard() {
           </Stack>
         )}
       </Box>
+
+      <AreaTaskDetail
+        task={openTask}
+        onClose={() => setOpenId(null)}
+        onChanged={(next) => { setTasks((prev) => prev.map((t) => (t.id === next.id ? next : t))); notify() }}
+        onDeleted={(id) => { setTasks((prev) => prev.filter((t) => t.id !== id)); notify() }}
+      />
     </Card>
   )
 }
 
-// ─── Singola riga task ────────────────────────────────────────────────────────
 function TaskRow({
-  task,
-  readOnly,
-  onCycle,
-  onDelete,
-  editing,
-  editForm,
-  onEditFormChange,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  editSaving,
+  task, readOnly, onCycle, onDelete, onOpen,
 }: {
-  task: AreaTask
+  task: AreaTaskRow
   readOnly: boolean
-  onCycle: (t: AreaTask) => void
+  onCycle: (t: AreaTaskRow) => void
   onDelete: (id: number) => void
-  editing: boolean
-  editForm: { title: string; description: string; due_date: string }
-  onEditFormChange: (f: { title: string; description: string; due_date: string }) => void
-  onStartEdit: (t: AreaTask) => void
-  onSaveEdit: (id: number) => void
-  onCancelEdit: () => void
-  editSaving: boolean
+  onOpen: (t: AreaTaskRow) => void
 }) {
-  if (editing) {
-    return (
-      <Stack spacing={0.75} sx={{ px: 2, py: 1.25, bgcolor: 'action.hover' }}>
-        <InputBase
-          autoFocus
-          value={editForm.title}
-          onChange={e => onEditFormChange({ ...editForm, title: e.target.value })}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSaveEdit(task.id) }
-            if (e.key === 'Escape') onCancelEdit()
-          }}
-          placeholder="Titolo"
-          sx={{ fontSize: '0.82rem', fontWeight: 600 }}
-          inputProps={{ maxLength: 200 }}
-        />
-        <InputBase
-          value={editForm.description}
-          onChange={e => onEditFormChange({ ...editForm, description: e.target.value })}
-          onKeyDown={e => { if (e.key === 'Escape') onCancelEdit() }}
-          placeholder="Descrizione (opzionale)"
-          multiline
-          minRows={1}
-          maxRows={4}
-          sx={{ fontSize: '0.76rem', color: 'text.secondary' }}
-        />
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <TextField
-            type="date"
-            size="small"
-            value={editForm.due_date}
-            onChange={e => onEditFormChange({ ...editForm, due_date: e.target.value })}
-            InputLabelProps={{ shrink: true }}
-            sx={{ width: 150, '& input': { fontSize: '0.78rem', py: 0.5 } }}
-          />
-          <Box sx={{ flex: 1 }} />
-          <Tooltip title="Annulla (Esc)">
-            <IconButton size="small" onClick={onCancelEdit} sx={{ color: 'text.disabled' }}>
-              <CloseRoundedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Salva (Invio)">
-            <span>
-              <IconButton
-                size="small"
-                onClick={() => onSaveEdit(task.id)}
-                disabled={!editForm.title.trim() || editSaving}
-                sx={{ color: 'primary.main' }}
-              >
-                <CheckRoundedIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Stack>
-      </Stack>
-    )
-  }
-
+  const canAct = !readOnly && task.can_edit
+  const showPriority = task.priority === 'high' || task.priority === 'critical'
+  const filesCount = task.drive_files_detail.length
   return (
     <Stack
       direction="row"
@@ -437,23 +293,35 @@ function TaskRow({
       spacing={1.25}
       sx={{
         px: 2, py: 1,
-        '&:hover .task-actions': { opacity: readOnly || !task.can_edit ? 0 : 1 },
+        '&:hover .task-actions': { opacity: canAct ? 1 : 0 },
+        '&:focus-within .task-actions': { opacity: canAct ? 1 : 0 },
         transition: 'background 0.12s',
-        '&:hover': { bgcolor: readOnly ? 'transparent' : 'action.hover' },
+        '&:hover': { bgcolor: 'action.hover' },
       }}
     >
-      <Tooltip title={readOnly ? '' : `Segna come "${STATUS_LABEL[NEXT_STATUS[task.status]]}"`}>
+      <Tooltip title={canAct ? `Segna come "${STATUS_META[NEXT_STATUS[task.status]].label}"` : ''}>
         <Box
+          {...(canAct ? { role: 'button', 'aria-label': 'Cambia stato' } : {})}
+          tabIndex={canAct ? 0 : -1}
           onClick={() => onCycle(task)}
-          sx={{ cursor: readOnly ? 'default' : 'pointer', display: 'flex', flexShrink: 0 }}
+          onKeyDown={(e) => {
+            if (!canAct) return
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCycle(task) }
+          }}
+          sx={{ cursor: canAct ? 'pointer' : 'default', display: 'flex', flexShrink: 0 }}
         >
           <StatusIcon status={task.status} />
         </Box>
       </Tooltip>
 
       <Box
-        sx={{ flex: 1, minWidth: 0, cursor: readOnly || !task.can_edit ? 'default' : 'pointer' }}
-        onClick={() => onStartEdit(task)}
+        role="button"
+        tabIndex={0}
+        sx={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+        onClick={() => onOpen(task)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(task) }
+        }}
       >
         <Typography
           variant="body2"
@@ -471,26 +339,43 @@ function TaskRow({
             {task.description}
           </Typography>
         ) : null}
-        {task.created_by_name && (
-          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.68rem' }}>
-            {task.created_by_name}
-          </Typography>
-        )}
       </Box>
+
+      {showPriority ? (
+        <Chip
+          size="small"
+          label={PRIORITY_META[task.priority].label}
+          color={task.priority === 'critical' ? 'error' : 'warning'}
+          sx={{ fontSize: '0.66rem', height: 18 }}
+        />
+      ) : null}
+      {task.comments_count > 0 ? (
+        <Stack direction="row" alignItems="center" spacing={0.25} sx={{ color: 'text.disabled' }}>
+          <ChatBubbleOutlineIcon sx={{ fontSize: 13 }} />
+          <Typography variant="caption" sx={{ fontSize: '0.68rem' }}>{task.comments_count}</Typography>
+        </Stack>
+      ) : null}
+      {filesCount > 0 ? (
+        <Stack direction="row" alignItems="center" spacing={0.25} sx={{ color: 'text.disabled' }}>
+          <AttachFileIcon sx={{ fontSize: 13 }} />
+          <Typography variant="caption" sx={{ fontSize: '0.68rem' }}>{filesCount}</Typography>
+        </Stack>
+      ) : null}
+      {task.assigned_to_name ? (
+        <Tooltip title={task.assigned_to_name}>
+          <Avatar sx={{ width: 20, height: 20, fontSize: '0.6rem', fontWeight: 700, bgcolor: 'primary.main' }}>
+            {personInitials(task.assigned_to_name)}
+          </Avatar>
+        </Tooltip>
+      ) : null}
 
       {dueChip(task.due_date)}
 
-      {!readOnly && task.can_edit && (
+      {canAct && (
         <Stack direction="row" className="task-actions" sx={{ opacity: 0, transition: 'opacity 0.12s' }}>
           <IconButton
             size="small"
-            onClick={() => onStartEdit(task)}
-            sx={{ color: 'text.disabled', '&:hover': { color: 'primary.main' } }}
-          >
-            <EditRoundedIcon sx={{ fontSize: 14 }} />
-          </IconButton>
-          <IconButton
-            size="small"
+            aria-label="Elimina task"
             onClick={() => onDelete(task.id)}
             sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
           >

@@ -12,6 +12,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Il modulo Bug & Feature invia ora email: alla nuova segnalazione a chi può gestirla, e a ogni cambio di stato (risolta/rifiutata/riaperta) al segnalatore, con la motivazione in caso di rifiuto.
 - I task di area hanno ora un assegnatario (scelto tra gli utenti della stessa area), una priorità (bassa, media, alta, critica), un nuovo stato "In attesa", commenti e allegati collegati da Drive. Gli allegati mostrano solo i file a cui l'utente ha accesso, con le stesse regole di Drive.
 - I task di area eliminati si possono ora ripristinare (singolarmente o in blocco) e l'elenco supporta filtri per stato, priorità, assegnatario, area e scadenza, oltre a ricerca e ordinamento.
+- Il widget "Task di area" della dashboard apre ora un drawer di dettaglio con commenti e allegati collegati da Drive, e un dialog di modifica con assegnatario (utenti della stessa area), priorità, stato "In attesa" e scadenza. Ogni riga mostra priorità alta/critica, assegnatario, commenti e allegati.
+- L'elenco utenti può essere filtrato per area (`/api/users/?leave_area=`) e riporta l'area di ciascun utente.
 
 ### Fixed
 - allega le immagini inline (cid:) referenziate dai template email
