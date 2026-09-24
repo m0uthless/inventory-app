@@ -10,6 +10,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Added
 - Il Piano Ferie invia ora email: quando un dipendente invia una richiesta di ferie i coordinatori (e i superuser) ricevono un'email di notifica; quando la richiesta viene validata o rifiutata il dipendente ne riceve l'esito via email. Un'unica email per richiesta, anche se copre più giorni.
 - Il modulo Bug & Feature invia ora email: alla nuova segnalazione a chi può gestirla, e a ogni cambio di stato (risolta/rifiutata/riaperta) al segnalatore, con la motivazione in caso di rifiuto.
+- I task di area hanno ora un assegnatario (scelto tra gli utenti della stessa area), una priorità (bassa, media, alta, critica), un nuovo stato "In attesa", commenti e allegati collegati da Drive. Gli allegati mostrano solo i file a cui l'utente ha accesso, con le stesse regole di Drive.
+- I task di area eliminati si possono ora ripristinare (singolarmente o in blocco) e l'elenco supporta filtri per stato, priorità, assegnatario, area e scadenza, oltre a ricerca e ordinamento.
 
 ### Fixed
 - allega le immagini inline (cid:) referenziate dai template email
