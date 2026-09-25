@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from django.db import transaction
@@ -18,9 +19,12 @@ from attendance.models import LeaveArea
 from audit.utils import log_event, to_change_value_for_field
 from drive.access import filter_accessible_files, has_file_access
 from drive.models import DriveFile
+from core.emails import send_templated_email
 from core.mixins import RestoreActionMixin, SoftDeleteAuditMixin
 from core.soft_delete import TRUTHY, apply_soft_delete_filters
 from portal.permissions import IsInternalOrPortalDedicatedApp
+
+logger = logging.getLogger(__name__)
 
 from core.models import (
     AreaTask, AreaTaskComment, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
@@ -551,6 +555,81 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             )
         return user_area_id
 
+    _COMMENT_EXCERPT_CHARS = 300
+
+    def _safe_notify(self, fn, **kwargs):
+        """Le email non devono mai rompere la richiesta API."""
+        try:
+            fn(**kwargs)
+        except Exception:
+            logger.exception("Notifica email task di area fallita (%s)", getattr(fn, "__name__", fn))
+
+    def _notify_comment(self, *, task, comment):
+        """Email all'assegnatario e al creatore del task (senza duplicati),
+        mai all'autore del commento."""
+        recipient_ids = {task.assigned_to_id, task.created_by_id} - {None, comment.author_id}
+        if not recipient_ids:
+            return
+
+        body = comment.body
+        limit = self._COMMENT_EXCERPT_CHARS
+        excerpt = body if len(body) <= limit else body[: limit - 1].rstrip() + "…"
+        autore = AreaTaskSerializer._display_name(comment.author)
+        area_label = task.area.label
+        title_for_subject = " ".join(task.title.split())
+
+        for user in User.objects.filter(id__in=recipient_ids, is_active=True).exclude(email=""):
+            send_templated_email(
+                template_name="emails/area_task_comment.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "task_title": task.title,
+                    "area_label": area_label,
+                    "autore": autore,
+                    "commento": excerpt,
+                    "is_assignee": user.id == task.assigned_to_id,
+                },
+                subject=f"ARCHIE — Nuovo commento sul task: {title_for_subject}",
+                recipient_list=[user.email],
+            )
+
+    def _notify_assignment_change(self, *, old_assigned_to_id, task):
+        """Email solo tra utenti reali: nessuna email su disassegnazione o
+        assegnatario invariato; chi compie l'azione non riceve l'email della
+        propria azione."""
+        new_assigned_to_id = task.assigned_to_id
+        if new_assigned_to_id is None or new_assigned_to_id == old_assigned_to_id:
+            return
+
+        recipient_ids = {new_assigned_to_id}
+        if old_assigned_to_id is not None:
+            recipient_ids.add(old_assigned_to_id)
+        recipient_ids.discard(self.request.user.id)
+
+        assegnatore = AreaTaskSerializer._display_name(self.request.user)
+        area_label = task.area.label
+        title_for_subject = " ".join(task.title.split())
+        for user in User.objects.filter(id__in=recipient_ids, is_active=True).exclude(email=""):
+            is_new_owner = user.id == new_assigned_to_id
+            send_templated_email(
+                template_name="emails/area_task_assigned.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "task_title": task.title,
+                    "area_label": area_label,
+                    "priority_label": task.get_priority_display(),
+                    "due_date": task.due_date,
+                    "assegnatore": assegnatore,
+                    "is_new_owner": is_new_owner,
+                },
+                subject=(
+                    f"ARCHIE — Task assegnato a te: {title_for_subject}"
+                    if is_new_owner
+                    else f"ARCHIE — Task riassegnato: {title_for_subject}"
+                ),
+                recipient_list=[user.email],
+            )
+
     def _visible_file_ids(self, task):
         return sorted(
             filter_accessible_files(
@@ -597,9 +676,11 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             actor=user, action="create", instance=instance,
             changes=changes, request=self.request,
         )
+        self._safe_notify(self._notify_assignment_change, old_assigned_to_id=None, task=instance)
 
     def perform_update(self, serializer):
         instance = serializer.instance
+        old_assigned_to_id = instance.assigned_to_id
         self._check_own_area(instance.area_id)
         validated = {k: v for k, v in serializer.validated_data.items() if k != 'drive_files'}
         changes = self._changes_from_validated(instance, validated)
@@ -625,6 +706,9 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         log_event(
             actor=self.request.user, action="update", instance=saved,
             changes=changes or None, request=self.request,
+        )
+        self._safe_notify(
+            self._notify_assignment_change, old_assigned_to_id=old_assigned_to_id, task=saved,
         )
 
     def perform_destroy(self, instance):
@@ -667,6 +751,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             changes={"comment_added": {"from": None, "to": comment.id}},
             request=request,
         )
+        self._safe_notify(self._notify_comment, task=task, comment=comment)
         return Response(AreaTaskCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['patch', 'delete'], url_path=r'comments/(?P<comment_pk>\d+)')
