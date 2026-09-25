@@ -371,14 +371,35 @@ class AreaTaskSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         return user if user is not None and getattr(user, 'is_authenticated', False) else None
 
+    def _accessible_file_ids(self, user):
+        """Id dei file Drive accessibili all'utente tra quelli collegati ai task
+        che questo serializer sta rappresentando (la pagina intera in lista):
+        un'unica query ACL per richiesta invece di una per riga."""
+        cache = self.context.setdefault('_area_task_acl_ids', {})
+        if 'ids' not in cache:
+            parent = self.parent
+            if isinstance(parent, serializers.ListSerializer):
+                objs = parent.instance
+            else:
+                objs = self.instance
+            if objs is None:
+                objs = []
+            elif not isinstance(objs, (list, tuple)) and not hasattr(objs, '__iter__'):
+                objs = [objs]
+            task_ids = [o.pk for o in objs]
+            files = DriveFile.objects.filter(area_tasks__in=task_ids, deleted_at__isnull=True)
+            cache['ids'] = set(filter_accessible_files(files, user).values_list('pk', flat=True))
+        return cache['ids']
+
     def get_drive_files_detail(self, obj):
         user = self._request_user()
         if user is None:
             return []
-        files = filter_accessible_files(obj.drive_files.filter(deleted_at__isnull=True), user)
+        allowed = self._accessible_file_ids(user)
         return [
             {'id': f.id, 'name': f.name, 'mime_type': f.mime_type, 'size': f.size, 'folder': f.folder_id}
-            for f in files
+            for f in obj.drive_files.all()
+            if f.deleted_at is None and f.id in allowed
         ]
 
     def validate_drive_files(self, files):
@@ -501,7 +522,9 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
     ]
 
     def get_queryset(self):
-        qs = AreaTask.objects.select_related('area', 'created_by', 'assigned_to')
+        qs = AreaTask.objects.select_related(
+            'area', 'created_by', 'assigned_to',
+        ).prefetch_related('drive_files')
         if getattr(self, 'action', None) in ('list', 'retrieve'):
             qs = qs.annotate(comments_count=Count('comments'))
         if getattr(self, 'action', None) in ('list', 'retrieve', 'restore', 'bulk_restore'):
@@ -515,6 +538,16 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         if getattr(self, 'action', None) == 'list' and params.get('include_hidden') != '1' and not in_trash:
             hide_before = timezone.now() - timedelta(days=AreaTask.HIDE_COMPLETED_AFTER_DAYS)
             qs = qs.exclude(status=AreaTask.STATUS_COMPLETATO, completed_at__lt=hide_before)
+        return qs
+
+    def filter_queryset(self, queryset):
+        # OrderingFilter sostituisce l'ordinamento di default con il solo campo
+        # richiesto: senza un tie-breaker su `id` la paginazione ripete/salta
+        # righe quando ci sono valori uguali o due_date NULL.
+        qs = super().filter_queryset(queryset)
+        ordering = list(qs.query.order_by) or list(AreaTask._meta.ordering or [])
+        if not any(str(o).lstrip('-') in ('id', 'pk') for o in ordering):
+            qs = qs.order_by(*ordering, 'id')
         return qs
 
     def get_permissions(self):
@@ -729,7 +762,9 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             AreaTask.objects
             .filter(area_id=user_area_id, due_date__isnull=False, due_date__lte=tomorrow, deleted_at__isnull=True)
             .exclude(status=AreaTask.STATUS_COMPLETATO)
-            .select_related('area')
+            .select_related('area', 'created_by', 'assigned_to')
+            .prefetch_related('drive_files')
+            .annotate(comments_count=Count('comments'))
             .order_by('due_date')
         )
         return Response(AreaTaskSerializer(qs, many=True, context={'request': request}).data)

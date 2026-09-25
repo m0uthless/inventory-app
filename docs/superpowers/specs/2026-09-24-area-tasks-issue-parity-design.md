@@ -66,3 +66,8 @@ Catena del CLAUDE.md: `tsc -b --force`, `npm run build`, `npm run lint` (baselin
 ## Fuori scope
 
 Upload di file da task, `waiting_reason`, collegamento a cliente/sito/ServiceNow, preferenze di opt-out email.
+
+## Note di consegna (2026-09-25)
+
+- La pagina `/tasks` (fase 2b) non ha vista cestino né tab "Attività": nell'app il cestino/restore vive nella pagina globale `Trash.tsx` (permessi per risorsa) e la pagina Issues non ha una vista cestino. Portare i task di area in `Trash.tsx` e decidere chi può fare restore (oggi serve `core.change_areatask`) è un lavoro separato, ancora da fare. L'audit resta consultabile dalla pagina `/audit`.
+- I filtri della pagina sono in stato locale (non nell'URL); il dettaglio non è collegato all'URL.

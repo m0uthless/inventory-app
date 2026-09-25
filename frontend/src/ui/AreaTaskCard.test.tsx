@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AreaTaskCard from './AreaTaskCard'
 import type { AreaTaskRow } from '../features/areatasks/types'
@@ -56,14 +57,14 @@ beforeEach(() => {
 
 describe('AreaTaskCard', () => {
   it('groups tasks by the four statuses, including "In attesa"', async () => {
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     expect(await screen.findByText('Bloccato')).toBeInTheDocument()
     expect(screen.getByText('In attesa')).toBeInTheDocument()
     expect(screen.getByText('Completato')).toBeInTheDocument()
   })
 
   it('shows priority, assignee initials and comment count for a task', async () => {
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Bloccato')
     expect(screen.getByText('Critica')).toBeInTheDocument()
     expect(screen.getByText('AR')).toBeInTheDocument()
@@ -71,7 +72,7 @@ describe('AreaTaskCard', () => {
   })
 
   it('opens the detail when a task title is clicked', async () => {
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     fireEvent.click(await screen.findByText('Da fare uno'))
     expect(await screen.findByTestId('detail')).toHaveTextContent('Da fare uno')
   })
@@ -92,7 +93,7 @@ describe('AreaTaskCard', () => {
   ] as const)('cycles %s to %s from the status icon', async (from, to) => {
     loadOnly([row({ id: 1, title: 'Unico', status: from })])
     apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Unico', status: to }) })
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Unico')
     fireEvent.click(screen.getByLabelText('Cambia stato'))
     await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/area-tasks/1/', { status: to }))
@@ -101,7 +102,7 @@ describe('AreaTaskCard', () => {
   it('uses the PATCH response row (completed_at) after completing', async () => {
     loadOnly([row({ id: 1, title: 'Unico', status: 'in_corso' })])
     apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Unico', status: 'completato', completed_at: '2026-09-24T11:00:00Z', description: 'Chiuso dal server' }) })
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Unico')
     fireEvent.click(screen.getByLabelText('Cambia stato'))
     await waitFor(() => expect(apiPatch).toHaveBeenCalled())
@@ -115,7 +116,7 @@ describe('AreaTaskCard', () => {
     loadOnly([row({ id: 1, title: 'Unico', status: 'da_fare' })])
     let rej: (e: unknown) => void = () => {}
     apiPatch.mockReturnValue(new Promise((_, r) => { rej = r }))
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Unico')
     fireEvent.click(screen.getByLabelText('Cambia stato'))
     await waitFor(() => expect(screen.getByText('In corso')).toBeInTheDocument())
@@ -127,14 +128,14 @@ describe('AreaTaskCard', () => {
 
   it('has no status control and sends no PATCH on a read-only task', async () => {
     loadOnly([row({ id: 1, title: 'Unico', can_edit: false })])
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Unico')
     expect(screen.queryByLabelText('Cambia stato')).toBeNull()
     expect(apiPatch).not.toHaveBeenCalled()
   })
 
   it('opens the detail with Enter on the task title', async () => {
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     fireEvent.keyDown(await screen.findByText('Da fare uno'), { key: 'Enter' })
     expect(await screen.findByTestId('detail')).toHaveTextContent('Da fare uno')
   })
@@ -142,7 +143,7 @@ describe('AreaTaskCard', () => {
   it('cycles the status with Enter on the status control', async () => {
     loadOnly([row({ id: 1, title: 'Unico', status: 'da_fare' })])
     apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Unico', status: 'in_corso' }) })
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Unico')
     fireEvent.keyDown(screen.getByLabelText('Cambia stato'), { key: 'Enter' })
     await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/area-tasks/1/', { status: 'in_corso' }))
@@ -150,11 +151,17 @@ describe('AreaTaskCard', () => {
 
   it('creates a task quickly with title and due date', async () => {
     apiPost.mockResolvedValue({ data: row({ id: 9, title: 'Nuovo' }) })
-    render(<AreaTaskCard />)
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     const input = await screen.findByPlaceholderText(/Aggiungi un task/)
     fireEvent.change(input, { target: { value: 'Nuovo' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/area-tasks/', expect.objectContaining({ title: 'Nuovo', area: 3 })))
     expect(await screen.findByText('Nuovo')).toBeInTheDocument()
+  })
+
+  it('links to the full tasks page', async () => {
+    render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
+    const link = await screen.findByRole('link', { name: /Vedi tutti/ })
+    expect(link).toHaveAttribute('href', '/tasks')
   })
 })

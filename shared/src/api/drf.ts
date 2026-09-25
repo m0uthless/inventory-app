@@ -7,7 +7,7 @@ export type ApiPage<T> = {
   results: T[]
 }
 
-export type DrfParamValue = string | number | boolean
+export type DrfParamValue = string | number | boolean | readonly (string | number)[]
 export type DrfParams = Record<string, DrfParamValue | null | undefined>
 
 export type BuildDrfListParamsArgs = {

@@ -626,3 +626,88 @@ def test_stale_assignee_does_not_block_unrelated_edit():
     y = _user(b)
     r = c.patch(f"{URL}{task.id}/", {"assigned_to": y.id}, format="json")
     assert r.status_code == 400
+
+
+# ── numero di query costante sull'elenco ──────────────────────────────────────
+
+from django.db import connection  # noqa: E402
+from django.test.utils import CaptureQueriesContext  # noqa: E402
+
+
+def _queries_for(client, url, params=None):
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(url, params or {})
+    assert resp.status_code == 200, resp.data
+    return len(ctx)
+
+
+def _make_tasks(area, creator, count, *, files_per_task=2):
+    files = [_drive_file(f"f{i}.pdf") for i in range(files_per_task)]
+    tasks = []
+    for i in range(count):
+        t = AreaTask.objects.create(area=area, title=f"T{i}", created_by=creator, assigned_to=creator,
+                                    due_date=timezone.localdate())
+        t.drive_files.add(*files)
+        tasks.append(t)
+    return tasks
+
+
+def test_list_query_count_does_not_grow_with_the_number_of_tasks():
+    area = _area()
+    user = _user(area)
+    client = _client(user)
+    _make_tasks(area, user, 1)
+    _queries_for(client, URL, {"page_size": 50})  # warm-up: cache one-shot (permessi, ecc.)
+    few = _queries_for(client, URL, {"page_size": 50})
+    _make_tasks(area, user, 7)
+    many = _queries_for(client, URL, {"page_size": 50})
+    assert many == few
+
+
+def test_due_query_count_does_not_grow_with_the_number_of_tasks():
+    area = _area()
+    user = _user(area)
+    client = _client(user)
+    _make_tasks(area, user, 1)
+    _queries_for(client, f"{URL}due/")  # warm-up: cache one-shot (permessi, ecc.)
+    few = _queries_for(client, f"{URL}due/")
+    _make_tasks(area, user, 7)
+    many = _queries_for(client, f"{URL}due/")
+    assert many == few
+
+
+def test_list_still_hides_restricted_and_deleted_files_per_task():
+    area = _area()
+    group = Group.objects.create(name="riservato-q")
+    user = _user(area)
+    public = _drive_file("pubblico.pdf")
+    secret = _drive_file("segreto.pdf", group=group)
+    trashed = _drive_file("cestino.pdf")
+    task = AreaTask.objects.create(area=area, title="T", created_by=user)
+    task.drive_files.add(public, secret, trashed)
+    trashed.soft_delete()
+    rows = _results(_client(user).get(URL))
+    row = next(r for r in rows if r["id"] == task.id)
+    assert [d["id"] for d in row["drive_files_detail"]] == [public.id]
+
+
+def test_ordering_is_stable_across_pages_with_ties_and_null_due_dates():
+    area = _area()
+    user = _user(area)
+    day = timezone.localdate() + timedelta(days=3)
+    created = []
+    for i in range(7):
+        due = day if i < 4 else None
+        created.append(AreaTask.objects.create(area=area, title=f"T{i}", created_by=user, due_date=due).id)
+    client = _client(user)
+    seen = []
+    for page in (1, 2, 3):
+        resp = client.get(URL, {"ordering": "due_date", "page_size": 3, "page": page})
+        assert resp.status_code == 200, resp.data
+        seen.extend(row["id"] for row in _results(resp))
+    assert sorted(seen) == sorted(created)
+    assert len(seen) == len(set(seen))
+    dated = [i for i in seen if i in created[:4]]
+    assert dated == sorted(dated)
+    undated = [i for i in seen if i in created[4:]]
+    assert undated == sorted(undated)

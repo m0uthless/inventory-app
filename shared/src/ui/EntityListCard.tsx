@@ -110,13 +110,14 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
                     mb: toolbar.compact ? 1 : 1.5,
                     display: 'flex',
                     alignItems: 'center',
+                    ...(belowToolbar ? { flexWrap: 'wrap' } : {}),
                   }
             }
           >
             <ListToolbar {...toolbar}>
               {children}
             </ListToolbar>
-            {belowToolbar ? <Box sx={{ mt: 1 }}>{belowToolbar}</Box> : null}
+            {belowToolbar ? <Box sx={{ mt: 1, flexBasis: '100%', width: '100%' }}>{belowToolbar}</Box> : null}
           </Box>
         )}
 

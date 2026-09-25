@@ -31,6 +31,7 @@ const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
 const ServiceNowStats = lazy(() => import('./pages/ServiceNowStats'))
 const ServiceNowAbsences = lazy(() => import('./pages/ServiceNowAbsences'))
 const PianoFerie = lazy(() => import('./pages/PianoFerie'))
+const AreaTasks = lazy(() => import('./pages/AreaTasks'))
 const RimborsoSpese = lazy(() => import('./pages/RimborsoSpese'))
 const RimborsoSpesePage = lazy(() => import('./pages/RimborsoSpesePage'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
@@ -209,6 +210,10 @@ const router = createBrowserRouter([
       {
         path: 'piano-ferie',
         element: <RequireAuth>{lazyEl(<PianoFerie />)}</RequireAuth>,
+      },
+      {
+        path: 'tasks',
+        element: <RequireAuth>{lazyEl(<AreaTasks />)}</RequireAuth>,
       },
       {
         path: 'rimborso-spese',

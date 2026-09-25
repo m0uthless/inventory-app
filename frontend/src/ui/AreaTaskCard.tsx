@@ -1,6 +1,7 @@
 import * as React from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import {
-  Avatar, Box, Card, Chip, Divider, IconButton, InputBase, MenuItem, Select,
+  Avatar, Box, Button, Card, Chip, Divider, IconButton, InputBase, MenuItem, Select,
   Stack, TextField, Tooltip, Typography,
 } from '@mui/material'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
@@ -166,19 +167,24 @@ export default function AreaTaskCard() {
           <GroupsRoundedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
           <Typography variant="subtitle2" fontWeight={700} noWrap>Task di area</Typography>
         </Stack>
-        <Select
-          size="small"
-          value={selectedArea ?? ''}
-          onChange={(e) => setSelectedArea(e.target.value ? Number(e.target.value) : null)}
-          displayEmpty
-          sx={{ fontSize: '0.78rem', minWidth: 140, '& .MuiSelect-select': { py: 0.5 } }}
-        >
-          {areas.map((a) => (
-            <MenuItem key={a.id} value={a.id} sx={{ fontSize: '0.82rem' }}>
-              {a.label}{a.id === myAreaId ? ' (mia)' : ''}
-            </MenuItem>
-          ))}
-        </Select>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Button component={RouterLink} to="/tasks" size="small" sx={{ fontSize: '0.75rem', textTransform: 'none' }}>
+            Vedi tutti
+          </Button>
+          <Select
+            size="small"
+            value={selectedArea ?? ''}
+            onChange={(e) => setSelectedArea(e.target.value ? Number(e.target.value) : null)}
+            displayEmpty
+            sx={{ fontSize: '0.78rem', minWidth: 140, '& .MuiSelect-select': { py: 0.5 } }}
+          >
+            {areas.map((a) => (
+              <MenuItem key={a.id} value={a.id} sx={{ fontSize: '0.82rem' }}>
+                {a.label}{a.id === myAreaId ? ' (mia)' : ''}
+              </MenuItem>
+            ))}
+          </Select>
+        </Stack>
       </Box>
 
       {readOnly && (
