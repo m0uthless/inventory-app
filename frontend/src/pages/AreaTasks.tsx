@@ -1,7 +1,7 @@
 import * as React from 'react'
 import {
   Box, Button, Checkbox, Chip, FormControl, FormControlLabel, InputLabel, MenuItem, Select,
-  Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Stack, Tooltip, Typography,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
@@ -41,6 +41,32 @@ function statusColor(s: TaskStatus): 'success' | 'warning' | 'info' | 'default' 
   if (s === 'in_corso') return 'warning'
   if (s === 'in_attesa') return 'info'
   return 'default'
+}
+
+function StatusViewChipBar({ value, onChange }: { value: StatusView; onChange: (v: StatusView) => void }) {
+  const options: { key: StatusView; label: string }[] = [
+    { key: 'open', label: 'Aperti' },
+    { key: 'done', label: 'Chiusi' },
+    { key: 'all', label: 'Tutti' },
+  ]
+  return (
+    <Stack direction="row" spacing={1}>
+      {options.map((o) => {
+        const selected = value === o.key
+        return (
+          <Chip
+            key={o.key}
+            size="small"
+            label={o.label}
+            clickable
+            onClick={() => onChange(o.key)}
+            color={selected ? (o.key === 'open' ? 'error' : o.key === 'done' ? 'default' : 'primary') : 'default'}
+            variant={selected ? 'filled' : 'outlined'}
+          />
+        )
+      })}
+    </Stack>
+  )
 }
 
 export default function AreaTasks() {
@@ -113,15 +139,6 @@ export default function AreaTasks() {
     overdue ? 'overdue' : '',
     statusView !== 'open' ? statusView : '',
   ].filter(Boolean).length
-
-  const resetFilters = () => {
-    setAreaFilter(myAreaId ?? '')
-    setPriorityFilter('')
-    setOnlyMine(false)
-    setAssigneeFilter('')
-    setOverdue(false)
-    setStatusView('open')
-  }
 
   const extra = React.useMemo(() => {
     const p: DrfParams = { include_hidden: 1 }
@@ -305,7 +322,6 @@ export default function AreaTasks() {
           q: grid.q,
           onQChange: grid.setQ,
           alignRightActions: true,
-          onReset: activeFilterCount > 0 || grid.search.trim() ? () => { grid.reset(); resetFilters() } : undefined,
           rightActions: (
             <Tooltip title={canCreate ? '' : isSuperuser ? "Seleziona un'area" : 'Nessuna area assegnata al tuo profilo'}>
               <span>
@@ -342,20 +358,6 @@ export default function AreaTasks() {
         }}
         belowToolbar={
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ px: 0.5, py: 1 }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="area-filter-label">Area</InputLabel>
-            <Select
-              labelId="area-filter-label"
-              label="Area"
-              value={areaFilter}
-              onChange={(e) => { const v = e.target.value as number | string; changeArea(v === '' ? '' : Number(v)) }}
-            >
-              <MenuItem value="">Tutte le aree</MenuItem>
-              {areaOptions.map((a) => (
-                <MenuItem key={a.id} value={a.id}>{a.label}{a.id === myAreaId ? ' (mia)' : ''}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel id="priority-filter-label">Priorità</InputLabel>
             <Select
@@ -392,20 +394,26 @@ export default function AreaTasks() {
             control={<Checkbox size="small" checked={onlyMine} onChange={(e) => changeOnlyMine(e.target.checked)} />}
             label="Assegnati a me"
           />
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={statusView}
-            onChange={(_, v: StatusView | null) => { if (v) changeStatusView(v) }}
-            aria-label="Vista stato"
-          >
-            <ToggleButton value="open">Aperti</ToggleButton>
-            <ToggleButton value="done">Completati</ToggleButton>
-            <ToggleButton value="all">Tutti</ToggleButton>
-          </ToggleButtonGroup>
         </Stack>
         }
-      />
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center" flexShrink={0}>
+          <Select
+            size="small"
+            displayEmpty
+            value={areaFilter}
+            onChange={(e) => { const v = e.target.value as number | string; changeArea(v === '' ? '' : Number(v)) }}
+            SelectDisplayProps={{ 'aria-label': 'Area' }}
+            sx={{ minWidth: 170, height: 32, fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.5 } }}
+          >
+            <MenuItem value="">Tutte le aree</MenuItem>
+            {areaOptions.map((a) => (
+              <MenuItem key={a.id} value={a.id}>{a.label}{a.id === myAreaId ? ' (mia)' : ''}</MenuItem>
+            ))}
+          </Select>
+          <StatusViewChipBar value={statusView} onChange={changeStatusView} />
+        </Stack>
+      </EntityListCard>
 
       <AreaTaskDetail
         task={openTask}

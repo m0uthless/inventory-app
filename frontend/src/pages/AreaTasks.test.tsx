@@ -79,10 +79,10 @@ describe('AreaTasks page', () => {
     expect(screen.getByText('Anna Rossi')).toBeInTheDocument()
   })
 
-  it('switches the status view to "Completati" and reloads with that filter', async () => {
+  it('switches the status view to "Chiusi" and reloads with that filter', async () => {
     renderPage()
     await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByRole('button', { name: 'Completati' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chiusi' }))
     await waitFor(() => expect(listCalls().some((c) => c[1].params.status === 'completato')).toBe(true))
   })
 
@@ -136,7 +136,7 @@ describe('AreaTasks page', () => {
     render(<MemoryRouter initialEntries={['/?page=3']}><AreaTasks /></MemoryRouter>)
     await screen.findByText('Ordine toner')
     expect(listCalls()[0]![1].params).toMatchObject({ page: 3 })
-    fireEvent.click(screen.getByRole('button', { name: 'Completati' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chiusi' }))
     await waitFor(() =>
       expect(listCalls().some((c) => c[1].params.status === 'completato' && c[1].params.page === 1)).toBe(true),
     )
@@ -177,10 +177,10 @@ describe('AreaTasks page', () => {
     )
   })
 
-  it('"Scaduti" sends due_before=yesterday and the open statuses even in the "Completati" view', async () => {
+  it('"Scaduti" sends due_before=yesterday and the open statuses even in the "Chiusi" view', async () => {
     renderPage()
     await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByRole('button', { name: 'Completati' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chiusi' }))
     await waitFor(() => expect(listCalls().some((c) => c[1].params.status === 'completato')).toBe(true))
     fireEvent.click(screen.getByLabelText('Scaduti'))
     const d = new Date()
@@ -265,7 +265,7 @@ describe('AreaTasks page', () => {
 
   describe('never requests the old page together with a new filter', () => {
     const cases: Array<[string, () => Promise<void>, (p: Record<string, unknown>) => boolean]> = [
-      ['status view', async () => { fireEvent.click(screen.getByRole('button', { name: 'Completati' })) }, (p) => p.status === 'completato'],
+      ['status view', async () => { fireEvent.click(screen.getByRole('button', { name: 'Chiusi' })) }, (p) => p.status === 'completato'],
       ['mine', async () => { fireEvent.click(screen.getByLabelText('Assegnati a me')) }, (p) => p.mine === 'true'],
       [
         'assignee',
@@ -295,5 +295,15 @@ describe('AreaTasks page', () => {
       expect(after).toHaveLength(1)
       expect(after[0]![1].params.page).toBe(1)
     })
+  })
+  it('shows search, area select, the Aperti/Chiusi/Tutti chips and "Nuovo task" in the toolbar, with no reset button', async () => {
+    renderPage()
+    await screen.findByText('Ordine toner')
+    expect(screen.getByRole('button', { name: 'Aperti' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Chiusi' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tutti' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Area')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Nuovo task/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reimposta/ })).toBeNull()
   })
 })
