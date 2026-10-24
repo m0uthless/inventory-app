@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/dom'
 import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AreaTaskDetail from './AreaTaskDetail'
 import type { AreaTaskRow } from './types'
@@ -19,8 +20,9 @@ vi.mock('@shared/api/client', () => ({
 vi.mock('@shared/api/error', () => ({ apiErrorToMessage: () => 'Errore' }))
 const toast = { error: vi.fn(), success: vi.fn() }
 vi.mock('@shared/ui/toast', () => ({ useToast: () => toast }))
+const auth = { me: { id: 1 }, hasPerm: (_perm: string) => true, inGroup: () => true }
 vi.mock('../../auth/AuthProvider', () => ({
-  useAuth: () => ({ me: { id: 1 }, hasPerm: () => true, inGroup: () => true }),
+  useAuth: () => auth,
 }))
 // Il selettore Drive ha un test proprio: qui lo sostituiamo con un finto pulsante.
 vi.mock('./DriveFilePickerDialog', () => ({
@@ -38,19 +40,26 @@ const baseTask: AreaTaskRow = {
   created_by: 1, created_by_name: 'Fede', created_at: '2026-09-24T10:00:00Z', updated_at: '2026-09-24T10:00:00Z',
   completed_at: null, comments_count: 0, can_edit: true,
   drive_files_detail: [{ id: 5, name: 'verbale.pdf', mime_type: 'application/pdf', size: 2048, folder: null }],
+  converted_to_issue: null, converted_to_issue_title: null,
 }
 
 function setup(task: AreaTaskRow = baseTask) {
   const onClose = vi.fn()
   const onChanged = vi.fn()
   const onDeleted = vi.fn()
-  render(<AreaTaskDetail task={task} onClose={onClose} onChanged={onChanged} onDeleted={onDeleted} />)
+  render(
+    <MemoryRouter>
+      <AreaTaskDetail task={task} onClose={onClose} onChanged={onChanged} onDeleted={onDeleted} />
+    </MemoryRouter>,
+  )
   return { onClose, onChanged, onDeleted }
 }
 
 beforeEach(() => {
   ;[apiGet, apiPost, apiPatch, apiDelete].forEach((m) => m.mockReset())
   toast.error.mockReset()
+  toast.success.mockReset()
+  auth.hasPerm = () => true
   apiGet.mockImplementation((url: string) => {
     if (url === '/area-tasks/7/comments/') return Promise.resolve({ data: [] })
     if (url === '/users/') return Promise.resolve({ data: [{ id: 12, full_name: 'Anna Rossi', username: 'anna' }] })
@@ -166,13 +175,13 @@ describe('AreaTaskDetail', () => {
   })
   it('keeps the content mounted while the drawer slides out and reloads comments on reopen', async () => {
     const props = { onClose: vi.fn(), onChanged: vi.fn(), onDeleted: vi.fn() }
-    const { rerender } = render(<AreaTaskDetail task={baseTask} {...props} />)
+    const { rerender } = render(<MemoryRouter><AreaTaskDetail task={baseTask} {...props} /></MemoryRouter>)
     await screen.findByText('Ordine toner')
     fireEvent.click(screen.getByRole('tab', { name: /Allegati/ }))
-    rerender(<AreaTaskDetail task={null} {...props} />)
+    rerender(<MemoryRouter><AreaTaskDetail task={null} {...props} /></MemoryRouter>)
     expect(screen.getByText('Ordine toner')).toBeInTheDocument()
     expect(screen.getByText('verbale.pdf')).toBeInTheDocument()
-    rerender(<AreaTaskDetail task={baseTask} {...props} />)
+    rerender(<MemoryRouter><AreaTaskDetail task={baseTask} {...props} /></MemoryRouter>)
     await waitFor(() => expect(apiGet.mock.calls.filter((c) => c[0] === '/area-tasks/7/comments/')).toHaveLength(2))
   })
 
@@ -201,5 +210,54 @@ describe('AreaTaskDetail', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2))
     expect(onChanged.mock.calls.at(-1)![0]).toMatchObject({ drive_files_detail: [], comments_count: 1 })
     expect(screen.queryByText('verbale.pdf')).toBeNull()
+  })
+
+  it('shows "Trasforma in issue" for an editable, not-yet-converted task when the user has the permission', async () => {
+    setup()
+    expect(await screen.findByRole('button', { name: 'Trasforma in issue' })).toBeInTheDocument()
+  })
+
+  it('hides "Trasforma in issue" when the task is read-only', async () => {
+    setup({ ...baseTask, can_edit: false })
+    await screen.findByText('Ordine toner')
+    expect(screen.queryByRole('button', { name: 'Trasforma in issue' })).toBeNull()
+  })
+
+  it('hides "Trasforma in issue" when already converted and shows the badge instead', async () => {
+    setup({ ...baseTask, converted_to_issue: 42, converted_to_issue_title: 'Stampante rotta' })
+    expect(screen.queryByRole('button', { name: 'Trasforma in issue' })).toBeNull()
+    const link = await screen.findByRole('link', { name: /Convertito in issue #42/ })
+    expect(link).toHaveAttribute('href', '/issues?open=42')
+    expect(link).toHaveTextContent('Stampante rotta')
+  })
+
+  it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {
+    auth.hasPerm = (perm: string) => perm !== 'issues.add_issue'
+    setup()
+    await screen.findByText('Ordine toner')
+    expect(screen.queryByRole('button', { name: 'Trasforma in issue' })).toBeNull()
+  })
+
+  it('opens the convert dialog, updates the task and toasts on success', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/area-tasks/7/comments/') return Promise.resolve({ data: [] })
+      if (url === '/customers/') return Promise.resolve({ data: { results: [{ id: 9, display_name: 'ACME' }] } })
+      return Promise.resolve({ data: [] })
+    })
+    apiPost.mockResolvedValue({
+      data: { task: { ...baseTask, converted_to_issue: 55, converted_to_issue_title: 'Ordine toner' }, issue: { id: 55, title: 'Ordine toner' } },
+    })
+    const { onChanged } = setup()
+    fireEvent.click(await screen.findByRole('button', { name: 'Trasforma in issue' }))
+    const dlg = await screen.findByRole('dialog')
+    const custInput = within(dlg).getByLabelText(/Cliente/)
+    fireEvent.change(custInput, { target: { value: 'ACME' } })
+    const option = await screen.findByText('ACME')
+    fireEvent.click(option)
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Conferma' }))
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/area-tasks/7/convert-to-issue/', expect.objectContaining({ customer: 9 })))
+    expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ converted_to_issue: 55 }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('#55')))
   })
 })

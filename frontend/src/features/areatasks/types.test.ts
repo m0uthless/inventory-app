@@ -30,6 +30,8 @@ const row: AreaTaskRow = {
   comments_count: 2,
   can_edit: true,
   drive_files_detail: [],
+  converted_to_issue: null,
+  converted_to_issue_title: null,
 }
 
 describe('areatasks types', () => {

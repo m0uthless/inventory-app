@@ -384,6 +384,10 @@ class AreaTask(TimeStampedModel):
         verbose_name='Ultima modifica di',
     )
     completed_at = models.DateTimeField(null=True, blank=True)
+    converted_to_issue = models.ForeignKey(
+        'issues.Issue', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='converted_from_tasks', verbose_name='Convertito in issue',
+    )
 
     class Meta:
         verbose_name = 'Task di area'

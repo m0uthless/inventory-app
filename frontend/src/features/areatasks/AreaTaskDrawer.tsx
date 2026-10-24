@@ -1,6 +1,7 @@
 import {
   Avatar, Box, Button, CircularProgress, Divider, IconButton, Stack, TextField, Tooltip, Typography,
 } from '@mui/material'
+import { Link as RouterLink } from 'react-router-dom'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
@@ -8,9 +9,12 @@ import AttachFileIcon from '@mui/icons-material/AttachFile'
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import LinkOffIcon from '@mui/icons-material/LinkOff'
 import SendIcon from '@mui/icons-material/Send'
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList } from '@shared/ui/DrawerParts'
+import { useAuth } from '../../auth/AuthProvider'
+import { PERMS } from '../../auth/perms'
 import {
   PRIORITY_META, STATUS_META, fmtTaskDate, fmtTaskDateTime, formatBytes, personInitials,
   type AreaTaskComment, type AreaTaskRow,
@@ -34,14 +38,18 @@ export type AreaTaskDrawerProps = {
   onSendComment: () => void
   onLinkFiles: () => void
   onUnlinkFile: (fileId: number) => void
+  onConvert: () => void
 }
 
 export default function AreaTaskDrawer({
   open, task, tab, comments, commentsLoading, newComment, sendingComment, canLinkFiles, unlinkingId,
-  onClose, onEdit, onDelete, onTabChange, onNewCommentChange, onSendComment, onLinkFiles, onUnlinkFile,
+  onClose, onEdit, onDelete, onTabChange, onNewCommentChange, onSendComment, onLinkFiles, onUnlinkFile, onConvert,
 }: AreaTaskDrawerProps) {
+  const { hasPerm } = useAuth()
   const files = task?.drive_files_detail ?? []
   const canEdit = Boolean(task?.can_edit)
+  const convertedToIssue = task?.converted_to_issue ?? null
+  const canConvert = canEdit && !convertedToIssue && hasPerm(PERMS.issues.issue.add)
 
   const commentFooter = tab === 1 && canEdit ? (
     <Box sx={{ px: 2.5, py: 2, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0, bgcolor: 'background.paper' }}>
@@ -101,6 +109,26 @@ export default function AreaTaskDrawer({
               ]} />
             </Stack>
           </DrawerSection>
+
+          {convertedToIssue ? (
+            <Button
+              component={RouterLink}
+              to={`/issues?open=${convertedToIssue}`}
+              size="small"
+              startIcon={<SwapHorizIcon />}
+              sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
+            >
+              Convertito in issue #{convertedToIssue}
+              {task.converted_to_issue_title ? ` · ${task.converted_to_issue_title}` : ''}
+            </Button>
+          ) : canConvert ? (
+            <Button
+              variant="outlined" size="small" startIcon={<SwapHorizIcon />}
+              onClick={onConvert} sx={{ alignSelf: 'flex-start' }}
+            >
+              Trasforma in issue
+            </Button>
+          ) : null}
         </>
       ) : null}
 

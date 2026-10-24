@@ -30,6 +30,8 @@ export type AreaTaskRow = {
   comments_count: number
   can_edit: boolean
   drive_files_detail: TaskDriveFile[]
+  converted_to_issue: number | null
+  converted_to_issue_title: string | null
 }
 
 export type AreaTaskComment = {
@@ -51,6 +53,15 @@ export const STATUS_META: Record<TaskStatus, { label: string }> = {
   in_corso: { label: 'In corso' },
   in_attesa: { label: 'In attesa' },
   completato: { label: 'Completato' },
+}
+
+// Ciclo rapido di stato (icona in AreaTaskCard.tsx, voce "Segna come..." nel menu
+// contestuale di AreaTasks.tsx): "In attesa" si imposta solo dal dialog di modifica.
+export const NEXT_STATUS: Record<TaskStatus, TaskStatus> = {
+  da_fare: 'in_corso',
+  in_corso: 'completato',
+  in_attesa: 'in_corso',
+  completato: 'da_fare',
 }
 
 export const PRIORITY_ORDER: TaskPriority[] = ['low', 'medium', 'high', 'critical']

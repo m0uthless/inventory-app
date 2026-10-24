@@ -134,20 +134,23 @@ def _grant_change(user):
 
 
 def test_restore_requires_change_permission_and_own_area():
+    # L'autorizzazione di restore/bulk_restore è per-area, non un permesso
+    # Django: un utente SENZA alcun permesso ma nella propria area può
+    # ripristinare; un utente di un'altra area resta bloccato indipendentemente
+    # dal permesso Django (nessun gruppo ha mai avuto `core.change_areatask`).
     mine, other = _area(), _area()
     task = AreaTask.objects.create(area=mine, title="T")
     task.soft_delete()
     url = f"{URL}{task.id}/restore/"
 
-    no_perm = _user(mine)
-    assert _client(no_perm).post(url).status_code == 403
-
     wrong_area = _user(other)
-    _grant_change(wrong_area)
     assert _client(wrong_area).post(url).status_code == 403
 
-    ok = _user(mine)
-    _grant_change(ok)
+    wrong_area_with_perm = _user(other)
+    _grant_change(wrong_area_with_perm)
+    assert _client(wrong_area_with_perm).post(url).status_code == 403
+
+    ok = _user(mine)  # nessun permesso Django
     assert _client(ok).post(url).status_code == 204
     task.refresh_from_db()
     assert task.deleted_at is None
@@ -605,11 +608,23 @@ def test_superuser_can_restore_task_of_other_area():
 
 
 def test_bulk_restore_without_change_permission_403():
-    area = _area()
-    task = AreaTask.objects.create(area=area, title="T")
+    # Come per `restore`: nessun permesso Django richiesto per la propria
+    # area. Un task di un'altra area incluso nella stessa richiesta resta
+    # escluso dal risultato (scoping esistente di `_get_scoped_trash_queryset`,
+    # vedi anche `test_bulk_restore_only_restores_own_area`), non un 403.
+    mine, other = _area(), _area()
+    task = AreaTask.objects.create(area=mine, title="T")
+    other_task = AreaTask.objects.create(area=other, title="Altra area")
     task.soft_delete()
-    resp = _client(_user(area)).post(f"{URL}bulk_restore/", {"ids": [task.id]}, format="json")
-    assert resp.status_code == 403
+    other_task.soft_delete()
+
+    resp = _client(_user(mine)).post(f"{URL}bulk_restore/", {"ids": [task.id, other_task.id]}, format="json")
+    assert resp.status_code == 200
+    assert resp.data["restored"] == [task.id]
+    task.refresh_from_db()
+    other_task.refresh_from_db()
+    assert task.deleted_at is None
+    assert other_task.deleted_at is not None
 
 
 def test_stale_assignee_does_not_block_unrelated_edit():
@@ -711,3 +726,33 @@ def test_ordering_is_stable_across_pages_with_ties_and_null_due_dates():
     assert dated == sorted(dated)
     undated = [i for i in seen if i in created[4:]]
     assert undated == sorted(undated)
+
+
+# ── summary (contatore personale) ─────────────────────────────────────────────
+
+def test_summary_counts_only_own_open_tasks_excluding_completed_others_and_deleted():
+    area = _area()
+    me = _user(area)
+    colleague = _user(area)
+
+    AreaTask.objects.create(area=area, title="Mio aperto 1", assigned_to=me)
+    AreaTask.objects.create(area=area, title="Mio aperto 2", assigned_to=me, status="in_attesa")
+    AreaTask.objects.create(area=area, title="Mio completato", assigned_to=me, status="completato")
+    AreaTask.objects.create(area=area, title="Collega", assigned_to=colleague)
+    deleted = AreaTask.objects.create(area=area, title="Mio cancellato", assigned_to=me)
+    deleted.deleted_at = timezone.now()
+    deleted.save(update_fields=["deleted_at"])
+
+    resp = _client(me).get(f"{URL}summary/")
+    assert resp.status_code == 200, resp.data
+    assert resp.data == {"mine_open_count": 2}
+
+
+def test_summary_is_zero_for_user_with_no_assigned_tasks():
+    area = _area()
+    user = _user(area)
+    AreaTask.objects.create(area=area, title="Non mio", assigned_to=_user(area))
+
+    resp = _client(user).get(f"{URL}summary/")
+    assert resp.status_code == 200, resp.data
+    assert resp.data == {"mine_open_count": 0}

@@ -6,6 +6,7 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../../auth/AuthProvider'
 import AreaTaskDrawer from './AreaTaskDrawer'
 import AreaTaskDialog from './AreaTaskDialog'
+import ConvertToIssueDialog from './ConvertToIssueDialog'
 import DriveFilePickerDialog from './DriveFilePickerDialog'
 import {
   createEmptyTaskForm, extractFieldErrors, formToPayload, taskToForm,
@@ -17,6 +18,8 @@ type Props = {
   onClose: () => void
   onChanged: (task: AreaTaskRow) => void
   onDeleted: (id: number) => void
+  /** Tab iniziale da mostrare al primo render per questo task (0 = Dettagli, 1 = Commenti). Default 0. */
+  initialTab?: number
 }
 
 const RENDERED_ERROR_KEYS = ['title', 'assigned_to', 'due_date', 'detail', 'non_field_errors']
@@ -33,7 +36,7 @@ function hiddenFieldMessages(e: unknown): string {
 
 type RawUser = { id: number; full_name?: string; username?: string }
 
-export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted }: Props) {
+export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, initialTab }: Props) {
   const toast = useToast()
   const { hasPerm } = useAuth()
 
@@ -63,17 +66,20 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted }: 
   const [linking, setLinking] = React.useState(false)
   const [unlinkingId, setUnlinkingId] = React.useState<number | null>(null)
 
+  const [convertOpen, setConvertOpen] = React.useState(false)
+
   // Riparte da zero quando cambia il task mostrato.
   React.useEffect(() => {
     // Con task nullo il drawer sta scorrendo fuori: non svuotare nulla, il cleanup
     // dell'effect precedente ha gia' invalidato la richiesta commenti in corso.
     if (!task) { setCommentsLoading(false); return }
     setCurrent(task)
-    setTab(0)
+    setTab(initialTab ?? 0)
     setComments([])
     setNewComment('')
     setEditOpen(false)
     setPickerOpen(false)
+    setConvertOpen(false)
     let alive = true
     setCommentsLoading(true)
     api.get<AreaTaskComment[]>(`/area-tasks/${task.id}/comments/`)
@@ -191,6 +197,12 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted }: 
     }
   }
 
+  // ── Trasforma in issue ──────────────────────────────────────────────────────
+  const handleConverted = (result: { task: AreaTaskRow; issue: { id: number; title: string } }) => {
+    apply(result.task)
+    toast.success(`Task trasformato in issue #${result.issue.id}.`)
+  }
+
   // Il dialog ha sempre l'assegnatario corrente tra le opzioni, anche se la lista utenti non e' ancora arrivata.
   const dialogUsers = React.useMemo<AreaUser[]>(() => {
     if (current?.assigned_to != null && !users.some((u) => u.id === current.assigned_to)) {
@@ -219,6 +231,13 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted }: 
         onSendComment={() => { void sendComment() }}
         onLinkFiles={() => setPickerOpen(true)}
         onUnlinkFile={(id) => { void unlinkFile(id) }}
+        onConvert={() => setConvertOpen(true)}
+      />
+      <ConvertToIssueDialog
+        open={convertOpen}
+        task={current}
+        onClose={() => setConvertOpen(false)}
+        onConverted={handleConverted}
       />
       <AreaTaskDialog
         open={editOpen}

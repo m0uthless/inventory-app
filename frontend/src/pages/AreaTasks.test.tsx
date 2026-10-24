@@ -7,26 +7,29 @@ import type { AreaTaskRow } from '../features/areatasks/types'
 
 const apiGet = vi.fn()
 const apiPost = vi.fn()
+const apiPatch = vi.fn()
+const apiDelete = vi.fn()
 vi.mock('@shared/api/client', () => ({
   api: {
     get: (...a: unknown[]) => apiGet(...a),
     post: (...a: unknown[]) => apiPost(...a),
-    patch: vi.fn(),
-    delete: vi.fn(),
+    patch: (...a: unknown[]) => apiPatch(...a),
+    delete: (...a: unknown[]) => apiDelete(...a),
   },
 }))
 vi.mock('@shared/api/error', () => ({ apiErrorToMessage: () => 'Errore' }))
 const toast = { error: vi.fn(), success: vi.fn() }
 vi.mock('@shared/ui/toast', () => ({ useToast: () => toast }))
 
-const auth: { me: Record<string, unknown>; hasPerm: () => boolean; inGroup: () => boolean } = {
+const auth: { me: Record<string, unknown>; hasPerm: (perm: string) => boolean; inGroup: () => boolean } = {
   me: { id: 1, username: 'fede', is_superuser: false, profile: { leave_area: 3, leave_area_label: 'Ufficio' } },
   hasPerm: () => true,
   inGroup: () => true,
 }
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => auth }))
 vi.mock('../features/areatasks/AreaTaskDetail', () => ({
-  default: (p: { task: AreaTaskRow | null }) => (p.task ? <div data-testid="detail">{p.task.title}</div> : null),
+  default: (p: { task: AreaTaskRow | null; initialTab?: number }) =>
+    p.task ? <div data-testid="detail" data-initial-tab={p.initialTab ?? 0}>{p.task.title}</div> : null,
 }))
 
 function row(over: Partial<AreaTaskRow>): AreaTaskRow {
@@ -34,7 +37,8 @@ function row(over: Partial<AreaTaskRow>): AreaTaskRow {
     id: 1, area: 3, area_label: 'Ufficio', title: 'Task', description: '', status: 'da_fare', priority: 'medium',
     due_date: null, assigned_to: null, assigned_to_name: null, created_by: 1, created_by_name: 'Fede',
     created_at: '2026-09-24T10:00:00Z', updated_at: '2026-09-24T10:00:00Z', completed_at: null,
-    comments_count: 0, can_edit: true, drive_files_detail: [], ...over,
+    comments_count: 0, can_edit: true, drive_files_detail: [],
+    converted_to_issue: null, converted_to_issue_title: null, ...over,
   }
 }
 
@@ -52,7 +56,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  ;[apiGet, apiPost, toast.error, toast.success].forEach((m) => m.mockReset())
+  ;[apiGet, apiPost, apiPatch, apiDelete, toast.error, toast.success].forEach((m) => m.mockReset())
   apiGet.mockImplementation((url: string) => {
     if (url === '/area-tasks/') return Promise.resolve({ data: { count: rows.length, results: rows } })
     if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }, { id: 4, label: 'Romagna' }] } })
@@ -60,6 +64,7 @@ beforeEach(() => {
     return Promise.reject(new Error(`unexpected ${url}`))
   })
   auth.me = { id: 1, username: 'fede', is_superuser: false, profile: { leave_area: 3, leave_area_label: 'Ufficio' } }
+  auth.hasPerm = () => true
 })
 
 describe('AreaTasks page', () => {
@@ -305,5 +310,111 @@ describe('AreaTasks page', () => {
     expect(screen.getByLabelText('Area')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Nuovo task/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Reimposta/ })).toBeNull()
+  })
+
+  describe('context menu', () => {
+    it('opens on right-click and shows the expected items in order', async () => {
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      const menu = await screen.findByRole('menu')
+      const items = within(menu).getAllByRole('menuitem').map((el) => el.textContent)
+      expect(items).toEqual(['Apri dettaglio', 'Modifica', 'Commenta', 'Segna come In corso', 'Trasforma in issue', 'Elimina'])
+    })
+
+    it('"Apri dettaglio" opens the detail drawer on the default tab', async () => {
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Apri dettaglio' }))
+      const detail = await screen.findByTestId('detail')
+      expect(detail).toHaveTextContent('Ordine toner')
+      expect(detail).toHaveAttribute('data-initial-tab', '0')
+    })
+
+    it('"Modifica" opens the dialog populated with the row values and saves with PATCH', async () => {
+      apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Ordine toner aggiornato' }) })
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Modifica' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText(/Titolo/)).toHaveValue('Ordine toner')
+      await waitFor(() =>
+        expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 3 }) })),
+      )
+      fireEvent.change(within(dialog).getByLabelText(/Titolo/), { target: { value: 'Ordine toner aggiornato' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Salva modifiche' }))
+      await waitFor(() =>
+        expect(apiPatch).toHaveBeenCalledWith('/area-tasks/1/', expect.objectContaining({ title: 'Ordine toner aggiornato' })),
+      )
+    })
+
+    it('"Commenta" opens the detail drawer on the comments tab', async () => {
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Commenta' }))
+      const detail = await screen.findByTestId('detail')
+      expect(detail).toHaveTextContent('Ordine toner')
+      expect(detail).toHaveAttribute('data-initial-tab', '1')
+    })
+
+    it('"Segna come..." sends the PATCH to the next status and reloads', async () => {
+      apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Ordine toner', status: 'in_corso' }) })
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      const before = listCalls().length
+      fireEvent.contextMenu(titleCell)
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Segna come In corso' }))
+      await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/area-tasks/1/', { status: 'in_corso' }))
+      await waitFor(() => expect(listCalls().length).toBeGreaterThan(before))
+    })
+
+    it('"Elimina" calls DELETE after confirmation and reloads', async () => {
+      apiDelete.mockResolvedValue({ data: {} })
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      const before = listCalls().length
+      fireEvent.contextMenu(titleCell)
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Elimina' }))
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }))
+      await waitFor(() => expect(apiDelete).toHaveBeenCalledWith('/area-tasks/1/'))
+      await waitFor(() => expect(listCalls().length).toBeGreaterThan(before))
+    })
+
+    it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {
+      auth.hasPerm = (perm: string) => perm !== 'issues.add_issue'
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      await screen.findByRole('menuitem', { name: 'Apri dettaglio' })
+      expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
+    })
+
+    it('hides "Trasforma in issue" for a task already converted to an issue', async () => {
+      const convertedRow = { ...row({ id: 1, title: 'Ordine toner' }), converted_to_issue: 7 } as unknown as AreaTaskRow
+      apiGet.mockImplementation((url: string) => {
+        if (url === '/area-tasks/') return Promise.resolve({ data: { count: 1, results: [convertedRow] } })
+        if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }] } })
+        if (url === '/users/') return Promise.resolve({ data: [] })
+        return Promise.reject(new Error(`unexpected ${url}`))
+      })
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      await screen.findByRole('menuitem', { name: 'Apri dettaglio' })
+      expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
+    })
+
+    it('"Trasforma in issue" opens the convert dialog for the right task', async () => {
+      renderPage()
+      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(titleCell)
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Trasforma in issue' }))
+      const dlg = await screen.findByRole('dialog')
+      expect(within(dlg).getByLabelText(/Titolo/)).toHaveValue('Ordine toner')
+    })
   })
 })

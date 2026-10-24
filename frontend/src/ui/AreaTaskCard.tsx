@@ -19,19 +19,11 @@ import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
 import AreaTaskDetail from '../features/areatasks/AreaTaskDetail'
 import {
-  PRIORITY_META, STATUS_META, STATUS_ORDER, personInitials,
+  NEXT_STATUS, PRIORITY_META, STATUS_META, STATUS_ORDER, personInitials,
   type AreaTaskRow, type TaskStatus,
 } from '../features/areatasks/types'
 
 type AreaOption = { id: number; label: string }
-
-// Ciclo rapido dall'icona di stato: "In attesa" si imposta dal dialog di modifica.
-const NEXT_STATUS: Record<TaskStatus, TaskStatus> = {
-  da_fare: 'in_corso',
-  in_corso: 'completato',
-  in_attesa: 'in_corso',
-  completato: 'da_fare',
-}
 
 function StatusIcon({ status }: { status: TaskStatus }) {
   if (status === 'completato') return <CheckCircleRoundedIcon sx={{ fontSize: 18, color: 'success.main' }} />

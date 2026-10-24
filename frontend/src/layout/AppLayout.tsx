@@ -95,6 +95,10 @@ type IssueSummary = {
   active_count: number
 }
 
+type TaskSummary = {
+  mine_open_count: number
+}
+
 // Spegne automaticamente la modalità "Personalizza" quando si esce dalla
 // route della dashboard (evita che il toggle resti "acceso" in background
 // se l'utente naviga via senza disattivarlo esplicitamente dal menu).
@@ -302,6 +306,29 @@ export function AppLayout() {
       clearInterval(interval)
     }
   }, [loc.pathname, hasPerm])
+
+  const [taskSummary, setTaskSummary] = React.useState<TaskSummary | null>(null)
+
+  React.useEffect(() => {
+    let active = true
+
+    const fetchSummary = async () => {
+      try {
+        const { data } = await api.get<TaskSummary>('/area-tasks/summary/')
+        if (active) setTaskSummary(data)
+      } catch {
+        if (active) setTaskSummary(null)
+      }
+    }
+
+    void fetchSummary()
+    const interval = setInterval(fetchSummary, 60_000) // aggiorna il badge ogni 60s
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [loc.pathname])
 
 
   // Stato dei 5 gruppi collassabili della sidebar (Wiki, Bug/Feature,
@@ -652,7 +679,8 @@ export function AppLayout() {
 
               if (!isSiteRepositoryGroup && !isWikiGroup && !isBugFeatureGroup && !isMaintenanceGroup && !isServiceNowGroup) {
                 const issueEndAdornment =
-                  it.path === '/issues' ? renderIssueCount(issueSummary?.active_count, SIDEBAR) : null
+                  it.path === '/issues' ? renderIssueCount(issueSummary?.active_count, SIDEBAR) :
+                  it.path === '/tasks' ? renderIssueCount(taskSummary?.mine_open_count, SIDEBAR) : null
                 return (
                   <React.Fragment key={it.path}>
                     {renderNavItem(it, isMini, issueEndAdornment ? { endAdornment: issueEndAdornment } : undefined)}

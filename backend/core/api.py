@@ -340,6 +340,8 @@ class AreaTaskSerializer(serializers.ModelSerializer):
     )
     drive_files_detail = serializers.SerializerMethodField()
     can_edit         = serializers.SerializerMethodField()
+    converted_to_issue = serializers.PrimaryKeyRelatedField(read_only=True)
+    converted_to_issue_title = serializers.SerializerMethodField()
 
     class Meta:
         model  = AreaTask
@@ -349,8 +351,12 @@ class AreaTaskSerializer(serializers.ModelSerializer):
             'drive_files', 'drive_files_detail',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
             'completed_at', 'comments_count', 'can_edit',
+            'converted_to_issue', 'converted_to_issue_title',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'completed_at']
+
+    def get_converted_to_issue_title(self, obj):
+        return obj.converted_to_issue.title if obj.converted_to_issue_id else None
 
     @staticmethod
     def _display_name(user):
@@ -551,12 +557,12 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         return qs
 
     def get_permissions(self):
-        perms = super().get_permissions()
         if self.action in ('restore', 'bulk_restore'):
-            # RestoreActionMixin sostituisce permission_classes su queste
-            # action: riaggiungiamo la barriera Portal/Archie.
-            perms.append(IsInternalOrPortalDedicatedApp())
-        return perms
+            # L'autorizzazione è per-area (_check_own_area / _get_scoped_trash_queryset),
+            # non un permesso Django: CanRestoreModelPermission richiederebbe
+            # core.change_areatask, che nessun gruppo ha mai avuto.
+            return [IsAuthenticated(), IsInternalOrPortalDedicatedApp()]
+        return super().get_permissions()
 
     def _get_scoped_trash_queryset(self):
         qs = super()._get_scoped_trash_queryset()
@@ -808,6 +814,111 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    @staticmethod
+    def _is_issue_assignable(user):
+        """Stessa regola di eleggibilità usata da IssueSerializer.validate
+        per assigned_to (tecnico ServiceNow non Philips): calcolata qui a
+        monte per poter omettere il campo invece di far fallire la validazione
+        con un 400 che il chiamante non ha mai richiesto."""
+        if user is None:
+            return False
+        profile = getattr(user, 'profile', None)
+        if profile is None:
+            return False
+        return bool(profile.is_servicenow_technician) and not bool(profile.is_philips)
+
+    @action(detail=True, methods=['post'], url_path='convert-to-issue')
+    def convert_to_issue(self, request, pk=None):
+        task = self.get_object()
+        self._check_own_area(task.area_id)
+
+        if not request.user.has_perm('issues.add_issue'):
+            return Response(
+                {'detail': 'Non hai il permesso di creare issue.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if task.converted_to_issue_id:
+            return Response(
+                {'detail': 'Questo task è già stato convertito in una issue.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from issues.api import IssueSerializer, notify_issue_created, notify_issue_assignment_change
+        from issues.models import IssueComment
+
+        with transaction.atomic():
+            # Re-check autoritativo con lock di riga: la verifica precedente
+            # (fuori dalla transazione) è solo un fast-path, non protegge da
+            # un doppio submit concorrente.
+            locked_task = AreaTask.objects.select_for_update().get(pk=task.pk)
+            if locked_task.converted_to_issue_id:
+                return Response(
+                    {'detail': 'Questo task è già stato convertito in una issue.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            task = locked_task
+
+            payload = {
+                'title': request.data.get('title') or task.title,
+                # Stessa semantica di 'title': valore mancante o vuoto → eredita dal task.
+                'description': request.data.get('description') or task.description,
+                'priority': task.priority,
+                'customer': request.data.get('customer'),
+                'site': request.data.get('site'),
+            }
+            if self._is_issue_assignable(task.assigned_to):
+                payload['assigned_to'] = task.assigned_to_id
+            serializer = IssueSerializer(data=payload)
+            serializer.is_valid(raise_exception=True)
+            issue = serializer.save(created_by=request.user)
+            log_event(
+                actor=request.user, action="create", instance=issue,
+                changes={"title": {"from": None, "to": to_change_value_for_field("title", issue.title)}},
+                request=request,
+            )
+            actor = request.user
+            transaction.on_commit(lambda: notify_issue_created(actor, issue))
+            transaction.on_commit(
+                lambda: notify_issue_assignment_change(actor, old_assigned_to_id=None, issue=issue)
+            )
+
+            for comment in task.comments.all():
+                IssueComment.objects.create(issue=issue, author=comment.author, body=comment.body)
+
+            old_status = task.status
+            task.status = AreaTask.STATUS_COMPLETATO
+            task.completed_at = timezone.now()
+            task.converted_to_issue = issue
+            task.updated_by = request.user
+            task.save(update_fields=['status', 'completed_at', 'converted_to_issue', 'updated_by', 'updated_at'])
+
+            log_event(
+                actor=request.user, action="update", instance=task,
+                changes={
+                    "status": {"from": old_status, "to": task.status},
+                    "converted_to_issue": {"from": None, "to": to_change_value_for_field("converted_to_issue", issue)},
+                },
+                request=request,
+            )
+
+        return Response(
+            {
+                'task': AreaTaskSerializer(task, context={'request': request}).data,
+                'issue': {'id': issue.id, 'title': issue.title},
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    # ── summary ──────────────────────────────────────────────────────────────
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        mine_open = AreaTask.objects.filter(
+            assigned_to=request.user, deleted_at__isnull=True,
+        ).exclude(status=AreaTask.STATUS_COMPLETATO).count()
+        return Response({'mine_open_count': mine_open})
 
 
 # ─── Dashboard dinamica ───────────────────────────────────────────────────────

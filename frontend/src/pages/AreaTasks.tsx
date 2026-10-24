@@ -6,6 +6,11 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import AttachFileIcon from '@mui/icons-material/AttachFile'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import EditIcon from '@mui/icons-material/Edit'
+import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded'
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import type { GridColDef } from '@mui/x-data-grid'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -14,13 +19,17 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useToast } from '@shared/ui/toast'
 import EntityListCard from '@shared/ui/EntityListCard'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useAuth } from '../auth/AuthProvider'
+import { PERMS } from '../auth/perms'
 import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import AreaTaskDetail from '../features/areatasks/AreaTaskDetail'
 import AreaTaskDialog from '../features/areatasks/AreaTaskDialog'
+import ConvertToIssueDialog from '../features/areatasks/ConvertToIssueDialog'
 import {
-  PRIORITY_META, PRIORITY_ORDER, STATUS_META,
-  createEmptyTaskForm, extractFieldErrors, fmtTaskDate, formToPayload,
+  NEXT_STATUS, PRIORITY_META, PRIORITY_ORDER, STATUS_META,
+  createEmptyTaskForm, extractFieldErrors, fmtTaskDate, formToPayload, taskToForm,
   type AreaTaskRow, type AreaUser, type TaskFormData, type TaskPriority, type TaskStatus,
 } from '../features/areatasks/types'
 
@@ -71,7 +80,7 @@ function StatusViewChipBar({ value, onChange }: { value: StatusView; onChange: (
 
 export default function AreaTasks() {
   const zebraSx = useDataGridZebraSx()
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
   const toast = useToast()
 
   const myAreaId = me?.profile?.leave_area ?? null
@@ -186,13 +195,22 @@ export default function AreaTasks() {
 
   // ── Dettaglio ─────────────────────────────────────────────────────────────
   const [openTask, setOpenTask] = React.useState<AreaTaskRow | null>(null)
+  const [openTaskInitialTab, setOpenTaskInitialTab] = React.useState(0)
 
-  // ── Creazione ─────────────────────────────────────────────────────────────
+  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => {
+    setOpenTaskInitialTab(tab)
+    setOpenTask(row)
+  }, [])
+
+  // ── Creazione / modifica ──────────────────────────────────────────────────
+  // Un solo dialog per crea e modifica: `editingTask` non-null discrimina la
+  // modifica (task={editingTask}, PATCH) dalla creazione (task=null, POST).
   const createAreaId: number | null = isSuperuser ? (areaFilter !== '' ? areaFilter : myAreaId) : myAreaId
   const createAreaLabel =
     areas.find((a) => a.id === createAreaId)?.label ?? (createAreaId === myAreaId ? myAreaLabel : null) ?? ''
 
-  const [createOpen, setCreateOpen] = React.useState(false)
+  const [taskDialogOpen, setTaskDialogOpen] = React.useState(false)
+  const [editingTask, setEditingTask] = React.useState<AreaTaskRow | null>(null)
   const [form, setForm] = React.useState<TaskFormData>(createEmptyTaskForm)
   const [users, setUsers] = React.useState<AreaUser[]>([])
   const [saving, setSaving] = React.useState(false)
@@ -200,10 +218,11 @@ export default function AreaTasks() {
 
   const openCreate = async () => {
     if (createAreaId === null) return
+    setEditingTask(null)
     setForm(createEmptyTaskForm())
     setErrors({})
     setUsers([])
-    setCreateOpen(true)
+    setTaskDialogOpen(true)
     try {
       const r = await api.get<RawUser[]>('/users/', { params: { leave_area: createAreaId, page_size: 200 } })
       const list = Array.isArray(r.data) ? r.data : []
@@ -213,14 +232,36 @@ export default function AreaTasks() {
     }
   }
 
-  const saveCreate = async () => {
-    if (createAreaId === null || saving) return
+  const openEditTask = async (row: AreaTaskRow) => {
+    setEditingTask(row)
+    setForm(taskToForm(row))
+    setErrors({})
+    setUsers([])
+    setTaskDialogOpen(true)
+    try {
+      const r = await api.get<RawUser[]>('/users/', { params: { leave_area: row.area, page_size: 200 } })
+      const list = Array.isArray(r.data) ? r.data : []
+      setUsers(list.map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }
+
+  const saveTask = async () => {
+    if (saving) return
     setSaving(true)
     setErrors({})
     try {
-      await api.post<AreaTaskRow>('/area-tasks/', { ...formToPayload(form), area: createAreaId })
-      setCreateOpen(false)
-      toast.success('Task creato.')
+      if (editingTask) {
+        await api.patch<AreaTaskRow>(`/area-tasks/${editingTask.id}/`, formToPayload(form))
+        toast.success('Task aggiornato.')
+      } else {
+        if (createAreaId === null) { setSaving(false); return }
+        await api.post<AreaTaskRow>('/area-tasks/', { ...formToPayload(form), area: createAreaId })
+        toast.success('Task creato.')
+      }
+      setTaskDialogOpen(false)
+      setEditingTask(null)
       reload()
     } catch (e) {
       const fields = extractFieldErrors(e)
@@ -230,6 +271,110 @@ export default function AreaTasks() {
       setSaving(false)
     }
   }
+
+  // ── Elimina ───────────────────────────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = React.useState<AreaTaskRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+
+  const handleDeleteTask = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/area-tasks/${deleteTarget.id}/`)
+      toast.success('Task eliminato.')
+      setDeleteTarget(null)
+      reload()
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // ── Trasforma in issue ───────────────────────────────────────────────────
+  const [convertTarget, setConvertTarget] = React.useState<AreaTaskRow | null>(null)
+
+  // ── Menu contestuale ──────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = React.useState<{
+    row: AreaTaskRow
+    mouseX: number
+    mouseY: number
+  } | null>(null)
+
+  const handleRowContextMenu = React.useCallback(
+    (row: AreaTaskRow, event: React.MouseEvent<HTMLElement>) => {
+      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
+    },
+    [],
+  )
+
+  const handleMarkNextStatus = React.useCallback(
+    async (row: AreaTaskRow) => {
+      const next = NEXT_STATUS[row.status]
+      try {
+        await api.patch<AreaTaskRow>(`/area-tasks/${row.id}/`, { status: next })
+        reload()
+      } catch (e) {
+        toast.error(apiErrorToMessage(e))
+      }
+    },
+    [reload, toast],
+  )
+
+  const contextMenuItems: RowContextMenuItem[] = (() => {
+    const row = contextMenu?.row
+    if (!row) return []
+
+    const canEdit = row.can_edit
+    const next = NEXT_STATUS[row.status]
+    const convertedToIssue = row.converted_to_issue
+
+    return [
+      {
+        key: 'open',
+        label: 'Apri dettaglio',
+        icon: <VisibilityOutlinedIcon fontSize="small" />,
+        onClick: () => openDetail(row, 0),
+      },
+      {
+        key: 'edit',
+        label: 'Modifica',
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => { void openEditTask(row) },
+        disabled: !canEdit,
+      },
+      {
+        key: 'comment',
+        label: 'Commenta',
+        icon: <ChatBubbleOutlineIcon fontSize="small" />,
+        onClick: () => openDetail(row, 1),
+        disabled: !canEdit,
+      },
+      {
+        key: 'next_status',
+        label: `Segna come ${STATUS_META[next].label}`,
+        icon: <AutorenewRoundedIcon fontSize="small" />,
+        onClick: () => { void handleMarkNextStatus(row) },
+        disabled: !canEdit,
+      },
+      {
+        key: 'convert',
+        label: 'Trasforma in issue',
+        icon: <SwapHorizIcon fontSize="small" />,
+        onClick: () => setConvertTarget(row),
+        hidden: Boolean(convertedToIssue) || !hasPerm(PERMS.issues.issue.add),
+        disabled: !canEdit,
+      },
+      {
+        key: 'delete',
+        label: 'Elimina',
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        onClick: () => setDeleteTarget(row),
+        tone: 'danger',
+        disabled: !canEdit,
+      },
+    ]
+  })()
 
   // ── Colonne ───────────────────────────────────────────────────────────────
   const columns: GridColDef<AreaTaskRow>[] = [
@@ -346,8 +491,9 @@ export default function AreaTasks() {
           onSortModelChange: grid.onSortModelChange,
           onRowClick: (id) => {
             const found = rows.find((r) => r.id === id)
-            if (found) setOpenTask(found)
+            if (found) openDetail(found, 0)
           },
+          onRowContextMenu: handleRowContextMenu,
           getRowClassName: (r) => (r.status === 'completato' ? 'row-done-task' : undefined),
           sx: {
             cursor: 'pointer',
@@ -417,22 +563,51 @@ export default function AreaTasks() {
 
       <AreaTaskDetail
         task={openTask}
+        initialTab={openTaskInitialTab}
         onClose={() => setOpenTask(null)}
         onChanged={(next) => { setOpenTask(next); reload() }}
         onDeleted={() => { setOpenTask(null); reload() }}
       />
 
       <AreaTaskDialog
-        open={createOpen}
-        task={null}
-        areaLabel={createAreaLabel}
+        open={taskDialogOpen}
+        task={editingTask}
+        areaLabel={editingTask ? editingTask.area_label : createAreaLabel}
         form={form}
         users={users}
         saving={saving}
         errors={errors}
         onFormChange={setForm}
-        onSave={() => { void saveCreate() }}
-        onClose={() => setCreateOpen(false)}
+        onSave={() => { void saveTask() }}
+        onClose={() => { setTaskDialogOpen(false); setEditingTask(null) }}
+      />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        busy={deleting}
+        title="Eliminare il task?"
+        description={`Il task «${deleteTarget?.title ?? ''}» verrà spostato nel cestino.`}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => { void handleDeleteTask() }}
+      />
+
+      <RowContextMenu
+        open={Boolean(contextMenu)}
+        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
+        onClose={() => setContextMenu(null)}
+        items={contextMenuItems}
+      />
+
+      <ConvertToIssueDialog
+        open={Boolean(convertTarget)}
+        task={convertTarget}
+        onClose={() => setConvertTarget(null)}
+        onConverted={(result) => {
+          toast.success(`Task trasformato in issue #${result.issue.id}.`)
+          setOpenTask((current) => (current?.id === result.task.id ? result.task : current))
+          setConvertTarget(null)
+          reload()
+        }}
       />
     </Stack>
   )

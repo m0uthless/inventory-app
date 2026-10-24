@@ -36,7 +36,8 @@ function row(over: Partial<AreaTaskRow>): AreaTaskRow {
     id: 1, area: 3, area_label: 'Ufficio', title: 'Task', description: '', status: 'da_fare', priority: 'medium',
     due_date: null, assigned_to: null, assigned_to_name: null, created_by: 1, created_by_name: 'Fede',
     created_at: '2026-09-24T10:00:00Z', updated_at: '2026-09-24T10:00:00Z', completed_at: null,
-    comments_count: 0, can_edit: true, drive_files_detail: [], ...over,
+    comments_count: 0, can_edit: true, drive_files_detail: [],
+    converted_to_issue: null, converted_to_issue_title: null, ...over,
   }
 }
 

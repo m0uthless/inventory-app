@@ -16,6 +16,9 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Il widget "Task di area" della dashboard apre ora un drawer di dettaglio con commenti e allegati collegati da Drive, e un dialog di modifica con assegnatario (utenti della stessa area), priorità, stato "In attesa" e scadenza. Ogni riga mostra priorità alta/critica, assegnatario, commenti e allegati.
 - L'elenco utenti può essere filtrato per area (`/api/users/?leave_area=`) e riporta l'area di ciascun utente.
 - Nuova pagina "Task" (`/tasks`) con l'elenco dei task di area: ricerca, filtri per area, priorità, "assegnati a me" e stato (aperti, completati, tutti), creazione di un nuovo task con assegnatario e scadenza e apertura del dettaglio con commenti e allegati Drive. Nel widget della dashboard è disponibile il link "Vedi tutti".
+- I task di area hanno ora un menu contestuale (apri, modifica, commenta, cambia stato, trasforma in issue, elimina) dall'elenco `/tasks`.
+- La sidebar mostra ora il numero dei propri task di area aperti, come già per le issue.
+- Un task di area può essere trasformato in una issue (titolo, descrizione, priorità e commenti vengono portati nella nuova issue; il task risultante si completa e resta collegato alla issue creata).
 
 ### Changed
 - L'elenco dei task di area carica gli allegati Drive con un numero di query costante, indipendente dal numero di task.
