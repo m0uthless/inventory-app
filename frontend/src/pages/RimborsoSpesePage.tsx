@@ -116,7 +116,7 @@ function CellInput({
       onBlur={onBlur}
       disabled={disabled}
       InputProps={{ disableUnderline: true }}
-      inputProps={{ style: { padding: 0, fontSize: 13, textAlign: align } }}
+      inputProps={{ style: { padding: 0, fontSize: 13, textAlign: align }, 'aria-label': placeholder }}
     />
   )
 }
@@ -554,7 +554,7 @@ function AmountCell({ value, disabled, onCommit }: { value: string; disabled: bo
       onBlur={() => onCommit(draft === '' ? '0' : draft)}
       disabled={disabled}
       InputProps={{ disableUnderline: true }}
-      inputProps={{ inputMode: 'decimal', style: { padding: 0, fontSize: 13, textAlign: 'right' } }}
+      inputProps={{ inputMode: 'decimal', style: { padding: 0, fontSize: 13, textAlign: 'right' }, 'aria-label': 'Importo' }}
     />
   )
 }
@@ -601,7 +601,7 @@ function ItemNoteCell({
         {editable ? (
           <>
             <Tooltip title="Carica scontrino">
-              <IconButton size="small" onClick={onUploadClick} disabled={extracting} sx={{ p: 0.25 }}>
+              <IconButton size="small" onClick={onUploadClick} disabled={extracting} sx={{ p: 0.25 }} aria-label="Carica scontrino">
                 {extracting ? <CircularProgress size={12} /> : <UploadFileOutlinedIcon sx={{ fontSize: 14 }} />}
               </IconButton>
             </Tooltip>

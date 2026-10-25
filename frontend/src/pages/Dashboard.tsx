@@ -60,7 +60,17 @@ function WidgetCarousel() {
         {Array.from({ length: TOTAL }, (_, i) => (
           <Box
             key={i}
+            role="button"
+            tabIndex={0}
+            aria-label={`Vai al widget ${i + 1} di ${TOTAL}`}
+            aria-current={i === index}
             onClick={() => setIndex(i)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setIndex(i)
+              }
+            }}
             sx={{
               width: i === index ? 18 : 7,
               height: 7,
@@ -68,6 +78,7 @@ function WidgetCarousel() {
               bgcolor: i === index ? 'primary.main' : 'divider',
               transition: 'all 0.2s ease',
               cursor: 'pointer',
+              '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
             }}
           />
         ))}

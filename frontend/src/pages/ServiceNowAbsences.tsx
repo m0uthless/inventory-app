@@ -400,10 +400,10 @@ export default function ServiceNowAbsences() {
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }} flexWrap="wrap" rowGap={1}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Assenze tecnici</Typography>
         <Stack direction="row" alignItems="center" spacing={0.5}>
-          <IconButton size="small" onClick={() => setWeekStart((w) => addDays(w, -7))}><ChevronLeftIcon /></IconButton>
+          <IconButton size="small" onClick={() => setWeekStart((w) => addDays(w, -7))} aria-label="Settimana precedente"><ChevronLeftIcon /></IconButton>
           <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, minWidth: 170, textAlign: 'center' }}>{weekLabel}</Typography>
-          <IconButton size="small" onClick={() => setWeekStart((w) => addDays(w, 7))}><ChevronRightIcon /></IconButton>
-          <IconButton size="small" onClick={() => setWeekStart(startOfWeek(new Date()))} title="Settimana corrente">
+          <IconButton size="small" onClick={() => setWeekStart((w) => addDays(w, 7))} aria-label="Settimana successiva"><ChevronRightIcon /></IconButton>
+          <IconButton size="small" onClick={() => setWeekStart(startOfWeek(new Date()))} title="Settimana corrente" aria-label="Settimana corrente">
             <TodayIcon fontSize="small" />
           </IconButton>
         </Stack>

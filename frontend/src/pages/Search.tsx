@@ -174,7 +174,7 @@ export default function Search() {
             <CircularProgress />
           </Box>
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={2} aria-live="polite">
             {q && results.length === 0 ? (
               <Typography color="text.secondary">Nessun risultato per “{q}”.</Typography>
             ) : null}

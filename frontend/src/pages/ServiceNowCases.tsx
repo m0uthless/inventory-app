@@ -173,6 +173,7 @@ function TriageTechnicianRow({ t, accent, canManage, onManage }: {
           onClick={() => onManage(t)}
           sx={{ p: 0.3, opacity: { xs: 1, sm: 0.35 }, transition: 'opacity 0.15s', flexShrink: 0 }}
           title="Gestisci assenze"
+          aria-label="Gestisci assenze"
         >
           <EventBusyOutlinedIcon sx={{ fontSize: 16 }} />
         </IconButton>
@@ -291,7 +292,7 @@ function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
         Assenze — {technician?.name}
-        <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+        <IconButton size="small" onClick={onClose} aria-label="Chiudi"><CloseIcon fontSize="small" /></IconButton>
       </DialogTitle>
       <DialogContent dividers sx={{ pt: 2 }}>
         <Stack spacing={2}>
@@ -353,7 +354,7 @@ function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
                       {a.note ? ` · ${a.note}` : ''}
                     </Typography>
                   </Box>
-                  <IconButton size="small" disabled={deletingId === a.id} onClick={() => handleDelete(a.id)}>
+                  <IconButton size="small" disabled={deletingId === a.id} onClick={() => handleDelete(a.id)} aria-label="Elimina assenza">
                     {deletingId === a.id ? <CircularProgress size={14} /> : <DeleteOutlineIcon sx={{ fontSize: 16 }} />}
                   </IconButton>
                 </Stack>
@@ -463,6 +464,7 @@ function makeRenderServiceNowCaseCard(clientChipPalette: DomainStatusTokens['cli
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             sx={{ flexShrink: 0 }}
+            aria-label="Apri in ServiceNow"
           >
             <OpenInNewIcon sx={{ fontSize: 18 }} />
           </IconButton>
@@ -543,6 +545,7 @@ function buildColumns(clientChipPalette: DomainStatusTokens['clientChipPalette']
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
+          aria-label="Apri in ServiceNow"
         >
           <OpenInNewIcon sx={{ fontSize: 16 }} />
         </IconButton>
