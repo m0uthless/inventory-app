@@ -26,8 +26,8 @@ import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
 import type { SiteRepoV2Handle } from '../features/siterepov2/SiteRepoV2Context'
 import { resolveItalianProvince } from '../data/italianProvinces'
 
-import type { CustomerRow, SiteRow, InventoryRow, LocationGroup, StatusFilter } from './siteRepository/types'
-import { normalizeProvince, normalizeCity, matchesStatusFilter } from './siteRepository/style'
+import type { CustomerRow, SiteRow, InventoryRow, LocationGroup } from './siteRepository/types'
+import { normalizeProvince, normalizeCity } from './siteRepository/style'
 import { ProvinceSection, type ProvinceSectionHandle } from './siteRepository/ProvinceSection'
 import { CustomerInfoDrawer, SiteInfoDrawer } from './siteRepository/InfoDrawers'
 import { ItalyRegionMap } from './siteRepository/ItalyRegionMap'
@@ -248,7 +248,9 @@ export default function SiteRepository() {
     }
   }, [deleteTarget, toast, loadCustomers])
 
-  const statusFilter: StatusFilter = 'all'
+  // Nessun controllo UI espone ancora un filtro di stato: il valore è fisso
+  // su 'all' e passato così com'è ai componenti figli che lo richiedono.
+  const statusFilter = 'all' as const
 
   // Contatori letti dalle annotazioni del backend (niente più derivazione da
   // liste in memoria).
@@ -272,17 +274,10 @@ export default function SiteRepository() {
     return map
   }, [customers])
 
-  // Il filtro per ricerca lo applica già il backend: qui resta solo il filtro
-  // di stato, che è puramente client-side.
-  const filteredCustomers = React.useMemo(
-    () => customers.filter((c) => matchesStatusFilter(statusFilter, c.status_label)),
-    [customers, statusFilter],
-  )
-
   const locationGroups = React.useMemo<LocationGroup[]>(() => {
     const noValueLabel = groupBy === 'province' ? 'Senza provincia' : 'Senza città'
     const map = new Map<string, CustomerRow[]>()
-    filteredCustomers.forEach((c) => {
+    customers.forEach((c) => {
       const label = groupBy === 'province' ? normalizeProvince(c.province) : normalizeCity(c.city)
       if (!map.has(label)) map.set(label, [])
       map.get(label)!.push(c)
@@ -299,7 +294,7 @@ export default function SiteRepository() {
         if (b.label === noValueLabel) return -1
         return a.label.localeCompare(b.label, 'it')
       })
-  }, [filteredCustomers, issueCountsByCustomer, groupBy])
+  }, [customers, issueCountsByCustomer, groupBy])
 
   // Refs per Comprimi / Espandi tutto
   const sectionRefs = React.useRef<Map<string, ProvinceSectionHandle>>(new Map())
@@ -312,13 +307,13 @@ export default function SiteRepository() {
 
   const provinceCounts = React.useMemo(() => {
     const map: Record<string, number> = {}
-    filteredCustomers.forEach((c) => {
+    customers.forEach((c) => {
       const resolved = resolveItalianProvince(c.province)
       if (!resolved) return
       map[resolved.sigla] = (map[resolved.sigla] ?? 0) + 1
     })
     return map
-  }, [filteredCustomers])
+  }, [customers])
 
   const handleSelectProvinceFromMap = React.useCallback((sigla: string) => {
     setMapOpen(false)
@@ -348,8 +343,8 @@ export default function SiteRepository() {
 
   // Aggiorna contatori nella toolbar
   React.useEffect(() => {
-    setTotals(filteredCustomers.length, locationGroups.length)
-  }, [filteredCustomers.length, locationGroups.length, setTotals])
+    setTotals(customers.length, locationGroups.length)
+  }, [customers.length, locationGroups.length, setTotals])
 
   // VPN modal
   const [vpnModalOpen, setVpnModalOpen] = React.useState(false)

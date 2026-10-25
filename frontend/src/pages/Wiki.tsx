@@ -480,20 +480,36 @@ export default function Wiki() {
   const [search, setSearch] = React.useState('')
   const [categoryId, setCategoryId] = React.useState<number | ''>('')
   const [published, setPublished] = React.useState<'' | 'true' | 'false'>('')
-  const [viewMode, setViewMode] = React.useState<ViewMode>(() =>
-    window.localStorage.getItem('wiki_view_mode') === 'list' ? 'list' : 'grid',
-  )
+  const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
+    try {
+      return window.localStorage.getItem('wiki_view_mode') === 'list' ? 'list' : 'grid'
+    } catch {
+      return 'grid'
+    }
+  })
   const [sortBy, setSortBy] = React.useState<SortValue>(() => {
-    const raw = window.localStorage.getItem('wiki_sort_mode')
-    return SORT_OPTIONS.some((opt) => opt.value === raw) ? (raw as SortValue) : '-updated_at'
+    try {
+      const raw = window.localStorage.getItem('wiki_sort_mode')
+      return SORT_OPTIONS.some((opt) => opt.value === raw) ? (raw as SortValue) : '-updated_at'
+    } catch {
+      return '-updated_at'
+    }
   })
 
   React.useEffect(() => {
-    window.localStorage.setItem('wiki_view_mode', viewMode)
+    try {
+      window.localStorage.setItem('wiki_view_mode', viewMode)
+    } catch {
+      // storage non disponibile (es. modalità privata): la preferenza resta solo in memoria
+    }
   }, [viewMode])
 
   React.useEffect(() => {
-    window.localStorage.setItem('wiki_sort_mode', sortBy)
+    try {
+      window.localStorage.setItem('wiki_sort_mode', sortBy)
+    } catch {
+      // storage non disponibile (es. modalità privata): la preferenza resta solo in memoria
+    }
   }, [sortBy])
 
   const loadCategories = React.useCallback(async () => {

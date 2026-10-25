@@ -2,6 +2,7 @@ import * as React from 'react'
 
 import DashboardIcon from '@mui/icons-material/DashboardOutlined'
 import LayersIcon from '@mui/icons-material/Layers'
+import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined'
 import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import BeachAccessOutlinedIcon from '@mui/icons-material/BeachAccessOutlined'
@@ -82,6 +83,7 @@ export const NAV: NavItem[] = [
   },
 
   { label: 'Issues', path: '/issues', icon: <BugReportOutlinedIcon />, section: 'principale', perm: 'issues.view_issue' },
+  { label: 'Task', path: '/tasks', icon: <TaskAltOutlinedIcon />, section: 'principale' },
 
   { label: 'ServiceNow', path: '/servicenow-cases', icon: <CloudSyncOutlinedIcon />, section: 'principale', perm: 'servicenow.view_servicenowcase' },
 
@@ -149,6 +151,7 @@ const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
   ['/monitors',               'SITE REPOSITORY · MONITOR'],
   ['/maintenance',            'MANUTENZIONE'],
   ['/issues',                 'ISSUES'],
+  ['/tasks',                  'TASK DI AREA'],
   ['/servicenow-stats',       'SERVICENOW · STATISTICHE'],
   ['/servicenow-absences',    'SERVICENOW · ASSENZE TECNICI'],
   ['/servicenow-cases',       'SERVICENOW'],

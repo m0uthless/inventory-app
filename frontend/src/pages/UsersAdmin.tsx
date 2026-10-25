@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useTheme, alpha } from '@mui/material/styles'
+import { alpha } from '@mui/material/styles'
 import { useDataGridZebraSx, useStatusTokens } from '../theme/AppThemeProvider'
 import { SHARED } from '../theme/constants'
 import {
@@ -7,6 +7,7 @@ import {
   Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
@@ -221,7 +222,6 @@ function PermissionMatrix(props: {
   disabled?: boolean
 }) {
   const { modules, groupState, value, onChange, extraGroupSet, extraValueSet, onToggleExtra, sectionTitle, disabled } = props
-  const TEAL = useTheme().palette.primary.main
   const modulesWithExtras = modules.filter((m) => m.extra_permissions.length > 0)
 
   return (
@@ -261,12 +261,13 @@ function PermissionMatrix(props: {
                       control={
                         <Tooltip title={fromGroup ? 'Concesso dal gruppo' : ''}>
                           <span>
-                            <input
-                              type="checkbox"
+                            <Checkbox
+                              size="small"
+                              color="primary"
                               checked={fromGroup || direct}
                               disabled={locked}
                               onChange={(e) => onToggleExtra(p.codename, e.target.checked)}
-                              style={{ width: 15, height: 15, cursor: locked ? 'not-allowed' : 'pointer', accentColor: TEAL, marginRight: 8 }}
+                              sx={{ p: 0.25, mr: 1 }}
                             />
                           </span>
                         </Tooltip>

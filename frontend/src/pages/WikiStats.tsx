@@ -521,7 +521,7 @@ export default function WikiStats() {
                       borderRadius: 8,
                       fontSize: 12,
                       border: `1px solid ${theme.palette.divider}`,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.08)}`,
                       padding: '6px 12px',
                     }}
                     itemStyle={{ fontWeight: 600 }}

@@ -706,7 +706,7 @@ function CategoryStatsPanel({ category, label, allUsers }: {
 
           <MuiTooltip title="Esporta PDF (riepilogo con i filtri correnti)">
             <span>
-              <IconButton size="small" onClick={handleExportPdf} disabled={exportingPdf || loading}>
+              <IconButton size="small" onClick={handleExportPdf} disabled={exportingPdf || loading} aria-label="Esporta PDF">
                 {exportingPdf ? <CircularProgress size={18} /> : <PictureAsPdfOutlinedIcon sx={{ fontSize: 18 }} />}
               </IconButton>
             </span>

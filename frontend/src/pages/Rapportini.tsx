@@ -12,7 +12,6 @@ import {
   InputLabel,
   MenuItem,
   Select,
-  TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -47,6 +46,8 @@ import { useToast } from '@shared/ui/toast'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 
 import { RapportinoDialog } from './Maintenance'
+import { RESULT_COLOR, RESULT_LABEL, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { YearFilterField } from './maintenance/YearFilterField'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,18 +56,8 @@ type TechItem = { id: number; full_name: string }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const RESULT_COLOR: Record<string, 'success' | 'error' | 'warning' | 'default'> = {
-  ok: 'success', ko: 'error', partial: 'warning', not_planned: 'default',
-}
-const RESULT_LABEL: Record<string, string> = {
-  ok: 'OK', ko: 'KO', partial: 'Parziale', not_planned: 'Non prevista',
-}
-
 const GRID_SX_BASE = {
-  '--DataGrid-rowHeight': '24px',
-  '--DataGrid-headerHeight': '35px',
-  '& .MuiDataGrid-cell': { py: 0.25 },
-  '& .MuiDataGrid-columnHeader': { py: 0.75 },
+  ...MAINTENANCE_GRID_SX_BASE,
   '& .row-actions': { opacity: 0, pointerEvents: 'none', transition: 'opacity 140ms ease' },
   '& .MuiDataGrid-row:hover .row-actions': { opacity: 1, pointerEvents: 'auto' },
   '@media (hover: none), (pointer: coarse)': { '& .row-actions': { opacity: 1, pointerEvents: 'auto' } },
@@ -581,15 +572,7 @@ export default function Rapportini() {
                   </Select>
                 </FormControl>
 
-                <TextField
-                  size="small"
-                  label="Anno"
-                  placeholder="es. 2025"
-                  value={yearF}
-                  onChange={e => setYearF(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  inputProps={{ inputMode: 'numeric', maxLength: 4 }}
-                  fullWidth
-                />
+                <YearFilterField value={yearF} onChange={setYearF} />
               </FilterChip>
 
               <Tooltip title="Reimposta" arrow>

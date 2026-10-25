@@ -60,6 +60,9 @@ import { DrawerShell, HERO_ICON_BTN_SX, HERO_ICON_BTN_DELETE_SX } from '@shared/
 import { DrawerEmptyState } from '@shared/ui/DrawerParts'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 import type { PlanRow, EventRow, TodoRow, RapportinoContext } from './maintenanceTypes'
+import { UNIT_IT, RESULT_COLOR, RESULT_LABEL, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { DueBadge } from './maintenance/DueBadge'
+import { YearFilterField } from './maintenance/YearFilterField'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -79,8 +82,6 @@ type EventForm = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const UNIT_IT: Record<string, string> = { days: 'giorni', weeks: 'settimane', months: 'mesi', years: 'anni' }
-
 function formatSchedule(row: Pick<PlanRow, 'schedule_type' | 'interval_value' | 'interval_unit' | 'fixed_month' | 'fixed_day'>) {
   if (row.schedule_type === 'interval' && row.interval_value && row.interval_unit)
     return `ogni ${row.interval_value} ${UNIT_IT[row.interval_unit] ?? row.interval_unit}`
@@ -88,31 +89,6 @@ function formatSchedule(row: Pick<PlanRow, 'schedule_type' | 'interval_value' | 
     return `${String(row.fixed_day).padStart(2, '0')}/${String(row.fixed_month).padStart(2, '0')} ogni anno`
   return row.schedule_type
 }
-
-function dueDiffDays(dateStr: string): number {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const due = new Date(dateStr); due.setHours(0, 0, 0, 0)
-  return Math.round((due.getTime() - today.getTime()) / 86_400_000)
-}
-
-function DueBadge({ dateStr }: { dateStr: string }) {
-  const diff = dueDiffDays(dateStr)
-  if (diff < 0) return <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: '14px !important' }} />} label={`${Math.abs(diff)} gg fa`} color="error" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  if (diff === 0) return <Chip size="small" label="Oggi" color="error" sx={{ height: 22, fontWeight: 700, fontSize: '0.72rem' }} />
-  if (diff <= 30) return <Chip size="small" label={`${diff} gg`} color="warning" variant="outlined" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  const [y, m, d] = dateStr.split('-')
-  return <Chip size="small" label={`${d}/${m}/${y}`} color="default" variant="outlined" sx={{ height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5 }} />
-}
-
-const RESULT_COLOR: Record<string, 'success' | 'error' | 'warning' | 'default'> = { ok: 'success', ko: 'error', partial: 'warning', not_planned: 'default' }
-const RESULT_LABEL: Record<string, string> = { ok: 'OK', ko: 'KO', partial: 'Parziale', not_planned: 'Non prevista' }
-
-const GRID_SX_BASE = {
-  '--DataGrid-rowHeight': '24px',
-  '--DataGrid-headerHeight': '35px',
-  '& .MuiDataGrid-cell': { py: 0.25 },
-  '& .MuiDataGrid-columnHeader': { py: 0.75 },
-} as const
 
 const DW = { xs: '100%', sm: 416 } as const
 
@@ -1115,18 +1091,7 @@ export default function Maintenance() {
                     <MenuItem value="next30">Prossimi 30 gg</MenuItem>
                   </Select>
                 </FormControl>
-                <TextField
-                  size="small"
-                  label="Anno"
-                  placeholder="es. 2025"
-                  value={yearFilter}
-                  onChange={e => {
-                    const v = e.target.value.replace(/\D/g, '').slice(0, 4)
-                    setYearFilter(v)
-                  }}
-                  inputProps={{ inputMode: 'numeric', maxLength: 4 }}
-                  fullWidth
-                />
+                <YearFilterField value={yearFilter} onChange={setYearFilter} />
               </FilterChip>
 
               <Tooltip title="Reimposta" arrow>
@@ -1180,7 +1145,7 @@ export default function Maintenance() {
           getRowId: (row) => (row as any).id,
           height: 420,
           sx: {
-            ...GRID_SX_BASE,
+            ...MAINTENANCE_GRID_SX_BASE,
             ...zebraSx,
             '& .row-overdue': { bgcolor: `${alpha(theme.palette.error.main, 0.04)} !important` },
             '& .row-overdue:hover': { bgcolor: `${alpha(theme.palette.error.main, 0.08)} !important` },

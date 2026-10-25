@@ -8,12 +8,17 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
+from django.contrib.auth import get_user_model
+
 from audit.utils import log_event
 from portal.permissions import IsInternalOrPortalDedicatedApp
+from core.emails import send_templated_email
 from core.media import build_action_url, protected_media_response
 from core.permissions import user_has_model_perm
 from core.uploads import validate_upload
 from .models import ReportRequest, ReportStatus
+
+User = get_user_model()
 
 
 
@@ -284,8 +289,56 @@ class ReportRequestViewSet(
         )
         return Response(counts)
 
+    @staticmethod
+    def _report_context(item):
+        return {
+            "tipo": item.get_kind_display(),
+            "sezione": item.get_section_display(),
+            "descrizione": item.description,
+        }
+
+    def _notify_report_created(self, item):
+        """Nuova segnalazione → email a chi può gestirla (permesso
+        feedback.change_reportrequest, superuser inclusi)."""
+        recipients = (
+            User.objects.with_perm("feedback.change_reportrequest")
+            .filter(is_active=True)
+            .exclude(email="")
+            .exclude(id=item.created_by_id)
+            .distinct()
+        )
+        for user in recipients:
+            send_templated_email(
+                template_name="emails/report_request_created.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "segnalatore": item.created_by.first_name or item.created_by.username,
+                    **self._report_context(item),
+                },
+                subject=f"ARCHIE — Nuova segnalazione: {item.get_kind_display()}",
+                recipient_list=[user.email],
+            )
+
+    def _notify_report_status_changed(self, item):
+        """Cambio stato → email al segnalatore. Skip se l'attore è lui."""
+        author = item.created_by
+        if not author or not author.email or author.id == self.request.user.id:
+            return
+        send_templated_email(
+            template_name="emails/report_request_resolved.html",
+            context={
+                "nome_utente": author.first_name or author.username,
+                "stato": item.get_status_display(),
+                "motivo_rifiuto": item.rejection_reason,
+                **self._report_context(item),
+            },
+            subject=f"ARCHIE — Segnalazione {item.get_status_display().lower()}",
+            recipient_list=[author.email],
+        )
+
     def perform_create(self, serializer):
         item = serializer.save(created_by=self.request.user, status=ReportStatus.OPEN, resolved_at=None, resolved_by=None)
+        self._notify_report_created(item)
         log_event(
             self.request.user,
             action='create',
@@ -338,6 +391,9 @@ class ReportRequestViewSet(
             changes['screenshot'] = [old_has_screenshot, bool(item.screenshot)]
         if old_rejection_reason != item.rejection_reason:
             changes['rejection_reason'] = [old_rejection_reason, item.rejection_reason]
+
+        if old_status != item.status:
+            self._notify_report_status_changed(item)
 
         if changes:
             log_event(

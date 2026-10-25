@@ -35,12 +35,18 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 import { api } from '@shared/api/client'
 import PurchaseOrderDialog from '../features/purchaseorders/PurchaseOrderDialog'
 import PurchaseOrderDrawer from '../features/purchaseorders/PurchaseOrderDrawer'
-import PurchaseOrderTransitionDialog, { type TransitionExtraFields } from '../features/purchaseorders/PurchaseOrderTransitionDialog'
+import PurchaseOrderTransitionDialog, {
+  type TransitionExtraFields,
+} from '../features/purchaseorders/PurchaseOrderTransitionDialog'
 import PurchaseOrderKpis from '../features/purchaseorders/PurchaseOrderKpis'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
-import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
+import {
+  emptySelectionModel,
+  selectionSize,
+  selectionToNumberIds,
+} from '@shared/utils/gridSelection'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 
@@ -99,174 +105,240 @@ const KIND_FILTER_OPTIONS: { value: KindFilterValue; label: string }[] = [
 // i colori seguono il tema attivo.
 function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrderRow>[] {
   return [
-  {
-    field: 'offer_date',
-    headerName: 'Data offerta',
-    width: 120,
-    valueGetter: (v, row) => {
-      void v
-      return formatItDate(row.offer_date)
+    {
+      field: 'offer_date',
+      headerName: 'Data offerta',
+      width: 120,
+      valueGetter: (v, row) => {
+        void v
+        return formatItDate(row.offer_date)
+      },
     },
-  },
-  {
-    field: 'client_name',
-    headerName: 'Committente',
-    flex: 1,
-    minWidth: 180,
-    renderCell: (p) => {
-      const name = p.value as string
-      const c = committenteColor(name, statusTokens.clientChipPalette)
-      return <Chip size="small" label={name} sx={{ bgcolor: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontWeight: 600 }} />
+    {
+      field: 'client_name',
+      headerName: 'Committente',
+      flex: 1,
+      minWidth: 180,
+      renderCell: (p) => {
+        const name = p.value as string
+        const c = committenteColor(name, statusTokens.clientChipPalette)
+        return (
+          <Chip
+            size="small"
+            label={name}
+            sx={{
+              bgcolor: c.bg,
+              color: c.color,
+              border: `0.5px solid ${c.border}`,
+              fontWeight: 600,
+            }}
+          />
+        )
+      },
     },
-  },
-  { field: 'description', headerName: 'Descrizione', flex: 1.4, minWidth: 220 },
-  { field: 'purchase_order', headerName: 'Purchase Order', width: 150 },
-  {
-    field: 'kind',
-    headerName: 'Tipo',
-    width: 110,
-    renderCell: (p) => (
-      <Chip
-        size="small"
-        label={KIND_LABEL[p.value as string] || p.value}
-        variant={p.value === 'extra' ? 'filled' : 'outlined'}
-        color={p.value === 'extra' ? 'primary' : 'default'}
-      />
-    ),
-  },
-  {
-    field: 'status',
-    headerName: 'Stato',
-    width: 130,
-    renderCell: (p) => {
-      const st = p.value as PurchaseOrderStatus
-      const c = statusTokens.purchaseOrder[st]
-      return (
+    { field: 'description', headerName: 'Descrizione', flex: 1.4, minWidth: 220 },
+    { field: 'purchase_order', headerName: 'Purchase Order', width: 150 },
+    {
+      field: 'kind',
+      headerName: 'Tipo',
+      width: 110,
+      renderCell: (p) => (
         <Chip
           size="small"
-          label={STATUS_LABEL[st] || st}
-          sx={{ bgcolor: c?.bg, color: c?.color, border: c ? `0.5px solid ${c.border}` : undefined }}
+          label={KIND_LABEL[p.value as string] || p.value}
+          variant={p.value === 'extra' ? 'filled' : 'outlined'}
+          color={p.value === 'extra' ? 'primary' : 'default'}
         />
-      )
-    },
-  },
-  {
-    field: 'amount',
-    headerName: 'Importo',
-    width: 130,
-    align: 'right',
-    valueGetter: (v, row) => {
-      void v
-      return formatEuro(row.amount)
-    },
-  },
-  {
-    field: 'is_invoiced',
-    headerName: 'Fattura',
-    width: 130,
-    renderCell: (p) =>
-      p.value ? (
-        <Chip size="small" label="Fatturato" sx={{ bgcolor: statusTokens.purchaseOrder.fatturato.bg, color: statusTokens.purchaseOrder.fatturato.color, border: `0.5px solid ${statusTokens.purchaseOrder.fatturato.border}` }} />
-      ) : (
-        <Chip size="small" variant="outlined" label="Non fatturato" />
       ),
-  },
-  {
-    field: 'costs_incurred',
-    headerName: 'Costi sostenuti',
-    width: 130,
-    align: 'right',
-    valueGetter: (v, row) => {
-      void v
-      return row.costs_incurred ? formatEuro(row.costs_incurred) : '—'
     },
-  },
-  {
-    field: 'customer_name',
-    headerName: 'Cliente collegato',
-    width: 180,
-    valueGetter: (v, row) => {
-      void v
-      // Cliente da anagrafica (display_name, già risolto lato backend) se
-      // collegato; altrimenti il Committente inserito a mano (Punto 10).
-      return row.customer_name || row.customer_code || row.client_name || '—'
+    {
+      field: 'status',
+      headerName: 'Stato',
+      width: 130,
+      renderCell: (p) => {
+        const st = p.value as PurchaseOrderStatus
+        const c = statusTokens.purchaseOrder[st]
+        return (
+          <Chip
+            size="small"
+            label={STATUS_LABEL[st] || st}
+            sx={{
+              bgcolor: c?.bg,
+              color: c?.color,
+              border: c ? `0.5px solid ${c.border}` : undefined,
+            }}
+          />
+        )
+      },
     },
-  },
+    {
+      field: 'amount',
+      headerName: 'Importo',
+      width: 130,
+      align: 'right',
+      valueGetter: (v, row) => {
+        void v
+        return formatEuro(row.amount)
+      },
+    },
+    {
+      field: 'is_invoiced',
+      headerName: 'Fattura',
+      width: 130,
+      renderCell: (p) =>
+        p.value ? (
+          <Chip
+            size="small"
+            label="Fatturato"
+            sx={{
+              bgcolor: statusTokens.purchaseOrder.fatturato.bg,
+              color: statusTokens.purchaseOrder.fatturato.color,
+              border: `0.5px solid ${statusTokens.purchaseOrder.fatturato.border}`,
+            }}
+          />
+        ) : (
+          <Chip size="small" variant="outlined" label="Non fatturato" />
+        ),
+    },
+    {
+      field: 'costs_incurred',
+      headerName: 'Costi sostenuti',
+      width: 130,
+      align: 'right',
+      valueGetter: (v, row) => {
+        void v
+        return row.costs_incurred ? formatEuro(row.costs_incurred) : '—'
+      },
+    },
+    {
+      field: 'customer_name',
+      headerName: 'Cliente collegato',
+      width: 180,
+      valueGetter: (v, row) => {
+        void v
+        // Cliente da anagrafica (display_name, già risolto lato backend) se
+        // collegato; altrimenti il Committente inserito a mano (Punto 10).
+        return row.customer_name || row.customer_code || row.client_name || '—'
+      },
+    },
   ]
 }
-
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
 // Stesso motivo di buildColumns sopra: factory chiamata dentro il componente.
 
-function makeRenderPurchaseOrderCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<PurchaseOrderRow> {
+function makeRenderPurchaseOrderCard(
+  statusTokens: DomainStatusTokens,
+): MobileCardRenderFn<PurchaseOrderRow> {
   return ({ row, onOpen }) => {
-  const meta: { label: string; value: string | null | undefined }[] = [
-    { label: 'Data offerta', value: formatItDate(row.offer_date) },
-    { label: 'Purchase Order', value: row.purchase_order },
-    { label: 'Tipo', value: KIND_LABEL[row.kind] || row.kind },
-    { label: 'Costi', value: row.costs_incurred ? formatEuro(row.costs_incurred) : null },
-  ]
+    const meta: { label: string; value: string | null | undefined }[] = [
+      { label: 'Data offerta', value: formatItDate(row.offer_date) },
+      { label: 'Purchase Order', value: row.purchase_order },
+      { label: 'Tipo', value: KIND_LABEL[row.kind] || row.kind },
+      { label: 'Costi', value: row.costs_incurred ? formatEuro(row.costs_incurred) : null },
+    ]
 
-  return (
-    <Box
-      onClick={() => onOpen(row.id)}
-      sx={{
-        bgcolor: 'background.paper',
-        border: '0.5px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
-        p: 1.25,
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.75,
-        '&:active': { bgcolor: 'action.hover' },
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Chip
-            size="small"
-            label={row.client_name}
-            sx={{
-              height: 20, fontSize: '0.68rem', fontWeight: 600, maxWidth: '100%',
-              bgcolor: committenteColor(row.client_name, statusTokens.clientChipPalette).bg,
-              color: committenteColor(row.client_name, statusTokens.clientChipPalette).color,
-              border: `0.5px solid ${committenteColor(row.client_name, statusTokens.clientChipPalette).border}`,
-            }}
-          />
-          <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.description}
-          </Typography>
-        </Box>
-        <Box sx={{ flexShrink: 0, textAlign: 'right' }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {formatEuro(row.amount)}
-          </Typography>
-          <Box sx={{ fontSize: '0.62rem', fontWeight: 600, px: 0.75, py: 0.15, borderRadius: 20, whiteSpace: 'nowrap', mt: 0.25, bgcolor: statusTokens.purchaseOrder[row.status]?.bg, color: statusTokens.purchaseOrder[row.status]?.color, border: `0.5px solid ${statusTokens.purchaseOrder[row.status]?.border}` }}>
-            {STATUS_LABEL[row.status] || row.status}
-          </Box>
-        </Box>
-      </Box>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {meta.map(({ label, value }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {value || '—'}
+    return (
+      <Box
+        onClick={() => onOpen(row.id)}
+        sx={{
+          bgcolor: 'background.paper',
+          border: '0.5px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          p: 1.25,
+          cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.75,
+          '&:active': { bgcolor: 'action.hover' },
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 1,
+          }}
+        >
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Chip
+              size="small"
+              label={row.client_name}
+              sx={{
+                height: 20,
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                maxWidth: '100%',
+                bgcolor: committenteColor(row.client_name, statusTokens.clientChipPalette).bg,
+                color: committenteColor(row.client_name, statusTokens.clientChipPalette).color,
+                border: `0.5px solid ${committenteColor(row.client_name, statusTokens.clientChipPalette).border}`,
+              }}
+            />
+            <Typography
+              sx={{
+                fontSize: '0.68rem',
+                color: 'text.secondary',
+                mt: 0.5,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {row.description}
             </Typography>
           </Box>
-        ))}
+          <Box sx={{ flexShrink: 0, textAlign: 'right' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {formatEuro(row.amount)}
+            </Typography>
+            <Box
+              sx={{
+                fontSize: '0.62rem',
+                fontWeight: 600,
+                px: 0.75,
+                py: 0.15,
+                borderRadius: 20,
+                whiteSpace: 'nowrap',
+                mt: 0.25,
+                bgcolor: statusTokens.purchaseOrder[row.status]?.bg,
+                color: statusTokens.purchaseOrder[row.status]?.color,
+                border: `0.5px solid ${statusTokens.purchaseOrder[row.status]?.border}`,
+              }}
+            >
+              {STATUS_LABEL[row.status] || row.status}
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+          {meta.map(({ label, value }) => (
+            <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+              <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>
+                {label}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.72rem',
+                  color: value ? 'text.secondary' : 'text.disabled',
+                  fontStyle: value ? 'normal' : 'italic',
+                  lineHeight: 1.3,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {value || '—'}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
       </Box>
-    </Box>
-  )
+    )
   }
 }
 
-
-// prettier-ignore
 export default function PurchaseOrders() {
   const statusTokens = useStatusTokens()
   const zebraSx = useDataGridZebraSx()
@@ -545,15 +617,21 @@ export default function PurchaseOrders() {
     setContextMenu(null)
   }, [])
 
-  const openTransition = React.useCallback((row: PurchaseOrderRow, direction: 'advance' | 'revert') => {
-    const target = direction === 'advance' ? nextStatus(row.status) : prevStatus(row.status)
-    if (!target) return
-    setTransitionState({
-      id: row.id, direction, fromStatus: row.status, toStatus: target,
-      initialPurchaseOrder: row.purchase_order || '',
-      initialInvoiceNumber: row.invoice_number || '',
-    })
-  }, [])
+  const openTransition = React.useCallback(
+    (row: PurchaseOrderRow, direction: 'advance' | 'revert') => {
+      const target = direction === 'advance' ? nextStatus(row.status) : prevStatus(row.status)
+      if (!target) return
+      setTransitionState({
+        id: row.id,
+        direction,
+        fromStatus: row.status,
+        toStatus: target,
+        initialPurchaseOrder: row.purchase_order || '',
+        initialInvoiceNumber: row.invoice_number || '',
+      })
+    },
+    [],
+  )
 
   const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
     const row = contextMenu?.row
@@ -620,7 +698,17 @@ export default function PurchaseOrders() {
         tone: 'danger',
       },
     ]
-  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openTransition, restoreBusy, restoreFromRow, canChange])
+  }, [
+    contextMenu,
+    deleteBusy,
+    openDeleteFromRow,
+    openDrawer,
+    openEditFromRow,
+    openTransition,
+    restoreBusy,
+    restoreFromRow,
+    canChange,
+  ])
 
   const columns = React.useMemo<GridColDef<PurchaseOrderRow>[]>(() => {
     return buildColumns(statusTokens)
@@ -839,13 +927,18 @@ export default function PurchaseOrders() {
   const save = async () => {
     const clientErrors: Record<string, string> = {}
     if (!form.offer_date) clientErrors.offer_date = 'La data offerta è obbligatoria.'
-    if (!String(form.description).trim()) clientErrors.description = 'La descrizione è obbligatoria.'
-    if (!String(form.client_name).trim()) clientErrors.client_name = 'Il committente è obbligatorio.'
+    if (!String(form.description).trim())
+      clientErrors.description = 'La descrizione è obbligatoria.'
+    if (!String(form.client_name).trim())
+      clientErrors.client_name = 'Il committente è obbligatorio.'
     if (form.amount_mode === 'giornate') {
-      if (form.days === '' || Number.isNaN(Number(form.days))) clientErrors.days = 'Indica le giornate.'
-      if (form.daily_rate === '' || Number.isNaN(Number(form.daily_rate))) clientErrors.daily_rate = 'Indica la tariffa/giorno.'
+      if (form.days === '' || Number.isNaN(Number(form.days)))
+        clientErrors.days = 'Indica le giornate.'
+      if (form.daily_rate === '' || Number.isNaN(Number(form.daily_rate)))
+        clientErrors.daily_rate = 'Indica la tariffa/giorno.'
     } else {
-      if (form.amount === '' || Number.isNaN(Number(form.amount))) clientErrors.amount = "Indica l'importo."
+      if (form.amount === '' || Number.isNaN(Number(form.amount)))
+        clientErrors.amount = "Indica l'importo."
     }
     if (Object.keys(clientErrors).length) {
       setDlgErrors(clientErrors)
@@ -879,7 +972,10 @@ export default function PurchaseOrders() {
         toast.success('Purchase Order creato')
       } else {
         if (!dlgId) return
-        const res = await api.patch<PurchaseOrderDetail>(`/purchase-order-entries/${dlgId}/`, payload)
+        const res = await api.patch<PurchaseOrderDetail>(
+          `/purchase-order-entries/${dlgId}/`,
+          payload,
+        )
         id = res.data.id
         toast.success('Purchase Order aggiornato')
       }
@@ -902,11 +998,7 @@ export default function PurchaseOrders() {
 
   return (
     <Stack spacing={2} sx={{ height: '100%' }}>
-      <PurchaseOrderKpis
-        year={effectiveYear}
-        summary={summary}
-        loading={summaryLoading}
-      />
+      <PurchaseOrderKpis year={effectiveYear} summary={summary} loading={summaryLoading} />
 
       <EntityListCard
         mobileCard={renderPurchaseOrderCard}
@@ -932,17 +1024,23 @@ export default function PurchaseOrders() {
                 <IconButton
                   size="small"
                   aria-label="Anno precedente"
-                  onClick={() => setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })}
+                  onClick={() =>
+                    setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })
+                  }
                 >
                   <ChevronLeftIcon fontSize="small" />
                 </IconButton>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', minWidth: 52, textAlign: 'center' }}>
+                <Typography
+                  sx={{ fontWeight: 700, fontSize: '0.85rem', minWidth: 52, textAlign: 'center' }}
+                >
                   {effectiveYear}
                 </Typography>
                 <IconButton
                   size="small"
                   aria-label="Anno successivo"
-                  onClick={() => setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })}
+                  onClick={() =>
+                    setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })
+                  }
                 >
                   <ChevronRightIcon fontSize="small" />
                 </IconButton>
@@ -957,7 +1055,10 @@ export default function PurchaseOrders() {
                   setKindFilterRaw(v === 'all' ? '' : v, { patch: { page: 1 }, keepOpen: false })
                 }}
                 aria-label="Filtro tipo Purchase Order"
-                sx={{ height: 32, '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 } }}
+                sx={{
+                  height: 32,
+                  '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 },
+                }}
               >
                 {KIND_FILTER_OPTIONS.map((opt) => (
                   <ToggleButton key={opt.value} value={opt.value} aria-label={opt.label}>
@@ -992,8 +1093,7 @@ export default function PurchaseOrders() {
             ...zebraSx,
           },
         }}
-      >
-      </EntityListCard>
+      ></EntityListCard>
 
       <RowContextMenu
         open={Boolean(contextMenu)}
@@ -1019,7 +1119,10 @@ export default function PurchaseOrders() {
         onEdit={openEdit}
         onDelete={() => setDeleteDlgOpen(true)}
         onRestore={doRestore}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+        onCopy={async (v: string) => {
+          await copyToClipboard(v)
+          toast.success('Copiato')
+        }}
         onUploadDocument={uploadDocument}
         onDeleteDocument={deleteDocument}
       />

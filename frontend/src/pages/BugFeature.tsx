@@ -642,7 +642,7 @@ export default function BugFeaturePage() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Tooltip title="Reimposta" arrow>
                 <span>
-                  <Button size="small" variant="contained" onClick={resetFilters} sx={compactResetButtonSx}>
+                  <Button size="small" variant="contained" onClick={resetFilters} sx={compactResetButtonSx} aria-label="Reimposta filtri">
                     <RestartAltIcon />
                   </Button>
                 </span>
@@ -734,7 +734,7 @@ export default function BugFeaturePage() {
         items={contextMenuItems}
       />
 
-      <input ref={uploadInputRef} hidden type="file" accept="image/*" onChange={handleInlineScreenshotUpload} />
+      <input ref={uploadInputRef} hidden type="file" accept="image/*" onChange={handleInlineScreenshotUpload} aria-label="Carica screenshot" />
 
       <Dialog open={dialogOpen} onClose={() => !submitBusy && setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pb: 1 }}>Report / Request</DialogTitle>

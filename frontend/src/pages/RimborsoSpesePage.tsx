@@ -116,7 +116,7 @@ function CellInput({
       onBlur={onBlur}
       disabled={disabled}
       InputProps={{ disableUnderline: true }}
-      inputProps={{ style: { padding: 0, fontSize: 13, textAlign: align } }}
+      inputProps={{ style: { padding: 0, fontSize: 13, textAlign: align }, 'aria-label': placeholder }}
     />
   )
 }
@@ -256,6 +256,9 @@ export default function RimborsoSpesePage() {
     const patch: Partial<Pick<ExpenseItemRow, 'amount' | 'date'>> = {}
     if (suggestion.amount && !item.is_km_category) patch.amount = suggestion.amount
     if (suggestion.date) patch.date = suggestion.date
+    if (suggestion.amount && item.is_km_category) {
+      toast.info('Importo non applicato: per le categorie a km è calcolato automaticamente.')
+    }
     await patchItem(item, patch)
     setSuggestion(null)
   }
@@ -551,7 +554,7 @@ function AmountCell({ value, disabled, onCommit }: { value: string; disabled: bo
       onBlur={() => onCommit(draft === '' ? '0' : draft)}
       disabled={disabled}
       InputProps={{ disableUnderline: true }}
-      inputProps={{ inputMode: 'decimal', style: { padding: 0, fontSize: 13, textAlign: 'right' } }}
+      inputProps={{ inputMode: 'decimal', style: { padding: 0, fontSize: 13, textAlign: 'right' }, 'aria-label': 'Importo' }}
     />
   )
 }
@@ -598,7 +601,7 @@ function ItemNoteCell({
         {editable ? (
           <>
             <Tooltip title="Carica scontrino">
-              <IconButton size="small" onClick={onUploadClick} disabled={extracting} sx={{ p: 0.25 }}>
+              <IconButton size="small" onClick={onUploadClick} disabled={extracting} sx={{ p: 0.25 }} aria-label="Carica scontrino">
                 {extracting ? <CircularProgress size={12} /> : <UploadFileOutlinedIcon sx={{ fontSize: 14 }} />}
               </IconButton>
             </Tooltip>

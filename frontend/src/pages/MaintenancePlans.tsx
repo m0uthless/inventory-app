@@ -34,7 +34,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import { api } from '@shared/api/client'
 import { escapeHtml } from '@shared/utils/html'
@@ -58,6 +57,8 @@ import { useExportCsv } from '@shared/ui/useExportCsv'
 import { useNavigate } from 'react-router-dom'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PlanDrawer, RapportinoDialog } from './Maintenance'
+import { UNIT_IT, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { DueBadge } from './maintenance/DueBadge'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -82,32 +83,6 @@ type PlanForm = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const UNIT_IT: Record<string, string> = { days: 'giorni', weeks: 'settimane', months: 'mesi', years: 'anni' }
-
-function dueDiffDays(dateStr: string): number {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const due = new Date(dateStr); due.setHours(0, 0, 0, 0)
-  return Math.round((due.getTime() - today.getTime()) / 86_400_000)
-}
-
-function DueBadge({ dateStr }: { dateStr: string }) {
-  const diff = dueDiffDays(dateStr)
-  if (diff < 0) return <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: '14px !important' }} />} label={`${Math.abs(diff)} gg fa`} color="error" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  if (diff === 0) return <Chip size="small" label="Oggi" color="error" sx={{ height: 22, fontWeight: 700, fontSize: '0.72rem' }} />
-  if (diff <= 30) return <Chip size="small" label={`${diff} gg`} color="warning" variant="outlined" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  return <Chip size="small" label={dateStr} color="default" variant="outlined" sx={{ height: 22, fontSize: '0.72rem' }} />
-}
-
-// Zebra striping (colore) è ora theme-aware — vedi useDataGridZebraSx()
-// (theme/AppThemeProvider.tsx), composto al punto di consumo con questa
-// base fissa (densità riga, non legata al tema).
-const GRID_SX_BASE = {
-  '--DataGrid-rowHeight': '24px',
-  '--DataGrid-headerHeight': '35px',
-  '& .MuiDataGrid-cell': { py: 0.25 },
-  '& .MuiDataGrid-columnHeader': { py: 0.75 },
-} as const
 
 async function fetchComputedDueDate(scheduleType: string, intervalValue: number | '', intervalUnit: string, fixedMonth: number | '', fixedDay: number | ''): Promise<string | null> {
   try {
@@ -630,7 +605,7 @@ export default function MaintenancePlans() {
           sortModel: grid.sortModel, onSortModelChange: grid.onSortModelChange,
           onRowClick: id => setDrawerPlanId(id),
           onRowContextMenu: handleRowContextMenu,
-          sx: { ...GRID_SX_BASE, ...zebraSx },
+          sx: { ...MAINTENANCE_GRID_SX_BASE, ...zebraSx },
         }}
       >
         <Can perm={PERMS.maintenance.plan.add}>

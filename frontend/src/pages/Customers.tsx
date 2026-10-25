@@ -1,12 +1,10 @@
 import * as React from 'react'
 import { useDataGridZebraSx } from '../theme/AppThemeProvider'
-import type { Theme } from '@mui/material/styles'
 import { alpha } from '@mui/material/styles'
 import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Stack,
   Tooltip,
   Typography,
@@ -20,10 +18,14 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import { Can } from '../auth/Can'
-import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import type { GridColDef } from '@mui/x-data-grid'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
@@ -36,10 +38,8 @@ import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
-import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { isRecord } from '@shared/utils/guards'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
@@ -53,6 +53,8 @@ import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
 import CustomerDrawer from '../features/customers/CustomerDrawer'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
+import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
+import { stripOpenParam } from '../features/entityRelations/relatedListUtils'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -98,14 +100,6 @@ type CustomerForm = {
   custom_fields: Record<string, unknown>
   notes: string
 }
-
-// Stile condiviso dai pulsanti "vai a sezione collegata" (Siti / Inventory / Drive)
-const navSectionButtonSx = {
-  bgcolor: (theme: Theme) => theme.palette.primary.main,
-  color: (theme: Theme) => theme.palette.common.white,
-  fontWeight: 600,
-  '&:hover': { bgcolor: (theme: Theme) => theme.palette.primary.dark },
-} as const
 
 type SiteMini = {
   id: number
@@ -172,35 +166,18 @@ function CustomerSitesTab(props: {
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Siti
-          </Typography>
-          <Chip size="small" label={rowCount} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={navSectionButtonSx}
-          onClick={() =>
-            navigate(
-              `/sites${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`,
-            )
-          }
-        >
-          Apri lista
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="Siti"
+        count={rowCount}
+        buttonLabel="Apri lista"
+        onOpenList={() =>
+          navigate(
+            `/sites${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + stripOpenParam(loc.search) })}`,
+          )
+        }
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : rows.length ? (
+      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
         <List
           dense
           disablePadding
@@ -220,7 +197,7 @@ function CustomerSitesTab(props: {
                 sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
               >
                 <ListItemButton
-                  onClick={() => navigate(`/sites${buildQuery({ ...q, return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`)}
+                  onClick={() => navigate(`/sites${buildQuery({ ...q, return: loc.pathname + stripOpenParam(loc.search) })}`)}
                   sx={{
                     py: 0.75,
                     opacity: s.deleted_at ? 0.55 : 1,
@@ -243,11 +220,7 @@ function CustomerSitesTab(props: {
             )
           })}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          —
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }
@@ -289,35 +262,18 @@ function CustomerInventoriesTab(props: {
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Inventari
-          </Typography>
-          <Chip size="small" label={rowCount} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={navSectionButtonSx}
-          onClick={() =>
-            navigate(
-              `/inventory${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`,
-            )
-          }
-        >
-          Apri lista
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="Inventari"
+        count={rowCount}
+        buttonLabel="Apri lista"
+        onOpenList={() =>
+          navigate(
+            `/inventory${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + stripOpenParam(loc.search) })}`,
+          )
+        }
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : rows.length ? (
+      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
         <List
           dense
           disablePadding
@@ -339,7 +295,7 @@ function CustomerInventoriesTab(props: {
                 sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
               >
                 <ListItemButton
-                  onClick={() => navigate(`/inventory${buildQuery({ ...q, return: loc.pathname + ((() => { const sp = new URLSearchParams(loc.search); sp.delete('open'); const s = sp.toString(); return s ? '?' + s : '' })()) })}`)}
+                  onClick={() => navigate(`/inventory${buildQuery({ ...q, return: loc.pathname + stripOpenParam(loc.search) })}`)}
                   sx={{
                     py: 0.75,
                     opacity: inv.deleted_at ? 0.55 : 1,
@@ -362,11 +318,7 @@ function CustomerInventoriesTab(props: {
             )
           })}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          —
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }
@@ -461,40 +413,25 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
     }
   }, [customerId, toast])
 
-  function fileEmoji(mime?: string) {
-    if (!mime) return '📁'
-    if (mime.startsWith('image/')) return '🖼️'
-    if (mime === 'application/pdf') return '📄'
-    return '📝'
+  function fileIcon(mime?: string) {
+    if (!mime) return <FolderOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+    if (mime.startsWith('image/'))
+      return <ImageOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+    if (mime === 'application/pdf')
+      return <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+    return <DescriptionOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
   }
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            File Drive
-          </Typography>
-          <Chip size="small" label={total} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={navSectionButtonSx}
-          onClick={() => navigate('/drive')}
-        >
-          Apri Drive
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="File Drive"
+        count={total}
+        buttonLabel="Apri Drive"
+        onOpenList={() => navigate('/drive')}
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : items.length ? (
+      <RelatedListBody loading={loading} isEmpty={items.length === 0} emptyText="Nessun file collegato.">
         <List
           dense
           disablePadding
@@ -510,9 +447,11 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
                 sx={{ px: 1.5, py: 0.75 }}
                 primary={
                   <Stack direction="row" alignItems="center" spacing={0.75}>
-                    <span style={{ fontSize: 14 }}>
-                      {item.kind === 'folder' ? '📁' : fileEmoji(item.mime_type)}
-                    </span>
+                    {item.kind === 'folder' ? (
+                      <FolderOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                    ) : (
+                      fileIcon(item.mime_type)
+                    )}
                     <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1 }}>
                       {item.name}
                     </Typography>
@@ -539,11 +478,7 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
             </ListItem>
           )}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          Nessun file collegato.
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }
@@ -750,16 +685,6 @@ export default function Customers() {
     ],
     defaultPageSize: 25,
   })
-
-  const [selectionModel, setSelectionModel] =
-    React.useState<GridRowSelectionModel>(emptySelectionModel())
-  const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
-  const selectedIds = React.useMemo(() => selectionToNumberIds(selectionModel), [selectionModel])
-  const selectedCount = React.useMemo(() => selectionSize(selectionModel), [selectionModel])
-
-  React.useEffect(() => {
-    setSelectionModel(emptySelectionModel())
-  }, [grid.view])
 
   const emptyState = React.useMemo(() => {
     if (grid.view === 'deleted' && !grid.search.trim()) {
@@ -1195,24 +1120,6 @@ export default function Customers() {
     }
   }
 
-  const doBulkRestore = async (): Promise<boolean> => {
-    const ids = selectedIds.filter((n) => Number.isFinite(n))
-    if (!ids.length) return false
-    setRestoreBusy(true)
-    try {
-      await api.post(`/customers/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi`)
-      setSelectionModel(emptySelectionModel())
-      reloadList()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setRestoreBusy(false)
-    }
-    return false
-  }
-
   const doRestore = async () => {
     if (!detail) return
     setRestoreBusy(true)
@@ -1327,20 +1234,6 @@ export default function Customers() {
         activityTabContent={detail ? (
           <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
         ) : null}
-      />
-
-      <ConfirmActionDialog
-        open={bulkRestoreDlgOpen}
-        busy={restoreBusy}
-        title="Ripristinare i clienti selezionati?"
-        description={`Verranno ripristinati ${selectedCount} clienti dal cestino.`}
-        confirmText="Ripristina"
-        confirmColor="success"
-        onClose={() => setBulkRestoreDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkRestore()
-          if (ok) setBulkRestoreDlgOpen(false)
-        }}
       />
 
       <ConfirmDeleteDialog

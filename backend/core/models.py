@@ -302,6 +302,13 @@ class UserTask(models.Model):
         return f"{self.user} — {self.text[:40]}"
 
 
+class AreaTaskPriority(models.TextChoices):
+    LOW      = 'low',      'Bassa'
+    MEDIUM   = 'medium',   'Media'
+    HIGH     = 'high',     'Alta'
+    CRITICAL = 'critical', 'Critica'
+
+
 class AreaTask(TimeStampedModel):
     """Task specifico di un'area organizzativa (stessa `attendance.LeaveArea`
     già usata come area del profilo utente — vedi `UserProfile.leave_area`).
@@ -313,17 +320,19 @@ class AreaTask(TimeStampedModel):
 
     Soft-delete + audit: eredita `deleted_at` da TimeStampedModel (stesso
     pattern di `SoftDeleteAuditMixin` usato nel resto del progetto — vedi
-    `core/mixins.py`). Per ora il ripristino non è esposto in UI: il
-    soft-delete serve come salvaguardia/audit trail, non come cestino
-    consultabile dall'utente.
+    `core/mixins.py`). Restore e bulk_restore sono esposti
+    dall'API (membri dell'area con permesso di modifica; superuser); la UI
+    arriverà in una fase successiva.
     """
 
     STATUS_DA_FARE    = 'da_fare'
     STATUS_IN_CORSO   = 'in_corso'
+    STATUS_IN_ATTESA  = 'in_attesa'
     STATUS_COMPLETATO = 'completato'
     STATUS_CHOICES = [
         (STATUS_DA_FARE, 'Da fare'),
         (STATUS_IN_CORSO, 'In corso'),
+        (STATUS_IN_ATTESA, 'In attesa'),
         (STATUS_COMPLETATO, 'Completato'),
     ]
 
@@ -342,6 +351,23 @@ class AreaTask(TimeStampedModel):
         max_length=16, choices=STATUS_CHOICES, default=STATUS_DA_FARE, verbose_name='Stato',
     )
     due_date = models.DateField(null=True, blank=True, verbose_name='Scadenza')
+    priority = models.CharField(
+        max_length=20, choices=AreaTaskPriority.choices,
+        default=AreaTaskPriority.MEDIUM, verbose_name='Priorità',
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='assigned_area_tasks',
+        verbose_name='Assegnato a',
+    )
+    drive_files = models.ManyToManyField(
+        'drive.DriveFile',
+        blank=True,
+        related_name='area_tasks',
+        verbose_name='Allegati Drive',
+    )
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -358,6 +384,10 @@ class AreaTask(TimeStampedModel):
         verbose_name='Ultima modifica di',
     )
     completed_at = models.DateTimeField(null=True, blank=True)
+    converted_to_issue = models.ForeignKey(
+        'issues.Issue', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='converted_from_tasks', verbose_name='Convertito in issue',
+    )
 
     class Meta:
         verbose_name = 'Task di area'
@@ -370,6 +400,31 @@ class AreaTask(TimeStampedModel):
 
     def __str__(self):
         return f"[{self.area}] {self.title[:40]}"
+
+
+class AreaTaskComment(models.Model):
+    task = models.ForeignKey(
+        AreaTask, on_delete=models.CASCADE,
+        related_name='comments', verbose_name='Task',
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='area_task_comments', verbose_name='Autore',
+    )
+    body       = models.TextField(verbose_name='Testo')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Commento task di area'
+        verbose_name_plural = 'Commenti task di area'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['task', 'created_at'], name='areataskcomment_task_idx'),
+        ]
+
+    def __str__(self):
+        return f"Comment by {self.author_id} on AreaTask #{self.task_id}"
 
 
 # ─── Dashboard dinamica ───────────────────────────────────────────────────────

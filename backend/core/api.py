@@ -1,11 +1,14 @@
+import logging
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework import serializers, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.filters import OrderingFilter
+import django_filters as filters
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,11 +16,18 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 
 from attendance.models import LeaveArea
-from audit.utils import log_event, to_change_value_for_field, to_primitive
+from audit.utils import log_event, to_change_value_for_field
+from drive.access import filter_accessible_files, has_file_access
+from drive.models import DriveFile
+from core.emails import send_templated_email
+from core.mixins import RestoreActionMixin, SoftDeleteAuditMixin
+from core.soft_delete import TRUTHY, apply_soft_delete_filters
 from portal.permissions import IsInternalOrPortalDedicatedApp
 
+logger = logging.getLogger(__name__)
+
 from core.models import (
-    AreaTask, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
+    AreaTask, AreaTaskComment, Announcement, ChangelogEntry, CustomerStatus, SiteStatus, InventoryStatus,
     InventoryType, UserProfile, UserTask, DashboardWidget, UserDashboardLayout, StickyNote,
     DefaultDashboardLayout,
 )
@@ -31,6 +41,7 @@ class UserListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     is_philips = serializers.SerializerMethodField()
     is_servicenow_technician = serializers.SerializerMethodField()
+    leave_area = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
@@ -47,9 +58,15 @@ class UserListSerializer(serializers.ModelSerializer):
         except Exception:
             return True
 
+    def get_leave_area(self, obj):
+        try:
+            return obj.profile.leave_area_id
+        except Exception:
+            return None
+
     class Meta:
         model  = User
-        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician"]
+        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician", "leave_area"]
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -57,7 +74,11 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return User.objects.select_related("profile").filter(is_active=True).order_by("first_name", "last_name", "username")
+        qs = User.objects.select_related("profile").filter(is_active=True).order_by("first_name", "last_name", "username")
+        leave_area = self.request.query_params.get("leave_area")
+        if leave_area and leave_area.isdigit():
+            qs = qs.filter(profile__leave_area_id=int(leave_area))
+        return qs
 
 
 class CustomerStatusLookupSerializer(serializers.ModelSerializer):
@@ -305,24 +326,110 @@ class AreaTaskSerializer(serializers.ModelSerializer):
         queryset=LeaveArea.objects.filter(deleted_at__isnull=True, is_active=True),
         required=False,
     )
-    area_label      = serializers.CharField(source='area.label', read_only=True)
-    created_by_name = serializers.SerializerMethodField()
-    can_edit        = serializers.SerializerMethodField()
+    area_label       = serializers.CharField(source='area.label', read_only=True)
+    created_by_name  = serializers.SerializerMethodField()
+    assigned_to      = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_active=True),
+        allow_null=True, required=False,
+    )
+    assigned_to_name = serializers.SerializerMethodField()
+    comments_count   = serializers.SerializerMethodField()
+    drive_files = serializers.PrimaryKeyRelatedField(
+        queryset=DriveFile.objects.filter(deleted_at__isnull=True),
+        many=True, required=False, write_only=True,
+    )
+    drive_files_detail = serializers.SerializerMethodField()
+    can_edit         = serializers.SerializerMethodField()
+    converted_to_issue = serializers.PrimaryKeyRelatedField(read_only=True)
+    converted_to_issue_title = serializers.SerializerMethodField()
 
     class Meta:
         model  = AreaTask
         fields = [
             'id', 'area', 'area_label', 'title', 'description', 'status',
-            'due_date', 'created_by', 'created_by_name', 'created_at',
-            'updated_at', 'completed_at', 'can_edit',
+            'priority', 'due_date', 'assigned_to', 'assigned_to_name',
+            'drive_files', 'drive_files_detail',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'completed_at', 'comments_count', 'can_edit',
+            'converted_to_issue', 'converted_to_issue_title',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'completed_at']
 
+    def get_converted_to_issue_title(self, obj):
+        return obj.converted_to_issue.title if obj.converted_to_issue_id else None
+
+    @staticmethod
+    def _display_name(user):
+        return f"{user.first_name} {user.last_name}".strip() or user.username
+
     def get_created_by_name(self, obj):
-        if not obj.created_by_id:
-            return None
-        u = obj.created_by
-        return f"{u.first_name} {u.last_name}".strip() or u.username
+        return self._display_name(obj.created_by) if obj.created_by_id else None
+
+    def get_assigned_to_name(self, obj):
+        return self._display_name(obj.assigned_to) if obj.assigned_to_id else None
+
+    def get_comments_count(self, obj):
+        annotated = getattr(obj, 'comments_count', None)
+        return annotated if annotated is not None else obj.comments.count()
+
+    def _request_user(self):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        return user if user is not None and getattr(user, 'is_authenticated', False) else None
+
+    def _accessible_file_ids(self, user):
+        """Id dei file Drive accessibili all'utente tra quelli collegati ai task
+        che questo serializer sta rappresentando (la pagina intera in lista):
+        un'unica query ACL per richiesta invece di una per riga."""
+        cache = self.context.setdefault('_area_task_acl_ids', {})
+        if 'ids' not in cache:
+            parent = self.parent
+            if isinstance(parent, serializers.ListSerializer):
+                objs = parent.instance
+            else:
+                objs = self.instance
+            if objs is None:
+                objs = []
+            elif not isinstance(objs, (list, tuple)) and not hasattr(objs, '__iter__'):
+                objs = [objs]
+            task_ids = [o.pk for o in objs]
+            files = DriveFile.objects.filter(area_tasks__in=task_ids, deleted_at__isnull=True)
+            cache['ids'] = set(filter_accessible_files(files, user).values_list('pk', flat=True))
+        return cache['ids']
+
+    def get_drive_files_detail(self, obj):
+        user = self._request_user()
+        if user is None:
+            return []
+        allowed = self._accessible_file_ids(user)
+        return [
+            {'id': f.id, 'name': f.name, 'mime_type': f.mime_type, 'size': f.size, 'folder': f.folder_id}
+            for f in obj.drive_files.all()
+            if f.deleted_at is None and f.id in allowed
+        ]
+
+    def validate_drive_files(self, files):
+        user = self._request_user()
+        denied = [f.id for f in files if user is None or not has_file_access(user, f)]
+        if denied:
+            raise serializers.ValidationError(
+                f"File non disponibili o non accessibili: {sorted(denied)}"
+            )
+        return files
+
+    def update(self, instance, validated_data):
+        files = validated_data.pop('drive_files', None)
+        instance = super().update(instance, validated_data)
+        if files is not None:
+            user = self._request_user()
+            visible_ids = set(
+                filter_accessible_files(
+                    instance.drive_files.filter(deleted_at__isnull=True), user,
+                ).values_list('pk', flat=True)
+            ) if user is not None else set()
+            preserved = [f.pk for f in instance.drive_files.all() if f.pk not in visible_ids]
+            instance.drive_files.set([f.pk for f in files] + preserved)
+        return instance
 
     def get_can_edit(self, obj):
         request = self.context.get('request')
@@ -334,52 +441,139 @@ class AreaTaskSerializer(serializers.ModelSerializer):
         user_area_id = getattr(getattr(user, 'profile', None), 'leave_area_id', None)
         return user_area_id is not None and user_area_id == obj.area_id
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        assignee = attrs.get('assigned_to')
+        if assignee is None:
+            return attrs
+        request = self.context.get('request')
+        actor = getattr(request, 'user', None)
+        if getattr(actor, 'is_superuser', False):
+            return attrs
+        if self.instance is not None:
+            if assignee.pk == self.instance.assigned_to_id:
+                return attrs  # valore invariato: niente ricontrollo area
+            area_id = self.instance.area_id
+        else:
+            area_id = getattr(getattr(actor, 'profile', None), 'leave_area_id', None)
+        assignee_area_id = getattr(getattr(assignee, 'profile', None), 'leave_area_id', None)
+        if area_id is None or assignee_area_id != area_id:
+            raise serializers.ValidationError(
+                {'assigned_to': "L'assegnatario deve appartenere all'area del task."}
+            )
+        return attrs
 
-class AreaTaskViewSet(viewsets.ModelViewSet):
+
+class AreaTaskCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = AreaTaskComment
+        fields = ['id', 'task', 'author', 'author_name', 'body', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'task', 'author', 'created_at', 'updated_at']
+
+    def get_author_name(self, obj):
+        u = obj.author
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+class AreaTaskFilter(filters.FilterSet):
+    status      = filters.MultipleChoiceFilter(choices=AreaTask.STATUS_CHOICES)
+    priority    = filters.MultipleChoiceFilter(choices=AreaTask._meta.get_field('priority').choices)
+    area        = filters.NumberFilter(field_name='area_id')
+    assigned_to = filters.NumberFilter(field_name='assigned_to_id')
+    due_before  = filters.DateFilter(field_name='due_date', lookup_expr='lte')
+    due_after   = filters.DateFilter(field_name='due_date', lookup_expr='gte')
+    mine        = filters.BooleanFilter(method='filter_mine')
+
+    class Meta:
+        model  = AreaTask
+        fields = ['status', 'priority', 'area', 'assigned_to', 'mine']
+
+    def filter_mine(self, queryset, name, value):
+        if value:
+            return queryset.filter(assigned_to=self.request.user)
+        return queryset
+
+
+class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     """
-    Task di area per la dashboard. Lettura: tutte le aree, a chiunque sia
-    autenticato (sola lettura sulle aree diverse dalla propria). Scrittura
-    (create/update/delete): solo sui task della propria area
-    (`request.user.profile.leave_area`).
+    Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+    lettura sulle aree diverse dalla propria). Scrittura
+    (create/update/delete/restore): solo sui task della propria area
+    (`request.user.profile.leave_area`); il superuser può sempre.
 
-    I task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS` giorni
-    sono esclusi dalla lista di default (restano in DB, non cancellati) —
-    passare `?include_hidden=1` per vederli comunque.
+    Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+    giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+    Vale solo per `action == 'list'`, così un task completato da tempo resta
+    apribile per id e ripristinabile.
 
-    Soft-delete + audit: l'eliminazione è un soft-delete (`deleted_at`,
-    stesso pattern di `SoftDeleteAuditMixin` — vedi `core/mixins.py`) e ogni
-    create/update/delete viene registrato in `AuditEvent`. Per ora non c'è
-    un ripristino esposto in UI: serve come salvaguardia/audit trail.
+    Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+    (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
     """
+    # RestoreActionMixin: AreaTask ha updated_by, nessun genitore da
+    # controllare, risposta 204 (default).
+    restore_use_block_check = False
+    restore_use_split       = False
+
     serializer_class   = AreaTaskSerializer
     permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
+    filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class    = AreaTaskFilter
+    search_fields      = ['title', 'description']
+    ordering           = ['status', 'due_date', '-created_at', 'id']
+    ordering_fields    = [
+        'created_at', 'updated_at', 'due_date', 'priority', 'status', 'title',
+        'completed_at', 'deleted_at',
+    ]
 
     def get_queryset(self):
-        qs = AreaTask.objects.select_related('area', 'created_by').filter(deleted_at__isnull=True)
-        area_param = self.request.query_params.get('area')
-        if area_param:
-            qs = qs.filter(area_id=area_param)
-        if self.request.query_params.get('include_hidden') != '1':
+        qs = AreaTask.objects.select_related(
+            'area', 'created_by', 'assigned_to',
+        ).prefetch_related('drive_files')
+        if getattr(self, 'action', None) in ('list', 'retrieve'):
+            qs = qs.annotate(comments_count=Count('comments'))
+        if getattr(self, 'action', None) in ('list', 'retrieve', 'restore', 'bulk_restore'):
+            qs = apply_soft_delete_filters(
+                qs, request=self.request, action_name=getattr(self, 'action', ''),
+            )
+        else:
+            qs = qs.filter(deleted_at__isnull=True)
+        params = self.request.query_params
+        in_trash = str(params.get('only_deleted', '')).strip().lower() in TRUTHY
+        if getattr(self, 'action', None) == 'list' and params.get('include_hidden') != '1' and not in_trash:
             hide_before = timezone.now() - timedelta(days=AreaTask.HIDE_COMPLETED_AFTER_DAYS)
             qs = qs.exclude(status=AreaTask.STATUS_COMPLETATO, completed_at__lt=hide_before)
         return qs
 
-    @staticmethod
-    def _changes_from_validated(instance, validated: dict) -> dict:
-        """Stesso schema di `SoftDeleteAuditMixin._changes_from_validated`
-        (core/mixins.py), non riusabile direttamente qui perché la viewset
-        ha una logica di permessi/campi troppo specifica per il mixin
-        generico — vedi `_check_own_area` e la gestione di `completed_at`."""
-        changes = {}
-        for k, v in (validated or {}).items():
-            before_raw = getattr(instance, k, None)
-            after_raw = v
-            if to_primitive(before_raw) != to_primitive(after_raw):
-                changes[k] = {
-                    "from": to_change_value_for_field(k, before_raw),
-                    "to":   to_change_value_for_field(k, after_raw),
-                }
-        return changes
+    def filter_queryset(self, queryset):
+        # OrderingFilter sostituisce l'ordinamento di default con il solo campo
+        # richiesto: senza un tie-breaker su `id` la paginazione ripete/salta
+        # righe quando ci sono valori uguali o due_date NULL.
+        qs = super().filter_queryset(queryset)
+        ordering = list(qs.query.order_by) or list(AreaTask._meta.ordering or [])
+        if not any(str(o).lstrip('-') in ('id', 'pk') for o in ordering):
+            qs = qs.order_by(*ordering, 'id')
+        return qs
+
+    def get_permissions(self):
+        if self.action in ('restore', 'bulk_restore'):
+            # L'autorizzazione è per-area (_check_own_area / _get_scoped_trash_queryset),
+            # non un permesso Django: CanRestoreModelPermission richiederebbe
+            # core.change_areatask, che nessun gruppo ha mai avuto.
+            return [IsAuthenticated(), IsInternalOrPortalDedicatedApp()]
+        return super().get_permissions()
+
+    def _get_scoped_trash_queryset(self):
+        qs = super()._get_scoped_trash_queryset()
+        user = self.request.user
+        if getattr(user, 'is_superuser', False):
+            return qs
+        return qs.filter(area_id=self._user_area_id(user))
+
+    def _restore_obj(self, obj, request):
+        self._check_own_area(obj.area_id)
+        super()._restore_obj(obj, request)
 
     @staticmethod
     def _user_area_id(user):
@@ -400,6 +594,88 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
             )
         return user_area_id
 
+    _COMMENT_EXCERPT_CHARS = 300
+
+    def _safe_notify(self, fn, **kwargs):
+        """Le email non devono mai rompere la richiesta API."""
+        try:
+            fn(**kwargs)
+        except Exception:
+            logger.exception("Notifica email task di area fallita (%s)", getattr(fn, "__name__", fn))
+
+    def _notify_comment(self, *, task, comment):
+        """Email all'assegnatario e al creatore del task (senza duplicati),
+        mai all'autore del commento."""
+        recipient_ids = {task.assigned_to_id, task.created_by_id} - {None, comment.author_id}
+        if not recipient_ids:
+            return
+
+        body = comment.body
+        limit = self._COMMENT_EXCERPT_CHARS
+        excerpt = body if len(body) <= limit else body[: limit - 1].rstrip() + "…"
+        autore = AreaTaskSerializer._display_name(comment.author)
+        area_label = task.area.label
+        title_for_subject = " ".join(task.title.split())
+
+        for user in User.objects.filter(id__in=recipient_ids, is_active=True).exclude(email=""):
+            send_templated_email(
+                template_name="emails/area_task_comment.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "task_title": task.title,
+                    "area_label": area_label,
+                    "autore": autore,
+                    "commento": excerpt,
+                    "is_assignee": user.id == task.assigned_to_id,
+                },
+                subject=f"ARCHIE — Nuovo commento sul task: {title_for_subject}",
+                recipient_list=[user.email],
+            )
+
+    def _notify_assignment_change(self, *, old_assigned_to_id, task):
+        """Email solo tra utenti reali: nessuna email su disassegnazione o
+        assegnatario invariato; chi compie l'azione non riceve l'email della
+        propria azione."""
+        new_assigned_to_id = task.assigned_to_id
+        if new_assigned_to_id is None or new_assigned_to_id == old_assigned_to_id:
+            return
+
+        recipient_ids = {new_assigned_to_id}
+        if old_assigned_to_id is not None:
+            recipient_ids.add(old_assigned_to_id)
+        recipient_ids.discard(self.request.user.id)
+
+        assegnatore = AreaTaskSerializer._display_name(self.request.user)
+        area_label = task.area.label
+        title_for_subject = " ".join(task.title.split())
+        for user in User.objects.filter(id__in=recipient_ids, is_active=True).exclude(email=""):
+            is_new_owner = user.id == new_assigned_to_id
+            send_templated_email(
+                template_name="emails/area_task_assigned.html",
+                context={
+                    "nome_utente": user.first_name or user.username,
+                    "task_title": task.title,
+                    "area_label": area_label,
+                    "priority_label": task.get_priority_display(),
+                    "due_date": task.due_date,
+                    "assegnatore": assegnatore,
+                    "is_new_owner": is_new_owner,
+                },
+                subject=(
+                    f"ARCHIE — Task assegnato a te: {title_for_subject}"
+                    if is_new_owner
+                    else f"ARCHIE — Task riassegnato: {title_for_subject}"
+                ),
+                recipient_list=[user.email],
+            )
+
+    def _visible_file_ids(self, task):
+        return sorted(
+            filter_accessible_files(
+                task.drive_files.filter(deleted_at__isnull=True), self.request.user,
+            ).values_list('pk', flat=True)
+        )
+
     def perform_create(self, serializer):
         user = self.request.user
         user_area_id = self._user_area_id(user)
@@ -414,7 +690,6 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
                 raise PermissionDenied(
                     "Specifica un'area: il tuo profilo non ne ha una assegnata."
                 )
-            instance = serializer.save(created_by=user, updated_by=user, area_id=area_id)
         else:
             # Utenti normali: sempre e solo la propria area, a prescindere
             # da cosa venga eventualmente inviato dal client.
@@ -422,21 +697,33 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
                 raise PermissionDenied(
                     "Nessuna area assegnata al tuo profilo: contatta un amministratore."
                 )
-            instance = serializer.save(created_by=user, updated_by=user, area_id=user_area_id)
+            area_id = user_area_id
+
+        instance = serializer.save(created_by=user, updated_by=user, area_id=area_id)
 
         changes = {
             k: {"from": None, "to": to_change_value_for_field(k, v)}
             for k, v in (serializer.validated_data or {}).items()
+            if k != 'drive_files'
         }
+        if 'area' in changes:
+            changes['area'] = {"from": None, "to": to_change_value_for_field('area', instance.area)}
+        file_ids = self._visible_file_ids(instance)
+        if file_ids:
+            changes['drive_files'] = {"from": [], "to": file_ids}
         log_event(
             actor=user, action="create", instance=instance,
             changes=changes, request=self.request,
         )
+        self._safe_notify(self._notify_assignment_change, old_assigned_to_id=None, task=instance)
 
     def perform_update(self, serializer):
         instance = serializer.instance
+        old_assigned_to_id = instance.assigned_to_id
         self._check_own_area(instance.area_id)
-        changes = self._changes_from_validated(instance, serializer.validated_data)
+        validated = {k: v for k, v in serializer.validated_data.items() if k != 'drive_files'}
+        changes = self._changes_from_validated(instance, validated)
+        files_before = self._visible_file_ids(instance)
 
         new_status = serializer.validated_data.get('status', instance.status)
         if new_status == AreaTask.STATUS_COMPLETATO and instance.status != AreaTask.STATUS_COMPLETATO:
@@ -452,27 +739,20 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
         saved = serializer.save(
             completed_at=completed_at, area_id=instance.area_id, updated_by=self.request.user,
         )
+        files_after = self._visible_file_ids(saved)
+        if files_before != files_after:
+            changes['drive_files'] = {"from": files_before, "to": files_after}
         log_event(
             actor=self.request.user, action="update", instance=saved,
             changes=changes or None, request=self.request,
         )
+        self._safe_notify(
+            self._notify_assignment_change, old_assigned_to_id=old_assigned_to_id, task=saved,
+        )
 
     def perform_destroy(self, instance):
         self._check_own_area(instance.area_id)
-        before = instance.deleted_at
-        instance.deleted_at = timezone.now()
-        instance.updated_by = self.request.user
-        instance.save(update_fields=['deleted_at', 'updated_by', 'updated_at'])
-        log_event(
-            actor=self.request.user, action="delete", instance=instance,
-            changes={
-                "deleted_at": {
-                    "from": to_change_value_for_field("deleted_at", before),
-                    "to":   to_change_value_for_field("deleted_at", instance.deleted_at),
-                }
-            },
-            request=self.request,
-        )
+        super().perform_destroy(instance)
 
     @action(detail=False, methods=['get'])
     def due(self, request):
@@ -488,10 +768,157 @@ class AreaTaskViewSet(viewsets.ModelViewSet):
             AreaTask.objects
             .filter(area_id=user_area_id, due_date__isnull=False, due_date__lte=tomorrow, deleted_at__isnull=True)
             .exclude(status=AreaTask.STATUS_COMPLETATO)
-            .select_related('area')
+            .select_related('area', 'created_by', 'assigned_to')
+            .prefetch_related('drive_files')
+            .annotate(comments_count=Count('comments'))
             .order_by('due_date')
         )
         return Response(AreaTaskSerializer(qs, many=True, context={'request': request}).data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='comments')
+    def comments(self, request, pk=None):
+        task = self.get_object()
+
+        if request.method == 'GET':
+            qs = task.comments.select_related('author').order_by('created_at')
+            return Response(AreaTaskCommentSerializer(qs, many=True).data)
+
+        self._check_own_area(task.area_id)
+        serializer = AreaTaskCommentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        comment = serializer.save(task=task, author=request.user)
+        log_event(
+            actor=request.user, action="update", instance=task,
+            changes={"comment_added": {"from": None, "to": comment.id}},
+            request=request,
+        )
+        self._safe_notify(self._notify_comment, task=task, comment=comment)
+        return Response(AreaTaskCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'comments/(?P<comment_pk>\d+)')
+    def comment_detail(self, request, pk=None, comment_pk=None):
+        task = self.get_object()
+        try:
+            comment = task.comments.select_related('author').get(pk=comment_pk)
+        except AreaTaskComment.DoesNotExist:
+            return Response({'detail': 'Commento non trovato.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if comment.author_id != request.user.id and not getattr(request.user, 'is_superuser', False):
+            return Response({'detail': 'Non autorizzato.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'DELETE':
+            comment.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = AreaTaskCommentSerializer(comment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    @staticmethod
+    def _is_issue_assignable(user):
+        """Stessa regola di eleggibilità usata da IssueSerializer.validate
+        per assigned_to (tecnico ServiceNow non Philips): calcolata qui a
+        monte per poter omettere il campo invece di far fallire la validazione
+        con un 400 che il chiamante non ha mai richiesto."""
+        if user is None:
+            return False
+        profile = getattr(user, 'profile', None)
+        if profile is None:
+            return False
+        return bool(profile.is_servicenow_technician) and not bool(profile.is_philips)
+
+    @action(detail=True, methods=['post'], url_path='convert-to-issue')
+    def convert_to_issue(self, request, pk=None):
+        task = self.get_object()
+        self._check_own_area(task.area_id)
+
+        if not request.user.has_perm('issues.add_issue'):
+            return Response(
+                {'detail': 'Non hai il permesso di creare issue.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if task.converted_to_issue_id:
+            return Response(
+                {'detail': 'Questo task è già stato convertito in una issue.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from issues.api import IssueSerializer, notify_issue_created, notify_issue_assignment_change
+        from issues.models import IssueComment
+
+        with transaction.atomic():
+            # Re-check autoritativo con lock di riga: la verifica precedente
+            # (fuori dalla transazione) è solo un fast-path, non protegge da
+            # un doppio submit concorrente.
+            locked_task = AreaTask.objects.select_for_update().get(pk=task.pk)
+            if locked_task.converted_to_issue_id:
+                return Response(
+                    {'detail': 'Questo task è già stato convertito in una issue.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            task = locked_task
+
+            payload = {
+                'title': request.data.get('title') or task.title,
+                # Stessa semantica di 'title': valore mancante o vuoto → eredita dal task.
+                'description': request.data.get('description') or task.description,
+                'priority': task.priority,
+                'customer': request.data.get('customer'),
+                'site': request.data.get('site'),
+            }
+            if self._is_issue_assignable(task.assigned_to):
+                payload['assigned_to'] = task.assigned_to_id
+            serializer = IssueSerializer(data=payload)
+            serializer.is_valid(raise_exception=True)
+            issue = serializer.save(created_by=request.user)
+            log_event(
+                actor=request.user, action="create", instance=issue,
+                changes={"title": {"from": None, "to": to_change_value_for_field("title", issue.title)}},
+                request=request,
+            )
+            actor = request.user
+            transaction.on_commit(lambda: notify_issue_created(actor, issue))
+            transaction.on_commit(
+                lambda: notify_issue_assignment_change(actor, old_assigned_to_id=None, issue=issue)
+            )
+
+            for comment in task.comments.all():
+                IssueComment.objects.create(issue=issue, author=comment.author, body=comment.body)
+
+            old_status = task.status
+            task.status = AreaTask.STATUS_COMPLETATO
+            task.completed_at = timezone.now()
+            task.converted_to_issue = issue
+            task.updated_by = request.user
+            task.save(update_fields=['status', 'completed_at', 'converted_to_issue', 'updated_by', 'updated_at'])
+
+            log_event(
+                actor=request.user, action="update", instance=task,
+                changes={
+                    "status": {"from": old_status, "to": task.status},
+                    "converted_to_issue": {"from": None, "to": to_change_value_for_field("converted_to_issue", issue)},
+                },
+                request=request,
+            )
+
+        return Response(
+            {
+                'task': AreaTaskSerializer(task, context={'request': request}).data,
+                'issue': {'id': issue.id, 'title': issue.title},
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    # ── summary ──────────────────────────────────────────────────────────────
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        mine_open = AreaTask.objects.filter(
+            assigned_to=request.user, deleted_at__isnull=True,
+        ).exclude(status=AreaTask.STATUS_COMPLETATO).count()
+        return Response({'mine_open_count': mine_open})
 
 
 # ─── Dashboard dinamica ───────────────────────────────────────────────────────

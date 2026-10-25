@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   FormControl,
   InputLabel,
   MenuItem,
@@ -24,7 +23,7 @@ import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
-import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import type { GridColDef } from '@mui/x-data-grid'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
@@ -44,10 +43,8 @@ import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
-import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { isRecord } from '@shared/utils/guards'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
@@ -55,6 +52,7 @@ import StatusChip from '@shared/ui/StatusChip'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useStatusTokens } from '../theme/AppThemeProvider'
 import type { DomainStatusTokens } from '../theme/statusTokens'
+import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -176,35 +174,18 @@ function SiteContactsTab(props: {
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Contatti
-          </Typography>
-          <Chip size="small" label={rowCount} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
-          onClick={() =>
-            navigate(
-              `/contacts${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
-            )
-          }
-        >
-          Apri lista
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="Contatti"
+        count={rowCount}
+        buttonLabel="Apri lista"
+        onOpenList={() =>
+          navigate(
+            `/contacts${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
+          )
+        }
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : rows.length ? (
+      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
         <List
           dense
           disablePadding
@@ -248,11 +229,7 @@ function SiteContactsTab(props: {
             )
           })}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          —
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }
@@ -292,35 +269,18 @@ function SiteInventoriesTab(props: {
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Inventari
-          </Typography>
-          <Chip size="small" label={rowCount} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
-          onClick={() =>
-            navigate(
-              `/inventory${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
-            )
-          }
-        >
-          Apri lista
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="Inventari"
+        count={rowCount}
+        buttonLabel="Apri lista"
+        onOpenList={() =>
+          navigate(
+            `/inventory${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
+          )
+        }
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : rows.length ? (
+      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
         <List
           dense
           disablePadding
@@ -360,11 +320,7 @@ function SiteInventoriesTab(props: {
             )
           })}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          —
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }
@@ -528,16 +484,6 @@ export default function Sites() {
     ],
     defaultPageSize: 25,
   })
-
-  const [selectionModel, setSelectionModel] =
-    React.useState<GridRowSelectionModel>(emptySelectionModel())
-  const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
-  const selectedIds = React.useMemo(() => selectionToNumberIds(selectionModel), [selectionModel])
-  const selectedCount = React.useMemo(() => selectionSize(selectionModel), [selectionModel])
-
-  React.useEffect(() => {
-    setSelectionModel(emptySelectionModel())
-  }, [grid.view])
 
   const emptyState = React.useMemo(() => {
     if (grid.view === 'deleted' && !grid.search.trim()) {
@@ -713,25 +659,6 @@ export default function Sites() {
       setDeleteBusy(false)
     }
   }, [selectedId, toast, closeDrawer, grid, reloadList])
-
-  const doBulkRestore = async (): Promise<boolean> => {
-    const ids = selectedIds.filter((n) => Number.isFinite(n))
-    if (!ids.length) return false
-    setRestoreBusy(true)
-    try {
-      await api.post(`/sites/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi`)
-      setSelectionModel(emptySelectionModel())
-      reloadList()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-      return false
-    } finally {
-      setRestoreBusy(false)
-    }
-    return false
-  }
 
   const doRestore = React.useCallback(async () => {
     if (!selectedId) return
@@ -1112,20 +1039,6 @@ export default function Sites() {
             onlyDeleted={grid.onlyDeleted}
           />
         ) : null}
-      />
-
-      <ConfirmActionDialog
-        open={bulkRestoreDlgOpen}
-        busy={restoreBusy}
-        title="Ripristinare i siti selezionati?"
-        description={`Verranno ripristinati ${selectedCount} siti dal cestino.`}
-        confirmText="Ripristina"
-        confirmColor="success"
-        onClose={() => setBulkRestoreDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkRestore()
-          if (ok) setBulkRestoreDlgOpen(false)
-        }}
       />
 
       <ConfirmDeleteDialog

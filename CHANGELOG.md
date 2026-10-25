@@ -7,8 +7,32 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-25
+
+### Added
+- I task di area inviano ora email: all'assegnazione o riassegnazione a chi diventa assegnatario e a chi non lo è più, e a ogni nuovo commento all'assegnatario e a chi ha creato il task (mai a chi ha scritto il commento o compiuto l'azione).
+- Il Piano Ferie invia ora email: quando un dipendente invia una richiesta di ferie i coordinatori (e i superuser) ricevono un'email di notifica; quando la richiesta viene validata o rifiutata il dipendente ne riceve l'esito via email. Un'unica email per richiesta, anche se copre più giorni.
+- Il modulo Bug & Feature invia ora email: alla nuova segnalazione a chi può gestirla, e a ogni cambio di stato (risolta/rifiutata/riaperta) al segnalatore, con la motivazione in caso di rifiuto.
+- I task di area hanno ora un assegnatario (scelto tra gli utenti della stessa area), una priorità (bassa, media, alta, critica), un nuovo stato "In attesa", commenti e allegati collegati da Drive. Gli allegati mostrano solo i file a cui l'utente ha accesso, con le stesse regole di Drive.
+- I task di area eliminati si possono ora ripristinare (singolarmente o in blocco) e l'elenco supporta filtri per stato, priorità, assegnatario, area e scadenza, oltre a ricerca e ordinamento.
+- Il widget "Task di area" della dashboard apre ora un drawer di dettaglio con commenti e allegati collegati da Drive, e un dialog di modifica con assegnatario (utenti della stessa area), priorità, stato "In attesa" e scadenza. Ogni riga mostra priorità alta/critica, assegnatario, commenti e allegati.
+- L'elenco utenti può essere filtrato per area (`/api/users/?leave_area=`) e riporta l'area di ciascun utente.
+- Nuova pagina "Task" (`/tasks`) con l'elenco dei task di area: ricerca, filtri per area, priorità, "assegnati a me" e stato (aperti, completati, tutti), creazione di un nuovo task con assegnatario e scadenza e apertura del dettaglio con commenti e allegati Drive. Nel widget della dashboard è disponibile il link "Vedi tutti".
+- I task di area hanno ora un menu contestuale (apri, modifica, commenta, cambia stato, trasforma in issue, elimina) dall'elenco `/tasks`.
+- La sidebar mostra ora il numero dei propri task di area aperti, come già per le issue.
+- Un task di area può essere trasformato in una issue (titolo, descrizione, priorità e commenti vengono portati nella nuova issue; il task risultante si completa e resta collegato alla issue creata).
+- Diversi pulsanti a sola icona (ServiceNow, Bug & Feature, Rimborso spese, Dashboard, Ricerca) hanno ora una descrizione per chi usa uno screen reader; gli indicatori del carosello nella Dashboard sono ora utilizzabili anche da tastiera.
+
+### Changed
+- L'elenco dei task di area carica gli allegati Drive con un numero di query costante, indipendente dal numero di task.
+
 ### Fixed
 - allega le immagini inline (cid:) referenziate dai template email
+- Drive: lo spostamento in blocco di più file/cartelle selezionati è ora bloccato con un avviso, invece di spostare in silenzio solo il primo elemento della selezione.
+- Wiki: la bozza di una pagina nuova non viene più sovrascritta se si apre un'altra pagina nuova in una scheda diversa del browser.
+- Rimborso spese: quando un suggerimento automatico sull'importo non viene applicato a una riga a km (calcolato automaticamente), ora viene mostrato un messaggio invece di ignorarlo in silenzio.
+- Piani di manutenzione: la data di scadenza mostrata quando è lontana nel tempo ha ora lo stesso formato ovunque (prima in alcuni casi era mostrata in formato non italiano).
+- Rimossi un filtro e alcuni controlli di selezione multipla rimasti senza alcun effetto visibile nelle pagine Issue, Clienti, Siti e Inventari (il ripristino multiplo da cestino resta disponibile dalla pagina Cestino).
 
 ## [0.9.3] - 2026-09-09
 

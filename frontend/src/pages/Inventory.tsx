@@ -25,13 +25,13 @@ import { useAuth } from '../auth/AuthProvider'
 import { useStatusTokens, useDataGridZebraSx } from '../theme/AppThemeProvider'
 import type { DomainStatusTokens, InventoryStatusKey } from '../theme/statusTokens'
 
-import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import type { GridColDef } from '@mui/x-data-grid'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam } from '@shared/hooks/useUrlParam'
 import { api } from '@shared/api/client'
-import { collectionActionPath, itemActionPath, itemPath, type CollectionPath } from '@shared/api/apiPaths'
+import { itemActionPath, itemPath, type CollectionPath } from '@shared/api/apiPaths'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
@@ -41,9 +41,7 @@ import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 
-import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
@@ -430,15 +428,6 @@ export default function Inventory() {
     defaultPageSize: defaultPageSizeRef.current,
   })
 
-  const [selectionModel, setSelectionModel] =
-    React.useState<GridRowSelectionModel>(emptySelectionModel())
-  const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
-  const selectedIds = React.useMemo(() => selectionToNumberIds(selectionModel), [selectionModel])
-  const selectedCount = React.useMemo(() => selectionSize(selectionModel), [selectionModel])
-
-  React.useEffect(() => {
-    setSelectionModel(emptySelectionModel())
-  }, [grid.view])
 
   const emptyState = React.useMemo(() => {
     if (grid.view === 'deleted' && !grid.search.trim()) {
@@ -969,7 +958,7 @@ export default function Inventory() {
     navigate(loc.pathname + loc.search, { replace: true, state: {} })
   }, [loc, navigate, openCreate])
 
-  const openEdit = async () => {
+  const openEdit = React.useCallback(async () => {
     if (!detail) return
     setDlgMode('edit')
     setDlgId(detail.id)
@@ -1004,7 +993,7 @@ export default function Inventory() {
     setDlgOpen(true)
     setFormErrors({})
     await loadSitesForDialogCustomer(cust)
-  }
+  }, [detail, loadSitesForDialogCustomer])
 
   const save = async () => {
     const errs: { customer?: string; status?: string; name?: string } = {}
@@ -1091,25 +1080,6 @@ export default function Inventory() {
       setDeleteBusy(false)
       setDeleteDlgOpen(false)
     }
-  }
-
-  const doBulkRestore = async (): Promise<boolean> => {
-    const ids = selectedIds.filter((n) => Number.isFinite(n))
-    if (!ids.length) return false
-    setRestoreBusy(true)
-    try {
-      await api.post(collectionActionPath(INVENTORIES_PATH, 'bulk_restore'), { ids })
-      toast.success(`Ripristinati ${ids.length} elementi`)
-      setSelectionModel(emptySelectionModel())
-      reloadList()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-      return false
-    } finally {
-      setRestoreBusy(false)
-    }
-    return false
   }
 
   const doRestore = async () => {
@@ -1211,20 +1181,6 @@ export default function Inventory() {
         onCustomerChange={loadSitesForDialogCustomer}
         isFieldDisabled={df}
         fieldHelpText={dfHelp}
-      />
-
-      <ConfirmActionDialog
-        open={bulkRestoreDlgOpen}
-        busy={restoreBusy}
-        title="Ripristinare gli inventari selezionati?"
-        description={`Verranno ripristinati ${selectedCount} inventari dal cestino.`}
-        confirmText="Ripristina"
-        confirmColor="success"
-        onClose={() => setBulkRestoreDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkRestore()
-          if (ok) setBulkRestoreDlgOpen(false)
-        }}
       />
 
       <ConfirmDeleteDialog
