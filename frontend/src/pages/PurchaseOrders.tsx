@@ -1066,6 +1066,12 @@ export default function PurchaseOrders() {
                   </ToggleButton>
                 ))}
               </ToggleButtonGroup>
+
+              <Can perm={PERMS.purchaseorders.entry.add}>
+                <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
+                  Nuovo PO
+                </Button>
+              </Can>
             </Stack>
           ),
         }}

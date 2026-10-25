@@ -49,3 +49,6 @@ frontend/dist/
 backend/import_files/*
 !backend/import_files/.gitkeep
 !backend/import_files/README.md
+
+# Screenshot locali usati per i mockup, non da versionare
+/screen/
