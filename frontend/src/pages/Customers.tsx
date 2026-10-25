@@ -25,7 +25,7 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import { Can } from '../auth/Can'
-import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
+import type { GridColDef } from '@mui/x-data-grid'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
@@ -38,10 +38,8 @@ import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { buildQuery } from '@shared/utils/nav'
-import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { isRecord } from '@shared/utils/guards'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
@@ -688,16 +686,6 @@ export default function Customers() {
     defaultPageSize: 25,
   })
 
-  const [selectionModel, setSelectionModel] =
-    React.useState<GridRowSelectionModel>(emptySelectionModel())
-  const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
-  const selectedIds = React.useMemo(() => selectionToNumberIds(selectionModel), [selectionModel])
-  const selectedCount = React.useMemo(() => selectionSize(selectionModel), [selectionModel])
-
-  React.useEffect(() => {
-    setSelectionModel(emptySelectionModel())
-  }, [grid.view])
-
   const emptyState = React.useMemo(() => {
     if (grid.view === 'deleted' && !grid.search.trim()) {
       return { title: 'Cestino vuoto', subtitle: 'Non ci sono clienti eliminati.' }
@@ -1132,24 +1120,6 @@ export default function Customers() {
     }
   }
 
-  const doBulkRestore = async (): Promise<boolean> => {
-    const ids = selectedIds.filter((n) => Number.isFinite(n))
-    if (!ids.length) return false
-    setRestoreBusy(true)
-    try {
-      await api.post(`/customers/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi`)
-      setSelectionModel(emptySelectionModel())
-      reloadList()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-      return false
-    } finally {
-      setRestoreBusy(false)
-    }
-  }
-
   const doRestore = async () => {
     if (!detail) return
     setRestoreBusy(true)
@@ -1264,20 +1234,6 @@ export default function Customers() {
         activityTabContent={detail ? (
           <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
         ) : null}
-      />
-
-      <ConfirmActionDialog
-        open={bulkRestoreDlgOpen}
-        busy={restoreBusy}
-        title="Ripristinare i clienti selezionati?"
-        description={`Verranno ripristinati ${selectedCount} clienti dal cestino.`}
-        confirmText="Ripristina"
-        confirmColor="success"
-        onClose={() => setBulkRestoreDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkRestore()
-          if (ok) setBulkRestoreDlgOpen(false)
-        }}
       />
 
       <ConfirmDeleteDialog

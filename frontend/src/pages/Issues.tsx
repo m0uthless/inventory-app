@@ -724,57 +724,20 @@ export default function Issues() {
     : grid.sortModel
 
   // ── Filtri extra ──────────────────────────────────────────────────────────
-  const [filterStatus, setFilterStatus] = React.useState('')
-  const [filterPriority, setFilterPriority] = React.useState('')
-  const [filterCustomer, setFilterCustomer] = React.useState<CustomerOption | null>(null)
-  const [filterAssigned, setFilterAssigned] = React.useState<UserOption | null>(null)
-  const [hideClosedCases, setHideClosedCases] = React.useState(false)
-  const [onlyMyIssues, setOnlyMyIssues] = React.useState(false)
   const [statusView, setStatusView] = React.useState<'all' | 'open' | 'closed'>('open')
-  const previousAssignedFilterRef = React.useRef<UserOption | null>(null)
-  const activeFilterCount = [
-    filterStatus,
-    filterPriority,
-    filterCustomer,
-    onlyMyIssues ? 'only_mine' : filterAssigned,
-    hideClosedCases ? 'hide_closed' : '',
-    statusView !== 'open' ? statusView : '',
-  ].filter(Boolean).length
+  const activeFilterCount = [statusView !== 'open' ? statusView : ''].filter(Boolean).length
 
   const resetFilters = () => {
-    setFilterStatus('')
-    setFilterPriority('')
-    setFilterCustomer(null)
-    setFilterAssigned(null)
-    setHideClosedCases(false)
-    setOnlyMyIssues(false)
     setStatusView('open')
-    previousAssignedFilterRef.current = null
   }
 
   const allExtraParams = React.useMemo(() => {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
-    if (filterStatus) p.status = filterStatus
-    if (filterPriority) p.priority = filterPriority
-    if (filterCustomer) p.customer = filterCustomer.id
-    if (onlyMyIssues && me?.id) p.assigned_to = me.id
-    else if (filterAssigned) p.assigned_to = filterAssigned.id
-    if (hideClosedCases) p.hide_closed = true
     if (statusView === 'open') p.hide_closed = true
     if (statusView === 'closed') p.only_closed = true
     return p
-  }, [
-    grid.view,
-    filterStatus,
-    filterPriority,
-    filterCustomer,
-    filterAssigned,
-    hideClosedCases,
-    onlyMyIssues,
-    statusView,
-    me,
-  ])
+  }, [grid.view, statusView])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -794,18 +757,6 @@ export default function Issues() {
   // ── Lookup data ───────────────────────────────────────────────────────────
   const [categories, setCategories] = React.useState<CategoryOption[]>([])
   const [users, setUsers] = React.useState<UserOption[]>([])
-
-  const currentUserOption = React.useMemo<UserOption | null>(() => {
-    if (!me?.id) return null
-    const existing = users.find((u) => u.id === me.id)
-    if (existing) return existing
-    const fullName = [me.first_name, me.last_name].filter(Boolean).join(' ').trim()
-    return {
-      id: me.id,
-      username: me.username,
-      label: fullName || me.username,
-    }
-  }, [me, users])
 
   // Assegnabili alle issue: solo utenti "tecnico ServiceNow" e non Philips (categoria Biotron)
   const assignableUsers = React.useMemo(
@@ -843,11 +794,6 @@ export default function Issues() {
       })
       .catch(() => {})
   }, [])
-
-  React.useEffect(() => {
-    if (!onlyMyIssues) return
-    setFilterAssigned(currentUserOption)
-  }, [onlyMyIssues, currentUserOption])
 
   // ── Customer autocomplete (form) ──────────────────────────────────────────
   const [custFormInput, setCustFormInput] = React.useState('')
