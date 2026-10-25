@@ -60,7 +60,8 @@ import { DrawerShell, HERO_ICON_BTN_SX, HERO_ICON_BTN_DELETE_SX } from '@shared/
 import { DrawerEmptyState } from '@shared/ui/DrawerParts'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 import type { PlanRow, EventRow, TodoRow, RapportinoContext } from './maintenanceTypes'
-import { UNIT_IT, RESULT_COLOR, RESULT_LABEL, dueDiffDays, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { UNIT_IT, RESULT_COLOR, RESULT_LABEL, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { DueBadge } from './maintenance/DueBadge'
 import { YearFilterField } from './maintenance/YearFilterField'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -87,15 +88,6 @@ function formatSchedule(row: Pick<PlanRow, 'schedule_type' | 'interval_value' | 
   if (row.schedule_type === 'fixed_date' && row.fixed_day && row.fixed_month)
     return `${String(row.fixed_day).padStart(2, '0')}/${String(row.fixed_month).padStart(2, '0')} ogni anno`
   return row.schedule_type
-}
-
-function DueBadge({ dateStr }: { dateStr: string }) {
-  const diff = dueDiffDays(dateStr)
-  if (diff < 0) return <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: '14px !important' }} />} label={`${Math.abs(diff)} gg fa`} color="error" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  if (diff === 0) return <Chip size="small" label="Oggi" color="error" sx={{ height: 22, fontWeight: 700, fontSize: '0.72rem' }} />
-  if (diff <= 30) return <Chip size="small" label={`${diff} gg`} color="warning" variant="outlined" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  const [y, m, d] = dateStr.split('-')
-  return <Chip size="small" label={`${d}/${m}/${y}`} color="default" variant="outlined" sx={{ height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5 }} />
 }
 
 const DW = { xs: '100%', sm: 416 } as const

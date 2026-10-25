@@ -503,7 +503,23 @@ export default function AreaTasks() {
           },
         }}
         belowToolbar={
+        // Tutti i filtri extra (Area, Priorità, Assegnatario, Scaduti, Assegnati a me)
+        // in un'unica area sotto la toolbar — prima erano divisi tra qui e i
+        // children di EntityListCard, incongruenza interna segnalata in revisione.
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ px: 0.5, py: 1 }}>
+          <Select
+            size="small"
+            displayEmpty
+            value={areaFilter}
+            onChange={(e) => { const v = e.target.value as number | string; changeArea(v === '' ? '' : Number(v)) }}
+            SelectDisplayProps={{ 'aria-label': 'Area' }}
+            sx={{ minWidth: 170, height: 32, fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.5 } }}
+          >
+            <MenuItem value="">Tutte le aree</MenuItem>
+            {areaOptions.map((a) => (
+              <MenuItem key={a.id} value={a.id}>{a.label}{a.id === myAreaId ? ' (mia)' : ''}</MenuItem>
+            ))}
+          </Select>
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel id="priority-filter-label">Priorità</InputLabel>
             <Select
@@ -543,22 +559,7 @@ export default function AreaTasks() {
         </Stack>
         }
       >
-        <Stack direction="row" spacing={1.5} alignItems="center" flexShrink={0}>
-          <Select
-            size="small"
-            displayEmpty
-            value={areaFilter}
-            onChange={(e) => { const v = e.target.value as number | string; changeArea(v === '' ? '' : Number(v)) }}
-            SelectDisplayProps={{ 'aria-label': 'Area' }}
-            sx={{ minWidth: 170, height: 32, fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.5 } }}
-          >
-            <MenuItem value="">Tutte le aree</MenuItem>
-            {areaOptions.map((a) => (
-              <MenuItem key={a.id} value={a.id}>{a.label}{a.id === myAreaId ? ' (mia)' : ''}</MenuItem>
-            ))}
-          </Select>
-          <StatusViewChipBar value={statusView} onChange={changeStatusView} />
-        </Stack>
+        <StatusViewChipBar value={statusView} onChange={changeStatusView} />
       </EntityListCard>
 
       <AreaTaskDetail

@@ -34,7 +34,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import { api } from '@shared/api/client'
 import { escapeHtml } from '@shared/utils/html'
@@ -58,7 +57,8 @@ import { useExportCsv } from '@shared/ui/useExportCsv'
 import { useNavigate } from 'react-router-dom'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PlanDrawer, RapportinoDialog } from './Maintenance'
-import { UNIT_IT, dueDiffDays, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { UNIT_IT, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
+import { DueBadge } from './maintenance/DueBadge'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -83,14 +83,6 @@ type PlanForm = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function DueBadge({ dateStr }: { dateStr: string }) {
-  const diff = dueDiffDays(dateStr)
-  if (diff < 0) return <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: '14px !important' }} />} label={`${Math.abs(diff)} gg fa`} color="error" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  if (diff === 0) return <Chip size="small" label="Oggi" color="error" sx={{ height: 22, fontWeight: 700, fontSize: '0.72rem' }} />
-  if (diff <= 30) return <Chip size="small" label={`${diff} gg`} color="warning" variant="outlined" sx={{ height: 22, fontWeight: 600, fontSize: '0.72rem' }} />
-  return <Chip size="small" label={dateStr} color="default" variant="outlined" sx={{ height: 22, fontSize: '0.72rem' }} />
-}
 
 async function fetchComputedDueDate(scheduleType: string, intervalValue: number | '', intervalUnit: string, fixedMonth: number | '', fixedDay: number | ''): Promise<string | null> {
   try {
