@@ -7,6 +7,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-25
+
 ### Added
 - I task di area inviano ora email: all'assegnazione o riassegnazione a chi diventa assegnatario e a chi non lo è più, e a ogni nuovo commento all'assegnatario e a chi ha creato il task (mai a chi ha scritto il commento o compiuto l'azione).
 - Il Piano Ferie invia ora email: quando un dipendente invia una richiesta di ferie i coordinatori (e i superuser) ricevono un'email di notifica; quando la richiesta viene validata o rifiutata il dipendente ne riceve l'esito via email. Un'unica email per richiesta, anche se copre più giorni.
