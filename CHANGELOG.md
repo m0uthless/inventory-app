@@ -19,12 +19,18 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - I task di area hanno ora un menu contestuale (apri, modifica, commenta, cambia stato, trasforma in issue, elimina) dall'elenco `/tasks`.
 - La sidebar mostra ora il numero dei propri task di area aperti, come già per le issue.
 - Un task di area può essere trasformato in una issue (titolo, descrizione, priorità e commenti vengono portati nella nuova issue; il task risultante si completa e resta collegato alla issue creata).
+- Diversi pulsanti a sola icona (ServiceNow, Bug & Feature, Rimborso spese, Dashboard, Ricerca) hanno ora una descrizione per chi usa uno screen reader; gli indicatori del carosello nella Dashboard sono ora utilizzabili anche da tastiera.
 
 ### Changed
 - L'elenco dei task di area carica gli allegati Drive con un numero di query costante, indipendente dal numero di task.
 
 ### Fixed
 - allega le immagini inline (cid:) referenziate dai template email
+- Drive: lo spostamento in blocco di più file/cartelle selezionati è ora bloccato con un avviso, invece di spostare in silenzio solo il primo elemento della selezione.
+- Wiki: la bozza di una pagina nuova non viene più sovrascritta se si apre un'altra pagina nuova in una scheda diversa del browser.
+- Rimborso spese: quando un suggerimento automatico sull'importo non viene applicato a una riga a km (calcolato automaticamente), ora viene mostrato un messaggio invece di ignorarlo in silenzio.
+- Piani di manutenzione: la data di scadenza mostrata quando è lontana nel tempo ha ora lo stesso formato ovunque (prima in alcuni casi era mostrata in formato non italiano).
+- Rimossi un filtro e alcuni controlli di selezione multipla rimasti senza alcun effetto visibile nelle pagine Issue, Clienti, Siti e Inventari (il ripristino multiplo da cestino resta disponibile dalla pagina Cestino).
 
 ## [0.9.3] - 2026-09-09
 
