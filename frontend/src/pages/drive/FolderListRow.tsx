@@ -1,17 +1,14 @@
 import * as React from 'react'
 import { alpha } from '@mui/material/styles'
-import { IconButton, ButtonBase, Checkbox, Menu, MenuItem, Typography } from '@mui/material'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
-import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined'
+import { IconButton, ButtonBase, Checkbox, Typography } from '@mui/material'
 import FolderIcon from '@mui/icons-material/Folder'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
-import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank'
 import CheckBoxIcon from '@mui/icons-material/CheckBox'
 
 import type { DriveFolder } from './types'
 import { fmtDate } from './style'
+import { DriveItemMenu } from './DriveItemMenu'
 
 // ─── Folder List Row ──────────────────────────────────────────────────────────
 
@@ -101,62 +98,16 @@ export function FolderListRow({
       >
         <MoreVertIcon fontSize="small" />
       </IconButton>
-      <Menu
+      <DriveItemMenu
+        kind="folder"
         anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
         onClose={() => setMenuAnchor(null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onOpen()
-          }}
-          dense
-        >
-          <FolderIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Apri
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onRename()
-          }}
-          dense
-        >
-          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Rinomina
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onMove()
-          }}
-          dense
-        >
-          <DriveFileMoveOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Sposta in…
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onLinkCustomers()
-          }}
-          dense
-        >
-          <PersonAddOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Collega
-          clienti
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onDelete()
-          }}
-          dense
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina
-        </MenuItem>
-      </Menu>
+        onOpen={onOpen}
+        onLinkCustomers={onLinkCustomers}
+        onRename={onRename}
+        onMove={onMove}
+        onDelete={onDelete}
+      />
     </ButtonBase>
   )
 }

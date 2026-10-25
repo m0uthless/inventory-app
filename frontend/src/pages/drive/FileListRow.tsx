@@ -1,17 +1,13 @@
 import * as React from 'react'
 import { alpha } from '@mui/material/styles'
-import { IconButton, Box, ButtonBase, Checkbox, Menu, MenuItem, Typography } from '@mui/material'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
-import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined'
-import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
+import { IconButton, Box, ButtonBase, Checkbox, Typography } from '@mui/material'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
-import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank'
 import CheckBoxIcon from '@mui/icons-material/CheckBox'
 
 import type { DriveFile } from './types'
 import { fmtDate, fileIconBg, FileTypeIcon } from './style'
+import { DriveItemMenu } from './DriveItemMenu'
 
 // ─── File List Row ────────────────────────────────────────────────────────────
 
@@ -133,62 +129,16 @@ export function FileListRow({
       >
         <MoreVertIcon fontSize="small" />
       </IconButton>
-      <Menu
+      <DriveItemMenu
+        kind="file"
         anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
         onClose={() => setMenuAnchor(null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            handleDownload()
-          }}
-          dense
-        >
-          <DownloadOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Scarica
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onLinkCustomers()
-          }}
-          dense
-        >
-          <PersonAddOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> Collega
-          clienti
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onRename()
-          }}
-          dense
-        >
-          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Rinomina
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onMove()
-          }}
-          dense
-        >
-          <DriveFileMoveOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} />{' '}
-          Sposta in…
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null)
-            onDelete()
-          }}
-          dense
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} /> Elimina
-        </MenuItem>
-      </Menu>
+        onDownload={handleDownload}
+        onLinkCustomers={onLinkCustomers}
+        onRename={onRename}
+        onMove={onMove}
+        onDelete={onDelete}
+      />
     </ButtonBase>
   )
 }

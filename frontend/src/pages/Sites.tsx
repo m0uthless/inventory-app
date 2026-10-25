@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   FormControl,
   InputLabel,
   MenuItem,
@@ -55,6 +54,7 @@ import StatusChip from '@shared/ui/StatusChip'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useStatusTokens } from '../theme/AppThemeProvider'
 import type { DomainStatusTokens } from '../theme/statusTokens'
+import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -176,35 +176,18 @@ function SiteContactsTab(props: {
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Contatti
-          </Typography>
-          <Chip size="small" label={rowCount} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
-          onClick={() =>
-            navigate(
-              `/contacts${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
-            )
-          }
-        >
-          Apri lista
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="Contatti"
+        count={rowCount}
+        buttonLabel="Apri lista"
+        onOpenList={() =>
+          navigate(
+            `/contacts${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
+          )
+        }
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : rows.length ? (
+      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
         <List
           dense
           disablePadding
@@ -248,11 +231,7 @@ function SiteContactsTab(props: {
             )
           })}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          —
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }
@@ -292,35 +271,18 @@ function SiteInventoriesTab(props: {
 
   return (
     <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
-            Inventari
-          </Typography>
-          <Chip size="small" label={rowCount} />
-        </Stack>
-        <Button
-          size="small"
-          variant="contained"
-          sx={{ bgcolor: (theme) => theme.palette.primary.main, color: (theme) => theme.palette.common.white, fontWeight: 600, '&:hover': { bgcolor: (theme) => theme.palette.primary.dark } }}
-          onClick={() =>
-            navigate(
-              `/inventory${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
-            )
-          }
-        >
-          Apri lista
-        </Button>
-      </Stack>
+      <RelatedListHeader
+        title="Inventari"
+        count={rowCount}
+        buttonLabel="Apri lista"
+        onOpenList={() =>
+          navigate(
+            `/inventory${buildQuery({ customer: customerId, site: siteId, ...viewQuery(includeDeleted, onlyDeleted) })}`,
+          )
+        }
+      />
 
-      {loading ? (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1.5 }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            Caricamento…
-          </Typography>
-        </Stack>
-      ) : rows.length ? (
+      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
         <List
           dense
           disablePadding
@@ -360,11 +322,7 @@ function SiteInventoriesTab(props: {
             )
           })}
         </List>
-      ) : (
-        <Typography variant="body2" sx={{ opacity: 0.7 }}>
-          —
-        </Typography>
-      )}
+      </RelatedListBody>
     </Stack>
   )
 }

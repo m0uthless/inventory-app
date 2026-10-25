@@ -969,7 +969,7 @@ export default function Inventory() {
     navigate(loc.pathname + loc.search, { replace: true, state: {} })
   }, [loc, navigate, openCreate])
 
-  const openEdit = async () => {
+  const openEdit = React.useCallback(async () => {
     if (!detail) return
     setDlgMode('edit')
     setDlgId(detail.id)
@@ -1004,7 +1004,7 @@ export default function Inventory() {
     setDlgOpen(true)
     setFormErrors({})
     await loadSitesForDialogCustomer(cust)
-  }
+  }, [detail, loadSitesForDialogCustomer])
 
   const save = async () => {
     const errs: { customer?: string; status?: string; name?: string } = {}
