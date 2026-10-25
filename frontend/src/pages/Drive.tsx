@@ -678,27 +678,37 @@ export default function Drive() {
             {selected.size} selezionati
           </Typography>
           <Can perm={PERMS.drive.folder.change}>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<DriveFileMoveOutlinedIcon />}
-              onClick={() => {
-                // move first selected item — bulk move opens move dialog for first item
-                // Full bulk move would require a different dialog; for now open move for first
-                const firstFolder = selectedFolderIds[0]
-                const firstFile = selectedFileIds[0]
-                if (firstFolder) {
-                  const f = folders.find((x) => x.id === firstFolder)
-                  if (f) openMove({ kind: 'folder', data: f })
-                } else if (firstFile) {
-                  const f = files.find((x) => x.id === firstFile)
-                  if (f) openMove({ kind: 'file', data: f })
-                }
-              }}
-              sx={{ borderColor: 'primary.light' }}
+            <Tooltip
+              title={
+                selected.size > 1
+                  ? 'Sposta uno alla volta: lo spostamento multiplo non è ancora supportato'
+                  : ''
+              }
             >
-              Sposta
-            </Button>
+              <span>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<DriveFileMoveOutlinedIcon />}
+                  disabled={selected.size > 1}
+                  onClick={() => {
+                    // Bulk move not supported: only enabled when exactly one item is selected.
+                    const firstFolder = selectedFolderIds[0]
+                    const firstFile = selectedFileIds[0]
+                    if (firstFolder) {
+                      const f = folders.find((x) => x.id === firstFolder)
+                      if (f) openMove({ kind: 'folder', data: f })
+                    } else if (firstFile) {
+                      const f = files.find((x) => x.id === firstFile)
+                      if (f) openMove({ kind: 'file', data: f })
+                    }
+                  }}
+                  sx={{ borderColor: 'primary.light' }}
+                >
+                  Sposta
+                </Button>
+              </span>
+            </Tooltip>
           </Can>
           <Can perm={PERMS.drive.file.delete}>
             <Button

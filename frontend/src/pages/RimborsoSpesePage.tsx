@@ -256,6 +256,9 @@ export default function RimborsoSpesePage() {
     const patch: Partial<Pick<ExpenseItemRow, 'amount' | 'date'>> = {}
     if (suggestion.amount && !item.is_km_category) patch.amount = suggestion.amount
     if (suggestion.date) patch.date = suggestion.date
+    if (suggestion.amount && item.is_km_category) {
+      toast.info('Importo non applicato: per le categorie a km è calcolato automaticamente.')
+    }
     await patchItem(item, patch)
     setSuggestion(null)
   }

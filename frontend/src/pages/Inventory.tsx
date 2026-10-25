@@ -1109,7 +1109,6 @@ export default function Inventory() {
     } finally {
       setRestoreBusy(false)
     }
-    return false
   }
 
   const doRestore = async () => {

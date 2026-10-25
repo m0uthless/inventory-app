@@ -1207,10 +1207,10 @@ export default function Customers() {
       return true
     } catch (e) {
       toast.error(apiErrorToMessage(e))
+      return false
     } finally {
       setRestoreBusy(false)
     }
-    return false
   }
 
   const doRestore = async () => {

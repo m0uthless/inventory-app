@@ -730,7 +730,6 @@ export default function Sites() {
     } finally {
       setRestoreBusy(false)
     }
-    return false
   }
 
   const doRestore = React.useCallback(async () => {

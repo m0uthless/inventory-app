@@ -1,7 +1,7 @@
 /**
  * WikiPage — /wiki/:id e /wiki/new
  *
- * - Editor rich text (Tiptap) con upload immagini via allegati
+ * - Editor rich text (Quill) con upload immagini via allegati
  * - Clienti collegati (solo Customer, dropdown reale)
  * - Allegati con upload
  * - Tabs: Contenuto / Clienti collegati / Allegati
@@ -509,7 +509,36 @@ export default function WikiPage() {
 
   // ── Autosave localStorage ────────────────────────────────────────────────
 
-  const AUTOSAVE_KEY = `wiki_autosave_${id ?? 'new'}`
+  // Per una pagina nuova non esiste ancora un id reale: usare solo 'new' come
+  // chiave la condividerebbe tra tutte le tab con una pagina nuova aperta,
+  // facendo sovrascrivere silenziosamente la bozza dell'una con quella
+  // dell'altra. sessionStorage è isolato per tab (sopravvive al refresh della
+  // stessa tab ma non è condiviso con altre tab/finestre), quindi lo usiamo
+  // per generare e ricordare un id di istanza stabile solo per questa tab.
+  const newPageInstanceId = React.useRef<string>('')
+  if (isNew && !newPageInstanceId.current) {
+    try {
+      const existing = sessionStorage.getItem('wiki_autosave_new_instance_id')
+      if (existing) {
+        newPageInstanceId.current = existing
+      } else {
+        const generated =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+        sessionStorage.setItem('wiki_autosave_new_instance_id', generated)
+        newPageInstanceId.current = generated
+      }
+    } catch {
+      // sessionStorage non disponibile: fallback a un id non persistito,
+      // la bozza non sopravvive a un refresh ma non collide con altre tab
+      newPageInstanceId.current = `${Date.now()}_${Math.random().toString(36).slice(2)}`
+    }
+  }
+
+  const AUTOSAVE_KEY = isNew
+    ? `wiki_autosave_new_${newPageInstanceId.current}`
+    : `wiki_autosave_${id}`
 
   // Ripristina bozza all'apertura (solo in edit mode)
   React.useEffect(() => {
@@ -550,7 +579,7 @@ export default function WikiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.title, form.slug, form.summary, form.content_html, form.tags, isNew, mode])
 
-  // ── Image upload (Tiptap) ────────────────────────────────────────────────
+  // ── Image upload (Quill) ─────────────────────────────────────────────────
 
   const handleImageUpload = React.useCallback(
     async (file: File): Promise<string> => {
