@@ -7,6 +7,10 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Changed
+
+- ServiceNow: la categoria Philips è temporaneamente nascosta nel pannello Triage, nelle Statistiche e nella pagina Assenze tecnici, che ora mostrano solo Biotron. Il filtro è solo lato frontend (`features/servicenow/visibleCategories.ts`): backend, case e utenti Philips restano invariati.
+
 ## [0.9.4] - 2026-10-25
 
 ### Added

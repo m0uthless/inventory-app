@@ -61,6 +61,7 @@ import ServiceNowCaseDrawer from '../features/servicenow/ServiceNowCaseDrawer'
 import ServiceNowCaseFormDrawer, { type ServiceNowCaseForm } from '../features/servicenow/ServiceNowCaseFormDrawer'
 import PhilipsAssignmentCopyDialog, { buildPhilipsAssignmentCopyText } from '../features/servicenow/PhilipsAssignmentCopyDialog'
 import ImportHistoricalDialog from '../features/servicenow/ImportHistoricalDialog'
+import { isServiceNowCategoryVisible } from '../features/servicenow/visibleCategories'
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -376,7 +377,7 @@ function TriagePanel({ refreshKey, canManage }: { refreshKey: number; canManage:
   const [loading, setLoading] = React.useState(true)
   const [absenceTarget, setAbsenceTarget] = React.useState<TriageTechnician | null>(null)
 
-  const TRIAGE_CATEGORIES = React.useMemo(() => TRIAGE_CATEGORY_DEFS.map((d) => {
+  const TRIAGE_CATEGORIES = React.useMemo(() => TRIAGE_CATEGORY_DEFS.filter((d) => isServiceNowCategoryVisible(d.value)).map((d) => {
     const accent = d.value === 'philips' ? theme.palette.primary.main : theme.palette.secondary.main
     return { ...d, accent, tint: alpha(accent, 0.08) }
   }), [theme])
