@@ -122,7 +122,7 @@ File/folder storage with API-side ACLs (`backend/drive/`). Nginx deliberately bl
 
 `backend/portal/` + `frontend-portal/` implement the customer-facing portal. Tenant scoping is enforced entirely server-side from `request.user` — never trust a client-supplied header/param as a tenant boundary in portal code.
 
-**Device/VLAN exclusivity:** `Device`, `DeviceType` (with `dose_sr`), `DeviceManufacturer` (logo), `Rispacs` M2M, and `DeviceWifi` (Fernet-encrypted password, `.p12` upload) remain **exclusive to `frontend-portal`** and are not ported to the main Archie frontend.
+**Device/VLAN exclusivity:** `Device` records are manageable from the main Archie frontend too, limited to the base fields (`customer` on create, `site`, `type`, `status`, `manufacturer`, `model`, `serial_number`, `inventario`, `note`); Archie never sends `ip`, `aetitle`, `reparto`, `room`, `location`, `vlan`, `dose`, `wifi`, `rispacs`, which stay Portal-managed and are preserved on PATCH. Devices created from Archie are inherited by the customer's Portal through the existing `customer` scoping in `DeviceViewSet` (no Archie-specific code there). `VLAN`, `DeviceWifi` (Fernet-encrypted password, `.p12` upload), `Rispacs` M2M, `DeviceType` (with `dose_sr`) and `DeviceManufacturer` (logo) editing remain **exclusive to `frontend-portal`**.
 
 ### Custom fields
 
