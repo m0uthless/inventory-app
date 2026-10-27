@@ -194,6 +194,8 @@ export default function Contracts() {
   const [customerId, setCustomerId] = useUrlNumberParam('customer')
   const [year, setYear] = useUrlNumberParam('year')
   const [statusFilter, setStatusFilter] = useUrlStringParam('status')
+  const [companyId, setCompanyId] = useUrlNumberParam('company')
+  const [sellerId, setSellerId] = useUrlNumberParam('seller')
 
   const listParams = React.useMemo(
     () =>
@@ -213,6 +215,8 @@ export default function Contracts() {
           ...(customerId !== '' ? { customer: customerId } : {}),
           ...(year !== '' ? { year } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(companyId !== '' ? { company: companyId } : {}),
+          ...(sellerId !== '' ? { seller: sellerId } : {}),
         },
       }),
     [
@@ -225,13 +229,18 @@ export default function Contracts() {
       customerId,
       year,
       statusFilter,
+      companyId,
+      sellerId,
     ],
   )
 
-  const { rows, rowCount, loading, reload: reloadList } = useDrfList<ContractListItem>(
-    '/contracts/',
-    listParams,
-    (e: unknown) => toast.error(apiErrorToMessage(e)),
+  const {
+    rows,
+    rowCount,
+    loading,
+    reload: reloadList,
+  } = useDrfList<ContractListItem>('/contracts/', listParams, (e: unknown) =>
+    toast.error(apiErrorToMessage(e)),
   )
 
   // ── Lookups ────────────────────────────────────────────────────────────────
@@ -253,7 +262,9 @@ export default function Contracts() {
   const loadSellers = React.useCallback(async () => {
     if (!canViewSellers) return
     try {
-      const res = await api.get<ApiPage<Seller>>('/sellers/', { params: { ordering: 'name', page_size: 500 } })
+      const res = await api.get<ApiPage<Seller>>('/sellers/', {
+        params: { ordering: 'name', page_size: 500 },
+      })
       setSellers(res.data.results ?? [])
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -288,7 +299,10 @@ export default function Contracts() {
       setDetail(null)
       try {
         const incParams = includeDeletedParams(forceIncludeDeleted ?? grid.includeDeleted)
-        const res = await api.get<ContractDetail>(`/contracts/${id}/`, incParams ? { params: incParams } : undefined)
+        const res = await api.get<ContractDetail>(
+          `/contracts/${id}/`,
+          incParams ? { params: incParams } : undefined,
+        )
         setDetail(res.data)
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -465,7 +479,7 @@ export default function Contracts() {
 
   // Cliente filtrato (es. arrivando dal tab Contratti del drawer Cliente).
   const filteredCustomer = React.useMemo(
-    () => (customerId === '' ? null : customers.find((c) => c.id === customerId) ?? null),
+    () => (customerId === '' ? null : (customers.find((c) => c.id === customerId) ?? null)),
     [customerId, customers],
   )
 
@@ -497,59 +511,6 @@ export default function Contracts() {
           q: grid.q,
           onQChange: grid.setQ,
           alignRightActions: true,
-          children: (
-            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-              {customerId !== '' ? (
-                <Chip
-                  size="small"
-                  label={`Cliente: ${filteredCustomer ? filteredCustomer.display_name || filteredCustomer.name : `#${customerId}`}`}
-                  onDelete={() => setCustomerId('', { patch: { page: 1 }, keepOpen: true })}
-                />
-              ) : null}
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={statusFilter}
-                onChange={(_e, v: string | null) => {
-                  if (v === null) return
-                  setStatusFilter(v, { patch: { page: 1 }, keepOpen: true })
-                }}
-                aria-label="Filtro stato contratto"
-                sx={{
-                  height: 32,
-                  '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 },
-                }}
-              >
-                {STATUS_FILTER_OPTIONS.map((o) => (
-                  <ToggleButton key={o.value || 'all'} value={o.value} aria-label={o.label}>
-                    {o.label}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-              <FormControl size="small" sx={{ minWidth: 130 }}>
-                <InputLabel id="contracts-year-label">Anno</InputLabel>
-                <Select
-                  labelId="contracts-year-label"
-                  label="Anno"
-                  value={year === '' ? '' : String(year)}
-                  onChange={(e) =>
-                    setYear(e.target.value === '' ? '' : Number(e.target.value), {
-                      patch: { page: 1 },
-                      keepOpen: true,
-                    })
-                  }
-                  sx={{ height: 32 }}
-                >
-                  <MenuItem value="">Tutti gli anni</MenuItem>
-                  {YEAR_OPTIONS.map((y) => (
-                    <MenuItem key={y} value={String(y)}>
-                      {y}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-          ),
           rightActions: (
             <Stack direction="row" alignItems="center" gap={1}>
               {canViewSellers ? (
@@ -590,7 +551,105 @@ export default function Contracts() {
             ...zebraSx,
           },
         }}
-      />
+      >
+        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+          {customerId !== '' ? (
+            <Chip
+              size="small"
+              label={`Cliente: ${filteredCustomer ? filteredCustomer.display_name || filteredCustomer.name : `#${customerId}`}`}
+              onDelete={() => setCustomerId('', { patch: { page: 1 }, keepOpen: true })}
+            />
+          ) : null}
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={statusFilter}
+            onChange={(_e, v: string | null) => {
+              if (v === null) return
+              setStatusFilter(v, { patch: { page: 1 }, keepOpen: true })
+            }}
+            aria-label="Filtro stato contratto"
+            sx={{
+              height: 32,
+              '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 },
+            }}
+          >
+            {STATUS_FILTER_OPTIONS.map((o) => (
+              <ToggleButton key={o.value || 'all'} value={o.value} aria-label={o.label}>
+                {o.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <InputLabel id="contracts-year-label">Anno</InputLabel>
+            <Select
+              labelId="contracts-year-label"
+              label="Anno"
+              value={year === '' ? '' : String(year)}
+              onChange={(e) =>
+                setYear(e.target.value === '' ? '' : Number(e.target.value), {
+                  patch: { page: 1 },
+                  keepOpen: true,
+                })
+              }
+              sx={{ height: 32 }}
+            >
+              <MenuItem value="">Tutti gli anni</MenuItem>
+              {YEAR_OPTIONS.map((y) => (
+                <MenuItem key={y} value={String(y)}>
+                  {y}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="contracts-company-label">Società</InputLabel>
+            <Select
+              labelId="contracts-company-label"
+              label="Società"
+              value={companyId === '' ? '' : String(companyId)}
+              onChange={(e) =>
+                setCompanyId(e.target.value === '' ? '' : Number(e.target.value), {
+                  patch: { page: 1 },
+                  keepOpen: true,
+                })
+              }
+              sx={{ height: 32 }}
+            >
+              <MenuItem value="">Tutte</MenuItem>
+              {companies.map((co) => (
+                <MenuItem key={co.id} value={String(co.id)}>
+                  {co.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {canViewSellers ? (
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id="contracts-seller-label">Venditore</InputLabel>
+              <Select
+                labelId="contracts-seller-label"
+                label="Venditore"
+                value={sellerId === '' ? '' : String(sellerId)}
+                onChange={(e) =>
+                  setSellerId(e.target.value === '' ? '' : Number(e.target.value), {
+                    patch: { page: 1 },
+                    keepOpen: true,
+                  })
+                }
+                sx={{ height: 32 }}
+              >
+                <MenuItem value="">Tutti</MenuItem>
+                {sellers.map((sl) => (
+                  <MenuItem key={sl.id} value={String(sl.id)}>
+                    {sl.is_active ? sl.name : `${sl.name} (non attivo)`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : null}
+        </Stack>
+      </EntityListCard>
 
       <ContractDrawer
         open={drawerOpen}
