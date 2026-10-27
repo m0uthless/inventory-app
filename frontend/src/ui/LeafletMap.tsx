@@ -145,13 +145,15 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
           zoom,
           zoomControl: true,
           scrollWheelZoom: false,
-          attributionControl: false,
+          // Attribuzione obbligatoria per le tile OpenStreetMap.
+          attributionControl: true,
         } as Record<string, unknown>)
         mapRef.current = map
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          subdomains: 'abcd',
+        // Tile OpenStreetMap: gratuite e senza API key (CARTO ora la richiede).
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
         } as Record<string, unknown>).addTo(map)
 
         const icon = L.divIcon({

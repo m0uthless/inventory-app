@@ -18,6 +18,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Mappe: le tile ora arrivano da OpenStreetMap (con attribuzione), perché il provider precedente (CARTO) richiede una API key e mostrava "API KEY REQUIRED" al posto della mappa.
 - ServiceNow: la categoria Philips è temporaneamente nascosta nel pannello Triage, nelle Statistiche e nella pagina Assenze tecnici, che ora mostrano solo Biotron. Il filtro è solo lato frontend (`features/servicenow/visibleCategories.ts`): backend, case e utenti Philips restano invariati.
 
 ## [0.9.4] - 2026-10-25
