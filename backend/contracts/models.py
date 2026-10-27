@@ -154,8 +154,12 @@ class Contract(TimeStampedModel):
 
     @property
     def notice_deadline(self) -> date:
-        """Ultimo giorno utile per la disdetta."""
-        return self.end_date - timedelta(days=self.notice_days)
+        """Ultimo giorno utile per la disdetta. Limitato a `date.min` se il
+        preavviso porterebbe prima dell'anno 1 (OverflowError → 500 in lista)."""
+        try:
+            return self.end_date - timedelta(days=self.notice_days)
+        except OverflowError:
+            return date.min
 
     def expiry_state_on(self, today: date) -> str:
         if self.status != ContractStatus.ATTIVO:

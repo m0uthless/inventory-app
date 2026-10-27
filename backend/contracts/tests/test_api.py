@@ -315,3 +315,64 @@ def test_ordering_by_total_value_ignored_without_perm():
 def test_year_filter_out_of_range_rejected(year):
     resp = _client(_internal_user(["view_contract"])).get(f"/api/contracts/?year={year}")
     assert resp.status_code == 400
+
+
+# ─── Audit: il valore economico non finisce mai nei log ──────────────────────
+
+def test_audit_never_contains_total_value():
+    import json
+
+    from audit.models import AuditEvent
+    from django.contrib.contenttypes.models import ContentType
+
+    customer = _customer("audit")
+    client = _client(_internal_user(ALL_CONTRACT_PERMS + ["view_contract_value"]))
+
+    resp = client.post("/api/contracts/", _payload(customer, total_value="98765.43"), format="json")
+    assert resp.status_code == 201, resp.data
+    contract_id = resp.data["id"]
+
+    resp = client.patch(f"/api/contracts/{contract_id}/", {"total_value": "45678.91"}, format="json")
+    assert resp.status_code == 200, resp.data
+
+    events = AuditEvent.objects.filter(
+        content_type=ContentType.objects.get_for_model(Contract), object_id=str(contract_id),
+    )
+    assert events.filter(action="create").exists()
+    update = events.get(action="update")
+    # La modifica è registrata, ma mascherata.
+    assert update.changes["total_value"] == {"from": "••••", "to": "••••"}
+
+    for ev in events:
+        dump = json.dumps({"changes": ev.changes, "metadata": ev.metadata}, ensure_ascii=False)
+        for needle in ("98765", "45678"):
+            assert needle not in dump
+
+
+# ─── Barriera Portal/Archie sulle action dei mixin core ──────────────────────
+
+def _portal_session_client(user) -> APIClient:
+    client = _client(user)
+    session = client.session
+    session["ambito"] = "portal"
+    session.save()
+    client.cookies["sessionid"] = session.session_key
+    return client
+
+
+@pytest.mark.parametrize("resource,model_name", [("contracts", "contract"), ("sellers", "seller")])
+def test_portal_user_forbidden_on_restore_and_purge(resource, model_name):
+    customer = _customer(f"portal_{resource}")
+    if resource == "contracts":
+        obj = _contract(customer, deleted_at=timezone.now())
+    else:
+        obj = Seller.objects.create(name="Venditore cestinato", deleted_at=timezone.now())
+    perms = [f"{p}_{model_name}" for p in ("view", "add", "change", "delete")]
+    client = _portal_session_client(_portal_user(customer, perms))
+
+    assert client.post(f"/api/{resource}/{obj.id}/restore/").status_code == 403
+    assert client.post(f"/api/{resource}/bulk_restore/", {"ids": [obj.id]}, format="json").status_code == 403
+    assert client.post(f"/api/{resource}/{obj.id}/purge/").status_code == 403
+
+    obj.refresh_from_db()
+    assert obj.deleted_at is not None

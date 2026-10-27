@@ -248,6 +248,9 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
         "customer__display_name", "seller__name",
     ]
     ordering = ["end_date"]
+    # Il valore economico non deve mai comparire nell'audit (leggibile con il
+    # solo audit.view_auditevent, senza contracts.view_contract_value).
+    audit_masked_fields = ("total_value",)
 
     def get_queryset(self):
         qs = Contract.objects.select_related("customer", "seller").prefetch_related(

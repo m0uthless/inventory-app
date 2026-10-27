@@ -71,3 +71,10 @@ def test_code_unique_only_among_active():
     first.deleted_at = timezone.now()
     first.save()
     assert _contract(code="DUP").pk
+
+
+def test_notice_deadline_clamped_near_date_min():
+    # end_date a ridosso di date.min: niente OverflowError (romperebbe la lista).
+    c = _contract(code="C-MIN", end_date=date.min + timedelta(days=5), notice_days=90)
+    assert c.notice_deadline == date.min
+    c.expiry_state_on(TODAY)
