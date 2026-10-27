@@ -415,12 +415,16 @@ export default function Contracts() {
     [selectedId, toast],
   )
 
+  // La rimozione del PDF è definitiva (niente cestino): sempre con conferma.
+  const [deleteDocDlgOpen, setDeleteDocDlgOpen] = React.useState(false)
+
   const deleteDocument = React.useCallback(async () => {
     if (!selectedId) return
     setDocumentBusy(true)
     try {
       await api.delete(`/contracts/${selectedId}/document/`)
       toast.success('Documento rimosso')
+      setDeleteDocDlgOpen(false)
       await loadDetail(selectedId)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -649,7 +653,7 @@ export default function Contracts() {
           toast.success('Copiato')
         }}
         onUploadDocument={(f) => void uploadDocument(f)}
-        onDeleteDocument={() => void deleteDocument()}
+        onDeleteDocument={() => setDeleteDocDlgOpen(true)}
       />
 
       <ContractDialog
@@ -677,6 +681,16 @@ export default function Contracts() {
         description="Il contratto verrà spostato nel cestino e potrà essere ripristinato."
         onClose={() => setDeleteDlgOpen(false)}
         onConfirm={doDelete}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteDocDlgOpen}
+        busy={documentBusy}
+        title="Rimuovere il documento?"
+        description={`Il PDF${detail?.document_filename ? ` "${detail.document_filename}"` : ''} verrà eliminato definitivamente e non potrà essere ripristinato.`}
+        confirmText="Rimuovi"
+        onClose={() => setDeleteDocDlgOpen(false)}
+        onConfirm={() => void deleteDocument()}
       />
 
       {canViewSellers ? (

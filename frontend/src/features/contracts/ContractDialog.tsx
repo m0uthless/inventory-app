@@ -382,6 +382,7 @@ export default function ContractDialog({
             value={form.devices}
             onChange={(ids) => set('devices', ids)}
             allowCreate
+            initialOptions={contract?.devices_detail}
             label="Device collegati (opzionale)"
             error={!!errors.devices}
             helperText={errors.devices}

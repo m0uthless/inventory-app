@@ -22,6 +22,9 @@ export type DevicePickerProps = {
   error?: boolean
   helperText?: string
   disabled?: boolean
+  /** Etichette note dei device già collegati (es. `devices_detail` del contratto):
+   *  usate finché la lista non è caricata, o al suo posto senza `device.view_device`. */
+  initialOptions?: Option[]
 }
 
 /**
@@ -37,17 +40,21 @@ export default function DevicePicker({
   error,
   helperText,
   disabled,
+  initialOptions,
 }: DevicePickerProps) {
   const toast = useToast()
   const { hasPerm } = useAuth()
-  const canCreate = allowCreate && hasPerm(PERMS.device.device.add)
+  // Senza device.view_device la lista non si può caricare (403): il picker
+  // diventa di sola lettura e mostra i device collegati da `initialOptions`.
+  const canView = hasPerm(PERMS.device.device.view)
+  const canCreate = allowCreate && canView && hasPerm(PERMS.device.device.add)
 
   const [devices, setDevices] = React.useState<Option[]>([])
   const [loading, setLoading] = React.useState(false)
   const [dlgOpen, setDlgOpen] = React.useState(false)
 
   React.useEffect(() => {
-    if (customerId == null) {
+    if (customerId == null || !canView) {
       setDevices([])
       return
     }
@@ -70,12 +77,13 @@ export default function DevicePicker({
     return () => {
       cancelled = true
     }
-  }, [customerId, toast])
+  }, [customerId, canView, toast])
 
   const selected = React.useMemo<Option[]>(() => {
-    const byId = new Map(devices.map((d) => [d.id, d]))
+    const byId = new Map<number, Option>((initialOptions ?? []).map((d) => [d.id, { id: d.id, label: d.label }]))
+    for (const d of devices) byId.set(d.id, d)
     return value.map((id) => byId.get(id) ?? { id, label: `Device #${id}` })
-  }, [devices, value])
+  }, [devices, initialOptions, value])
 
   const handleCreated = (d: DeviceDetail) => {
     setDlgOpen(false)
@@ -91,6 +99,7 @@ export default function DevicePicker({
         options={devices}
         value={selected}
         loading={loading}
+        readOnly={!canView}
         disabled={disabled || customerId == null}
         filterSelectedOptions
         onChange={(_, v) => onChange(v.map((o) => o.id))}
@@ -103,7 +112,7 @@ export default function DevicePicker({
             label={label}
             placeholder={selected.length ? undefined : 'Nessun device (opzionale)'}
             error={error}
-            helperText={helperText}
+            helperText={helperText ?? (canView ? undefined : 'Non hai i permessi per modificare i device collegati')}
           />
         )}
       />
