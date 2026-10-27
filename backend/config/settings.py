@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "attendance.apps.AttendanceConfig",
     "expenses.apps.ExpensesConfig",
     "purchaseorders.apps.PurchaseOrdersConfig",
+    "contracts.apps.ContractsConfig",
 ]
 
 # --- CSRF / Origin handling ---

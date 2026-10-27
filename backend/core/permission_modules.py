@@ -49,6 +49,7 @@ MODULE_LABELS: dict[str, str] = {
     "attendance": "Presenze & Ferie",
     "expenses": "Note Spese",
     "purchaseorders": "Purchase Order",
+    "contracts": "Contratti",
     "portal": "Portale Clienti",
     "core": "Core / Sistema",
     "custom_fields": "Campi Personalizzati",
