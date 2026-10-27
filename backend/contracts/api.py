@@ -201,7 +201,8 @@ class ContractFilter(filters.FilterSet):
     customer = filters.NumberFilter(field_name="customer_id")
     seller   = filters.NumberFilter(field_name="seller_id")
     # Contratti attivi nell'anno indicato: start_date.year <= y <= end_date.year.
-    year = filters.NumberFilter(method="filter_year")
+    # Limitato a 1..9999 (range di datetime.date): fuori range → 400, non 500.
+    year = filters.NumberFilter(method="filter_year", min_value=1, max_value=9999)
 
     class Meta:
         model  = Contract
@@ -212,6 +213,19 @@ class ContractFilter(filters.FilterSet):
             return queryset
         y = int(value)
         return queryset.filter(start_date__year__lte=y, end_date__year__gte=y)
+
+
+class ContractOrderingFilter(OrderingFilter):
+    """Senza `contracts.view_contract_value` l'ordinamento per `total_value`
+    non è ammesso (rivelerebbe la graduatoria dei valori): viene ignorato
+    come qualunque campo non consentito."""
+
+    def get_valid_fields(self, queryset, view, context=None):
+        fields = super().get_valid_fields(queryset, view, context or {})
+        user = getattr(getattr(view, "request", None), "user", None)
+        if not (user and user.has_perm(VALUE_PERM)):
+            fields = [f for f in fields if f[0] != "total_value"]
+        return fields
 
 
 class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -226,7 +240,7 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
     serializer_class   = ContractSerializer
     permission_classes = [PortalModelPermissions, IsInternalOrPortalDedicatedApp]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
-    filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends    = [DjangoFilterBackend, SearchFilter, ContractOrderingFilter]
     filterset_class    = ContractFilter
     search_fields      = ["code", "title", "customer__name", "customer__display_name", "seller__name"]
     ordering_fields    = [

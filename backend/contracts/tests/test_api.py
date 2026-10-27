@@ -291,3 +291,27 @@ def test_sellers_crud_and_user_link():
 
     assert client.delete(f"/api/sellers/{seller_id}/").status_code == 204
     assert Seller.objects.get(pk=seller_id).deleted_at is not None
+
+
+def test_ordering_by_total_value_ignored_without_perm():
+    customer = _customer()
+    # end_date crescente con valore decrescente: l'ordinamento di default
+    # (end_date) e quello per -total_value darebbero sequenze opposte.
+    a = _contract(customer, end_date=date(2026, 6, 30), total_value="100.00")
+    b = _contract(customer, end_date=date(2026, 9, 30), total_value="500.00")
+    c = _contract(customer, end_date=date(2026, 12, 31), total_value="900.00")
+
+    resp = _client(_internal_user(["view_contract"])).get("/api/contracts/?ordering=-total_value")
+    assert resp.status_code == 200
+    assert [row["id"] for row in resp.data["results"]] == [a.id, b.id, c.id]
+
+    resp = _client(_internal_user(["view_contract", "view_contract_value"])).get(
+        "/api/contracts/?ordering=-total_value",
+    )
+    assert [row["id"] for row in resp.data["results"]] == [c.id, b.id, a.id]
+
+
+@pytest.mark.parametrize("year", ["10000", "0", "-1"])
+def test_year_filter_out_of_range_rejected(year):
+    resp = _client(_internal_user(["view_contract"])).get(f"/api/contracts/?year={year}")
+    assert resp.status_code == 400
