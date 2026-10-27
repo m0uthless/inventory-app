@@ -52,6 +52,8 @@ import { useThemeTokens } from '../theme/AppThemeProvider'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
 import CustomerDrawer from '../features/customers/CustomerDrawer'
+import CustomerDevicesTab from '../features/devices/CustomerDevicesTab'
+import CustomerContractsTab from '../features/contracts/CustomerContractsTab'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
 import { stripOpenParam } from '../features/entityRelations/relatedListUtils'
@@ -751,6 +753,8 @@ export default function Customers() {
     sitesCount,
     invCount,
     driveCount,
+    devicesCount,
+    contractsCount,
     reset: resetKpis,
   } = useCustomerKpis(detail?.id ?? null)
 
@@ -1205,6 +1209,8 @@ export default function Customers() {
         sitesCount={sitesCount}
         inventoriesCount={invCount}
         driveCount={driveCount}
+        devicesCount={devicesCount}
+        contractsCount={contractsCount}
         address={address}
         canChange={canChange}
         canDelete={canDelete}
@@ -1231,6 +1237,8 @@ export default function Customers() {
           />
         ) : null}
         driveTabContent={detail ? <CustomerDriveTab customerId={detail.id} /> : null}
+        devicesTabContent={detail ? <CustomerDevicesTab customerId={detail.id} /> : null}
+        contractsTabContent={detail ? <CustomerContractsTab customerId={detail.id} /> : null}
         activityTabContent={detail ? (
           <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
         ) : null}

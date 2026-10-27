@@ -6,6 +6,8 @@ import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerAddressSection, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
 import LeafletMap from '../../ui/LeafletMap'
+import { useAuth } from '../../auth/AuthProvider'
+import { PERMS } from '../../auth/perms'
 import type { CustomerDetail } from './types'
 
 type CustomerDrawerProps = {
@@ -17,6 +19,8 @@ type CustomerDrawerProps = {
   sitesCount: number | null
   inventoriesCount: number | null
   driveCount: number | null
+  devicesCount?: number | null
+  contractsCount?: number | null
   address: string | null
   canChange: boolean
   canDelete: boolean
@@ -31,16 +35,55 @@ type CustomerDrawerProps = {
   sitesTabContent: React.ReactNode
   inventoriesTabContent: React.ReactNode
   driveTabContent: React.ReactNode
+  devicesTabContent?: React.ReactNode
+  contractsTabContent?: React.ReactNode
   activityTabContent: React.ReactNode
 }
 
+/**
+ * Indici LOGICI delle tab (stabili, usati da `drawerTab`/`onTabChange`).
+ * Device e Contratti sono condizionali ai permessi: quando nascoste, l'indice
+ * logico non cambia (Attività resta 6); la conversione logico ↔ posizione
+ * visibile avviene solo qui, verso DrawerShell.
+ */
+export const CUSTOMER_TAB = {
+  details: 0,
+  sites: 1,
+  inventories: 2,
+  drive: 3,
+  devices: 4,
+  contracts: 5,
+  activity: 6,
+} as const
+
+const withCount = (label: string, n: number | null | undefined) => (n != null ? `${label} (${n})` : label)
+
 export default function CustomerDrawer({
   open, detail, detailLoading, selectedId, drawerTab,
-  sitesCount, inventoriesCount, driveCount, address,
+  sitesCount, inventoriesCount, driveCount, devicesCount, contractsCount, address,
   canChange, canDelete, deleteBusy, restoreBusy,
   onClose, onEdit, onDelete, onRestore, onTabChange, onCopy,
-  sitesTabContent, inventoriesTabContent, driveTabContent, activityTabContent,
+  sitesTabContent, inventoriesTabContent, driveTabContent, devicesTabContent, contractsTabContent, activityTabContent,
 }: CustomerDrawerProps) {
+  const { hasPerm } = useAuth()
+  const showDevices = hasPerm(PERMS.device.device.view)
+  const showContracts = hasPerm(PERMS.contracts.contract.view)
+
+  const visibleTabs = React.useMemo(
+    () =>
+      [
+        { index: CUSTOMER_TAB.details, label: 'Dettagli', visible: true },
+        { index: CUSTOMER_TAB.sites, label: withCount('Siti', sitesCount), visible: true },
+        { index: CUSTOMER_TAB.inventories, label: withCount('Inventari', inventoriesCount), visible: true },
+        { index: CUSTOMER_TAB.drive, label: withCount('Drive', driveCount), visible: true },
+        { index: CUSTOMER_TAB.devices, label: withCount('Device', devicesCount), visible: showDevices },
+        { index: CUSTOMER_TAB.contracts, label: withCount('Contratti', contractsCount), visible: showContracts },
+        { index: CUSTOMER_TAB.activity, label: 'Attività', visible: true },
+      ].filter((t) => t.visible),
+    [sitesCount, inventoriesCount, driveCount, devicesCount, contractsCount, showDevices, showContracts],
+  )
+  const visiblePos = Math.max(0, visibleTabs.findIndex((t) => t.index === drawerTab))
+  const activeTab = visibleTabs[visiblePos]?.index ?? CUSTOMER_TAB.details
   return (
     <DrawerShell
       open={open} onClose={onClose} gradient="teal"
@@ -51,12 +94,12 @@ export default function CustomerDrawer({
       title={detail?.display_name || (selectedId ? `Cliente #${selectedId}` : 'Cliente')}
       subtitle={detail?.city || undefined}
       loading={detailLoading}
-      tabs={['Dettagli', sitesCount != null ? `Siti (${sitesCount})` : 'Siti', inventoriesCount != null ? `Inventari (${inventoriesCount})` : 'Inventari', driveCount != null ? `Drive (${driveCount})` : 'Drive', 'Attività']}
-      tabValue={drawerTab} onTabChange={onTabChange}
+      tabs={visibleTabs.map((t) => t.label)}
+      tabValue={visiblePos} onTabChange={(pos) => onTabChange(visibleTabs[pos]?.index ?? CUSTOMER_TAB.details)}
     >
       {!detail && !detailLoading ? <DrawerEmptyState /> : null}
 
-      {drawerTab === 0 && detail ? (
+      {activeTab === CUSTOMER_TAB.details && detail ? (
         <>
           <DrawerSection icon={<PersonOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Contatto primario">
             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} flexWrap="wrap">
@@ -94,10 +137,12 @@ export default function CustomerDrawer({
         </>
       ) : null}
 
-      {drawerTab === 1 ? sitesTabContent : null}
-      {drawerTab === 2 ? inventoriesTabContent : null}
-      {drawerTab === 3 ? driveTabContent : null}
-      {drawerTab === 4 ? activityTabContent : null}
+      {activeTab === CUSTOMER_TAB.sites ? sitesTabContent : null}
+      {activeTab === CUSTOMER_TAB.inventories ? inventoriesTabContent : null}
+      {activeTab === CUSTOMER_TAB.drive ? driveTabContent : null}
+      {activeTab === CUSTOMER_TAB.devices ? devicesTabContent : null}
+      {activeTab === CUSTOMER_TAB.contracts ? contractsTabContent : null}
+      {activeTab === CUSTOMER_TAB.activity ? activityTabContent : null}
 
       {detailLoading ? <DrawerLoadingState /> : null}
     </DrawerShell>
