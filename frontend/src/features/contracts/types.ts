@@ -48,7 +48,7 @@ export type Seller = {
   deleted_at: string | null
 }
 
-export type ContractDeviceDetail = { id: number; label: string; serial_number: string }
+export type ContractDeviceDetail = { id: number; label: string; serial_number: string | null }
 
 export type ContractListItem = {
   id: number
@@ -83,3 +83,5 @@ export type ContractListItem = {
 }
 
 export type ContractDetail = ContractListItem
+
+export type CustomerOption = { id: number; code?: string; name?: string; display_name?: string | null }

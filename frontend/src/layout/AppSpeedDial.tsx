@@ -17,6 +17,7 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
 import MonitorIcon from '@mui/icons-material/MonitorOutlined'
 import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { useTheme } from '@mui/material/styles'
@@ -131,6 +132,14 @@ export default function AppSpeedDial() {
         openCreate: true,
         icon: <ReceiptLongOutlinedIcon sx={{ fontSize: 20 }} />,
       },
+      newContract: {
+        key: 'newContract',
+        label: 'Nuovo contratto',
+        to: '/contracts',
+        perm: 'contracts.add_contract',
+        openCreate: true,
+        icon: <GavelOutlinedIcon sx={{ fontSize: 20 }} />,
+      },
       newReportRequest: {
         key: 'newReportRequest',
         label: 'Report / Request',
@@ -166,6 +175,9 @@ export default function AppSpeedDial() {
     }
     if (pathStarts(loc.pathname, '/purchase-orders')) {
       return ['newPurchaseOrder', 'newReportRequest', 'search']
+    }
+    if (pathStarts(loc.pathname, '/contracts')) {
+      return ['newContract', 'newReportRequest', 'search']
     }
     if (pathStarts(loc.pathname, '/customers')) {
       return ['newCustomer', 'newSite', 'newContact', 'newReportRequest', 'search']
