@@ -7,6 +7,15 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Added
+
+- Nuovo modulo Contratti: pagina `/contracts` con elenco, filtri, drawer di dettaglio e creazione/modifica dei contratti dei clienti, con indicatore di scadenza (preavviso, in scadenza, scaduto) e allegato PDF. Il PDF è servito solo tramite API (l'accesso diretto a `/media/contracts/` è bloccato da nginx) e il modulo non è accessibile dal Portal.
+- Contratti: i valori economici sono visibili solo a chi ha il permesso `contracts.view_contract_value`.
+- Contratti: il pulsante "Rinnova" crea il rinnovo manuale del contratto; l'opzione di rinnovo automatico è solo informativa e non genera rinnovi.
+- Nuova anagrafica venditori (`/api/sellers/`): un venditore può essere un utente interno o un referente esterno ed è selezionabile nei contratti.
+- Contratti: nel form del contratto si possono collegare i device del cliente; nel drawer del Cliente è disponibile la nuova tab "Contratti".
+- I dati base dei Device sono ora gestibili anche da Archie, con la nuova tab "Device" nel drawer del Cliente; i device creati sono visibili anche nel Portal del cliente.
+
 ### Changed
 
 - ServiceNow: la categoria Philips è temporaneamente nascosta nel pannello Triage, nelle Statistiche e nella pagina Assenze tecnici, che ora mostrano solo Biotron. Il filtro è solo lato frontend (`features/servicenow/visibleCategories.ts`): backend, case e utenti Philips restano invariati.
