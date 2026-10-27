@@ -76,6 +76,7 @@ from expenses.api import (
     TechnicianKmRateViewSet,
 )
 from purchaseorders.api import PurchaseOrderEntryViewSet
+from contracts.api import ContractViewSet, SellerViewSet
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customer")
@@ -154,6 +155,10 @@ router.register(r"expense-km-rates", TechnicianKmRateViewSet, basename="expense-
 
 # Purchase Order
 router.register(r"purchase-order-entries", PurchaseOrderEntryViewSet, basename="purchase-order-entry")
+
+# Contratti
+router.register(r"contracts", ContractViewSet, basename="contract")
+router.register(r"sellers", SellerViewSet, basename="seller")
 
 # Lookups (core)
 router.register(r"customer-statuses", CustomerStatusViewSet, basename="customer-status")
