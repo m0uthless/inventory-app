@@ -105,6 +105,7 @@ class SellerViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, So
 class ContractSerializer(serializers.ModelSerializer):
     customer_name       = serializers.SerializerMethodField()
     seller_name         = serializers.CharField(source="seller.name", read_only=True, default=None)
+    company_label       = serializers.CharField(source="company.label", read_only=True, default=None)
     contract_type_label = serializers.CharField(source="get_contract_type_display", read_only=True)
     billing_freq_label  = serializers.CharField(source="get_billing_freq_display", read_only=True)
     status_label        = serializers.CharField(source="get_status_display", read_only=True)
@@ -125,6 +126,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "customer", "customer_name",
             "contract_type", "contract_type_label",
             "seller", "seller_name",
+            "company", "company_label",
             "start_date", "end_date", "notice_days", "notice_deadline", "auto_renew",
             "total_value", "billing_freq", "billing_freq_label",
             "status", "status_label", "expiry_state",
@@ -194,19 +196,24 @@ class ContractSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 "devices": f"Dispositivi non appartenenti al cliente del contratto: {foreign}.",
             })
+
+        # Società non indicata in creazione → quella del cliente.
+        if inst is None and attrs.get("company") is None and customer is not None:
+            attrs["company"] = customer.status
         return attrs
 
 
 class ContractFilter(filters.FilterSet):
     customer = filters.NumberFilter(field_name="customer_id")
     seller   = filters.NumberFilter(field_name="seller_id")
+    company  = filters.NumberFilter(field_name="company_id")
     # Contratti attivi nell'anno indicato: start_date.year <= y <= end_date.year.
     # Limitato a 1..9999 (range di datetime.date): fuori range → 400, non 500.
     year = filters.NumberFilter(method="filter_year", min_value=1, max_value=9999)
 
     class Meta:
         model  = Contract
-        fields = ["customer", "seller", "status", "contract_type", "auto_renew", "year"]
+        fields = ["customer", "seller", "company", "status", "contract_type", "auto_renew", "year"]
 
     def filter_year(self, queryset, name, value):
         if value is None:
@@ -245,7 +252,7 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
     search_fields      = ["code", "title", "customer__name", "customer__display_name", "seller__name"]
     ordering_fields    = [
         "code", "title", "end_date", "start_date", "total_value", "updated_at",
-        "customer__display_name", "seller__name",
+        "customer__display_name", "seller__name", "company__label",
     ]
     ordering = ["end_date"]
     # Il valore economico non deve mai comparire nell'audit (leggibile con il
@@ -253,7 +260,7 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
     audit_masked_fields = ("total_value",)
 
     def get_queryset(self):
-        qs = Contract.objects.select_related("customer", "seller").prefetch_related(
+        qs = Contract.objects.select_related("customer", "seller", "company").prefetch_related(
             # Solo device non eliminati: coerente con il queryset scrivibile
             # del campo `devices` (un round-trip GET→PUT resta valido).
             Prefetch("devices", queryset=Device.objects.filter(deleted_at__isnull=True).select_related("type")),

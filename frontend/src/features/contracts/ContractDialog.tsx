@@ -27,6 +27,7 @@ import {
   type ContractDetail,
   type ContractStatus,
   type ContractType,
+  type CompanyOption,
   type CustomerOption,
   type Seller,
 } from './types'
@@ -37,6 +38,7 @@ type ContractForm = {
   customer: number | null
   contract_type: ContractType
   seller: number | null
+  company: number | null
   start_date: string
   end_date: string
   notice_days: string
@@ -55,6 +57,7 @@ function emptyForm(customer: number | null): ContractForm {
     customer,
     contract_type: 'assistenza',
     seller: null,
+    company: null,
     start_date: '',
     end_date: '',
     notice_days: '90',
@@ -74,6 +77,7 @@ function formFromContract(c: ContractDetail): ContractForm {
     customer: c.customer,
     contract_type: c.contract_type,
     seller: c.seller,
+    company: c.company,
     start_date: c.start_date,
     end_date: c.end_date,
     notice_days: String(c.notice_days ?? ''),
@@ -94,6 +98,8 @@ export type ContractDialogProps = {
   initialCustomer?: number | null
   customers: CustomerOption[]
   sellers: Seller[]
+  /** Scelte per la Società (`/customer-statuses/`). */
+  companies: CompanyOption[]
   /** `contracts.view_contract_value`: senza, il valore non è né mostrato né inviato. */
   canViewValue: boolean
   onClose: () => void
@@ -106,6 +112,7 @@ export default function ContractDialog({
   initialCustomer = null,
   customers,
   sellers,
+  companies,
   canViewValue,
   onClose,
   onSaved,
@@ -118,7 +125,14 @@ export default function ContractDialog({
 
   React.useEffect(() => {
     if (!open) return
-    setForm(contract ? formFromContract(contract) : emptyForm(initialCustomer))
+    setForm(
+      contract
+        ? formFromContract(contract)
+        : {
+            ...emptyForm(initialCustomer),
+            company: customers.find((c) => c.id === initialCustomer)?.status ?? null,
+          },
+    )
     setErrors({})
     // Reinizializza solo all'apertura.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,6 +182,8 @@ export default function ContractDialog({
       customer: form.customer,
       contract_type: form.contract_type,
       seller: form.seller,
+      // null in creazione → il backend usa la società del cliente.
+      company: form.company,
       start_date: form.start_date,
       end_date: form.end_date,
       notice_days: notice,
@@ -244,7 +260,17 @@ export default function ContractDialog({
               onChange={(_, v) => {
                 const next = v?.id ?? null
                 // I device appartengono al cliente: al cambio cliente si svuotano.
-                setForm((f) => ({ ...f, customer: next, devices: next === f.customer ? f.devices : [] }))
+                // La Società segue il cliente finché l'utente non l'ha cambiata a mano.
+                setForm((f) => {
+                  const prevStatus = customers.find((c) => c.id === f.customer)?.status ?? null
+                  const keepCompany = f.company != null && f.company !== prevStatus
+                  return {
+                    ...f,
+                    customer: next,
+                    devices: next === f.customer ? f.devices : [],
+                    company: keepCompany ? f.company : (v?.status ?? f.company),
+                  }
+                })
               }}
               renderInput={(p) => (
                 <TextField {...p} label="Cliente" required error={!!errors.customer} helperText={errors.customer} />
@@ -262,6 +288,25 @@ export default function ContractDialog({
                 <TextField {...p} label="Venditore" error={!!errors.seller} helperText={errors.seller} />
               )}
             />
+            <TextField
+              select
+              size="small"
+              sx={{ flex: 1 }}
+              label="Società"
+              value={form.company == null ? '' : String(form.company)}
+              onChange={(e) => set('company', e.target.value === '' ? null : Number(e.target.value))}
+              error={!!errors.company}
+              helperText={errors.company}
+            >
+              <MenuItem value="">—</MenuItem>
+              {companies
+                .filter((co) => co.is_active !== false || co.id === form.company)
+                .map((co) => (
+                  <MenuItem key={co.id} value={String(co.id)}>
+                    {co.label}
+                  </MenuItem>
+                ))}
+            </TextField>
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

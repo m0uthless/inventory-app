@@ -44,7 +44,7 @@ export default function ContractDrawer({
 
   return (
     <DrawerShell
-      open={open} onClose={onClose} gradient="blue"
+      open={open} onClose={onClose} gradient="teal"
       statusLabel={detail ? `● ${detail.status_label}` : undefined}
       statusLabelSecondary={detail?.auto_renew ? 'Rinnovo automatico' : undefined}
       canChange={canChange} canDelete={canDelete}
@@ -63,6 +63,7 @@ export default function ContractDrawer({
                 { label: 'Cliente', value: detail.customer_name },
                 { label: 'Tipo', value: detail.contract_type_label },
                 { label: 'Venditore', value: detail.seller_name ?? '' },
+                { label: 'Società', value: detail.company_label ?? '' },
                 { label: 'Fatturazione', value: detail.billing_freq_label },
                 ...(canViewValue && detail.total_value !== undefined
                   ? [{ label: 'Valore totale', value: formatEuro(detail.total_value) }]

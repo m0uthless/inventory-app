@@ -60,6 +60,9 @@ export type ContractListItem = {
   contract_type_label: string
   seller: number | null
   seller_name: string | null
+  /** Società (stesse voci del campo "Stato" dei clienti). */
+  company: number | null
+  company_label: string | null
   start_date: string
   end_date: string
   notice_days: number
@@ -84,4 +87,14 @@ export type ContractListItem = {
 
 export type ContractDetail = ContractListItem
 
-export type CustomerOption = { id: number; code?: string; name?: string; display_name?: string | null }
+export type CustomerOption = {
+  id: number
+  code?: string
+  name?: string
+  display_name?: string | null
+  /** id della CustomerStatus del cliente: propone la Società del contratto. */
+  status?: number | null
+}
+
+/** Voce di `/customer-statuses/`, usata come scelta per la Società. */
+export type CompanyOption = { id: number; key: string; label: string; is_active?: boolean }

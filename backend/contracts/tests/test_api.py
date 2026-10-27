@@ -130,6 +130,30 @@ def test_create_contract_without_devices():
     assert resp.data["devices"] == []
 
 
+def test_company_defaults_to_customer_status():
+    customer = _customer()
+    client = _client(_internal_user(ALL_CONTRACT_PERMS))
+
+    resp = client.post("/api/contracts/", _payload(customer), format="json")
+    assert resp.status_code == 201, resp.data
+    assert resp.data["company"] == customer.status_id
+    assert resp.data["company_label"] == customer.status.label
+
+
+def test_company_explicit_choice_and_filter():
+    customer = _customer()
+    other = CustomerStatus.objects.get_or_create(key="contracts_api_other_co", defaults={"label": "Altra società"})[0]
+    client = _client(_internal_user(ALL_CONTRACT_PERMS))
+
+    resp = client.post("/api/contracts/", _payload(customer, company=other.id), format="json")
+    assert resp.status_code == 201, resp.data
+    assert resp.data["company"] == other.id
+    client.post("/api/contracts/", _payload(customer, code="C-DEF-CO"), format="json")
+
+    resp = client.get(f"/api/contracts/?company={other.id}")
+    assert [r["company"] for r in resp.data["results"]] == [other.id]
+
+
 def test_create_contract_with_devices():
     customer = _customer()
     d1 = _device(customer, "d1")

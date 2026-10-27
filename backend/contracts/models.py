@@ -16,7 +16,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
-from core.models import TimeStampedModel
+from core.models import CustomerStatus, TimeStampedModel
 from crm.models import Customer
 
 
@@ -99,6 +99,13 @@ class Contract(TimeStampedModel):
     )
     seller = models.ForeignKey(
         Seller, null=True, blank=True, on_delete=models.SET_NULL, related_name="contracts",
+    )
+    # Società che detiene il contratto: stesse voci del campo "Stato" dei
+    # clienti (Biotron, Philips, Medical Imaging...). Se non indicata viene
+    # proposta quella del cliente (vedi ContractSerializer.validate).
+    company = models.ForeignKey(
+        CustomerStatus, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="+", verbose_name="Società",
     )
 
     start_date = models.DateField()

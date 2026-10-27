@@ -7,6 +7,8 @@ import {
   MenuItem,
   Select,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined'
@@ -23,7 +25,6 @@ import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import EntityListCard from '@shared/ui/EntityListCard'
-import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 
@@ -37,8 +38,8 @@ import ContractRenewDialog from '../features/contracts/ContractRenewDialog'
 import SellersDialog from '../features/contracts/SellersDialog'
 import {
   CONTRACT_STATUS_OPTIONS,
-  CONTRACT_TYPE_OPTIONS,
   EXPIRY_CHIP,
+  type CompanyOption,
   type ContractDetail,
   type ContractListItem,
   type ContractStatus,
@@ -55,6 +56,12 @@ const STATUS_CHIP_COLOR: Record<ContractStatus, 'default' | 'success' | 'error'>
   disdetto: 'error',
 }
 
+// Filtro stato in toolbar ('' = tutti).
+const STATUS_FILTER_OPTIONS: { value: '' | ContractStatus; label: string }[] = [
+  { value: '', label: 'Tutti' },
+  ...CONTRACT_STATUS_OPTIONS,
+]
+
 const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 16 }, (_, i) => CURRENT_YEAR + 5 - i)
 
@@ -63,6 +70,15 @@ function buildColumns(canViewValue: boolean): GridColDef<ContractListItem>[] {
     { field: 'code', headerName: 'Codice', width: 130 },
     { field: 'title', headerName: 'Titolo', flex: 1.2, minWidth: 200 },
     { field: 'customer_name', headerName: 'Cliente', flex: 1, minWidth: 170 },
+    {
+      field: 'company_label',
+      headerName: 'Società',
+      width: 140,
+      valueGetter: (v, row) => {
+        void v
+        return row.company_label || '—'
+      },
+    },
     {
       field: 'seller_name',
       headerName: 'Venditore',
@@ -165,6 +181,7 @@ export default function Contracts() {
       'title',
       'customer_name',
       'seller_name',
+      'company_label',
       'start_date',
       'end_date',
       'updated_at',
@@ -175,10 +192,8 @@ export default function Contracts() {
 
   // Filtri (URL): `customer` arriva anche dal tab Contratti del drawer Cliente.
   const [customerId, setCustomerId] = useUrlNumberParam('customer')
-  const [sellerId, setSellerId] = useUrlNumberParam('seller')
   const [year, setYear] = useUrlNumberParam('year')
   const [statusFilter, setStatusFilter] = useUrlStringParam('status')
-  const [typeFilter, setTypeFilter] = useUrlStringParam('contract_type')
 
   const listParams = React.useMemo(
     () =>
@@ -188,6 +203,7 @@ export default function Contracts() {
         orderingMap: {
           customer_name: 'customer__display_name',
           seller_name: 'seller__name',
+          company_label: 'company__label',
         },
         page0: grid.paginationModel.page,
         pageSize: grid.paginationModel.pageSize,
@@ -195,10 +211,8 @@ export default function Contracts() {
         onlyDeleted: grid.onlyDeleted,
         extra: {
           ...(customerId !== '' ? { customer: customerId } : {}),
-          ...(sellerId !== '' ? { seller: sellerId } : {}),
           ...(year !== '' ? { year } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
-          ...(typeFilter ? { contract_type: typeFilter } : {}),
         },
       }),
     [
@@ -209,10 +223,8 @@ export default function Contracts() {
       grid.includeDeleted,
       grid.onlyDeleted,
       customerId,
-      sellerId,
       year,
       statusFilter,
-      typeFilter,
     ],
   )
 
@@ -225,6 +237,7 @@ export default function Contracts() {
   // ── Lookups ────────────────────────────────────────────────────────────────
   const [customers, setCustomers] = React.useState<CustomerOption[]>([])
   const [sellers, setSellers] = React.useState<Seller[]>([])
+  const [companies, setCompanies] = React.useState<CompanyOption[]>([])
 
   const loadCustomers = React.useCallback(async () => {
     try {
@@ -247,10 +260,21 @@ export default function Contracts() {
     }
   }, [toast, canViewSellers])
 
+  const loadCompanies = React.useCallback(async () => {
+    try {
+      const res = await api.get<ApiPage<CompanyOption> | CompanyOption[]>('/customer-statuses/')
+      const data = res.data
+      setCompanies(Array.isArray(data) ? data : (data.results ?? []))
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }, [toast])
+
   React.useEffect(() => {
     void loadCustomers()
     void loadSellers()
-  }, [loadCustomers, loadSellers])
+    void loadCompanies()
+  }, [loadCustomers, loadSellers, loadCompanies])
 
   // ── Drawer ─────────────────────────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = React.useState(false)
@@ -439,106 +463,11 @@ export default function Contracts() {
   // ── Griglia ────────────────────────────────────────────────────────────────
   const columns = React.useMemo(() => buildColumns(canViewValue), [canViewValue])
 
-  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
-    const opts = { patch: { page: 1 }, keepOpen: true }
-    return {
-      customer_name: {
-        value: customerId,
-        label: 'Filtra per cliente',
-        onSet: (v) => setCustomerId(v === '' ? '' : Number(v), opts),
-        onReset: () => setCustomerId('', opts),
-        children: (
-          <FormControl size="small" fullWidth>
-            <InputLabel>Cliente</InputLabel>
-            <Select
-              label="Cliente"
-              value={customerId === '' ? '' : String(customerId)}
-              onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), opts)}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={String(c.id)}>
-                  {c.display_name || c.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        ),
-      },
-      seller_name: {
-        value: sellerId,
-        label: 'Filtra per venditore',
-        onSet: (v) => setSellerId(v === '' ? '' : Number(v), opts),
-        onReset: () => setSellerId('', opts),
-        children: (
-          <FormControl size="small" fullWidth>
-            <InputLabel>Venditore</InputLabel>
-            <Select
-              label="Venditore"
-              value={sellerId === '' ? '' : String(sellerId)}
-              onChange={(e) => setSellerId(e.target.value === '' ? '' : Number(e.target.value), opts)}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {sellers.map((s) => (
-                <MenuItem key={s.id} value={String(s.id)}>
-                  {s.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        ),
-      },
-      contract_type: {
-        value: typeFilter,
-        label: 'Filtra per tipo',
-        onSet: (v) => setTypeFilter(String(v), opts),
-        onReset: () => setTypeFilter('', opts),
-        children: (
-          <FormControl size="small" fullWidth>
-            <InputLabel>Tipo</InputLabel>
-            <Select label="Tipo" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value, opts)}>
-              <MenuItem value="">Tutti</MenuItem>
-              {CONTRACT_TYPE_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        ),
-      },
-      status: {
-        value: statusFilter,
-        label: 'Filtra per stato',
-        onSet: (v) => setStatusFilter(String(v), opts),
-        onReset: () => setStatusFilter('', opts),
-        children: (
-          <FormControl size="small" fullWidth>
-            <InputLabel>Stato</InputLabel>
-            <Select label="Stato" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value, opts)}>
-              <MenuItem value="">Tutti</MenuItem>
-              {CONTRACT_STATUS_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        ),
-      },
-    }
-  }, [
-    customerId,
-    setCustomerId,
-    customers,
-    sellerId,
-    setSellerId,
-    sellers,
-    typeFilter,
-    setTypeFilter,
-    statusFilter,
-    setStatusFilter,
-  ])
+  // Cliente filtrato (es. arrivando dal tab Contratti del drawer Cliente).
+  const filteredCustomer = React.useMemo(
+    () => (customerId === '' ? null : customers.find((c) => c.id === customerId) ?? null),
+    [customerId, customers],
+  )
 
   const emptyState = React.useMemo(() => {
     if (grid.view === 'deleted' && !grid.search.trim()) {
@@ -567,8 +496,36 @@ export default function Contracts() {
           compact: true,
           q: grid.q,
           onQChange: grid.setQ,
-          rightActions: (
-            <Stack direction="row" alignItems="center" gap={1}>
+          alignRightActions: true,
+          children: (
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+              {customerId !== '' ? (
+                <Chip
+                  size="small"
+                  label={`Cliente: ${filteredCustomer ? filteredCustomer.display_name || filteredCustomer.name : `#${customerId}`}`}
+                  onDelete={() => setCustomerId('', { patch: { page: 1 }, keepOpen: true })}
+                />
+              ) : null}
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={statusFilter}
+                onChange={(_e, v: string | null) => {
+                  if (v === null) return
+                  setStatusFilter(v, { patch: { page: 1 }, keepOpen: true })
+                }}
+                aria-label="Filtro stato contratto"
+                sx={{
+                  height: 32,
+                  '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 },
+                }}
+              >
+                {STATUS_FILTER_OPTIONS.map((o) => (
+                  <ToggleButton key={o.value || 'all'} value={o.value} aria-label={o.label}>
+                    {o.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
               <FormControl size="small" sx={{ minWidth: 130 }}>
                 <InputLabel id="contracts-year-label">Anno</InputLabel>
                 <Select
@@ -591,6 +548,10 @@ export default function Contracts() {
                   ))}
                 </Select>
               </FormControl>
+            </Stack>
+          ),
+          rightActions: (
+            <Stack direction="row" alignItems="center" gap={1}>
               {canViewSellers ? (
                 <Button
                   variant="outlined"
@@ -621,7 +582,6 @@ export default function Contracts() {
           sortModel: grid.sortModel,
           onSortModelChange: grid.onSortModelChange,
           onRowClick: openDrawer,
-          filterConfig,
           sx: {
             '--DataGrid-rowHeight': '24px',
             '--DataGrid-headerHeight': '35px',
@@ -662,6 +622,7 @@ export default function Contracts() {
         initialCustomer={customerId === '' ? null : customerId}
         customers={customers}
         sellers={sellers}
+        companies={companies}
         canViewValue={canViewValue}
         onClose={() => setDlgOpen(false)}
         onSaved={onSaved}

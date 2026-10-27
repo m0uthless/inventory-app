@@ -8980,6 +8980,9 @@ export interface components {
       readonly contract_type_label: string
       seller?: number | null
       readonly seller_name: string
+      /** Società */
+      company?: number | null
+      readonly company_label: string
       /** Format: date */
       start_date: string
       /** Format: date */
@@ -10785,6 +10788,9 @@ export interface components {
       readonly contract_type_label?: string
       seller?: number | null
       readonly seller_name?: string
+      /** Società */
+      company?: number | null
+      readonly company_label?: string
       /** Format: date */
       start_date?: string
       /** Format: date */
@@ -14706,6 +14712,7 @@ export interface operations {
     parameters: {
       query?: {
         auto_renew?: boolean
+        company?: number
         /**
          * @description * `assistenza` - Assistenza
          *     * `noleggio` - Noleggio
