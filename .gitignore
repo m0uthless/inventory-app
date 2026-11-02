@@ -56,3 +56,6 @@ backend/import_files/*
 
 # Screenshot locali usati per i mockup, non da versionare
 /screen/
+
+# graphify knowledge graph output (local)
+graphify-out/

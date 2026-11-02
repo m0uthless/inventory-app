@@ -21,6 +21,11 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Mappe: le tile ora arrivano da OpenStreetMap (con attribuzione), perché il provider precedente (CARTO) richiede una API key e mostrava "API KEY REQUIRED" al posto della mappa.
 - ServiceNow: la categoria Philips è temporaneamente nascosta nel pannello Triage, nelle Statistiche e nella pagina Assenze tecnici, che ora mostrano solo Biotron. Il filtro è solo lato frontend (`features/servicenow/visibleCategories.ts`): backend, case e utenti Philips restano invariati.
 
+### Fixed
+
+- Piano Ferie: la validazione e il rifiuto di una singola richiesta di assenza ora vengono registrati nel registro di audit, come già avveniva per le richieste di gruppo. In entrambi i casi l'evento riporta anche il cambio di stato.
+- Issue: la riassegnazione di una issue ora compare nel registro di audit con il vecchio e il nuovo assegnatario. Prima l'email di riassegnazione partiva, ma l'evento di audit non indicava cosa fosse cambiato.
+
 ## [0.9.4] - 2026-10-25
 
 ### Added
