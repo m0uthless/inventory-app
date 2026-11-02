@@ -33,7 +33,11 @@ prod-sync.sh
 .DS_Store
 .idea/
 .vscode/
-.claude/
+.claude/*
+!.claude/skills/
+
+# script locale con credenziali proxy (non versionare)
+update-docker-proxy-password-with-claude.sh
 
 # frontend
 frontend/node_modules/
