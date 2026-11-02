@@ -63,13 +63,18 @@ class _InternalOnlyMixin:
 
 class ContractDocumentPermissions(PortalModelPermissions):
     """Azione `document`: lettura con view_contract, upload/rimozione del PDF
-    sono una modifica del contratto (change_contract), non add/delete."""
+    sono una modifica del contratto (change_contract), non add/delete.
+    In più serve sempre il permesso sul valore economico: il PDF firmato
+    riporta di norma il prezzo del contratto."""
 
     perms_map = {
         **PortalModelPermissions.perms_map,
         "POST":   ["%(app_label)s.change_%(model_name)s"],
         "DELETE": ["%(app_label)s.change_%(model_name)s"],
     }
+
+    def has_permission(self, request, view):
+        return super().has_permission(request, view) and request.user.has_perm(VALUE_PERM)
 
 
 # ─── Seller ──────────────────────────────────────────────────────────────────
@@ -146,6 +151,9 @@ class ContractSerializer(serializers.ModelSerializer):
         user = getattr(request, "user", None)
         if not (user and user.has_perm(VALUE_PERM)):
             fields.pop("total_value", None)
+            # Anche il PDF (che riporta il prezzo) è riservato a chi vede i valori.
+            fields.pop("document_url", None)
+            fields.pop("document_filename", None)
         return fields
 
     def get_customer_name(self, obj):

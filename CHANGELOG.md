@@ -10,7 +10,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Added
 
 - Nuovo modulo Contratti: pagina `/contracts` con elenco (colonne tutte spostabili, filtri per stato e anno), colonna Società (stesse voci dello Stato dei clienti, proposta dal cliente del contratto), drawer di dettaglio e creazione/modifica dei contratti dei clienti, con indicatore di scadenza (preavviso, in scadenza, scaduto) e allegato PDF. Il PDF è servito solo tramite API (l'accesso diretto a `/media/contracts/` è bloccato da nginx) e il modulo non è accessibile dal Portal.
-- Contratti: i valori economici sono visibili solo a chi ha il permesso `contracts.view_contract_value` e non compaiono mai nel registro di audit (le modifiche restano tracciate con valore mascherato).
+- Contratti: i valori economici e il PDF del contratto (che riporta il prezzo) sono visibili solo a chi ha il permesso `contracts.view_contract_value` e non compaiono mai nel registro di audit (le modifiche restano tracciate con valore mascherato).
 - Contratti: il pulsante "Rinnova" crea il rinnovo manuale del contratto; l'opzione di rinnovo automatico è solo informativa e non genera rinnovi.
 - Nuova anagrafica venditori (`/api/sellers/`): un venditore può essere un utente interno o un referente esterno ed è selezionabile nei contratti.
 - Contratti: nel form del contratto si possono collegare i device del cliente; nel drawer del Cliente è disponibile la nuova tab "Contratti".

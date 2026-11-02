@@ -256,7 +256,7 @@ def test_document_upload_download_delete(settings, tmp_path):
     settings.MEDIA_ROOT = str(tmp_path)
     customer = _customer()
     c = _contract(customer)
-    client = _client(_internal_user(ALL_CONTRACT_PERMS))
+    client = _client(_internal_user(ALL_CONTRACT_PERMS + ["view_contract_value"]))
     url = f"/api/contracts/{c.id}/document/"
 
     pdf = SimpleUploadedFile("contratto.pdf", b"%PDF-1.4 minimal test content", content_type="application/pdf")
@@ -275,6 +275,27 @@ def test_document_upload_download_delete(settings, tmp_path):
     c.refresh_from_db()
     assert not c.document
     assert c.document_original_filename == ""
+
+
+def test_document_requires_value_perm(settings, tmp_path):
+    settings.MEDIA_ROOT = str(tmp_path)
+    customer = _customer()
+    c = _contract(customer)
+    url = f"/api/contracts/{c.id}/document/"
+    admin = _client(_internal_user(ALL_CONTRACT_PERMS + ["view_contract_value"]))
+    pdf = SimpleUploadedFile("contratto.pdf", b"%PDF-1.4 minimal test content", content_type="application/pdf")
+    assert admin.post(url, {"file": pdf}, format="multipart").status_code == 201
+
+    client = _client(_internal_user(ALL_CONTRACT_PERMS))
+    assert client.get(url).status_code == 403
+    pdf2 = SimpleUploadedFile("altro.pdf", b"%PDF-1.4 minimal test content", content_type="application/pdf")
+    assert client.post(url, {"file": pdf2}, format="multipart").status_code == 403
+    assert client.delete(url).status_code == 403
+    c.refresh_from_db()
+    assert c.document_original_filename == "contratto.pdf"
+
+    item = client.get(f"/api/contracts/{c.id}/").data
+    assert "document_url" not in item and "document_filename" not in item
 
 
 # ─── Soft delete / restore ───────────────────────────────────────────────────

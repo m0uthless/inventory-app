@@ -77,8 +77,9 @@ export type ContractListItem = {
   expiry_state: ExpiryState
   devices: number[]
   devices_detail: ContractDeviceDetail[]
-  document_url: string | null
-  document_filename: string | null
+  /** Assenti senza `contracts.view_contract_value` (il PDF riporta il prezzo). */
+  document_url?: string | null
+  document_filename?: string | null
   notes: string
   created_at: string
   updated_at: string

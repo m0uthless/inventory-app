@@ -138,6 +138,8 @@ export default function ContractDrawer({
             </DrawerSection>
           ) : null}
 
+          {/* Il PDF riporta di norma il prezzo: visibile solo con il permesso sui valori. */}
+          {canViewValue ? (
           <DrawerSection title="Documento PDF">
             <Stack spacing={1}>
               {detail.document_url ? (
@@ -204,6 +206,7 @@ export default function ContractDrawer({
               ) : null}
             </Stack>
           </DrawerSection>
+          ) : null}
         </>
       ) : <DrawerEmptyState />}
     </DrawerShell>
