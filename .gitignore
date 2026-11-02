@@ -59,3 +59,12 @@ backend/import_files/*
 
 # graphify knowledge graph output (local)
 graphify-out/
+
+# Impeccable (design skill) — artefatti locali, non versionati
+.claude/skills/impeccable/
+.impeccable/
+**/.impeccable/
+/PRODUCT.md
+/frontend/DESIGN.md
+/frontend-portal/DESIGN.md
+/frontend-portal/PRODUCT.md
