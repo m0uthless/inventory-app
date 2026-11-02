@@ -248,6 +248,11 @@ function ColumnHeader({
           <Tooltip title={filterActive ? `${fc.label ?? 'Filtro'}: attivo` : (fc.label ?? 'Filtra')} arrow>
             <IconButton
               size="small"
+              // tabIndex -1 come i pulsanti nativi MUI dell'header (Ordina,
+              // Menù colonna): un discendente tabbabile (tabindex=0) dentro
+              // l'header impedisce a Chromium di avviare il drag nativo, e le
+              // colonne con filtro non si potevano più spostare.
+              tabIndex={-1}
               draggable={false}
               onDragStart={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.preventDefault()}

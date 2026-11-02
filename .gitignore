@@ -68,3 +68,6 @@ graphify-out/
 /frontend/DESIGN.md
 /frontend-portal/DESIGN.md
 /frontend-portal/PRODUCT.md
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+.playwright/

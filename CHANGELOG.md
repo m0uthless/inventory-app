@@ -15,14 +15,18 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Nuova anagrafica venditori (`/api/sellers/`): un venditore può essere un utente interno o un referente esterno ed è selezionabile nei contratti.
 - Contratti: nel form del contratto si possono collegare i device del cliente; nel drawer del Cliente è disponibile la nuova tab "Contratti".
 - I dati base dei Device sono ora gestibili anche da Archie, con la nuova tab "Device" nel drawer del Cliente; i device creati sono visibili anche nel Portal del cliente.
+- Clienti: nuovi filtri sulle colonne per vendor, provincia, presenza della VPN e del contatto primario (API: `has_vpn`, `has_contact`), salvati nell'URL. Con nessun risultato la lista propone "Cancella ricerca" e "Azzera filtri".
 
 ### Changed
 
+- Clienti: la colonna "Stato" si chiama ora "Vendor" (il lookup contiene il vendor) ed è testo neutro. Su mobile le card hanno pulsanti diretti per chiamare, scrivere e aprire la VPN; nel drawer il telefono del contatto primario si chiama o si copia con un tocco e le etichette dei campi personalizzati sono leggibili.
+- Drawer: le tab scorrono quando non entrano nella larghezza (es. Cliente) e il testo dell'intestazione ha più contrasto. Le liste senza righe non mostrano più il paginatore.
 - Mappe: le tile ora arrivano da OpenStreetMap (con attribuzione), perché il provider precedente (CARTO) richiede una API key e mostrava "API KEY REQUIRED" al posto della mappa.
 - ServiceNow: la categoria Philips è temporaneamente nascosta nel pannello Triage, nelle Statistiche e nella pagina Assenze tecnici, che ora mostrano solo Biotron. Il filtro è solo lato frontend (`features/servicenow/visibleCategories.ts`): backend, case e utenti Philips restano invariati.
 
 ### Fixed
 
+- Liste: le colonne con filtro (imbuto nell'intestazione) non si potevano trascinare per cambiarne l'ordine; ora si spostano come le altre.
 - Piano Ferie: la validazione e il rifiuto di una singola richiesta di assenza ora vengono registrati nel registro di audit, come già avveniva per le richieste di gruppo. In entrambi i casi l'evento riporta anche il cambio di stato.
 - Issue: la riassegnazione di una issue ora compare nel registro di audit con il vecchio e il nuovo assegnatario. Prima l'email di riassegnazione partiva, ma l'evento di audit non indicava cosa fosse cambiato.
 

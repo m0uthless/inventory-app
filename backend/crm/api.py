@@ -54,10 +54,20 @@ class CustomerFilter(filters.FilterSet):
     # province è ora una colonna reale (crm/migrations/0010_customer_province.py):
     # filtro diretto, niente hack JSON come per city.
     province = filters.CharFilter(field_name="province", lookup_expr="icontains")
+    # Filtri sulle annotazioni di CustomerViewSet.get_queryset (has_vpn,
+    # primary_contact_id): il filterset gira dopo get_queryset, quindi le
+    # annotazioni sono gia' presenti.
+    has_vpn = filters.BooleanFilter(field_name="has_vpn")
+    has_contact = filters.BooleanFilter(method="filter_has_contact")
 
     class Meta:
         model = Customer
-        fields = ["status", "city", "province"]
+        fields = ["status", "city", "province", "has_vpn", "has_contact"]
+
+    def filter_has_contact(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(primary_contact_id__isnull=not value)
 
     def filter_city(self, queryset, name, value):
         v = (value or "").strip()
