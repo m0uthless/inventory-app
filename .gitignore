@@ -64,6 +64,10 @@ graphify-out/
 .claude/skills/impeccable/
 .impeccable/
 **/.impeccable/
+# Copia di impeccable installata per GitHub Copilot (contiene un eseguibile da ~21 MB)
+.github/skills/impeccable/
+.github/agents/impeccable-*.agent.md
+.github/hooks/impeccable.json
 /PRODUCT.md
 /frontend/DESIGN.md
 /frontend-portal/DESIGN.md
