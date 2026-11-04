@@ -5,6 +5,7 @@
  * completamente indipendenti dall'altra colonna.
  */
 import * as React from 'react'
+import { KpiTile } from '../ui/campo'
 import { alpha, useTheme } from '@mui/material/styles'
 import type { Theme } from '@mui/material/styles'
 import { useKpiAccents, useWidgetAccents } from '../theme/AppThemeProvider'
@@ -97,50 +98,13 @@ const WEEK_OPTIONS = Array.from({ length: 53 }, (_, i) => i + 1)
 
 // ─── KPI card ─────────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, helper, accent, valueFontSize = '1.75rem' }: {
-  label: string; value: string; helper?: string; accent: string; valueFontSize?: string
+function KpiCard({ label, value, helper }: {
+  label: string; value: string; helper?: string; accent?: string; valueFontSize?: string
 }) {
-  const theme = useTheme()
+  // Restyle "Campo sterile": riquadro indicatore neutro (DESIGN.md › KPI strip).
   return (
-    <Box sx={{
-      position: 'relative', overflow: 'hidden', borderRadius: '8px', flex: 1, minWidth: 0,
-      display: 'flex', flexDirection: 'column', justifyContent: 'center',
-      p: { xs: '12px', sm: '14px 16px' },
-      backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.62)} 0%, ${alpha(accent, 0.86)} 100%)`,
-      border: `1px solid ${alpha(accent, 0.18)}`,
-      boxShadow: `0 10px 28px ${alpha(accent, 0.18)}`,
-      '&::before': {
-        content: '""', position: 'absolute',
-        width: 80, height: 80, borderRadius: '50%',
-        right: -20, top: -16,
-        backgroundColor: alpha(theme.palette.common.white, 0.14),
-      },
-      '&::after': {
-        content: '""', position: 'absolute',
-        width: 100, height: 100, borderRadius: '50%',
-        right: 16, bottom: -52,
-        backgroundColor: alpha(theme.palette.common.white, 0.10),
-      },
-    }}>
-      <Box sx={{ position: 'relative', zIndex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: alpha(theme.palette.common.white, 0.85), mb: '6px', lineHeight: 1.2 }}>
-          {label}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: valueFontSize, fontWeight: 800, color: theme.palette.common.white, lineHeight: 1.2, letterSpacing: -0.5,
-            textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}`,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}
-        >
-          {value}
-        </Typography>
-        {helper && (
-          <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: alpha(theme.palette.common.white, 0.75), mt: '4px' }} noWrap>
-            {helper}
-          </Typography>
-        )}
-      </Box>
+    <Box sx={{ flex: 1, minWidth: 0, display: 'grid' }}>
+      <KpiTile label={label} value={value} sub={helper} />
     </Box>
   )
 }

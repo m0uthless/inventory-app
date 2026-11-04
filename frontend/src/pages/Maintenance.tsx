@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react'
+import { KpiTile } from '../ui/campo'
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Checkbox,
   Chip,
   CircularProgress,
@@ -94,61 +93,16 @@ const DW = { xs: '100%', sm: 416 } as const
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
-function StatCard({ value, label, sublabel, accent, icon: Icon }: {
+function StatCard({ value, label, sublabel }: {
   value: number | null; label: string; sublabel?: string
-  accent: string
-  icon: React.ElementType
+  accent?: string
+  icon?: React.ElementType
 }) {
-  const theme = useTheme()
+  // Restyle "Campo sterile": riquadro indicatore neutro (DESIGN.md › KPI strip).
   return (
-    <Card
-      elevation={0}
-      sx={{
-        flex: '1 1 0', minWidth: 0,
-        position: 'relative', overflow: 'hidden',
-        borderRadius: 1,
-        color: theme.palette.common.white,
-        backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.72)} 0%, ${alpha(accent, 0.94)} 100%)`,
-        border: `1px solid ${alpha(accent, 0.22)}`,
-        boxShadow: `0 10px 28px ${alpha(accent, 0.22)}`,
-        '&::before': {
-          content: '""', position: 'absolute',
-          width: 110, height: 110, borderRadius: '50%',
-          right: -24, top: -22,
-          backgroundColor: alpha(theme.palette.common.white, 0.13),
-        },
-        '&::after': {
-          content: '""', position: 'absolute',
-          width: 130, height: 130, borderRadius: '50%',
-          right: 24, bottom: -72,
-          backgroundColor: alpha(theme.palette.common.white, 0.10),
-        },
-      }}
-    >
-      <CardContent sx={{ position: 'relative', zIndex: 1, px: 2.5, py: 2.25, '&:last-child': { pb: 2.25 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 2.5 }}>
-          <Box>
-            <Typography variant="overline" sx={{ display: 'block', color: alpha(theme.palette.common.white, 0.9), letterSpacing: 0.4, fontSize: 11, fontWeight: 700, textTransform: 'none', lineHeight: 1.2 }}>
-              Manutenzione
-            </Typography>
-            <Typography variant="h6" sx={{ mt: 0.5, fontWeight: 700, lineHeight: 1.15, color: theme.palette.common.white }}>
-              {label}
-            </Typography>
-          </Box>
-          <Box sx={{ width: 40, height: 40, borderRadius: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(theme.palette.common.white, 0.16), border: `1px solid ${alpha(theme.palette.common.white, 0.22)}` }}>
-            <Icon sx={{ fontSize: 22, color: theme.palette.common.white }} />
-          </Box>
-        </Box>
-        <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1, letterSpacing: -1.4, color: theme.palette.common.white, textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}` }}>
-          {value != null ? value.toLocaleString('it-IT') : '—'}
-        </Typography>
-        {sublabel && (
-          <Typography variant="body2" sx={{ mt: 1.25, color: alpha(theme.palette.common.white, 0.88), fontWeight: 600 }}>
-            {sublabel}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
+    <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'grid' }}>
+      <KpiTile label={label} value={value != null ? value.toLocaleString('it-IT') : '—'} sub={sublabel} />
+    </Box>
   )
 }
 

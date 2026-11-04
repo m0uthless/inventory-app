@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { KpiTile } from '../ui/campo'
 import {
   Box,
   Card,
@@ -100,115 +101,15 @@ function fmtRating(value?: number | null) {
   })
 }
 
-function StatKpiCard({
-  icon,
-  label,
-  value,
-  helper,
-  accent,
-}: {
-  icon: React.ReactNode
+function StatKpiCard({ label, value, helper }: {
+  icon?: React.ReactNode
   label: string
   value: string | number
   helper: string
-  accent: string
+  accent?: string
 }) {
-  const theme = useTheme()
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        position: 'relative',
-        overflow: 'hidden',
-        borderRadius: 1,
-        minHeight: 176,
-        color: theme.palette.common.white,
-        backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.72)} 0%, ${alpha(accent, 0.96)} 100%)`,
-        border: `1px solid ${alpha(accent, 0.24)}`,
-        boxShadow: `0 14px 34px ${alpha(accent, 0.24)}`,
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          width: 132,
-          height: 132,
-          borderRadius: '50%',
-          right: -30,
-          top: -18,
-          backgroundColor: alpha(theme.palette.common.white, 0.14),
-        },
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          width: 160,
-          height: 160,
-          borderRadius: '50%',
-          right: 24,
-          bottom: -88,
-          backgroundColor: alpha(theme.palette.common.white, 0.1),
-        },
-      }}
-    >
-      <Box
-        sx={{
-          position: 'relative',
-          zIndex: 1,
-          height: '100%',
-          px: 2.5,
-          py: 2.25,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
-          <Box>
-            <Typography
-              variant="overline"
-              sx={{
-                display: 'block',
-                color: alpha(theme.palette.common.white, 0.92),
-                letterSpacing: 0.36,
-                fontSize: 12,
-                fontWeight: 700,
-                lineHeight: 1.2,
-                textTransform: 'none',
-              }}
-            >
-              Statistiche Wiki
-            </Typography>
-            <Typography variant="h6" sx={{ mt: 0.75, fontWeight: 700, lineHeight: 1.15 }}>
-              {label}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              width: 42,
-              height: 42,
-              borderRadius: 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: alpha(theme.palette.common.white, 0.18),
-              color: theme.palette.common.white,
-              border: `1px solid ${alpha(theme.palette.common.white, 0.18)}`,
-              flexShrink: 0,
-            }}
-          >
-            {icon}
-          </Box>
-        </Stack>
-
-        <Stack spacing={0.75}>
-          <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1, letterSpacing: -1.1 }}>
-            {value}
-          </Typography>
-          <Typography variant="body2" sx={{ color: alpha(theme.palette.common.white, 0.9) }}>
-            {helper}
-          </Typography>
-        </Stack>
-      </Box>
-    </Card>
-  )
+  // Restyle "Campo sterile": riquadro indicatore neutro (DESIGN.md › KPI strip).
+  return <KpiTile label={label} value={value} sub={helper} />
 }
 
 function SectionCard({ title, helper, action, children }: {
