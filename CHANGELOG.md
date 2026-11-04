@@ -7,6 +7,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-04
+
 ### Added
 
 - Nuovo modulo Contratti: pagina `/contracts` con elenco (colonne tutte spostabili, filtri per stato e anno), colonna Società (stesse voci dello Stato dei clienti, proposta dal cliente del contratto), drawer di dettaglio e creazione/modifica dei contratti dei clienti, con indicatore di scadenza (preavviso, in scadenza, scaduto) e allegato PDF. Il PDF è servito solo tramite API (l'accesso diretto a `/media/contracts/` è bloccato da nginx) e il modulo non è accessibile dal Portal.
