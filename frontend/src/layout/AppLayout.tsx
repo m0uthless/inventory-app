@@ -39,6 +39,7 @@ import { getPageTitle, type NavLeaf } from './appNav'
 import { AppSidebar } from './AppSidebar'
 import { SiteRepoV2Toolbar_Shell } from './SiteRepoV2Toolbar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
+import { UndoToastProvider } from '../ui/campo'
 
 const ProfileDrawer = React.lazy(() =>
   import('../pages/Profile').then((m) => ({ default: m.ProfileDrawer })),
@@ -253,6 +254,7 @@ export function AppLayout() {
     <DashboardEditModeProvider>
     <SiteRepoV2Provider>
     <PageHeaderProvider>
+    <UndoToastProvider>
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'archie.frame' }}>
       <DevEnvironmentBadge />
 
@@ -438,6 +440,7 @@ export function AppLayout() {
         {Boolean(me) && <ChangelogLoginModal />}
       </React.Suspense>
     </Box>
+    </UndoToastProvider>
     </PageHeaderProvider>
     </SiteRepoV2Provider>
     </DashboardEditModeProvider>
