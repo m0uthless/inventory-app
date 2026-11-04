@@ -1,6 +1,6 @@
 # Restyle frontend Archie — sintesi di progetto
 
-Data: 2026-11-04 · Stato: **da confermare** · Ramo: `restyle`
+Data: 2026-11-04 · Stato: **decisioni aperte risolte, in attesa di conferma finale** · Ramo: `restyle`
 Riferimento visivo: `design-previews/h-base.html` (Issue) e `design-previews/po-base.html` (Purchase Order).
 
 ## 1. Per chi e per cosa
@@ -63,11 +63,11 @@ Riferimento visivo: `design-previews/h-base.html` (Issue) e `design-previews/po-
 - Purchase Order: conteggio "da fatturare" in `summary`; soglie "da sollecitare" da decidere; margine calcolato in frontend.
 - Ricerca Ctrl K: usa l'endpoint di ricerca globale esistente.
 
-**Decisioni ancora aperte (da non inventare)**
-1. Chiaro/scuro: predefinito "segue il sistema" o "chiaro"?
-2. Le tre palette restano tutte disponibili agli utenti, o se ne sceglie una e le altre spariscono?
-3. Soglie "da sollecitare" dei Purchase Order (proposta: 7 / 21 / 14 giorni).
-4. Ordine di migrazione delle pagine dopo Issue e PO (proposta: Clienti, Siti, Inventari, Contratti, Manutenzione, poi il resto).
+**Decisioni prese (2026-11-04)**
+1. **Chiaro/scuro:** predefinito **chiaro**; lo scuro si attiva dal profilo utente (opzione "segue il sistema" disponibile ma non predefinita).
+2. **Palette:** si implementano tutte e tre (Verde, Blu, Indaco) nel registro temi, ma **per ora è attiva solo Verde**: Blu e Indaco non compaiono nella scelta del profilo finché non si decide di aprirle.
+3. **Soglie "da sollecitare" PO:** da inviare oltre **7** giorni, in attesa del PO oltre **21**, da fatturare oltre **14**.
+4. **Ordine di migrazione:** Issue e Purchase Order (pilota), poi **Clienti, Siti, Inventari, Contratti, Manutenzione**, poi il resto.
 
 ## 8. Piano di consegna (dopo conferma)
 
