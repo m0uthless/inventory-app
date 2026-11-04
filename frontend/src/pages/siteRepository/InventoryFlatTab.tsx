@@ -55,5 +55,5 @@ export function InventoryFlatTab({ customerId, searchQuery, statusFilter, onOpen
     </Box>
   )
 
-  return <InventoryInlineList rows={filtered} onOpenDrawer={onOpenDrawer} onRowContextMenu={onInventoryContextMenu} />
+  return <InventoryInlineList rows={filtered} searchQuery={searchQuery} onOpenDrawer={onOpenDrawer} onRowContextMenu={onInventoryContextMenu} />
 }

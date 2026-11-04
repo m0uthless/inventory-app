@@ -23,12 +23,14 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Drawer: le tab scorrono quando non entrano nella larghezza (es. Cliente) e il testo dell'intestazione ha più contrasto. Le liste senza righe non mostrano più il paginatore.
 - Mappe: le tile ora arrivano da OpenStreetMap (con attribuzione), perché il provider precedente (CARTO) richiede una API key e mostrava "API KEY REQUIRED" al posto della mappa.
 - ServiceNow: la categoria Philips è temporaneamente nascosta nel pannello Triage, nelle Statistiche e nella pagina Assenze tecnici, che ora mostrano solo Biotron. Il filtro è solo lato frontend (`features/servicenow/visibleCategories.ts`): backend, case e utenti Philips restano invariati.
+- Site Repository: elenco asset riordinato per l'uso in campo (prima nome, hostname, IP e K#, poi stato), colonne facoltative nascoste quando sono vuote in tutte le righe e testo cercato evidenziato nei risultati. Su telefono la barra va a capo senza coprire l'elenco, gli asset diventano card e la cartina si apre a schermo intero. Quando la ricerca non trova nulla, la pagina spiega dove cerca e propone "Cancella ricerca"; etichette e intestazioni hanno più contrasto.
 
 ### Fixed
 
 - Liste: le colonne con filtro (imbuto nell'intestazione) non si potevano trascinare per cambiarne l'ordine; ora si spostano come le altre.
 - Piano Ferie: la validazione e il rifiuto di una singola richiesta di assenza ora vengono registrati nel registro di audit, come già avveniva per le richieste di gruppo. In entrambi i casi l'evento riporta anche il cambio di stato.
 - Issue: la riassegnazione di una issue ora compare nel registro di audit con il vecchio e il nuovo assegnatario. Prima l'email di riassegnazione partiva, ma l'evento di audit non indicava cosa fosse cambiato.
+- Site Repository: il contatore "siti" di ogni cliente contava anche i siti senza asset; ora conta solo i siti con almeno un asset non eliminato.
 
 ## [0.9.4] - 2026-10-25
 

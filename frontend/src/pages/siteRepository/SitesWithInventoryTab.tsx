@@ -5,6 +5,7 @@ import { api } from '@shared/api/client'
 
 import type { InventoryRow, SiteRow, StatusFilter } from './types'
 import { FS, matchesSearch, matchesStatusFilter } from './style'
+import { columnHeaderSx } from './tokens'
 import { SITE_COL, SITE_HEADERS, CollapsibleSiteRow } from './CollapsibleSiteRow'
 import { InventoryInlineList } from './InventoryInlineList'
 
@@ -106,16 +107,15 @@ export function SitesWithInventoryTab({
     <Box>
       {/* Header colonne */}
       <Box sx={{
-        display: 'grid',
         gridTemplateColumns: SITE_COL,
-        px: 2, py: 0.625,
+        px: 2, py: 0.75,
+        display: { xs: 'none', sm: 'grid' },
         bgcolor: 'grey.50',
         borderBottom: '1px solid', borderColor: 'divider',
         gap: 1,
       }}>
         {SITE_HEADERS.map((h) => (
-          <Typography key={h}
-            sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: '0.06em', fontSize: FS.micro }}>
+          <Typography key={h} sx={columnHeaderSx}>
             {h}
           </Typography>
         ))}
@@ -151,12 +151,11 @@ export function SitesWithInventoryTab({
         return filteredOrphans.length > 0 ? (
           <>
             <Box sx={{ px: 2, py: 0.75, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'divider' }}>
-              <Typography
-                sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: '0.06em', fontSize: FS.micro }}>
-                ASSET SENZA SITO
+              <Typography sx={columnHeaderSx}>
+                Asset senza sito
               </Typography>
             </Box>
-            <InventoryInlineList rows={filteredOrphans} onOpenDrawer={onOpenDrawer} onRowContextMenu={onInventoryContextMenu} />
+            <InventoryInlineList rows={filteredOrphans} searchQuery={searchQuery} onOpenDrawer={onOpenDrawer} onRowContextMenu={onInventoryContextMenu} />
           </>
         ) : null
       })()}

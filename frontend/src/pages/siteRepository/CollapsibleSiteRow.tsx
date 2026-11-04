@@ -6,11 +6,10 @@ import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { Tooltip } from '@mui/material'
 import StatusChip from '@shared/ui/StatusChip'
 
 import type { InventoryRow, SiteRow, StatusFilter } from './types'
-import { FS, ICON, matchesSearch, matchesStatusFilter } from './style'
+import { FS, ICON, Highlight, matchesSearch, matchesStatusFilter } from './style'
 import { ActionButton, CountStat } from './primitives'
 import { InventoryInlineList } from './InventoryInlineList'
 import { ContactsListModal } from './ContactsListModal'
@@ -36,8 +35,8 @@ export type CollapsibleSiteRowProps = {
   matchedAssetIds?: Set<number>
 }
 
-export const SITE_COL = '1fr 170px'
-export const SITE_HEADERS = ['SITO', '']
+export const SITE_COL = 'minmax(0, 1fr) auto'
+export const SITE_HEADERS = ['Sito', '']
 
 export function CollapsibleSiteRow({
   site, allInventory, searchQuery, statusFilter, onOpenDrawer, onOpenSite, onOpenSiteContacts, canViewSite,
@@ -78,6 +77,7 @@ export function CollapsibleSiteRow({
   )
 
   const contactLabel = site.primary_contact_name || ''
+  const siteName = site.display_name || site.name
   const addressLine = [site.address_line1, site.postal_code, site.city].filter(Boolean).join(' - ')
 
   return (
@@ -91,12 +91,15 @@ export function CollapsibleSiteRow({
       boxShadow: open ? `inset 3px 0 0 ${theme.palette.primary.main}` : 'none',
       transition: 'background 0.15s, box-shadow 0.15s',
     }}>
-      {/* Riga sito */}
+      {/* Riga sito: da sm in su una griglia nome | azioni; su mobile il nome
+          prende tutta la larghezza (prima veniva troncato a 2-3 lettere) e
+          contatori/azioni scendono su una seconda riga. */}
       <Box
         role="button"
         tabIndex={0}
         aria-expanded={open}
         aria-controls={contentId}
+        aria-label={`Sito ${siteName}`}
         onClick={() => setOpen((p) => !p)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -107,9 +110,11 @@ export function CollapsibleSiteRow({
         onContextMenu={(e) => { e.preventDefault(); onSiteContextMenu(site, e) }}
         sx={{
           display: 'grid',
-          gridTemplateColumns: SITE_COL,
+          gridTemplateColumns: { xs: '1fr', sm: SITE_COL },
           alignItems: 'center',
-          px: 2, py: 0.9,
+          px: 2, py: 1,
+          rowGap: 0.75,
+          columnGap: 1.5,
           cursor: 'pointer',
           bgcolor: 'transparent',
           transition: 'background 0.12s',
@@ -119,45 +124,47 @@ export function CollapsibleSiteRow({
             outlineColor: theme.palette.primary.main,
             outlineOffset: -2,
           },
-          gap: 1,
         }}
       >
-        {/* Sito — nome + stato + contatto inline, indirizzo sotto (come CustomerCard) */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ flexShrink: 0, p: 0.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, minWidth: 0 }}>
+          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ flexShrink: 0, p: 0.25, mt: '1px' }}>
             {open ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
           </IconButton>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 1, rowGap: 0.5, minWidth: 0 }}>
               <Typography fontWeight={open ? 700 : 600} sx={{
-                fontSize: FS.body,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontSize: FS.title,
+                minWidth: 0,
+                overflowWrap: 'anywhere',
               }}>
-                {site.display_name || site.name}
+                <Highlight text={siteName} query={searchQuery} />
               </Typography>
               {site.status_label ? (
                 <StatusChip statusId={site.status ?? undefined} label={site.status_label} size="small" sx={{ flexShrink: 0, fontWeight: 700 }} />
               ) : null}
-              {contactLabel && (
-                <Typography
-                  onClick={canViewSite ? (e) => { e.stopPropagation(); onOpenSite(site.id) } : undefined}
-                  sx={{
-                    fontSize: FS.micro,
-                    color: canViewSite ? 'primary.main' : 'text.secondary',
-                    cursor: canViewSite ? 'pointer' : 'default',
-                    minWidth: 0,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    ...(canViewSite ? { '&:hover': { textDecoration: 'underline' } } : {}),
-                  }}
-                >
-                  {contactLabel}
-                  {site.primary_contact_phone ? ` · ${site.primary_contact_phone}` : ''}
-                </Typography>
-              )}
             </Box>
+            {contactLabel && (
+              <Typography
+                component={canViewSite ? 'button' : 'span'}
+                onClick={canViewSite ? (e: React.MouseEvent) => { e.stopPropagation(); onOpenSite(site.id) } : undefined}
+                onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+                sx={{
+                  display: 'block', p: 0, border: 0, bgcolor: 'transparent', font: 'inherit', textAlign: 'left',
+                  fontSize: FS.body,
+                  color: canViewSite ? 'primary.dark' : 'text.secondary',
+                  cursor: canViewSite ? 'pointer' : 'default',
+                  maxWidth: '100%',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  ...(canViewSite ? { '&:hover': { textDecoration: 'underline' } } : {}),
+                }}
+              >
+                {contactLabel}
+                {site.primary_contact_phone ? ` · ${site.primary_contact_phone}` : ''}
+              </Typography>
+            )}
             {addressLine && (
               <Typography color="text.secondary" sx={{
-                fontSize: FS.micro,
+                fontSize: FS.body,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
               }}>
                 {addressLine}
@@ -166,8 +173,15 @@ export function CollapsibleSiteRow({
           </Box>
         </Box>
 
-        {/* Conteggio asset — Info e Contatti spostati qui accanto (come CustomerCard) */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, justifyContent: 'flex-end' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, pl: { xs: 3.5, sm: 0 } }}>
+          <CountStat
+            value={totalCount}
+            label="asset"
+            tooltip="Vai agli asset"
+            onClick={(e) => { e.stopPropagation(); setOpen(true) }}
+          />
+          {/* Larghezza riservata: il contatore asset resta in colonna tra i siti. */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, minWidth: { sm: 120, lg: 219 } }}>
           {issueCount > 0 && (
             <ActionButton
               tone="danger"
@@ -177,39 +191,34 @@ export function CollapsibleSiteRow({
               onClick={(e) => { e.stopPropagation(); setOpen(true) }}
             />
           )}
-          <CountStat
-            value={totalCount}
-            label="asset"
-            tooltip="Vai agli asset"
-            onClick={(e) => { e.stopPropagation(); setOpen(true) }}
-          />
           {(site.contacts_count ?? 0) > 1 && (
-            <Tooltip title="Contatti collegati" arrow>
-              <ActionButton
-                tone="neutral"
-                icon={<GroupsOutlinedIcon />}
-                ariaLabel="Contatti sito"
-                onClick={(e) => { e.stopPropagation(); setContactsModalOpen(true) }}
-              />
-            </Tooltip>
+            <ActionButton
+              tone="neutral"
+              icon={<GroupsOutlinedIcon />}
+              ariaLabel="Contatti del sito"
+              label="Contatti"
+              title="Contatti collegati al sito"
+              onClick={(e) => { e.stopPropagation(); setContactsModalOpen(true) }}
+            />
           )}
           {canViewSite && (
-            <Tooltip title="Apri scheda sito" arrow>
-              <ActionButton
-                tone="info"
-                icon={<InfoOutlinedIcon />}
-                ariaLabel="Info sito"
-                onClick={(e) => { e.stopPropagation(); onOpenSite(site.id) }}
-              />
-            </Tooltip>
+            <ActionButton
+              tone="neutral"
+              icon={<InfoOutlinedIcon />}
+              ariaLabel="Scheda del sito"
+              label="Scheda"
+              title="Apri la scheda del sito"
+              onClick={(e) => { e.stopPropagation(); onOpenSite(site.id) }}
+            />
           )}
+          </Box>
         </Box>
       </Box>
 
       {/* Lista asset */}
       <Collapse in={open} unmountOnExit>
         <Box id={contentId}>
-          <InventoryInlineList rows={siteAssets} onOpenDrawer={onOpenDrawer} onRowContextMenu={onInventoryContextMenu} />
+          <InventoryInlineList rows={siteAssets} searchQuery={searchQuery} onOpenDrawer={onOpenDrawer} onRowContextMenu={onInventoryContextMenu} />
         </Box>
       </Collapse>
 
