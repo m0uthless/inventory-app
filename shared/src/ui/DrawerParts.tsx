@@ -19,6 +19,7 @@ import {
   type SxProps,
   type Theme,
 } from '@mui/material'
+import { useDrawerAppearance } from './DrawerShell'
 import { alpha } from '@mui/material/styles'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined'
@@ -54,6 +55,30 @@ export function DrawerSection({
   children,
   sx,
 }: DrawerSectionProps) {
+  const campo = useDrawerAppearance() === 'campo'
+  if (campo) {
+    // Restyle "Campo sterile": riquadro piatto su paper, titolo in sentence case,
+    // l'accento è un fondo tenue (niente bordo spesso su un angolo arrotondato).
+    return (
+      <Box sx={{
+        bgcolor: accent && accent !== 'neutral' ? `${accent}.light` : 'background.paper',
+        border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5,
+        ...sx,
+      }}>
+        {title ? (
+          <Typography component="h3" sx={{
+            fontSize: 12, fontWeight: 600, letterSpacing: 0, textTransform: 'none',
+            color: accent && accent !== 'neutral' ? `${accent}.main` : 'text.secondary',
+            display: 'flex', alignItems: 'center', gap: 0.75, mb: 1, '& svg': { fontSize: 14 },
+          }}>
+            {icon}
+            {title}
+          </Typography>
+        ) : null}
+        {children}
+      </Box>
+    )
+  }
   const bg = variant === 'muted' ? '#fafafa' : '#f8fafc'
   const border = variant === 'muted' ? 'grey.100' : 'grey.200'
 
@@ -230,16 +255,18 @@ export interface DrawerAddressSectionProps {
 }
 
 export function DrawerAddressSection({ address, mapSlot }: DrawerAddressSectionProps) {
+  const campo = useDrawerAppearance() === 'campo'
   return (
-    <Box sx={{ bgcolor: '#fff', borderRadius: 1, border: '1px solid', borderColor: 'grey.200', overflow: 'hidden' }}>
-      <Box sx={{ px: 1.75, pt: 1.5, pb: 1.25 }}>
+    <Box sx={{ bgcolor: campo ? 'background.paper' : '#fff', borderRadius: campo ? '8px' : 1, border: '1px solid', borderColor: campo ? 'divider' : 'grey.200', overflow: 'hidden' }}>
+      <Box sx={{ px: campo ? 1.5 : 1.75, pt: 1.5, pb: 1.25 }}>
         <Typography
           variant="caption"
           sx={{
-            fontWeight: 700,
-            color: 'text.disabled',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
+            fontWeight: campo ? 600 : 700,
+            fontSize: campo ? 12 : undefined,
+            color: campo ? 'text.secondary' : 'text.disabled',
+            letterSpacing: campo ? 0 : '0.08em',
+            textTransform: campo ? 'none' : 'uppercase',
             display: 'flex',
             alignItems: 'center',
             gap: 0.75,

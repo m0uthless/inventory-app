@@ -40,6 +40,7 @@ import { AppSidebar } from './AppSidebar'
 import { SiteRepoV2Toolbar_Shell } from './SiteRepoV2Toolbar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
 import { UndoToastProvider } from '../ui/campo'
+import { DrawerAppearanceProvider } from '@shared/ui/DrawerShell'
 
 const ProfileDrawer = React.lazy(() =>
   import('../pages/Profile').then((m) => ({ default: m.ProfileDrawer })),
@@ -255,6 +256,7 @@ export function AppLayout() {
     <SiteRepoV2Provider>
     <PageHeaderProvider>
     <UndoToastProvider>
+    <DrawerAppearanceProvider value="campo">
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'archie.frame' }}>
       <DevEnvironmentBadge />
 
@@ -440,6 +442,7 @@ export function AppLayout() {
         {Boolean(me) && <ChangelogLoginModal />}
       </React.Suspense>
     </Box>
+    </DrawerAppearanceProvider>
     </UndoToastProvider>
     </PageHeaderProvider>
     </SiteRepoV2Provider>
