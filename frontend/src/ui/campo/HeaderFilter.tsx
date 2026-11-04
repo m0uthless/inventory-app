@@ -110,6 +110,7 @@ export function FilterHeader({ title, filter }: { title: string; filter?: React.
 }
 
 /** Stile da aggiungere al DataGrid per mostrare l'imbuto al passaggio sull'intestazione. */
+// eslint-disable-next-line react-refresh/only-export-components
 export const headerFilterGridSx = {
   '& .MuiDataGrid-columnHeader:hover .hf-btn, & .MuiDataGrid-columnHeader:focus-within .hf-btn': { opacity: 1 },
   '& .MuiDataGrid-columnHeaderTitleContainerContent': { width: '100%' },
