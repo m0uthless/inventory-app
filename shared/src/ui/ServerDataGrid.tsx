@@ -55,6 +55,8 @@ type Props<R extends GridValidRowModel> = {
   slots?: DataGridProps<R>['slots']
   slotProps?: DataGridProps<R>['slotProps']
   density?: DataGridProps<R>['density']
+  /** Altezza riga in px (predefinita 36). */
+  rowHeight?: number
   zebra?: boolean
   checkboxSelection?: boolean
   rowSelectionModel?: GridRowSelectionModel
@@ -326,6 +328,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     slots,
     slotProps,
     density,
+    rowHeight,
     zebra = false,
     checkboxSelection,
     rowSelectionModel,
@@ -664,7 +667,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         loading={loading}
         density={density}
         columnHeaderHeight={32}
-        rowHeight={36}
+        rowHeight={rowHeight ?? 36}
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}
         rowSelectionModel={rowSelectionModel}

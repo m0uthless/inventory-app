@@ -1,14 +1,10 @@
 import * as React from 'react'
-import { alpha } from '@mui/material/styles'
 
 import {
   Box,
   Button,
-  Chip,
   IconButton,
   Stack,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
 
@@ -34,7 +30,10 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 
 import { api } from '@shared/api/client'
 import PurchaseOrderDialog from '../features/purchaseorders/PurchaseOrderDialog'
-import PurchaseOrderDrawer from '../features/purchaseorders/PurchaseOrderDrawer'
+import PurchaseOrderDetailCard, { type PoPatch } from '../features/purchaseorders/PurchaseOrderDetailCard'
+import { Committente, PoStatusBadge } from '../features/purchaseorders/PoBadges'
+import { PageHead, ViewTabs, FilterOptionList, FilterTokens, headerFilterGridSx, useUndoToast } from '../ui/campo'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import PurchaseOrderTransitionDialog, {
   type TransitionExtraFields,
 } from '../features/purchaseorders/PurchaseOrderTransitionDialog'
@@ -76,7 +75,7 @@ import {
   prevStatus,
 } from '../features/purchaseorders/types'
 import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
-import { useStatusTokens, useDataGridZebraSx } from '../theme/AppThemeProvider'
+import { useStatusTokens } from '../theme/AppThemeProvider'
 
 type OpenCreateState = { openCreate?: boolean }
 
@@ -91,6 +90,9 @@ type TransitionState = {
 
 const KIND_LABEL: Record<string, string> = { ordinario: 'Ordinario', extra: 'Extra' }
 
+type PoView = 'all' | 'send' | 'wait' | 'inv' | 'done'
+const VIEW_STATUS: Record<PoView, PurchaseOrderStatus | null> = { all: null, send: 'inserito', wait: 'inviato', inv: 'ricevuto', done: 'fatturato' }
+
 // Filtro tipo PO (vicino al selettore anni): 'all' = nessun filtro kind lato API.
 type KindFilterValue = 'all' | 'ordinario' | 'extra'
 const KIND_FILTER_OPTIONS: { value: KindFilterValue; label: string }[] = [
@@ -104,122 +106,81 @@ const KIND_FILTER_OPTIONS: { value: KindFilterValue; label: string }[] = [
 // dentro il componente (useMemo su statusTokens = useStatusTokens()), così
 // i colori seguono il tema attivo.
 function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrderRow>[] {
+  const custLabel = (row: PurchaseOrderRow) => row.customer_name || row.customer_code || row.customer_placeholder || ''
   return [
     {
       field: 'offer_date',
       headerName: 'Data offerta',
-      width: 120,
-      valueGetter: (v, row) => {
-        void v
-        return formatItDate(row.offer_date)
-      },
+      width: 116,
+      renderCell: (p) => <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{formatItDate(p.row.offer_date)}</Typography>,
     },
     {
       field: 'client_name',
-      headerName: 'Committente',
+      headerName: 'Committente · cliente',
       flex: 1,
-      minWidth: 180,
+      minWidth: 200,
       renderCell: (p) => {
-        const name = p.value as string
-        const c = committenteColor(name, statusTokens.clientChipPalette)
-        return (
-          <Chip
-            size="small"
-            label={name}
-            sx={{
-              bgcolor: c.bg,
-              color: c.color,
-              border: `0.5px solid ${c.border}`,
-              fontWeight: 600,
-            }}
-          />
-        )
+        const c = committenteColor(p.row.client_name, statusTokens.clientChipPalette)
+        const cust = custLabel(p.row)
+        return <Committente name={p.row.client_name} color={c.color} sub={cust && cust !== p.row.client_name ? <>→ {cust}{p.row.is_customer_placeholder ? ' · non in anagrafica' : ''}</> : undefined} />
       },
     },
-    { field: 'description', headerName: 'Descrizione', flex: 1.4, minWidth: 220 },
-    { field: 'purchase_order', headerName: 'Purchase Order', width: 150 },
+    {
+      field: 'description',
+      headerName: 'Descrizione',
+      flex: 1.4,
+      minWidth: 220,
+      renderCell: (p) => <Typography component="span" sx={{ fontSize: 13, fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.description}</Typography>,
+    },
     {
       field: 'kind',
       headerName: 'Tipo',
-      width: 110,
+      width: 104,
       renderCell: (p) => (
-        <Chip
-          size="small"
-          label={KIND_LABEL[p.value as string] || p.value}
-          variant={p.value === 'extra' ? 'filled' : 'outlined'}
-          color={p.value === 'extra' ? 'primary' : 'default'}
-        />
+        <Box component="span" sx={{
+          display: 'inline-flex', alignItems: 'center', height: 20, px: 0.875, borderRadius: '5px', fontSize: 11, fontWeight: 600, border: '1px solid',
+          ...(p.value === 'extra' ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'archie.fieldLine' } : { color: 'text.secondary', borderColor: 'divider' }),
+        }}>{KIND_LABEL[p.value as string] || p.value}</Box>
       ),
     },
     {
       field: 'status',
       headerName: 'Stato',
-      width: 130,
-      renderCell: (p) => {
-        const st = p.value as PurchaseOrderStatus
-        const c = statusTokens.purchaseOrder[st]
-        return (
-          <Chip
-            size="small"
-            label={STATUS_LABEL[st] || st}
-            sx={{
-              bgcolor: c?.bg,
-              color: c?.color,
-              border: c ? `0.5px solid ${c.border}` : undefined,
-            }}
-          />
-        )
-      },
+      width: 150,
+      renderCell: (p) => <PoStatusBadge status={p.value as PurchaseOrderStatus} />,
+    },
+    {
+      field: 'purchase_order',
+      headerName: 'PO · fattura',
+      width: 160,
+      renderCell: (p) => (
+        <Box sx={{ lineHeight: 1.3, minWidth: 0 }}>
+          <Box sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: p.row.purchase_order ? 'text.primary' : 'text.disabled' }}>{p.row.purchase_order || 'PO —'}</Box>
+          {p.row.invoice_number ? <Box sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 11, color: 'text.secondary' }}>{p.row.invoice_number}</Box>
+            : p.row.purchase_order ? <Box sx={{ fontSize: 11, color: 'text.disabled' }}>fattura da emettere</Box> : null}
+        </Box>
+      ),
     },
     {
       field: 'amount',
       headerName: 'Importo',
-      width: 130,
+      width: 140,
       align: 'right',
-      valueGetter: (v, row) => {
-        void v
-        return formatEuro(row.amount)
-      },
-    },
-    {
-      field: 'is_invoiced',
-      headerName: 'Fattura',
-      width: 130,
-      renderCell: (p) =>
-        p.value ? (
-          <Chip
-            size="small"
-            label="Fatturato"
-            sx={{
-              bgcolor: statusTokens.purchaseOrder.fatturato.bg,
-              color: statusTokens.purchaseOrder.fatturato.color,
-              border: `0.5px solid ${statusTokens.purchaseOrder.fatturato.border}`,
-            }}
-          />
-        ) : (
-          <Chip size="small" variant="outlined" label="Non fatturato" />
-        ),
+      headerAlign: 'right',
+      renderCell: (p) => (
+        <Box sx={{ textAlign: 'right', lineHeight: 1.3 }}>
+          <Box sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatEuro(p.row.amount)}</Box>
+          {p.row.amount_mode === 'giornate' && p.row.days ? <Box sx={{ fontSize: 11, color: 'text.secondary' }}>{Number(p.row.days).toLocaleString('it-IT')} gg × {formatEuro(p.row.daily_rate)}</Box> : null}
+        </Box>
+      ),
     },
     {
       field: 'costs_incurred',
       headerName: 'Costi sostenuti',
       width: 130,
       align: 'right',
-      valueGetter: (v, row) => {
-        void v
-        return row.costs_incurred ? formatEuro(row.costs_incurred) : '—'
-      },
-    },
-    {
-      field: 'customer_name',
-      headerName: 'Cliente collegato',
-      width: 180,
-      valueGetter: (v, row) => {
-        void v
-        // Cliente da anagrafica (display_name, già risolto lato backend) se
-        // collegato; altrimenti il Committente inserito a mano (Punto 10).
-        return row.customer_name || row.customer_code || row.client_name || '—'
-      },
+      headerAlign: 'right',
+      renderCell: (p) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums', color: p.row.costs_incurred ? 'text.primary' : 'text.disabled' }}>{p.row.costs_incurred ? formatEuro(p.row.costs_incurred) : '—'}</Box>,
     },
   ]
 }
@@ -230,118 +191,24 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
 function makeRenderPurchaseOrderCard(
   statusTokens: DomainStatusTokens,
 ): MobileCardRenderFn<PurchaseOrderRow> {
-  return ({ row, onOpen }) => {
-    const meta: { label: string; value: string | null | undefined }[] = [
-      { label: 'Data offerta', value: formatItDate(row.offer_date) },
-      { label: 'Purchase Order', value: row.purchase_order },
-      { label: 'Tipo', value: KIND_LABEL[row.kind] || row.kind },
-      { label: 'Costi', value: row.costs_incurred ? formatEuro(row.costs_incurred) : null },
-    ]
-
-    return (
-      <Box
-        onClick={() => onOpen(row.id)}
-        sx={{
-          bgcolor: 'background.paper',
-          border: '0.5px solid',
-          borderColor: 'divider',
-          borderRadius: 1,
-          p: 1.25,
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0.75,
-          '&:active': { bgcolor: 'action.hover' },
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 1,
-          }}
-        >
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Chip
-              size="small"
-              label={row.client_name}
-              sx={{
-                height: 20,
-                fontSize: '0.68rem',
-                fontWeight: 600,
-                maxWidth: '100%',
-                bgcolor: committenteColor(row.client_name, statusTokens.clientChipPalette).bg,
-                color: committenteColor(row.client_name, statusTokens.clientChipPalette).color,
-                border: `0.5px solid ${committenteColor(row.client_name, statusTokens.clientChipPalette).border}`,
-              }}
-            />
-            <Typography
-              sx={{
-                fontSize: '0.68rem',
-                color: 'text.secondary',
-                mt: 0.5,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {row.description}
-            </Typography>
-          </Box>
-          <Box sx={{ flexShrink: 0, textAlign: 'right' }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {formatEuro(row.amount)}
-            </Typography>
-            <Box
-              sx={{
-                fontSize: '0.62rem',
-                fontWeight: 600,
-                px: 0.75,
-                py: 0.15,
-                borderRadius: 20,
-                whiteSpace: 'nowrap',
-                mt: 0.25,
-                bgcolor: statusTokens.purchaseOrder[row.status]?.bg,
-                color: statusTokens.purchaseOrder[row.status]?.color,
-                border: `0.5px solid ${statusTokens.purchaseOrder[row.status]?.border}`,
-              }}
-            >
-              {STATUS_LABEL[row.status] || row.status}
-            </Box>
-          </Box>
-        </Box>
-
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-          {meta.map(({ label, value }) => (
-            <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-              <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>
-                {label}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.72rem',
-                  color: value ? 'text.secondary' : 'text.disabled',
-                  fontStyle: value ? 'normal' : 'italic',
-                  lineHeight: 1.3,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {value || '—'}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
+  return ({ row, onOpen, onContextMenu }) => (
+    <Box role="button" tabIndex={0} onClick={() => onOpen(row.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(row.id) }}
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(row, e) }}
+      sx={{ display: 'grid', gap: 0.5, p: 1.5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', cursor: 'pointer' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <PoStatusBadge status={row.status} />
+        <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{formatItDate(row.offer_date)}</Typography>
+        <Typography component="span" sx={{ ml: 'auto', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatEuro(row.amount)}</Typography>
       </Box>
-    )
-  }
+      <Typography sx={{ fontWeight: 600, fontSize: 13, lineHeight: 1.35 }}>{row.description}</Typography>
+      <Committente name={row.client_name} color={committenteColor(row.client_name, statusTokens.clientChipPalette).color}
+        sub={row.purchase_order ? <Box component="span" sx={{ fontFamily: '"Geist Mono", monospace' }}>{row.purchase_order}</Box> : undefined} />
+    </Box>
+  )
 }
 
 export default function PurchaseOrders() {
   const statusTokens = useStatusTokens()
-  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const canChange = hasPerm(PERMS.purchaseorders.entry.change)
   const canDelete = hasPerm(PERMS.purchaseorders.entry.delete)
@@ -377,6 +244,11 @@ export default function PurchaseOrders() {
   const [kindFilterRaw, setKindFilterRaw] = useUrlStringParam('kind', { defaultValue: 'all' })
   const kindFilter: KindFilterValue =
     kindFilterRaw === 'ordinario' || kindFilterRaw === 'extra' ? kindFilterRaw : 'all'
+
+  // Viste per stato del flusso (schede nel riquadro), salvate nell'URL.
+  const [poViewRaw, setPoViewRaw] = useUrlStringParam('vista', { defaultValue: 'all' })
+  const poView: PoView = (['all', 'send', 'wait', 'inv', 'done'] as const).includes(poViewRaw as PoView) ? (poViewRaw as PoView) : 'all'
+  const setPoView = (v: string) => setPoViewRaw(v === 'all' ? '' : v, { patch: { page: 1 }, keepOpen: false })
 
   const [selectionModel, setSelectionModel] =
     React.useState<GridRowSelectionModel>(emptySelectionModel())
@@ -432,6 +304,7 @@ export default function PurchaseOrders() {
         extra: {
           year: effectiveYear,
           ...(kindFilter !== 'all' ? { kind: kindFilter } : {}),
+          ...(VIEW_STATUS[poView] ? { status: VIEW_STATUS[poView] } : {}),
         },
       }),
     [
@@ -443,6 +316,7 @@ export default function PurchaseOrders() {
       grid.onlyDeleted,
       effectiveYear,
       kindFilter,
+      poView,
     ],
   )
 
@@ -856,6 +730,49 @@ export default function PurchaseOrders() {
     [selectedId, toast, loadDetail, reloadList],
   )
 
+  const [poTab, setPoTab] = React.useState<'det' | 'doc'>('det')
+  const drawerIndex = drawerOpen && selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
+
+  // Modifica sul posto dal pannello: salva subito, con Annulla (PATCH inverso).
+  const undoToast = useUndoToast()
+  const patchPo = React.useCallback(async (patch: PoPatch, label: string) => {
+    if (!detail) return
+    const id = detail.id
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? (k === 'costs_incurred' ? null : '')
+    try {
+      await api.patch(`/purchase-order-entries/${id}/`, patch)
+      await loadDetail(id)
+      reloadList()
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          await api.patch(`/purchase-order-entries/${id}/`, prev)
+          await loadDetail(id)
+          reloadList()
+        } catch (e) {
+          toast.error(apiErrorToMessage(e))
+        }
+      })
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }, [detail, loadDetail, reloadList, undoToast, toast])
+
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    kind: {
+      value: kindFilter === 'all' ? '' : kindFilter,
+      label: 'Filtra tipo',
+      onSet: (v) => setKindFilterRaw(v === '' ? '' : String(v), { patch: { page: 1 }, keepOpen: false }),
+      onReset: () => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false }),
+      children: (
+        <FilterOptionList label="Tipo" single
+          options={KIND_FILTER_OPTIONS.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+          selected={kindFilter === 'all' ? [] : [kindFilter]}
+          onChange={(v) => setKindFilterRaw(v[0] ?? '', { patch: { page: 1 }, keepOpen: false })} />
+      ),
+    },
+  }), [kindFilter, setKindFilterRaw])
+
   React.useEffect(() => {
     loadCustomers()
   }, [loadCustomers])
@@ -997,109 +914,74 @@ export default function PurchaseOrders() {
   }
 
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
-      <PurchaseOrderKpis year={effectiveYear} summary={summary} loading={summaryLoading} />
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Purchase Order"
+        inline={
+          <Box role="group" aria-label="Anno" sx={{ display: 'inline-flex', alignItems: 'center', height: 30, border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper', px: '2px' }}>
+            <IconButton size="small" aria-label="Anno precedente" onClick={() => setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })} sx={{ width: 26, height: 26 }}>
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+            <Typography component="b" sx={{ minWidth: 44, textAlign: 'center', fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>{effectiveYear}</Typography>
+            <IconButton size="small" aria-label="Anno successivo" onClick={() => setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })} sx={{ width: 26, height: 26 }}>
+              <ChevronRightIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        }
+        actions={
+          <Can perm={PERMS.purchaseorders.entry.add}>
+            <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>Nuovo PO</Button>
+          </Can>
+        }
+      />
+      <PurchaseOrderKpis year={effectiveYear} summary={summary} loading={summaryLoading} view={poView} onView={setPoView} />
 
-      <EntityListCard
-        mobileCard={renderPurchaseOrderCard}
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-          rightActions: (
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.25,
-                  bgcolor: (theme) => alpha(theme.palette.background.default, 0.9),
-                  border: '0.5px solid',
-                  borderColor: 'divider',
-                  borderRadius: 999,
-                  px: 0.5,
-                  height: 32,
-                }}
-              >
-                <IconButton
-                  size="small"
-                  aria-label="Anno precedente"
-                  onClick={() =>
-                    setYear(effectiveYear - 1, { patch: { page: 1 }, keepOpen: false })
-                  }
-                >
-                  <ChevronLeftIcon fontSize="small" />
-                </IconButton>
-                <Typography
-                  sx={{ fontWeight: 700, fontSize: '0.85rem', minWidth: 52, textAlign: 'center' }}
-                >
-                  {effectiveYear}
-                </Typography>
-                <IconButton
-                  size="small"
-                  aria-label="Anno successivo"
-                  onClick={() =>
-                    setYear(effectiveYear + 1, { patch: { page: 1 }, keepOpen: false })
-                  }
-                >
-                  <ChevronRightIcon fontSize="small" />
-                </IconButton>
-              </Box>
-
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={kindFilter}
-                onChange={(_e, v: KindFilterValue | null) => {
-                  if (!v) return
-                  setKindFilterRaw(v === 'all' ? '' : v, { patch: { page: 1 }, keepOpen: false })
-                }}
-                aria-label="Filtro tipo Purchase Order"
-                sx={{
-                  height: 32,
-                  '& .MuiToggleButton-root': { px: 1.25, fontSize: '0.78rem', fontWeight: 600 },
-                }}
-              >
-                {KIND_FILTER_OPTIONS.map((opt) => (
-                  <ToggleButton key={opt.value} value={opt.value} aria-label={opt.label}>
-                    {opt.label}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-
-              <Can perm={PERMS.purchaseorders.entry.add}>
-                <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
-                  Nuovo PO
-                </Button>
-              </Can>
-            </Stack>
-          ),
-        }}
-        grid={{
-          pageKey: 'purchase-orders',
-          username: me?.username,
-
-          emptyState,
-          rows,
-          columns: columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          onRowContextMenu: handleRowContextMenu,
-          slotProps: { toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } },
-          sx: {
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-      ></EntityListCard>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <ViewTabs
+          value={poView}
+          onChange={setPoView}
+          tabs={[
+            { key: 'all', label: 'Tutti' },
+            { key: 'send', label: 'Da inviare', count: summary?.to_send },
+            { key: 'wait', label: 'In attesa del PO' },
+            { key: 'inv', label: 'Da fatturare' },
+            { key: 'done', label: 'Fatturati' },
+          ]}
+        />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          mobileCard={renderPurchaseOrderCard}
+          toolbar={{
+            compact: true,
+            q: grid.q,
+            onQChange: grid.setQ,
+          }}
+          belowToolbar={kindFilter !== 'all' ? (
+            <FilterTokens filters={[{ key: 'kind', label: 'Tipo', values: KIND_LABEL[kindFilter] }]}
+              onRemove={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
+              onClear={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })} />
+          ) : undefined}
+          grid={{
+            pageKey: 'purchase-orders',
+            username: me?.username,
+            filterConfig,
+            emptyState,
+            rows,
+            columns: columns,
+            loading,
+            rowCount,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: openDrawer,
+            onRowContextMenu: handleRowContextMenu,
+            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            rowHeight: 50,
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
       <RowContextMenu
         open={Boolean(contextMenu)}
@@ -1110,28 +992,35 @@ export default function PurchaseOrders() {
         items={contextMenuItems}
       />
 
-      <PurchaseOrderDrawer
-        open={drawerOpen}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        canChange={canChange}
-        canDelete={canDelete}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        uploadingSlot={uploadingSlot}
-        deletingDocId={deletingDocId}
-        onClose={closeDrawer}
-        onEdit={openEdit}
-        onDelete={() => setDeleteDlgOpen(true)}
-        onRestore={doRestore}
-        onCopy={async (v: string) => {
-          await copyToClipboard(v)
-          toast.success('Copiato')
-        }}
-        onUploadDocument={uploadDocument}
-        onDeleteDocument={deleteDocument}
-      />
+      {drawerOpen ? (
+        <PurchaseOrderDetailCard
+          detail={detail}
+          loading={detailLoading}
+          committenteColor={detail ? committenteColor(detail.client_name, statusTokens.clientChipPalette).color : 'transparent'}
+          canChange={canChange}
+          canDelete={canDelete}
+          tab={poTab}
+          onTab={setPoTab}
+          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onClose={closeDrawer}
+          onEdit={() => void openEdit()}
+          onDelete={() => setDeleteDlgOpen(true)}
+          onRestore={() => void doRestore()}
+          onCopy={async (v: string) => {
+            await copyToClipboard(v)
+            toast.success('Copiato')
+          }}
+          onPatch={patchPo}
+          onAdvance={() => { if (detail) openTransition(detail, 'advance') }}
+          onRevert={() => { if (detail) openTransition(detail, 'revert') }}
+          uploadingSlot={uploadingSlot}
+          deletingDocId={deletingDocId}
+          onUploadDocument={uploadDocument}
+          onDeleteDocument={deleteDocument}
+        />
+      ) : null}
 
       <ConfirmActionDialog
         open={bulkRestoreDlgOpen}
