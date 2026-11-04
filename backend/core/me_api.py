@@ -152,6 +152,7 @@ class MeAPIView(APIView):
                 "leave_area_label": leave_area_label,
                 "gender": profile.gender if profile is not None else None,
                 "theme": profile.theme if profile is not None else UserProfile.Theme.DEFAULT,
+                "color_mode": profile.color_mode if profile is not None else UserProfile.ColorMode.LIGHT,
             },
         }
         return data
@@ -223,6 +224,17 @@ class MeAPIView(APIView):
                 )
             new_theme = raw_theme
 
+        new_color_mode = _UNSET
+        if "color_mode" in data:
+            raw_mode = data.get("color_mode")
+            valid_modes = {choice for choice, _ in UserProfile.ColorMode.choices}
+            if raw_mode not in valid_modes:
+                return Response(
+                    {"color_mode": f"Valore non valido. Ammessi: {', '.join(sorted(valid_modes))}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            new_color_mode = raw_mode
+
         # ── Fase 2: tutte le validazioni passate → salvataggio atomico ──────
 
         if new_email is not None:
@@ -243,6 +255,9 @@ class MeAPIView(APIView):
 
         if new_theme is not _UNSET:
             profile.theme = new_theme
+
+        if new_color_mode is not _UNSET:
+            profile.color_mode = new_color_mode
 
         profile.save()
 

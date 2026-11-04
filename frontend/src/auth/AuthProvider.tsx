@@ -20,7 +20,8 @@ export type Me = {
     leave_area?: number | null
     leave_area_label?: string | null
     gender?: 'M' | 'F' | null
-    theme?: 'default' | null
+    theme?: 'default' | 'blu' | 'indaco' | null
+    color_mode?: 'light' | 'dark' | 'system' | null
   }
 }
 

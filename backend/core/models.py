@@ -165,7 +165,18 @@ class UserProfile(models.Model):
     )
 
     class Theme(models.TextChoices):
-        DEFAULT = "default", "Predefinito (teal)"
+        # "default" resta la chiave della palette Verde chirurgico (restyle
+        # "Campo sterile"): nessuna migrazione dati per gli utenti esistenti.
+        # Blu e Indaco sono implementate ma per ora non selezionabili dal
+        # frontend (vedi frontend/src/theme/themeRegistry.ts, `selectable`).
+        DEFAULT = "default", "Verde chirurgico"
+        BLU = "blu", "Blu clinico"
+        INDACO = "indaco", "Indaco"
+
+    class ColorMode(models.TextChoices):
+        LIGHT = "light", "Chiaro"
+        DARK = "dark", "Scuro"
+        SYSTEM = "system", "Segue il sistema"
 
     theme = models.CharField(
         max_length=16, choices=Theme.choices, default=Theme.DEFAULT,
@@ -173,6 +184,11 @@ class UserProfile(models.Model):
         help_text="Tema grafico del frontend Archie. Preferenza personale, modificabile "
                    "dall'utente stesso dal proprio profilo (a differenza degli altri campi "
                    "di questo modello). Persiste cross-device essendo salvato lato server.",
+    )
+    color_mode = models.CharField(
+        max_length=8, choices=ColorMode.choices, default=ColorMode.LIGHT,
+        verbose_name="Modalità chiaro/scuro",
+        help_text="Preferenza personale, come `theme`. Predefinita: chiaro.",
     )
 
     last_seen_changelog = models.ForeignKey(

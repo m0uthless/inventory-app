@@ -17,6 +17,8 @@ import {
   Tab,
   Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
   Autocomplete,
@@ -46,7 +48,7 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 import { buildDrfListParams } from '@shared/api/drf'
 import { isRecord } from '@shared/utils/guards'
 import { ActionIconButton } from '@shared/ui/ActionIconButton'
-import { THEME_REGISTRY, resolveThemeKey, type ThemeKey } from '../theme/themeRegistry'
+import { THEME_REGISTRY, resolveThemeKey, resolveColorModePref, type ThemeKey, type ColorModePref } from '../theme/themeRegistry'
 import { useWidgetAccents } from '../theme/AppThemeProvider'
 
 // ─── Colori accent della pagina ─────────────────────────────────────────────
@@ -267,20 +269,29 @@ function SezioneProfilo({ me, onSaved }: { me: NonNullable<ReturnType<typeof use
 }
 
 // ─── SEZIONE: Aspetto ─────────────────────────────────────────────────────────
+const MODE_OPTIONS: { value: ColorModePref; label: string }[] = [
+  { value: 'light', label: 'Chiaro' },
+  { value: 'dark', label: 'Scuro' },
+  { value: 'system', label: 'Segue il sistema' },
+]
+
 function SezioneAspetto({ me, onSaved }: { me: NonNullable<ReturnType<typeof useAuth>['me']>; onSaved: () => Promise<void> }) {
   const toast = useToast()
-  const [saving, setSaving] = React.useState<ThemeKey | null>(null)
+  const [saving, setSaving] = React.useState<string | null>(null)
   const currentKey = resolveThemeKey(me.profile?.theme)
+  const currentMode = resolveColorModePref(me.profile?.color_mode)
+  const palettes = (Object.entries(THEME_REGISTRY) as [ThemeKey, typeof THEME_REGISTRY[ThemeKey]][])
+    .filter(([key, entry]) => entry.selectable || key === currentKey)
 
-  const onSelect = async (key: ThemeKey) => {
-    if (key === currentKey || saving) return
-    setSaving(key)
+  const save = async (field: 'theme' | 'color_mode', value: string, ok: string) => {
+    if (saving) return
+    setSaving(`${field}:${value}`)
     try {
-      await api.patch('/me/', { theme: key })
+      await api.patch('/me/', { [field]: value })
       await onSaved()
-      toast.success('Tema aggiornato.')
+      toast.success(ok)
     } catch {
-      toast.error('Errore durante il salvataggio del tema.')
+      toast.error('Errore durante il salvataggio della preferenza.')
     } finally {
       setSaving(null)
     }
@@ -288,46 +299,65 @@ function SezioneAspetto({ me, onSaved }: { me: NonNullable<ReturnType<typeof use
 
   return (
     <Box>
-      <SectionTitle>Tema interfaccia</SectionTitle>
-      <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2.5 }}>
-        Il tema scelto viene salvato sul tuo account e si applica automaticamente su tutti i
-        dispositivi da cui accedi ad Archie.
+      <SectionTitle>Aspetto</SectionTitle>
+      <Typography sx={{ color: 'text.secondary', mb: 2.5 }}>
+        Le preferenze vengono salvate sul tuo account e valgono su tutti i dispositivi da cui accedi ad Archie.
       </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
-        {(Object.entries(THEME_REGISTRY) as [ThemeKey, typeof THEME_REGISTRY[ThemeKey]][]).map(([key, entry]) => {
+
+      <Typography component="h3" sx={{ fontWeight: 600, mb: 1 }}>Modalità</Typography>
+      <ToggleButtonGroup
+        exclusive
+        value={currentMode}
+        onChange={(_e, v: ColorModePref | null) => {
+          if (v && v !== currentMode) void save('color_mode', v, 'Modalità aggiornata.')
+        }}
+        aria-label="Modalità chiaro o scuro"
+        sx={{ mb: 3 }}
+      >
+        {MODE_OPTIONS.map((o) => (
+          <ToggleButton key={o.value} value={o.value} disabled={!!saving}>
+            {saving === `color_mode:${o.value}` ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null}
+            {o.label}
+          </ToggleButton>
+        ))}
+      </ToggleButtonGroup>
+
+      <Typography component="h3" sx={{ fontWeight: 600, mb: 1 }}>Palette</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1.5 }}>
+        {palettes.map(([key, entry]) => {
           const active = key === currentKey
-          const p = entry.theme.palette
+          const pal = entry.theme.palette
           return (
             <Box
               key={key}
-              onClick={() => onSelect(key)}
+              component="button"
+              type="button"
+              onClick={() => { if (!active) void save('theme', key, 'Palette aggiornata.') }}
+              aria-pressed={active}
               sx={{
-                position: 'relative',
-                borderRadius: 2,
-                border: '2px solid',
-                borderColor: active ? p.primary.main : 'divider',
-                cursor: saving ? 'default' : 'pointer',
-                overflow: 'hidden',
-                opacity: saving && saving !== key ? 0.5 : 1,
-                transition: 'all 0.15s',
-                '&:hover': saving ? undefined : { borderColor: p.primary.main },
+                font: 'inherit', textAlign: 'left', p: 0, cursor: saving ? 'default' : 'pointer',
+                borderRadius: '8px', border: '1px solid', overflow: 'hidden', bgcolor: 'background.paper',
+                borderColor: active ? pal.primary.main : 'divider',
+                boxShadow: active ? `inset 0 0 0 1px ${pal.primary.main}` : 'none',
+                opacity: saving && saving !== `theme:${key}` ? 0.5 : 1,
+                '&:hover': saving ? undefined : { borderColor: pal.primary.main },
+                '&:focus-visible': { outline: 'none', boxShadow: (t) => t.palette.archie.focusRing },
               }}
             >
-              {/* Anteprima: barra "sidebar" scura + blocco chiaro con swatch colore */}
-              <Box sx={{ display: 'flex', height: 64 }}>
-                <Box sx={{ width: 28, background: entry.sidebar.bgGradient }} />
-                <Box sx={{ flex: 1, bgcolor: p.background.default, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
-                  {[p.primary.main, p.secondary.main, p.info.main].map((c) => (
-                    <Box key={c} sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: c }} />
-                  ))}
+              <Box sx={{ display: 'flex', height: 56 }}>
+                <Box sx={{ width: 36, bgcolor: pal.archie.frame, borderRight: '1px solid', borderColor: pal.divider }} />
+                <Box sx={{ flex: 1, bgcolor: pal.background.default, display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5 }}>
+                  <Box sx={{ width: 40, height: 14, borderRadius: '4px', bgcolor: pal.primary.main }} />
+                  <Box sx={{ width: 28, height: 14, borderRadius: '4px', bgcolor: pal.archie.field }} />
+                  <Box sx={{ width: 20, height: 14, borderRadius: '4px', bgcolor: pal.archie.band }} />
                 </Box>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1, bgcolor: 'background.paper' }}>
-                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{entry.label}</Typography>
-                {saving === key ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Typography sx={{ fontWeight: 550 }}>{entry.label}</Typography>
+                {saving === `theme:${key}` ? (
                   <CircularProgress size={16} />
                 ) : active ? (
-                  <CheckCircleIcon fontSize="small" sx={{ color: p.primary.main }} />
+                  <CheckCircleIcon fontSize="small" sx={{ color: pal.primary.main }} />
                 ) : null}
               </Box>
             </Box>
