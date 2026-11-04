@@ -8,6 +8,7 @@ import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import BeachAccessOutlinedIcon from '@mui/icons-material/BeachAccessOutlined'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined'
+import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined'
 import HandymanIcon from '@mui/icons-material/HandymanOutlined'
 import FolderIcon from '@mui/icons-material/FolderOutlined'
 import MenuBookIcon from '@mui/icons-material/MenuBookOutlined'
@@ -93,6 +94,8 @@ export const NAV: NavItem[] = [
 
   { label: 'Purchase Order', path: '/purchase-orders', icon: <RequestQuoteOutlinedIcon />, section: 'principale', perm: 'purchaseorders.view_purchaseorderentry' },
 
+  { label: 'Contratti', path: '/contracts', icon: <GavelOutlinedIcon />, section: 'principale', perm: 'contracts.view_contract' },
+
   {
     label: 'Manutenzione',
     path: '/maintenance',
@@ -158,6 +161,7 @@ const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
   ['/piano-ferie',            'PIANO FERIE'],
   ['/rimborso-spese',         'RIMBORSO SPESE'],
   ['/purchase-orders',        'PURCHASE ORDERS'],
+  ['/contracts',              'CONTRATTI'],
   ['/bug-feature',            'BUG / FEATURE'],
   ['/utenti',                 'UTENTI E GRUPPI'],
   ['/accesso-portal',         'ACCESSO PORTAL'],

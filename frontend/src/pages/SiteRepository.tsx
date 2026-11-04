@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Alert, Box, Dialog, DialogContent, DialogTitle, IconButton, Skeleton, Stack, Typography } from '@mui/material'
+import { Box, Button, Dialog, DialogContent, DialogTitle, IconButton, Skeleton, Stack, Typography, useMediaQuery } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -8,6 +9,7 @@ import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumb
 import VpnLockIcon from '@mui/icons-material/VpnLock'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
+import SearchOffOutlinedIcon from '@mui/icons-material/SearchOffOutlined'
 import GridOnOutlinedIcon from '@mui/icons-material/GridOnOutlined'
 import VpnModal from '../features/customers/VpnModal'
 import { api } from '@shared/api/client'
@@ -37,9 +39,11 @@ import { ItalyRegionMap } from './siteRepository/ItalyRegionMap'
 export default function SiteRepository() {
   const { hasPerm } = useAuth()
   const toast = useToast()
+  const theme = useTheme()
+  const isPhone = useMediaQuery(theme.breakpoints.down('sm'))
   const navigate = useNavigate()
   const location = useLocation()
-  const { searchQuery, registerHandle, unregisterHandle, setTotals, groupBy, setGroupBy, mapOpen, setMapOpen } = useSiteRepoV2()
+  const { searchQuery, setSearchQuery, registerHandle, unregisterHandle, setTotals, groupBy, setGroupBy, mapOpen, setMapOpen } = useSiteRepoV2()
 
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
   const canChange      = hasPerm(PERMS.inventory.inventory.change)
@@ -468,9 +472,33 @@ export default function SiteRepository() {
           ))}
         </Stack>
       ) : locationGroups.length === 0 ? (
-        <Alert severity="info">
-          {customers.length === 0 ? 'Nessun cliente trovato.' : 'Nessun risultato per i filtri selezionati.'}
-        </Alert>
+        <Box sx={{
+          border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper',
+          px: 3, py: 4, textAlign: 'center',
+        }}>
+          <SearchOffOutlinedIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 1 }} />
+          {searchQuery.trim() ? (
+            <>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                Nessun risultato per “{searchQuery.trim()}”
+              </Typography>
+              <Typography sx={{ fontSize: '0.8125rem', color: 'grey.700', mt: 0.5, maxWidth: '60ch', mx: 'auto' }}>
+                La ricerca guarda nome e codice del cliente, siti, hostname, IP, K# e seriale degli asset.
+                Prova con una parte del nome o dell'indirizzo IP.
+              </Typography>
+              <Button variant="outlined" size="small" sx={{ mt: 2 }} onClick={() => setSearchQuery('')}>
+                Cancella ricerca
+              </Button>
+            </>
+          ) : (
+            <>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>Nessun cliente</Typography>
+              <Typography sx={{ fontSize: '0.8125rem', color: 'grey.700', mt: 0.5 }}>
+                Quando ci saranno clienti, qui li troverai raggruppati per provincia con siti e asset.
+              </Typography>
+            </>
+          )}
+        </Box>
       ) : (
         <Stack spacing={0} sx={{ gap: 0 }}>
           {locationGroups.map((group) => (
@@ -517,7 +545,7 @@ export default function SiteRepository() {
       {/* Cartina Italia per regione — naviga regione → provincia → apre/scrolla
           la sezione provincia corrispondente (passando a groupBy 'provincia'
           se necessario). */}
-      <Dialog open={mapOpen} onClose={() => setMapOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={mapOpen} onClose={() => setMapOpen(false)} maxWidth="sm" fullWidth fullScreen={isPhone}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <MapOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />

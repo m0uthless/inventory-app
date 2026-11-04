@@ -36,7 +36,12 @@ The container is always named **`backend`** — never `web`.
 
 Common `make` targets (see `Makefile` for the full list — verify they already wrap the dual-file invocation above): `make up`, `make down`, `make rebuild`, `make logs-backend`, `make shell` (Django shell), `make bash-backend`, `make migrate`, `make makemigrations-<app>`, `make health`.
 
-Backend tests:
+**Gotcha — the dev `backend` image bakes the code in (no bind mount):** `exec backend …` runs the code of the last build, so new/changed files are invisible to it. For tests/checks on the working tree mount it explicitly, and rebuild the stack (`up -d --build backend cron frontend`) to publish changes in dev:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps -v ./backend:/app --entrypoint "" backend pytest -q
+```
+
+Backend tests (against the built image):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend pytest -q
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend pytest path/to/test_x.py -q -k some_test
@@ -44,21 +49,13 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend pyth
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend python -m mypy --config-file mypy.ini .
 ```
 
-Frontend (either `frontend/` or `frontend-portal/`):
-```bash
-npm ci
-npm run dev
-npm run build          # tsc -b && vite build
-npm run lint
-npx tsc --noEmit
-npm run test:run        # vitest run (single run, non-watch)
-npm run test            # vitest watch mode
-```
+Frontend (`frontend/` or `frontend-portal/`): standard npm scripts in each `package.json`.
 
 Regenerate the typed API client from the live OpenAPI schema (`frontend/` only):
 ```bash
 npm run gen:api          # writes src/api/generated.ts
 ```
+The dev backend exposes no host port, so the default schema URL is unreachable: dump it with `exec backend python manage.py spectacular --file /tmp/schema.yml`, `docker compose cp` it out, and run `OPENAPI_URL=<file> npm run gen:api` + prettier.
 
 Full local quality gate (mirrors CI):
 ```bash
@@ -73,7 +70,7 @@ Smoke tests: `make smoke` (`./scripts/smoke.sh full`) / `make smoke-quick`.
 
 Before considering any change complete, run the full chain and compare against baseline — **any new problem beyond baseline is a blocker**:
 
-- Frontend: `tsc -b --force` → `npm run build` → `npm run lint` (baseline: 30 problems) → `npx vitest run` (baseline: 62/62 passing as of v0.9.5)
+- Frontend: `tsc -b --force` → `npm run build` → `npm run lint` (baseline: 27 problems) → `npx vitest run` (baseline: 62/62 passing as of v0.9.5)
 - Backend: `python manage.py check` → `makemigrations --check --dry-run`
 - Any new migration: apply and verify it before considering the change done.
 
@@ -81,7 +78,7 @@ Before considering any change complete, run the full chain and compare against b
 
 ### Backend: app-per-domain Django project
 
-`backend/config/` is the Django project (settings, root urls, auth views, search, system stats). Each business domain is its own app at `backend/<app>/` (e.g. `crm`, `inventory`, `device`, `vlan`, `wiki`, `drive`, `issues`, `maintenance`, `servicenow`, `attendance`, `expenses`, `purchaseorders`, `custom_fields`, `notifications`, `portal`, `audit`, `feedback`). `core/` holds cross-cutting infrastructure, not a domain of its own.
+`backend/config/` is the Django project; each business domain is its own app at `backend/<app>/`. `core/` holds cross-cutting infrastructure, not a domain of its own.
 
 All API routes are registered in `backend/config/urls.py` via a single DRF `DefaultRouter`.
 
@@ -122,15 +119,13 @@ File/folder storage with API-side ACLs (`backend/drive/`). Nginx deliberately bl
 
 `backend/portal/` + `frontend-portal/` implement the customer-facing portal. Tenant scoping is enforced entirely server-side from `request.user` — never trust a client-supplied header/param as a tenant boundary in portal code.
 
-**Device/VLAN exclusivity:** `Device`, `DeviceType` (with `dose_sr`), `DeviceManufacturer` (logo), `Rispacs` M2M, and `DeviceWifi` (Fernet-encrypted password, `.p12` upload) remain **exclusive to `frontend-portal`** and are not ported to the main Archie frontend.
+**Device/VLAN exclusivity:** `Device` records are manageable from the main Archie frontend too, limited to the base fields (`customer` on create, `site`, `type`, `status`, `manufacturer`, `model`, `serial_number`, `inventario`, `note`); Archie never sends `ip`, `aetitle`, `reparto`, `room`, `location`, `vlan`, `dose`, `wifi`, `rispacs`, which stay Portal-managed and are preserved on PATCH. Devices created from Archie are inherited by the customer's Portal through the existing `customer` scoping in `DeviceViewSet` (no Archie-specific code there). `VLAN`, `DeviceWifi` (Fernet-encrypted password, `.p12` upload), `Rispacs` M2M, `DeviceType` (with `dose_sr`) and `DeviceManufacturer` (logo) editing remain **exclusive to `frontend-portal`**.
 
 ### Custom fields
 
 `backend/custom_fields/` provides a generic, admin-configurable custom-fields system; `core.mixins.CustomFieldsValidationMixin` is how app serializers validate/normalize the `custom_fields` payload.
 
 ### Frontend structure
-
-`frontend/src/` is organized by `features/<domain>/` (customers, contacts, inventory, wiki, issues, expenses, purchaseorders, servicenow, pianoferie/attendance, monitor, dashboard, audit, ...) alongside `layout/`, `pages/`, `ui/`, `auth/`, `api/`, `hooks/`, `theme/`. `frontend-portal/` mirrors a scoped subset.
 
 **Known bug pattern — static theme import:** `import { theme } from '../theme'` at module level always resolves to the default theme regardless of the active theme (navy/temp). Always use the `useTheme()` hook inside components instead.
 
@@ -146,15 +141,7 @@ Dev override: `docker-compose.dev.yml`. Production override: `docker-compose.pro
 
 ## Release & versioning workflow
 
-Keep a Changelog + Semantic Versioning. The release toolchain (`release-save.sh`, `release-push.sh`, `fix-save.sh`, `fix-push.sh`, `prod-sync.sh`, `status.sh`, `archie-dev-common.sh`) lives **outside this repo**, at `/home/fede/scripts` — it is not checked in and Claude Code won't see it by scanning the repo.
-
-- `release-push.sh`'s `normalize_category()` requires **English section headers** (`Added`/`Changed`/`Fixed`/`Security`) — never write Italian headers (Sicurezza/Migliorie/Corretti).
-- All new changelog content goes under `## [Unreleased]` — never write a version header directly into the file; the release script promotes `[Unreleased]` to a version on release.
-- Flow: implement → run the full verification chain above → package the delivery zip (see below) → `release-save` → follow through `release-push` for the prod push.
-
-### Delivery zip convention
-
-When packaging a change for handoff/testing: name it `archie-xxxxxxx-NN.zip` (`xxxxxxx` = short identifier for the change, `NN` = sequential number — same feature gets `-01`, `-02`, ... for patches; a different feature gets a new identifier). Contains **only** modified/created files. Internal structure mirrors the project starting from the directories inside `inventory-app/`. Exclude `.claude`, `.git`, `__pycache__`, `node_modules`, and any other generated/cache directories.
+For releases, changelog edits or packaging use the `archie-release` skill. Always-on rules: never commit to `main`; changelog entries go under `## [Unreleased]` with English section headers only (`Added`/`Changed`/`Fixed`/`Security`), never a version header. Fede does not want delivery zips: publish changes to the dev stack instead.
 
 ## Roadmap guardrails
 

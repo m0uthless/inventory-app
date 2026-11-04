@@ -33,7 +33,11 @@ prod-sync.sh
 .DS_Store
 .idea/
 .vscode/
-.claude/
+.claude/*
+!.claude/skills/
+
+# script locale con credenziali proxy (non versionare)
+update-docker-proxy-password-with-claude.sh
 
 # frontend
 frontend/node_modules/
@@ -49,3 +53,25 @@ frontend/dist/
 backend/import_files/*
 !backend/import_files/.gitkeep
 !backend/import_files/README.md
+
+# Screenshot locali usati per i mockup, non da versionare
+/screen/
+
+# graphify knowledge graph output (local)
+graphify-out/
+
+# Impeccable (design skill) — artefatti locali, non versionati
+.claude/skills/impeccable/
+.impeccable/
+**/.impeccable/
+# Copia di impeccable installata per GitHub Copilot (contiene un eseguibile da ~21 MB)
+.github/skills/impeccable/
+.github/agents/impeccable-*.agent.md
+.github/hooks/impeccable.json
+/PRODUCT.md
+/frontend/DESIGN.md
+/frontend-portal/DESIGN.md
+/frontend-portal/PRODUCT.md
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+.playwright/

@@ -1,4 +1,5 @@
-import { Typography } from '@mui/material'
+import * as React from 'react'
+import { Box, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import type { Theme } from '@mui/material/styles'
 import { formatProvinceLabel } from '../../data/italianProvinces'
@@ -63,30 +64,66 @@ export function issuePriorityTone(priority?: string | null): Tone {
   }
 }
 
-export const COL_GRID = '160px 180px 140px 130px 180px 110px 140px 150px 130px 130px 130px'
-
 // ─── Scala tipografica ──────────────────────────────────────────────────────────
 //
-// Prima ogni testo aveva un fontSize scelto a mano (0.6/0.68/0.72/0.78/0.82/
-// 0.975/1rem...), senza relazione tra loro né con le variant del tema — con il
-// risultato che elementi con lo stesso ruolo (es. nome sito vs nome asset)
-// finivano a dimensioni diverse. Un'unica scala a 5 livelli, usata ovunque:
+// Un'unica scala a 5 livelli, usata ovunque. Il minimo è 12px: a 10-11px le
+// intestazioni di colonna e le didascalie dei contatori non si leggevano in
+// sessioni lunghe né al telefono in campo (critique 2026-11-02). 12px è anche
+// il grid-header di DESIGN.md.
 //
-//   micro   10px  intestazioni colonna, didascalie sotto i contatori
-//   label   11px  badge/chip, tab
-//   body    12px  testo di riga: nomi, indirizzi, contatti — E campi tecnici
+//   micro   12px  intestazioni colonna, didascalie sotto i contatori
+//   label   12px  badge/chip, tab
+//   body    13px  testo di riga: nomi, indirizzi, contatti — E campi tecnici
 //                 monospace (K#, Seriale, IP, codice cliente): stessa taglia,
 //                 stesso peso, per allineamento visivo nella riga
-//   title   13px  enfasi di riga: nome cliente, valore dei contatori
-//   section 15px  titolo di sezione: nome città
+//   title   14px  enfasi di riga: nome cliente, valore dei contatori
+//   section 15px  titolo di sezione: nome provincia/città
 
 export const FS = {
-  micro:   '0.625rem',
-  label:   '0.6875rem',
-  body:    '0.75rem',
-  title:   '0.8125rem',
+  micro:   '0.75rem',
+  label:   '0.75rem',
+  body:    '0.8125rem',
+  title:   '0.875rem',
   section: '0.9375rem',
 } as const
+
+// ─── Evidenziazione della ricerca ──────────────────────────────────────────────
+// Avvolge in <mark> le occorrenze di `query` dentro `text` (case-insensitive),
+// così la riga trovata si riconosce senza rileggere ogni campo.
+
+export function Highlight({ text, query }: { text?: string | null; query: string }) {
+  const value = text ?? ''
+  const q = query.trim()
+  if (!q || !value) return <>{value}</>
+  const lower = value.toLowerCase()
+  const lq = q.toLowerCase()
+  const parts: React.ReactNode[] = []
+  let from = 0
+  let idx = lower.indexOf(lq, from)
+  if (idx === -1) return <>{value}</>
+  while (idx !== -1) {
+    if (idx > from) parts.push(value.slice(from, idx))
+    parts.push(
+      <Box
+        key={idx}
+        component="mark"
+        sx={(theme) => ({
+          bgcolor: alpha(theme.palette.warning.main, 0.28),
+          color: 'inherit',
+          borderRadius: '3px',
+          px: '1px',
+          boxDecorationBreak: 'clone',
+        })}
+      >
+        {value.slice(idx, idx + q.length)}
+      </Box>,
+    )
+    from = idx + q.length
+    idx = lower.indexOf(lq, from)
+  }
+  if (from < value.length) parts.push(value.slice(from))
+  return <>{parts}</>
+}
 
 // Scala icone — 3 livelli invece di 6 valori sparsi (12/13/14/15/16/18px)
 export const ICON = {
@@ -106,10 +143,10 @@ export const monoFieldSx = {
   whiteSpace: 'nowrap' as const,
 }
 
-export function MonoField({ value, sx }: { value?: string | null; sx?: object }) {
+export function MonoField({ value, sx, query }: { value?: string | null; sx?: object; query?: string }) {
   return (
     <Typography sx={{ ...monoFieldSx, ...sx }}>
-      {value || '—'}
+      {value ? <Highlight text={value} query={query ?? ''} /> : <Box component="span" sx={(t) => ({ fontFamily: t.typography.fontFamily })}>—</Box>}
     </Typography>
   )
 }

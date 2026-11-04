@@ -4,6 +4,765 @@
  */
 
 export interface paths {
+  '/api/absences/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    get: operations['absences_list']
+    put?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    post: operations['absences_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    get: operations['absences_retrieve']
+    put?: never
+    post?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    delete: operations['absences_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    patch: operations['absences_partial_update']
+    trace?: never
+  }
+  '/api/absences/{id}/reject/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    post: operations['absences_reject_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    post: operations['absences_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/{id}/validate/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    post: operations['absences_validate_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/bulk/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Applica lo stesso motivo/stato a più giorni (selezione multipla).
+     *
+     *     Body: {user, day_part, dates: [iso, ...], action: "set"|"clear",
+     *            reason?, status?, note?}. `day_part` accetta anche "entrambe"
+     *            (giornata intera: applica sia MATTINA sia POMERIGGIO per ogni
+     *            data). Rispetta gli stessi permessi del create: il dipendente
+     *            può solo proporre ferie sulle proprie righe.
+     */
+    post: operations['absences_bulk_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['absences_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/reject-group/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    post: operations['absences_reject_group_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/roster/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Righe del Piano Ferie: utenti attivi NON Philips (esclusi i
+     *     superuser, es. account root/amministrativi) e NON account funzionali
+     *     (es. cdd.biotron: sono utenti di servizio Biotron, non persone reali,
+     *     vedi profile.is_functional_account), con area.
+     *     Include `can_edit_all` (coordinatore o staff/superuser, per i
+     *     permessi di modifica) e `is_full_access` (solo staff/superuser, per
+     *     distinguere il coordinatore "puro" — che vede le statistiche solo
+     *     della propria area — da chi deve vederle su tutte le aree).
+     */
+    get: operations['absences_roster_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/absences/validate-group/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD delle voci del Piano Ferie (mezza giornata). Soft-delete + audit.
+     *
+     *     Filtri query: `user`, `area` (LeaveArea id), `date_from`/`date_to`
+     *     (sovrapposizione), `year`+`month`, `reason`, `status`.
+     */
+    post: operations['absences_validate_group_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin-groups/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione. */
+    get: operations['admin_groups_list']
+    put?: never
+    /** @description Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione. */
+    post: operations['admin_groups_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin-groups/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione. */
+    get: operations['admin_groups_retrieve']
+    /** @description Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione. */
+    put: operations['admin_groups_update']
+    post?: never
+    /** @description Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione. */
+    delete: operations['admin_groups_destroy']
+    options?: never
+    head?: never
+    /** @description Gestione gruppi: lista/dettaglio/modifica + creazione ed eliminazione. */
+    patch: operations['admin_groups_partial_update']
+    trace?: never
+  }
+  '/api/admin-users/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    get: operations['admin_users_list']
+    put?: never
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    post: operations['admin_users_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin-users/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    get: operations['admin_users_retrieve']
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    put: operations['admin_users_update']
+    post?: never
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    delete: operations['admin_users_destroy']
+    options?: never
+    head?: never
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    patch: operations['admin_users_partial_update']
+    trace?: never
+  }
+  '/api/admin-users/{id}/reset-password/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    post: operations['admin_users_reset_password_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin-users/{id}/reset-permissions-to-group/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Gestione utenti: lista/dettaglio/modifica + creazione ed eliminazione. */
+    post: operations['admin_users_reset_permissions_to_group_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/permission-modules/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['admin_permission_modules_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/announcements/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD comunicazioni bacheca.
+     *     Lettura: tutti gli utenti autenticati.
+     *     Scrittura: solo gruppo admin o superuser.
+     */
+    get: operations['announcements_list']
+    put?: never
+    /**
+     * @description CRUD comunicazioni bacheca.
+     *     Lettura: tutti gli utenti autenticati.
+     *     Scrittura: solo gruppo admin o superuser.
+     */
+    post: operations['announcements_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/announcements/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD comunicazioni bacheca.
+     *     Lettura: tutti gli utenti autenticati.
+     *     Scrittura: solo gruppo admin o superuser.
+     */
+    get: operations['announcements_retrieve']
+    /**
+     * @description CRUD comunicazioni bacheca.
+     *     Lettura: tutti gli utenti autenticati.
+     *     Scrittura: solo gruppo admin o superuser.
+     */
+    put: operations['announcements_update']
+    post?: never
+    /**
+     * @description CRUD comunicazioni bacheca.
+     *     Lettura: tutti gli utenti autenticati.
+     *     Scrittura: solo gruppo admin o superuser.
+     */
+    delete: operations['announcements_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD comunicazioni bacheca.
+     *     Lettura: tutti gli utenti autenticati.
+     *     Scrittura: solo gruppo admin o superuser.
+     */
+    patch: operations['announcements_partial_update']
+    trace?: never
+  }
+  '/api/area-tasks/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    get: operations['area_tasks_list']
+    put?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    post: operations['area_tasks_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/area-tasks/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    get: operations['area_tasks_retrieve']
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    put: operations['area_tasks_update']
+    post?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    delete: operations['area_tasks_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    patch: operations['area_tasks_partial_update']
+    trace?: never
+  }
+  '/api/area-tasks/{id}/comments/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    get: operations['area_tasks_comments_retrieve']
+    put?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    post: operations['area_tasks_comments_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/area-tasks/{id}/comments/{comment_pk}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    delete: operations['area_tasks_comments_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    patch: operations['area_tasks_comments_partial_update']
+    trace?: never
+  }
+  '/api/area-tasks/{id}/convert-to-issue/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    post: operations['area_tasks_convert_to_issue_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/area-tasks/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    post: operations['area_tasks_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/area-tasks/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['area_tasks_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/area-tasks/due/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task della propria area, non completati, con scadenza entro domani
+     *     (inclusa) o già scaduta. Usati dalla campanella "Scadenze" in header.
+     */
+    get: operations['area_tasks_due_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/area-tasks/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task di area. Lettura: tutte le aree, a chiunque sia autenticato (sola
+     *     lettura sulle aree diverse dalla propria). Scrittura
+     *     (create/update/delete/restore): solo sui task della propria area
+     *     (`request.user.profile.leave_area`); il superuser può sempre.
+     *
+     *     Nella lista i task completati da più di `AreaTask.HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni sono nascosti (restano in DB): `?include_hidden=1` li mostra.
+     *     Vale solo per `action == 'list'`, così un task completato da tempo resta
+     *     apribile per id e ripristinabile.
+     *
+     *     Soft-delete/restore/audit: mixin standard di `core/mixins.py`
+     *     (`?include_deleted=1`, `?only_deleted=1`, `restore`, `bulk_restore`).
+     */
+    get: operations['area_tasks_summary_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/audit-events/': {
     parameters: {
       query?: never
@@ -65,8 +824,144 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** @description Return distinct entity types present in audit events. */
+    /**
+     * @description Return distinct entity types present in audit events.
+     *
+     *     Esclude le righe con content_type=NULL (eventi senza entità associata,
+     *     es. login o bulk-restore): non avrebbero comunque app_label/model utili.
+     */
     get: operations['audit_events_entities_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/birthdays/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Compleanni di oggi tra gli utenti attivi (widget dashboard 'birthdays').
+     *
+     *     Solo il giorno corrente: niente fallback sul "prossimo compleanno" se
+     *     oggi non festeggia nessuno — il widget deve mostrare solo eventi del
+     *     giorno, non un conto alla rovescia.
+     */
+    get: operations['birthdays_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/changelog-entries/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD voci di changelog.
+     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     */
+    get: operations['changelog_entries_list']
+    put?: never
+    /**
+     * @description CRUD voci di changelog.
+     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     */
+    post: operations['changelog_entries_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/changelog-entries/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD voci di changelog.
+     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     */
+    get: operations['changelog_entries_retrieve']
+    /**
+     * @description CRUD voci di changelog.
+     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     */
+    put: operations['changelog_entries_update']
+    post?: never
+    /**
+     * @description CRUD voci di changelog.
+     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     */
+    delete: operations['changelog_entries_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD voci di changelog.
+     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
+     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     */
+    patch: operations['changelog_entries_partial_update']
+    trace?: never
+  }
+  '/api/changelog/dismiss/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description POST /api/changelog/dismiss/
+     *     Segna come letto il changelog fino all'ultima voce esistente (calcolata
+     *     lato server, ignorando qualsiasi id passato dal client).
+     */
+    post: operations['changelog_dismiss_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/changelog/unseen/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description GET /api/changelog/unseen/
+     *     Voci non ancora confermate dall'utente loggato (per il modal al login).
+     *
+     *     - Se l'utente non ha mai confermato nulla: solo l'ultima voce inserita
+     *       (evita di sommergere un utente nuovo con l'intero storico).
+     *     - Altrimenti: tutte le voci inserite dopo l'ultima confermata, in ordine
+     *       cronologico di rilascio (le più vecchie per prime), fino a 10.
+     */
+    get: operations['changelog_unseen_retrieve']
     put?: never
     post?: never
     delete?: never
@@ -82,8 +977,52 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     get: operations['contacts_list']
     put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     post: operations['contacts_create']
     delete?: never
     options?: never
@@ -98,13 +1037,139 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     get: operations['contacts_retrieve']
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     put: operations['contacts_update']
     post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     delete: operations['contacts_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     patch: operations['contacts_partial_update']
+    trace?: never
+  }
+  '/api/contacts/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['contacts_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/contacts/{id}/restore/': {
@@ -116,7 +1181,67 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     post: operations['contacts_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contacts/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['contacts_bulk_purge_create']
     delete?: never
     options?: never
     head?: never
@@ -135,8 +1260,207 @@ export interface paths {
     /**
      * @description Restore multiple soft-deleted Contact objects.
      *     Body: {"ids": [1,2,3]} (or a raw list).
+     *     Uses QuerySet.update() to avoid N+1; demote PRIMA del restore
+     *     bulk (0.9.1, DATA-003), non dopo — stesso motivo di restore().
      */
     post: operations['contacts_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    get: operations['contracts_list']
+    put?: never
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    post: operations['contracts_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    get: operations['contracts_retrieve']
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    put: operations['contracts_update']
+    post?: never
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    delete: operations['contracts_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    patch: operations['contracts_partial_update']
+    trace?: never
+  }
+  '/api/contracts/{id}/document/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description GET: scarica il PDF (inline). POST (multipart, campo `file`):
+     *     carica o sostituisce il PDF. DELETE: rimuove il PDF.
+     */
+    get: operations['contracts_document_retrieve']
+    put?: never
+    /**
+     * @description GET: scarica il PDF (inline). POST (multipart, campo `file`):
+     *     carica o sostituisce il PDF. DELETE: rimuove il PDF.
+     */
+    post: operations['contracts_document_create']
+    /**
+     * @description GET: scarica il PDF (inline). POST (multipart, campo `file`):
+     *     carica o sostituisce il PDF. DELETE: rimuove il PDF.
+     */
+    delete: operations['contracts_document_destroy']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    post: operations['contracts_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    post: operations['contracts_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description ViewSet dei contratti.
+     *
+     *     CRUD standard con soft delete/restore/purge dai mixin core. Il PDF del
+     *     contratto (uno solo) passa dall'azione `document`: POST multipart (campo
+     *     `file`) per caricarlo/sostituirlo, GET per scaricarlo inline, DELETE per
+     *     rimuoverlo. Il file è servito solo via API (`protected_media_response`).
+     */
+    post: operations['contracts_bulk_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['contracts_bulk_restore_create']
     delete?: never
     options?: never
     head?: never
@@ -150,8 +1474,30 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     get: operations['custom_field_definitions_list']
     put?: never
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     post: operations['custom_field_definitions_create']
     delete?: never
     options?: never
@@ -166,12 +1512,56 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     get: operations['custom_field_definitions_retrieve']
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     put: operations['custom_field_definitions_update']
     post?: never
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     delete: operations['custom_field_definitions_destroy']
     options?: never
     head?: never
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     patch: operations['custom_field_definitions_partial_update']
     trace?: never
   }
@@ -184,6 +1574,17 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
     post: operations['custom_field_definitions_restore_create']
     delete?: never
     options?: never
@@ -201,10 +1602,105 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * @description Restore multiple soft-deleted custom field definitions.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
      */
     post: operations['custom_field_definitions_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/custom-fields/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
+    post: operations['custom_fields_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/custom-fields/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Reusable restore / bulk_restore actions for soft-deleted models.
+     *
+     *     Defaults are intentionally conservative:
+     *     - `restore` returns 204 No Content
+     *     - `bulk_restore` returns {restored, count}
+     *     - permission is delegated to CanRestoreModelPermission, optionally using
+     *       `restore_permission` on the viewset
+     *
+     *     Viewsets can override hook methods for audit logging or business rules.
+     */
+    post: operations['custom_fields_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/customer-rispacs/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Restituisce i sistemi RIS/PACS collegati ai device del customer autenticato. */
+    get: operations['customer_rispacs_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/customer-rispacs/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Restituisce i sistemi RIS/PACS collegati ai device del customer autenticato. */
+    get: operations['customer_rispacs_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -250,6 +1746,35 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
     get: operations['customers_list']
     put?: never
     /** @description Convert DB integrity errors into 400 ValidationError. */
@@ -260,6 +1785,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/customers/{customer_pk}/vpn/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description GET    /api/customers/{customer_pk}/vpn/  → restituisce l'accesso VPN (o 404)
+     *     POST   /api/customers/{customer_pk}/vpn/  → crea l'accesso VPN
+     *     PATCH  /api/customers/{customer_pk}/vpn/  → aggiorna l'accesso VPN
+     *     DELETE /api/customers/{customer_pk}/vpn/  → elimina l'accesso VPN
+     */
+    get: operations['customers_vpn_retrieve']
+    put?: never
+    /**
+     * @description GET    /api/customers/{customer_pk}/vpn/  → restituisce l'accesso VPN (o 404)
+     *     POST   /api/customers/{customer_pk}/vpn/  → crea l'accesso VPN
+     *     PATCH  /api/customers/{customer_pk}/vpn/  → aggiorna l'accesso VPN
+     *     DELETE /api/customers/{customer_pk}/vpn/  → elimina l'accesso VPN
+     */
+    post: operations['customers_vpn_create']
+    /**
+     * @description GET    /api/customers/{customer_pk}/vpn/  → restituisce l'accesso VPN (o 404)
+     *     POST   /api/customers/{customer_pk}/vpn/  → crea l'accesso VPN
+     *     PATCH  /api/customers/{customer_pk}/vpn/  → aggiorna l'accesso VPN
+     *     DELETE /api/customers/{customer_pk}/vpn/  → elimina l'accesso VPN
+     */
+    delete: operations['customers_vpn_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description GET    /api/customers/{customer_pk}/vpn/  → restituisce l'accesso VPN (o 404)
+     *     POST   /api/customers/{customer_pk}/vpn/  → crea l'accesso VPN
+     *     PATCH  /api/customers/{customer_pk}/vpn/  → aggiorna l'accesso VPN
+     *     DELETE /api/customers/{customer_pk}/vpn/  → elimina l'accesso VPN
+     */
+    patch: operations['customers_vpn_partial_update']
+    trace?: never
+  }
   '/api/customers/{id}/': {
     parameters: {
       query?: never
@@ -267,14 +1832,191 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
     get: operations['customers_retrieve']
     /** @description Convert DB integrity errors into 400 ValidationError. */
     put: operations['customers_update']
     post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
     delete: operations['customers_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
     patch: operations['customers_partial_update']
+    trace?: never
+  }
+  '/api/customers/{id}/export-site-repository/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
+    get: operations['customers_export_site_repository_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/customers/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
+    post: operations['customers_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/customers/{id}/restore/': {
@@ -286,7 +2028,81 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
     post: operations['customers_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/customers/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet che devono rispettare lo scope Portal.
+     *
+     *     Usa filter_queryset() invece di get_queryset() perché i ViewSet esistenti
+     *     costruiscono il queryset da zero senza chiamare super(), quindi un override
+     *     di get_queryset() nel mixin non riceverebbe mai il queryset finale.
+     *
+     *     filter_queryset() viene invocato da DRF *dopo* get_queryset() su ogni
+     *     action (list, retrieve, ecc.), quindi il filtro viene sempre applicato
+     *     sul queryset già costruito dal ViewSet.
+     *
+     *     Comportamento (deciso SOLO da identità/permessi/ambito di sessione
+     *     server-side, MAI da un header inviato dal client — vedi fix 2.1 audit
+     *     2026-07, esteso 0.9.0 con la distinzione per ambito):
+     *     - superuser → nessuno scope, sempre (override di sistema);
+     *     - utente con accesso interno Archie (`core.access_archie`), che ha
+     *       fatto login con ambito "site-repo" (Archie principale) → nessuno
+     *       scope, vede tutto, anche se ha anche un profilo Portal;
+     *     - stesso utente interno, ma con la sessione aperta con ambito "portal"
+     *       (login dal Portal) → SCOPATO come un utente Portal puro: può
+     *       amministrare tutti i clienti dal frontend Archie, ma resta
+     *       differenziato per cliente quando opera dal Portal (vedi
+     *       `_bypasses_portal_scope` in portal/permissions.py);
+     *     - utente Portal "puro" (profilo attivo, nessun accesso interno)
+     *       → SEMPRE scopato sul proprio customer, indipendentemente da qualunque
+     *         header presente o assente nella richiesta;
+     *     - qualunque altro utente autenticato → queryset invariato (la view a
+     *       monte decide se può accedervi tramite le proprie permission class).
+     */
+    post: operations['customers_bulk_purge_create']
     delete?: never
     options?: never
     head?: never
@@ -302,11 +2118,777 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * @description Restore multiple soft-deleted Customer objects.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
-     */
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['customers_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-default-layout/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Layout predefinito applicato solo ai nuovi utenti (nessuna riga
+     *     UserDashboardLayout ancora salvata). Lettura aperta a chiunque sia
+     *     autenticato — serve al frontend per il fallback al primo accesso; la
+     *     scrittura passa solo dall'azione `set_mine`, riservata ai superuser.
+     */
+    get: operations['dashboard_default_layout_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-default-layout/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Layout predefinito applicato solo ai nuovi utenti (nessuna riga
+     *     UserDashboardLayout ancora salvata). Lettura aperta a chiunque sia
+     *     autenticato — serve al frontend per il fallback al primo accesso; la
+     *     scrittura passa solo dall'azione `set_mine`, riservata ai superuser.
+     */
+    get: operations['dashboard_default_layout_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-default-layout/set_mine/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Sostituisce l'intero layout predefinito con quello ATTUALE
+     *     dell'utente che chiama (deve essere superuser). Istantanea presa
+     *     on-demand, non una sincronizzazione continua: chi ha già
+     *     personalizzato la propria dashboard non viene mai toccato, il
+     *     default si applica solo ai nuovi utenti da questo momento in poi.
+     */
+    post: operations['dashboard_default_layout_set_mine_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-layout/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Layout dashboard personale dell'utente loggato.
+     *
+     *     Il CRUD standard resta disponibile (utile per debug/admin), ma il
+     *     frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+     *     dopo ogni modifica in modalità "Personalizza".
+     */
+    get: operations['dashboard_layout_list']
+    put?: never
+    /**
+     * @description Layout dashboard personale dell'utente loggato.
+     *
+     *     Il CRUD standard resta disponibile (utile per debug/admin), ma il
+     *     frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+     *     dopo ogni modifica in modalità "Personalizza".
+     */
+    post: operations['dashboard_layout_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-layout/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Layout dashboard personale dell'utente loggato.
+     *
+     *     Il CRUD standard resta disponibile (utile per debug/admin), ma il
+     *     frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+     *     dopo ogni modifica in modalità "Personalizza".
+     */
+    get: operations['dashboard_layout_retrieve']
+    /**
+     * @description Layout dashboard personale dell'utente loggato.
+     *
+     *     Il CRUD standard resta disponibile (utile per debug/admin), ma il
+     *     frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+     *     dopo ogni modifica in modalità "Personalizza".
+     */
+    put: operations['dashboard_layout_update']
+    post?: never
+    /**
+     * @description Layout dashboard personale dell'utente loggato.
+     *
+     *     Il CRUD standard resta disponibile (utile per debug/admin), ma il
+     *     frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+     *     dopo ogni modifica in modalità "Personalizza".
+     */
+    delete: operations['dashboard_layout_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Layout dashboard personale dell'utente loggato.
+     *
+     *     Il CRUD standard resta disponibile (utile per debug/admin), ma il
+     *     frontend usa esclusivamente l'azione `bulk` per salvare l'intero layout
+     *     dopo ogni modifica in modalità "Personalizza".
+     */
+    patch: operations['dashboard_layout_partial_update']
+    trace?: never
+  }
+  '/api/dashboard-layout/bulk/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Sostituisce l'intero layout dell'utente con quello inviato.
+     *
+     *     Valida ogni item contro `allowed_sizes` del widget corrispondente nel
+     *     catalogo (difesa in profondità: lo snap ai formati ammessi avviene
+     *     già lato frontend durante il drag, ma il backend non si fida di
+     *     coppie w/h arbitrarie in arrivo). `allowed_sizes` è una lista di
+     *     coppie [w, h] esplicite, non due assi indipendenti: alcuni widget
+     *     (es. il meteo) ammettono combinazioni specifiche non cartesiane.
+     */
+    post: operations['dashboard_layout_bulk_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-widgets/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Catalogo dei widget disponibili (statico, non editabile da UI). */
+    get: operations['dashboard_widgets_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/dashboard-widgets/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Catalogo dei widget disponibili (statico, non editabile da UI). */
+    get: operations['dashboard_widgets_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/device-manufacturers/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['device_manufacturers_list']
+    put?: never
+    post: operations['device_manufacturers_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/device-manufacturers/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['device_manufacturers_retrieve']
+    put: operations['device_manufacturers_update']
+    post?: never
+    delete: operations['device_manufacturers_destroy']
+    options?: never
+    head?: never
+    patch: operations['device_manufacturers_partial_update']
+    trace?: never
+  }
+  '/api/device-rispacs/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Tabella associativa Device↔RIS/PACS.
+     *
+     *     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+     *     né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
+     *     utente portale con un permesso Django sufficiente poteva leggere/creare
+     *     collegamenti per device di QUALSIASI customer, non solo il proprio.
+     */
+    get: operations['device_rispacs_list']
+    put?: never
+    /**
+     * @description Tabella associativa Device↔RIS/PACS.
+     *
+     *     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+     *     né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
+     *     utente portale con un permesso Django sufficiente poteva leggere/creare
+     *     collegamenti per device di QUALSIASI customer, non solo il proprio.
+     */
+    post: operations['device_rispacs_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/device-rispacs/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Tabella associativa Device↔RIS/PACS.
+     *
+     *     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+     *     né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
+     *     utente portale con un permesso Django sufficiente poteva leggere/creare
+     *     collegamenti per device di QUALSIASI customer, non solo il proprio.
+     */
+    get: operations['device_rispacs_retrieve']
+    /**
+     * @description Tabella associativa Device↔RIS/PACS.
+     *
+     *     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+     *     né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
+     *     utente portale con un permesso Django sufficiente poteva leggere/creare
+     *     collegamenti per device di QUALSIASI customer, non solo il proprio.
+     */
+    put: operations['device_rispacs_update']
+    post?: never
+    /**
+     * @description Tabella associativa Device↔RIS/PACS.
+     *
+     *     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+     *     né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
+     *     utente portale con un permesso Django sufficiente poteva leggere/creare
+     *     collegamenti per device di QUALSIASI customer, non solo il proprio.
+     */
+    delete: operations['device_rispacs_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Tabella associativa Device↔RIS/PACS.
+     *
+     *     Fix collaterale (stessa famiglia di 2.2/2.3, audit 2026-07): non aveva
+     *     né `PortalScopedMixin` né `permission_classes` espliciti, quindi un
+     *     utente portale con un permesso Django sufficiente poteva leggere/creare
+     *     collegamenti per device di QUALSIASI customer, non solo il proprio.
+     */
+    patch: operations['device_rispacs_partial_update']
+    trace?: never
+  }
+  '/api/device-statuses/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['device_statuses_list']
+    put?: never
+    post: operations['device_statuses_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/device-statuses/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['device_statuses_retrieve']
+    put: operations['device_statuses_update']
+    post?: never
+    delete: operations['device_statuses_destroy']
+    options?: never
+    head?: never
+    patch: operations['device_statuses_partial_update']
+    trace?: never
+  }
+  '/api/device-types/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['device_types_list']
+    put?: never
+    post: operations['device_types_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/device-types/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['device_types_retrieve']
+    put: operations['device_types_update']
+    post?: never
+    delete: operations['device_types_destroy']
+    options?: never
+    head?: never
+    patch: operations['device_types_partial_update']
+    trace?: never
+  }
+  '/api/device-wifi/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    get: operations['device_wifi_list']
+    put?: never
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    post: operations['device_wifi_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/device-wifi/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    get: operations['device_wifi_retrieve']
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    put: operations['device_wifi_update']
+    post?: never
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    delete: operations['device_wifi_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    patch: operations['device_wifi_partial_update']
+    trace?: never
+  }
+  '/api/device-wifi/{id}/certificato/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Fix 2.4 (audit 2026-07): prima non aveva alcuno scope tenant (mancava
+     *     PortalScopedMixin) — un utente portale poteva leggere/scaricare il
+     *     certificato WiFi di device di QUALSIASI customer, non solo il proprio.
+     *     Vedi anche WifiSecretPermissionMixin sopra per l'esposizione in chiaro
+     *     della password.
+     */
+    get: operations['device_wifi_certificato_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/devices/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    get: operations['devices_list']
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['devices_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/devices/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    get: operations['devices_retrieve']
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    put: operations['devices_update']
+    post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    delete: operations['devices_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    patch: operations['devices_partial_update']
+    trace?: never
+  }
+  '/api/devices/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['devices_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/devices/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['devices_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/devices/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['devices_bulk_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/devices/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['devices_bulk_restore_create']
     delete?: never
     options?: never
     head?: never
@@ -320,8 +2902,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_files_list']
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['drive_files_create']
     delete?: never
     options?: never
@@ -336,12 +2920,16 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_files_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     put: operations['drive_files_update']
     post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     delete: operations['drive_files_destroy']
     options?: never
     head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     patch: operations['drive_files_partial_update']
     trace?: never
   }
@@ -352,6 +2940,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_files_download_retrieve']
     put?: never
     post?: never
@@ -389,6 +2978,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_files_preview_retrieve']
     put?: never
     post?: never
@@ -407,6 +2997,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['drive_files_restore_create']
     delete?: never
     options?: never
@@ -423,6 +3014,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['drive_files_bulk_restore_create']
     delete?: never
     options?: never
@@ -459,8 +3051,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_folders_list']
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['drive_folders_create']
     delete?: never
     options?: never
@@ -475,12 +3069,16 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_folders_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     put: operations['drive_folders_update']
     post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     delete: operations['drive_folders_destroy']
     options?: never
     head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     patch: operations['drive_folders_partial_update']
     trace?: never
   }
@@ -491,6 +3089,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_folders_breadcrumb_retrieve']
     put?: never
     post?: never
@@ -507,6 +3106,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['drive_folders_children_retrieve']
     put?: never
     post?: never
@@ -546,6 +3146,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['drive_folders_restore_create']
     delete?: never
     options?: never
@@ -562,7 +3163,419 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['drive_folders_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-items/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_items_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-items/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_items_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch: operations['expense_items_partial_update']
+    trace?: never
+  }
+  '/api/expense-km-rates/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_km_rates_list']
+    put?: never
+    post: operations['expense_km_rates_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-km-rates/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_km_rates_retrieve']
+    put?: never
+    post?: never
+    delete: operations['expense_km_rates_destroy']
+    options?: never
+    head?: never
+    patch: operations['expense_km_rates_partial_update']
+    trace?: never
+  }
+  '/api/expense-km-trips/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_km_trips_list']
+    put?: never
+    post: operations['expense_km_trips_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-km-trips/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_km_trips_retrieve']
+    put: operations['expense_km_trips_update']
+    post?: never
+    delete: operations['expense_km_trips_destroy']
+    options?: never
+    head?: never
+    patch: operations['expense_km_trips_partial_update']
+    trace?: never
+  }
+  '/api/expense-receipts/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_receipts_list']
+    put?: never
+    post: operations['expense_receipts_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-receipts/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['expense_receipts_retrieve']
+    put?: never
+    post?: never
+    delete: operations['expense_receipts_destroy']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-receipts/{id}/file/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Serve il file dello scontrino dietro autenticazione (stesso
+     *     pattern di servicenow-cases/{id}/screenshot/).
+     */
+    get: operations['expense_receipts_file_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-receipts/extract/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description OCR dello scontrino: NON salva nulla, restituisce solo un
+     *     suggerimento importo/data che l'utente conferma o corregge.
+     */
+    post: operations['expense_receipts_extract_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-reports/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    get: operations['expense_reports_list']
+    put?: never
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    post: operations['expense_reports_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-reports/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    get: operations['expense_reports_retrieve']
+    put?: never
+    post?: never
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    delete: operations['expense_reports_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    patch: operations['expense_reports_partial_update']
+    trace?: never
+  }
+  '/api/expense-reports/{id}/export-pdf/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    get: operations['expense_reports_export_pdf_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-reports/{id}/reject/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    post: operations['expense_reports_reject_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-reports/{id}/submit/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    post: operations['expense_reports_submit_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-reports/{id}/validate/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD nota spese. Creazione: genera automaticamente le 12 voci fisse
+     *     (una per categoria). Le transizioni di stato passano dalle action
+     *     dedicate (submit/validate/reject), non da PATCH diretto su `status`.
+     */
+    post: operations['expense_reports_validate_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/expense-reports/meta/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Info di contesto per il frontend: ruolo Segreteria e tariffa
+     *     km dell'utente corrente (per mostrare/nascondere le azioni giuste
+     *     senza dover dedurle dalla lista dei report).
+     */
+    get: operations['expense_reports_meta_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/feedback-items/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['feedback_items_list']
+    put?: never
+    post: operations['feedback_items_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/feedback-items/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['feedback_items_retrieve']
+    put: operations['feedback_items_update']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch: operations['feedback_items_partial_update']
+    trace?: never
+  }
+  '/api/feedback-items/{id}/screenshot/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['feedback_items_screenshot_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/feedback-items/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['feedback_items_summary_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/health/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Health endpoint pubblico per liveness/readiness check di base. */
+    get: operations['health_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -576,6 +3589,28 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     get: operations['inventories_list']
     put?: never
     /** @description Convert DB integrity errors into 400 ValidationError. */
@@ -593,14 +3628,118 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     get: operations['inventories_retrieve']
     /** @description Convert DB integrity errors into 400 ValidationError. */
     put: operations['inventories_update']
     post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     delete: operations['inventories_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     patch: operations['inventories_partial_update']
+    trace?: never
+  }
+  '/api/inventories/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['inventories_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/inventories/{id}/restore/': {
@@ -612,7 +3751,67 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     post: operations['inventories_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/inventories/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['inventories_bulk_purge_create']
     delete?: never
     options?: never
     head?: never
@@ -628,10 +3827,7 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * @description Restore multiple soft-deleted inventory records.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
-     */
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['inventories_bulk_restore_create']
     delete?: never
     options?: never
@@ -703,6 +3899,61 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/inventory/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['inventory_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/inventory/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['inventory_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/issue-categories/': {
     parameters: {
       query?: never
@@ -742,8 +3993,38 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     get: operations['issues_list']
     put?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     post: operations['issues_create']
     delete?: never
     options?: never
@@ -758,12 +4039,72 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     get: operations['issues_retrieve']
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     put: operations['issues_update']
     post?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     delete: operations['issues_destroy']
     options?: never
     head?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     patch: operations['issues_partial_update']
     trace?: never
   }
@@ -774,8 +4115,38 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     get: operations['issues_comments_retrieve']
     put?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     post: operations['issues_comments_create']
     delete?: never
     options?: never
@@ -793,9 +4164,39 @@ export interface paths {
     get?: never
     put?: never
     post?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     delete: operations['issues_comments_destroy']
     options?: never
     head?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     patch: operations['issues_comments_partial_update']
     trace?: never
   }
@@ -808,7 +4209,128 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
     post: operations['issues_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/issues/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['issues_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/issues/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri. */
+    get: operations['issues_summary_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/leave-areas/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['leave_areas_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/leave-areas/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['leave_areas_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/leave-holidays/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Festività per un anno (`?year=2026`). `area_ids` vuoto = vale per
+     *     tutte le aree; altrimenti vale solo per le aree elencate.
+     */
+    get: operations['leave_holidays_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/leave-holidays/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Festività per un anno (`?year=2026`). `area_ids` vuoto = vale per
+     *     tutte le aree; altrimenti vale solo per le aree elencate.
+     */
+    get: operations['leave_holidays_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -822,8 +4344,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['maintenance_events_list']
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_events_create']
     delete?: never
     options?: never
@@ -838,13 +4362,72 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['maintenance_events_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     put: operations['maintenance_events_update']
     post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     delete: operations['maintenance_events_destroy']
     options?: never
     head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     patch: operations['maintenance_events_partial_update']
+    trace?: never
+  }
+  '/api/maintenance-events/{id}/delete-pdf/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    delete: operations['maintenance_events_delete_pdf_destroy']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-events/{id}/pdf/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    get: operations['maintenance_events_pdf_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-events/{id}/reset/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Hard-delete del rapportino (+ PDF se presente).
+     *     L'inventory torna nella lista scadenze poiché non esiste più un evento
+     *     ok/ko/not_planned che lo esclude dal todo.
+     */
+    post: operations['maintenance_events_reset_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/maintenance-events/{id}/restore/': {
@@ -856,7 +4439,42 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_events_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-events/{id}/set-not-planned/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    patch: operations['maintenance_events_set_not_planned_partial_update']
+    trace?: never
+  }
+  '/api/maintenance-events/{id}/upload-pdf/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Carica o sostituisce il PDF allegato senza toccare gli altri campi. */
+    post: operations['maintenance_events_upload_pdf_create']
     delete?: never
     options?: never
     head?: never
@@ -872,6 +4490,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_events_bulk_restore_create']
     delete?: never
     options?: never
@@ -886,8 +4505,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['maintenance_notifications_list']
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_notifications_create']
     delete?: never
     options?: never
@@ -902,12 +4523,16 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['maintenance_notifications_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     put: operations['maintenance_notifications_update']
     post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     delete: operations['maintenance_notifications_destroy']
     options?: never
     head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     patch: operations['maintenance_notifications_partial_update']
     trace?: never
   }
@@ -920,6 +4545,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_notifications_restore_create']
     delete?: never
     options?: never
@@ -936,7 +4562,96 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_notifications_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-plan-inventories/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    get: operations['maintenance_plan_inventories_list']
+    put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    post: operations['maintenance_plan_inventories_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-plan-inventories/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    get: operations['maintenance_plan_inventories_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    put: operations['maintenance_plan_inventories_update']
+    post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    delete: operations['maintenance_plan_inventories_destroy']
+    options?: never
+    head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    patch: operations['maintenance_plan_inventories_partial_update']
+    trace?: never
+  }
+  '/api/maintenance-plan-inventories/{id}/reset-override/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Rimuove il due_date_override: il record torna ad ereditare la data del piano. */
+    post: operations['maintenance_plan_inventories_reset_override_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-plan-inventories/sync/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Popola/aggiorna automaticamente la pivot per uno o più piani.
+     *
+     *     Body (JSON):
+     *       { "plan_ids": [1, 2, 3] }   → sincronizza solo quei piani
+     *       { "plan_ids": [] }           → sincronizza TUTTI i piani attivi
+     *
+     *     Per ogni piano:
+     *       - trova tutti gli inventory attivi del cliente compatibili con
+     *         inventory_types del piano
+     *       - crea i record pivot mancanti (skip su quelli già esistenti,
+     *         compresi i soft-deleted per non perdere gli override)
+     *       - NON cancella record pivot esistenti (la rimozione è esplicita)
+     *
+     *     Risposta:
+     *       { "created": 12, "skipped": 5, "plans_processed": 3 }
+     */
+    post: operations['maintenance_plan_inventories_sync_create']
     delete?: never
     options?: never
     head?: never
@@ -950,8 +4665,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['maintenance_plans_list']
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_plans_create']
     delete?: never
     options?: never
@@ -966,13 +4683,34 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['maintenance_plans_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     put: operations['maintenance_plans_update']
     post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     delete: operations['maintenance_plans_destroy']
     options?: never
     head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     patch: operations['maintenance_plans_partial_update']
+    trace?: never
+  }
+  '/api/maintenance-plans/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    post: operations['maintenance_plans_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/maintenance-plans/{id}/restore/': {
@@ -984,7 +4722,25 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_plans_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-plans/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    post: operations['maintenance_plans_bulk_purge_create']
     delete?: never
     options?: never
     head?: never
@@ -1000,6 +4756,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_plans_bulk_restore_create']
     delete?: never
     options?: never
@@ -1102,6 +4859,783 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/monitors/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    get: operations['monitors_list']
+    put?: never
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    post: operations['monitors_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/monitors/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    get: operations['monitors_retrieve']
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    put: operations['monitors_update']
+    post?: never
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    delete: operations['monitors_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    patch: operations['monitors_partial_update']
+    trace?: never
+  }
+  '/api/monitors/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    post: operations['monitors_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/monitors/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    post: operations['monitors_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/monitors/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD monitor. Filtrabili per inventory, stato, tipo.
+     *
+     *     Supporta soft-delete con cestino:
+     *       ?include_deleted=1  -> include attivi + eliminati
+     *       ?only_deleted=1     -> solo eliminati (cestino)
+     *     Endpoint extra: POST /monitors/{id}/restore/
+     */
+    post: operations['monitors_bulk_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/monitors/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['monitors_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/notifications/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Sola lettura + azioni di mark-read: le notifiche sono generate solo dal
+     *     management command `refresh_notifications`, mai da input utente diretto.
+     */
+    get: operations['notifications_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/notifications/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Sola lettura + azioni di mark-read: le notifiche sono generate solo dal
+     *     management command `refresh_notifications`, mai da input utente diretto.
+     */
+    get: operations['notifications_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/notifications/{id}/mark_read/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Sola lettura + azioni di mark-read: le notifiche sono generate solo dal
+     *     management command `refresh_notifications`, mai da input utente diretto.
+     */
+    post: operations['notifications_mark_read_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/notifications/mark_all_read/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Sola lettura + azioni di mark-read: le notifiche sono generate solo dal
+     *     management command `refresh_notifications`, mai da input utente diretto.
+     */
+    post: operations['notifications_mark_all_read_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/notifications/unread_count/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Sola lettura + azioni di mark-read: le notifiche sono generate solo dal
+     *     management command `refresh_notifications`, mai da input utente diretto.
+     */
+    get: operations['notifications_unread_count_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/portal/config/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description GET /api/portal/config/
+     *
+     *     Endpoint pubblico (no auth) che il frontend Portal chiama prima del
+     *     login per sapere se il backend è raggiungibile e ottenere la lista
+     *     degli ambiti disponibili per il select del login.
+     *
+     *     Non espone dati sensibili.
+     */
+    get: operations['portal_config_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/portal/me/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description GET /api/portal/me/
+     *
+     *     Restituisce le informazioni sull'utente Portal autenticato, il cliente
+     *     ATTIVO (risolto da sessione, con fallback self-healing sul default) e
+     *     la lista di tutti i clienti assegnati (0.9.0: multi-cliente — usata dal
+     *     frontend per popolare il dropdown in topbar, mostrato solo se >1).
+     *     Usato dal frontend Portal come primo endpoint dopo il login per
+     *     inizializzare il contesto.
+     *
+     *     Se il profilo esiste ma è bloccato (is_active=False — il cliente di
+     *     default non è più tra quelli assegnati, o è stato disattivato) risponde
+     *     403 con un messaggio esplicito invece di lasciar passare dati stantii:
+     *     nessun fallback automatico su un altro cliente assegnato, per decisione
+     *     esplicita (punto 4 roadmap 0.9.0).
+     *
+     *     Risposta (profilo attivo):
+     *     {
+     *         "user": { "id", "username", "email", "first_name", "last_name" },
+     *         "customer": { "id", "name", "display_name", "code" },  // cliente ATTIVO
+     *         "customers": [{ "id", "name", "display_name", "code" }, ...],  // tutti gli assegnati
+     *         "portal": {
+     *             "is_active": true,
+     *             "can_edit_devices": true,
+     *             "permissions": ["device.add_device", ...]  // tutti i permessi Django dell'utente
+     *         }
+     *     }
+     */
+    get: operations['portal_me_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/portal/switch-customer/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description POST /api/portal/switch-customer/  {"customer_id": <int>}
+     *
+     *     Cambia il cliente ATTIVO dell'utente portale per la sessione corrente.
+     *     Valida che il cliente richiesto sia tra quelli assegnati all'utente
+     *     (mai fidarsi del client oltre la validazione): se non lo è, 400.
+     *     La scelta viene tenuta in sessione server-side (mai in localStorage/
+     *     header — stesso principio di PortalScopedMixin).
+     */
+    post: operations['portal_switch_customer_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    get: operations['purchase_order_entries_list']
+    put?: never
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    post: operations['purchase_order_entries_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    get: operations['purchase_order_entries_retrieve']
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    put: operations['purchase_order_entries_update']
+    post?: never
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    delete: operations['purchase_order_entries_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    patch: operations['purchase_order_entries_partial_update']
+    trace?: never
+  }
+  '/api/purchase-order-entries/{id}/advance/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Avanza di UN passo lo stato (inserito->inviato->ricevuto->fatturato).
+     *
+     *     Body multipart opzionale: `document` (PDF) viene aggiunto come nuovo
+     *     PurchaseOrderDocument del kind corrispondente allo stato di
+     *     destinazione (Punto 9: non sovrascrive documenti già caricati).
+     */
+    post: operations['purchase_order_entries_advance_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/{id}/documents/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description GET: lista documenti dell'entry. POST (multipart): carica un nuovo
+     *     PDF — `kind` (offer/po/invoice) + `file`. Si aggiunge alla lista,
+     *     non sostituisce eventuali documenti dello stesso kind già presenti.
+     */
+    get: operations['purchase_order_entries_documents_retrieve']
+    put?: never
+    /**
+     * @description GET: lista documenti dell'entry. POST (multipart): carica un nuovo
+     *     PDF — `kind` (offer/po/invoice) + `file`. Si aggiunge alla lista,
+     *     non sostituisce eventuali documenti dello stesso kind già presenti.
+     */
+    post: operations['purchase_order_entries_documents_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/{id}/documents/{doc_pk}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description GET: scarica il PDF (inline). DELETE: rimuove il singolo documento. */
+    get: operations['purchase_order_entries_documents_retrieve_2']
+    put?: never
+    post?: never
+    /** @description GET: scarica il PDF (inline). DELETE: rimuove il singolo documento. */
+    delete: operations['purchase_order_entries_documents_destroy']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description ViewSet per PurchaseOrderEntry.
+     *
+     *     Eredita da RestoreActionMixin + SoftDeleteAuditMixin (vedi core.mixins):
+     *     perform_create/perform_update/perform_destroy standard con audit log,
+     *     più l'azione `restore`/`bulk_restore`. Nessun override necessario perché
+     *     il modello ha created_by/updated_by come tutti gli altri moduli CRUD.
+     *
+     *     Workflow (`advance`/`revert`): SEMPRE un passo alla volta, in entrambe le
+     *     direzioni (deciso in chat). Il PDF è opzionale in `advance` — se assente
+     *     può essere caricato dopo (o in aggiunta) tramite POST multipart su
+     *     `documents` (Punto 9: multi-PDF per tipo, un upload = una nuova riga, mai
+     *     una sostituzione). Download e cancellazione del singolo PDF passano da
+     *     `documents/{doc_id}` (GET per scaricare, DELETE per rimuovere).
+     */
+    post: operations['purchase_order_entries_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/{id}/revert/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Torna indietro di UN passo. Azzera il timestamp dello step lasciato
+     *     (il documento eventualmente già caricato resta, non viene cancellato).
+     */
+    post: operations['purchase_order_entries_revert_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['purchase_order_entries_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/purchase-order-entries/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Conteggi/totali per i KPI in testata pagina, filtrati per anno (`?year=`).
+     *
+     *     `total_amount` è la somma degli importi di TUTTI i Purchase Order,
+     *     indipendentemente dallo stato workflow (deciso in chat). `to_send` e
+     *     `waiting` sono invece conteggi filtrati per stato:
+     *       - to_send: stato INSERITO (offerta non ancora inviata)
+     *       - waiting: stato INVIATO o RICEVUTO (in attesa di riscontro dal cliente)
+     *
+     *     Include anche il confronto con l'anno precedente (`previous_year`,
+     *     `previous_year_amount`, `yoy_delta_pct`) per il KPI di variazione
+     *     annua del totale in Euro (deciso in chat). `yoy_delta_pct` è `None`
+     *     quando l'anno precedente non ha importi da confrontare (evita
+     *     divisioni per zero / percentuali fuorvianti).
+     *
+     *     `?kind=` (opzionale, ordinario/extra) filtra i KPI per tipo di PO,
+     *     in coerenza col filtro di tipo del datagrid — se assente/valore non
+     *     valido i KPI restano calcolati su tutti i tipi.
+     */
+    get: operations['purchase_order_entries_summary_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/rispacs/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Registro RIS/PACS globale (condiviso tra tutti i customer).
+     *
+     *     Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+     *     qualunque utente portale autenticato, anche solo lettore, senza
+     *     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+     *     interni da portale. Ora:
+     *     - la lettura richiede `device.view_rispacs` (chiunque, interno o
+     *       portale, via PortalModelPermissions);
+     *     - le scritture richiedono ANCHE l'accesso interno Archie
+     *       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+     *     Gli utenti portale che devono solo consultare i sistemi collegati ai
+     *     propri device continuano a usare l'endpoint già scoped
+     *     `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+     */
+    get: operations['rispacs_list']
+    put?: never
+    /**
+     * @description Registro RIS/PACS globale (condiviso tra tutti i customer).
+     *
+     *     Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+     *     qualunque utente portale autenticato, anche solo lettore, senza
+     *     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+     *     interni da portale. Ora:
+     *     - la lettura richiede `device.view_rispacs` (chiunque, interno o
+     *       portale, via PortalModelPermissions);
+     *     - le scritture richiedono ANCHE l'accesso interno Archie
+     *       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+     *     Gli utenti portale che devono solo consultare i sistemi collegati ai
+     *     propri device continuano a usare l'endpoint già scoped
+     *     `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+     */
+    post: operations['rispacs_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/rispacs/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Registro RIS/PACS globale (condiviso tra tutti i customer).
+     *
+     *     Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+     *     qualunque utente portale autenticato, anche solo lettore, senza
+     *     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+     *     interni da portale. Ora:
+     *     - la lettura richiede `device.view_rispacs` (chiunque, interno o
+     *       portale, via PortalModelPermissions);
+     *     - le scritture richiedono ANCHE l'accesso interno Archie
+     *       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+     *     Gli utenti portale che devono solo consultare i sistemi collegati ai
+     *     propri device continuano a usare l'endpoint già scoped
+     *     `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+     */
+    get: operations['rispacs_retrieve']
+    /**
+     * @description Registro RIS/PACS globale (condiviso tra tutti i customer).
+     *
+     *     Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+     *     qualunque utente portale autenticato, anche solo lettore, senza
+     *     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+     *     interni da portale. Ora:
+     *     - la lettura richiede `device.view_rispacs` (chiunque, interno o
+     *       portale, via PortalModelPermissions);
+     *     - le scritture richiedono ANCHE l'accesso interno Archie
+     *       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+     *     Gli utenti portale che devono solo consultare i sistemi collegati ai
+     *     propri device continuano a usare l'endpoint già scoped
+     *     `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+     */
+    put: operations['rispacs_update']
+    post?: never
+    /**
+     * @description Registro RIS/PACS globale (condiviso tra tutti i customer).
+     *
+     *     Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+     *     qualunque utente portale autenticato, anche solo lettore, senza
+     *     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+     *     interni da portale. Ora:
+     *     - la lettura richiede `device.view_rispacs` (chiunque, interno o
+     *       portale, via PortalModelPermissions);
+     *     - le scritture richiedono ANCHE l'accesso interno Archie
+     *       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+     *     Gli utenti portale che devono solo consultare i sistemi collegati ai
+     *     propri device continuano a usare l'endpoint già scoped
+     *     `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+     */
+    delete: operations['rispacs_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Registro RIS/PACS globale (condiviso tra tutti i customer).
+     *
+     *     Fix 2.3 (audit 2026-07): prima era un ModelViewSet completo aperto a
+     *     qualunque utente portale autenticato, anche solo lettore, senza
+     *     rispettare i permessi Django (add/change/delete_rispacs) né distinguere
+     *     interni da portale. Ora:
+     *     - la lettura richiede `device.view_rispacs` (chiunque, interno o
+     *       portale, via PortalModelPermissions);
+     *     - le scritture richiedono ANCHE l'accesso interno Archie
+     *       (IsInternalOrReadOnly) oltre al permesso Django corrispondente.
+     *     Gli utenti portale che devono solo consultare i sistemi collegati ai
+     *     propri device continuano a usare l'endpoint già scoped
+     *     `/api/customer-rispacs/` (CustomerRispacsViewSet, sotto).
+     */
+    patch: operations['rispacs_partial_update']
+    trace?: never
+  }
   '/api/schema/': {
     parameters: {
       query?: never
@@ -1131,16 +5665,671 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /**
-     * @description Global search API.
-     *
-     *     GET /api/search/?q=...&limit=50
-     *
-     *     Returns a flat list of results with a 'kind' and a suggested UI path.
-     *     NOTE: This view is not a ModelViewSet, therefore it must NOT use
-     *     IsAuthenticatedDjangoModelPermissions.
-     */
     get: operations['search_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sellers/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    get: operations['sellers_list']
+    put?: never
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    post: operations['sellers_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sellers/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    get: operations['sellers_retrieve']
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    put: operations['sellers_update']
+    post?: never
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    delete: operations['sellers_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    patch: operations['sellers_partial_update']
+    trace?: never
+  }
+  '/api/sellers/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    post: operations['sellers_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sellers/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    post: operations['sellers_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sellers/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Garantisce la barriera Portal/Archie anche sulle action che dichiarano
+     *     proprie `permission_classes` (restore/purge dei mixin core), che
+     *     altrimenti sostituirebbero quelle del ViewSet.
+     */
+    post: operations['sellers_bulk_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sellers/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['sellers_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-case-types/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Elenco dei type disponibili per categoria (Philips/Biotron), usato dal
+     *     drawer di inserimento e dalla pagina statistiche per popolare le opzioni.
+     *     Gestione (aggiunta/disattivazione type) esclusivamente da Django admin.
+     */
+    get: operations['servicenow_case_types_list']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-case-types/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Elenco dei type disponibili per categoria (Philips/Biotron), usato dal
+     *     drawer di inserimento e dalla pagina statistiche per popolare le opzioni.
+     *     Gestione (aggiunta/disattivazione type) esclusivamente da Django admin.
+     */
+    get: operations['servicenow_case_types_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    get: operations['servicenow_cases_list']
+    put?: never
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    post: operations['servicenow_cases_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    get: operations['servicenow_cases_retrieve']
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    put: operations['servicenow_cases_update']
+    post?: never
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    delete: operations['servicenow_cases_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    patch: operations['servicenow_cases_partial_update']
+    trace?: never
+  }
+  '/api/servicenow-cases/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    post: operations['servicenow_cases_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/{id}/screenshot/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Serve lo screenshot del case dietro autenticazione.
+     *
+     *     Sostituisce l'accesso diretto a /api/media/servicenow_cases/..., che era
+     *     pubblico. Il file resta dov'è su disco: viene servito da nginx tramite
+     *     X-Accel-Redirect sulla location interna /protected_media/, quindi Django
+     *     non fa da proxy ai byte.
+     *
+     *     `disposition="inline"` perché il frontend lo mostra in un <img> (drawer
+     *     dettaglio e anteprima del form): essendo same-origin, il cookie di
+     *     sessione viene inviato automaticamente e non serve modificare il client.
+     *
+     *     Il lookup NON usa self.get_object(): quello applica i filtri di
+     *     soft-delete e restituirebbe 404 sullo screenshot di un case nel cestino,
+     *     che invece resta visibile nella vista "eliminati". Chi può vedere il case
+     *     può vederne lo screenshot, quindi si interroga il queryset completo e si
+     *     richiamano comunque i controlli di permesso a oggetto.
+     */
+    get: operations['servicenow_cases_screenshot_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['servicenow_cases_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/extract/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD ServiceNowCase.
+     *
+     *     ServiceNowCase non ha created_by/updated_by (come Monitor) → il mixin
+     *     generico SoftDeleteAuditMixin funziona senza override.
+     *
+     *     Endpoint extra:
+     *     - POST /servicenow-cases/extract/ → estrae i campi da uno screenshot
+     *       via OCR e li ritorna SENZA salvare nulla (l'utente conferma/corregge
+     *       prima di creare il case tramite la POST standard).
+     */
+    post: operations['servicenow_cases_extract_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/import-historical-commit/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Esegue l'import vero e proprio. Ri-analizza lo stesso CSV (i dati
+     *     possono essere cambiati tra preview e commit, es. un case creato nel
+     *     frattempo) e crea un case per ogni riga valida; un errore su una
+     *     riga non blocca le altre. MAI notifica Teams/modal Philips per
+     *     queste righe: a differenza di perform_create, qui non si richiama
+     *     notify_teams_new_case in nessun caso — sono case storici.
+     */
+    post: operations['servicenow_cases_import_historical_commit_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/import-historical-preview/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Valida e mappa TUTTE le righe del CSV senza scrivere nulla sul DB,
+     *     così l'utente può rivedere il riepilogo (righe da creare, duplicati,
+     *     errori, avvisi) prima di confermare con import-historical-commit.
+     */
+    post: operations['servicenow_cases_import_historical_preview_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/notification-settings/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Espone al frontend la modalità di notifica attiva per i case
+     *     Philips, così il form di creazione sa se mostrare il modal di copia
+     *     dopo il salvataggio oppure affidarsi (come da sempre) al canale
+     *     Teams. Switch TEMPORANEO in prova — vedi servicenow/notifications.py.
+     */
+    get: operations['servicenow_cases_notification_settings_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Aggregazione casi gestiti per tecnico, raggruppati per mese o
+     *     settimana ISO dell'anno indicato. Filtrabile per Type e tecnico.
+     *     Usato dalla pagina Statistiche ServiceNow (grafico a barre / matrice).
+     */
+    get: operations['servicenow_cases_stats_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/stats-export-pdf/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Report PDF sintetico (KPI + breakdown Type + totali per tecnico)
+     *     per i filtri correnti della pagina Statistiche. Stessi query params
+     *     di stats/, generato server-side con reportlab (stesso pattern di
+     *     wiki/api/pages.py:export_pdf).
+     */
+    get: operations['servicenow_cases_stats_export_pdf_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-cases/triage/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Riepilogo rapido dei case aperti *oggi*, raggruppati per categoria
+     *     (Philips/Biotron) e tecnico, ordinati per numero di casi decrescente.
+     *     Include SEMPRE tutti i tecnici attivi della categoria, anche a 0 casi
+     *     oggi, così il pannello 'Triage' mostra a colpo d'occhio chi è scarico.
+     *
+     *     Gli account funzionali (profile.is_functional_account, es. ac.philips,
+     *     ris.philips, cdd.biotron, jolly.philips) sono esclusi dall'elenco e dal
+     *     totale: non sono persone da bilanciare nel Triage, anche se restano
+     *     normali assegnatari validi per i case (fallback automatico).
+     *
+     *     Lo stato 'assente' è sensibile all'ora corrente: un'assenza a giornata
+     *     intera (ferie/malattia/trasferta/altro senza orario) copre tutto il
+     *     giorno; un permesso orario segnala il tecnico assente solo mentre
+     *     l'orario corrente rientra nella fascia registrata.
+     */
+    get: operations['servicenow_cases_triage_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-technician-absences/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD assenze per i tecnici ServiceNow (Philips + Biotron), a mezza
+     *     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
+     */
+    get: operations['servicenow_technician_absences_list']
+    put?: never
+    /**
+     * @description CRUD assenze per i tecnici ServiceNow (Philips + Biotron), a mezza
+     *     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
+     */
+    post: operations['servicenow_technician_absences_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-technician-absences/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD assenze per i tecnici ServiceNow (Philips + Biotron), a mezza
+     *     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
+     */
+    get: operations['servicenow_technician_absences_retrieve']
+    put?: never
+    post?: never
+    /**
+     * @description CRUD assenze per i tecnici ServiceNow (Philips + Biotron), a mezza
+     *     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
+     */
+    delete: operations['servicenow_technician_absences_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD assenze per i tecnici ServiceNow (Philips + Biotron), a mezza
+     *     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
+     */
+    patch: operations['servicenow_technician_absences_partial_update']
+    trace?: never
+  }
+  '/api/servicenow-technician-absences/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description CRUD assenze per i tecnici ServiceNow (Philips + Biotron), a mezza
+     *     giornata. Vedi nota sopra sul perché non riusa `attendance.api.AbsenceViewSet`.
+     */
+    post: operations['servicenow_technician_absences_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-technician-absences/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['servicenow_technician_absences_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-technician-absences/full-day/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Crea in un'unica transazione le due voci mattina+pomeriggio per un
+     *     giorno intero. Volutamente NON delega a due POST separate lato
+     *     frontend: se una delle due fasce fosse già occupata, due chiamate
+     *     indipendenti potrebbero salvarne una e fallire sull'altra (scrittura
+     *     parziale), oltre a rischiare l'IntegrityError/500 visto in produzione.
+     *     Qui si valida prima ENTRAMBE le fasce e si scrive tutto o niente.
+     */
+    post: operations['servicenow_technician_absences_full_day_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/servicenow-technician-absences/technicians/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Elenco tecnici ServiceNow attivi, con categoria Philips/Biotron
+     *     (per popolare la vista settimanale, coerente col Triage). Esclude gli
+     *     account funzionali (profile.is_functional_account): non sono persone
+     *     e non possono avere assenze da pianificare.
+     */
+    get: operations['servicenow_technician_absences_technicians_retrieve']
     put?: never
     post?: never
     delete?: never
@@ -1188,8 +6377,52 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     get: operations['sites_list']
     put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     post: operations['sites_create']
     delete?: never
     options?: never
@@ -1204,13 +6437,139 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     get: operations['sites_retrieve']
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     put: operations['sites_update']
     post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     delete: operations['sites_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     patch: operations['sites_partial_update']
+    trace?: never
+  }
+  '/api/sites/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['sites_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/sites/{id}/restore/': {
@@ -1222,7 +6581,67 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
     post: operations['sites_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sites/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['sites_bulk_purge_create']
     delete?: never
     options?: never
     head?: never
@@ -1238,11 +6657,52 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * @description Restore multiple soft-deleted Site objects.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
-     */
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['sites_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/sticky-note/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['sticky_note_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch: operations['sticky_note_partial_update']
+    trace?: never
+  }
+  '/api/system-stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Statistiche di sistema pubbliche — usate nella pagina di Login
+     *     prima dell'autenticazione.
+     *
+     *     GET /api/system-stats/
+     *     Response:
+     *     {
+     *         "inventory_count": 142,
+     *         "uptime": "3d 4h",
+     *         "version": "0.8"
+     *     }
+     */
+    get: operations['system_stats_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -1256,8 +6716,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['techs_list']
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['techs_create']
     delete?: never
     options?: never
@@ -1272,13 +6734,34 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     get: operations['techs_retrieve']
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     put: operations['techs_update']
     post?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     delete: operations['techs_destroy']
     options?: never
     head?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     patch: operations['techs_partial_update']
+    trace?: never
+  }
+  '/api/techs/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    post: operations['techs_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/techs/{id}/restore/': {
@@ -1290,7 +6773,25 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['techs_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/techs/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
+    post: operations['techs_bulk_purge_create']
     delete?: never
     options?: never
     head?: never
@@ -1306,11 +6807,68 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['techs_bulk_restore_create']
     delete?: never
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/user-tasks/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task personali dell'utente loggato.
+     *     Ogni utente vede e gestisce solo i propri task.
+     */
+    get: operations['user_tasks_list']
+    put?: never
+    /**
+     * @description Task personali dell'utente loggato.
+     *     Ogni utente vede e gestisce solo i propri task.
+     */
+    post: operations['user_tasks_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/user-tasks/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Task personali dell'utente loggato.
+     *     Ogni utente vede e gestisce solo i propri task.
+     */
+    get: operations['user_tasks_retrieve']
+    /**
+     * @description Task personali dell'utente loggato.
+     *     Ogni utente vede e gestisce solo i propri task.
+     */
+    put: operations['user_tasks_update']
+    post?: never
+    /**
+     * @description Task personali dell'utente loggato.
+     *     Ogni utente vede e gestisce solo i propri task.
+     */
+    delete: operations['user_tasks_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Task personali dell'utente loggato.
+     *     Ogni utente vede e gestisce solo i propri task.
+     */
+    patch: operations['user_tasks_partial_update']
     trace?: never
   }
   '/api/users/': {
@@ -1345,6 +6903,563 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/vlan-ip-requests/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    get: operations['vlan_ip_requests_list']
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['vlan_ip_requests_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlan-ip-requests/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    get: operations['vlan_ip_requests_retrieve']
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    put: operations['vlan_ip_requests_update']
+    post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    delete: operations['vlan_ip_requests_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    patch: operations['vlan_ip_requests_partial_update']
+    trace?: never
+  }
+  '/api/vlan-ip-requests/{id}/approve/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Approva una richiesta pendente (richiede permesso vlan.change_vlaniprequest).
+     *
+     *     Fix P0 6.5: prima leggeva `stato` e poi salvava senza alcun lock,
+     *     quindi due approve() concorrenti sulla stessa richiesta potevano
+     *     entrambi superare il controllo "PENDING" prima che l'altro scrivesse.
+     *     Ora la riga viene bloccata con select_for_update dentro una
+     *     transazione, quindi la seconda richiesta aspetta e poi trova
+     *     `stato` già cambiato dalla prima.
+     */
+    post: operations['vlan_ip_requests_approve_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlan-ip-requests/{id}/reject/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Rifiuta una richiesta pendente (richiede permesso vlan.change_vlaniprequest).
+     *
+     *     Fix P0 6.5: stesso lock di approve() per evitare race condition.
+     */
+    post: operations['vlan_ip_requests_reject_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    get: operations['vlans_list']
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['vlans_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    get: operations['vlans_retrieve']
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    put: operations['vlans_update']
+    post?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    delete: operations['vlans_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    patch: operations['vlans_partial_update']
+    trace?: never
+  }
+  '/api/vlans/{id}/exclude-ip/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Esclude manualmente un IP dalla heatmap (lo marca in rosso). */
+    post: operations['vlans_exclude_ip_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/{id}/ip-pool/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Restituisce il pool completo degli IP della VLAN con stato occupazione. */
+    get: operations['vlans_ip_pool_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/{id}/purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['vlans_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['vlans_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/{id}/unexclude-ip/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Rimuove l'esclusione manuale di un IP. */
+    post: operations['vlans_unexclude_ip_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/bulk_purge/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin da aggiungere ai ViewSet insieme a `PortalScopedMixin` per
+     *     vincolare le SCRITTURE (create/update) al tenant dell'utente portale.
+     *
+     *     `PortalScopedMixin` filtra solo le letture (list/retrieve): senza questo
+     *     mixin nulla impedisce a un utente portale con permesso di scrittura di
+     *     inviare un `customer` (o un `site`/`vlan`/`device` di un altro cliente)
+     *     diverso dal proprio nel payload (fix 2.2 audit 2026-07).
+     *
+     *     Configurazione per sottoclasse:
+     *         tenant_owned_field: nome del campo FK diretto verso Customer sul
+     *             modello (default "customer"). Impostare a None se il modello
+     *             non ha un customer proprio ma lo eredita da una relazione
+     *             (es. DeviceWifi → device.customer).
+     *         tenant_related_fields: altri campi FK il cui `.customer_id` deve
+     *             combaciare con quello dell'utente portale (es. "site", "vlan",
+     *             "device").
+     *
+     *     Per gli utenti che bypassano lo scope Portal (`_bypasses_portal_scope`:
+     *     superuser, o interni Archie con sessione ambito != "portal") il mixin
+     *     non applica alcun vincolo: possono scrivere su qualunque customer.
+     */
+    post: operations['vlans_bulk_purge_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/vlans/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['vlans_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/wiki-attachments/': {
     parameters: {
       query?: never
@@ -1352,8 +7467,42 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_attachments_list']
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_attachments_create']
     delete?: never
     options?: never
@@ -1368,13 +7517,147 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_attachments_retrieve']
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     put: operations['wiki_attachments_update']
     post?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     delete: operations['wiki_attachments_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     patch: operations['wiki_attachments_partial_update']
+    trace?: never
+  }
+  '/api/wiki-attachments/{id}/download/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    get: operations['wiki_attachments_download_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-attachments/{id}/preview/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    get: operations['wiki_attachments_preview_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/api/wiki-attachments/{id}/restore/': {
@@ -1386,6 +7669,23 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_attachments_restore_create']
     delete?: never
     options?: never
@@ -1402,6 +7702,7 @@ export interface paths {
     }
     get?: never
     put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['wiki_attachments_bulk_restore_create']
     delete?: never
     options?: never
@@ -1436,8 +7737,42 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_categories_list']
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_categories_create']
     delete?: never
     options?: never
@@ -1452,12 +7787,80 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_categories_retrieve']
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     put: operations['wiki_categories_update']
     post?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     delete: operations['wiki_categories_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     patch: operations['wiki_categories_partial_update']
     trace?: never
   }
@@ -1470,6 +7873,23 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_categories_restore_create']
     delete?: never
     options?: never
@@ -1486,10 +7906,7 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * @description Restore multiple soft-deleted records.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
-     */
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['wiki_categories_bulk_restore_create']
     delete?: never
     options?: never
@@ -1504,8 +7921,42 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_links_list']
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_links_create']
     delete?: never
     options?: never
@@ -1520,12 +7971,80 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_links_retrieve']
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     put: operations['wiki_links_update']
     post?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     delete: operations['wiki_links_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     patch: operations['wiki_links_partial_update']
     trace?: never
   }
@@ -1538,6 +8057,23 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_links_restore_create']
     delete?: never
     options?: never
@@ -1554,10 +8090,7 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * @description Restore multiple soft-deleted records.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
-     */
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['wiki_links_bulk_restore_create']
     delete?: never
     options?: never
@@ -1572,8 +8105,42 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_pages_list']
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_pages_create']
     delete?: never
     options?: never
@@ -1588,12 +8155,80 @@ export interface paths {
       path?: never
       cookie?: never
     }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     get: operations['wiki_pages_retrieve']
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     put: operations['wiki_pages_update']
     post?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     delete: operations['wiki_pages_destroy']
     options?: never
     head?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     patch: operations['wiki_pages_partial_update']
     trace?: never
   }
@@ -1608,6 +8243,39 @@ export interface paths {
     get: operations['wiki_pages_export_pdf_retrieve']
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-pages/{id}/rate/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    post: operations['wiki_pages_rate_create']
     delete?: never
     options?: never
     head?: never
@@ -1640,6 +8308,23 @@ export interface paths {
     }
     get?: never
     put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
     post: operations['wiki_pages_restore_create']
     delete?: never
     options?: never
@@ -1673,15 +8358,302 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * @description Restore multiple soft-deleted records.
-     *     Body: {"ids": [1,2,3]} (or a raw list).
-     */
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['wiki_pages_bulk_restore_create']
     delete?: never
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/wiki-pages/slug-availability/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    get: operations['wiki_pages_slug_availability_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-queries/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    get: operations['wiki_queries_list']
+    put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    post: operations['wiki_queries_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-queries/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    get: operations['wiki_queries_retrieve']
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    put: operations['wiki_queries_update']
+    post?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    delete: operations['wiki_queries_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    patch: operations['wiki_queries_partial_update']
+    trace?: never
+  }
+  '/api/wiki-queries/{id}/restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * @description Mixin che aggiunge `restore` e `bulk_restore` a un ViewSet.
+     *
+     *     Attributi configurabili (tutti con default):
+     *
+     *         restore_use_block_check = True
+     *         restore_has_updated_by  = True
+     *         restore_response_204    = True
+     *         restore_use_split       = True
+     *
+     *     Esempio senza updated_by e con risposta serializer (es. WikiCategory):
+     *
+     *         class WikiCategoryViewSet(RestoreActionMixin, ...):
+     *             restore_has_updated_by = False
+     *             restore_response_204   = False
+     *             restore_use_split      = False
+     */
+    post: operations['wiki_queries_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-queries/{id}/use/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Incrementa use_count quando un utente copia la query. */
+    post: operations['wiki_queries_use_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-queries/bulk_restore/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
+    post: operations['wiki_queries_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-query-languages/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD per i linguaggi delle query Wiki.
+     *     Endpoint: /wiki-query-languages/
+     */
+    get: operations['wiki_query_languages_list']
+    put?: never
+    /**
+     * @description CRUD per i linguaggi delle query Wiki.
+     *     Endpoint: /wiki-query-languages/
+     */
+    post: operations['wiki_query_languages_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/wiki-query-languages/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description CRUD per i linguaggi delle query Wiki.
+     *     Endpoint: /wiki-query-languages/
+     */
+    get: operations['wiki_query_languages_retrieve']
+    /**
+     * @description CRUD per i linguaggi delle query Wiki.
+     *     Endpoint: /wiki-query-languages/
+     */
+    put: operations['wiki_query_languages_update']
+    post?: never
+    /**
+     * @description CRUD per i linguaggi delle query Wiki.
+     *     Endpoint: /wiki-query-languages/
+     */
+    delete: operations['wiki_query_languages_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description CRUD per i linguaggi delle query Wiki.
+     *     Endpoint: /wiki-query-languages/
+     */
+    patch: operations['wiki_query_languages_partial_update']
     trace?: never
   }
   '/api/wiki-revisions/': {
@@ -1718,6 +8690,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/wiki-revisions/{id}/render/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Revisioni in sola lettura. Il restore avviene tramite action dedicata. */
+    get: operations['wiki_revisions_render_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/wiki-revisions/{id}/restore/': {
     parameters: {
       query?: never
@@ -1742,7 +8731,16 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** @description Statistiche aggregate per la dashboard wiki. */
+    /**
+     * @description Statistiche aggregate per la dashboard wiki.
+     *
+     *     Il risultato viene cachato per WIKI_STATS_CACHE_TTL secondi (default 300)
+     *     per evitare 8+ query aggregate ad ogni apertura della dashboard.
+     *     La cache è condivisa tra tutti gli utenti (i dati non sono sensibili per
+     *     utente). Viene invalidata automaticamente allo scadere del TTL, e in modo
+     *     esplicito da wiki.api.pages ad ogni create/update/destroy/restore di una
+     *     WikiPage (vedi invalidate_wiki_stats_cache più sotto).
+     */
     get: operations['wiki_stats_retrieve']
     put?: never
     post?: never
@@ -1756,6 +8754,58 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    Absence: {
+      readonly id: number
+      /** Utente */
+      user: number
+      readonly user_name: string
+      /**
+       * Giorno
+       * Format: date
+       */
+      date: string
+      /** Fascia */
+      day_part: components['schemas']['DayPartEnum']
+      readonly day_part_label: string
+      /** Motivo */
+      reason?: components['schemas']['ReasonEnum']
+      readonly reason_label: string
+      /** Stato */
+      status?: components['schemas']['StatusD0aEnum']
+      readonly status_label: string
+      /** Nota */
+      note?: string
+      /**
+       * Ora inizio
+       * Format: time
+       * @description Precisione oraria opzionale (permesso). Se valorizzata, vanno indicate sia ora inizio sia ora fine.
+       */
+      time_from?: string | null
+      /**
+       * Ora fine
+       * Format: time
+       */
+      time_to?: string | null
+      readonly is_hourly: boolean
+      /**
+       * Gruppo richiesta
+       * Format: uuid
+       * @description Tutte le righe create dalla stessa selezione (singola cella o trascinamento multi-giorno) condividono lo stesso valore, cosa che permette al coordinatore di validare/rifiutare l'intera richiesta con un solo click invece che riga per riga.
+       */
+      readonly request_group: string | null
+      /** Validata da */
+      readonly validated_by: number | null
+      readonly validated_by_name: string
+      /**
+       * Validata il
+       * Format: date-time
+       */
+      readonly validated_at: string | null
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
     /**
      * @description * `create` - Create
      *     * `update` - Update
@@ -1764,9 +8814,82 @@ export interface components {
      *     * `login` - Login
      *     * `login_failed` - Login Failed
      *     * `logout` - Logout
+     *     * `rate` - Rate
      * @enum {string}
      */
-    ActionEnum: 'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout'
+    ActionEnum:
+      'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout' | 'rate'
+    /**
+     * @description * `fisso` - Valore fisso
+     *     * `giornate` - Giornate × tariffa
+     * @enum {string}
+     */
+    AmountModeEnum: 'fisso' | 'giornate'
+    Announcement: {
+      readonly id: number
+      /** Titolo */
+      title: string
+      /** Testo */
+      body: string
+      /** Categoria */
+      category?: components['schemas']['AnnouncementCategoryEnum']
+      readonly created_by: number | null
+      readonly created_by_name: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    /**
+     * @description * `news` - News
+     *     * `warning` - Avviso
+     *     * `maintenance` - Manutenzione
+     * @enum {string}
+     */
+    AnnouncementCategoryEnum: 'news' | 'warning' | 'maintenance'
+    AreaTask: {
+      readonly id: number
+      area?: number
+      readonly area_label: string
+      /** Titolo */
+      title: string
+      /** Descrizione */
+      description?: string
+      /** Stato */
+      status?: components['schemas']['AreaTaskStatusEnum']
+      /** Priorità */
+      priority?: components['schemas']['PriorityF0aEnum']
+      /**
+       * Scadenza
+       * Format: date
+       */
+      due_date?: string | null
+      assigned_to?: number | null
+      readonly assigned_to_name: string
+      drive_files?: number[]
+      readonly drive_files_detail: string
+      /** Creato da */
+      readonly created_by: number | null
+      readonly created_by_name: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly completed_at: string | null
+      readonly comments_count: string
+      readonly can_edit: string
+      readonly converted_to_issue: number
+      readonly converted_to_issue_title: string
+    }
+    /**
+     * @description * `da_fare` - Da fare
+     *     * `in_corso` - In corso
+     *     * `in_attesa` - In attesa
+     *     * `completato` - Completato
+     * @enum {string}
+     */
+    AreaTaskStatusEnum: 'da_fare' | 'in_corso' | 'in_attesa' | 'completato'
     AuditEvent: {
       readonly id: number
       /** Format: date-time */
@@ -1781,14 +8904,50 @@ export interface components {
       object_id?: string
       object_repr?: string
       subject?: string
-      changes?: unknown
+      readonly changes: string
+      readonly entity_path: string
+      readonly metadata_summary: string
       path?: string | null
       method?: string | null
       ip_address?: string | null
       user_agent?: string | null
     }
+    /**
+     * @description * `una_tantum` - Una tantum
+     *     * `mensile` - Mensile
+     *     * `trimestrale` - Trimestrale
+     *     * `annuale` - Annuale
+     * @enum {string}
+     */
+    BillingFreqEnum: 'una_tantum' | 'mensile' | 'trimestrale' | 'annuale'
     /** @enum {unknown} */
     BlankEnum: ''
+    /**
+     * @description * `philips` - Philips
+     *     * `biotron` - Biotron
+     * @enum {string}
+     */
+    CategoryEbbEnum: 'philips' | 'biotron'
+    ChangelogEntry: {
+      readonly id: number
+      /** Versione */
+      version?: string
+      /** Titolo */
+      title: string
+      /** Testo (Markdown) */
+      body: string
+      /**
+       * Data rilascio
+       * Format: date
+       */
+      date?: string
+      readonly created_by: number | null
+      readonly created_by_name: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
     Contact: {
       readonly id: number
       customer: number
@@ -1798,11 +8957,11 @@ export interface components {
       readonly site_name: string
       readonly site_display_name: string
       name: string
-      /** Format: email */
       email?: string | null
       phone?: string | null
       department?: string | null
-      is_primary?: boolean
+      /** @default false */
+      is_primary: boolean
       notes?: string | null
       /** Format: date-time */
       readonly created_at: string
@@ -1811,6 +8970,59 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    Contract: {
+      readonly id: number
+      code: string
+      title: string
+      customer: number
+      readonly customer_name: string
+      contract_type?: components['schemas']['ContractTypeEnum']
+      readonly contract_type_label: string
+      seller?: number | null
+      readonly seller_name: string
+      /** Società */
+      company?: number | null
+      readonly company_label: string
+      /** Format: date */
+      start_date: string
+      /** Format: date */
+      end_date: string
+      notice_days?: number
+      /** Format: date */
+      readonly notice_deadline: string
+      auto_renew?: boolean
+      billing_freq?: components['schemas']['BillingFreqEnum']
+      readonly billing_freq_label: string
+      status?: components['schemas']['ContractStatusEnum']
+      readonly status_label: string
+      readonly expiry_state: string
+      devices?: number[]
+      readonly devices_detail: string
+      readonly document_url: string
+      readonly document_filename: string
+      notes?: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    /**
+     * @description * `bozza` - Bozza
+     *     * `attivo` - Attivo
+     *     * `disdetto` - Disdetto
+     * @enum {string}
+     */
+    ContractStatusEnum: 'bozza' | 'attivo' | 'disdetto'
+    /**
+     * @description * `assistenza` - Assistenza
+     *     * `noleggio` - Noleggio
+     *     * `licenza` - Licenza
+     *     * `altro` - Altro
+     * @enum {string}
+     */
+    ContractTypeEnum: 'assistenza' | 'noleggio' | 'licenza' | 'altro'
     CustomFieldDefinition: {
       readonly id: number
       entity: components['schemas']['EntityEnum']
@@ -1831,12 +9043,27 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     Customer: {
       readonly id: number
       code?: string | null
       name: string
       display_name?: string | null
-      readonly city: string
+      /**
+       * @description Restituisce la città dall'annotazione del queryset, con fallback sui custom_fields.
+       *
+       *     La Coalesce nel queryset (`get_queryset`) è la fonte di verità unica per list,
+       *     ordering e filtering. Questo metodo la legge direttamente quando disponibile,
+       *     evitando qualsiasi logica duplicata.
+       */
+      readonly city: string | null
+      /** Provincia */
+      province?: string | null
       readonly primary_contact_id: number
       readonly primary_contact_name: string
       readonly primary_contact_email: string
@@ -1847,6 +9074,18 @@ export interface components {
       readonly status_key: string
       readonly status_label: string
       notes?: string | null
+      /** @default false */
+      readonly has_vpn: boolean
+      /** @default 0 */
+      readonly assets_count: number
+      /** @default 0 */
+      readonly sites_count: number
+      /** @default 0 */
+      readonly sites_with_assets_count: number
+      /** @default 0 */
+      readonly active_issue_count: number
+      /** @default 0 */
+      readonly contacts_count: number
       tags?: string[] | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -1863,6 +9102,197 @@ export interface components {
       sort_order?: number
       is_active?: boolean
     }
+    DashboardWidget: {
+      readonly id: number
+      /** Chiave */
+      key: string
+      /** Etichetta */
+      label: string
+      /** Formati ammessi (coppie w,h) */
+      allowed_sizes?: unknown
+      /** Larghezza predefinita */
+      default_w: number
+      /** Altezza predefinita */
+      default_h: number
+      /** Ordine */
+      sort_order?: number
+    }
+    /**
+     * @description * `mattina` - Mattina
+     *     * `pomeriggio` - Pomeriggio
+     * @enum {string}
+     */
+    DayPartEnum: 'mattina' | 'pomeriggio'
+    DefaultDashboardLayout: {
+      readonly widget_key: string
+      x?: number
+      y?: number
+      w: number
+      h: number
+      visible?: boolean
+    }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
+    DeviceDetail: {
+      readonly id: number
+      customer: number
+      readonly customer_name: string
+      readonly customer_code: string
+      /** Sito */
+      site: number
+      readonly site_name: string
+      readonly site_display_name: string
+      /** Tipo */
+      type: number
+      readonly type_name: string
+      readonly type_dose_sr: boolean
+      /** Stato */
+      status: number
+      readonly status_name: string
+      /** Produttore */
+      manufacturer?: number | null
+      readonly manufacturer_name: string
+      readonly manufacturer_logo_url: string
+      /** Modello */
+      model?: string | null
+      /** AE Title */
+      aetitle?: string | null
+      /** Numero seriale */
+      serial_number?: string | null
+      inventario?: string | null
+      reparto?: string | null
+      /** Stanza/Sala */
+      room?: string | null
+      /** Indirizzo IP */
+      ip?: string | null
+      vlan?: boolean
+      wifi?: boolean
+      /** RIS/PACS */
+      rispacs?: boolean
+      /** DoseSR */
+      dose?: boolean
+      note?: string | null
+      /** Posizione */
+      location?: string | null
+      /** Campi personalizzati */
+      custom_fields?: unknown
+      readonly rispacs_links: components['schemas']['DeviceRispacs'][]
+      readonly wifi_detail: components['schemas']['DeviceWifi']
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      deleted_at?: string | null
+    }
+    DeviceList: {
+      readonly id: number
+      readonly customer: number
+      readonly customer_name: string
+      readonly customer_code: string
+      readonly site: number
+      readonly site_name: string
+      readonly site_display_name: string
+      /** Tipo */
+      type: number
+      readonly type_name: string
+      /** Stato */
+      status: number
+      readonly status_name: string
+      /** Produttore */
+      manufacturer?: number | null
+      readonly manufacturer_name: string
+      /** Modello */
+      model?: string | null
+      /** AE Title */
+      aetitle?: string | null
+      /** Numero seriale */
+      serial_number?: string | null
+      inventario?: string | null
+      reparto?: string | null
+      /** Stanza/Sala */
+      room?: string | null
+      /** Indirizzo IP */
+      ip?: string | null
+      vlan?: boolean
+      wifi?: boolean
+      /** RIS/PACS */
+      rispacs?: boolean
+      /** DoseSR */
+      dose?: boolean
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      deleted_at?: string | null
+    }
+    DeviceManufacturer: {
+      readonly id: number
+      /** Nome */
+      name: string
+      /** Format: uri */
+      logo?: string | null
+      readonly logo_url: string
+    }
+    DeviceRispacs: {
+      readonly id: number
+      device: number
+      /** Sistema RIS/PACS */
+      rispacs: number
+      readonly rispacs_name: string
+      readonly rispacs_ip: string
+      readonly rispacs_port: number
+      readonly rispacs_aetitle: string
+    }
+    DeviceStatus: {
+      readonly id: number
+      /** Nome */
+      name: string
+    }
+    DeviceType: {
+      readonly id: number
+      /** Nome */
+      name: string
+      /** DoseSR */
+      dose_sr?: boolean
+    }
+    /**
+     * @description Nasconde `pass_certificato` in lettura a chi non ha `device.view_wifi_secrets`,
+     *     e blocca la scrittura dello stesso campo senza quel permesso (fix 2.4,
+     *     audit 2026-07 — stesso pattern di SecretsPermissionMixin in inventory/api.py).
+     *
+     *     NB: il controllo di lettura avviene in `to_representation()`, non in
+     *     `__init__()` come in SecretsPermissionMixin. `DeviceWifiSerializer` viene
+     *     usato anche NESTED (`DeviceDetailSerializer.wifi_detail`): quell'istanza
+     *     è creata una sola volta all'import del modulo, con `context` vuoto — un
+     *     controllo in `__init__` vedrebbe sempre "nessun permesso" per il nested
+     *     field, indipendentemente da chi fa la richiesta. `to_representation` è
+     *     invece chiamato ad ogni serializzazione, quando il field è già bindato
+     *     al serializer radice e `self.context` riflette la request reale.
+     */
+    DeviceWifi: {
+      readonly id: number
+      device: number
+      /** Indirizzo IP WiFi */
+      ip?: string | null
+      /** @description Formato: AA:BB:CC:DD:EE:FF */
+      mac_address?: string | null
+      /**
+       * Certificato (.p12)
+       * Format: uri
+       */
+      certificato?: string | null
+      readonly certificato_url: string
+      pass_certificato?: string | null
+      /**
+       * Scadenza certificato
+       * Format: date
+       */
+      scad_certificato?: string | null
+    }
     DriveFile: {
       readonly id: number
       /** @description Nome visualizzato (può differire dal nome fisico del file). */
@@ -1870,7 +9300,7 @@ export interface components {
       folder?: number | null
       readonly folder_name: string
       /** Format: uri */
-      file?: string
+      file?: string | null
       readonly mime_type: string
       /** @description Dimensione in byte */
       readonly size: number
@@ -1931,6 +9361,143 @@ export interface components {
      * @enum {string}
      */
     EntityTypeEnum: 'customer' | 'site' | 'inventory'
+    ExpenseItem: {
+      readonly id: number
+      readonly report: number
+      /** Categoria */
+      readonly category: components['schemas']['ExpenseItemCategoryEnum']
+      readonly category_label: string
+      readonly is_km_category: string
+      /**
+       * Data
+       * Format: date
+       */
+      date?: string | null
+      /** Descrizione */
+      description?: string
+      /**
+       * Importo
+       * Format: decimal
+       */
+      amount?: string
+      readonly km_trips: components['schemas']['ExpenseKmTrip'][]
+      readonly receipts: components['schemas']['ExpenseReceipt'][]
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    /**
+     * @description * `treni` - Treni, pullman
+     *     * `taxi_comune` - Taxi/bus/autonoleggio nel comune
+     *     * `taxi_fuori_comune` - Taxi/bus/autonoleggio fuori comune
+     *     * `autostrade` - Autostrade
+     *     * `rimborso_km` - Rimborso chilometraggio
+     *     * `varie_automezzi` - Varie automezzi (lavaggio/parcheggi/manutenzioni fino a 50€)
+     *     * `carburanti` - Carburanti e lubrificanti
+     *     * `pernottamento` - Pernottamento
+     *     * `pasti` - Pasti (ristorante/bar)
+     *     * `rappresentanza` - Spese di rappresentanza
+     *     * `telefoniche` - Spese telefoniche
+     *     * `varie` - Varie
+     * @enum {string}
+     */
+    ExpenseItemCategoryEnum:
+      | 'treni'
+      | 'taxi_comune'
+      | 'taxi_fuori_comune'
+      | 'autostrade'
+      | 'rimborso_km'
+      | 'varie_automezzi'
+      | 'carburanti'
+      | 'pernottamento'
+      | 'pasti'
+      | 'rappresentanza'
+      | 'telefoniche'
+      | 'varie'
+    ExpenseKmTrip: {
+      readonly id: number
+      item: number
+      /**
+       * Data
+       * Format: date
+       */
+      date: string
+      /** Luogo di destinazione */
+      destination: string
+      /** Km percorsi */
+      km: number
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    ExpenseReceipt: {
+      readonly id: number
+      item: number
+      /** Format: uri */
+      file: string
+      readonly file_url: string
+      readonly file_name: string
+      /**
+       * Importo OCR
+       * Format: decimal
+       */
+      readonly ocr_amount: string | null
+      /**
+       * Data OCR
+       * Format: date
+       */
+      readonly ocr_date: string | null
+      /** Format: date-time */
+      readonly created_at: string
+    }
+    ExpenseReport: {
+      readonly id: number
+      /** Dipendente */
+      readonly user: number
+      readonly user_name: string
+      /** Anno */
+      year: number
+      /** Mese */
+      month: number
+      readonly number: string
+      readonly month_label: string
+      /**
+       * Totale anticipi
+       * Format: decimal
+       */
+      advances_total?: string
+      note?: string
+      /** Stato */
+      readonly status: components['schemas']['ExpenseReportStatusEnum']
+      readonly status_label: string
+      /** Motivo rifiuto */
+      readonly rejection_reason: string
+      /** Validata/rifiutata da */
+      readonly validated_by: number | null
+      readonly validated_by_name: string
+      /**
+       * Validata/rifiutata il
+       * Format: date-time
+       */
+      readonly validated_at: string | null
+      readonly total_expenses: string
+      readonly total_due: string
+      readonly items: components['schemas']['ExpenseItem'][]
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    /**
+     * @description * `bozza` - Bozza
+     *     * `inviata` - Inviata
+     *     * `validata` - Validata
+     *     * `rifiutata` - Rifiutata
+     * @enum {string}
+     */
+    ExpenseReportStatusEnum: 'bozza' | 'inviata' | 'validata' | 'rifiutata'
     /**
      * @description * `text` - Testo
      *     * `number` - Numero
@@ -1941,6 +9508,30 @@ export interface components {
      */
     FieldTypeEnum: 'text' | 'number' | 'date' | 'select' | 'boolean'
     /**
+     * @description * `M` - Uomo
+     *     * `F` - Donna
+     * @enum {string}
+     */
+    GenderEnum: 'M' | 'F'
+    GroupAdmin: {
+      readonly id: number
+      /** Nome */
+      name: string
+      readonly user_count: string
+      readonly permissions_state: string
+    }
+    Holiday: {
+      readonly id: number
+      /**
+       * Data
+       * Format: date
+       */
+      date: string
+      /** Descrizione */
+      label: string
+      readonly area_ids: number[]
+    }
+    /**
      * @description * `days` - Days
      *     * `weeks` - Weeks
      *     * `months` - Months
@@ -1948,7 +9539,12 @@ export interface components {
      * @enum {string}
      */
     IntervalUnitEnum: 'days' | 'weeks' | 'months' | 'years'
-    /** @description Mixin per nascondere i campi sensibili (password) se l'utente non ha permesso. */
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     InventoryDetail: {
       readonly id: number
       customer: number
@@ -1958,11 +9554,16 @@ export interface components {
       readonly site_name: string
       readonly site_display_name: string
       name: string
+      /** K-Number */
       knumber?: string | null
+      /** Numero seriale */
       serial_number?: string | null
       hostname?: string | null
       local_ip?: string | null
       srsa_ip?: string | null
+      /** Posizione */
+      location?: string | null
+      telefono?: string | null
       type: number
       readonly type_key: string
       readonly type_label: string
@@ -1984,24 +9585,40 @@ export interface components {
       readonly updated_at: string
       /** Format: date-time */
       deleted_at?: string | null
+      readonly has_active_issue: boolean
+      readonly active_issue_priority: string | null
+      readonly monitors: string
     }
     InventoryList: {
       readonly id: number
+      readonly customer: number
       readonly customer_code: string
       readonly customer_name: string
+      readonly site: number
       readonly site_name: string
+      readonly site_display_name: string
+      name: string
       hostname?: string | null
+      /** K-Number */
       knumber?: string | null
+      model?: string | null
+      /** Numero seriale */
       serial_number?: string | null
       readonly type_key: string
       readonly type_label: string
+      readonly status_key: string
       readonly status_label: string
       local_ip?: string | null
       srsa_ip?: string | null
+      /** Posizione */
+      location?: string | null
+      telefono?: string | null
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
       deleted_at?: string | null
+      readonly has_active_issue: boolean
+      readonly active_issue_priority: string | null
     }
     InventoryStatusLookup: {
       readonly id: number
@@ -2016,9 +9633,18 @@ export interface components {
       label: string
       sort_order?: number
       is_active?: boolean
+      /**
+       * Hardware
+       * @description Indica se questo tipo di inventory è un dispositivo hardware (Y) o software/altro (N).
+       */
       is_hw?: boolean
     }
-    /** @description Mixin per nascondere i campi sensibili (password) se l'utente non ha permesso. */
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     InventoryWrite: {
       readonly id: number
       customer: number
@@ -2028,11 +9654,16 @@ export interface components {
       readonly site_name: string
       readonly site_display_name: string
       name: string
+      /** K-Number */
       knumber?: string | null
+      /** Numero seriale */
       serial_number?: string | null
       hostname?: string | null
       local_ip?: string | null
       srsa_ip?: string | null
+      /** Posizione */
+      location?: string | null
+      telefono?: string | null
       type: number
       readonly type_key: string
       readonly type_label: string
@@ -2054,6 +9685,9 @@ export interface components {
       readonly updated_at: string
       /** Format: date-time */
       deleted_at?: string | null
+      readonly has_active_issue: boolean
+      readonly active_issue_priority: string | null
+      readonly monitors: string
     }
     Issue: {
       readonly id: number
@@ -2067,12 +9701,23 @@ export interface components {
        */
       servicenow_id?: string
       /** Cliente */
-      customer: number
+      customer?: number
       readonly customer_name: string
       readonly customer_code: string
+      /**
+       * Cliente (testo libero)
+       * @description Nome del cliente reale, usato quando non è ancora presente in anagrafica. Se valorizzato, il campo Cliente punta al record sentinella e questo testo viene mostrato al suo posto.
+       */
+      customer_placeholder?: string
+      readonly is_customer_placeholder: string
       /** Sito */
       site?: number | null
       readonly site_name: string
+      inventory?: number | null
+      readonly inventory_name: string
+      readonly inventory_knumber: string
+      readonly inventory_serial_number: string
+      readonly inventory_hostname: string
       /** Categoria */
       category?: number | null
       readonly category_label: string
@@ -2080,21 +9725,40 @@ export interface components {
       assigned_to?: number | null
       readonly assigned_to_username: string
       readonly assigned_to_full_name: string
+      readonly assigned_to_avatar: string
       /** Creato da */
       readonly created_by: number
       readonly created_by_username: string
       readonly created_by_full_name: string
       /** Priorità */
-      priority?: components['schemas']['PriorityEnum']
+      priority?: components['schemas']['PriorityF0aEnum']
       readonly priority_label: string
       /** Stato */
       status?: components['schemas']['IssueStatusEnum']
       readonly status_label: string
       /**
+       * In attesa di
+       * @description Obbligatorio quando lo stato è «In attesa».
+       *
+       *     * `philips` - Philips
+       *     * `elco` - Elco
+       *     * `cliente` - Cliente
+       *     * `exprivia` - Exprivia
+       *     * `altro` - Altro
+       */
+      waiting_reason?:
+        components['schemas']['WaitingReasonEnum'] | components['schemas']['BlankEnum']
+      readonly waiting_reason_label: string
+      /**
        * Data apertura
        * Format: date
        */
       opened_at?: string | null
+      /**
+       * Data chiusura
+       * Format: date
+       */
+      readonly closed_at: string | null
       readonly days_open: string
       /**
        * Scadenza
@@ -2102,6 +9766,7 @@ export interface components {
        */
       due_date?: string | null
       readonly comments_count: string
+      readonly servicenow_external_url: string
       /** Format: date-time */
       readonly created_at: string
       /** Format: date-time */
@@ -2119,26 +9784,39 @@ export interface components {
     /**
      * @description * `open` - Aperta
      *     * `in_progress` - In lavorazione
+     *     * `waiting` - In attesa
      *     * `resolved` - Risolta
      *     * `closed` - Chiusa
      * @enum {string}
      */
-    IssueStatusEnum: 'open' | 'in_progress' | 'resolved' | 'closed'
+    IssueStatusEnum: 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
+    LeaveArea: {
+      readonly id: number
+      key: string
+      label: string
+      sort_order?: number
+    }
     MaintenanceEvent: {
       readonly id: number
       plan: number
       readonly plan_title: string
       inventory: number
+      readonly inventory_name: string
+      readonly inventory_hostname: string | null
+      readonly inventory_knumber: string | null
       readonly customer_code: string
       readonly customer_name: string
       readonly site_name: string
-      readonly inventory_hostname: string
       /** Format: date */
       performed_at: string
       result: components['schemas']['ResultEnum']
-      tech: number
+      tech?: number | null
       readonly tech_name: string
+      created_by?: number | null
+      readonly created_by_username: string | null
       notes?: string | null
+      /** Format: uri */
+      pdf_file?: string | null
       readonly pdf_url: string
       /** Format: date-time */
       readonly created_at: string
@@ -2178,6 +9856,12 @@ export interface components {
      * @enum {string}
      */
     MaintenanceNotificationStatusEnum: 'sent' | 'failed'
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     MaintenancePlan: {
       readonly id: number
       customer: number
@@ -2186,6 +9870,7 @@ export interface components {
       inventory_types: number[]
       readonly inventory_type_labels: string
       readonly covered_count: string
+      readonly completed_count: number | null
       title: string
       schedule_type: components['schemas']['ScheduleTypeEnum']
       interval_unit?:
@@ -2200,7 +9885,8 @@ export interface components {
       fixed_day?: number | null
       /** Format: date */
       next_due_date: string
-      readonly last_done_date: string
+      /** Format: date */
+      readonly last_done_date: string | null
       alert_days_before?: number
       is_active?: boolean
       notes?: string | null
@@ -2212,8 +9898,112 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    MaintenancePlanInventory: {
+      readonly id: number
+      plan: number
+      inventory: number
+      readonly inventory_name: string
+      readonly inventory_knumber: string | null
+      readonly inventory_hostname: string | null
+      readonly inventory_type_label: string | null
+      readonly site_id: number | null
+      readonly site_name: string
+      readonly customer_id: number
+      /** Format: date */
+      readonly plan_next_due_date: string
+      /** Format: date */
+      due_date_override?: string | null
+      readonly effective_due_date: string
+      notes?: string | null
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    Monitor: {
+      readonly id: number
+      /** Inventory (workstation) */
+      inventory?: number | null
+      readonly inventory_name: string
+      readonly site_name: string | null
+      produttore?: string
+      modello?: string | null
+      seriale?: string | null
+      stato?: components['schemas']['MonitorStatoEnum']
+      readonly stato_label: string
+      tipo: components['schemas']['TipoEnum']
+      readonly tipo_label: string
+      /** @description Abilitabile solo per monitor di tipo Diagnostico. */
+      radinet?: boolean
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    /**
+     * @description * `in_uso` - In uso
+     *     * `da_installare` - Da installare
+     *     * `guasto` - Guasto
+     *     * `rma` - RMA
+     * @enum {string}
+     */
+    MonitorStatoEnum: 'in_uso' | 'da_installare' | 'guasto' | 'rma'
+    Notification: {
+      readonly id: number
+      readonly notification_type: components['schemas']['NotificationTypeEnum']
+      readonly title: string
+      readonly subtitle: string
+      readonly link: string
+      /** Format: date */
+      readonly event_date: string
+      readonly is_read: boolean
+      /** Format: date-time */
+      readonly read_at: string | null
+      /** Format: date-time */
+      readonly created_at: string
+    }
+    /**
+     * @description * `maintenance_due` - Manutenzione in scadenza
+     *     * `area_task_due` - Task di area in scadenza
+     * @enum {string}
+     */
+    NotificationTypeEnum: 'maintenance_due' | 'area_task_due'
     /** @enum {unknown} */
     NullEnum: null
+    PaginatedAnnouncementList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Announcement'][]
+    }
+    PaginatedAreaTaskList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['AreaTask'][]
+    }
     PaginatedAuditEventList: {
       /** @example 123 */
       count: number
@@ -2229,6 +10019,21 @@ export interface components {
       previous?: string | null
       results: components['schemas']['AuditEvent'][]
     }
+    PaginatedChangelogEntryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['ChangelogEntry'][]
+    }
     PaginatedContactList: {
       /** @example 123 */
       count: number
@@ -2243,6 +10048,21 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['Contact'][]
+    }
+    PaginatedContractList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Contract'][]
     }
     PaginatedCustomFieldDefinitionList: {
       /** @example 123 */
@@ -2273,6 +10093,126 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['Customer'][]
+    }
+    PaginatedDashboardWidgetList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DashboardWidget'][]
+    }
+    PaginatedDefaultDashboardLayoutList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DefaultDashboardLayout'][]
+    }
+    PaginatedDeviceListList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeviceList'][]
+    }
+    PaginatedDeviceManufacturerList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeviceManufacturer'][]
+    }
+    PaginatedDeviceRispacsList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeviceRispacs'][]
+    }
+    PaginatedDeviceStatusList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeviceStatus'][]
+    }
+    PaginatedDeviceTypeList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeviceType'][]
+    }
+    PaginatedDeviceWifiList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['DeviceWifi'][]
     }
     PaginatedDriveFileList: {
       /** @example 123 */
@@ -2364,6 +10304,21 @@ export interface components {
       previous?: string | null
       results: components['schemas']['MaintenanceNotification'][]
     }
+    PaginatedMaintenancePlanInventoryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['MaintenancePlanInventory'][]
+    }
     PaginatedMaintenancePlanList: {
       /** @example 123 */
       count: number
@@ -2378,6 +10333,126 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['MaintenancePlan'][]
+    }
+    PaginatedMonitorList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Monitor'][]
+    }
+    PaginatedNotificationList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Notification'][]
+    }
+    PaginatedPurchaseOrderEntryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['PurchaseOrderEntry'][]
+    }
+    PaginatedReportRequestList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['ReportRequest'][]
+    }
+    PaginatedRispacsList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Rispacs'][]
+    }
+    PaginatedRispacsLiteList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['RispacsLite'][]
+    }
+    PaginatedSellerList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Seller'][]
+    }
+    PaginatedServiceNowCaseList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['ServiceNowCase'][]
     }
     PaginatedSiteList: {
       /** @example 123 */
@@ -2408,6 +10483,66 @@ export interface components {
        */
       previous?: string | null
       results: components['schemas']['Tech'][]
+    }
+    PaginatedUserDashboardLayoutList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['UserDashboardLayout'][]
+    }
+    PaginatedUserTaskList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['UserTask'][]
+    }
+    PaginatedVlanIpRequestList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['VlanIpRequest'][]
+    }
+    PaginatedVlanList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Vlan'][]
     }
     PaginatedWikiAttachmentList: {
       /** @example 123 */
@@ -2484,6 +10619,143 @@ export interface components {
       previous?: string | null
       results: components['schemas']['WikiPageRevision'][]
     }
+    PaginatedWikiQueryList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['WikiQuery'][]
+    }
+    PatchedAbsence: {
+      readonly id?: number
+      /** Utente */
+      user?: number
+      readonly user_name?: string
+      /**
+       * Giorno
+       * Format: date
+       */
+      date?: string
+      /** Fascia */
+      day_part?: components['schemas']['DayPartEnum']
+      readonly day_part_label?: string
+      /** Motivo */
+      reason?: components['schemas']['ReasonEnum']
+      readonly reason_label?: string
+      /** Stato */
+      status?: components['schemas']['StatusD0aEnum']
+      readonly status_label?: string
+      /** Nota */
+      note?: string
+      /**
+       * Ora inizio
+       * Format: time
+       * @description Precisione oraria opzionale (permesso). Se valorizzata, vanno indicate sia ora inizio sia ora fine.
+       */
+      time_from?: string | null
+      /**
+       * Ora fine
+       * Format: time
+       */
+      time_to?: string | null
+      readonly is_hourly?: boolean
+      /**
+       * Gruppo richiesta
+       * Format: uuid
+       * @description Tutte le righe create dalla stessa selezione (singola cella o trascinamento multi-giorno) condividono lo stesso valore, cosa che permette al coordinatore di validare/rifiutare l'intera richiesta con un solo click invece che riga per riga.
+       */
+      readonly request_group?: string | null
+      /** Validata da */
+      readonly validated_by?: number | null
+      readonly validated_by_name?: string
+      /**
+       * Validata il
+       * Format: date-time
+       */
+      readonly validated_at?: string | null
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedAnnouncement: {
+      readonly id?: number
+      /** Titolo */
+      title?: string
+      /** Testo */
+      body?: string
+      /** Categoria */
+      category?: components['schemas']['AnnouncementCategoryEnum']
+      readonly created_by?: number | null
+      readonly created_by_name?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedAreaTask: {
+      readonly id?: number
+      area?: number
+      readonly area_label?: string
+      /** Titolo */
+      title?: string
+      /** Descrizione */
+      description?: string
+      /** Stato */
+      status?: components['schemas']['AreaTaskStatusEnum']
+      /** Priorità */
+      priority?: components['schemas']['PriorityF0aEnum']
+      /**
+       * Scadenza
+       * Format: date
+       */
+      due_date?: string | null
+      assigned_to?: number | null
+      readonly assigned_to_name?: string
+      drive_files?: number[]
+      readonly drive_files_detail?: string
+      /** Creato da */
+      readonly created_by?: number | null
+      readonly created_by_name?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly completed_at?: string | null
+      readonly comments_count?: string
+      readonly can_edit?: string
+      readonly converted_to_issue?: number
+      readonly converted_to_issue_title?: string
+    }
+    PatchedChangelogEntry: {
+      readonly id?: number
+      /** Versione */
+      version?: string
+      /** Titolo */
+      title?: string
+      /** Testo (Markdown) */
+      body?: string
+      /**
+       * Data rilascio
+       * Format: date
+       */
+      date?: string
+      readonly created_by?: number | null
+      readonly created_by_name?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
     PatchedContact: {
       readonly id?: number
       customer?: number
@@ -2493,11 +10765,11 @@ export interface components {
       readonly site_name?: string
       readonly site_display_name?: string
       name?: string
-      /** Format: email */
       email?: string | null
       phone?: string | null
       department?: string | null
-      is_primary?: boolean
+      /** @default false */
+      is_primary: boolean
       notes?: string | null
       /** Format: date-time */
       readonly created_at?: string
@@ -2505,6 +10777,44 @@ export interface components {
       readonly updated_at?: string
       /** Format: date-time */
       deleted_at?: string | null
+    }
+    PatchedContract: {
+      readonly id?: number
+      code?: string
+      title?: string
+      customer?: number
+      readonly customer_name?: string
+      contract_type?: components['schemas']['ContractTypeEnum']
+      readonly contract_type_label?: string
+      seller?: number | null
+      readonly seller_name?: string
+      /** Società */
+      company?: number | null
+      readonly company_label?: string
+      /** Format: date */
+      start_date?: string
+      /** Format: date */
+      end_date?: string
+      notice_days?: number
+      /** Format: date */
+      readonly notice_deadline?: string
+      auto_renew?: boolean
+      billing_freq?: components['schemas']['BillingFreqEnum']
+      readonly billing_freq_label?: string
+      status?: components['schemas']['ContractStatusEnum']
+      readonly status_label?: string
+      readonly expiry_state?: string
+      devices?: number[]
+      readonly devices_detail?: string
+      readonly document_url?: string
+      readonly document_filename?: string
+      notes?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
     }
     PatchedCustomFieldDefinition: {
       readonly id?: number
@@ -2526,12 +10836,27 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     PatchedCustomer: {
       readonly id?: number
       code?: string | null
       name?: string
       display_name?: string | null
-      readonly city?: string
+      /**
+       * @description Restituisce la città dall'annotazione del queryset, con fallback sui custom_fields.
+       *
+       *     La Coalesce nel queryset (`get_queryset`) è la fonte di verità unica per list,
+       *     ordering e filtering. Questo metodo la legge direttamente quando disponibile,
+       *     evitando qualsiasi logica duplicata.
+       */
+      readonly city?: string | null
+      /** Provincia */
+      province?: string | null
       readonly primary_contact_id?: number
       readonly primary_contact_name?: string
       readonly primary_contact_email?: string
@@ -2542,6 +10867,18 @@ export interface components {
       readonly status_key?: string
       readonly status_label?: string
       notes?: string | null
+      /** @default false */
+      readonly has_vpn: boolean
+      /** @default 0 */
+      readonly assets_count: number
+      /** @default 0 */
+      readonly sites_count: number
+      /** @default 0 */
+      readonly sites_with_assets_count: number
+      /** @default 0 */
+      readonly active_issue_count: number
+      /** @default 0 */
+      readonly contacts_count: number
       tags?: string[] | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -2551,6 +10888,128 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
+    PatchedDeviceDetail: {
+      readonly id?: number
+      customer?: number
+      readonly customer_name?: string
+      readonly customer_code?: string
+      /** Sito */
+      site?: number
+      readonly site_name?: string
+      readonly site_display_name?: string
+      /** Tipo */
+      type?: number
+      readonly type_name?: string
+      readonly type_dose_sr?: boolean
+      /** Stato */
+      status?: number
+      readonly status_name?: string
+      /** Produttore */
+      manufacturer?: number | null
+      readonly manufacturer_name?: string
+      readonly manufacturer_logo_url?: string
+      /** Modello */
+      model?: string | null
+      /** AE Title */
+      aetitle?: string | null
+      /** Numero seriale */
+      serial_number?: string | null
+      inventario?: string | null
+      reparto?: string | null
+      /** Stanza/Sala */
+      room?: string | null
+      /** Indirizzo IP */
+      ip?: string | null
+      vlan?: boolean
+      wifi?: boolean
+      /** RIS/PACS */
+      rispacs?: boolean
+      /** DoseSR */
+      dose?: boolean
+      note?: string | null
+      /** Posizione */
+      location?: string | null
+      /** Campi personalizzati */
+      custom_fields?: unknown
+      readonly rispacs_links?: components['schemas']['DeviceRispacs'][]
+      readonly wifi_detail?: components['schemas']['DeviceWifi']
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      deleted_at?: string | null
+    }
+    PatchedDeviceManufacturer: {
+      readonly id?: number
+      /** Nome */
+      name?: string
+      /** Format: uri */
+      logo?: string | null
+      readonly logo_url?: string
+    }
+    PatchedDeviceRispacs: {
+      readonly id?: number
+      device?: number
+      /** Sistema RIS/PACS */
+      rispacs?: number
+      readonly rispacs_name?: string
+      readonly rispacs_ip?: string
+      readonly rispacs_port?: number
+      readonly rispacs_aetitle?: string
+    }
+    PatchedDeviceStatus: {
+      readonly id?: number
+      /** Nome */
+      name?: string
+    }
+    PatchedDeviceType: {
+      readonly id?: number
+      /** Nome */
+      name?: string
+      /** DoseSR */
+      dose_sr?: boolean
+    }
+    /**
+     * @description Nasconde `pass_certificato` in lettura a chi non ha `device.view_wifi_secrets`,
+     *     e blocca la scrittura dello stesso campo senza quel permesso (fix 2.4,
+     *     audit 2026-07 — stesso pattern di SecretsPermissionMixin in inventory/api.py).
+     *
+     *     NB: il controllo di lettura avviene in `to_representation()`, non in
+     *     `__init__()` come in SecretsPermissionMixin. `DeviceWifiSerializer` viene
+     *     usato anche NESTED (`DeviceDetailSerializer.wifi_detail`): quell'istanza
+     *     è creata una sola volta all'import del modulo, con `context` vuoto — un
+     *     controllo in `__init__` vedrebbe sempre "nessun permesso" per il nested
+     *     field, indipendentemente da chi fa la richiesta. `to_representation` è
+     *     invece chiamato ad ogni serializzazione, quando il field è già bindato
+     *     al serializer radice e `self.context` riflette la request reale.
+     */
+    PatchedDeviceWifi: {
+      readonly id?: number
+      device?: number
+      /** Indirizzo IP WiFi */
+      ip?: string | null
+      /** @description Formato: AA:BB:CC:DD:EE:FF */
+      mac_address?: string | null
+      /**
+       * Certificato (.p12)
+       * Format: uri
+       */
+      certificato?: string | null
+      readonly certificato_url?: string
+      pass_certificato?: string | null
+      /**
+       * Scadenza certificato
+       * Format: date
+       */
+      scad_certificato?: string | null
+    }
     PatchedDriveFile: {
       readonly id?: number
       /** @description Nome visualizzato (può differire dal nome fisico del file). */
@@ -2558,7 +11017,7 @@ export interface components {
       folder?: number | null
       readonly folder_name?: string
       /** Format: uri */
-      file?: string
+      file?: string | null
       readonly mime_type?: string
       /** @description Dimensione in byte */
       readonly size?: number
@@ -2604,7 +11063,100 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
-    /** @description Mixin per nascondere i campi sensibili (password) se l'utente non ha permesso. */
+    PatchedExpenseItem: {
+      readonly id?: number
+      readonly report?: number
+      /** Categoria */
+      readonly category?: components['schemas']['ExpenseItemCategoryEnum']
+      readonly category_label?: string
+      readonly is_km_category?: string
+      /**
+       * Data
+       * Format: date
+       */
+      date?: string | null
+      /** Descrizione */
+      description?: string
+      /**
+       * Importo
+       * Format: decimal
+       */
+      amount?: string
+      readonly km_trips?: components['schemas']['ExpenseKmTrip'][]
+      readonly receipts?: components['schemas']['ExpenseReceipt'][]
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedExpenseKmTrip: {
+      readonly id?: number
+      item?: number
+      /**
+       * Data
+       * Format: date
+       */
+      date?: string
+      /** Luogo di destinazione */
+      destination?: string
+      /** Km percorsi */
+      km?: number
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedExpenseReport: {
+      readonly id?: number
+      /** Dipendente */
+      readonly user?: number
+      readonly user_name?: string
+      /** Anno */
+      year?: number
+      /** Mese */
+      month?: number
+      readonly number?: string
+      readonly month_label?: string
+      /**
+       * Totale anticipi
+       * Format: decimal
+       */
+      advances_total?: string
+      note?: string
+      /** Stato */
+      readonly status?: components['schemas']['ExpenseReportStatusEnum']
+      readonly status_label?: string
+      /** Motivo rifiuto */
+      readonly rejection_reason?: string
+      /** Validata/rifiutata da */
+      readonly validated_by?: number | null
+      readonly validated_by_name?: string
+      /**
+       * Validata/rifiutata il
+       * Format: date-time
+       */
+      readonly validated_at?: string | null
+      readonly total_expenses?: string
+      readonly total_due?: string
+      readonly items?: components['schemas']['ExpenseItem'][]
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedGroupAdmin: {
+      readonly id?: number
+      /** Nome */
+      name?: string
+      readonly user_count?: string
+      readonly permissions_state?: string
+    }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     PatchedInventoryWrite: {
       readonly id?: number
       customer?: number
@@ -2614,11 +11166,16 @@ export interface components {
       readonly site_name?: string
       readonly site_display_name?: string
       name?: string
+      /** K-Number */
       knumber?: string | null
+      /** Numero seriale */
       serial_number?: string | null
       hostname?: string | null
       local_ip?: string | null
       srsa_ip?: string | null
+      /** Posizione */
+      location?: string | null
+      telefono?: string | null
       type?: number
       readonly type_key?: string
       readonly type_label?: string
@@ -2640,6 +11197,9 @@ export interface components {
       readonly updated_at?: string
       /** Format: date-time */
       deleted_at?: string | null
+      readonly has_active_issue?: boolean
+      readonly active_issue_priority?: string | null
+      readonly monitors?: string
     }
     PatchedIssue: {
       readonly id?: number
@@ -2656,9 +11216,20 @@ export interface components {
       customer?: number
       readonly customer_name?: string
       readonly customer_code?: string
+      /**
+       * Cliente (testo libero)
+       * @description Nome del cliente reale, usato quando non è ancora presente in anagrafica. Se valorizzato, il campo Cliente punta al record sentinella e questo testo viene mostrato al suo posto.
+       */
+      customer_placeholder?: string
+      readonly is_customer_placeholder?: string
       /** Sito */
       site?: number | null
       readonly site_name?: string
+      inventory?: number | null
+      readonly inventory_name?: string
+      readonly inventory_knumber?: string
+      readonly inventory_serial_number?: string
+      readonly inventory_hostname?: string
       /** Categoria */
       category?: number | null
       readonly category_label?: string
@@ -2666,21 +11237,40 @@ export interface components {
       assigned_to?: number | null
       readonly assigned_to_username?: string
       readonly assigned_to_full_name?: string
+      readonly assigned_to_avatar?: string
       /** Creato da */
       readonly created_by?: number
       readonly created_by_username?: string
       readonly created_by_full_name?: string
       /** Priorità */
-      priority?: components['schemas']['PriorityEnum']
+      priority?: components['schemas']['PriorityF0aEnum']
       readonly priority_label?: string
       /** Stato */
       status?: components['schemas']['IssueStatusEnum']
       readonly status_label?: string
       /**
+       * In attesa di
+       * @description Obbligatorio quando lo stato è «In attesa».
+       *
+       *     * `philips` - Philips
+       *     * `elco` - Elco
+       *     * `cliente` - Cliente
+       *     * `exprivia` - Exprivia
+       *     * `altro` - Altro
+       */
+      waiting_reason?:
+        components['schemas']['WaitingReasonEnum'] | components['schemas']['BlankEnum']
+      readonly waiting_reason_label?: string
+      /**
        * Data apertura
        * Format: date
        */
       opened_at?: string | null
+      /**
+       * Data chiusura
+       * Format: date
+       */
+      readonly closed_at?: string | null
       readonly days_open?: string
       /**
        * Scadenza
@@ -2688,6 +11278,7 @@ export interface components {
        */
       due_date?: string | null
       readonly comments_count?: string
+      readonly servicenow_external_url?: string
       /** Format: date-time */
       readonly created_at?: string
       /** Format: date-time */
@@ -2700,16 +11291,22 @@ export interface components {
       plan?: number
       readonly plan_title?: string
       inventory?: number
+      readonly inventory_name?: string
+      readonly inventory_hostname?: string | null
+      readonly inventory_knumber?: string | null
       readonly customer_code?: string
       readonly customer_name?: string
       readonly site_name?: string
-      readonly inventory_hostname?: string
       /** Format: date */
       performed_at?: string
       result?: components['schemas']['ResultEnum']
-      tech?: number
+      tech?: number | null
       readonly tech_name?: string
+      created_by?: number | null
+      readonly created_by_username?: string | null
       notes?: string | null
+      /** Format: uri */
+      pdf_file?: string | null
       readonly pdf_url?: string
       /** Format: date-time */
       readonly created_at?: string
@@ -2743,6 +11340,12 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     PatchedMaintenancePlan: {
       readonly id?: number
       customer?: number
@@ -2751,6 +11354,7 @@ export interface components {
       inventory_types?: number[]
       readonly inventory_type_labels?: string
       readonly covered_count?: string
+      readonly completed_count?: number | null
       title?: string
       schedule_type?: components['schemas']['ScheduleTypeEnum']
       interval_unit?:
@@ -2765,7 +11369,8 @@ export interface components {
       fixed_day?: number | null
       /** Format: date */
       next_due_date?: string
-      readonly last_done_date?: string
+      /** Format: date */
+      readonly last_done_date?: string | null
       alert_days_before?: number
       is_active?: boolean
       notes?: string | null
@@ -2777,6 +11382,269 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    PatchedMaintenancePlanInventory: {
+      readonly id?: number
+      plan?: number
+      inventory?: number
+      readonly inventory_name?: string
+      readonly inventory_knumber?: string | null
+      readonly inventory_hostname?: string | null
+      readonly inventory_type_label?: string | null
+      readonly site_id?: number | null
+      readonly site_name?: string
+      readonly customer_id?: number
+      /** Format: date */
+      readonly plan_next_due_date?: string
+      /** Format: date */
+      due_date_override?: string | null
+      readonly effective_due_date?: string
+      notes?: string | null
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
+    PatchedMonitor: {
+      readonly id?: number
+      /** Inventory (workstation) */
+      inventory?: number | null
+      readonly inventory_name?: string
+      readonly site_name?: string | null
+      produttore?: string
+      modello?: string | null
+      seriale?: string | null
+      stato?: components['schemas']['MonitorStatoEnum']
+      readonly stato_label?: string
+      tipo?: components['schemas']['TipoEnum']
+      readonly tipo_label?: string
+      /** @description Abilitabile solo per monitor di tipo Diagnostico. */
+      radinet?: boolean
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
+    PatchedPurchaseOrderEntry: {
+      readonly id?: number
+      /**
+       * Data offerta
+       * Format: date
+       */
+      offer_date?: string
+      /** Descrizione */
+      description?: string
+      /** Committente */
+      client_name?: string
+      /** Cliente */
+      customer?: number | null
+      readonly customer_name?: string
+      readonly customer_code?: string
+      /**
+       * Cliente collegato (testo libero)
+       * @description Nome del cliente su cui è stato eseguito il lavoro, quando non è ancora presente in anagrafica. Alternativo al campo Cliente.
+       */
+      customer_placeholder?: string
+      readonly is_customer_placeholder?: boolean
+      purchase_order?: string
+      /** N. Fattura */
+      invoice_number?: string
+      readonly is_invoiced?: boolean
+      /** Tipo */
+      kind?: components['schemas']['PurchaseOrderEntryKindEnum']
+      readonly kind_label?: string
+      /** Stato */
+      readonly status?: components['schemas']['PurchaseOrderEntryStatusEnum']
+      readonly status_label?: string
+      readonly is_editable?: boolean
+      /**
+       * Data invio offerta
+       * Format: date-time
+       */
+      readonly sent_at?: string | null
+      /**
+       * Data ricezione PO
+       * Format: date-time
+       */
+      readonly received_at?: string | null
+      /**
+       * Data fatturazione
+       * Format: date-time
+       */
+      readonly invoiced_at?: string | null
+      readonly documents?: components['schemas']['PurchaseOrderDocument'][]
+      /** Modalità importo */
+      amount_mode?: components['schemas']['AmountModeEnum']
+      readonly amount_mode_label?: string
+      /**
+       * Giornate
+       * Format: decimal
+       */
+      days?: string | null
+      /**
+       * Tariffa/giorno
+       * Format: decimal
+       */
+      daily_rate?: string | null
+      /**
+       * Importo
+       * Format: decimal
+       */
+      amount?: string
+      /**
+       * Costi sostenuti
+       * Format: decimal
+       */
+      costs_incurred?: string | null
+      /** Note */
+      notes?: string
+      readonly created_by?: number | null
+      readonly created_by_username?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
+    PatchedReportRequest: {
+      readonly id?: number
+      kind?: components['schemas']['ReportRequestKindEnum']
+      readonly kind_label?: string
+      status?: components['schemas']['ReportRequestStatusEnum']
+      readonly status_label?: string
+      section?: components['schemas']['SectionEnum']
+      readonly section_label?: string
+      /** Descrizione */
+      description?: string
+      /** Format: uri */
+      screenshot?: string | null
+      readonly screenshot_url?: string
+      readonly can_upload_screenshot?: string
+      readonly can_resolve?: string
+      /** Creato da */
+      readonly created_by?: number
+      readonly created_by_username?: string
+      readonly created_by_full_name?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /**
+       * Risolto il
+       * Format: date-time
+       */
+      readonly resolved_at?: string | null
+      /** Risolto da */
+      readonly resolved_by?: number | null
+      readonly resolved_by_username?: string
+      readonly resolved_by_full_name?: string
+      /** Motivazione rifiuto */
+      rejection_reason?: string
+      /**
+       * Rifiutato il
+       * Format: date-time
+       */
+      readonly rejected_at?: string | null
+      /** Rifiutato da */
+      readonly rejected_by?: number | null
+      readonly rejected_by_username?: string
+      readonly rejected_by_full_name?: string
+    }
+    PatchedRispacs: {
+      readonly id?: number
+      /** Nome */
+      name?: string
+      /** Indirizzo IP */
+      ip?: string | null
+      /** Porta */
+      port?: number | null
+      /** AE Title */
+      aetitle?: string | null
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      deleted_at?: string | null
+    }
+    PatchedSeller: {
+      readonly id?: number
+      name?: string
+      email?: string
+      phone?: string
+      user?: number | null
+      readonly user_username?: string
+      is_active?: boolean
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
+    PatchedServiceNowCase: {
+      readonly id?: number
+      /**
+       * Numero case
+       * @description Es. CS0628228
+       */
+      number?: string
+      account?: string
+      /** Descrizione breve */
+      short_description?: string
+      /** Priorità */
+      priority?: components['schemas']['ServiceNowCasePriorityEnum']
+      readonly priority_label?: string
+      /** Categoria */
+      category?: components['schemas']['CategoryEbbEnum']
+      readonly category_label?: string
+      /** Type */
+      case_type?: number
+      readonly case_type_label?: string
+      /**
+       * Data apertura
+       * Format: date
+       */
+      opened_date?: string | null
+      /**
+       * Ora apertura
+       * Format: time
+       * @description Richiesta lato form quando è impostata la data apertura (non estratta via OCR).
+       */
+      opened_time?: string | null
+      /** Format: uri */
+      screenshot?: string | null
+      readonly screenshot_url?: string
+      /** Stato interno */
+      status?: components['schemas']['ServiceNowCaseStatusEnum']
+      readonly status_label?: string
+      /** Assegnato a */
+      assigned_to?: number | null
+      readonly assigned_to_username?: string
+      readonly assigned_to_full_name?: string
+      readonly assigned_to_avatar?: string
+      /**
+       * URL
+       * @description Link opzionale a una pagina esterna collegata al case
+       */
+      external_url?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     PatchedSite: {
       readonly id?: number
       customer?: number
@@ -2787,9 +11655,17 @@ export interface components {
       city?: string | null
       address_line1?: string | null
       postal_code?: string | null
+      province?: string | null
+      country?: string | null
       status?: number
       readonly status_key?: string
       readonly status_label?: string
+      readonly primary_contact_id?: number | null
+      readonly primary_contact_name?: string | null
+      readonly primary_contact_email?: string | null
+      readonly primary_contact_phone?: string | null
+      /** @default 0 */
+      readonly contacts_count: number
       notes?: string | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -2798,6 +11674,43 @@ export interface components {
       readonly updated_at?: string
       /** Format: date-time */
       deleted_at?: string | null
+    }
+    PatchedSnTechnicianAbsence: {
+      readonly id?: number
+      /** Utente */
+      user?: number
+      readonly user_name?: string
+      /**
+       * Giorno
+       * Format: date
+       */
+      date?: string
+      /** Fascia */
+      day_part?: components['schemas']['DayPartEnum']
+      readonly day_part_label?: string
+      /** Motivo */
+      reason?: components['schemas']['ReasonEnum']
+      readonly reason_label?: string
+      /** Nota */
+      note?: string
+      /**
+       * Ora inizio
+       * Format: time
+       * @description Precisione oraria opzionale (permesso). Se valorizzata, vanno indicate sia ora inizio sia ora fine.
+       */
+      time_from?: string | null
+      /**
+       * Ora fine
+       * Format: time
+       */
+      time_to?: string | null
+      readonly is_hourly?: boolean
+      /** Stato */
+      readonly status?: components['schemas']['StatusD0aEnum']
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
     }
     PatchedTech: {
       readonly id?: number
@@ -2816,6 +11729,172 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    PatchedTechnicianKmRate: {
+      readonly id?: number
+      /** Dipendente */
+      user?: number
+      readonly user_name?: string
+      /**
+       * Tariffa €/km
+       * Format: decimal
+       */
+      rate_per_km?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedUserAdmin: {
+      readonly id?: number
+      /**
+       * Nome utente
+       * @description Obbligatorio. 150 caratteri o meno.Solo lettere, cifre e @/./+/-/_
+       */
+      readonly username?: string
+      /** Indirizzo email */
+      email?: string
+      /** Nome */
+      first_name?: string
+      /** Cognome */
+      last_name?: string
+      /**
+       * Attivo
+       * @description Stabilisce se l'utente debba essere considerato attivo. Deseleziona qui, piuttosto che cancellare gli account.
+       */
+      is_active?: boolean
+      /**
+       * Privilegi di staff
+       * @description Stabilisce se l'utente può accedere a questo sito di amministrazione.
+       */
+      is_staff?: boolean
+      /**
+       * Privilegi di superutente
+       * @description Attribuisce all'utente tutti i privilegi, senza che sia necessario assegnarli esplicitamente.
+       */
+      is_superuser?: boolean
+      /**
+       * Iscritto in data
+       * Format: date-time
+       */
+      readonly date_joined?: string
+      /**
+       * Ultimo accesso
+       * Format: date-time
+       */
+      readonly last_login?: string | null
+      readonly groups?: string
+      readonly group_permissions?: string
+      readonly direct_permissions?: string
+      readonly has_portal_access?: boolean
+      readonly portal_profile?: string
+      readonly profile?: components['schemas']['UserAdminProfile']
+    }
+    PatchedUserDashboardLayout: {
+      readonly id?: number
+      widget?: number
+      readonly widget_key?: string
+      x?: number
+      y?: number
+      w?: number
+      h?: number
+      visible?: boolean
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedUserTask: {
+      readonly id?: number
+      /** Testo */
+      text?: string
+      /** Completato */
+      done?: boolean
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      done_at?: string | null
+    }
+    PatchedVlan: {
+      readonly id?: number
+      customer?: number
+      readonly customer_name?: string
+      /** Sede */
+      site?: number
+      readonly site_name?: string
+      readonly site_display_name?: string
+      vlan_id?: number
+      /** Nome / Descrizione */
+      name?: string
+      /**
+       * Network (CIDR)
+       * @description Es. 10.241.0.64/26
+       */
+      network?: string
+      /**
+       * Subnet mask
+       * @description Es. 255.255.255.192
+       */
+      subnet?: string
+      /** @description Es. 10.241.0.65 */
+      gateway?: string
+      /** @description Es. 172.26.99.0/24 */
+      lan?: string | null
+      note?: string | null
+      readonly total_hosts?: number
+      readonly used_count?: number
+      readonly free_count?: number
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
+    PatchedVlanIpRequest: {
+      readonly id?: number
+      customer?: number
+      vlan?: number
+      readonly vlan_name?: string
+      readonly vlan_network?: string
+      readonly vlan_gateway?: string
+      readonly vlan_subnet?: string
+      /** Indirizzo IP riservato */
+      ip?: string
+      /** AE Title */
+      aetitle?: string | null
+      /** Modalità */
+      modalita?: string
+      readonly modalita_label?: string
+      rispacs?: number[]
+      readonly rispacs_detail?: components['schemas']['RispacsLite'][]
+      /**
+       * Configurazione RIS/PACS
+       * @description Lista di {rispacs_id, etichetta} per ogni sistema associato.
+       */
+      rispacs_config?: unknown
+      site?: number | null
+      readonly site_name?: string
+      reparto?: string | null
+      device_type?: number | null
+      readonly device_type_name?: string
+      manufacturer?: number | null
+      readonly manufacturer_name?: string
+      /** @default pending */
+      readonly stato: components['schemas']['VlanIpRequestStatoEnum']
+      readonly stato_label?: string
+      note?: string | null
+      readonly richiedente?: number | null
+      readonly richiedente_username?: string
+      readonly richiedente_full_name?: string | null
+      readonly approvato_da?: number | null
+      readonly approvato_da_username?: string
+      readonly approvato_da_full_name?: string | null
+      /**
+       * Data approvazione
+       * Format: date-time
+       */
+      readonly approvato_at?: string | null
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+    }
     PatchedWikiAttachment: {
       readonly id?: number
       page?: number
@@ -2827,6 +11906,8 @@ export interface components {
       size_bytes?: number | null
       notes?: string | null
       readonly file_url?: string
+      readonly preview_url?: string
+      readonly download_url?: string
       /** Format: date-time */
       readonly created_at?: string
       /** Format: date-time */
@@ -2855,6 +11936,8 @@ export interface components {
       entity_type?: components['schemas']['EntityTypeEnum']
       /** Format: int64 */
       entity_id?: number
+      readonly entity_label?: string
+      readonly entity_path?: string
       notes?: string | null
       /** Format: date-time */
       readonly created_at?: string
@@ -2875,6 +11958,10 @@ export interface components {
       content_markdown?: string
       is_published?: boolean
       readonly view_count?: number
+      readonly average_rating?: string
+      readonly rating_count?: string
+      readonly current_user_rating?: string
+      readonly attachment_count?: string
       custom_fields?: unknown
       pdf_template_key?: string
       pdf_options?: unknown
@@ -2887,6 +11974,54 @@ export interface components {
       /** Format: date-time */
       deleted_at?: string | null
     }
+    PatchedWikiQuery: {
+      readonly id?: number
+      /** Titolo */
+      title?: string
+      /** Linguaggio */
+      language?: number | null
+      readonly language_key?: string | null
+      readonly language_label?: string | null
+      readonly language_color?: string | null
+      readonly language_text_color?: string | null
+      /** Query */
+      body?: string
+      /** Descrizione */
+      description?: string | null
+      /** Tag */
+      tags?: string[] | null
+      /** Utilizzi */
+      readonly use_count?: number
+      readonly created_by?: number | null
+      readonly created_by_username?: string
+      readonly updated_by?: number | null
+      readonly updated_by_username?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly updated_at?: string
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
+    PatchedWikiQueryLanguage: {
+      readonly id?: number
+      /** Chiave */
+      key?: string
+      label?: string
+      /**
+       * Colore sfondo chip (hex)
+       * @description Colore pastello HEX usato nel chip nella UI (es. #d1fae5).
+       */
+      color?: string
+      /** Colore testo chip (hex) */
+      text_color?: string
+      /** Ordinamento */
+      sort_order?: number
+      /** Attivo */
+      is_active?: boolean
+      /** Format: date-time */
+      readonly deleted_at?: string | null
+    }
     /**
      * @description * `low` - Bassa
      *     * `medium` - Media
@@ -2894,20 +12029,361 @@ export interface components {
      *     * `critical` - Critica
      * @enum {string}
      */
-    PriorityEnum: 'low' | 'medium' | 'high' | 'critical'
+    PriorityF0aEnum: 'low' | 'medium' | 'high' | 'critical'
+    PurchaseOrderDocument: {
+      readonly id: number
+      readonly kind: components['schemas']['PurchaseOrderDocumentKindEnum']
+      readonly kind_label: string
+      readonly filename: string
+      readonly url: string
+      /** Format: date-time */
+      readonly uploaded_at: string
+      readonly uploaded_by: number | null
+      readonly uploaded_by_username: string
+    }
+    /**
+     * @description * `offer` - Offerta
+     *     * `po` - Purchase Order
+     *     * `invoice` - Fattura
+     * @enum {string}
+     */
+    PurchaseOrderDocumentKindEnum: 'offer' | 'po' | 'invoice'
+    PurchaseOrderEntry: {
+      readonly id: number
+      /**
+       * Data offerta
+       * Format: date
+       */
+      offer_date: string
+      /** Descrizione */
+      description: string
+      /** Committente */
+      client_name: string
+      /** Cliente */
+      customer?: number | null
+      readonly customer_name: string
+      readonly customer_code: string
+      /**
+       * Cliente collegato (testo libero)
+       * @description Nome del cliente su cui è stato eseguito il lavoro, quando non è ancora presente in anagrafica. Alternativo al campo Cliente.
+       */
+      customer_placeholder?: string
+      readonly is_customer_placeholder: boolean
+      purchase_order?: string
+      /** N. Fattura */
+      invoice_number?: string
+      readonly is_invoiced: boolean
+      /** Tipo */
+      kind?: components['schemas']['PurchaseOrderEntryKindEnum']
+      readonly kind_label: string
+      /** Stato */
+      readonly status: components['schemas']['PurchaseOrderEntryStatusEnum']
+      readonly status_label: string
+      readonly is_editable: boolean
+      /**
+       * Data invio offerta
+       * Format: date-time
+       */
+      readonly sent_at: string | null
+      /**
+       * Data ricezione PO
+       * Format: date-time
+       */
+      readonly received_at: string | null
+      /**
+       * Data fatturazione
+       * Format: date-time
+       */
+      readonly invoiced_at: string | null
+      readonly documents: components['schemas']['PurchaseOrderDocument'][]
+      /** Modalità importo */
+      amount_mode?: components['schemas']['AmountModeEnum']
+      readonly amount_mode_label: string
+      /**
+       * Giornate
+       * Format: decimal
+       */
+      days?: string | null
+      /**
+       * Tariffa/giorno
+       * Format: decimal
+       */
+      daily_rate?: string | null
+      /**
+       * Importo
+       * Format: decimal
+       */
+      amount?: string
+      /**
+       * Costi sostenuti
+       * Format: decimal
+       */
+      costs_incurred?: string | null
+      /** Note */
+      notes?: string
+      readonly created_by: number | null
+      readonly created_by_username: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    /**
+     * @description * `ordinario` - Ordinario
+     *     * `extra` - Extra
+     * @enum {string}
+     */
+    PurchaseOrderEntryKindEnum: 'ordinario' | 'extra'
+    /**
+     * @description * `inserito` - Inserito
+     *     * `inviato` - Inviato
+     *     * `ricevuto` - Ricevuto
+     *     * `fatturato` - Fatturato
+     * @enum {string}
+     */
+    PurchaseOrderEntryStatusEnum: 'inserito' | 'inviato' | 'ricevuto' | 'fatturato'
+    /**
+     * @description * `ferie` - Ferie
+     *     * `malattia` - Malattia/Infortunio
+     *     * `permesso_104` - 104
+     *     * `training` - Training
+     *     * `trasferta` - Trasferta
+     *     * `altro` - Altro
+     * @enum {string}
+     */
+    ReasonEnum: 'ferie' | 'malattia' | 'permesso_104' | 'training' | 'trasferta' | 'altro'
+    ReportRequest: {
+      readonly id: number
+      kind?: components['schemas']['ReportRequestKindEnum']
+      readonly kind_label: string
+      status?: components['schemas']['ReportRequestStatusEnum']
+      readonly status_label: string
+      section?: components['schemas']['SectionEnum']
+      readonly section_label: string
+      /** Descrizione */
+      description: string
+      /** Format: uri */
+      screenshot?: string | null
+      readonly screenshot_url: string
+      readonly can_upload_screenshot: string
+      readonly can_resolve: string
+      /** Creato da */
+      readonly created_by: number
+      readonly created_by_username: string
+      readonly created_by_full_name: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /**
+       * Risolto il
+       * Format: date-time
+       */
+      readonly resolved_at: string | null
+      /** Risolto da */
+      readonly resolved_by: number | null
+      readonly resolved_by_username: string
+      readonly resolved_by_full_name: string
+      /** Motivazione rifiuto */
+      rejection_reason?: string
+      /**
+       * Rifiutato il
+       * Format: date-time
+       */
+      readonly rejected_at: string | null
+      /** Rifiutato da */
+      readonly rejected_by: number | null
+      readonly rejected_by_username: string
+      readonly rejected_by_full_name: string
+    }
+    /**
+     * @description * `bug` - Report a bug
+     *     * `feature` - Request feature
+     * @enum {string}
+     */
+    ReportRequestKindEnum: 'bug' | 'feature'
+    /**
+     * @description * `open` - Open
+     *     * `resolved` - Resolved
+     *     * `rejected` - Rejected
+     * @enum {string}
+     */
+    ReportRequestStatusEnum: 'open' | 'resolved' | 'rejected'
     /**
      * @description * `ok` - OK
      *     * `ko` - KO
      *     * `partial` - Partial
+     *     * `not_planned` - Non prevista
      * @enum {string}
      */
-    ResultEnum: 'ok' | 'ko' | 'partial'
+    ResultEnum: 'ok' | 'ko' | 'partial' | 'not_planned'
+    Rispacs: {
+      readonly id: number
+      /** Nome */
+      name: string
+      /** Indirizzo IP */
+      ip?: string | null
+      /** Porta */
+      port?: number | null
+      /** AE Title */
+      aetitle?: string | null
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      deleted_at?: string | null
+    }
+    RispacsLite: {
+      readonly id: number
+      /** Nome */
+      name: string
+      /** Indirizzo IP */
+      ip?: string | null
+      /** AE Title */
+      aetitle?: string | null
+    }
     /**
      * @description * `interval` - Interval
      *     * `fixed_date` - Fixed date
      * @enum {string}
      */
     ScheduleTypeEnum: 'interval' | 'fixed_date'
+    /**
+     * @description * `dashboard` - Dashboard
+     *     * `site_repository` - Site Repository
+     *     * `customers` - Customers
+     *     * `sites` - Sites
+     *     * `contacts` - Contacts
+     *     * `inventory` - Inventory
+     *     * `issues` - Issues
+     *     * `audit` - Audit
+     *     * `maintenance` - Maintenance
+     *     * `drive` - Drive
+     *     * `wiki` - Wiki
+     *     * `search` - Ricerca
+     *     * `profile` - Profilo
+     *     * `trash` - Cestino
+     *     * `other` - Altro
+     * @enum {string}
+     */
+    SectionEnum:
+      | 'dashboard'
+      | 'site_repository'
+      | 'customers'
+      | 'sites'
+      | 'contacts'
+      | 'inventory'
+      | 'issues'
+      | 'audit'
+      | 'maintenance'
+      | 'drive'
+      | 'wiki'
+      | 'search'
+      | 'profile'
+      | 'trash'
+      | 'other'
+    Seller: {
+      readonly id: number
+      name: string
+      email?: string
+      phone?: string
+      user?: number | null
+      readonly user_username: string
+      is_active?: boolean
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    ServiceNowCase: {
+      readonly id: number
+      /**
+       * Numero case
+       * @description Es. CS0628228
+       */
+      number: string
+      account: string
+      /** Descrizione breve */
+      short_description?: string
+      /** Priorità */
+      priority?: components['schemas']['ServiceNowCasePriorityEnum']
+      readonly priority_label: string
+      /** Categoria */
+      category?: components['schemas']['CategoryEbbEnum']
+      readonly category_label: string
+      /** Type */
+      case_type: number
+      readonly case_type_label: string
+      /**
+       * Data apertura
+       * Format: date
+       */
+      opened_date?: string | null
+      /**
+       * Ora apertura
+       * Format: time
+       * @description Richiesta lato form quando è impostata la data apertura (non estratta via OCR).
+       */
+      opened_time?: string | null
+      /** Format: uri */
+      screenshot?: string | null
+      readonly screenshot_url: string
+      /** Stato interno */
+      status?: components['schemas']['ServiceNowCaseStatusEnum']
+      readonly status_label: string
+      /** Assegnato a */
+      assigned_to?: number | null
+      readonly assigned_to_username: string
+      readonly assigned_to_full_name: string
+      readonly assigned_to_avatar: string
+      /**
+       * URL
+       * @description Link opzionale a una pagina esterna collegata al case
+       */
+      external_url?: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    /**
+     * @description * `1` - 1 - Critical
+     *     * `2` - 2 - High
+     *     * `3` - 3 - Moderate
+     *     * `4` - 4 - Low
+     * @enum {string}
+     */
+    ServiceNowCasePriorityEnum: '1' | '2' | '3' | '4'
+    /**
+     * @description * `open` - Aperto
+     *     * `in_progress` - In lavorazione
+     *     * `closed` - Chiuso
+     * @enum {string}
+     */
+    ServiceNowCaseStatusEnum: 'open' | 'in_progress' | 'closed'
+    ServiceNowCaseType: {
+      readonly id: number
+      /** Categoria */
+      category: components['schemas']['CategoryEbbEnum']
+      readonly category_label: string
+      /** Nome */
+      name: string
+      /** Ordinamento */
+      order?: number
+    }
+    /**
+     * @description Mixin per serializer con campo custom_fields.
+     *
+     *     Richiede di dichiarare nella sottoclasse:
+     *         custom_fields_entity: str  # es. "customer", "site", "inventory"
+     */
     Site: {
       readonly id: number
       customer: number
@@ -2918,9 +12394,17 @@ export interface components {
       city?: string | null
       address_line1?: string | null
       postal_code?: string | null
+      province?: string | null
+      country?: string | null
       status: number
       readonly status_key: string
       readonly status_label: string
+      readonly primary_contact_id: number | null
+      readonly primary_contact_name: string | null
+      readonly primary_contact_email: string | null
+      readonly primary_contact_phone: string | null
+      /** @default 0 */
+      readonly contacts_count: number
       notes?: string | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -2937,6 +12421,50 @@ export interface components {
       sort_order?: number
       is_active?: boolean
     }
+    SnTechnicianAbsence: {
+      readonly id: number
+      /** Utente */
+      user: number
+      readonly user_name: string
+      /**
+       * Giorno
+       * Format: date
+       */
+      date: string
+      /** Fascia */
+      day_part: components['schemas']['DayPartEnum']
+      readonly day_part_label: string
+      /** Motivo */
+      reason?: components['schemas']['ReasonEnum']
+      readonly reason_label: string
+      /** Nota */
+      note?: string
+      /**
+       * Ora inizio
+       * Format: time
+       * @description Precisione oraria opzionale (permesso). Se valorizzata, vanno indicate sia ora inizio sia ora fine.
+       */
+      time_from?: string | null
+      /**
+       * Ora fine
+       * Format: time
+       */
+      time_to?: string | null
+      readonly is_hourly: boolean
+      /** Stato */
+      readonly status: components['schemas']['StatusD0aEnum']
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    /**
+     * @description * `proposta` - Proposta
+     *     * `validata` - Validata
+     *     * `rifiutata` - Rifiutata
+     * @enum {string}
+     */
+    StatusD0aEnum: 'proposta' | 'validata' | 'rifiutata'
     Tech: {
       readonly id: number
       first_name: string
@@ -2953,6 +12481,138 @@ export interface components {
       readonly updated_at: string
       /** Format: date-time */
       deleted_at?: string | null
+    }
+    TechnicianKmRate: {
+      readonly id: number
+      /** Dipendente */
+      user: number
+      readonly user_name: string
+      /**
+       * Tariffa €/km
+       * Format: decimal
+       */
+      rate_per_km?: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    /**
+     * @description * `amministrativo` - Amministrativo
+     *     * `diagnostico` - Diagnostico
+     * @enum {string}
+     */
+    TipoEnum: 'amministrativo' | 'diagnostico'
+    UserAdmin: {
+      readonly id: number
+      /**
+       * Nome utente
+       * @description Obbligatorio. 150 caratteri o meno.Solo lettere, cifre e @/./+/-/_
+       */
+      readonly username: string
+      /** Indirizzo email */
+      email?: string
+      /** Nome */
+      first_name?: string
+      /** Cognome */
+      last_name?: string
+      /**
+       * Attivo
+       * @description Stabilisce se l'utente debba essere considerato attivo. Deseleziona qui, piuttosto che cancellare gli account.
+       */
+      is_active?: boolean
+      /**
+       * Privilegi di staff
+       * @description Stabilisce se l'utente può accedere a questo sito di amministrazione.
+       */
+      is_staff?: boolean
+      /**
+       * Privilegi di superutente
+       * @description Attribuisce all'utente tutti i privilegi, senza che sia necessario assegnarli esplicitamente.
+       */
+      is_superuser?: boolean
+      /**
+       * Iscritto in data
+       * Format: date-time
+       */
+      readonly date_joined: string
+      /**
+       * Ultimo accesso
+       * Format: date-time
+       */
+      readonly last_login: string | null
+      readonly groups: string
+      readonly group_permissions: string
+      readonly direct_permissions: string
+      readonly has_portal_access: boolean
+      readonly portal_profile: string
+      readonly profile: components['schemas']['UserAdminProfile']
+    }
+    UserAdminProfile: {
+      readonly avatar: string
+      /**
+       * Philips
+       * @description Utente assegnabile ai case ServiceNow di categoria Philips (se falso: Biotron). Impostabile solo da admin.
+       */
+      is_philips?: boolean
+      /**
+       * Tecnico ServiceNow
+       * @description Se disattivato, l'utente non è assegnabile a nessun case ServiceNow (né Philips né Biotron) e non compare nel Triage / Statistiche. Impostabile solo da admin.
+       */
+      is_servicenow_technician?: boolean
+      /**
+       * Account funzionale
+       * @description Utente di servizio (es. ac.philips, ris.philips, cdd.biotron, jolly.philips) usato solo come assegnatario automatico di fallback per i case ServiceNow senza un tecnico reale disponibile: resta assegnabile normalmente, ma non compare nel pannello Triage né nella vista settimanale assenze, dato che non è una persona. Impostabile solo da admin.
+       */
+      is_functional_account?: boolean
+      /**
+       * Coordinatore piano ferie
+       * @description Se attivo, l'utente può validare/rifiutare le proposte di ferie e inserire attività (training/104/malattia/…) per chiunque nel Piano Ferie. Impostabile solo da admin.
+       */
+      is_leave_coordinator?: boolean
+      /**
+       * Area piano ferie
+       * @description Area organizzativa usata per raggruppare le righe del Piano Ferie.
+       */
+      leave_area?: number | null
+      readonly leave_area_name: string
+      /**
+       * Segreteria rimborsi spese
+       * @description Se attivo, l'utente può vedere tutte le note spese dei dipendenti e validarle/rifiutarle. Impostabile solo da admin.
+       */
+      is_expense_secretary?: boolean
+      /**
+       * Data di nascita
+       * Format: date
+       * @description Usata dal widget dashboard 'Compleanni'. Impostabile solo da admin.
+       */
+      birth_date?: string | null
+      /**
+       * Genere
+       * @description Usato per personalizzare i saluti (es. widget Meteo). Impostabile solo da admin.
+       *
+       *     * `M` - Uomo
+       *     * `F` - Donna
+       */
+      gender?:
+        | (
+            | components['schemas']['GenderEnum']
+            | components['schemas']['BlankEnum']
+            | components['schemas']['NullEnum']
+          )
+        | null
+    }
+    UserDashboardLayout: {
+      readonly id: number
+      widget: number
+      readonly widget_key: string
+      x?: number
+      y?: number
+      w: number
+      h: number
+      visible?: boolean
+      /** Format: date-time */
+      readonly updated_at: string
     }
     UserList: {
       readonly id: number
@@ -2971,7 +12631,120 @@ export interface components {
        * @description Stabilisce se l'utente debba essere considerato attivo. Deseleziona qui, piuttosto che cancellare gli account.
        */
       is_active?: boolean
+      readonly is_philips: string
+      readonly is_servicenow_technician: string
+      readonly leave_area: string
     }
+    UserTask: {
+      readonly id: number
+      /** Testo */
+      text: string
+      /** Completato */
+      done?: boolean
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      done_at?: string | null
+    }
+    Vlan: {
+      readonly id: number
+      customer: number
+      readonly customer_name: string
+      /** Sede */
+      site: number
+      readonly site_name: string
+      readonly site_display_name: string
+      vlan_id: number
+      /** Nome / Descrizione */
+      name: string
+      /**
+       * Network (CIDR)
+       * @description Es. 10.241.0.64/26
+       */
+      network: string
+      /**
+       * Subnet mask
+       * @description Es. 255.255.255.192
+       */
+      subnet: string
+      /** @description Es. 10.241.0.65 */
+      gateway: string
+      /** @description Es. 172.26.99.0/24 */
+      lan?: string | null
+      note?: string | null
+      readonly total_hosts: number
+      readonly used_count: number
+      readonly free_count: number
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    VlanIpRequest: {
+      readonly id: number
+      customer: number
+      vlan: number
+      readonly vlan_name: string
+      readonly vlan_network: string
+      readonly vlan_gateway: string
+      readonly vlan_subnet: string
+      /** Indirizzo IP riservato */
+      ip: string
+      /** AE Title */
+      aetitle?: string | null
+      /** Modalità */
+      modalita: string
+      readonly modalita_label: string
+      rispacs?: number[]
+      readonly rispacs_detail: components['schemas']['RispacsLite'][]
+      /**
+       * Configurazione RIS/PACS
+       * @description Lista di {rispacs_id, etichetta} per ogni sistema associato.
+       */
+      rispacs_config?: unknown
+      site?: number | null
+      readonly site_name: string
+      reparto?: string | null
+      device_type?: number | null
+      readonly device_type_name: string
+      manufacturer?: number | null
+      readonly manufacturer_name: string
+      /** @default pending */
+      readonly stato: components['schemas']['VlanIpRequestStatoEnum']
+      readonly stato_label: string
+      note?: string | null
+      readonly richiedente: number | null
+      readonly richiedente_username: string
+      readonly richiedente_full_name: string | null
+      readonly approvato_da: number | null
+      readonly approvato_da_username: string
+      readonly approvato_da_full_name: string | null
+      /**
+       * Data approvazione
+       * Format: date-time
+       */
+      readonly approvato_at: string | null
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+    }
+    /**
+     * @description * `pending` - In attesa
+     *     * `approved` - Approvata
+     *     * `rejected` - Rifiutata
+     * @enum {string}
+     */
+    VlanIpRequestStatoEnum: 'pending' | 'approved' | 'rejected'
+    /**
+     * @description * `philips` - Philips
+     *     * `elco` - Elco
+     *     * `cliente` - Cliente
+     *     * `exprivia` - Exprivia
+     *     * `altro` - Altro
+     * @enum {string}
+     */
+    WaitingReasonEnum: 'philips' | 'elco' | 'cliente' | 'exprivia' | 'altro'
     WikiAttachment: {
       readonly id: number
       page: number
@@ -2983,6 +12756,8 @@ export interface components {
       size_bytes?: number | null
       notes?: string | null
       readonly file_url: string
+      readonly preview_url: string
+      readonly download_url: string
       /** Format: date-time */
       readonly created_at: string
       /** Format: date-time */
@@ -3011,6 +12786,8 @@ export interface components {
       entity_type: components['schemas']['EntityTypeEnum']
       /** Format: int64 */
       entity_id: number
+      readonly entity_label: string
+      readonly entity_path: string
       notes?: string | null
       /** Format: date-time */
       readonly created_at: string
@@ -3031,6 +12808,10 @@ export interface components {
       content_markdown: string
       is_published?: boolean
       readonly view_count: number
+      readonly average_rating: string
+      readonly rating_count: string
+      readonly current_user_rating: string
+      readonly attachment_count: string
       custom_fields?: unknown
       pdf_template_key?: string
       pdf_options?: unknown
@@ -3055,6 +12836,54 @@ export interface components {
       /** Format: date-time */
       readonly saved_at: string
     }
+    WikiQuery: {
+      readonly id: number
+      /** Titolo */
+      title: string
+      /** Linguaggio */
+      language?: number | null
+      readonly language_key: string | null
+      readonly language_label: string | null
+      readonly language_color: string | null
+      readonly language_text_color: string | null
+      /** Query */
+      body: string
+      /** Descrizione */
+      description?: string | null
+      /** Tag */
+      tags?: string[] | null
+      /** Utilizzi */
+      readonly use_count: number
+      readonly created_by: number | null
+      readonly created_by_username: string
+      readonly updated_by: number | null
+      readonly updated_by_username: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly updated_at: string
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
+    WikiQueryLanguage: {
+      readonly id: number
+      /** Chiave */
+      key: string
+      label: string
+      /**
+       * Colore sfondo chip (hex)
+       * @description Colore pastello HEX usato nel chip nella UI (es. #d1fae5).
+       */
+      color?: string
+      /** Colore testo chip (hex) */
+      text_color?: string
+      /** Ordinamento */
+      sort_order?: number
+      /** Attivo */
+      is_active?: boolean
+      /** Format: date-time */
+      readonly deleted_at: string | null
+    }
   }
   responses: never
   parameters: never
@@ -3064,6 +12893,1259 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  absences_list: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `mattina` - Mattina
+         *     * `pomeriggio` - Pomeriggio
+         */
+        day_part?: 'mattina' | 'pomeriggio'
+        /**
+         * @description * `ferie` - Ferie
+         *     * `malattia` - Malattia/Infortunio
+         *     * `permesso_104` - 104
+         *     * `training` - Training
+         *     * `trasferta` - Trasferta
+         *     * `altro` - Altro
+         */
+        reason?: 'altro' | 'ferie' | 'malattia' | 'permesso_104' | 'training' | 'trasferta'
+        /**
+         * @description * `proposta` - Proposta
+         *     * `validata` - Validata
+         *     * `rifiutata` - Rifiutata
+         */
+        status?: 'proposta' | 'rifiutata' | 'validata'
+        user?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence'][]
+        }
+      }
+    }
+  }
+  absences_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  absences_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedAbsence']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedAbsence']
+        'multipart/form-data': components['schemas']['PatchedAbsence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_reject_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_validate_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_bulk_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_reject_group_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_roster_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  absences_validate_group_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Absence']
+        'application/x-www-form-urlencoded': components['schemas']['Absence']
+        'multipart/form-data': components['schemas']['Absence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Absence']
+        }
+      }
+    }
+  }
+  admin_groups_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GroupAdmin'][]
+        }
+      }
+    }
+  }
+  admin_groups_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GroupAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['GroupAdmin']
+        'multipart/form-data': components['schemas']['GroupAdmin']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GroupAdmin']
+        }
+      }
+    }
+  }
+  admin_groups_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this gruppo. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GroupAdmin']
+        }
+      }
+    }
+  }
+  admin_groups_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this gruppo. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GroupAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['GroupAdmin']
+        'multipart/form-data': components['schemas']['GroupAdmin']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GroupAdmin']
+        }
+      }
+    }
+  }
+  admin_groups_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this gruppo. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  admin_groups_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this gruppo. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedGroupAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedGroupAdmin']
+        'multipart/form-data': components['schemas']['PatchedGroupAdmin']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GroupAdmin']
+        }
+      }
+    }
+  }
+  admin_users_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin'][]
+        }
+      }
+    }
+  }
+  admin_users_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UserAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['UserAdmin']
+        'multipart/form-data': components['schemas']['UserAdmin']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin']
+        }
+      }
+    }
+  }
+  admin_users_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this utente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin']
+        }
+      }
+    }
+  }
+  admin_users_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this utente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UserAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['UserAdmin']
+        'multipart/form-data': components['schemas']['UserAdmin']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin']
+        }
+      }
+    }
+  }
+  admin_users_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this utente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  admin_users_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this utente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedUserAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedUserAdmin']
+        'multipart/form-data': components['schemas']['PatchedUserAdmin']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin']
+        }
+      }
+    }
+  }
+  admin_users_reset_password_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this utente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UserAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['UserAdmin']
+        'multipart/form-data': components['schemas']['UserAdmin']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin']
+        }
+      }
+    }
+  }
+  admin_users_reset_permissions_to_group_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this utente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UserAdmin']
+        'application/x-www-form-urlencoded': components['schemas']['UserAdmin']
+        'multipart/form-data': components['schemas']['UserAdmin']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserAdmin']
+        }
+      }
+    }
+  }
+  admin_permission_modules_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  announcements_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedAnnouncementList']
+        }
+      }
+    }
+  }
+  announcements_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Announcement']
+        'application/x-www-form-urlencoded': components['schemas']['Announcement']
+        'multipart/form-data': components['schemas']['Announcement']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Announcement']
+        }
+      }
+    }
+  }
+  announcements_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Comunicazione. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Announcement']
+        }
+      }
+    }
+  }
+  announcements_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Comunicazione. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Announcement']
+        'application/x-www-form-urlencoded': components['schemas']['Announcement']
+        'multipart/form-data': components['schemas']['Announcement']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Announcement']
+        }
+      }
+    }
+  }
+  announcements_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Comunicazione. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  announcements_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Comunicazione. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedAnnouncement']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedAnnouncement']
+        'multipart/form-data': components['schemas']['PatchedAnnouncement']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Announcement']
+        }
+      }
+    }
+  }
+  area_tasks_list: {
+    parameters: {
+      query?: {
+        area?: number
+        assigned_to?: number
+        due_after?: string
+        due_before?: string
+        mine?: boolean
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /**
+         * @description * `low` - Bassa
+         *     * `medium` - Media
+         *     * `high` - Alta
+         *     * `critical` - Critica
+         */
+        priority?: ('critical' | 'high' | 'low' | 'medium')[]
+        /** @description A search term. */
+        search?: string
+        /**
+         * @description * `da_fare` - Da fare
+         *     * `in_corso` - In corso
+         *     * `in_attesa` - In attesa
+         *     * `completato` - Completato
+         */
+        status?: ('completato' | 'da_fare' | 'in_attesa' | 'in_corso')[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedAreaTaskList']
+        }
+      }
+    }
+  }
+  area_tasks_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['AreaTask']
+        'multipart/form-data': components['schemas']['AreaTask']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['AreaTask']
+        'multipart/form-data': components['schemas']['AreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  area_tasks_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedAreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedAreaTask']
+        'multipart/form-data': components['schemas']['PatchedAreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_comments_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_comments_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['AreaTask']
+        'multipart/form-data': components['schemas']['AreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_comments_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        comment_pk: string
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  area_tasks_comments_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        comment_pk: string
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedAreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedAreaTask']
+        'multipart/form-data': components['schemas']['PatchedAreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_convert_to_issue_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['AreaTask']
+        'multipart/form-data': components['schemas']['AreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Task di area. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['AreaTask']
+        'multipart/form-data': components['schemas']['AreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AreaTask']
+        'application/x-www-form-urlencoded': components['schemas']['AreaTask']
+        'multipart/form-data': components['schemas']['AreaTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_due_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
+  area_tasks_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
   audit_events_list: {
     parameters: {
       query?: {
@@ -3078,6 +14160,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -3157,6 +14241,212 @@ export interface operations {
       }
     }
   }
+  birthdays_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  changelog_entries_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedChangelogEntryList']
+        }
+      }
+    }
+  }
+  changelog_entries_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangelogEntry']
+        'application/x-www-form-urlencoded': components['schemas']['ChangelogEntry']
+        'multipart/form-data': components['schemas']['ChangelogEntry']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChangelogEntry']
+        }
+      }
+    }
+  }
+  changelog_entries_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Voce changelog. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChangelogEntry']
+        }
+      }
+    }
+  }
+  changelog_entries_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Voce changelog. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangelogEntry']
+        'application/x-www-form-urlencoded': components['schemas']['ChangelogEntry']
+        'multipart/form-data': components['schemas']['ChangelogEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChangelogEntry']
+        }
+      }
+    }
+  }
+  changelog_entries_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Voce changelog. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  changelog_entries_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Voce changelog. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedChangelogEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedChangelogEntry']
+        'multipart/form-data': components['schemas']['PatchedChangelogEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChangelogEntry']
+        }
+      }
+    }
+  }
+  changelog_dismiss_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  changelog_unseen_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   contacts_list: {
     parameters: {
       query?: {
@@ -3166,6 +14456,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
         site?: number
@@ -3310,6 +14602,34 @@ export interface operations {
       }
     }
   }
+  contacts_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contact. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Contact']
+        'application/x-www-form-urlencoded': components['schemas']['Contact']
+        'multipart/form-data': components['schemas']['Contact']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contact']
+        }
+      }
+    }
+  }
   contacts_restore_create: {
     parameters: {
       query?: never
@@ -3318,6 +14638,31 @@ export interface operations {
         /** @description A unique integer value identifying this contact. */
         id: number
       }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Contact']
+        'application/x-www-form-urlencoded': components['schemas']['Contact']
+        'multipart/form-data': components['schemas']['Contact']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contact']
+        }
+      }
+    }
+  }
+  contacts_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
       cookie?: never
     }
     requestBody: {
@@ -3363,6 +14708,353 @@ export interface operations {
       }
     }
   }
+  contracts_list: {
+    parameters: {
+      query?: {
+        auto_renew?: boolean
+        company?: number
+        /**
+         * @description * `assistenza` - Assistenza
+         *     * `noleggio` - Noleggio
+         *     * `licenza` - Licenza
+         *     * `altro` - Altro
+         */
+        contract_type?: 'altro' | 'assistenza' | 'licenza' | 'noleggio'
+        customer?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+        seller?: number
+        /**
+         * @description * `bozza` - Bozza
+         *     * `attivo` - Attivo
+         *     * `disdetto` - Disdetto
+         */
+        status?: 'attivo' | 'bozza' | 'disdetto'
+        year?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedContractList']
+        }
+      }
+    }
+  }
+  contracts_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  contracts_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedContract']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedContract']
+        'application/json': components['schemas']['PatchedContract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_document_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_document_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_document_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  contracts_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this contract. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Contract']
+        'application/x-www-form-urlencoded': components['schemas']['Contract']
+        'application/json': components['schemas']['Contract']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
   custom_field_definitions_list: {
     parameters: {
       query?: {
@@ -3370,6 +15062,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -3566,6 +15260,106 @@ export interface operations {
       }
     }
   }
+  custom_fields_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomFieldDefinition']
+        'application/x-www-form-urlencoded': components['schemas']['CustomFieldDefinition']
+        'multipart/form-data': components['schemas']['CustomFieldDefinition']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CustomFieldDefinition']
+        }
+      }
+    }
+  }
+  custom_fields_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomFieldDefinition']
+        'application/x-www-form-urlencoded': components['schemas']['CustomFieldDefinition']
+        'multipart/form-data': components['schemas']['CustomFieldDefinition']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CustomFieldDefinition']
+        }
+      }
+    }
+  }
+  customer_rispacs_list: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedRispacsLiteList']
+        }
+      }
+    }
+  }
+  customer_rispacs_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Sistema RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RispacsLite']
+        }
+      }
+    }
+  }
   customer_statuses_list: {
     parameters: {
       query?: {
@@ -3620,6 +15414,9 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        province?: string
         /** @description A search term. */
         search?: string
         status?: number
@@ -3662,6 +15459,86 @@ export interface operations {
         content: {
           'application/json': components['schemas']['Customer']
         }
+      }
+    }
+  }
+  customers_vpn_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        customer_pk: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  customers_vpn_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        customer_pk: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  customers_vpn_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        customer_pk: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  customers_vpn_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        customer_pk: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }
@@ -3764,6 +15641,56 @@ export interface operations {
       }
     }
   }
+  customers_export_site_repository_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Cliente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Customer']
+        }
+      }
+    }
+  }
+  customers_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Cliente. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Customer']
+        'application/x-www-form-urlencoded': components['schemas']['Customer']
+        'multipart/form-data': components['schemas']['Customer']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Customer']
+        }
+      }
+    }
+  }
   customers_restore_create: {
     parameters: {
       query?: never
@@ -3772,6 +15699,31 @@ export interface operations {
         /** @description A unique integer value identifying this Cliente. */
         id: number
       }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Customer']
+        'application/x-www-form-urlencoded': components['schemas']['Customer']
+        'multipart/form-data': components['schemas']['Customer']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Customer']
+        }
+      }
+    }
+  }
+  customers_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
       cookie?: never
     }
     requestBody: {
@@ -3817,6 +15769,1353 @@ export interface operations {
       }
     }
   }
+  dashboard_default_layout_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDefaultDashboardLayoutList']
+        }
+      }
+    }
+  }
+  dashboard_default_layout_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Layout predefinito dashboard. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DefaultDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_default_layout_set_mine_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DefaultDashboardLayout']
+        'application/x-www-form-urlencoded': components['schemas']['DefaultDashboardLayout']
+        'multipart/form-data': components['schemas']['DefaultDashboardLayout']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DefaultDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_layout_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedUserDashboardLayoutList']
+        }
+      }
+    }
+  }
+  dashboard_layout_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserDashboardLayout']
+        'application/x-www-form-urlencoded': components['schemas']['UserDashboardLayout']
+        'multipart/form-data': components['schemas']['UserDashboardLayout']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_layout_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_layout_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserDashboardLayout']
+        'application/x-www-form-urlencoded': components['schemas']['UserDashboardLayout']
+        'multipart/form-data': components['schemas']['UserDashboardLayout']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_layout_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  dashboard_layout_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedUserDashboardLayout']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedUserDashboardLayout']
+        'multipart/form-data': components['schemas']['PatchedUserDashboardLayout']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_layout_bulk_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserDashboardLayout']
+        'application/x-www-form-urlencoded': components['schemas']['UserDashboardLayout']
+        'multipart/form-data': components['schemas']['UserDashboardLayout']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserDashboardLayout']
+        }
+      }
+    }
+  }
+  dashboard_widgets_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDashboardWidgetList']
+        }
+      }
+    }
+  }
+  dashboard_widgets_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Widget dashboard. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DashboardWidget']
+        }
+      }
+    }
+  }
+  device_manufacturers_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeviceManufacturerList']
+        }
+      }
+    }
+  }
+  device_manufacturers_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['DeviceManufacturer']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceManufacturer']
+        'application/json': components['schemas']['DeviceManufacturer']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceManufacturer']
+        }
+      }
+    }
+  }
+  device_manufacturers_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Produttore. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceManufacturer']
+        }
+      }
+    }
+  }
+  device_manufacturers_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Produttore. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['DeviceManufacturer']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceManufacturer']
+        'application/json': components['schemas']['DeviceManufacturer']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceManufacturer']
+        }
+      }
+    }
+  }
+  device_manufacturers_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Produttore. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  device_manufacturers_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Produttore. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedDeviceManufacturer']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedDeviceManufacturer']
+        'application/json': components['schemas']['PatchedDeviceManufacturer']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceManufacturer']
+        }
+      }
+    }
+  }
+  device_rispacs_list: {
+    parameters: {
+      query?: {
+        device?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        rispacs?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeviceRispacsList']
+        }
+      }
+    }
+  }
+  device_rispacs_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceRispacs']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceRispacs']
+        'multipart/form-data': components['schemas']['DeviceRispacs']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceRispacs']
+        }
+      }
+    }
+  }
+  device_rispacs_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Associazione Device-RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceRispacs']
+        }
+      }
+    }
+  }
+  device_rispacs_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Associazione Device-RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceRispacs']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceRispacs']
+        'multipart/form-data': components['schemas']['DeviceRispacs']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceRispacs']
+        }
+      }
+    }
+  }
+  device_rispacs_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Associazione Device-RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  device_rispacs_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Associazione Device-RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedDeviceRispacs']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedDeviceRispacs']
+        'multipart/form-data': components['schemas']['PatchedDeviceRispacs']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceRispacs']
+        }
+      }
+    }
+  }
+  device_statuses_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeviceStatusList']
+        }
+      }
+    }
+  }
+  device_statuses_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceStatus']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceStatus']
+        'multipart/form-data': components['schemas']['DeviceStatus']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceStatus']
+        }
+      }
+    }
+  }
+  device_statuses_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Stato device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceStatus']
+        }
+      }
+    }
+  }
+  device_statuses_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Stato device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceStatus']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceStatus']
+        'multipart/form-data': components['schemas']['DeviceStatus']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceStatus']
+        }
+      }
+    }
+  }
+  device_statuses_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Stato device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  device_statuses_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Stato device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedDeviceStatus']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedDeviceStatus']
+        'multipart/form-data': components['schemas']['PatchedDeviceStatus']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceStatus']
+        }
+      }
+    }
+  }
+  device_types_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeviceTypeList']
+        }
+      }
+    }
+  }
+  device_types_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceType']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceType']
+        'multipart/form-data': components['schemas']['DeviceType']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceType']
+        }
+      }
+    }
+  }
+  device_types_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Tipo device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceType']
+        }
+      }
+    }
+  }
+  device_types_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Tipo device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceType']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceType']
+        'multipart/form-data': components['schemas']['DeviceType']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceType']
+        }
+      }
+    }
+  }
+  device_types_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Tipo device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  device_types_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Tipo device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedDeviceType']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedDeviceType']
+        'multipart/form-data': components['schemas']['PatchedDeviceType']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceType']
+        }
+      }
+    }
+  }
+  device_wifi_list: {
+    parameters: {
+      query?: {
+        device?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeviceWifiList']
+        }
+      }
+    }
+  }
+  device_wifi_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['DeviceWifi']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceWifi']
+        'application/json': components['schemas']['DeviceWifi']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceWifi']
+        }
+      }
+    }
+  }
+  device_wifi_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this WiFi device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceWifi']
+        }
+      }
+    }
+  }
+  device_wifi_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this WiFi device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['DeviceWifi']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceWifi']
+        'application/json': components['schemas']['DeviceWifi']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceWifi']
+        }
+      }
+    }
+  }
+  device_wifi_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this WiFi device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  device_wifi_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this WiFi device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedDeviceWifi']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedDeviceWifi']
+        'application/json': components['schemas']['PatchedDeviceWifi']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceWifi']
+        }
+      }
+    }
+  }
+  device_wifi_certificato_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this WiFi device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceWifi']
+        }
+      }
+    }
+  }
+  devices_list: {
+    parameters: {
+      query?: {
+        customer?: number
+        dose?: boolean
+        manufacturer?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        reparto?: string
+        rispacs?: boolean
+        /** @description A search term. */
+        search?: string
+        site?: number
+        status?: number
+        type?: number
+        vlan?: boolean
+        wifi?: boolean
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedDeviceListList']
+        }
+      }
+    }
+  }
+  devices_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceDetail']
+        'multipart/form-data': components['schemas']['DeviceDetail']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceDetail']
+        'multipart/form-data': components['schemas']['DeviceDetail']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  devices_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedDeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedDeviceDetail']
+        'multipart/form-data': components['schemas']['PatchedDeviceDetail']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceDetail']
+        'multipart/form-data': components['schemas']['DeviceDetail']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Device. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceDetail']
+        'multipart/form-data': components['schemas']['DeviceDetail']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceDetail']
+        'multipart/form-data': components['schemas']['DeviceDetail']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
+  devices_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeviceDetail']
+        'application/x-www-form-urlencoded': components['schemas']['DeviceDetail']
+        'multipart/form-data': components['schemas']['DeviceDetail']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeviceDetail']
+        }
+      }
+    }
+  }
   drive_files_list: {
     parameters: {
       query?: {
@@ -3826,6 +17125,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -4120,6 +17421,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         parent?: number
         /** @description A search term. */
         search?: string
@@ -4389,6 +17692,886 @@ export interface operations {
       }
     }
   }
+  expense_items_list: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseItem'][]
+        }
+      }
+    }
+  }
+  expense_items_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseItem']
+        }
+      }
+    }
+  }
+  expense_items_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedExpenseItem']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedExpenseItem']
+        'multipart/form-data': components['schemas']['PatchedExpenseItem']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseItem']
+        }
+      }
+    }
+  }
+  expense_km_rates_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TechnicianKmRate'][]
+        }
+      }
+    }
+  }
+  expense_km_rates_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TechnicianKmRate']
+        'application/x-www-form-urlencoded': components['schemas']['TechnicianKmRate']
+        'multipart/form-data': components['schemas']['TechnicianKmRate']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TechnicianKmRate']
+        }
+      }
+    }
+  }
+  expense_km_rates_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TechnicianKmRate']
+        }
+      }
+    }
+  }
+  expense_km_rates_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  expense_km_rates_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedTechnicianKmRate']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedTechnicianKmRate']
+        'multipart/form-data': components['schemas']['PatchedTechnicianKmRate']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TechnicianKmRate']
+        }
+      }
+    }
+  }
+  expense_km_trips_list: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseKmTrip'][]
+        }
+      }
+    }
+  }
+  expense_km_trips_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExpenseKmTrip']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseKmTrip']
+        'multipart/form-data': components['schemas']['ExpenseKmTrip']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseKmTrip']
+        }
+      }
+    }
+  }
+  expense_km_trips_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseKmTrip']
+        }
+      }
+    }
+  }
+  expense_km_trips_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExpenseKmTrip']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseKmTrip']
+        'multipart/form-data': components['schemas']['ExpenseKmTrip']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseKmTrip']
+        }
+      }
+    }
+  }
+  expense_km_trips_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  expense_km_trips_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedExpenseKmTrip']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedExpenseKmTrip']
+        'multipart/form-data': components['schemas']['PatchedExpenseKmTrip']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseKmTrip']
+        }
+      }
+    }
+  }
+  expense_receipts_list: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReceipt'][]
+        }
+      }
+    }
+  }
+  expense_receipts_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ExpenseReceipt']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseReceipt']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReceipt']
+        }
+      }
+    }
+  }
+  expense_receipts_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReceipt']
+        }
+      }
+    }
+  }
+  expense_receipts_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  expense_receipts_file_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReceipt']
+        }
+      }
+    }
+  }
+  expense_receipts_extract_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ExpenseReceipt']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseReceipt']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReceipt']
+        }
+      }
+    }
+  }
+  expense_reports_list: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport'][]
+        }
+      }
+    }
+  }
+  expense_reports_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExpenseReport']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseReport']
+        'multipart/form-data': components['schemas']['ExpenseReport']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  expense_reports_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedExpenseReport']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedExpenseReport']
+        'multipart/form-data': components['schemas']['PatchedExpenseReport']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_export_pdf_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_reject_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExpenseReport']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseReport']
+        'multipart/form-data': components['schemas']['ExpenseReport']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_submit_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExpenseReport']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseReport']
+        'multipart/form-data': components['schemas']['ExpenseReport']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_validate_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExpenseReport']
+        'application/x-www-form-urlencoded': components['schemas']['ExpenseReport']
+        'multipart/form-data': components['schemas']['ExpenseReport']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  expense_reports_meta_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExpenseReport']
+        }
+      }
+    }
+  }
+  feedback_items_list: {
+    parameters: {
+      query?: {
+        created_by?: number
+        has_screenshot?: boolean
+        kind?: string
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+        section?: string
+        status?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedReportRequestList']
+        }
+      }
+    }
+  }
+  feedback_items_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ReportRequest']
+        'application/x-www-form-urlencoded': components['schemas']['ReportRequest']
+        'application/json': components['schemas']['ReportRequest']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportRequest']
+        }
+      }
+    }
+  }
+  feedback_items_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Report / Request. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportRequest']
+        }
+      }
+    }
+  }
+  feedback_items_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Report / Request. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ReportRequest']
+        'application/x-www-form-urlencoded': components['schemas']['ReportRequest']
+        'application/json': components['schemas']['ReportRequest']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportRequest']
+        }
+      }
+    }
+  }
+  feedback_items_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Report / Request. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedReportRequest']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedReportRequest']
+        'application/json': components['schemas']['PatchedReportRequest']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportRequest']
+        }
+      }
+    }
+  }
+  feedback_items_screenshot_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Report / Request. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportRequest']
+        }
+      }
+    }
+  }
+  feedback_items_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportRequest']
+        }
+      }
+    }
+  }
+  health_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   inventories_list: {
     parameters: {
       query?: {
@@ -4397,6 +18580,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
         site?: number
@@ -4543,6 +18728,34 @@ export interface operations {
       }
     }
   }
+  inventories_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this inventory. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InventoryWrite']
+        'application/x-www-form-urlencoded': components['schemas']['InventoryWrite']
+        'multipart/form-data': components['schemas']['InventoryWrite']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InventoryWrite']
+        }
+      }
+    }
+  }
   inventories_restore_create: {
     parameters: {
       query?: never
@@ -4551,6 +18764,31 @@ export interface operations {
         /** @description A unique integer value identifying this inventory. */
         id: number
       }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InventoryWrite']
+        'application/x-www-form-urlencoded': components['schemas']['InventoryWrite']
+        'multipart/form-data': components['schemas']['InventoryWrite']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InventoryWrite']
+        }
+      }
+    }
+  }
+  inventories_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
       cookie?: never
     }
     requestBody: {
@@ -4645,10 +18883,10 @@ export interface operations {
   inventory_types_list: {
     parameters: {
       query?: {
+        is_active?: boolean
+        is_hw?: boolean
         /** @description Which field to use when ordering the results. */
         ordering?: string
-        /** @description A search term. */
-        search?: string
       }
       header?: never
       path?: never
@@ -4684,6 +18922,58 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['InventoryTypeLookup']
+        }
+      }
+    }
+  }
+  inventory_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InventoryWrite']
+        'application/x-www-form-urlencoded': components['schemas']['InventoryWrite']
+        'multipart/form-data': components['schemas']['InventoryWrite']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InventoryWrite']
+        }
+      }
+    }
+  }
+  inventory_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InventoryWrite']
+        'application/x-www-form-urlencoded': components['schemas']['InventoryWrite']
+        'multipart/form-data': components['schemas']['InventoryWrite']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InventoryWrite']
         }
       }
     }
@@ -4740,13 +19030,17 @@ export interface operations {
         assigned_to?: number
         category?: number
         customer?: number
-        deleted?: boolean
         due_after?: string
         due_before?: string
+        hide_closed?: boolean
+        inventory?: number
+        only_closed?: boolean
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /**
          * @description * `low` - Bassa
          *     * `medium` - Media
@@ -4760,10 +19054,11 @@ export interface operations {
         /**
          * @description * `open` - Aperta
          *     * `in_progress` - In lavorazione
+         *     * `waiting` - In attesa
          *     * `resolved` - Risolta
          *     * `closed` - Chiusa
          */
-        status?: ('closed' | 'in_progress' | 'open' | 'resolved')[]
+        status?: ('closed' | 'in_progress' | 'open' | 'resolved' | 'waiting')[]
       }
       header?: never
       path?: never
@@ -5034,6 +19329,142 @@ export interface operations {
       }
     }
   }
+  issues_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Issue']
+        'application/x-www-form-urlencoded': components['schemas']['Issue']
+        'multipart/form-data': components['schemas']['Issue']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Issue']
+        }
+      }
+    }
+  }
+  issues_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Issue']
+        }
+      }
+    }
+  }
+  leave_areas_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LeaveArea'][]
+        }
+      }
+    }
+  }
+  leave_areas_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Area piano ferie. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LeaveArea']
+        }
+      }
+    }
+  }
+  leave_holidays_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Holiday'][]
+        }
+      }
+    }
+  }
+  leave_holidays_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Festività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Holiday']
+        }
+      }
+    }
+  }
   maintenance_events_list: {
     parameters: {
       query?: {
@@ -5042,13 +19473,17 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         plan?: number
+        plan__customer?: number
         /**
          * @description * `ok` - OK
          *     * `ko` - KO
          *     * `partial` - Partial
+         *     * `not_planned` - Non prevista
          */
-        result?: 'ko' | 'ok' | 'partial'
+        result?: 'ko' | 'not_planned' | 'ok' | 'partial'
         /** @description A search term. */
         search?: string
         tech?: number
@@ -5193,6 +19628,77 @@ export interface operations {
       }
     }
   }
+  maintenance_events_delete_pdf_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Rapportino. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  maintenance_events_pdf_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Rapportino. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenanceEvent']
+        }
+      }
+    }
+  }
+  maintenance_events_reset_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Rapportino. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['MaintenanceEvent']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenanceEvent']
+        'application/json': components['schemas']['MaintenanceEvent']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenanceEvent']
+        }
+      }
+    }
+  }
   maintenance_events_restore_create: {
     parameters: {
       query?: never
@@ -5208,6 +19714,61 @@ export interface operations {
         'multipart/form-data': components['schemas']['MaintenanceEvent']
         'application/x-www-form-urlencoded': components['schemas']['MaintenanceEvent']
         'application/json': components['schemas']['MaintenanceEvent']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenanceEvent']
+        }
+      }
+    }
+  }
+  maintenance_events_set_not_planned_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Rapportino. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedMaintenanceEvent']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedMaintenanceEvent']
+        'application/json': components['schemas']['PatchedMaintenanceEvent']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenanceEvent']
+        }
+      }
+    }
+  }
+  maintenance_events_upload_pdf_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Rapportino. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['MaintenanceEvent']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenanceEvent']
       }
     }
     responses: {
@@ -5254,6 +19815,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         plan?: number
         /** @description A search term. */
         search?: string
@@ -5456,6 +20019,213 @@ export interface operations {
       }
     }
   }
+  maintenance_plan_inventories_list: {
+    parameters: {
+      query?: {
+        inventory?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        plan?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedMaintenancePlanInventoryList']
+        }
+      }
+    }
+  }
+  maintenance_plan_inventories_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MaintenancePlanInventory']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenancePlanInventory']
+        'multipart/form-data': components['schemas']['MaintenancePlanInventory']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlanInventory']
+        }
+      }
+    }
+  }
+  maintenance_plan_inventories_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Inventory nel piano. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlanInventory']
+        }
+      }
+    }
+  }
+  maintenance_plan_inventories_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Inventory nel piano. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MaintenancePlanInventory']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenancePlanInventory']
+        'multipart/form-data': components['schemas']['MaintenancePlanInventory']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlanInventory']
+        }
+      }
+    }
+  }
+  maintenance_plan_inventories_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Inventory nel piano. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  maintenance_plan_inventories_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Inventory nel piano. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedMaintenancePlanInventory']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedMaintenancePlanInventory']
+        'multipart/form-data': components['schemas']['PatchedMaintenancePlanInventory']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlanInventory']
+        }
+      }
+    }
+  }
+  maintenance_plan_inventories_reset_override_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Inventory nel piano. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MaintenancePlanInventory']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenancePlanInventory']
+        'multipart/form-data': components['schemas']['MaintenancePlanInventory']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlanInventory']
+        }
+      }
+    }
+  }
+  maintenance_plan_inventories_sync_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MaintenancePlanInventory']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenancePlanInventory']
+        'multipart/form-data': components['schemas']['MaintenancePlanInventory']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlanInventory']
+        }
+      }
+    }
+  }
   maintenance_plans_list: {
     parameters: {
       query?: {
@@ -5465,6 +20235,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /**
          * @description * `interval` - Interval
          *     * `fixed_date` - Fixed date
@@ -5613,6 +20385,34 @@ export interface operations {
       }
     }
   }
+  maintenance_plans_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Piano manutenzione. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MaintenancePlan']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenancePlan']
+        'multipart/form-data': components['schemas']['MaintenancePlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlan']
+        }
+      }
+    }
+  }
   maintenance_plans_restore_create: {
     parameters: {
       query?: never
@@ -5621,6 +20421,31 @@ export interface operations {
         /** @description A unique integer value identifying this Piano manutenzione. */
         id: number
       }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MaintenancePlan']
+        'application/x-www-form-urlencoded': components['schemas']['MaintenancePlan']
+        'multipart/form-data': components['schemas']['MaintenancePlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlan']
+        }
+      }
+    }
+  }
+  maintenance_plans_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
       cookie?: never
     }
     requestBody: {
@@ -5755,6 +20580,997 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+    }
+  }
+  monitors_list: {
+    parameters: {
+      query?: {
+        inventory?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        radinet?: boolean
+        /** @description A search term. */
+        search?: string
+        /**
+         * @description * `in_uso` - In uso
+         *     * `da_installare` - Da installare
+         *     * `guasto` - Guasto
+         *     * `rma` - RMA
+         */
+        stato?: 'da_installare' | 'guasto' | 'in_uso' | 'rma'
+        /**
+         * @description * `amministrativo` - Amministrativo
+         *     * `diagnostico` - Diagnostico
+         */
+        tipo?: 'amministrativo' | 'diagnostico'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedMonitorList']
+        }
+      }
+    }
+  }
+  monitors_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Monitor']
+        'application/x-www-form-urlencoded': components['schemas']['Monitor']
+        'multipart/form-data': components['schemas']['Monitor']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Monitor. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Monitor. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Monitor']
+        'application/x-www-form-urlencoded': components['schemas']['Monitor']
+        'multipart/form-data': components['schemas']['Monitor']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Monitor. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  monitors_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Monitor. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedMonitor']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedMonitor']
+        'multipart/form-data': components['schemas']['PatchedMonitor']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Monitor. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Monitor']
+        'application/x-www-form-urlencoded': components['schemas']['Monitor']
+        'multipart/form-data': components['schemas']['Monitor']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Monitor. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Monitor']
+        'application/x-www-form-urlencoded': components['schemas']['Monitor']
+        'multipart/form-data': components['schemas']['Monitor']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Monitor']
+        'application/x-www-form-urlencoded': components['schemas']['Monitor']
+        'multipart/form-data': components['schemas']['Monitor']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  monitors_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Monitor']
+        'application/x-www-form-urlencoded': components['schemas']['Monitor']
+        'multipart/form-data': components['schemas']['Monitor']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
+  notifications_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedNotificationList']
+        }
+      }
+    }
+  }
+  notifications_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Notification']
+        }
+      }
+    }
+  }
+  notifications_mark_read_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['Notification']
+        'application/x-www-form-urlencoded': components['schemas']['Notification']
+        'multipart/form-data': components['schemas']['Notification']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Notification']
+        }
+      }
+    }
+  }
+  notifications_mark_all_read_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['Notification']
+        'application/x-www-form-urlencoded': components['schemas']['Notification']
+        'multipart/form-data': components['schemas']['Notification']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Notification']
+        }
+      }
+    }
+  }
+  notifications_unread_count_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Notification']
+        }
+      }
+    }
+  }
+  portal_config_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  portal_me_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  portal_switch_customer_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  purchase_order_entries_list: {
+    parameters: {
+      query?: {
+        amount_mode?: string
+        customer?: number
+        invoiced?: boolean
+        /**
+         * @description * `ordinario` - Ordinario
+         *     * `extra` - Extra
+         */
+        kind?: ('extra' | 'ordinario')[]
+        offer_date_after?: string
+        offer_date_before?: string
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+        /**
+         * @description * `inserito` - Inserito
+         *     * `inviato` - Inviato
+         *     * `ricevuto` - Ricevuto
+         *     * `fatturato` - Fatturato
+         */
+        status?: ('fatturato' | 'inserito' | 'inviato' | 'ricevuto')[]
+        year?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedPurchaseOrderEntryList']
+        }
+      }
+    }
+  }
+  purchase_order_entries_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  purchase_order_entries_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedPurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedPurchaseOrderEntry']
+        'application/json': components['schemas']['PatchedPurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_advance_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_documents_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_documents_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_documents_retrieve_2: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        doc_pk: string
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_documents_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        doc_pk: string
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  purchase_order_entries_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_revert_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Purchase Order. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseOrderEntry']
+        'application/x-www-form-urlencoded': components['schemas']['PurchaseOrderEntry']
+        'application/json': components['schemas']['PurchaseOrderEntry']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  purchase_order_entries_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderEntry']
+        }
+      }
+    }
+  }
+  rispacs_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedRispacsList']
+        }
+      }
+    }
+  }
+  rispacs_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Rispacs']
+        'application/x-www-form-urlencoded': components['schemas']['Rispacs']
+        'multipart/form-data': components['schemas']['Rispacs']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Rispacs']
+        }
+      }
+    }
+  }
+  rispacs_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Sistema RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Rispacs']
+        }
+      }
+    }
+  }
+  rispacs_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Sistema RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Rispacs']
+        'application/x-www-form-urlencoded': components['schemas']['Rispacs']
+        'multipart/form-data': components['schemas']['Rispacs']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Rispacs']
+        }
+      }
+    }
+  }
+  rispacs_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Sistema RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  rispacs_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Sistema RIS/PACS. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedRispacs']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedRispacs']
+        'multipart/form-data': components['schemas']['PatchedRispacs']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Rispacs']
+        }
       }
     }
   }
@@ -5908,6 +21724,937 @@ export interface operations {
       }
     }
   }
+  sellers_list: {
+    parameters: {
+      query?: {
+        is_active?: boolean
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+        user?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedSellerList']
+        }
+      }
+    }
+  }
+  sellers_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Seller']
+        'application/x-www-form-urlencoded': components['schemas']['Seller']
+        'multipart/form-data': components['schemas']['Seller']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this seller. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this seller. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Seller']
+        'application/x-www-form-urlencoded': components['schemas']['Seller']
+        'multipart/form-data': components['schemas']['Seller']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this seller. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  sellers_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this seller. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedSeller']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedSeller']
+        'multipart/form-data': components['schemas']['PatchedSeller']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this seller. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Seller']
+        'application/x-www-form-urlencoded': components['schemas']['Seller']
+        'multipart/form-data': components['schemas']['Seller']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this seller. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Seller']
+        'application/x-www-form-urlencoded': components['schemas']['Seller']
+        'multipart/form-data': components['schemas']['Seller']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Seller']
+        'application/x-www-form-urlencoded': components['schemas']['Seller']
+        'multipart/form-data': components['schemas']['Seller']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  sellers_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Seller']
+        'application/x-www-form-urlencoded': components['schemas']['Seller']
+        'multipart/form-data': components['schemas']['Seller']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Seller']
+        }
+      }
+    }
+  }
+  servicenow_case_types_list: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `philips` - Philips
+         *     * `biotron` - Biotron
+         */
+        category?: 'biotron' | 'philips'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCaseType'][]
+        }
+      }
+    }
+  }
+  servicenow_case_types_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Type ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCaseType']
+        }
+      }
+    }
+  }
+  servicenow_cases_list: {
+    parameters: {
+      query?: {
+        assigned_to?: number
+        case_type?: number[]
+        /**
+         * @description * `philips` - Philips
+         *     * `biotron` - Biotron
+         */
+        category?: ('biotron' | 'philips')[]
+        number?: string
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /**
+         * @description * `1` - 1 - Critical
+         *     * `2` - 2 - High
+         *     * `3` - 3 - Moderate
+         *     * `4` - 4 - Low
+         */
+        priority?: ('1' | '2' | '3' | '4')[]
+        /** @description A search term. */
+        search?: string
+        /**
+         * @description * `open` - Aperto
+         *     * `in_progress` - In lavorazione
+         *     * `closed` - Chiuso
+         */
+        status?: ('closed' | 'in_progress' | 'open')[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedServiceNowCaseList']
+        }
+      }
+    }
+  }
+  servicenow_cases_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+        'application/json': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+        'application/json': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  servicenow_cases_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['PatchedServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedServiceNowCase']
+        'application/json': components['schemas']['PatchedServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+        'application/json': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_screenshot_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this ServiceNow Case. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+        'application/json': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_extract_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_import_historical_commit_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_import_historical_preview_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ServiceNowCase']
+        'application/x-www-form-urlencoded': components['schemas']['ServiceNowCase']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_notification_settings_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_stats_export_pdf_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_cases_triage_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceNowCase']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_list: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `mattina` - Mattina
+         *     * `pomeriggio` - Pomeriggio
+         */
+        day_part?: 'mattina' | 'pomeriggio'
+        /**
+         * @description * `ferie` - Ferie
+         *     * `malattia` - Malattia/Infortunio
+         *     * `permesso_104` - 104
+         *     * `training` - Training
+         *     * `trasferta` - Trasferta
+         *     * `altro` - Altro
+         */
+        reason?: 'altro' | 'ferie' | 'malattia' | 'permesso_104' | 'training' | 'trasferta'
+        user?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence'][]
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SnTechnicianAbsence']
+        'application/x-www-form-urlencoded': components['schemas']['SnTechnicianAbsence']
+        'multipart/form-data': components['schemas']['SnTechnicianAbsence']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  servicenow_technician_absences_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedSnTechnicianAbsence']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedSnTechnicianAbsence']
+        'multipart/form-data': components['schemas']['PatchedSnTechnicianAbsence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Assenza / attività. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SnTechnicianAbsence']
+        'application/x-www-form-urlencoded': components['schemas']['SnTechnicianAbsence']
+        'multipart/form-data': components['schemas']['SnTechnicianAbsence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SnTechnicianAbsence']
+        'application/x-www-form-urlencoded': components['schemas']['SnTechnicianAbsence']
+        'multipart/form-data': components['schemas']['SnTechnicianAbsence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_full_day_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SnTechnicianAbsence']
+        'application/x-www-form-urlencoded': components['schemas']['SnTechnicianAbsence']
+        'multipart/form-data': components['schemas']['SnTechnicianAbsence']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
+  servicenow_technician_absences_technicians_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SnTechnicianAbsence']
+        }
+      }
+    }
+  }
   site_statuses_list: {
     parameters: {
       query?: {
@@ -5962,6 +22709,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
         status?: number
@@ -6106,6 +22855,34 @@ export interface operations {
       }
     }
   }
+  sites_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Sito. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Site']
+        'application/x-www-form-urlencoded': components['schemas']['Site']
+        'multipart/form-data': components['schemas']['Site']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Site']
+        }
+      }
+    }
+  }
   sites_restore_create: {
     parameters: {
       query?: never
@@ -6114,6 +22891,31 @@ export interface operations {
         /** @description A unique integer value identifying this Sito. */
         id: number
       }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Site']
+        'application/x-www-form-urlencoded': components['schemas']['Site']
+        'multipart/form-data': components['schemas']['Site']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Site']
+        }
+      }
+    }
+  }
+  sites_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
       cookie?: never
     }
     requestBody: {
@@ -6159,6 +22961,60 @@ export interface operations {
       }
     }
   }
+  sticky_note_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  sticky_note_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  system_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   techs_list: {
     parameters: {
       query?: {
@@ -6167,6 +23023,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -6310,6 +23168,34 @@ export interface operations {
       }
     }
   }
+  techs_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Tecnico. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Tech']
+        'application/x-www-form-urlencoded': components['schemas']['Tech']
+        'multipart/form-data': components['schemas']['Tech']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Tech']
+        }
+      }
+    }
+  }
   techs_restore_create: {
     parameters: {
       query?: never
@@ -6318,6 +23204,31 @@ export interface operations {
         /** @description A unique integer value identifying this Tecnico. */
         id: number
       }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Tech']
+        'application/x-www-form-urlencoded': components['schemas']['Tech']
+        'multipart/form-data': components['schemas']['Tech']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Tech']
+        }
+      }
+    }
+  }
+  techs_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
       cookie?: never
     }
     requestBody: {
@@ -6359,6 +23270,154 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Tech']
+        }
+      }
+    }
+  }
+  user_tasks_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedUserTaskList']
+        }
+      }
+    }
+  }
+  user_tasks_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserTask']
+        'application/x-www-form-urlencoded': components['schemas']['UserTask']
+        'multipart/form-data': components['schemas']['UserTask']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserTask']
+        }
+      }
+    }
+  }
+  user_tasks_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserTask']
+        }
+      }
+    }
+  }
+  user_tasks_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserTask']
+        'application/x-www-form-urlencoded': components['schemas']['UserTask']
+        'multipart/form-data': components['schemas']['UserTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserTask']
+        }
+      }
+    }
+  }
+  user_tasks_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  user_tasks_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedUserTask']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedUserTask']
+        'multipart/form-data': components['schemas']['PatchedUserTask']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserTask']
         }
       }
     }
@@ -6409,6 +23468,562 @@ export interface operations {
       }
     }
   }
+  vlan_ip_requests_list: {
+    parameters: {
+      query?: {
+        customer?: number
+        modalita?: string
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+        /**
+         * @description * `pending` - In attesa
+         *     * `approved` - Approvata
+         *     * `rejected` - Rifiutata
+         */
+        stato?: 'approved' | 'pending' | 'rejected'
+        vlan?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedVlanIpRequestList']
+        }
+      }
+    }
+  }
+  vlan_ip_requests_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VlanIpRequest']
+        'application/x-www-form-urlencoded': components['schemas']['VlanIpRequest']
+        'multipart/form-data': components['schemas']['VlanIpRequest']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VlanIpRequest']
+        }
+      }
+    }
+  }
+  vlan_ip_requests_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Richiesta IP VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VlanIpRequest']
+        }
+      }
+    }
+  }
+  vlan_ip_requests_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Richiesta IP VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VlanIpRequest']
+        'application/x-www-form-urlencoded': components['schemas']['VlanIpRequest']
+        'multipart/form-data': components['schemas']['VlanIpRequest']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VlanIpRequest']
+        }
+      }
+    }
+  }
+  vlan_ip_requests_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Richiesta IP VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  vlan_ip_requests_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Richiesta IP VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedVlanIpRequest']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedVlanIpRequest']
+        'multipart/form-data': components['schemas']['PatchedVlanIpRequest']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VlanIpRequest']
+        }
+      }
+    }
+  }
+  vlan_ip_requests_approve_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Richiesta IP VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VlanIpRequest']
+        'application/x-www-form-urlencoded': components['schemas']['VlanIpRequest']
+        'multipart/form-data': components['schemas']['VlanIpRequest']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VlanIpRequest']
+        }
+      }
+    }
+  }
+  vlan_ip_requests_reject_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Richiesta IP VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VlanIpRequest']
+        'application/x-www-form-urlencoded': components['schemas']['VlanIpRequest']
+        'multipart/form-data': components['schemas']['VlanIpRequest']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VlanIpRequest']
+        }
+      }
+    }
+  }
+  vlans_list: {
+    parameters: {
+      query?: {
+        customer?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+        site?: number
+        vlan_id?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedVlanList']
+        }
+      }
+    }
+  }
+  vlans_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  vlans_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedVlan']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedVlan']
+        'multipart/form-data': components['schemas']['PatchedVlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_exclude_ip_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_ip_pool_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_unexclude_ip_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this VLAN. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_bulk_purge_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
+  vlans_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Vlan']
+        'application/x-www-form-urlencoded': components['schemas']['Vlan']
+        'multipart/form-data': components['schemas']['Vlan']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Vlan']
+        }
+      }
+    }
+  }
   wiki_attachments_list: {
     parameters: {
       query?: {
@@ -6417,6 +24032,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -6560,6 +24177,50 @@ export interface operations {
       }
     }
   }
+  wiki_attachments_download_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Allegato. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiAttachment']
+        }
+      }
+    }
+  }
+  wiki_attachments_preview_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Allegato. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiAttachment']
+        }
+      }
+    }
+  }
   wiki_attachments_restore_create: {
     parameters: {
       query?: never
@@ -6645,6 +24306,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -6855,6 +24518,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
       }
@@ -7060,8 +24725,11 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
         /** @description A search term. */
         search?: string
+        slug?: string
       }
       header?: never
       path?: never
@@ -7225,6 +24893,34 @@ export interface operations {
       }
     }
   }
+  wiki_pages_rate_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Pagina. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiPage']
+        'application/x-www-form-urlencoded': components['schemas']['WikiPage']
+        'multipart/form-data': components['schemas']['WikiPage']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiPage']
+        }
+      }
+    }
+  }
   wiki_pages_render_retrieve: {
     parameters: {
       query?: never
@@ -7328,6 +25024,407 @@ export interface operations {
       }
     }
   }
+  wiki_pages_slug_availability_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiPage']
+        }
+      }
+    }
+  }
+  wiki_queries_list: {
+    parameters: {
+      query?: {
+        language?: number
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedWikiQueryList']
+        }
+      }
+    }
+  }
+  wiki_queries_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQuery']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQuery']
+        'multipart/form-data': components['schemas']['WikiQuery']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_queries_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_queries_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQuery']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQuery']
+        'multipart/form-data': components['schemas']['WikiQuery']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_queries_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  wiki_queries_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedWikiQuery']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedWikiQuery']
+        'multipart/form-data': components['schemas']['PatchedWikiQuery']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_queries_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQuery']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQuery']
+        'multipart/form-data': components['schemas']['WikiQuery']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_queries_use_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQuery']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQuery']
+        'multipart/form-data': components['schemas']['WikiQuery']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_queries_bulk_restore_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQuery']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQuery']
+        'multipart/form-data': components['schemas']['WikiQuery']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQuery']
+        }
+      }
+    }
+  }
+  wiki_query_languages_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQueryLanguage'][]
+        }
+      }
+    }
+  }
+  wiki_query_languages_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQueryLanguage']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQueryLanguage']
+        'multipart/form-data': components['schemas']['WikiQueryLanguage']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQueryLanguage']
+        }
+      }
+    }
+  }
+  wiki_query_languages_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Linguaggio query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQueryLanguage']
+        }
+      }
+    }
+  }
+  wiki_query_languages_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Linguaggio query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiQueryLanguage']
+        'application/x-www-form-urlencoded': components['schemas']['WikiQueryLanguage']
+        'multipart/form-data': components['schemas']['WikiQueryLanguage']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQueryLanguage']
+        }
+      }
+    }
+  }
+  wiki_query_languages_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Linguaggio query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  wiki_query_languages_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Linguaggio query. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedWikiQueryLanguage']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedWikiQueryLanguage']
+        'multipart/form-data': components['schemas']['PatchedWikiQueryLanguage']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiQueryLanguage']
+        }
+      }
+    }
+  }
   wiki_revisions_list: {
     parameters: {
       query?: {
@@ -7335,6 +25432,8 @@ export interface operations {
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
       }
       header?: never
       path?: never
@@ -7353,6 +25452,28 @@ export interface operations {
     }
   }
   wiki_revisions_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Revisione. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiPageRevision']
+        }
+      }
+    }
+  }
+  wiki_revisions_render_retrieve: {
     parameters: {
       query?: never
       header?: never

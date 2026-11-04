@@ -1,11 +1,12 @@
 import * as React from 'react'
-import { Box, Chip, IconButton, Tooltip, Typography } from '@mui/material'
+import { Box, ButtonBase, Chip, IconButton, Tooltip, Typography } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 
 import type { Tone } from './types'
 import { FS, ICON, toneColors, issuePriorityTone, copyText, MonoField } from './style'
+import { RADIUS, LABEL_COLOR } from './tokens'
 import { SHARED } from '../../theme/constants'
 
 // ─── SignalChip — badge "segnale" ──────────────────────────────────────────────
@@ -109,46 +110,61 @@ export function MetaTag({
   )
 }
 
-// ─── ActionButton — pulsante quadrato Info/Modifica ─────────────────────────────
+// ─── ActionButton — pulsante azione di riga ─────────────────────────────────────
+// Con `label` mostra anche il testo da `labelFrom` in su: le icone nude (nota,
+// VPN, contatti, info) si capivano solo passandoci sopra col mouse. Sotto quel
+// breakpoint resta l'icona quadrata da 36px con aria-label e tooltip.
 
 export function ActionButton({
-  icon, tone = 'neutral', onClick, ariaLabel, title,
+  icon, tone = 'neutral', onClick, ariaLabel, title, label, labelFrom = 'lg',
 }: {
   icon: React.ReactElement
-  tone?: 'info' | 'neutral' | 'success' | 'danger'
+  tone?: 'info' | 'neutral' | 'success' | 'danger' | 'warning'
   onClick?: (e: React.MouseEvent) => void
   ariaLabel: string
   title?: string
+  label?: string
+  labelFrom?: 'sm' | 'md' | 'lg' | 'xl'
 }) {
   const theme = useTheme()
   const paletteColor = {
     info: theme.palette.info,
     success: theme.palette.success,
     danger: theme.palette.error,
-  }[tone as 'info' | 'success' | 'danger']
+    warning: theme.palette.warning,
+  }[tone as 'info' | 'success' | 'danger' | 'warning']
   const isNeutral = tone === 'neutral'
+  const colors = {
+    border: isNeutral ? alpha(theme.palette.text.secondary, 0.28) : alpha(paletteColor.main, 0.28),
+    bg: isNeutral ? 'background.paper' : alpha(paletteColor.main, 0.10),
+    fg: isNeutral ? 'grey.700' : paletteColor.dark,
+    hoverBg: isNeutral ? 'action.hover' : alpha(paletteColor.main, 0.20),
+    hoverBorder: isNeutral ? 'text.secondary' : paletteColor.main,
+  }
   const btn = (
-    <IconButton
-      size="small"
+    <ButtonBase
       aria-label={ariaLabel}
       onClick={onClick}
+      onKeyDown={(e) => e.stopPropagation()}
       sx={{
-        width: 32, height: 32, p: 0, borderRadius: '8px', flexShrink: 0,
-        border: '1px solid',
-        borderColor: isNeutral ? alpha(theme.palette.text.secondary, 0.28) : alpha(paletteColor.main, 0.28),
-        bgcolor: isNeutral ? 'background.paper' : alpha(paletteColor.main, 0.10),
-        color: isNeutral ? 'text.secondary' : paletteColor.dark,
-        cursor: onClick ? 'pointer' : 'default',
-        '&:hover': onClick ? {
-          bgcolor: isNeutral ? 'action.hover' : alpha(paletteColor.main, 0.20),
-          borderColor: isNeutral ? 'text.secondary' : paletteColor.main,
-          color: isNeutral ? 'primary.main' : paletteColor.dark,
-        } : {},
+        minWidth: 36, height: 36, px: label ? { xs: 0, [labelFrom]: 1.25 } : 0,
+        gap: 0.75, borderRadius: RADIUS, flexShrink: 0,
+        border: '1px solid', borderColor: colors.border,
+        bgcolor: colors.bg, color: colors.fg,
+        fontSize: FS.label, fontWeight: 600, fontFamily: 'inherit',
+        transition: 'background 0.15s, border-color 0.15s',
+        '&:hover': onClick ? { bgcolor: colors.hoverBg, borderColor: colors.hoverBorder } : {},
+        '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
         '& svg': { fontSize: ICON.feature },
       }}
     >
       {icon}
-    </IconButton>
+      {label ? (
+        <Box component="span" aria-hidden="true" sx={{ display: { xs: 'none', [labelFrom]: 'inline' }, whiteSpace: 'nowrap' }}>
+          {label}
+        </Box>
+      ) : null}
+    </ButtonBase>
   )
   return title ? <Tooltip title={title} arrow>{btn}</Tooltip> : btn
 }
@@ -169,19 +185,27 @@ export function CountStat({
     <Tooltip title={tooltip} arrow>
       <Box
         onClick={onClick}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        aria-label={`${value} ${label}: ${tooltip.toLowerCase()}`}
+        onKeyDown={onClick ? (e) => {
+          e.stopPropagation()
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e as unknown as React.MouseEvent) }
+        } : undefined}
         sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minWidth: 42, px: 0.5, py: 0.25, borderRadius: '6px',
+          minWidth: 44, px: 0.5, py: 0.25, borderRadius: RADIUS,
           cursor: onClick ? 'pointer' : 'default',
           transition: 'background 0.15s',
           '&:hover': onClick ? { bgcolor: 'action.hover' } : undefined,
+          '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
         }}
       >
         <Typography sx={{ fontWeight: 800, lineHeight: 1, fontSize: FS.title, color: 'text.primary' }}>
           {value}
         </Typography>
-        <Typography sx={{ fontSize: FS.micro, fontWeight: 700, color: 'text.secondary', opacity: 0.85, lineHeight: 1.3, letterSpacing: '0.05em' }}>
-          {label.toUpperCase()}
+        <Typography sx={{ fontSize: FS.micro, fontWeight: 600, color: LABEL_COLOR, lineHeight: 1.3 }}>
+          {label}
         </Typography>
       </Box>
     </Tooltip>
@@ -192,14 +216,15 @@ export function CountStat({
 // Stessa taglia/fontFamily dei campi K#/Seriale (monoFieldSx): l'IP è un campo
 // tecnico come gli altri, deve avere lo stesso peso visivo in riga.
 
-export function IpCell({ ip }: { ip?: string | null }) {
+export function IpCell({ ip, query }: { ip?: string | null; query?: string }) {
   if (!ip) return <Typography sx={{ fontSize: FS.body, color: 'text.disabled' }}>—</Typography>
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <MonoField value={ip} sx={{ color: 'text.primary' }} />
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+      <MonoField value={ip} query={query} sx={{ color: 'text.primary' }} />
       <Tooltip title="Copia IP">
-        <IconButton size="small" onClick={(e) => { e.stopPropagation(); void copyText(ip) }}
-          sx={{ opacity: 0.35, '&:hover': { opacity: 1 }, p: 0.25 }}>
+        <IconButton size="small" aria-label={`Copia IP ${ip}`} onClick={(e) => { e.stopPropagation(); void copyText(ip) }}
+          onKeyDown={(e) => e.stopPropagation()}
+          sx={{ opacity: 0.55, '&:hover, &:focus-visible': { opacity: 1 }, p: 0.25 }}>
           <ContentCopyIcon sx={{ fontSize: ICON.inline }} />
         </IconButton>
       </Tooltip>

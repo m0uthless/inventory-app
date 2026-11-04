@@ -52,6 +52,7 @@ export default function GridPaginationFooter({
         </Typography>
       </Box>
 
+      {rowCount > 0 ? (
       <Pagination
         shape="rounded"
         page={paginationModel.page + 1}
@@ -95,6 +96,11 @@ export default function GridPaginationFooter({
           },
         }}
       />
+      ) : (
+        // Nessuna riga: niente paginatore (mostrerebbe una pagina "1" vuota),
+        // ma la cella resta per non spostare il contatore nella griglia a 3 colonne.
+        <Box />
+      )}
 
       <Box sx={{ display: { xs: 'none', sm: 'block' } }} />
     </Box>

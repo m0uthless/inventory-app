@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "attendance.apps.AttendanceConfig",
     "expenses.apps.ExpensesConfig",
     "purchaseorders.apps.PurchaseOrdersConfig",
+    "contracts.apps.ContractsConfig",
 ]
 
 # --- CSRF / Origin handling ---
@@ -223,7 +224,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.9.4",
+    "VERSION": "0.10.0",
 }
 
 REST_FRAMEWORK = {

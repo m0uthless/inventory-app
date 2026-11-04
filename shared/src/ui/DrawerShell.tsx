@@ -288,7 +288,7 @@ export function DrawerShell({
   const resolvedStatusSlot = statusSlot ?? (
     <Stack direction="row" alignItems="center" spacing={0.75}>
       <Tooltip title="Chiudi">
-        <IconButton size="small" onClick={onClose} sx={HERO_ICON_BTN_SX}>
+        <IconButton size="small" onClick={onClose} sx={HERO_ICON_BTN_SX} aria-label="Chiudi">
           <ArrowBackIcon fontSize="small" />
         </IconButton>
       </Tooltip>
@@ -333,13 +333,21 @@ export function DrawerShell({
       <Tabs
         value={tabValue}
         onChange={(_, v: number) => onTabChange?.(v)}
+        // Con 6-7 tab (es. Cliente) la barra supera la larghezza del drawer:
+        // scrollabile con frecce, così le ultime tab restano raggiungibili.
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         sx={{
           minHeight: 0,
+          minWidth: 0,
+          flex: '0 1 auto',
+          '& .MuiTabs-scrollButtons': { color: '#fff', width: 28, '&.Mui-disabled': { opacity: 0 } },
           '& .MuiTabs-indicator': { bgcolor: 'rgba(255,255,255,0.9)', height: 2, borderRadius: 1 },
           '& .MuiTab-root': {
             minHeight: 0, minWidth: 0, px: 1.25, py: 0.5,
             fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.55)',
+            color: 'rgba(255,255,255,0.75)',
             '&.Mui-selected': { color: '#fff' },
           },
         }}
@@ -396,7 +404,8 @@ export function DrawerShell({
                 </Typography>
               ) : null}
             </Stack>
-            <Stack direction="row" spacing={0.75}>
+            {/* Su touch Modifica ed Elimina più distanziate: un tocco impreciso non deve finire sul cestino. */}
+            <Stack direction="row" spacing={{ xs: 1.5, sm: 0.75 }}>
               {resolvedActions}
             </Stack>
           </Stack>
@@ -421,7 +430,7 @@ export function DrawerShell({
               </Typography>
             </Stack>
             {subtitle ? (
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.58)', mt: icon ? 0 : 0.5 }}>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mt: icon ? 0 : 0.5 }}>
                 {subtitle}
               </Typography>
             ) : null}

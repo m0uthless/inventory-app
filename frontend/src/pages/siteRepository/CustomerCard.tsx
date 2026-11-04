@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Box, Collapse, Dialog, DialogContent, DialogTitle, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material'
+import { Box, Collapse, Dialog, DialogContent, DialogTitle, IconButton, Tab, Tabs, Typography } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
@@ -13,7 +13,7 @@ import StatusChip from '@shared/ui/StatusChip'
 import { isRecord } from '@shared/utils/guards'
 
 import type { CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
-import { FS, ICON, MonoField } from './style'
+import { FS, ICON, Highlight, MonoField } from './style'
 import { MetaTag, ActionButton, CountStat } from './primitives'
 import { SitesWithInventoryTab } from './SitesWithInventoryTab'
 import { InventoryFlatTab } from './InventoryFlatTab'
@@ -82,6 +82,8 @@ export function CustomerCard({
 
   const zebraBg = rowIndex % 2 === 0 ? 'background.paper' : alpha(theme.palette.primary.main, 0.025)
   const addressLine = React.useMemo(() => customerAddressFromRow(customer), [customer])
+  const customerName = customer.display_name || customer.name
+  const hasNotes = Boolean(customer.notes && customer.notes.trim().length > 0)
 
   return (
     <Box sx={{
@@ -96,6 +98,7 @@ export function CustomerCard({
         tabIndex={0}
         aria-expanded={expanded}
         aria-controls={contentId}
+        aria-label={`Cliente ${customerName}`}
         onClick={() => setExpanded((p) => !p)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -105,7 +108,17 @@ export function CustomerCard({
         }}
         onContextMenu={(e) => { e.preventDefault(); onCustomerContextMenu(customer, e) }}
         sx={{
-          display: 'flex', alignItems: 'center', gap: 1.5,
+          // Da md in su: identità a sinistra, contatori e azioni a destra.
+          // Sotto md due righe: prima il nome a tutta larghezza (prima a 390px
+          // restavano 1-3 lettere), poi contatori e azioni.
+          display: 'grid',
+          gridTemplateColumns: { xs: 'minmax(0, 1fr) auto', md: 'minmax(0, 1fr) auto auto' },
+          gridTemplateAreas: {
+            xs: '"id chevron" "actions actions"',
+            md: '"id actions chevron"',
+          },
+          alignItems: 'center',
+          columnGap: 1.5, rowGap: 1,
           px: 2, py: 1.25, cursor: 'pointer',
           bgcolor: 'transparent',
           '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) },
@@ -116,39 +129,41 @@ export function CustomerCard({
           },
         }}
       >
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
-            <Typography fontWeight={600} sx={{
-              fontSize: FS.title,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {customer.display_name || customer.name}
+        <Box sx={{ gridArea: 'id', minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 1, rowGap: 0.5, minWidth: 0 }}>
+            <Typography fontWeight={700} sx={{ fontSize: FS.title, minWidth: 0, overflowWrap: 'anywhere' }}>
+              <Highlight text={customerName} query={searchQuery} />
             </Typography>
-            <MonoField value={customer.code} sx={{ flexShrink: 0 }} />
+            <MonoField value={customer.code} query={searchQuery} sx={{ flexShrink: 0 }} />
             {(customer.tags ?? []).length > 0 && (
               <MetaTag label={(customer.tags ?? [])[0]} sx={{ flexShrink: 0 }} />
             )}
-            <StatusChip statusId={customer.status ?? undefined} label={customer.status_label} size="small" sx={{ flexShrink: 0, fontWeight: 700 }} />
-            {customer.primary_contact_name && (
-              <Typography
-                onClick={canViewCustomer ? (e) => { e.stopPropagation(); onOpenCustomer(customer.id) } : undefined}
-                sx={{
-                  fontSize: FS.micro,
-                  color: canViewCustomer ? 'primary.main' : 'text.secondary',
-                  cursor: canViewCustomer ? 'pointer' : 'default',
-                  minWidth: 0,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  ...(canViewCustomer ? { '&:hover': { textDecoration: 'underline' } } : {}),
-                }}
-              >
-                {customer.primary_contact_name}
-                {customer.primary_contact_phone ? ` · ${customer.primary_contact_phone}` : ''}
-              </Typography>
-            )}
+            {customer.status_label ? (
+              <StatusChip statusId={customer.status ?? undefined} label={customer.status_label} size="small" sx={{ flexShrink: 0, fontWeight: 700 }} />
+            ) : null}
           </Box>
+          {customer.primary_contact_name && (
+            <Typography
+              component={canViewCustomer ? 'button' : 'span'}
+              onClick={canViewCustomer ? (e: React.MouseEvent) => { e.stopPropagation(); onOpenCustomer(customer.id) } : undefined}
+              onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+              sx={{
+                display: 'block', p: 0, border: 0, bgcolor: 'transparent', font: 'inherit', textAlign: 'left',
+                fontSize: FS.body,
+                color: canViewCustomer ? 'primary.dark' : 'text.secondary',
+                cursor: canViewCustomer ? 'pointer' : 'default',
+                maxWidth: '100%',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                ...(canViewCustomer ? { '&:hover': { textDecoration: 'underline' } } : {}),
+              }}
+            >
+              {customer.primary_contact_name}
+              {customer.primary_contact_phone ? ` · ${customer.primary_contact_phone}` : ''}
+            </Typography>
+          )}
           {addressLine && (
             <Typography color="text.secondary" sx={{
-              fontSize: FS.micro,
+              fontSize: FS.body,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
             }}>
               {addressLine}
@@ -156,103 +171,77 @@ export function CustomerCard({
           )}
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-
-          {/* Pulsanti azione — Note/VPN, senza Info (spostato accanto al conteggio asset) */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-            {/* Note — solo icona, click apre modal con il testo completo (niente più tooltip handover) */}
-            {customer.notes && customer.notes.trim().length > 0 && (
-              <Tooltip title="Note cliente" arrow>
-                <Box
-                  onClick={(e) => { e.stopPropagation(); setNoteModalOpen(true) }}
-                  sx={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
-                    bgcolor: alpha(theme.palette.warning.main, 0.10),
-                    border: `1px solid ${alpha(theme.palette.warning.main, 0.28)}`,
-                    cursor: 'pointer',
-                    transition: 'background 0.15s',
-                    '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.20) },
-                  }}
-                >
-                  <NoteAltOutlinedIcon sx={{ fontSize: ICON.feature, color: theme.palette.warning.dark }} />
-                </Box>
-              </Tooltip>
-            )}
-
-            {/* VPN — solo icona, click apre VpnModal */}
-            {customer.has_vpn && (
-              <Tooltip title="Visualizza VPN" arrow>
-                <Box
-                  onClick={(e) => { e.stopPropagation(); onOpenVpn(customer) }}
-                  sx={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32, borderRadius: '8px', flexShrink: 0,
-                    bgcolor: alpha(theme.palette.success.main, 0.10),
-                    border: `1px solid ${alpha(theme.palette.success.main, 0.28)}`,
-                    cursor: 'pointer',
-                    transition: 'background 0.15s',
-                    '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.20) },
-                  }}
-                >
-                  <VpnLockIcon sx={{ fontSize: ICON.feature, color: theme.palette.success.dark }} />
-                </Box>
-              </Tooltip>
-            )}
-          </Box>
-
-          {/* Issue attive — pulsante quadrato, conteggio solo in tooltip */}
+        <Box sx={{ gridArea: 'actions', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+          <CountStat
+            value={siteCount ?? '—'}
+            label={siteCount === 1 ? 'sito' : 'siti'}
+            tooltip="Vai ai siti"
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(0) }}
+          />
+          <CountStat
+            value={assetCount ?? '—'}
+            label="asset"
+            tooltip="Vai agli asset"
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(siteCount ? 1 : 0) }}
+          />
+          {/* Larghezza riservata alle azioni: i contatori restano in colonna tra
+              clienti con e senza Note/VPN/Contatti (5 bottoni: icona sotto lg, etichetta da lg). */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, justifyContent: { xs: 'flex-start', md: 'flex-end' }, minWidth: { md: 204, lg: 365 } }}>
           {issueCount > 0 && (
             <ActionButton
               tone="danger"
               icon={<WarningAmberRoundedIcon />}
-              ariaLabel={`${issueCount} issue attive`}
-              title={`${issueCount} issue attiv${issueCount === 1 ? 'a' : 'e'}`}
+              ariaLabel={`${issueCount} asset con issue attive`}
+              title={`${issueCount} asset con issue attiv${issueCount === 1 ? 'a' : 'e'}`}
               onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
             />
           )}
-
-          {/* Contatori siti/asset — spinti tutto a destra, subito prima dell'expand.
-              Info e Contatti spostati qui accanto al conteggio asset. */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto', flexShrink: 0 }}>
-            <CountStat
-              value={siteCount ?? '—'}
-              label="siti"
-              tooltip="Vai ai siti"
-              onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(0) }}
+          {hasNotes && (
+            <ActionButton
+              tone="warning"
+              icon={<NoteAltOutlinedIcon />}
+              ariaLabel="Note del cliente"
+              label="Note"
+              title="Leggi le note del cliente"
+              onClick={(e) => { e.stopPropagation(); setNoteModalOpen(true) }}
             />
-            <CountStat
-              value={assetCount ?? '—'}
-              label="asset"
-              tooltip="Vai agli asset"
-              onClick={(e) => { e.stopPropagation(); setExpanded(true); setTab(siteCount ? 1 : 0) }}
+          )}
+          {customer.has_vpn && (
+            <ActionButton
+              tone="success"
+              icon={<VpnLockIcon />}
+              ariaLabel="VPN del cliente"
+              label="VPN"
+              title="Apri l'accesso VPN"
+              onClick={(e) => { e.stopPropagation(); onOpenVpn(customer) }}
             />
-            {(customer.contacts_count ?? 0) > 1 && (
-              <Tooltip title="Contatti collegati" arrow>
-                <ActionButton
-                  tone="neutral"
-                  icon={<GroupsOutlinedIcon />}
-                  ariaLabel="Contatti cliente"
-                  onClick={(e) => { e.stopPropagation(); setContactsModalOpen(true) }}
-                />
-              </Tooltip>
-            )}
-            {canViewCustomer && (
-              <Tooltip title="Apri scheda cliente" arrow>
-                <ActionButton
-                  tone="info"
-                  icon={<InfoOutlinedIcon />}
-                  ariaLabel="Info cliente"
-                  onClick={(e) => { e.stopPropagation(); onOpenCustomer(customer.id) }}
-                />
-              </Tooltip>
-            )}
+          )}
+          {(customer.contacts_count ?? 0) > 1 && (
+            <ActionButton
+              tone="neutral"
+              icon={<GroupsOutlinedIcon />}
+              ariaLabel="Contatti del cliente"
+              label="Contatti"
+              title="Contatti collegati al cliente"
+              onClick={(e) => { e.stopPropagation(); setContactsModalOpen(true) }}
+            />
+          )}
+          {canViewCustomer && (
+            <ActionButton
+              tone="neutral"
+              icon={<InfoOutlinedIcon />}
+              ariaLabel="Scheda del cliente"
+              label="Scheda"
+              title="Apri la scheda del cliente"
+              onClick={(e) => { e.stopPropagation(); onOpenCustomer(customer.id) }}
+            />
+          )}
           </Box>
-
-          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ ml: 0.25 }}>
-            {expanded ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
-          </IconButton>
         </Box>
+
+        <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ gridArea: 'chevron', alignSelf: { xs: 'start', md: 'center' } }}>
+          {expanded ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
+        </IconButton>
       </Box>
 
       <Collapse in={expanded} unmountOnExit>
@@ -275,12 +264,12 @@ export function CustomerCard({
                 textColor="primary"
                 indicatorColor="primary"
                 sx={{
-                  px: 2, minHeight: 36,
+                  px: 2, minHeight: 40,
                   borderBottom: '1px solid', borderColor: 'divider',
                   '& .MuiTab-root': {
-                    minHeight: 36, fontSize: FS.label, fontWeight: 700,
-                    letterSpacing: '0.06em', textTransform: 'uppercase', py: 0,
-                    color: 'text.secondary',
+                    minHeight: 40, fontSize: FS.label, fontWeight: 700,
+                    textTransform: 'none', py: 0,
+                    color: 'grey.700',
                   },
                   '& .MuiTab-root.Mui-selected': {
                     color: 'primary.main',
@@ -290,8 +279,8 @@ export function CustomerCard({
                   },
                 }}
               >
-                <Tab label={`Siti ${siteCount}`} />
-                <Tab label={`Inventario${assetCount != null ? ` ${assetCount}` : ''}`} />
+                <Tab label={`${siteCount === 1 ? 'Sito' : 'Siti'} con asset · ${siteCount}`} />
+                <Tab label={`Tutti gli asset${assetCount != null ? ` · ${assetCount}` : ''}`} />
               </Tabs>
 
               {tab === 0 && (

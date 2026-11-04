@@ -267,31 +267,35 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
         log_event(actor=self.request.user, action="update", instance=instance,
                   changes=changes or None, request=self.request)
 
-    @action(detail=True, methods=["post"], url_path="validate")
-    def validate_entry(self, request, pk=None):
-        obj = self.get_object()
-        if not is_leave_coordinator(request.user):
-            return Response({"detail": "Permesso negato."}, status=403)
-        obj.status = AbsenceStatus.VALIDATA
+    @staticmethod
+    def _apply_resolution(request, obj, new_status):
+        """Imposta l'esito su una riga e lo registra nell'audit."""
+        old_status = obj.status
+        obj.status = new_status
         obj.validated_by = request.user
         obj.validated_at = timezone.now()
         obj.updated_by = request.user
         obj.save(update_fields=["status", "validated_by", "validated_at", "updated_by", "updated_at"])
+        log_event(
+            actor=request.user, action="update", instance=obj, request=request,
+            changes={"status": {"from": old_status, "to": new_status}} if old_status != new_status else None,
+        )
+
+    def _resolve_single(self, request, new_status):
+        obj = self.get_object()
+        if not is_leave_coordinator(request.user):
+            return Response({"detail": "Permesso negato."}, status=403)
+        self._apply_resolution(request, obj, new_status)
         notify_leave_request_resolved([obj], actor=request.user)
         return Response(self.get_serializer(obj).data)
 
+    @action(detail=True, methods=["post"], url_path="validate")
+    def validate_entry(self, request, pk=None):
+        return self._resolve_single(request, AbsenceStatus.VALIDATA)
+
     @action(detail=True, methods=["post"], url_path="reject")
     def reject_entry(self, request, pk=None):
-        obj = self.get_object()
-        if not is_leave_coordinator(request.user):
-            return Response({"detail": "Permesso negato."}, status=403)
-        obj.status = AbsenceStatus.RIFIUTATA
-        obj.validated_by = request.user
-        obj.validated_at = timezone.now()
-        obj.updated_by = request.user
-        obj.save(update_fields=["status", "validated_by", "validated_at", "updated_by", "updated_at"])
-        notify_leave_request_resolved([obj], actor=request.user)
-        return Response(self.get_serializer(obj).data)
+        return self._resolve_single(request, AbsenceStatus.RIFIUTATA)
 
     def _resolve_group(self, request, new_status):
         """Applica `new_status` a tutte le righe in stato 'proposta' che
@@ -305,15 +309,9 @@ class AbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, viewsets.ModelVie
         qs = Absence.objects.filter(
             request_group=group, status=AbsenceStatus.PROPOSTA, deleted_at__isnull=True,
         )
-        now = timezone.now()
         updated_ids = []
         for obj in qs:
-            obj.status = new_status
-            obj.validated_by = request.user
-            obj.validated_at = now
-            obj.updated_by = request.user
-            obj.save(update_fields=["status", "validated_by", "validated_at", "updated_by", "updated_at"])
-            log_event(actor=request.user, action="update", instance=obj, request=request)
+            self._apply_resolution(request, obj, new_status)
             updated_ids.append(obj.id)
         if updated_ids:
             notify_leave_request_resolved(

@@ -8,10 +8,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 
 import type { LocationGroup, CustomerRow, InventoryRow, SiteRow, StatusFilter } from './types'
 import { FS, ICON } from './style'
-import { SignalChip, MetaTag } from './primitives'
+import { RADIUS, LABEL_COLOR, plural } from './tokens'
+import { SignalChip } from './primitives'
 import { CustomerCard } from './CustomerCard'
-import { SHARED } from '../../theme/constants'
-import { SIDEBAR } from '../../theme/tokens'
 
 // ─── ProvinceSection ────────────────────────────────────────────────────────
 // Rinominato da CitySection: il Site Repository raggruppa i clienti per
@@ -56,6 +55,8 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
   }, ref) {
     const theme = useTheme()
     const [open, setOpen] = React.useState(false)
+    // "Senza provincia/città" segnala un dato mancante, non un luogo: resa attenuata.
+    const isUnassigned = group.label === 'Senza provincia' || group.label === 'Senza città'
     const contentId = React.useId()
     const rootRef = React.useRef<HTMLDivElement>(null)
 
@@ -76,13 +77,14 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
       <Box ref={rootRef} sx={{
         mb: 2,
         border: '1px solid',
-        borderColor: open ? theme.palette.primary.dark : 'divider',
-        borderRadius: '10px',
+        borderColor: open ? alpha(theme.palette.primary.main, 0.35) : 'divider',
+        borderRadius: RADIUS,
         overflow: 'hidden',
-        transition: 'border-color 0.2s, border-width 0.1s',
+        transition: 'border-color 0.2s',
         bgcolor: 'background.paper',
       }}>
-        {/* Header provincia — unico elemento a fondo pieno della pagina: massima densità informativa (elevazione) */}
+        {/* Header provincia: etichetta di sezione chiara. Prima era a fondo teal
+            pieno e pesava più dei dati che contiene (hostname, IP). */}
         <Box
           role="button"
           tabIndex={0}
@@ -99,20 +101,29 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
             display: 'flex', alignItems: 'center', gap: 1.25,
             py: 1.125, px: 2,
             cursor: 'pointer',
-            bgcolor: open ? theme.palette.primary.dark : 'background.paper',
+            bgcolor: open ? alpha(theme.palette.primary.main, 0.06) : 'background.paper',
+            borderBottom: open ? '1px solid' : 'none',
+            borderColor: alpha(theme.palette.primary.main, 0.2),
             transition: 'background 0.2s',
-            '&:hover': { bgcolor: open ? theme.palette.primary.dark : 'grey.50' },
+            '&:hover': { bgcolor: alpha(theme.palette.primary.main, open ? 0.09 : 0.04) },
             '&:focus-visible': {
               outline: '2px solid',
-              outlineColor: open ? SHARED.pureWhite : theme.palette.primary.main,
+              outlineColor: theme.palette.primary.main,
               outlineOffset: -2,
             },
           }}
         >
-          <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: open ? alpha(SHARED.pureWhite, 0.75) : 'primary.main', flexShrink: 0 }} />
+          <PlaceOutlinedIcon sx={{ fontSize: ICON.feature, color: isUnassigned ? 'text.disabled' : 'primary.main', flexShrink: 0 }} />
 
-          <Typography fontWeight={700} sx={{ fontSize: FS.section, color: open ? SIDEBAR.textDefault : 'text.primary' }}>
+          <Typography fontWeight={700} sx={{
+            fontSize: FS.section,
+            color: isUnassigned ? 'text.secondary' : open ? 'primary.dark' : 'text.primary',
+            fontStyle: isUnassigned ? 'italic' : 'normal',
+          }}>
             {group.label}
+          </Typography>
+          <Typography sx={{ fontSize: FS.body, color: LABEL_COLOR }}>
+            {plural(group.customers.length, 'cliente', 'clienti')}
           </Typography>
 
           <Box sx={{ flex: 1 }} />
@@ -121,19 +132,12 @@ export const ProvinceSection = React.forwardRef<ProvinceSectionHandle, ProvinceS
           {group.issueCount > 0 && (
             <SignalChip
               tone="error"
-              inverse={open}
               icon={<WarningAmberRoundedIcon />}
               label={`${group.issueCount} issue attiv${group.issueCount === 1 ? 'a' : 'e'}`}
             />
           )}
 
-          {/* Numero clienti — "meta": è un conteggio strutturale, non uno stato */}
-          <MetaTag
-            inverse={open}
-            label={`${group.customers.length} client${group.customers.length !== 1 ? 'i' : 'e'}`}
-          />
-
-          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ ml: 0.25, color: open ? SHARED.pureWhite : 'text.secondary' }}>
+          <IconButton size="small" tabIndex={-1} aria-hidden="true" sx={{ ml: 0.25, color: 'grey.700' }}>
             {open ? <ExpandLessIcon sx={{ fontSize: ICON.action }} /> : <ExpandMoreIcon sx={{ fontSize: ICON.action }} />}
           </IconButton>
         </Box>

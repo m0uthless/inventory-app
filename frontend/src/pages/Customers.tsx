@@ -4,8 +4,14 @@ import { alpha } from '@mui/material/styles'
 import {
   Box,
   Button,
+  ButtonBase,
   Chip,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
+  TextField,
   Tooltip,
   Typography,
   List,
@@ -17,7 +23,8 @@ import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
+import MailOutlineIcon from '@mui/icons-material/MailOutline'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
@@ -43,15 +50,16 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import StatusChip from '@shared/ui/StatusChip'
 import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { useStatusTokens } from '../theme/AppThemeProvider'
-import type { DomainStatusTokens } from '../theme/statusTokens'
 import { useThemeTokens } from '../theme/AppThemeProvider'
+import { useUrlStringParam } from '@shared/hooks/useUrlParam'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
 import CustomerDrawer from '../features/customers/CustomerDrawer'
+import CustomerDevicesTab from '../features/devices/CustomerDevicesTab'
+import CustomerContractsTab from '../features/contracts/CustomerContractsTab'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
 import { stripOpenParam } from '../features/entityRelations/relatedListUtils'
@@ -483,7 +491,48 @@ function CustomerDriveTab({ customerId }: { customerId: number }) {
   )
 }
 
-function buildColumns(onVpnClick: (row: CustomerRow) => void, statusTokens: DomainStatusTokens): GridColDef<CustomerRow>[] {
+/** Testo leggibile solo dagli screen reader. */
+const srOnlySx = {
+  border: 0, clip: 'rect(0 0 0 0)', height: '1px', margin: '-1px', overflow: 'hidden',
+  padding: 0, position: 'absolute', whiteSpace: 'nowrap', width: '1px',
+} as const
+
+/** Pillola VPN: vero pulsante (tastiera + screen reader), apre le credenziali VPN. */
+function VpnPill({ row, onClick, size = 'grid' }: { row: CustomerRow; onClick: (row: CustomerRow) => void; size?: 'grid' | 'touch' }) {
+  const name = row.display_name || row.name
+  return (
+    <ButtonBase
+      aria-label={`Apri VPN di ${name}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick(row)
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      sx={{
+        flexShrink: 0,
+        gap: 0.5,
+        fontSize: size === 'touch' ? '0.75rem' : '0.6rem',
+        fontWeight: 700,
+        letterSpacing: '0.05em',
+        px: size === 'touch' ? 1.5 : 0.6,
+        py: size === 'touch' ? 0 : 0.15,
+        minHeight: size === 'touch' ? 44 : undefined,
+        borderRadius: size === 'touch' ? 1 : 0.75,
+        bgcolor: 'success.50',
+        color: 'success.800',
+        border: '0.5px solid',
+        borderColor: 'success.200',
+        lineHeight: 1.6,
+        '&:hover': { bgcolor: 'success.100' },
+        '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+      }}
+    >
+      VPN
+    </ButtonBase>
+  )
+}
+
+function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<CustomerRow>[] {
   return [
   {
     field: 'id',
@@ -499,49 +548,23 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void, statusTokens: Doma
     minWidth: 260,
     renderCell: (p) => (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <Box component="span" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {p.value as string}
-        </span>
-        {p.row.has_vpn && (
-          <Box
-            component="span"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation()
-              onVpnClick(p.row)
-            }}
-            sx={{
-              flexShrink: 0,
-              fontSize: '0.6rem',
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-              px: 0.6,
-              py: 0.15,
-              borderRadius: 0.75,
-              bgcolor: 'success.50',
-              color: 'success.800',
-              border: '0.5px solid',
-              borderColor: 'success.200',
-              lineHeight: 1.6,
-              cursor: 'pointer',
-              '&:hover': { bgcolor: 'success.100' },
-            }}
-          >
-            VPN
-          </Box>
-        )}
+        </Box>
+        {p.row.has_vpn && <VpnPill row={p.row} onClick={onVpnClick} />}
       </Box>
     ),
   },
   {
+    // Il lookup "stato" del cliente contiene il vendor (Philips, Biotron, …):
+    // testo neutro, il colore resta riservato a stati veri.
     field: 'status_label',
-    headerName: 'Stato',
+    headerName: 'Vendor',
     width: 170,
     renderCell: (p) => (
-      <StatusChip
-        statusId={p.row.status ?? null}
-        label={typeof p.value === 'string' ? p.value : '—'}
-        sx={{ fontWeight: 700 }}
-      />
+      <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+        {typeof p.value === 'string' && p.value ? p.value : '—'}
+      </Box>
     ),
   },
   { field: 'city', headerName: 'Città', width: 170 },
@@ -559,25 +582,20 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void, statusTokens: Doma
 
       if (!name && !email && !phone) {
         return (
-          <Chip
-            size="small"
-            icon={<WarningAmberRoundedIcon sx={{ fontSize: '0.95rem !important' }} />}
-            label="Nessun contatto"
-            sx={{
-              bgcolor: statusTokens.noContactWarning.bg,
-              color: statusTokens.noContactWarning.color,
-              border: `1px solid ${statusTokens.noContactWarning.border}`,
-              fontWeight: 600,
-              '& .MuiChip-icon': { color: statusTokens.noContactWarning.iconColor },
-            }}
-          />
+          <Box component="span" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+            Nessun contatto
+          </Box>
         )
       }
 
       const label = name || email || phone
       return tooltip ? (
         <Tooltip title={tooltip} arrow>
-          <span>{label}</span>
+          <span>
+            {label}
+            {/* Email/telefono anche per chi naviga con screen reader (il tooltip è solo hover). */}
+            {name ? <Box component="span" sx={srOnlySx}>{`, ${tooltip}`}</Box> : null}
+          </span>
         </Tooltip>
       ) : (
         <span>{label}</span>
@@ -586,23 +604,37 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void, statusTokens: Doma
   },
   { field: 'vat_number', headerName: 'P.IVA', width: 160 },
   { field: 'tax_code', headerName: 'Codice fiscale', width: 170 },
-  // { field: "updated_at", headerName: "Aggiornato", width: 180 },
   ]
 }
 
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
 
-function makeRenderCustomerCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<CustomerRow> {
-  return ({ row, onOpen }) => {
-  const sc = row.status != null ? statusTokens.entityStatus[row.status] ?? null : null
+const touchLinkSx = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 0.75,
+  minHeight: 44,
+  px: 1.25,
+  borderRadius: 1,
+  border: '0.5px solid',
+  borderColor: 'divider',
+  color: 'primary.main',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  textDecoration: 'none',
+  minWidth: 0,
+  '&:active': { bgcolor: 'action.selected' },
+  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+} as const
 
-  const meta: { label: string; value: string | null | undefined }[] = [
-    { label: 'Contatto',  value: row.primary_contact_name },
-    { label: 'Telefono',  value: row.primary_contact_phone },
-    { label: 'Email',     value: row.primary_contact_email },
-    { label: '',          value: null },
-  ]
+function makeRenderCustomerCard(onVpnClick: (row: CustomerRow) => void): MobileCardRenderFn<CustomerRow> {
+  return ({ row, onOpen }) => {
+  const place = [row.city, row.province ? `(${row.province})` : null].filter(Boolean).join(' ')
+  const phone = row.primary_contact_phone?.trim() || ''
+  const email = row.primary_contact_email?.trim() || ''
+  const contactName = row.primary_contact_name?.trim() || ''
+  const hasActions = Boolean(phone || email || row.has_vpn)
 
   return (
     <Box
@@ -612,47 +644,56 @@ function makeRenderCustomerCard(statusTokens: DomainStatusTokens): MobileCardRen
         border: '0.5px solid',
         borderColor: 'divider',
         borderRadius: 1,
-        p: 1.25,
+        p: 1.5,
         cursor: 'pointer',
         display: 'flex',
         flexDirection: 'column',
-        gap: 0.75,
+        gap: 1,
         '&:active': { bgcolor: 'action.hover' },
       }}
     >
-      {/* Header: nome + badge stato */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-          {row.display_name || row.name}
-        </Typography>
-        {sc && row.status_label && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.color, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
-            {row.status_label}
-          </Box>
-        )}
-      </Box>
-
-      {/* Grid 2×2 */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {meta.map(({ label, value }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            {label && <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>}
-            {label && (
-              <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {value || '—'}
-              </Typography>
-            )}
-          </Box>
-        ))}
-      </Box>
-
-      {/* Footer: VPN (solo se presente) */}
-      {row.has_vpn && (
-        <Box sx={{ borderTop: '0.5px solid', borderColor: 'divider', pt: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', opacity: 0.5, flexShrink: 0 }} />
-          <Typography variant="caption" color="text.secondary">VPN</Typography>
+      {/* Nome + vendor, poi luogo */}
+      <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+            {row.display_name || row.name}
+          </Typography>
+          {row.status_label ? (
+            <Typography variant="caption" sx={{ flexShrink: 0, color: 'text.secondary', fontWeight: 500 }}>
+              {row.status_label}
+            </Typography>
+          ) : null}
         </Box>
-      )}
+        {place || contactName ? (
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {[place, contactName].filter(Boolean).join(' · ')}
+          </Typography>
+        ) : null}
+        {!contactName && !phone && !email ? (
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontStyle: 'italic' }}>
+            Nessun contatto
+          </Typography>
+        ) : null}
+      </Box>
+
+      {/* Azioni dirette: chiama, scrivi, VPN. Il tap non apre il drawer. */}
+      {hasActions ? (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }} onClick={(e) => e.stopPropagation()}>
+          {phone ? (
+            <Box component="a" href={`tel:${phone.replace(/\s+/g, '')}`} aria-label={`Chiama ${phone}`} sx={{ ...touchLinkSx, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+              <PhoneOutlinedIcon sx={{ fontSize: 18 }} />
+              {phone}
+            </Box>
+          ) : null}
+          {email ? (
+            <Box component="a" href={`mailto:${email}`} aria-label={`Scrivi a ${email}`} sx={{ ...touchLinkSx, flex: '1 1 auto', maxWidth: '100%' }}>
+              <MailOutlineIcon sx={{ fontSize: 18, flexShrink: 0 }} />
+              <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</Box>
+            </Box>
+          ) : null}
+          {row.has_vpn ? <VpnPill row={row} onClick={onVpnClick} size="touch" /> : null}
+        </Box>
+      ) : null}
     </Box>
   )
   }
@@ -666,8 +707,6 @@ export default function Customers() {
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
-  const statusTokens = useStatusTokens()
-  const renderCustomerCard = React.useMemo(() => makeRenderCustomerCard(statusTokens), [statusTokens])
   const canChange = hasPerm(PERMS.crm.customer.change)
   const canDelete = hasPerm(PERMS.crm.customer.delete)
 
@@ -686,14 +725,47 @@ export default function Customers() {
     defaultPageSize: 25,
   })
 
+  // Filtri URL (stesso pattern di Siti): imbuto sulle colonne, chip su mobile.
+  const [statusFilter, setStatusFilter] = useUrlStringParam('status')
+  const [provinceFilter, setProvinceFilter] = useUrlStringParam('province')
+  const [vpnFilter, setVpnFilter] = useUrlStringParam('has_vpn')
+  const [contactFilter, setContactFilter] = useUrlStringParam('has_contact')
+  const filterOpts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const hasActiveFilters = Boolean(statusFilter || provinceFilter || vpnFilter || contactFilter)
+  const resetFilters = React.useCallback(() => {
+    setStatusFilter('', { patch: { page: 1, province: '', has_vpn: '', has_contact: '' }, keepOpen: true })
+  }, [setStatusFilter])
+
+  const { setQ: setGridQ } = grid
   const emptyState = React.useMemo(() => {
-    if (grid.view === 'deleted' && !grid.search.trim()) {
+    const searching = Boolean(grid.search.trim())
+    if (grid.view === 'deleted' && !searching && !hasActiveFilters) {
       return { title: 'Cestino vuoto', subtitle: 'Non ci sono clienti eliminati.' }
     }
-    if (!grid.search.trim()) {
+    if (searching || hasActiveFilters) {
+      const what = searching && hasActiveFilters ? 'la ricerca o i filtri' : searching ? 'la ricerca' : 'i filtri'
       return {
+        title: 'Nessun risultato',
+        subtitle: `Nessun cliente corrisponde: prova a modificare ${what}.`,
+        action: (
+          <Stack direction="row" spacing={1} justifyContent="center">
+            {searching ? (
+              <Button variant="outlined" onClick={() => setGridQ('')}>
+                Cancella ricerca
+              </Button>
+            ) : null}
+            {hasActiveFilters ? (
+              <Button variant="outlined" onClick={resetFilters}>
+                Azzera filtri
+              </Button>
+            ) : null}
+          </Stack>
+        ),
+      }
+    }
+    return {
         title: 'Nessun cliente',
-        subtitle: 'Crea un nuovo cliente o cambia i filtri.',
+        subtitle: 'Non ci sono ancora clienti.',
         action: (
           <Can perm={PERMS.crm.customer.add}>
             <Button
@@ -705,10 +777,8 @@ export default function Customers() {
             </Button>
           </Can>
         ),
-      }
     }
-    return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
-  }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
+  }, [grid.view, grid.search, setGridQ, hasActiveFilters, resetFilters, loc.pathname, loc.search, navigate])
 
   const [statuses, setStatuses] = React.useState<LookupItem[]>([])
 
@@ -722,8 +792,18 @@ export default function Customers() {
         pageSize: grid.paginationModel.pageSize,
         includeDeleted: grid.includeDeleted,
         onlyDeleted: grid.onlyDeleted,
+        extra: {
+          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(provinceFilter.trim() ? { province: provinceFilter.trim() } : {}),
+          ...(vpnFilter ? { has_vpn: vpnFilter } : {}),
+          ...(contactFilter ? { has_contact: contactFilter } : {}),
+        },
       }),
     [
+      statusFilter,
+      provinceFilter,
+      vpnFilter,
+      contactFilter,
       grid.search,
       grid.ordering,
       grid.paginationModel.page,
@@ -751,6 +831,8 @@ export default function Customers() {
     sitesCount,
     invCount,
     driveCount,
+    devicesCount,
+    contractsCount,
     reset: resetKpis,
   } = useCustomerKpis(detail?.id ?? null)
 
@@ -967,7 +1049,7 @@ export default function Customers() {
       },
       {
         key: 'vpn',
-        label: row.has_vpn ? 'VPN' : 'VPN',
+        label: 'VPN',
         icon: <LanOutlinedIcon fontSize="small" sx={{ color: 'primary.main' }} />,
         onClick: () => openVpnModal(row),
         badge: row.has_vpn ? 'configurata' : 'non configurata',
@@ -985,8 +1067,71 @@ export default function Customers() {
   }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openVpnModal, restoreBusy, restoreFromRow])
 
   const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
-    return buildColumns(openVpnModal, statusTokens)
-  }, [openVpnModal, statusTokens])
+    return buildColumns(openVpnModal)
+  }, [openVpnModal])
+
+  const renderCustomerCard = React.useMemo(() => makeRenderCustomerCard(openVpnModal), [openVpnModal])
+
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
+    const yesNoSelect = (label: string, value: string, onChange: (v: string) => void, yes: string, no: string) => (
+      <FormControl size="small" fullWidth>
+        <InputLabel>{label}</InputLabel>
+        <Select label={label} value={value} onChange={(e) => onChange(String(e.target.value))}>
+          <MenuItem value="">Tutti</MenuItem>
+          <MenuItem value="true">{yes}</MenuItem>
+          <MenuItem value="false">{no}</MenuItem>
+        </Select>
+      </FormControl>
+    )
+    return {
+      status_label: {
+        value: statusFilter,
+        label: 'Filtra per vendor',
+        onSet: (v) => setStatusFilter(String(v), filterOpts),
+        onReset: () => setStatusFilter('', filterOpts),
+        children: (
+          <FormControl size="small" fullWidth>
+            <InputLabel>Vendor</InputLabel>
+            <Select label="Vendor" value={statusFilter} onChange={(e) => setStatusFilter(String(e.target.value), filterOpts)}>
+              <MenuItem value="">Tutti</MenuItem>
+              {statuses.map((st) => <MenuItem key={st.id} value={String(st.id)}>{st.label}</MenuItem>)}
+            </Select>
+          </FormControl>
+        ),
+      },
+      province: {
+        value: provinceFilter,
+        label: 'Filtra per provincia',
+        onSet: (v) => setProvinceFilter(String(v), filterOpts),
+        onReset: () => setProvinceFilter('', filterOpts),
+        children: (
+          <TextField
+            size="small"
+            fullWidth
+            autoFocus
+            label="Provincia"
+            placeholder="Es. BO"
+            value={provinceFilter}
+            onChange={(e) => setProvinceFilter(e.target.value.toUpperCase(), filterOpts)}
+          />
+        ),
+      },
+      display_name: {
+        value: vpnFilter,
+        label: 'Filtra per VPN',
+        onSet: (v) => setVpnFilter(String(v), filterOpts),
+        onReset: () => setVpnFilter('', filterOpts),
+        children: yesNoSelect('VPN', vpnFilter, (v) => setVpnFilter(v, filterOpts), 'Con VPN', 'Senza VPN'),
+      },
+      primary_contact_name: {
+        value: contactFilter,
+        label: 'Filtra per contatto',
+        onSet: (v) => setContactFilter(String(v), filterOpts),
+        onReset: () => setContactFilter('', filterOpts),
+        children: yesNoSelect('Contatto primario', contactFilter, (v) => setContactFilter(v, filterOpts), 'Con contatto', 'Senza contatto'),
+      },
+    }
+  }, [statusFilter, provinceFilter, vpnFilter, contactFilter, statuses, filterOpts, setStatusFilter, setProvinceFilter, setVpnFilter, setContactFilter])
 
   // Configurazione filtri URL per il kebab menu delle colonne
   // If opened from global Search, we can return back to the Search results on close.
@@ -1056,7 +1201,7 @@ export default function Customers() {
     // Validazione client-side: popola fieldErrors invece del toast generico
     // così i campi si colorano di rosso esattamente come fanno gli errori backend.
     const clientErrors: Record<string, string> = {}
-    if (form.status === '') clientErrors.status = 'Seleziona uno stato.'
+    if (form.status === '') clientErrors.status = 'Seleziona un vendor.'
     if (!String(form.name).trim()) clientErrors.name = 'Il nome è obbligatorio.'
     if (Object.keys(clientErrors).length) {
       setFieldErrors(clientErrors)
@@ -1143,10 +1288,14 @@ export default function Customers() {
           q: grid.q,
           onQChange: grid.setQ,
           compact: true,
+          searchLabel: 'Cerca clienti, siti, hostname…',
+          onReset: hasActiveFilters ? resetFilters : undefined,
+          resetLabel: 'Azzera filtri',
         }}
         grid={{
           pageKey: 'customers',
           username: me?.username,
+          filterConfig,
 
           emptyState,
           columnVisibilityModel: {},
@@ -1205,6 +1354,8 @@ export default function Customers() {
         sitesCount={sitesCount}
         inventoriesCount={invCount}
         driveCount={driveCount}
+        devicesCount={devicesCount}
+        contractsCount={contractsCount}
         address={address}
         canChange={canChange}
         canDelete={canDelete}
@@ -1231,6 +1382,8 @@ export default function Customers() {
           />
         ) : null}
         driveTabContent={detail ? <CustomerDriveTab customerId={detail.id} /> : null}
+        devicesTabContent={detail ? <CustomerDevicesTab customerId={detail.id} /> : null}
+        contractsTabContent={detail ? <CustomerContractsTab customerId={detail.id} /> : null}
         activityTabContent={detail ? (
           <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
         ) : null}

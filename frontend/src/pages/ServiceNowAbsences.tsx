@@ -36,6 +36,7 @@ import {
   formatItTime, startOfWeek, addDays, toISODate, findAbsence,
   validateAbsencePayload,
 } from '../features/servicenow/absenceShared'
+import { isServiceNowCategoryVisible } from '../features/servicenow/visibleCategories'
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven']
 
@@ -359,7 +360,7 @@ export default function ServiceNowAbsences() {
   const categorySections = [
     { value: 'philips' as const, label: 'Philips', accent: theme.palette.primary.main, tint: alpha(theme.palette.primary.main, 0.06) },
     { value: 'biotron' as const, label: 'Biotron', accent: theme.palette.secondary.main, tint: alpha(theme.palette.secondary.main, 0.06) },
-  ]
+  ].filter((c) => isServiceNowCategoryVisible(c.value))
   const toast = useToast()
   const { hasPerm } = useAuth()
   const canManage = hasPerm(PERMS.servicenow.case.change)

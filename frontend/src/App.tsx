@@ -36,6 +36,7 @@ const RimborsoSpese = lazy(() => import('./pages/RimborsoSpese'))
 const RimborsoSpesePage = lazy(() => import('./pages/RimborsoSpesePage'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
 const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
+const Contracts = lazy(() => import('./pages/Contracts'))
 const UsersAdmin = lazy(() => import('./pages/UsersAdmin'))
 const PortalAccess = lazy(() => import('./pages/PortalAccess'))
 const NotFound = lazy(() => import('./pages/NotFound'))
@@ -226,6 +227,10 @@ const router = createBrowserRouter([
       {
         path: 'purchase-orders',
         element: <RequirePerm perm="purchaseorders.view_purchaseorderentry">{lazyEl(<PurchaseOrders />)}</RequirePerm>,
+      },
+      {
+        path: 'contracts',
+        element: <RequirePerm perm="contracts.view_contract">{lazyEl(<Contracts />)}</RequirePerm>,
       },
       { path: 'bug-feature', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
       { path: 'bug-feature/resolved', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },

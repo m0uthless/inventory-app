@@ -438,15 +438,22 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     # ── perform_update override ───────────────────────────────────────────────
 
     def perform_update(self, serializer):
-        """Audit diff limitato a status e priority — i campi chiave per i report."""
+        """Audit diff limitato a status, priority e assegnatario — i campi chiave per i report."""
         old = serializer.instance
         old_status       = old.status
         old_priority     = old.priority
         old_assigned_to_id = old.assigned_to_id
+        old_assigned_to    = old.assigned_to
         issue = serializer.save()
         changes = {}
         if old_status   != issue.status:   changes["status"]   = {"from": old_status,   "to": issue.status}
         if old_priority != issue.priority: changes["priority"] = {"from": old_priority, "to": issue.priority}
+        # La riassegnazione fa partire un'email: deve restare traccia anche nell'audit.
+        if old_assigned_to_id != issue.assigned_to_id:
+            changes["assigned_to"] = {
+                "from": to_change_value_for_field("assigned_to", old_assigned_to),
+                "to":   to_change_value_for_field("assigned_to", issue.assigned_to),
+            }
         log_event(
             self.request.user,
             action="update",

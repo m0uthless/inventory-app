@@ -60,6 +60,13 @@ export function ItalyRegionMap({
     return map
   }, [provinceCounts])
 
+  // Intensità del riempimento proporzionale ai clienti: la cartina dice "dove
+  // sono i clienti" a colpo d'occhio, non solo "dove ce n'è almeno uno".
+  const maxRegionCount = Math.max(1, ...Object.values(regionCounts))
+  const regionsWithCustomers = ITALIAN_REGIONS
+    .filter((r) => (regionCounts[r.id] ?? 0) > 0)
+    .sort((a, b) => (regionCounts[b.id] ?? 0) - (regionCounts[a.id] ?? 0) || a.name.localeCompare(b.name, 'it'))
+
   // ── Livello 1: cartina Italia, regioni ──────────────────────────────────
   if (!selectedRegion) {
     return (
@@ -72,9 +79,9 @@ export function ItalyRegionMap({
               const hasCustomers = count > 0
               const isHover = hoverId === region.id
               const fill = isHover
-                ? alpha(theme.palette.primary.main, 0.5)
+                ? alpha(theme.palette.primary.main, 0.7)
                 : hasCustomers
-                  ? alpha(theme.palette.primary.main, 0.28)
+                  ? alpha(theme.palette.primary.main, 0.22 + 0.4 * (count / maxRegionCount))
                   : theme.palette.grey[100]
 
               return (
@@ -105,8 +112,46 @@ export function ItalyRegionMap({
             })}
           </svg>
         </Box>
-        <Typography sx={{ fontSize: FS.body, color: 'text.secondary', textAlign: 'center', mt: 1 }}>
-          Clicca una regione per vedere le sue province.
+        {regionsWithCustomers.length > 0 ? (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography sx={{ fontSize: FS.micro, fontWeight: 600, color: 'grey.700', mb: 0.75 }}>
+              Regioni con clienti
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+              {regionsWithCustomers.map((r) => {
+                const count = regionCounts[r.id] ?? 0
+                const isHover = hoverId === r.id
+                return (
+                  <Box
+                    key={r.id}
+                    component="button"
+                    type="button"
+                    onClick={() => setSelectedRegion(r.id)}
+                    onMouseEnter={() => setHoverId(r.id)}
+                    onMouseLeave={() => setHoverId(null)}
+                    onFocus={() => setHoverId(r.id)}
+                    onBlur={() => setHoverId(null)}
+                    sx={{
+                      display: 'inline-flex', alignItems: 'center', gap: 0.75,
+                      minHeight: 36, px: 1.25, borderRadius: '8px', cursor: 'pointer',
+                      font: 'inherit', fontSize: FS.body, fontWeight: 600, color: 'text.primary',
+                      border: '1px solid', borderColor: isHover ? 'primary.main' : 'divider',
+                      bgcolor: isHover ? alpha(theme.palette.primary.main, 0.08) : 'background.paper',
+                      '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+                    }}
+                  >
+                    {r.name}
+                    <Box component="span" sx={{ color: 'primary.dark', fontVariantNumeric: 'tabular-nums' }}>
+                      {count}
+                    </Box>
+                  </Box>
+                )
+              })}
+            </Box>
+          </Box>
+        ) : null}
+        <Typography sx={{ fontSize: FS.body, color: 'grey.700', textAlign: 'center', mt: 1.5 }}>
+          Scegli una regione sulla cartina o dall'elenco per vederne le province.
         </Typography>
       </Box>
     )
@@ -130,8 +175,8 @@ export function ItalyRegionMap({
         </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
-        <Box sx={{ flex: '0 1 300px', minWidth: 0 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2.5, alignItems: { xs: 'stretch', sm: 'flex-start' } }}>
+        <Box sx={{ flex: '0 1 300px', minWidth: 0, maxWidth: { xs: 260, sm: 'none' }, mx: { xs: 'auto', sm: 0 } }}>
           <svg viewBox={geo.viewBox} width="100%" role="img" aria-label={`Province di ${REGION_NAME[selectedRegion]}`}>
             {geo.provinces.map((p) => {
               const count = provinceCounts[p.sigla] ?? 0
@@ -227,9 +272,9 @@ export function ItalyRegionMap({
         </Stack>
       </Box>
 
-      <Typography sx={{ fontSize: FS.body, color: 'text.secondary', textAlign: 'center', mt: 1.5 }}>
+      <Typography sx={{ fontSize: FS.body, color: 'grey.700', textAlign: 'center', mt: 1.5 }}>
         {geo.provinces.some((p) => (provinceCounts[p.sigla] ?? 0) > 0)
-          ? 'Clicca una provincia evidenziata (sulla mappa o in lista) per aprirla.'
+          ? 'Scegli una provincia evidenziata (sulla mappa o in lista) per aprirla.'
           : 'Nessun cliente in questa regione.'}
       </Typography>
     </Box>

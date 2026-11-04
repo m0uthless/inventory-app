@@ -1151,7 +1151,7 @@ export function AppLayout() {
         }}
       >
         <Toolbar sx={{ flexShrink: 0 }} />
-        {loc.pathname === '/site-repository' && <Box sx={{ height: 56, flexShrink: 0 }} />}
+        {loc.pathname === '/site-repository' && <Box sx={{ height: 'var(--site-repo-toolbar-h, 56px)', flexShrink: 0 }} />}
 
         <Box sx={{ p: { xs: 2, md: 3 }, pb: { xs: 10, md: 3 }, flex: 1, overflowY: 'auto', minHeight: 0, bgcolor: 'background.default' }}>
           <DashboardEditModeRouteGuard isDashboardRoute={loc.pathname === '/'} />

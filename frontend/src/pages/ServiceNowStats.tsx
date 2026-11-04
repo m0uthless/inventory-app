@@ -33,6 +33,7 @@ import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
 import { isRecord } from '@shared/utils/guards'
+import { isServiceNowCategoryVisible } from '../features/servicenow/visibleCategories'
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -788,7 +789,7 @@ export default function ServiceNowStats() {
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} divider={
       <Box sx={{ width: { xs: '100%', md: '1px' }, height: { xs: '1px', md: 'auto' }, bgcolor: 'divider' }} />
     }>
-      {CATEGORIES.map((c) => (
+      {CATEGORIES.filter((c) => isServiceNowCategoryVisible(c.value)).map((c) => (
         <CategoryStatsPanel key={c.value} category={c.value} label={c.label} allUsers={userRows} />
       ))}
     </Stack>

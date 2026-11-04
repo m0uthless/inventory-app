@@ -137,6 +137,25 @@ export const PERMS = {
     },
   },
 
+  device: {
+    device: {
+      view: 'device.view_device',
+      add: 'device.add_device',
+      change: 'device.change_device',
+      delete: 'device.delete_device',
+    },
+  },
+
+  contracts: {
+    contract: {
+      view: 'contracts.view_contract',
+      add: 'contracts.add_contract',
+      change: 'contracts.change_contract',
+      delete: 'contracts.delete_contract',
+      viewValue: 'contracts.view_contract_value',
+    },
+  },
+
   core: {
     manageUsers: 'core.manage_users',
     accessArchie: 'core.access_archie',

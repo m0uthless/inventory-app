@@ -29,6 +29,8 @@ type Props<R extends GridValidRowModel> = {
   getRowId?: (row: R) => number | string
   emptyTitle?: string
   emptySubtitle?: string
+  /** Azione opzionale nello stato vuoto (es. "Cancella ricerca"). */
+  emptyAction?: React.ReactNode
   /** Stessa filterConfig usata dal DataGrid — mostra chip filtro sopra le card */
   filterConfig?: Record<string, ColumnFilterConfig>
 }
@@ -114,6 +116,7 @@ export default function MobileCardList<R extends GridValidRowModel>({
   getRowId,
   emptyTitle = 'Nessun elemento',
   emptySubtitle = 'Nessun risultato trovato.',
+  emptyAction,
 }: Props<R>) {
   const { page, pageSize } = paginationModel
   const totalPages = Math.max(1, Math.ceil(rowCount / pageSize))
@@ -142,9 +145,10 @@ export default function MobileCardList<R extends GridValidRowModel>({
           <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
             {emptyTitle}
           </Typography>
-          <Typography variant="caption" color="text.disabled">
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             {emptySubtitle}
           </Typography>
+          {emptyAction ? <Box sx={{ mt: 1.5 }}>{emptyAction}</Box> : null}
         </Box>
       </Stack>
     )

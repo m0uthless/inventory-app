@@ -49,15 +49,19 @@ MODULE_LABELS: dict[str, str] = {
     "attendance": "Presenze & Ferie",
     "expenses": "Note Spese",
     "purchaseorders": "Purchase Order",
+    "contracts": "Contratti",
     "portal": "Portale Clienti",
     "core": "Core / Sistema",
     "custom_fields": "Campi Personalizzati",
     "audit": "Audit Log",
 }
 
-# app_label esclusivi del Portal: non hanno equivalente sul frontend
-# Archie principale (vedi TODO ARCHIE punto 3: Device/VLAN restano esclusivi
-# di Portal). "portal" è il modulo che rappresenta l'accesso al portal stesso.
+# app_label raggruppati nella sezione Portal del pannello permessi.
+# "portal" è il modulo che rappresenta l'accesso al portal stesso; "vlan" è
+# esclusivo del Portal. "device" resta nel gruppo Portal del pannello, ma lo
+# staff Archie lo usa per gestire i campi base dei device (anche per i
+# contratti): i permessi `device.*` si assegnano quindi dalla sezione Portal
+# del pannello Utenti.
 PORTAL_DEDICATED_APPS: frozenset[str] = frozenset({"portal", "device", "vlan"})
 
 _STANDARD_ACTIONS = ("view", "add", "change", "delete")

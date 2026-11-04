@@ -133,6 +133,9 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
             onRowContextMenu={grid.onRowContextMenu as any}
             getRowId={grid.getRowId as any}
             filterConfig={grid.filterConfig}
+            emptyTitle={grid.emptyState?.title}
+            emptySubtitle={grid.emptyState?.subtitle}
+            emptyAction={grid.emptyState?.action}
           />
         ) : (
           <ServerDataGrid

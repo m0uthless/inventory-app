@@ -27,7 +27,7 @@ from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from audit.utils import log_event, to_change_value_for_field, to_primitive
+from audit.utils import _mask_value, log_event, to_change_value_for_field, to_primitive
 from core.permissions import CanRestoreModelPermission, CanPurgeModelPermission
 
 
@@ -38,6 +38,16 @@ from core.permissions import CanRestoreModelPermission, CanPurgeModelPermission
 class SoftDeleteAuditMixin:
     """Mixin per ViewSet con soft-delete e audit logging."""
 
+    # Campi del modello i cui valori non devono mai finire nell'audit pur non
+    # rientrando in SENSITIVE_FIELD_RE (es. Contract.total_value): la modifica
+    # resta registrata, ma con i valori mascherati.
+    audit_masked_fields: tuple[str, ...] = ()
+
+    def _audit_value(self, field_name: str, value):
+        if field_name in self.audit_masked_fields:
+            return _mask_value(value)
+        return to_change_value_for_field(field_name, value)
+
     def _changes_from_validated(self, instance, validated: dict) -> dict:
         changes = {}
         for k, v in (validated or {}).items():
@@ -45,8 +55,8 @@ class SoftDeleteAuditMixin:
             after_raw = v
             if to_primitive(before_raw) != to_primitive(after_raw):
                 changes[k] = {
-                    "from": to_change_value_for_field(k, before_raw),
-                    "to":   to_change_value_for_field(k, after_raw),
+                    "from": self._audit_value(k, before_raw),
+                    "to":   self._audit_value(k, after_raw),
                 }
         return changes
 
@@ -89,7 +99,7 @@ class SoftDeleteAuditMixin:
             }
         instance = serializer.save(**save_kwargs)
         changes = {
-            k: {"from": None, "to": to_change_value_for_field(k, v)}
+            k: {"from": None, "to": self._audit_value(k, v)}
             for k, v in (serializer.validated_data or {}).items()
         }
         log_event(

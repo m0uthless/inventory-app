@@ -54,9 +54,9 @@ export default function CustomerDialog({
       <DialogContent>
         <Stack spacing={1.5} sx={{ mt: 1 }}>
           <FormControl size="small" fullWidth error={Boolean(errors.status)}>
-            <InputLabel>Stato</InputLabel>
+            <InputLabel>Vendor</InputLabel>
             <Select
-              label="Stato"
+              label="Vendor"
               value={form.status}
               onChange={(e) => {
                 onFormChange((f) => ({ ...f, status: asId(e.target.value) }))
