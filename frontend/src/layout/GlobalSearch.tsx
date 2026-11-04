@@ -1,11 +1,8 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, IconButton, InputAdornment, TextField } from '@mui/material'
+import { Box, IconButton, InputBase } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import ClearIcon from '@mui/icons-material/Clear'
-import { useSidebarTokens } from '../theme/AppThemeProvider'
-import { alpha } from '@mui/material/styles'
-import { SHARED } from '../theme/constants'
 
 type Props = {
   /** Called when the easter-egg trigger word is typed, instead of navigating. */
@@ -14,10 +11,27 @@ type Props = {
 
 const EGG_TRIGGER = 'supertennis'
 
+/**
+ * Ricerca globale della topbar (DESIGN.md › Navigation): campo centrato su
+ * fondo paper con il suggerimento Ctrl K. Ctrl K (o ⌘K) porta il focus qui da
+ * qualunque pagina; Invio apre la pagina Ricerca, Esc svuota ed esce.
+ */
 export default function GlobalSearch({ onEggTrigger }: Props) {
-  const SIDEBAR = useSidebarTokens()
   const nav = useNavigate()
   const [q, setQ] = React.useState('')
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const go = React.useCallback(() => {
     const trimmed = q.trim()
@@ -27,65 +41,49 @@ export default function GlobalSearch({ onEggTrigger }: Props) {
       return
     }
     nav(trimmed ? `/search?search=${encodeURIComponent(trimmed)}` : '/search')
+    inputRef.current?.blur()
   }, [q, nav, onEggTrigger])
 
   return (
     <>
-      {/* Desktop */}
-      <Box sx={{ display: { xs: 'none', sm: 'flex' }, width: { sm: 216, md: 312 } }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Cerca…"
+      <Box
+        role="search"
+        onClick={() => inputRef.current?.focus()}
+        sx={{
+          display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1,
+          width: { sm: 300, md: 'min(520px, 42vw)' }, height: 34, px: 1.25,
+          bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px',
+          color: 'text.disabled', cursor: 'text', transition: 'border-color .15s, box-shadow .15s',
+          '&:hover': { borderColor: 'archie.borderStrong' },
+          '&:focus-within': { borderColor: 'primary.main', boxShadow: (t) => t.palette.archie.focusRing },
+        }}
+      >
+        <SearchIcon sx={{ fontSize: 18 }} />
+        <InputBase
+          inputRef={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              go()
-            }
+            if (e.key === 'Enter') { e.preventDefault(); go() }
+            if (e.key === 'Escape') { setQ(''); inputRef.current?.blur() }
           }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-            endAdornment: q ? (
-              <InputAdornment position="end">
-                <IconButton
-                  size="small"
-                  aria-label="Cancella ricerca"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setQ('')}
-                  edge="end"
-                >
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ) : null,
-          }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 1,
-              backgroundColor: SIDEBAR.chipBg,
-              color: SHARED.pureWhite,
-              '& fieldset': { borderColor: alpha(SHARED.pureWhite, 0.3) },
-              '&:hover fieldset': { borderColor: alpha(SHARED.pureWhite, 0.6) },
-              '&.Mui-focused fieldset': { borderColor: alpha(SHARED.pureWhite, 0.8) },
-              '& .MuiInputAdornment-root svg': { color: SIDEBAR.textDefault },
-              '& input::placeholder': { color: SIDEBAR.textMuted, opacity: 1 },
-            },
-          }}
+          placeholder="Cerca clienti, siti, inventari, issue…"
+          inputProps={{ 'aria-label': 'Cerca in ARCHIE' }}
+          sx={{ flex: 1, fontSize: 13, color: 'text.primary', '& input::placeholder': { color: 'text.disabled', opacity: 1 } }}
         />
+        {q ? (
+          <IconButton size="small" aria-label="Cancella ricerca" onMouseDown={(e) => e.preventDefault()} onClick={() => setQ('')} sx={{ p: 0.25 }}>
+            <ClearIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        ) : (
+          <Box component="kbd" sx={{
+            fontFamily: (t) => t.typography.fontFamily, fontSize: 11, fontWeight: 500, color: 'text.secondary',
+            border: '1px solid', borderColor: 'divider', borderRadius: '4px', px: 0.6, lineHeight: '18px', bgcolor: 'archie.surface2',
+          }}>Ctrl K</Box>
+        )}
       </Box>
 
-      {/* Mobile */}
-      <IconButton
-        onClick={() => nav('/search')}
-        sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
-        aria-label="Ricerca"
-      >
+      <IconButton onClick={() => nav('/search')} sx={{ display: { xs: 'inline-flex', sm: 'none' } }} aria-label="Ricerca">
         <SearchIcon />
       </IconButton>
     </>

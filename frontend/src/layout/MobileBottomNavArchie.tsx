@@ -149,7 +149,7 @@ export default function MobileBottomNavArchie() {
 
   return (
     <MobileBottomNav
-      color={theme.palette.primary.main}
+      color={theme.palette.archie.band}
       items={NAV_ITEMS}
       activeKey={activeKey}
       onNavigate={handleNavigate}

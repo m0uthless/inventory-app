@@ -28,7 +28,7 @@ function useToolbarHeightVar() {
   }, [])
 }
 
-export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
+export function SiteRepoV2Toolbar() {
   const toolbarRef = useToolbarHeightVar()
   const { searchQuery, setSearchQuery, handle, totalCustomers, totalCities, groupBy, setGroupBy, mapOpen, setMapOpen } = useSiteRepoV2()
   const theme = useTheme()
@@ -53,19 +53,7 @@ export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
       flexWrap: { xs: 'wrap', md: 'nowrap' },
       py: { xs: 1, md: 1.125 },
       flexShrink: 0,
-      // override AppBar color inheritance
-      '& .MuiInputBase-root': { color: 'text.primary' },
-      // Il path di palette con "!important" non viene risolto da sx (CSS non
-      // valido → vinceva il bianco dell'AppBar): serve il valore esplicito.
-      '& .MuiIconButton-root': { color: `${theme.palette.text.secondary} !important` },
-      // override AppBar color inheritance — il valore rgba(0,0,0,0.23) è il
-      // default MUI stesso per OutlinedInput in light mode (tutti e 3 i temi
-      // sono mode:'light'), qui usato per ripristinarlo esplicitamente.
-      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23) !important' },
     }}>
-      {/* Spacer sidebar — allinea al contenuto della pagina */}
-      <Box sx={{ display: { xs: 'none', md: 'block' }, width: sidebarWidth, flexShrink: 0 }} />
-
       <TextField
         size="small"
         placeholder={isPhone ? 'Cerca host, IP, K#, cliente…' : 'Cerca hostname, IP, K#, seriale, cliente o sito'}
@@ -180,7 +168,7 @@ export function SiteRepoV2Toolbar({ sidebarWidth }: { sidebarWidth: number }) {
 }
 
 // Wrapper condizionale — mostrato solo su /site-repository (V2, ora rotta definitiva)
-export function SiteRepoV2Toolbar_Shell({ loc, sidebarWidth }: { loc: string; sidebarWidth: number }) {
+export function SiteRepoV2Toolbar_Shell({ loc }: { loc: string }) {
   if (loc !== '/site-repository') return null
-  return <SiteRepoV2Toolbar sidebarWidth={sidebarWidth} />
+  return <SiteRepoV2Toolbar />
 }
