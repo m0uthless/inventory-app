@@ -848,6 +848,29 @@ export default function Issues() {
     if (key === 'category') setFCategory([])
     if (key === 'assigned') setFAssigned([])
   }
+  // Card su telefono: stato e scadenza in alto, titolo, cliente.
+  const renderIssueCard = React.useCallback(({ row, onOpen, onContextMenu }: { row: IssueRow; onOpen: (id: number) => void; onContextMenu: (r: IssueRow, e: React.MouseEvent<HTMLElement>) => void }) => {
+    const overdue = !!row.due_date && new Date(row.due_date) < new Date() && !isClosedIssueRow(row)
+    return (
+      <Box role="button" tabIndex={0} onClick={() => onOpen(row.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(row.id) }}
+        onContextMenu={(e) => { e.preventDefault(); onContextMenu(row, e) }}
+        sx={{ display: 'grid', gap: 0.5, p: 1.5, bgcolor: 'background.paper', border: '1px solid', borderColor: detailIssue?.id === row.id ? 'archie.fieldLine' : 'divider', borderRadius: '8px', cursor: 'pointer' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>
+          <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
+          <IssuePriorityMark priority={row.priority} compact />
+          <Typography component="span" sx={{ ml: 'auto', fontSize: 12, fontWeight: overdue ? 600 : 500, color: overdue ? 'error.main' : 'text.secondary' }}>
+            {row.due_date ? fmtDate(row.due_date) : ''}
+          </Typography>
+        </Box>
+        <Typography sx={{ fontWeight: 600, fontSize: 13, lineHeight: 1.35 }}>{row.title}</Typography>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+          {[row.customer_name, row.site_name].filter(Boolean).join(' · ')}{row.assigned_to_full_name ? ` · ${row.assigned_to_full_name}` : ''}
+        </Typography>
+      </Box>
+    )
+  }, [detailIssue?.id])
+
   const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
     const make = (label: string, sel: string[], set: (v: string[]) => void, options: { value: string; label: string }[], opts?: { single?: boolean; searchable?: boolean }) => ({
       value: sel.join(','),
@@ -1299,6 +1322,7 @@ export default function Issues() {
         />
         <EntityListCard
           sx={{ border: 0, borderRadius: 0 }}
+          mobileCard={renderIssueCard}
           toolbar={{
             compact: true,
             q: grid.q,
