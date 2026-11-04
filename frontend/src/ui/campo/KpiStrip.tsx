@@ -26,7 +26,7 @@ export function KpiStrip({ children, label = 'Indicatori' }: { children: React.R
 
 type TileProps = {
   label: string
-  value: React.ReactNode
+  value?: React.ReactNode
   /** Valore secondario accanto al principale (es. importo). */
   unit?: React.ReactNode
   /** Riga di contesto in basso. */
@@ -47,13 +47,13 @@ export function KpiTile({ label, value, unit, sub, spark, onClick, active, child
         {label}
         {onClick ? <ArrowForwardIcon className="kpi-go" sx={{ ml: 'auto', fontSize: 14, color: 'text.disabled', opacity: 0, transition: 'opacity .12s' }} /> : null}
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, fontSize: 24, lineHeight: 1.15, fontWeight: 650, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', '@container (max-width: 780px)': { fontSize: 20 } }}>
+      {value !== undefined ? <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, fontSize: 24, lineHeight: 1.15, fontWeight: 650, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', '@container (max-width: 780px)': { fontSize: 20 } }}>
         {value}
         {unit ? <Box component="small" sx={{ fontSize: 13, fontWeight: 550, color: 'text.secondary', letterSpacing: 0 }}>{unit}</Box> : null}
-      </Box>
+      </Box> : null}
       {children}
       {sub ? <Box sx={{ mt: 'auto', pt: 0.5, fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '& b': { color: 'text.primary', fontWeight: 600 } }}>{sub}</Box> : null}
-      {spark && spark.values.length > 1 ? <Spark {...spark} /> : null}
+      {spark && spark.values.length > 1 && spark.values.some((v) => v !== spark.values[0]) ? <Spark {...spark} /> : null}
     </>
   )
   const sx = {

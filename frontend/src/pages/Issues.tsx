@@ -1,6 +1,5 @@
 import * as React from 'react'
-import { alpha, useTheme } from '@mui/material/styles'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
+import { alpha } from '@mui/material/styles'
 
 import {
   Alert,
@@ -8,7 +7,6 @@ import {
   Badge,
   Box,
   Button,
-  Chip,
   CircularProgress,
   IconButton,
   Stack,
@@ -35,7 +33,6 @@ import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMe
 import type { GridColDef, GridSortModel } from '@mui/x-data-grid'
 
 import { useAuth } from '../auth/AuthProvider'
-import { useKpiAccents } from '../theme/AppThemeProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -54,22 +51,17 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
-import IssueDrawer from '../features/issues/IssueDrawer'
+import IssueDetail, { type IssuePatch } from '../features/issues/IssueDetail'
+import IssuesKpis from '../features/issues/IssuesKpis'
+import { IssuePriorityMark, IssueStatusBadge } from '../features/issues/IssueBadges'
+import { PageHead, ViewTabs, FilterOptionList, FilterTokens, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useToast } from '@shared/ui/toast'
 import EntityListCard from '@shared/ui/EntityListCard'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { isRecord } from '@shared/utils/guards'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-} from 'recharts'
 
 type CreateFromInventoryState = {
   inventoryId: number
@@ -194,28 +186,6 @@ function inventoryLabel(item: InventoryLabelSource) {
   return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
-function IssuePriorityChip({ priority }: { priority: string }) {
-  const m = PRIORITY_META[priority] ?? { label: priority, color: 'default' as const }
-  const dotColor = m.color === 'default' ? 'text.disabled' : `${m.color}.main`
-  return (
-    <Tooltip title={m.label}>
-      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
-    </Tooltip>
-  )
-}
-
-function IssueStatusChip({ status }: { status: string }) {
-  const m = STATUS_META[status] ?? { label: status, color: 'default' as const }
-  return (
-    <Chip
-      size="small"
-      label={m.label}
-      color={m.color}
-      variant={m.color === 'default' ? 'outlined' : 'filled'}
-    />
-  )
-}
-
 // Raggruppamento "Aperte"/"Chiuse" già usato in /issues/summary/ e nel grafico
 // andamento: risolta + chiusa contano entrambe come "chiuse" agli occhi
 // dell'utente (solo "chiusa" è lo stato terminale/immutabile).
@@ -223,444 +193,7 @@ function isClosedIssueRow(row: Pick<IssueRow, 'status'>) {
   return row.status === 'resolved' || row.status === 'closed'
 }
 
-function StatusViewChipBar({
-  value,
-  onChange,
-}: {
-  value: 'all' | 'open' | 'closed'
-  onChange: (v: 'all' | 'open' | 'closed') => void
-}) {
-  const options: { key: 'all' | 'open' | 'closed'; label: string }[] = [
-    { key: 'open', label: 'Aperte' },
-    { key: 'closed', label: 'Chiuse' },
-    { key: 'all', label: 'Tutte' },
-  ]
-  return (
-    <Stack direction="row" spacing={1}>
-      {options.map((o) => {
-        const selected = value === o.key
-        return (
-          <Chip
-            key={o.key}
-            size="small"
-            label={o.label}
-            clickable
-            onClick={() => onChange(o.key)}
-            color={
-              selected
-                ? o.key === 'open'
-                  ? 'error'
-                  : o.key === 'closed'
-                    ? 'default'
-                    : 'primary'
-                : 'default'
-            }
-            variant={selected ? 'filled' : 'outlined'}
-          />
-        )
-      })}
-    </Stack>
-  )
-}
-
-// ─── Widget riepilogo ────────────────────────────────────────────────────────
-
-type Granularity = 'day' | 'week' | 'month'
-
-// Riempie i buchi del calendario e fonde due serie (aperte + risolte/chiuse)
-function fillChartBuckets(
-  openedBuckets: { date: string; count: number }[],
-  closedBuckets: { date: string; count: number }[],
-  granularity: Granularity,
-): { label: string; opened: number; closed: number }[] {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  // Usa date locali (evita lo sfasamento UTC di toISOString con fuso +X)
-  const localISO = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-  const slots: { key: string; label: string; opened: number; closed: number }[] = []
-
-  if (granularity === 'day') {
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      slots.push({
-        key: localISO(d),
-        label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }),
-        opened: 0,
-        closed: 0,
-      })
-    }
-  } else if (granularity === 'week') {
-    const monday = new Date(today)
-    const dow = today.getDay()
-    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
-    for (let i = 11; i >= 0; i--) {
-      const ws = new Date(monday)
-      ws.setDate(monday.getDate() - i * 7)
-      slots.push({
-        key: localISO(ws),
-        label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }),
-        opened: 0,
-        closed: 0,
-      })
-    }
-  } else {
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      slots.push({
-        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`,
-        label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }),
-        opened: 0,
-        closed: 0,
-      })
-    }
-  }
-
-  const byKey = Object.fromEntries(slots.map((s) => [s.key, s]))
-  for (const b of openedBuckets) {
-    const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
-    if (byKey[k]) byKey[k].opened = b.count
-  }
-  for (const b of closedBuckets) {
-    const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
-    if (byKey[k]) byKey[k].closed = b.count
-  }
-  return slots
-}
-
-function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boolean }) {
-  const theme = useTheme()
-  const kpiAccents = useKpiAccents()
-  const toast = useToast()
-  const [granularity, setGranularity] = React.useState<Granularity>('day')
-  const [avgDaysGlobal, setAvgDaysGlobal] = React.useState<number | null>(null)
-  const [chartData, setChartData] = React.useState<
-    { label: string; opened: number; closed: number }[]
-  >([])
-
-  // Carica dati globali (avg + grafico) ad ogni cambio di granularità
-  React.useEffect(() => {
-    api
-      .get<{
-        avg_days_to_close: number | null
-        chart_buckets: { date: string; count: number }[]
-        closed_buckets: { date: string; count: number }[]
-      }>('/issues/summary/', { params: { granularity } })
-      .then((r) => {
-        setAvgDaysGlobal(r.data.avg_days_to_close ?? null)
-        setChartData(
-          fillChartBuckets(r.data.chart_buckets ?? [], r.data.closed_buckets ?? [], granularity),
-        )
-      })
-      .catch((e) => toast.error(apiErrorToMessage(e)))
-  }, [granularity, toast])
-
-  const open = rows.filter((r) => r.status === 'open').length
-  const inProg = rows.filter((r) => r.status === 'in_progress').length
-  const critical = rows.filter(
-    (r) => r.priority === 'critical' && (r.status === 'open' || r.status === 'in_progress'),
-  ).length
-
-  const cardSx = {
-    bgcolor: 'background.paper',
-    border: '0.5px solid',
-    borderColor: 'divider',
-    borderRadius: 2,
-    p: '1rem 1.25rem',
-    opacity: loading ? 0.6 : 1,
-    transition: 'opacity .2s',
-  }
-
-  const avgLabel = avgDaysGlobal != null ? `${avgDaysGlobal.toFixed(1)} gg` : '—'
-
-  const kpis = [
-    {
-      label: 'Aperte',
-      value: open,
-      sub: `su ${rows.length} totali`,
-      accent: theme.palette.error.main,
-    },
-    { label: 'In lavorazione', value: inProg, sub: 'in corso', accent: theme.palette.warning.main },
-    {
-      label: 'Critiche aperte',
-      value: critical,
-      sub: critical > 0 ? 'richiedono attenzione' : 'nessuna criticità',
-      accent: critical > 0 ? theme.palette.error.dark : theme.palette.success.main,
-    },
-    {
-      label: 'Tempo medio',
-      value: avgLabel,
-      sub: 'su tutte le issue chiuse',
-      accent: kpiAccents.teal1,
-    },
-  ]
-
-  const granularityOptions: { key: Granularity; label: string }[] = [
-    { key: 'day', label: 'Giornaliero' },
-    { key: 'week', label: 'Settimanale' },
-    { key: 'month', label: 'Mensile' },
-  ]
-
-  return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-      {/* ── Sinistra: KPI gradient cards ── */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '10px',
-          opacity: loading ? 0.6 : 1,
-          transition: 'opacity .2s',
-        }}
-      >
-        {kpis.map((m) => (
-          <Box
-            key={m.label}
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: '8px',
-              p: { xs: '12px', sm: '14px 16px' },
-              backgroundImage: `linear-gradient(135deg, ${alpha(m.accent, 0.62)} 0%, ${alpha(m.accent, 0.86)} 100%)`,
-              border: `1px solid ${alpha(m.accent, 0.18)}`,
-              boxShadow: `0 10px 28px ${alpha(m.accent, 0.18)}`,
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                right: -20,
-                top: -16,
-                backgroundColor: alpha(theme.palette.common.white, 0.14),
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                width: 100,
-                height: 100,
-                borderRadius: '50%',
-                right: 16,
-                bottom: -52,
-                backgroundColor: alpha(theme.palette.common.white, 0.1),
-              },
-            }}
-          >
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: alpha(theme.palette.common.white, 0.85),
-                  mb: '6px',
-                  lineHeight: 1.2,
-                }}
-              >
-                {m.label}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '1.75rem',
-                  fontWeight: 800,
-                  color: theme.palette.common.white,
-                  lineHeight: 1,
-                  letterSpacing: -0.5,
-                  textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}`,
-                }}
-              >
-                {m.value}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.68rem',
-                  fontWeight: 600,
-                  color: alpha(theme.palette.common.white, 0.75),
-                  mt: '4px',
-                }}
-              >
-                {m.sub}
-              </Typography>
-            </Box>
-          </Box>
-        ))}
-      </Box>
-
-      <Box sx={cardSx}>
-        <Box
-          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '8px' }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography
-              sx={{
-                fontSize: '11px',
-                fontWeight: 500,
-                letterSpacing: '.06em',
-                textTransform: 'uppercase',
-                color: 'text.disabled',
-              }}
-            >
-              Andamento issue
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.error.main,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>Aperte</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.success.main,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>
-                  Risolte/Chiuse
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-          <Box
-            sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: 1, p: '2px', gap: '2px' }}
-          >
-            {granularityOptions.map((o) => (
-              <Box
-                key={o.key}
-                onClick={() => setGranularity(o.key)}
-                sx={{
-                  px: 1,
-                  py: '3px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  userSelect: 'none',
-                  transition: 'all .15s',
-                  color: granularity === o.key ? 'text.primary' : 'text.secondary',
-                  bgcolor: granularity === o.key ? 'background.paper' : 'transparent',
-                  border: '0.5px solid',
-                  borderColor: granularity === o.key ? 'divider' : 'transparent',
-                }}
-              >
-                {o.label}
-              </Box>
-            ))}
-          </Box>
-        </Box>
-        <IssueAreaChart data={chartData} granularity={granularity} />
-      </Box>
-    </Box>
-  )
-}
-
-// NOTA (color refactor 0.9.x): stile del grafico Recharts — eccezione
-// tecnica deliberata (non theme-aware, non duplicata altrove nell'app).
-// I colori "di significato" (aperte/chiuse) restano su theme.palette
-// (error/success), qui restano solo i grigi neutri di assi/griglia/tooltip,
-// centralizzati in un'unica costante per evitare 7 letterali sparsi nel file.
-const CHART_NEUTRAL = {
-  grid: 'rgba(0,0,0,0.06)',
-  axisLabel: '#888',
-  tooltipBg: '#fff',
-  tooltipBorder: 'rgba(0,0,0,0.12)',
-  tooltipShadow: 'rgba(0,0,0,0.08)',
-} as const
-
-function IssueAreaChart({
-  data,
-  granularity,
-}: {
-  data: { label: string; opened: number; closed: number }[]
-  granularity: Granularity
-}) {
-  const theme = useTheme()
-  const openedColor = theme.palette.error.main
-  const closedColor = theme.palette.success.main
-  const interval = granularity === 'day' ? 6 : 2
-  return (
-    <ResponsiveContainer width="100%" height={148}>
-      <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-        <defs>
-          <linearGradient id="issueAreaGradOpened" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={openedColor} stopOpacity={0.25} />
-            <stop offset="95%" stopColor={openedColor} stopOpacity={0.03} />
-          </linearGradient>
-          <linearGradient id="issueAreaGradClosed" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={closedColor} stopOpacity={0.22} />
-            <stop offset="95%" stopColor={closedColor} stopOpacity={0.03} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL.grid} vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 10, fill: CHART_NEUTRAL.axisLabel }}
-          tickLine={false}
-          axisLine={false}
-          interval={interval}
-        />
-        <YAxis
-          tick={{ fontSize: 10, fill: CHART_NEUTRAL.axisLabel }}
-          tickLine={false}
-          axisLine={false}
-          allowDecimals={false}
-          width={28}
-        />
-        <RechartsTooltip
-          wrapperStyle={{ outline: 'none' }}
-          contentStyle={{
-            background: CHART_NEUTRAL.tooltipBg,
-            border: `0.5px solid ${CHART_NEUTRAL.tooltipBorder}`,
-            borderRadius: 8,
-            fontSize: 12,
-            padding: '6px 10px',
-            boxShadow: `0 2px 8px ${CHART_NEUTRAL.tooltipShadow}`,
-          }}
-          formatter={(value: number, name: string) =>
-            [value, name === 'opened' ? 'Aperte' : 'Risolte/Chiuse'] as [number, string]
-          }
-          labelStyle={{ color: CHART_NEUTRAL.axisLabel, marginBottom: 2 }}
-        />
-        <Area
-          type="monotone"
-          dataKey="opened"
-          stroke={openedColor}
-          strokeWidth={2}
-          fill="url(#issueAreaGradOpened)"
-          dot={false}
-          activeDot={{ r: 4, fill: openedColor, strokeWidth: 0 }}
-        />
-        <Area
-          type="monotone"
-          dataKey="closed"
-          stroke={closedColor}
-          strokeWidth={2}
-          fill="url(#issueAreaGradClosed)"
-          dot={false}
-          activeDot={{ r: 4, fill: closedColor, strokeWidth: 0 }}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  )
-}
-
-// ─── Componente principale ────────────────────────────────────────────────────
-
 export default function Issues() {
-  const zebraSx = useDataGridZebraSx()
   const loc = useLocation()
   const navigate = useNavigate()
   const { me } = useAuth()
@@ -723,21 +256,31 @@ export default function Issues() {
     ? [{ field: 'days_open', sort: daysOpenSortDir }]
     : grid.sortModel
 
-  // ── Filtri extra ──────────────────────────────────────────────────────────
-  const [statusView, setStatusView] = React.useState<'all' | 'open' | 'closed'>('open')
-  const activeFilterCount = [statusView !== 'open' ? statusView : ''].filter(Boolean).length
+  // ── Viste e filtri (dalle intestazioni di colonna) ──────────────────────
+  type IssueView = 'active' | 'mine' | 'closed' | 'all'
+  const [view, setView] = React.useState<IssueView>('active')
+  const [fStatus, setFStatus] = React.useState<string[]>([])
+  const [fPriority, setFPriority] = React.useState<string[]>([])
+  const [fCategory, setFCategory] = React.useState<string[]>([])
+  const [fAssigned, setFAssigned] = React.useState<string[]>([])
+  const activeFilterCount = [fStatus, fPriority, fCategory, fAssigned].filter((f) => f.length).length + (view !== 'active' ? 1 : 0)
 
   const resetFilters = () => {
-    setStatusView('open')
+    setView('active'); setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([])
   }
 
   const allExtraParams = React.useMemo(() => {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
-    if (statusView === 'open') p.hide_closed = true
-    if (statusView === 'closed') p.only_closed = true
+    if (view === 'active' || view === 'mine') p.hide_closed = true
+    if (view === 'closed') p.only_closed = true
+    if (view === 'mine' && me?.id) p.assigned_to = me.id
+    else if (fAssigned.length) p.assigned_to = fAssigned[0]
+    if (fStatus.length) p.status = fStatus
+    if (fPriority.length) p.priority = fPriority
+    if (fCategory.length) p.category = fCategory[0]
     return p
-  }, [grid.view, statusView])
+  }, [grid.view, view, me?.id, fStatus, fPriority, fCategory, fAssigned])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -1246,6 +789,82 @@ export default function Issues() {
     }
   }
 
+  // ── Modifica sul posto dal pannello: salva subito, con Annulla ──────────
+  const undoToast = useUndoToast()
+  const [kpiReload, setKpiReload] = React.useState(0)
+  const patchIssue = React.useCallback(async (patch: IssuePatch, label: string) => {
+    if (!detailIssue) return
+    const id = detailIssue.id
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detailIssue as Record<string, unknown>)[k]
+    try {
+      const r = await api.patch<IssueRow>(`/issues/${id}/`, patch)
+      syncIssueState(r.data)
+      reload()
+      setKpiReload((n) => n + 1)
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          const back = await api.patch<IssueRow>(`/issues/${id}/`, prev)
+          syncIssueState(back.data)
+          reload()
+          setKpiReload((n) => n + 1)
+        } catch (e) {
+          toast.error(apiErrorToMessage(e))
+        }
+      })
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }, [detailIssue, syncIssueState, reload, undoToast, toast])
+
+  const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
+
+  // Conteggi delle viste (globali, da /issues/summary/)
+  const [kpiCounts, setKpiCounts] = React.useState<{ active: number; closed: number; all: number } | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    api.get('/issues/summary/').then((r) => {
+      const d = r.data as Record<string, number>
+      if (alive) setKpiCounts({
+        active: d.active_count ?? 0,
+        closed: (d.resolved_count ?? 0) + (d.closed_count ?? 0),
+        all: (d.active_count ?? 0) + (d.resolved_count ?? 0) + (d.closed_count ?? 0),
+      })
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [kpiReload])
+
+  const userLabel = (id: string) => users.find((u) => String(u.id) === id)?.label ?? id
+  const catLabel = (id: string) => categories.find((c) => String(c.id) === id)?.label ?? id
+  const activeFilters: ActiveFilter[] = [
+    fStatus.length ? { key: 'status', label: 'Stato', values: fStatus.map((x) => STATUS_META[x]?.label ?? x).join(', ') } : null,
+    fPriority.length ? { key: 'priority', label: 'Priorità', values: fPriority.map((x) => PRIORITY_META[x]?.label ?? x).join(', ') } : null,
+    fCategory.length ? { key: 'category', label: 'Categoria', values: fCategory.map(catLabel).join(', ') } : null,
+    fAssigned.length && view !== 'mine' ? { key: 'assigned', label: 'Assegnata a', values: fAssigned.map(userLabel).join(', ') } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (key: string) => {
+    if (key === 'status') setFStatus([])
+    if (key === 'priority') setFPriority([])
+    if (key === 'category') setFCategory([])
+    if (key === 'assigned') setFAssigned([])
+  }
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
+    const make = (label: string, sel: string[], set: (v: string[]) => void, options: { value: string; label: string }[], opts?: { single?: boolean; searchable?: boolean }) => ({
+      value: sel.join(','),
+      label: `Filtra ${label.toLowerCase()}`,
+      onSet: (v: string | number | '') => set(v === '' ? [] : String(v).split(',')),
+      onReset: () => set([]),
+      children: <FilterOptionList label={label} options={options} selected={sel} onChange={set} single={opts?.single} searchable={opts?.searchable} />,
+    })
+    const cfg: Record<string, ColumnFilterConfig> = {
+      priority: make('Priorità', fPriority, setFPriority, ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k].label }))),
+      status: make('Stato', fStatus, setFStatus, Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))),
+      category_label: make('Categoria', fCategory, setFCategory, categories.map((c) => ({ value: String(c.id), label: c.label })), { single: true }),
+    }
+    if (view !== 'mine') cfg.assigned_to_full_name = make('Assegnata a', fAssigned, setFAssigned, assignableUsers.map((u) => ({ value: String(u.id), label: u.label })), { single: true, searchable: true })
+    return cfg
+  }, [fPriority, fStatus, fCategory, fAssigned, categories, assignableUsers, view])
+
   // ── Delete / restore ──────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = React.useState<IssueRow | null>(null)
 
@@ -1402,27 +1021,23 @@ export default function Issues() {
     {
       field: 'priority',
       headerName: 'Priorità',
-      width: 64,
+      width: 120,
       sortable: true,
-      align: 'center',
-      headerAlign: 'center',
       renderCell: ({ row }) => (
-        <Box
-          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}
-        >
-          <IssuePriorityChip priority={row.priority} />
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <IssuePriorityMark priority={row.priority} />
         </Box>
       ),
     },
     {
       field: 'status',
       headerName: 'Stato',
-      width: 220,
+      width: 200,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%' }}>
-          <IssueStatusChip status={row.status} />
+          <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
           {row.status === 'waiting' && row.waiting_reason_label ? (
-            <Chip size="small" label={row.waiting_reason_label} variant="outlined" />
+            <Typography component="span" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.waiting_reason_label}</Typography>
           ) : null}
         </Box>
       ),
@@ -1455,9 +1070,9 @@ export default function Issues() {
                   void openServiceNowCaseDrawer(row.servicenow_id as string)
                 }}
                 sx={{
-                  fontFamily: 'monospace',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
+                  fontFamily: '"Geist Mono", monospace',
+                  fontWeight: 500,
+                  fontSize: 12,
                   cursor: resolvingServiceNowId === row.servicenow_id ? 'wait' : 'pointer',
                   color: 'primary.main',
                   opacity: resolvingServiceNowId === row.servicenow_id ? 0.5 : 1,
@@ -1484,12 +1099,7 @@ export default function Issues() {
               ) : null}
             </>
           ) : (
-            <Chip
-              size="small"
-              variant="outlined"
-              label="Non collegato"
-              sx={{ color: 'text.disabled', borderColor: 'divider' }}
-            />
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
           )}
         </Box>
       ),
@@ -1514,31 +1124,27 @@ export default function Issues() {
     {
       field: 'category_label',
       headerName: 'Categoria',
-      width: 140,
+      width: 150,
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
           {row.category_label ? (
-            <Chip size="small" label={row.category_label} variant="outlined" />
+            <Typography variant="body2" noWrap>{row.category_label}</Typography>
           ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-              —
-            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
           )}
         </Box>
       ),
     },
     {
       field: 'assigned_to_full_name',
-      headerName: 'Assegnato a',
-      width: 190,
+      headerName: 'Assegnata a',
+      width: 180,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
           {row.assigned_to_full_name ? (
-            <Typography variant="body2" noWrap>
-              {row.assigned_to_full_name}
-            </Typography>
+            <Typography variant="body2" noWrap>{row.assigned_to_full_name}</Typography>
           ) : (
-            <Chip size="small" variant="outlined" label="Non assegnata" sx={{ height: 24 }} />
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>Non assegnata</Typography>
           )}
         </Box>
       ),
@@ -1668,48 +1274,67 @@ export default function Issues() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
-      <IssuesSummaryWidget rows={rows} loading={loading} />
-      <EntityListCard
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-          alignRightActions: true,
-          rightActions: (
-            <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
-              Nuova issue
-            </Button>
-          ),
-        }}
-        grid={{
-          pageKey: 'issues',
-          username: me?.username,
-          rows,
-          emptyState,
-          rowCount,
-          loading,
-          columns,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: displaySortModel,
-          onSortModelChange: handleSortModelChange,
-          onRowClick: (id) => {
-            const row = rows.find((r) => r.id === id)
-            if (row) openDetail(row, 0)
-          },
-          onRowContextMenu: handleRowContextMenu,
-          getRowClassName: (row) => (isClosedIssueRow(row) ? 'row-closed-issue' : undefined),
-          sx: {
-            cursor: 'pointer',
-            ...zebraSx,
-            '& .row-closed-issue': { opacity: 0.5 },
-            '& .row-closed-issue:hover': { opacity: 0.8 },
-          },
-        }}
-      >
-        <StatusViewChipBar value={statusView} onChange={setStatusView} />
-      </EntityListCard>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Issue"
+        actions={<Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>Nuova issue</Button>}
+      />
+      <IssuesKpis
+        reloadKey={kpiReload}
+        view={view}
+        status={fStatus}
+        onView={(k) => { setView(k as IssueView); setFStatus([]) }}
+        onStatusPick={(st) => { setView('active'); setFStatus((cur) => (cur.length === 1 && cur[0] === st ? [] : [st])) }}
+      />
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <ViewTabs
+          value={view}
+          onChange={(k) => setView(k as IssueView)}
+          tabs={[
+            { key: 'active', label: 'Attive', count: kpiCounts?.active },
+            { key: 'mine', label: 'Le mie' },
+            { key: 'closed', label: 'Risolte e chiuse', count: kpiCounts?.closed },
+            { key: 'all', label: 'Tutte', count: kpiCounts?.all },
+          ]}
+        />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          toolbar={{
+            compact: true,
+            q: grid.q,
+            onQChange: grid.setQ,
+            alignRightActions: true,
+          }}
+          belowToolbar={activeFilters.length ? (
+            <FilterTokens filters={activeFilters} onRemove={removeFilter} onClear={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }} />
+          ) : undefined}
+          grid={{
+            pageKey: 'issues',
+            filterConfig,
+            username: me?.username,
+            rows,
+            emptyState,
+            rowCount,
+            loading,
+            columns,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: displaySortModel,
+            onSortModelChange: handleSortModelChange,
+            onRowClick: (id) => {
+              const row = rows.find((r) => r.id === id)
+              if (row) openDetail(row, 0)
+            },
+            onRowContextMenu: handleRowContextMenu,
+            getRowClassName: (row) => [isClosedIssueRow(row) ? 'row-closed-issue' : '', detailIssue?.id === row.id ? 'Mui-selected' : ''].filter(Boolean).join(' ') || undefined,
+            sx: {
+              cursor: 'pointer',
+              ...headerFilterGridSx,
+              '& .row-closed-issue': { color: 'text.secondary' },
+            },
+          }}
+        />
+      </Box>
       <IssueDialog
         open={formOpen}
         editIssue={editIssue}
@@ -1827,18 +1452,26 @@ export default function Issues() {
           </Button>
         </DialogActions>
       </Dialog>
-      <IssueDrawer
-        open={!!detailIssue}
+      <IssueDetail
         issue={detailIssue}
-        detailTab={detailTab}
+        tab={detailTab === 1 ? 'att' : 'det'}
+        onTab={(t) => setDetailTab(t === 'att' ? 1 : 0)}
+        position={detailIndex >= 0 ? `${detailIndex + 1} di ${rows.length}` : undefined}
+        onPrev={detailIndex > 0 ? () => openDetail(rows[detailIndex - 1], detailTab) : undefined}
+        onNext={detailIndex >= 0 && detailIndex < rows.length - 1 ? () => openDetail(rows[detailIndex + 1], detailTab) : undefined}
+        onClose={() => setDetailIssue(null)}
         comments={comments}
         commentsLoading={commentsLoading}
         newComment={newComment}
         sendingComment={sendingComment}
-        onClose={() => setDetailIssue(null)}
+        onNewCommentChange={setNewComment}
+        onSendComment={handleSendComment}
+        users={assignableUsers}
+        categories={categories}
+        meId={me?.id}
+        onPatch={patchIssue}
         onEdit={() => {
           if (!detailIssue) return
-          setDetailIssue(null)
           openEdit(detailIssue)
         }}
         onDelete={() => {
@@ -1846,9 +1479,12 @@ export default function Issues() {
           setDeleteTarget(detailIssue)
           setDetailIssue(null)
         }}
-        onDetailTabChange={setDetailTab}
-        onNewCommentChange={setNewComment}
-        onSendComment={handleSendComment}
+        onLinkInventory={() => {
+          if (!detailIssue) return
+          openEdit(detailIssue)
+          window.setTimeout(() => openLinkInventoryPicker(), 120)
+        }}
+        onOpenServiceNow={(n) => void openServiceNowCaseDrawer(n)}
       />
 
       {/* ── Context menu ── */}

@@ -114,6 +114,7 @@ export function FilterHeader({ title, filter }: { title: string; filter?: React.
 export const headerFilterGridSx = {
   '& .MuiDataGrid-columnHeader:hover .hf-btn, & .MuiDataGrid-columnHeader:focus-within .hf-btn': { opacity: 1 },
   '& .MuiDataGrid-columnHeaderTitleContainerContent': { width: '100%' },
+  '& .MuiDataGrid-columnHeaderTitle, & .MuiDataGrid-columnHeaderTitleContainerContent > span': { fontSize: '12px !important', fontWeight: '550 !important', color: 'text.secondary' },
 } as const
 
 export type ActiveFilter = { key: string; label: string; values: string }
@@ -141,6 +142,44 @@ export function FilterTokens({ filters, onRemove, onClear, empty }: {
         </Box>
       ))}
       <Button size="small" onClick={onClear} sx={{ color: 'primary.main' }}>Azzera filtri</Button>
+    </Box>
+  )
+}
+
+/**
+ * Elenco di valori da mettere nel popover dell'imbuto della DataGrid condivisa
+ * (`filterConfig[field].children`): spunte con conteggio, si applica subito.
+ */
+export function FilterOptionList({ options, selected, onChange, single, searchable, label }: {
+  options: FilterOption[]
+  selected: string[]
+  onChange: (values: string[]) => void
+  single?: boolean
+  searchable?: boolean
+  label: string
+}) {
+  const [q, setQ] = React.useState('')
+  const shown = q ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase())) : options
+  const toggle = (v: string) => onChange(single ? (selected[0] === v ? [] : [v]) : selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v])
+  return (
+    <Box role="group" aria-label={`Filtra ${label}`} sx={{ width: 232 }}>
+      <Box sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', px: 0.5, pb: 0.5 }}>Filtra {label.toLowerCase()}</Box>
+      {searchable ? (
+        <InputBase autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca…" inputProps={{ 'aria-label': `Cerca in ${label}` }}
+          sx={{ width: '100%', height: 30, px: 1, mb: 0.5, fontSize: 13, border: '1px solid', borderColor: 'divider', borderRadius: '6px' }} />
+      ) : null}
+      <Box sx={{ maxHeight: 260, overflowY: 'auto', display: 'grid' }}>
+        {shown.map((o) => (
+          <ButtonBase key={o.value} onClick={() => toggle(o.value)} sx={{ justifyContent: 'flex-start', gap: 1, height: 30, px: 0.5, borderRadius: '5px', fontSize: 13, '&:hover': { bgcolor: 'archie.surface2' } }}>
+            {single
+              ? <Radio size="small" checked={selected.includes(o.value)} tabIndex={-1} sx={{ p: 0.25 }} />
+              : <Checkbox size="small" checked={selected.includes(o.value)} tabIndex={-1} sx={{ p: 0.25 }} />}
+            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</Box>
+            {o.count != null ? <Box component="small" sx={{ ml: 'auto', color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{o.count}</Box> : null}
+          </ButtonBase>
+        ))}
+        {!shown.length ? <Box sx={{ p: 1, fontSize: 12, color: 'text.secondary' }}>Nessun valore</Box> : null}
+      </Box>
     </Box>
   )
 }

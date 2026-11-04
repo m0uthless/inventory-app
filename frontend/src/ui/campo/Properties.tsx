@@ -74,7 +74,7 @@ function PropRow({ p }: { p: PropDef }) {
   return (
     <Box sx={{ gridColumn: p.full ? '1 / -1' : undefined }}>
       {editing && p.text ? (
-        <Box sx={{ display: 'grid', gridTemplateColumns: '84px minmax(0,1fr)', alignItems: 'center', columnGap: 0.75, minHeight: 32, px: 1, mx: -1 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '72px minmax(0,1fr)', alignItems: 'center', columnGap: 0.75, minHeight: 32, px: 1, mx: -1 }}>
           <Box component="span" sx={{ fontSize: 11, color: 'text.secondary' }}>{p.label}</Box>
           <InputBase autoFocus type={p.text.type ?? 'text'} value={draft} placeholder={p.text.placeholder}
             onChange={(e) => setDraft(e.target.value)} onBlur={commit}
@@ -88,7 +88,7 @@ function PropRow({ p }: { p: PropDef }) {
           onClick={(e) => { if (p.options) setMenuEl(e.currentTarget); else { setDraft(p.text?.value ?? ''); setEditing(true) } }}
           aria-haspopup={p.options ? 'menu' : undefined}
           sx={{
-            display: 'grid', gridTemplateColumns: '84px minmax(0,1fr) 14px', alignItems: 'center', columnGap: 0.75, width: 'calc(100% + 16px)',
+            display: 'grid', gridTemplateColumns: '72px minmax(0,1fr) 14px', alignItems: 'center', columnGap: 0.75, width: 'calc(100% + 16px)',
             minHeight: 32, px: 1, mx: -1, borderRadius: '6px', textAlign: 'left',
             '&:hover': { bgcolor: 'archie.surface2' }, '&:hover .pr-ic, &.Mui-focusVisible .pr-ic': { opacity: 1 },
             '&.Mui-disabled': { color: 'text.primary' },
