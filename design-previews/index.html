@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direzioni ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Overpass"; src: url("fonts/Overpass-300_900-normal.woff2") format("woff2"); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: "Archivo"; src: url("fonts/Archivo-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-stretch: 62% 125%; font-display: swap; }
+:root { color-scheme: light; --bg: #f4f5f7; --surface: #fff; --text: #14181f; --muted: #555d6b; --line: #dde1e7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #101318; --surface: #171b22; --text: #e7eaf0; --muted: #9aa3b2; --line: #2a303b; } }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #101318; --surface: #171b22; --text: #e7eaf0; --muted: #9aa3b2; --line: #2a303b; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.55 "Geist", system-ui, sans-serif; }
+main { max-width: 1120px; margin: 0 auto; padding: 48px 16px 64px; }
+h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.02em; font-weight: 650; }
+.lead { color: var(--muted); margin: 0 0 32px; max-width: 70ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; text-decoration: none; color: inherit; transition: border-color .15s; }
+.card:hover { border-color: var(--muted); }
+.card h2 { margin: 0; font-size: 22px; line-height: 1.2; }
+.card p { margin: 0; color: var(--muted); font-size: 14px; }
+.sw { display: flex; gap: 0; border-radius: 4px; overflow: hidden; height: 28px; border: 1px solid var(--line); }
+.sw span { flex: 1; }
+.meta { font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.meta b { color: var(--text); font-weight: 600; }
+.go { margin-top: auto; font-weight: 600; font-size: 14px; }
+.a h2 { font-family: "Geist"; font-weight: 650; }
+.b h2 { font-family: "Overpass"; font-weight: 900; }
+.c h2 { font-family: "Archivo"; font-stretch: 75%; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.sec { font-size: 18px; margin: 36px 0 8px; }
+.heads { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 6px; }
+.heads a { color: var(--text); }
+.note { margin-top: 28px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tre direzioni per ARCHIE</h1>
+  <p class="lead">Anteprime statiche: shell con sidebar, elenco Issue con pannello di modifica, login. Ogni pagina ha i comandi App / Login / Tema in basso; la sidebar si comprime dal pulsante in alto. Tutti i dati sono fittizi.</p>
+  <div class="grid">
+    <a class="card a" href="a-campo-sterile.html">
+      <h2>A · Campo sterile</h2>
+      <p>La calma di una sala operatoria: acciaio freddo e verde chirurgico. La riga aperta e il suo pannello condividono lo stesso «campo».</p>
+      <div class="sw" aria-label="Palette chiara"><span style="background:#1f6b5c"></span><span style="background:#eef2f1"></span><span style="background:#ffffff"></span><span style="background:#e2f0eb"></span><span style="background:#d5dedb"></span><span style="background:#2e7d4f"></span><span style="background:#9a5b00"></span><span style="background:#c2362b"></span></div>
+      <div class="sw" aria-label="Palette scura"><span style="background:#5fb8a3"></span><span style="background:#0f1615"></span><span style="background:#151e1c"></span><span style="background:#183a33"></span><span style="background:#2a3734"></span><span style="background:#5cc48a"></span><span style="background:#e0a43a"></span><span style="background:#f07466"></span></div>
+      <div class="meta"><span><b>Geist</b> 13px · Geist Mono per i codici</span><span>Sidebar chiara 232px → icone 64px · densità media</span></div>
+      <span class="go">Apri anteprima →</span>
+    </a>
+    <a class="card b" href="b-segnaletica.html">
+      <h2>B · Segnaletica</h2>
+      <p>La segnaletica ospedaliera: ogni area di moduli ha il suo colore di reparto e la testata dice dove sei, come un cartello di corridoio.</p>
+      <div class="sw" aria-label="Palette chiara"><span style="background:#12284a"></span><span style="background:#1b4f9c"></span><span style="background:#0e6f78"></span><span style="background:#6a3fa0"></span><span style="background:#8a5a2b"></span><span style="background:#f3f5f8"></span><span style="background:#1f7a47"></span><span style="background:#c8312b"></span></div>
+      <div class="sw" aria-label="Palette scura"><span style="background:#0a1426"></span><span style="background:#6ea0f0"></span><span style="background:#4cc3cc"></span><span style="background:#b18cf0"></span><span style="background:#d4a067"></span><span style="background:#0c1220"></span><span style="background:#5dc98a"></span><span style="background:#f2736b"></span></div>
+      <div class="meta"><span><b>Overpass</b> 14px · Overpass Mono per i codici</span><span>Sidebar blu 248px → icone 72px · righe alte, adatta al touch</span></div>
+      <span class="go">Apri anteprima →</span>
+    </a>
+    <a class="card c" href="c-modulo.html">
+      <h2>C · Modulo</h2>
+      <p>Il modulo a ricalco: caselle rigate, valori scritti in «carbone», stati timbrati. Nulla sparisce: si annulla, e resta leggibile.</p>
+      <div class="sw" aria-label="Palette chiara"><span style="background:#1d2b5c"></span><span style="background:#4636a8"></span><span style="background:#eef0f4"></span><span style="background:#ffffff"></span><span style="background:#c9cfdb"></span><span style="background:#1e7a4a"></span><span style="background:#9b5c00"></span><span style="background:#c2272d"></span></div>
+      <div class="sw" aria-label="Palette scura"><span style="background:#9db0f5"></span><span style="background:#b3a8ff"></span><span style="background:#0e1220"></span><span style="background:#151a2b"></span><span style="background:#2c3550"></span><span style="background:#5ccb8d"></span><span style="background:#e6ab48"></span><span style="background:#f0656a"></span></div>
+      <div class="meta"><span><b>Archivo</b> 13px (condensato per le etichette) · JetBrains Mono</span><span>Rail a gruppi 60px + elenco 208px · densità alta</span></div>
+      <span class="go">Apri anteprima →</span>
+    </a>
+    <a class="card a" href="e-campo-doppia.html">
+      <h2>A · Sidebar doppia</h2>
+      <p>Direzione A con la navigazione di C: rail delle aree a icone più l'elenco dei moduli dell'area. Il pannello di modifica si apre cliccando una riga.</p>
+      <div class="sw" aria-label="Palette chiara"><span style="background:#1f6b5c"></span><span style="background:#eef2f1"></span><span style="background:#ffffff"></span><span style="background:#e2f0eb"></span><span style="background:#d5dedb"></span><span style="background:#2e7d4f"></span><span style="background:#9a5b00"></span><span style="background:#c2362b"></span></div>
+      <div class="sw" aria-label="Palette scura"><span style="background:#5fb8a3"></span><span style="background:#0f1615"></span><span style="background:#151e1c"></span><span style="background:#183a33"></span><span style="background:#2a3734"></span><span style="background:#5cc48a"></span><span style="background:#e0a43a"></span><span style="background:#f07466"></span></div>
+      <div class="meta"><span><b>Geist</b> 13px · Geist Mono per i codici</span><span>Rail 60px + elenco 216px (nascondibile) · pannello chiuso di default</span></div>
+      <span class="go">Apri anteprima →</span>
+    </a>
+  </div>
+  <h2 class="sec">Nuova base</h2>
+  <ul class="heads">
+    <li><a href="h-base.html"><b>H · Sidebar A + Issue g2</b></a> — barra laterale unica di A, pagina Issue della proposta 2 con indicatori; tre palette: verde, blu, indaco.</li>
+    <li><a href="po-base.html"><b>Purchase Order</b></a> — stessa base applicata al modulo PO: flusso Inserito → Inviato → Ricevuto → Fatturato, importi e documenti per tipo.</li>
+  </ul>
+  <h2 class="sec">Base precedente e proposte per topbar e testata</h2>
+  <ul class="heads">
+    <li><a href="f2-viste.html"><b>Base · Viste salvate</b></a> — sidebar doppia, viste a schede, filtri e ordinamento dalle intestazioni.</li>
+    <li><a href="g1-testata-in-topbar.html"><b>1 · Testata nella topbar</b></a> — titolo, conteggi, ricerca e «Nuova issue» in una sola barra.</li>
+    <li><a href="g2-topbar-globale.html"><b>2 · Topbar globale</b></a> — in alto solo ciò che vale ovunque (ricerca, notifiche, profilo); testata di pagina su una riga.</li>
+    <li><a href="g3-senza-topbar.html"><b>3 · Senza topbar</b></a> — la ricerca va nella rail, la pagina comincia dal titolo.</li>
+  </ul>
+  <p class="note">I font sono serviti in locale da <code>fonts/</code>. Nessun file dell'applicazione è stato modificato.</p>
+</main>
+</body>
+</html>

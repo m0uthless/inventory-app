@@ -1,0 +1,127 @@
+/* Pannello di dettaglio in sovrapposizione: la tabella resta a tutta larghezza.
+   Varianti con data-dw sull'elemento html:
+   pannello = bordo a filo del lato destro, testata tinta
+   scheda   = scheda flottante staccata dai bordi, testata chiara
+   ampio    = più largo, modulo + colonna di riepilogo (SLA, attività, collegati) */
+
+/* La tabella non si stringe più: annulla le riduzioni pensate per il pannello affiancato. */
+.has-drawer .workspace { grid-template-columns: minmax(0, 1fr) !important; }
+.workspace { position: relative; }
+
+.drawer {
+  position: absolute; z-index: 20; top: 0; right: 0; bottom: 0; width: 420px; max-width: calc(100% - 24px);
+  border-left: 1px solid var(--border); box-shadow: -16px 0 40px -18px rgb(0 0 0 / .28);
+  animation: dw-in .2s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes dw-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.d-nav { margin-left: auto; display: inline-flex; gap: 2px; }
+.drawer-head .d-nav + .icon-btn { margin-left: 0; }
+.d-nav .icon-btn .i { width: 16px; height: 16px; }
+.d-pos { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; align-self: center; padding: 0 4px; }
+.d-side { display: none; }
+
+/* ── Pannello ──────────────────────────────────────────────────── */
+:root[data-dw="pannello"] .d-nav .icon-btn[data-dmore] { display: none; }
+
+/* ── Scheda flottante ──────────────────────────────────────────── */
+:root[data-dw="scheda"] .drawer {
+  top: 12px; right: 12px; bottom: 12px; width: 460px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  box-shadow: var(--shadow-float), 0 24px 60px -24px rgb(0 0 0 / .3);
+}
+:root[data-dw="scheda"] .drawer-head { background: var(--surface); padding: 16px 18px 0; }
+:root[data-dw="scheda"] .drawer-head h2 { font-size: 18px; margin: 10px 0 4px; }
+:root[data-dw="scheda"] .drawer-head .tabs { margin: 12px -18px 0; padding: 0 12px; gap: 4px; border-top: 0; }
+:root[data-dw="scheda"] .drawer-head .tabs button { position: relative; border-radius: 0; height: 38px; background: transparent; box-shadow: none; }
+:root[data-dw="scheda"] .drawer-head .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--primary); }
+:root[data-dw="scheda"] .drawer-body { padding: 18px; }
+:root[data-dw="scheda"] .drawer-foot { background: var(--surface-2); padding: 12px 18px; }
+
+/* ── Ampio con riepilogo ───────────────────────────────────────── */
+:root[data-dw="ampio"] .drawer { width: 760px; }
+:root[data-dw="ampio"] .drawer-head { background: var(--surface); padding: 16px 20px 0; }
+:root[data-dw="ampio"] .drawer-head h2 { font-size: 18px; margin: 10px 0 4px; }
+:root[data-dw="ampio"] .drawer-head .tabs { margin: 12px -20px 0; padding: 0 14px; gap: 4px; }
+:root[data-dw="ampio"] .drawer-head .tabs button { position: relative; border-radius: 0; height: 38px; background: transparent; box-shadow: none; }
+:root[data-dw="ampio"] .drawer-head .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--primary); }
+:root[data-dw="ampio"] .d-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 260px; }
+:root[data-dw="ampio"] .drawer-body { padding: 18px 20px; }
+:root[data-dw="ampio"] .d-side { display: block; overflow-y: auto; background: var(--surface-2); border-left: 1px solid var(--border); padding: 16px; }
+.d-split { display: contents; }
+
+.d-side h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.d-side section + section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.d-sla { display: grid; gap: 6px; }
+.d-sla .big { font-size: 20px; font-weight: 650; letter-spacing: -.01em; }
+.d-sla .big small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.d-sla .track { height: 6px; border-radius: 3px; background: var(--neutral-bg); overflow: hidden; }
+.d-sla .track span { display: block; height: 100%; width: 72%; background: var(--warning); border-radius: 3px; }
+.d-sla .lbls { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.d-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 12px; }
+.d-facts dt { color: var(--muted); }
+.d-facts dd { margin: 0; color: var(--text); font-weight: 500; min-width: 0; }
+.d-tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.d-tl li { position: relative; padding-left: 16px; font-size: 12px; line-height: 1.45; color: var(--text); }
+.d-tl li::before { content: ""; position: absolute; left: 0; top: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 2px var(--primary); }
+.d-tl li:not(:last-child)::after { content: ""; position: absolute; left: 3px; top: 15px; bottom: -10px; width: 1px; background: var(--border); }
+.d-tl time { display: block; color: var(--muted); font-size: 11px; }
+.d-links { display: grid; gap: 6px; }
+.d-links a { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); text-decoration: none; color: var(--text); font-size: 12px; font-weight: 500; }
+.d-links a:hover { border-color: var(--border-strong); }
+.d-links a .i { width: 14px; height: 14px; color: var(--muted); }
+.d-links a small { margin-left: auto; color: var(--muted); font-weight: 400; }
+
+/* Telefono: il pannello occupa tutto lo schermo, qualunque variante. */
+@media (max-width: 860px) {
+  .drawer, :root[data-dw] .drawer { position: fixed; inset: 0; width: 100%; max-width: none; border-radius: 0; border: 0; z-index: 45; }
+  :root[data-dw="ampio"] .d-split { display: flex; flex-direction: column; overflow-y: auto; }
+  :root[data-dw="ampio"] .drawer-body { overflow: visible; }
+  :root[data-dw="ampio"] .d-side { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { .drawer { animation: none; } }
+
+.pv-dw { display: inline-flex; align-items: center; gap: 2px; }
+.pv-dw .pv-lbl { color: var(--muted); font-size: 12px; padding: 0 4px 0 2px; }
+.icon-btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
+/* ── Colore della scheda (data-dwc), vale per le varianti 2 e 3 ─── */
+.d-sec { display: contents; }
+.d-sec > h4 { display: none; }
+.pv-dwc { display: inline-flex; align-items: center; gap: 2px; }
+.pv-dwc .pv-lbl { color: var(--muted); font-size: 12px; padding: 0 4px 0 2px; }
+
+/* a · testata tinta: sfuma dal campo sterile, filo di colore in alto, id nel primario */
+:root[data-dwc="testata"]:not([data-dw="pannello"]) .drawer-head,
+:root[data-dwc="sezioni"]:not([data-dw="pannello"]) .drawer-head {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--field) 80%, var(--primary)) 0%, var(--field) 55%, color-mix(in oklab, var(--field) 60%, var(--surface)) 100%);
+  border-bottom-color: color-mix(in oklab, var(--field-line) 25%, var(--border));
+  box-shadow: inset 0 3px 0 var(--primary); /* filo di colore, ritagliato dagli angoli della scheda */
+}
+:root[data-dwc="testata"] .drawer-head .id,
+:root[data-dwc="sezioni"] .drawer-head .id { color: var(--primary); font-weight: 600; }
+:root[data-dwc="testata"]:not([data-dw="pannello"]) .drawer-foot,
+:root[data-dwc="sezioni"]:not([data-dw="pannello"]) .drawer-foot { background: color-mix(in oklab, var(--field) 40%, var(--surface)); }
+
+/* b · più sezioni: il corpo diventa un fondo tinto con riquadri bianchi titolati */
+:root[data-dwc="sezioni"]:not([data-dw="pannello"]) .drawer-body { background: color-mix(in oklab, var(--field) 30%, var(--surface-2)); gap: 12px; }
+:root[data-dwc="sezioni"]:not([data-dw="pannello"]) .d-sec {
+  display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 14px;
+}
+:root[data-dwc="sezioni"]:not([data-dw="pannello"]) .d-sec > h4 {
+  display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; font-weight: 650; color: var(--primary); letter-spacing: .01em;
+}
+:root[data-dwc="sezioni"] .d-sec > h4 .i { width: 22px; height: 22px; padding: 4px; border-radius: 6px; background: var(--field); color: var(--primary); }
+
+/* c · testata di marca: la stessa fascia scura della topbar C */
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head {
+  background: linear-gradient(120deg, var(--band) 0%, var(--band-2) 100%); color: #fff; border-bottom: 0;
+}
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .id { color: rgb(255 255 255 / .75); }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head p,
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .d-pos { color: rgb(255 255 255 / .7); }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .icon-btn { color: rgb(255 255 255 / .8); }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .icon-btn:hover { background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .16); color: #fff; }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .tabs button { color: rgb(255 255 255 / .7); }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .tabs button[aria-selected="true"] { color: #fff; }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .tabs button[aria-selected="true"]::after { background: #fff; }
+:root[data-dwc="banda"]:not([data-dw="pannello"]) .drawer-head .st { box-shadow: 0 0 0 1px rgb(255 255 255 / .2); }
