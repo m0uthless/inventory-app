@@ -16,11 +16,11 @@ type Props = {
 export function PageHead({ title, meta, inline, actions }: Props) {
   useOwnPageHeader()
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap', minHeight: 36 }}>
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2, flexWrap: 'wrap', minHeight: 32 }}>
       <Typography variant="h4" component="h1">{title}</Typography>
-      {inline}
+      {inline ? <Box sx={{ alignSelf: 'center', display: 'flex' }}>{inline}</Box> : null}
       {meta ? <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary', display: { xs: 'none', sm: 'inline' } }}>{meta}</Typography> : null}
-      {actions ? <Box sx={{ ml: 'auto', display: 'flex', gap: 1, alignItems: 'center' }}>{actions}</Box> : null}
+      {actions ? <Box sx={{ ml: 'auto', display: 'flex', gap: 1, alignItems: 'center', alignSelf: 'center' }}>{actions}</Box> : null}
     </Box>
   )
 }

@@ -626,21 +626,23 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
   // menu a tre puntini (le colonne si gestiscono dal pulsante Colonne).
   const campoSx: SxProps<Theme> = campo ? {
     '& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaders .MuiDataGrid-filler, & .MuiDataGrid-scrollbarFiller--header': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
-    '& .MuiDataGrid-columnHeaders': { borderBottom: '1px solid', borderColor: 'divider' },
-    '& .MuiDataGrid-columnHeader': { px: '12px', color: 'text.secondary', fontSize: 12, fontWeight: 550 },
-    '& .MuiDataGrid-columnHeader:first-of-type': { pl: '16px' },
+    // Un solo filo sotto l'intestazione e uno sotto ogni riga (niente doppi bordi).
+    '& .MuiDataGrid-columnHeaders': { borderBottom: 0 },
+    '& .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaders .MuiDataGrid-filler': { borderTop: 0, borderBottom: '1px solid', borderBottomColor: 'divider' },
+    '& .MuiDataGrid-columnHeader': { px: '7px', color: 'text.secondary', fontSize: 12, fontWeight: 550 },
+    '& .MuiDataGrid-columnHeader[aria-colindex="1"]': { pl: '16px' },
     '& .MuiDataGrid-columnHeaderTitleContainerContent > span': { fontWeight: '550 !important', letterSpacing: 0 },
     '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 550, letterSpacing: 0 },
     '& .MuiDataGrid-columnSeparator': { opacity: 0 },
     '& .MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator': { opacity: 1, color: 'divider' },
     '& .MuiDataGrid-menuIcon': { display: 'none' },
-    '& .MuiDataGrid-cell': { px: '12px', py: 0, fontSize: 13, borderColor: 'divider' },
-    '& .MuiDataGrid-cell:first-of-type': { pl: '16px' },
+    '& .MuiDataGrid-cell': { px: '12px', py: 0, fontSize: 13, borderTop: 0, borderBottom: '1px solid', borderBottomColor: 'divider' },
+    '& .MuiDataGrid-row, & .MuiDataGrid-row--firstVisible .MuiDataGrid-cell': { borderTop: 0 },
     '& .MuiDataGrid-row:hover': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
     '& .MuiDataGrid-row.Mui-selected, & .MuiDataGrid-row.Mui-selected:hover': {
       backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { field: string } }).archie.field,
-      boxShadow: (t: Theme) => `inset 0 1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}, inset 0 -1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
     },
+    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine },
     '& .row-odd': { backgroundColor: 'transparent' },
     '& .MuiDataGrid-virtualScrollerContent': { pb: 0 },
   } : {}
@@ -768,7 +770,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         columns={columnsWithHeader}
         loading={loading}
         density={density}
-        columnHeaderHeight={campo ? 36 : 32}
+        columnHeaderHeight={campo ? 34 : 32}
         rowHeight={rowHeight ?? (campo ? 40 : 36)}
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}

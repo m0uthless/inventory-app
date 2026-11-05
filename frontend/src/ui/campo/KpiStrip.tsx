@@ -8,10 +8,13 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
  * Si adatta alla larghezza del contenitore (container query), non della finestra.
  */
 export function KpiStrip({ children, label = 'Indicatori' }: { children: React.ReactNode; label?: string }) {
+  const n = React.Children.toArray(children).length
   return (
     <Box sx={{ containerType: 'inline-size', mb: 1.5 }}>
-      <Box role="group" aria-label={label} sx={{
+      <Box role="group" aria-label={label} style={{ ['--kpi-n' as string]: Math.max(1, n - 1) }} sx={{
         display: 'grid', gap: 1, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        '&:has(> .kpi-wide)': { gridTemplateColumns: 'repeat(var(--kpi-n), minmax(0, 1fr)) minmax(0, 1.35fr)' },
+        '@container (max-width: 980px)': { '&:has(> .kpi-wide)': { gridTemplateColumns: 'repeat(var(--kpi-n), minmax(0, 1fr))' }, '& > .kpi-wide': { display: 'none' } },
         '@container (max-width: 560px)': {
           display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', mx: -2, px: 2, scrollPaddingInline: '16px',
           '& > *': { flex: '0 0 172px', scrollSnapAlign: 'start' },
@@ -60,17 +63,17 @@ export function KpiTile({ label, value, unit, sub, spark, onClick, active, child
     position: 'relative' as const, minWidth: 0, display: 'flex', flexDirection: 'column' as const, alignItems: 'stretch', textAlign: 'left' as const,
     gap: 0.25, p: '10px 12px', minHeight: 92, bgcolor: 'background.paper', border: '1px solid', borderColor: active ? 'archie.fieldLine' : 'divider',
     boxShadow: active ? (t: { palette: { archie: { fieldLine: string } } }) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none',
-    borderRadius: '8px', color: 'text.primary', gridColumn: wide ? 'span 2' : undefined,
+    borderRadius: '8px', color: 'text.primary', 
     '@container (max-width: 780px)': { minHeight: 80, p: '8px 10px' },
   }
   if (onClick) {
     return (
-      <ButtonBase onClick={onClick} aria-pressed={active} sx={{ ...sx, '&:hover': { borderColor: 'archie.borderStrong' }, '&:hover .kpi-go, &.Mui-focusVisible .kpi-go': { opacity: 1 }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing } }}>
+      <ButtonBase onClick={onClick} aria-pressed={active} className={wide ? 'kpi-wide' : undefined} sx={{ ...sx, '&:hover': { borderColor: 'archie.borderStrong' }, '&:hover .kpi-go, &.Mui-focusVisible .kpi-go': { opacity: 1 }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing } }}>
         {content}
       </ButtonBase>
     )
   }
-  return <Box sx={sx}>{content}</Box>
+  return <Box className={wide ? 'kpi-wide' : undefined} sx={sx}>{content}</Box>
 }
 
 function Spark({ values, labels, format }: { values: number[]; labels?: string[]; format?: (v: number) => string }) {
@@ -113,7 +116,7 @@ export function SegmentBar({ parts, onPick, dimmed, darkFirst }: {
   const total = parts.reduce((s, p) => s + p.value, 0) || 1
   return (
     <>
-      <Box aria-hidden sx={{ display: 'flex', gap: '2px', height: 8, my: 1 }}>
+      <Box aria-hidden sx={{ display: 'flex', gap: '2px', height: 8, mt: '10px', mb: '8px' }}>
         {parts.map((p, i) => (
           <Tooltip key={p.key} title={`${p.label} · ${p.display ?? p.value}`} placement="top">
             <Box sx={{

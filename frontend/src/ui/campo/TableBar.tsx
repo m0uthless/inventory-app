@@ -28,7 +28,7 @@ export function TableBar({ filters, onRemoveFilter, onClearFilters, q, onQChange
   const iconBtn = { width: 32, height: 32 }
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 48, px: '12px', py: '6px' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 49, px: '12px', py: '8px', borderBottom: on ? 0 : '1px solid', borderColor: 'divider' }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <FilterTokens filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters}
             empty={<Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>Nessun filtro. Usa l'imbuto accanto al nome di una colonna.</Box>} />
@@ -59,7 +59,7 @@ export function TableBar({ filters, onRemoveFilter, onClearFilters, q, onQChange
         ) : null}
       </Box>
       {on ? (
-        <Box sx={{ px: '12px', pb: '10px' }}>
+        <Box sx={{ px: '12px', pb: '10px', borderBottom: '1px solid', borderColor: 'divider' }}>
           <Box sx={{
             display: 'flex', alignItems: 'center', gap: 1, height: 32, px: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: '6px',
             bgcolor: 'archie.surface2', color: 'text.disabled', '&:focus-within': { borderColor: 'primary.main', bgcolor: 'background.paper', boxShadow: (t) => t.palette.archie.focusRing },

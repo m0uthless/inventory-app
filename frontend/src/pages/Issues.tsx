@@ -1074,14 +1074,14 @@ export default function Issues() {
     {
       field: 'id',
       headerName: 'ID',
-      width: 68,
+      width: 62,
       sortable: false,
       renderCell: ({ row }) => <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>,
     },
     {
       field: 'priority',
       headerName: 'Priorità',
-      width: 104,
+      width: 91,
       sortable: true,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
@@ -1092,7 +1092,7 @@ export default function Issues() {
     {
       field: 'status',
       headerName: 'Stato',
-      width: 168,
+      width: 161,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%' }}>
           <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
@@ -1116,7 +1116,7 @@ export default function Issues() {
     {
       field: 'customer_name',
       headerName: 'Cliente · sito',
-      width: 190,
+      width: 173,
       renderCell: ({ row }) => (
         <Box sx={{ minWidth: 0, lineHeight: 1.3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
@@ -1134,7 +1134,7 @@ export default function Issues() {
     {
       field: 'servicenow_id',
       headerName: 'ServiceNow',
-      width: 128,
+      width: 111,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
           {row.servicenow_id ? (
@@ -1182,7 +1182,7 @@ export default function Issues() {
     {
       field: 'assigned_to_full_name',
       headerName: 'Assegnata a',
-      width: 150,
+      width: 113,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
           {row.assigned_to_full_name ? (
@@ -1196,7 +1196,7 @@ export default function Issues() {
     {
       field: 'due_date',
       headerName: 'Scadenza',
-      width: 124,
+      width: 123,
       renderCell: ({ row }) => {
         if (!row.due_date) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
         const today = new Date(); today.setHours(0, 0, 0, 0)
