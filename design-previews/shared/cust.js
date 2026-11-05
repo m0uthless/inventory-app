@@ -19,6 +19,7 @@
   const mail = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 6.5 12 13l8.5-6.5"/></svg>';
   const phoneB = phone.replace('stroke-width="1.75"', 'stroke-width="2.4"');
   const mailB = mail.replace('stroke-width="1.75"', 'stroke-width="2.4"');
+  const clock = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 0 1 0-18z M12 7.5V12l3 2"/></svg>';
   const key = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11a4 4 0 1 1 0 8a4 4 0 0 1 0-8z M10.8 12.2 20 3 M16 7l3 3 M14 9l2 2"/></svg>';
 
   // Nav: pagina attiva
@@ -134,11 +135,11 @@
     .filter((r) => Object.entries(cs).every(([k, v]) => { if (!v) return true; const c = COLS.find((x) => x.k === k); return c.q ? c.q(r).toLowerCase().includes(v.toLowerCase()) : c.set(r) === v; }));
   const sorted = () => { const c = COLS.find((x) => x.k === sort.k); return visible().sort((a, b) => sort.dir * c.cmp(a, b) || a.id - b.id); };
   let selected = null;
-  const issChip = (n) => n ? `<span class="c-ichip">${ic('alert')}${n}</span>` : '<span class="none">—</span>';
+  const issChip = (n) => n ? `<a class="c-icount" href="h-base.html" title="${n} issue aperte · apri l'elenco">${n}</a>` : '<span class="none">—</span>';
   const ctrCell = (c) => {
     const n = nextExpiry(c);
     if (!c.contracts.length) return '<span class="none">—</span>';
-    return n && n[2] <= 60 ? `<span class="due due-soon" title="${n[0]}">scade ${n[1]}</span>` : `<span class="c-ok">${c.contracts.length} ${c.contracts.length === 1 ? 'attivo' : 'attivi'}</span>`;
+    return n && n[2] <= 60 ? `<span class="c-exp" title="${n[0]} · scade tra ${n[2]} giorni">${clock}${n[1]}</span>` : `<span class="c-ok">${c.contracts.length} ${c.contracts.length === 1 ? 'attivo' : 'attivi'}</span>`;
   };
   const renderRows = () => {
     const rows = sorted();
@@ -274,13 +275,13 @@
       </div></section>`; };
   const notesBlock = (c) => `<section class="c-sec">${secH('Note')}${c.notes ? `<p class="desc-p">${c.notes}</p>` : '<p class="files-empty">Nessuna nota.</p>'}</section>`;
 
+  const clockDef = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 0 1 0-18z M12 7.5V12l3 2"/></svg>';
   const summary = (c) => {
     const n = nextExpiry(c); const soon = n && n[2] <= 60;
+    const cell = (go, k, v, extra = '', cls = '', tip = '') => `<button type="button" data-tab-go="${go}" class="${cls}"${tip ? ` title="${tip}"` : ''}><b>${v}${extra}</b><span>${k}</span></button>`;
     return `<section class="c-stats" aria-label="Riepilogo">
-      <button type="button" data-tab-go="sites"><span class="k">Siti</span><b>${c.sites}</b></button>
-      <button type="button" data-tab-go="inv"><span class="k">Inventari</span><b>${c.inv}</b></button>
-      <button type="button" data-tab-go="sites" class="${c.issues ? 'is-info' : ''}"><span class="k">Issue aperte</span><b>${c.issues}</b></button>
-      <button type="button" data-tab-go="doc" class="${soon ? 'is-warn' : ''}"><span class="k">Contratti</span><b>${c.contracts.length}</b>${n ? `<small>${soon ? 'scade' : 'fino al'} ${n[1].slice(0, 5)}</small>` : ''}</button>
+      ${cell('sites', 'Siti', c.sites)}${cell('inv', 'Inventari', c.inv)}${cell('sites', 'Issue aperte', c.issues)}
+      ${cell('doc', 'Contratti', c.contracts.length, soon ? clock : '', soon ? 'is-warn' : '', soon ? `${n[0]} · scade il ${n[1]}` : n ? `Prossima scadenza ${n[1]}` : '')}
     </section>`;
   };
 
