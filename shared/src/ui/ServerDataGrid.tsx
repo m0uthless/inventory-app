@@ -635,7 +635,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 550, letterSpacing: 0 },
     '& .MuiDataGrid-columnSeparator': { opacity: 0 },
     '& .MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator': { opacity: 1, color: 'divider' },
-    '& .MuiDataGrid-menuIcon': { display: 'none' },
+    '& .MuiDataGrid-menuIcon, & .MuiDataGrid-iconButtonContainer': { display: 'none' },
     '& .MuiDataGrid-cell': { px: '12px', py: 0, fontSize: 13, borderTop: 0, borderBottom: '1px solid', borderBottomColor: 'divider' },
     '& .MuiDataGrid-row, & .MuiDataGrid-row--firstVisible .MuiDataGrid-cell': { borderTop: 0 },
     '& .MuiDataGrid-row:hover': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
