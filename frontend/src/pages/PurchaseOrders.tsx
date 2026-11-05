@@ -6,8 +6,6 @@ import {
   IconButton,
   Stack,
   Typography,
-  Tooltip,
-  CircularProgress,
 } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
@@ -34,15 +32,13 @@ import { api } from '@shared/api/client'
 import PurchaseOrderDialog from '../features/purchaseorders/PurchaseOrderDialog'
 import PurchaseOrderDetailCard, { type PoPatch, type PoEvent } from '../features/purchaseorders/PurchaseOrderDetailCard'
 import { Committente, PoStatusBadge } from '../features/purchaseorders/PoBadges'
-import { PageHead, ViewTabs, FilterOptionList, FilterTokens, headerFilterGridSx, useUndoToast } from '../ui/campo'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, headerFilterGridSx, useUndoToast } from '../ui/campo'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import PurchaseOrderTransitionDialog, {
   type TransitionExtraFields,
 } from '../features/purchaseorders/PurchaseOrderTransitionDialog'
 import PurchaseOrderKpis, { usePoYearStats } from '../features/purchaseorders/PurchaseOrderKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import SearchIcon from '@mui/icons-material/Search'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
@@ -116,7 +112,7 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
     {
       field: 'offer_date',
       headerName: 'Data offerta',
-      width: 104,
+      width: 120,
       renderCell: (p) => <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{formatItDate(p.row.offer_date)}</Typography>,
     },
     {
@@ -747,7 +743,7 @@ export default function PurchaseOrders() {
     return () => { alive = false }
   }, [detail, canAudit])
   const yearStats = usePoYearStats(effectiveYear, kindFilter === 'all' ? null : kindFilter, rows)
-  const [searchOpen, setSearchOpen] = React.useState(false)
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
   const { exporting, exportCsv } = useExportCsv()
   const exportVisible = () => {
     const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
@@ -990,38 +986,25 @@ export default function PurchaseOrders() {
         <EntityListCard
           sx={{ border: 0, borderRadius: 0 }}
           mobileCard={renderPurchaseOrderCard}
+          flush
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={kindFilter !== 'all' ? [{ key: 'kind', label: 'Tipo', values: KIND_LABEL[kindFilter] }] : []}
+              onRemoveFilter={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
+              onClearFilters={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca descrizione, committente, PO, fattura…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+            />
+          }
           toolbar={{
             compact: true,
             q: grid.q,
             onQChange: grid.setQ,
-            hideSearch: !searchOpen && !grid.q,
-            searchLabel: 'Cerca descrizione, committente, PO, fattura…',
-            alignRightActions: true,
-            children: (
-              <FilterTokens
-                filters={kindFilter !== 'all' ? [{ key: 'kind', label: 'Tipo', values: KIND_LABEL[kindFilter] }] : []}
-                onRemove={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
-                onClear={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
-                empty={searchOpen || grid.q ? undefined : 'Filtra e ordina dalle intestazioni di colonna'} />
-            ),
-            rightActions: (
-              <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
-                <Tooltip title="Esporta le righe visibili (CSV)">
-                  <span>
-                    <IconButton aria-label="Esporta le righe visibili" disabled={exporting} onClick={exportVisible}>
-                      {exporting ? <CircularProgress size={16} /> : <FileDownloadOutlinedIcon fontSize="small" />}
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title={searchOpen ? 'Nascondi la ricerca' : 'Cerca nella tabella'}>
-                  <IconButton aria-label="Cerca nella tabella" aria-pressed={searchOpen || !!grid.q}
-                    onClick={() => { if (searchOpen && grid.q) grid.setQ(''); setSearchOpen((v) => !v) }}
-                    sx={searchOpen || grid.q ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'archie.fieldLine' } : undefined}>
-                    <SearchIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            ),
           }}
           grid={{
             pageKey: 'purchase-orders',
@@ -1039,7 +1022,7 @@ export default function PurchaseOrders() {
             onRowClick: openDrawer,
             onRowContextMenu: handleRowContextMenu,
             getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
-            rowHeight: 50,
+            rowHeight: 48,
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />

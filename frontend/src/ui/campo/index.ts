@@ -5,3 +5,7 @@ export { HeaderFilter, FilterHeader, FilterOptionList, FilterTokens, headerFilte
 export { FloatingDetail, DetailSection, type DetailTab, type DetailMenuItem } from './FloatingDetail'
 export { Properties, type PropOption } from './Properties'
 export { UndoToastProvider, useUndoToast } from './UndoToast'
+export { CampoIcon, type CampoIconName } from './CampoIcon'
+export { TableBar } from './TableBar'
+export { useSavedViews, type SavedView } from './savedViews'
+export { SaveViewDialog } from './SaveViewDialog'

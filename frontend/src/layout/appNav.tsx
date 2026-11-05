@@ -1,24 +1,6 @@
 import * as React from 'react'
 
-import DashboardIcon from '@mui/icons-material/DashboardOutlined'
-import LayersIcon from '@mui/icons-material/LayersOutlined'
-import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined'
-import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
-import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
-import BeachAccessOutlinedIcon from '@mui/icons-material/BeachAccessOutlined'
-import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
-import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined'
-import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined'
-import HandymanIcon from '@mui/icons-material/HandymanOutlined'
-import FolderIcon from '@mui/icons-material/FolderOutlined'
-import MenuBookIcon from '@mui/icons-material/MenuBookOutlined'
-import HistoryIcon from '@mui/icons-material/HistoryOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined'
-import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
-import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
-import ContactsOutlinedIcon from '@mui/icons-material/ContactsOutlined'
-import MonitorIcon from '@mui/icons-material/MonitorOutlined'
+import { CampoIcon } from '../ui/campo/CampoIcon'
 
 /**
  * Navigazione del restyle "Campo sterile" (frontend/DESIGN.md › Navigation).
@@ -55,11 +37,11 @@ const prefix = (p: string) => (pathname: string) => pathname === p || pathname.s
 export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'op', label: 'Operatività', items: [
-      { label: 'Dashboard', path: '/', icon: <DashboardIcon />, match: (p) => p === '/' },
-      { label: 'Issue', path: '/issues', icon: <ReportProblemOutlinedIcon />, perm: 'issues.view_issue', count: 'issues' },
-      { label: 'Task di area', path: '/tasks', icon: <TaskAltOutlinedIcon />, count: 'tasks' },
+      { label: 'Dashboard', path: '/', icon: <CampoIcon name="dashboard" />, match: (p) => p === '/' },
+      { label: 'Issue', path: '/issues', icon: <CampoIcon name="alert" />, perm: 'issues.view_issue', count: 'issues' },
+      { label: 'Task di area', path: '/tasks', icon: <CampoIcon name="task" />, count: 'tasks' },
       {
-        label: 'Manutenzione', path: '/maintenance', icon: <HandymanIcon />,
+        label: 'Manutenzione', path: '/maintenance', icon: <CampoIcon name="wrench" />,
         permAny: ['maintenance.view_maintenanceplan', 'maintenance.view_maintenanceevent'],
         match: (p) => p === '/maintenance',
         children: [
@@ -68,7 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
-        label: 'ServiceNow', path: '/servicenow-cases', icon: <CloudSyncOutlinedIcon />, perm: 'servicenow.view_servicenowcase',
+        label: 'ServiceNow', path: '/servicenow-cases', icon: <CampoIcon name="cloud" />, perm: 'servicenow.view_servicenowcase',
         children: [
           { label: 'Statistiche', path: '/servicenow-stats', perm: 'servicenow.view_servicenowcase' },
           { label: 'Assenze tecnici', path: '/servicenow-absences', perm: 'servicenow.view_servicenowcase' },
@@ -79,45 +61,45 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'ana', label: 'Anagrafiche', items: [
       {
-        label: 'Site Repository', path: '/site-repository', icon: <LayersIcon />,
+        label: 'Site Repository', path: '/site-repository', icon: <CampoIcon name="layers" />,
         permAny: ['inventory.view_inventory', 'crm.view_customer', 'crm.view_site', 'crm.view_contact'],
       },
-      { label: 'Clienti', path: '/customers', icon: <PeopleAltOutlinedIcon />, perm: 'crm.view_customer' },
-      { label: 'Siti', path: '/sites', icon: <ApartmentOutlinedIcon />, perm: 'crm.view_site' },
-      { label: 'Contatti', path: '/contacts', icon: <ContactsOutlinedIcon />, perm: 'crm.view_contact' },
-      { label: 'Monitor', path: '/monitors', icon: <MonitorIcon />, perm: 'inventory.view_monitor' },
+      { label: 'Clienti', path: '/customers', icon: <CampoIcon name="building" />, perm: 'crm.view_customer' },
+      { label: 'Siti', path: '/sites', icon: <CampoIcon name="pin" />, perm: 'crm.view_site' },
+      { label: 'Contatti', path: '/contacts', icon: <CampoIcon name="users" />, perm: 'crm.view_contact' },
+      { label: 'Monitor', path: '/monitors', icon: <CampoIcon name="monitor" />, perm: 'inventory.view_monitor' },
     ],
   },
   {
     id: 'kno', label: 'Conoscenza', items: [
       {
-        label: 'Wiki', path: '/wiki', icon: <MenuBookIcon />, perm: 'wiki.view_wikipage',
+        label: 'Wiki', path: '/wiki', icon: <CampoIcon name="book" />, perm: 'wiki.view_wikipage',
         match: (p) => p === '/wiki' || /^\/wiki\/\d+/.test(p),
         children: [
           { label: 'Query', path: '/wiki/queries', perm: 'wiki.view_wikiquery' },
           { label: 'Statistiche', path: '/wiki/stats', perm: 'wiki.view_wikipage' },
         ],
       },
-      { label: 'Drive', path: '/drive', icon: <FolderIcon />, permAny: ['drive.view_drivefolder', 'drive.view_drivefile'] },
+      { label: 'Drive', path: '/drive', icon: <CampoIcon name="folder" />, permAny: ['drive.view_drivefolder', 'drive.view_drivefile'] },
     ],
   },
   {
     id: 'adm', label: 'Amministrazione', items: [
-      { label: 'Contratti', path: '/contracts', icon: <GavelOutlinedIcon />, perm: 'contracts.view_contract' },
-      { label: 'Purchase Order', path: '/purchase-orders', icon: <RequestQuoteOutlinedIcon />, perm: 'purchaseorders.view_purchaseorderentry' },
-      { label: 'Rimborso spese', path: '/rimborso-spese', icon: <ReceiptLongOutlinedIcon /> },
-      { label: 'Piano ferie', path: '/piano-ferie', icon: <BeachAccessOutlinedIcon /> },
+      { label: 'Contratti', path: '/contracts', icon: <CampoIcon name="file" />, perm: 'contracts.view_contract' },
+      { label: 'Purchase Order', path: '/purchase-orders', icon: <CampoIcon name="bag" />, perm: 'purchaseorders.view_purchaseorderentry' },
+      { label: 'Rimborso spese', path: '/rimborso-spese', icon: <CampoIcon name="receipt" /> },
+      { label: 'Piano ferie', path: '/piano-ferie', icon: <CampoIcon name="calendar" /> },
     ],
   },
   {
     id: 'sys', label: 'Sistema', items: [
-      { label: 'Audit', path: '/audit', icon: <HistoryIcon />, perm: 'audit.view_auditevent' },
+      { label: 'Audit', path: '/audit', icon: <CampoIcon name="history" />, perm: 'audit.view_auditevent' },
       {
-        label: 'Cestino', path: '/trash', icon: <DeleteOutlineIcon />,
+        label: 'Cestino', path: '/trash', icon: <CampoIcon name="trash" />,
         permAny: ['crm.view_customer', 'crm.view_site', 'crm.view_contact', 'inventory.view_inventory'],
       },
       {
-        label: 'Bug e feature', path: '/bug-feature', icon: <FeedbackOutlinedIcon />, count: 'feedback',
+        label: 'Bug e feature', path: '/bug-feature', icon: <CampoIcon name="message" />, count: 'feedback',
         match: (p) => prefix('/bug-feature')(p) && !p.startsWith('/bug-feature/resolved'),
         children: [{ label: 'Risolte', path: '/bug-feature/resolved' }],
       },

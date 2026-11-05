@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, ButtonBase, IconButton, Popover, Tooltip, Typography } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
-import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined'
+import { CampoIcon } from '../ui/campo/CampoIcon'
 
 import { NAV_GROUPS, entryActive, leafMatches, type CountKey, type NavEntry, type NavLeaf } from './appNav'
 
@@ -57,7 +57,7 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
     justifyContent: mini ? 'center' : 'flex-start', border: '1px solid transparent',
     color: selected || sectionActive ? 'text.primary' : 'text.secondary',
     fontSize: 13, fontWeight: selected ? 600 : sectionActive ? 550 : 500, whiteSpace: 'nowrap' as const,
-    '& .nav-ic': { display: 'inline-flex', color: selected ? 'primary.main' : 'inherit', '& svg': { fontSize: 18 } },
+    '& .nav-ic': { display: 'inline-flex', color: selected ? 'primary.main' : 'inherit' },
     '&:hover': { bgcolor: 'background.paper', color: 'text.primary' },
     '&.Mui-focusVisible': { boxShadow: a.focusRing },
     ...(selected && { bgcolor: 'background.paper', borderColor: a.fieldLine }),
@@ -128,8 +128,8 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
         {!mobile && onToggleMini ? (
           <Tooltip title={mini ? 'Espandi la barra laterale' : 'Comprimi la barra laterale'} placement="right">
             <IconButton onClick={onToggleMini} aria-label={mini ? 'Espandi la barra laterale' : 'Comprimi la barra laterale'} aria-expanded={!mini}
-              sx={{ ml: mini ? 0 : 'auto', '&:hover': { bgcolor: 'background.paper' }, '& svg': { fontSize: 18, transform: mini ? 'scaleX(-1)' : 'none' } }}>
-              <ViewSidebarOutlinedIcon />
+              sx={{ ml: mini ? 0 : 'auto', '&:hover': { bgcolor: 'background.paper' }, '& svg': { transform: mini ? 'scaleX(-1)' : 'none' } }}>
+              <CampoIcon name="panel" />
             </IconButton>
           </Tooltip>
         ) : null}
@@ -142,7 +142,7 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
             {!mini && (
               <Typography component="div" sx={{ fontSize: 11, fontWeight: 600, color: 'text.disabled', px: 1, pb: 0.5 }}>{g.label}</Typography>
             )}
-            <Box component="ul" sx={{ m: 0, p: 0, display: 'grid', gap: 0.25 }}>
+            <Box component="ul" sx={{ m: 0, p: 0, display: 'grid', gap: 0 }}>
               {g.items.map(renderEntry)}
             </Box>
           </Box>

@@ -19,10 +19,16 @@ type Props<R extends GridValidRowModel> = {
   stickyToolbar?: boolean
   /** Se fornito, in mobile (xs/sm) mostra una card list invece del DataGrid */
   mobileCard?: MobileCardRenderFn<any>
+  /** Senza padding interno: la tabella va da bordo a bordo del riquadro. */
+  flush?: boolean
+  /** Barra disegnata dalla pagina (`header`) al posto di ListToolbar (solo desktop). */
+  header?: React.ReactNode
+  /** Riceve la funzione che apre il pannello Colonne (per un pulsante esterno). */
+  openColumnsRef?: React.MutableRefObject<((anchor: HTMLElement) => void) | null>
 }
 
 export default function EntityListCard<R extends GridValidRowModel>(props: Props<R>) {
-  const { toolbar, children, belowToolbar, grid, sx, stickyToolbar = false, mobileCard } = props
+  const { toolbar, children, belowToolbar, grid, sx, stickyToolbar = false, mobileCard, flush = false, header, openColumnsRef } = props
 
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -50,13 +56,14 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
       prefs
         ? {
             columnOrder: prefs.columnOrder,
-            columnVisibility: prefs.columnVisibilityModel,
+            columnVisibility: { ...Object.fromEntries((grid.defaultHiddenColumns ?? []).map((f) => [f, false])), ...prefs.columnVisibilityModel },
             hasPrefs: prefs.hasPrefs,
           }
         : null,
     )
     forceUpdate()
-  }, [])
+  }, [grid.defaultHiddenColumns])
+  if (openColumnsRef) openColumnsRef.current = persistEnabled ? openColumnPanel : null
 
   return (
     <Card
@@ -70,10 +77,10 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
     >
       <CardContent
         sx={{
-          pt: toolbar.compact ? 1.75 : 2,
-          pb: 2,
-          px: isMobile && mobileCard ? 0 : 2,
-          '&:last-child': { pb: 2 },
+          pt: flush && !isMobile ? 0 : toolbar.compact ? 1.75 : 2,
+          pb: flush && !isMobile ? 0 : 2,
+          px: isMobile && mobileCard ? 0 : flush ? 0 : 2,
+          '&:last-child': { pb: flush && !isMobile ? 0 : 2 },
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
@@ -90,6 +97,8 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
               <FilterChipBar filterConfig={grid.filterConfig} />
             )}
           </Box>
+        ) : header !== undefined ? (
+          header
         ) : (
           <Box
             sx={
@@ -177,7 +186,7 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
                 prefs
                   ? {
                       columnOrder: prefs.columnOrder,
-                      columnVisibility: prefs.columnVisibilityModel,
+                      columnVisibility: { ...Object.fromEntries((grid.defaultHiddenColumns ?? []).map((f) => [f, false])), ...prefs.columnVisibilityModel },
                       hasPrefs: prefs.hasPrefs,
                     }
                   : null,

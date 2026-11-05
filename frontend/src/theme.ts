@@ -76,6 +76,7 @@ export function createArchieTheme(key: PaletteKey = 'default', mode: ColorMode =
             @font-face { font-family: "Geist"; src: url("${geistUrl}") format("woff2"); font-weight: 300 800; font-style: normal; font-display: swap; }
             @font-face { font-family: "Geist Mono"; src: url("${geistMonoUrl}") format("woff2"); font-weight: 400 600; font-style: normal; font-display: swap; }
             body { -webkit-font-smoothing: antialiased; font-feature-settings: "ss01"; }
+            button, input, select, textarea { font-family: inherit; }
             code, kbd, samp, pre { font-family: ${FONT_MONO}; }
             ::selection { background: ${a.field}; color: ${p.text.primary}; }
             * { scrollbar-width: thin; scrollbar-color: ${a.borderStrong} transparent; }

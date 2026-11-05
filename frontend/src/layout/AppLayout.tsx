@@ -319,8 +319,8 @@ export function AppLayout() {
 
         <Box component="main" sx={{
           flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          bgcolor: 'background.default', borderTop: '1px solid', borderLeft: { md: '1px solid' }, borderColor: 'divider',
-          borderTopLeftRadius: { md: 14 },
+          bgcolor: 'background.default', borderStyle: 'solid', borderColor: 'divider',
+          borderWidth: { xs: '1px 0 0 0', md: '1px 0 0 1px' }, borderTopLeftRadius: { md: 14 },
         }}>
           <SiteRepoV2Toolbar_Shell loc={loc.pathname} />
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>

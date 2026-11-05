@@ -27,6 +27,11 @@ import { useColumnDragReorder } from '@shared/hooks/useColumnDragReorder'
 import { isRecord } from '@shared/utils/guards'
 import GridPaginationFooter from '@shared/ui/GridPaginationFooter'
 import EmptyStatePanel from '@shared/ui/EmptyStatePanel'
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import { Typography } from '@mui/material'
+import { useDrawerAppearance } from './DrawerShell'
 
 export type GridEmptyState = {
   title: string
@@ -57,6 +62,8 @@ type Props<R extends GridValidRowModel> = {
   density?: DataGridProps<R>['density']
   /** Altezza riga in px (predefinita 36). */
   rowHeight?: number
+  /** Colonne nascoste finché l'utente non le mostra dal pannello Colonne. */
+  defaultHiddenColumns?: string[]
   zebra?: boolean
   checkboxSelection?: boolean
   rowSelectionModel?: GridRowSelectionModel
@@ -212,6 +219,73 @@ function ColumnHeader({
 }) {
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(null)
   const filterActive = Boolean(fc && fc.value !== '' && fc.value != null)
+  const campo = useDrawerAppearance() === 'campo'
+
+  if (campo) {
+    // Restyle "Campo sterile": etichetta 12/550, freccia solo sulla colonna
+    // ordinata, imbuto a destra visibile al passaggio o se il filtro è attivo.
+    const align = params.colDef.headerAlign
+    return (
+      <>
+        <Box component="span" sx={{
+          display: 'inline-flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          flex: 1, minWidth: 0, pr: fc ? '26px' : 0, pointerEvents: 'none', userSelect: 'none',
+          fontSize: 12, fontWeight: 550, letterSpacing: 0, color: sortDir ? 'text.primary' : 'text.secondary',
+          justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : undefined,
+        }}>
+          {params.colDef.headerName ?? params.field}
+          {sortDir === 'asc' && <ArrowUpwardIcon sx={{ fontSize: 13, flexShrink: 0, color: 'primary.main' }} />}
+          {sortDir === 'desc' && <ArrowDownwardIcon sx={{ fontSize: 13, flexShrink: 0, color: 'primary.main' }} />}
+        </Box>
+        {fc && (
+          <>
+            <Tooltip title={fc.label ?? 'Filtra'}>
+              <IconButton
+                size="small"
+                tabIndex={-1}
+                draggable={false}
+                onDragStart={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => { e.stopPropagation(); setFilterAnchor(e.currentTarget) }}
+                className={`campo-hf${filterActive ? ' is-on' : ''}${filterAnchor ? ' is-open' : ''}`}
+                sx={{
+                  position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', zIndex: 1, pointerEvents: 'auto',
+                  width: 22, height: 22, p: 0, borderRadius: '5px', border: '1px solid transparent', color: 'text.disabled',
+                  opacity: filterActive || filterAnchor ? 1 : 0, transition: 'opacity .12s',
+                  '.MuiDataGrid-columnHeader:hover &': { opacity: 1 },
+                  '&:hover': { color: 'text.primary', bgcolor: 'background.paper', borderColor: 'divider' },
+                  '&.is-open': { color: 'text.primary', bgcolor: 'background.paper', borderColor: 'archie.borderStrong' },
+                  '&.is-on': { color: 'primary.main', bgcolor: 'archie.field', borderColor: 'archie.fieldLine' },
+                }}
+                aria-label={fc.label ?? 'Filtra'}
+              >
+                <FilterAltOutlinedIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
+            <Popover
+              open={Boolean(filterAnchor)}
+              anchorEl={filterAnchor}
+              onClose={() => setFilterAnchor(null)}
+              onClick={(e) => e.stopPropagation()}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              slotProps={{ paper: { sx: { p: 0.75, mt: 0.5, minWidth: 248 } } }}
+            >
+              <Box>{fc.children}</Box>
+              {filterActive ? (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-start', pt: 0.75, mt: 0.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Box component="button" type="button" onClick={() => { setFilterAnchor(null); fc.onReset() }}
+                    sx={{ border: 0, bgcolor: 'transparent', color: 'text.secondary', font: 'inherit', fontSize: 12, fontWeight: 550, cursor: 'pointer', px: 0.5, height: 26, borderRadius: '5px', '&:hover': { color: 'text.primary', bgcolor: 'archie.surface2' } }}>
+                    Rimuovi filtro
+                  </Box>
+                </Box>
+              ) : null}
+            </Popover>
+          </>
+        )}
+      </>
+    )
+  }
 
   // Spazio riservato a destra del testo, SEMPRE per 2 icone (imbuto + kebab),
   // indipendentemente da quali colonne del grid abbiano effettivamente un
@@ -330,6 +404,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     slotProps,
     density,
     rowHeight,
+    defaultHiddenColumns,
     zebra = false,
     checkboxSelection,
     rowSelectionModel,
@@ -345,6 +420,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
   } = props
 
   const persistEnabled = Boolean(pageKey)
+  const campo = useDrawerAppearance() === 'campo'
   const colPrefs = useColumnPrefs(pageKey ?? '__none__', username)
   const gridRef = React.useRef<HTMLDivElement | null>(null)
 
@@ -355,6 +431,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
 
   // Merge: preferenze utente + override esterno (es. cestino forzato)
   const mergedVisibility: GridColumnVisibilityModel = {
+    ...Object.fromEntries((defaultHiddenColumns ?? []).map((f) => [f, false])),
     ...colPrefs.columnVisibilityModel,
     ...externalVisibility,
   }
@@ -544,11 +621,35 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     },
   }
 
+  // Restyle "Campo sterile" (DESIGN.md › Data table): intestazione su paper 2,
+  // righe 40px con filo, hover tenue, selezione nel colore "campo", niente
+  // menu a tre puntini (le colonne si gestiscono dal pulsante Colonne).
+  const campoSx: SxProps<Theme> = campo ? {
+    '& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaders .MuiDataGrid-filler, & .MuiDataGrid-scrollbarFiller--header': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
+    '& .MuiDataGrid-columnHeaders': { borderBottom: '1px solid', borderColor: 'divider' },
+    '& .MuiDataGrid-columnHeader': { px: '12px', color: 'text.secondary', fontSize: 12, fontWeight: 550 },
+    '& .MuiDataGrid-columnHeader:first-of-type': { pl: '16px' },
+    '& .MuiDataGrid-columnHeaderTitleContainerContent > span': { fontWeight: '550 !important', letterSpacing: 0 },
+    '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 550, letterSpacing: 0 },
+    '& .MuiDataGrid-columnSeparator': { opacity: 0 },
+    '& .MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator': { opacity: 1, color: 'divider' },
+    '& .MuiDataGrid-menuIcon': { display: 'none' },
+    '& .MuiDataGrid-cell': { px: '12px', py: 0, fontSize: 13, borderColor: 'divider' },
+    '& .MuiDataGrid-cell:first-of-type': { pl: '16px' },
+    '& .MuiDataGrid-row:hover': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
+    '& .MuiDataGrid-row.Mui-selected, & .MuiDataGrid-row.Mui-selected:hover': {
+      backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { field: string } }).archie.field,
+      boxShadow: (t: Theme) => `inset 0 1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}, inset 0 -1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
+    },
+    '& .row-odd': { backgroundColor: 'transparent' },
+    '& .MuiDataGrid-virtualScrollerContent': { pb: 0 },
+  } : {}
+
   const mergedSx: SxProps<Theme> = sx
     ? Array.isArray(sx)
-      ? [baseSx, ...sx]
-      : [baseSx, sx]
-    : baseSx
+      ? [baseSx, campoSx, ...sx]
+      : [baseSx, campoSx, sx]
+    : [baseSx, campoSx]
 
   const rowMap = React.useMemo(() => {
     const map = new Map<string, R>()
@@ -667,8 +768,8 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         columns={columnsWithHeader}
         loading={loading}
         density={density}
-        columnHeaderHeight={32}
-        rowHeight={rowHeight ?? 36}
+        columnHeaderHeight={campo ? 36 : 32}
+        rowHeight={rowHeight ?? (campo ? 40 : 36)}
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}
         rowSelectionModel={rowSelectionModel}
@@ -712,13 +813,47 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
           if (!Number.isNaN(n)) onRowClick(n)
         }}
       />
-      <Box sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+      {campo ? (
+        <CampoFooter rowCount={rowCount} paginationModel={paginationModel} onPaginationModelChange={onPaginationModelChange} label={inferredFooterLabel} />
+      ) : null}
+      <Box sx={{ borderTop: '1px solid', borderColor: 'divider', display: campo ? 'none' : undefined }}>
         <GridPaginationFooter
           rowCount={rowCount}
           paginationModel={paginationModel}
           onPaginationModelChange={onPaginationModelChange}
           label={inferredFooterLabel}
         />
+      </Box>
+    </Box>
+  )
+}
+
+/** Piè compatto "Campo sterile": "n di N" a sinistra, "‹ 1 di 3 ›" a destra. */
+function CampoFooter({ rowCount, paginationModel, onPaginationModelChange, label }: {
+  rowCount: number
+  paginationModel: GridPaginationModel
+  onPaginationModelChange: (m: GridPaginationModel) => void
+  label: string
+}) {
+  const size = Math.max(1, paginationModel.pageSize || 25)
+  const pages = Math.max(1, Math.ceil(rowCount / size))
+  const page = paginationModel.page
+  const from = rowCount ? page * size + 1 : 0
+  const to = Math.min(rowCount, (page + 1) * size)
+  const btn = { width: 26, height: 26, p: 0, color: 'text.secondary' }
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: '12px', py: 1, borderTop: '1px solid', borderColor: 'divider', fontSize: 12, color: 'text.secondary' }}>
+      <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+        {pages > 1 ? `${from}–${to} di ${rowCount}` : rowCount} {label.toLowerCase()}
+      </Typography>
+      <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <IconButton size="small" aria-label="Pagina precedente" disabled={page <= 0} onClick={() => onPaginationModelChange({ ...paginationModel, page: page - 1 })} sx={btn}>
+          <ChevronLeftIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+        <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'center' }}>{page + 1} di {pages}</Typography>
+        <IconButton size="small" aria-label="Pagina successiva" disabled={page >= pages - 1} onClick={() => onPaginationModelChange({ ...paginationModel, page: page + 1 })} sx={btn}>
+          <ChevronRightIcon sx={{ fontSize: 18 }} />
+        </IconButton>
       </Box>
     </Box>
   )

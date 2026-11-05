@@ -22,7 +22,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import LinkIcon from '@mui/icons-material/Link'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
@@ -54,10 +53,8 @@ import IssueDialog from '../features/issues/IssueDialog'
 import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import SearchIcon from '@mui/icons-material/Search'
 import { IssuePriorityMark, IssueStatusBadge } from '../features/issues/IssueBadges'
-import { PageHead, ViewTabs, FilterOptionList, FilterTokens, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
@@ -155,13 +152,6 @@ function isIssueInventoryLabelSource(
   return 'inventory_name' in item
 }
 
-function UnlinkedInventoryWarningIcon() {
-  return (
-    <Tooltip title="Questa issue non è ancora collegata a un inventory.">
-      <WarningAmberRoundedIcon sx={{ color: 'warning.main', fontSize: 18, flexShrink: 0 }} />
-    </Tooltip>
-  )
-}
 
 function inventoryLabel(item: InventoryLabelSource) {
   if (!item) return '—'
@@ -824,6 +814,20 @@ export default function Issues() {
   const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
 
   const issueCounts = useIssueCounts(kpiReload, me?.id)
+  // Viste salvate (scheda + filtri + ordinamento + ricerca)
+  type ViewState = { view: IssueView; fStatus: string[]; fPriority: string[]; fCategory: string[]; fAssigned: string[]; q: string; sort: GridSortModel }
+  const saved = useSavedViews<ViewState>('issues', me?.username)
+  const [savedId, setSavedId] = React.useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
+  const currentViewState = (): ViewState => ({ view, fStatus, fPriority, fCategory, fAssigned, q: grid.q, sort: displaySortModel })
+  const applySaved = (id: string) => {
+    const v = saved.views.find((x) => x.id === id); if (!v) return
+    setSavedId(id)
+    setView(v.state.view); setFStatus(v.state.fStatus); setFPriority(v.state.fPriority); setFCategory(v.state.fCategory); setFAssigned(v.state.fAssigned)
+    grid.setQ(v.state.q ?? '')
+    if (v.state.sort) handleSortModelChange(v.state.sort)
+  }
   // Eventi di audit per Attività e timeline (solo con il permesso di vedere l'audit).
   const canAudit = hasPerm('audit.view_auditevent')
   const [events, setEvents] = React.useState<IssueEvent[] | null>(null)
@@ -835,7 +839,6 @@ export default function Issues() {
       .catch(() => { if (alive) setEvents(null) })
     return () => { alive = false }
   }, [detailIssue, canAudit])
-  const [searchOpen, setSearchOpen] = React.useState(false)
   const { exporting, exportCsv } = useExportCsv()
   const exportVisible = () => {
     const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
@@ -1106,8 +1109,7 @@ export default function Issues() {
       minWidth: 220,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%', minWidth: 0 }}>
-          <Typography noWrap sx={{ fontSize: 13, fontWeight: 600 }}>{row.title}</Typography>
-          {!row.inventory && <UnlinkedInventoryWarningIcon />}
+          <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{row.title}</Typography>
         </Box>
       ),
     },
@@ -1147,7 +1149,7 @@ export default function Issues() {
                   fontWeight: 500,
                   fontSize: 12,
                   cursor: resolvingServiceNowId === row.servicenow_id ? 'wait' : 'pointer',
-                  color: 'primary.main',
+                  color: 'text.primary',
                   opacity: resolvingServiceNowId === row.servicenow_id ? 0.5 : 1,
                   '&:hover': { textDecoration: 'underline' },
                 }}
@@ -1184,9 +1186,9 @@ export default function Issues() {
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
           {row.assigned_to_full_name ? (
-            <Typography variant="body2" noWrap>{row.assigned_to_full_name}</Typography>
+            <Typography noWrap sx={{ fontSize: 13 }}>{row.assigned_to_full_name}</Typography>
           ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>Non assegnata</Typography>
+            <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>Non assegnata</Typography>
           )}
         </Box>
       ),
@@ -1346,52 +1348,55 @@ export default function Issues() {
       />
       <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <ViewTabs
-          value={view}
-          onChange={(k) => setView(k as IssueView)}
+          value={savedId ? `saved:${savedId}` : view}
+          onChange={(k) => {
+            if (k.startsWith('saved:')) { applySaved(k.slice(6)); return }
+            setSavedId(null); setView(k as IssueView)
+          }}
           tabs={[
             { key: 'active', label: 'Attive', count: kpiCounts?.active },
             { key: 'mine', label: 'Le mie', count: issueCounts?.mine },
             { key: 'overdue', label: 'Scadute', count: issueCounts?.overdue, tone: 'alert' },
             { key: 'closed', label: 'Risolte e chiuse', count: kpiCounts?.closed },
             { key: 'all', label: 'Tutte', count: kpiCounts?.all },
+            ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
           ]}
+          end={
+            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+              Salva vista
+            </Button>
+          }
         />
+        <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
+          onSave={(name) => { const v = saved.add(name, currentViewState()); setSavedId(v.id) }} />
         <EntityListCard
           sx={{ border: 0, borderRadius: 0 }}
+          flush
           mobileCard={renderIssueCard}
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={activeFilters}
+              onRemoveFilter={removeFilter}
+              onClearFilters={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca titolo, cliente, ServiceNow, inventario…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+            />
+          }
           toolbar={{
             compact: true,
             q: grid.q,
             onQChange: grid.setQ,
-            hideSearch: !searchOpen && !grid.q,
-            searchLabel: 'Cerca titolo, cliente, ServiceNow, inventario…',
             alignRightActions: true,
-            children: (
-              <FilterTokens filters={activeFilters} onRemove={removeFilter} onClear={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }}
-                empty={searchOpen || grid.q ? undefined : 'Filtra e ordina dalle intestazioni di colonna'} />
-            ),
-            rightActions: (
-              <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
-                <Tooltip title="Esporta le righe visibili (CSV)">
-                  <span>
-                    <IconButton aria-label="Esporta le righe visibili" disabled={exporting} onClick={exportVisible}>
-                      {exporting ? <CircularProgress size={16} /> : <FileDownloadOutlinedIcon fontSize="small" />}
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title={searchOpen ? 'Nascondi la ricerca' : 'Cerca nella tabella'}>
-                  <IconButton aria-label="Cerca nella tabella" aria-pressed={searchOpen || !!grid.q}
-                    onClick={() => { if (searchOpen && grid.q) grid.setQ(''); setSearchOpen((v) => !v) }}
-                    sx={searchOpen || grid.q ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'archie.fieldLine' } : undefined}>
-                    <SearchIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            ),
           }}
           grid={{
             pageKey: 'issues',
-            rowHeight: 44,
+            defaultHiddenColumns: ['opened_at', 'category_label', 'comments_count', 'closed_at', 'days_open'],
             filterConfig,
             username: me?.username,
             rows,

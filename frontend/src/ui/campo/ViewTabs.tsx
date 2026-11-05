@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Box, ButtonBase } from '@mui/material'
 
-export type ViewTab = { key: string; label: string; count?: number | null; tone?: 'default' | 'alert' }
+export type ViewTab = { key: string; label: string; count?: number | null; tone?: 'default' | 'alert'; onRemove?: () => void }
 
 type Props = {
   tabs: ViewTab[]
@@ -34,6 +34,12 @@ export function ViewTabs({ tabs, value, onChange, end }: Props) {
                 bgcolor: t.tone === 'alert' && t.count ? 'error.light' : on ? 'archie.field' : 'archie.neutralBg',
                 color: t.tone === 'alert' && t.count ? 'error.main' : on ? 'primary.main' : 'text.secondary',
               }}>{t.count}</Box>
+            ) : null}
+            {t.onRemove && on ? (
+              <Box component="span" role="button" tabIndex={0} aria-label={`Elimina la vista ${t.label}`} title="Elimina vista"
+                onClick={(e) => { e.stopPropagation(); t.onRemove?.() }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); t.onRemove?.() } }}
+                sx={{ display: 'inline-grid', placeItems: 'center', width: 18, height: 18, borderRadius: '4px', color: 'text.secondary', fontSize: 14, lineHeight: 1, '&:hover': { bgcolor: 'archie.surface2', color: 'text.primary' } }}>×</Box>
             ) : null}
           </ButtonBase>
         )
