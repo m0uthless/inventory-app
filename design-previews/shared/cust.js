@@ -17,6 +17,8 @@
   const tick = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const phone = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>';
   const mail = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 6.5 12 13l8.5-6.5"/></svg>';
+  const phoneB = phone.replace('stroke-width="1.75"', 'stroke-width="2.4"');
+  const mailB = mail.replace('stroke-width="1.75"', 'stroke-width="2.4"');
   const key = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11a4 4 0 1 1 0 8a4 4 0 0 1 0-8z M10.8 12.2 20 3 M16 7l3 3 M14 9l2 2"/></svg>';
 
   // Nav: pagina attiva
@@ -219,10 +221,10 @@
 
   const secH = (t, right = '') => `<div class="c-sec-h"><h4>${t}</h4>${right}</div>`;
   const contactCard = (c) => c.contact ? `<section class="c-sec" aria-label="Contatto primario">${secH('Contatto primario', '<button type="button" class="c-link" data-tab-go="sites">Contatti dei siti</button>')}
-      <div class="c-person"><span class="ava" aria-hidden="true">${c.contact[0].split(' ').map((x) => x[0]).join('').slice(0, 2)}</span><div class="fn"><b>${c.contact[0]}</b><span>${c.contact[1]}</span></div></div>
+      <div class="c-person"><b>${c.contact[0]}</b><span>${c.contact[1]}</span></div>
       <div class="c-acts">
-        <div class="c-act"><span class="ci">${phone}</span><a class="ct" href="tel:${c.contact[2].replace(/\s+/g, '')}"><small>Telefono</small><b class="code">${c.contact[2]}</b></a><button type="button" class="icon-btn" data-copy aria-label="Copia il telefono" title="Copia">${ic('copy')}</button></div>
-        <div class="c-act"><span class="ci">${mail}</span><a class="ct" href="mailto:${c.contact[3]}"><small>Email</small><b>${c.contact[3]}</b></a><button type="button" class="icon-btn" data-copy aria-label="Copia l'email" title="Copia">${ic('copy')}</button></div>
+        <span class="c-act"><a class="ct" href="tel:${c.contact[2].replace(/\s+/g, '')}">${phoneB}<span class="code">${c.contact[2]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia il telefono" title="Copia">${ic('copy')}</button></span>
+        <span class="c-act"><a class="ct" href="mailto:${c.contact[3]}">${mailB}<span>${c.contact[3]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia l'email" title="Copia">${ic('copy')}</button></span>
       </div>
     </section>` : `<section class="c-sec">${secH('Contatto primario')}<button type="button" class="c-empty">${ic('user')}<span><b>Nessun contatto primario</b><span>Aggiungilo o scegline uno tra i contatti dei siti</span></span>${ic('plus')}</button></section>`;
 
