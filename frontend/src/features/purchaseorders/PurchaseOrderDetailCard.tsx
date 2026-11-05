@@ -18,6 +18,43 @@ import {
   type DocumentSlot, type PurchaseOrderDetail, type PurchaseOrderKind,
 } from './types'
 
+export type PoEvent = {
+  id: number
+  created_at: string
+  action: string
+  actor_username?: string | null
+  changes?: Record<string, { from?: unknown; to?: unknown } | [unknown, unknown]> | null
+}
+
+const PO_FIELD: Record<string, string> = {
+  status: 'lo stato', kind: 'il tipo', offer_date: "la data dell'offerta", purchase_order: 'il numero PO', invoice_number: 'il numero fattura',
+  amount: "l'importo", days: 'le giornate', daily_rate: 'la tariffa', costs_incurred: 'i costi sostenuti', description: 'la descrizione',
+  notes: 'le note', client_name: 'il committente', customer: 'il cliente collegato', amount_mode: "la modalità dell'importo",
+}
+const poVal = (k: string, v: unknown) => {
+  if (v == null || v === '') return '—'
+  if (k === 'status') return STATUS_LABEL[String(v) as keyof typeof STATUS_LABEL] ?? String(v)
+  if (['amount', 'daily_rate', 'costs_incurred'].includes(k)) return formatEuro(String(v))
+  return String(v)
+}
+function describePoEvent(e: PoEvent): React.ReactNode {
+  if (e.action === 'create') return 'ha creato il Purchase Order'
+  if (e.action === 'delete') return 'lo ha spostato nel cestino'
+  if (e.action === 'restore') return 'lo ha ripristinato'
+  const ch = Object.entries(e.changes ?? {}).filter(([k]) => k !== 'updated_at')
+  if (!ch.length) return 'ha modificato il Purchase Order'
+  return ch.map(([k, v], i) => {
+    const [from, to] = Array.isArray(v) ? v : [v?.from, v?.to]
+    let txt: React.ReactNode
+    if (k === 'document_added') txt = <>ha caricato <b>{String(to ?? '').replace(/^\w+: /, '')}</b></>
+    else if (k === 'document_removed') txt = <>ha eliminato <b>{String(from ?? '').replace(/^\w+: /, '')}</b></>
+    else if (/_document$/.test(k)) txt = <>ha caricato <b>{String(to ?? '')}</b></>
+    else if (k === 'description' || k === 'notes') txt = <>ha modificato {PO_FIELD[k]}</>
+    else txt = <>ha cambiato {PO_FIELD[k] ?? k} da <b>{poVal(k, from)}</b> a <b>{poVal(k, to)}</b></>
+    return <React.Fragment key={k}>{i ? '; ' : ''}{txt}</React.Fragment>
+  })
+}
+
 export type PoPatch = Partial<{ kind: PurchaseOrderKind; offer_date: string; purchase_order: string; invoice_number: string; costs_incurred: string | null }>
 
 type Props = {
@@ -26,8 +63,10 @@ type Props = {
   committenteColor: string
   canChange: boolean
   canDelete: boolean
-  tab: 'det' | 'doc'
-  onTab: (t: 'det' | 'doc') => void
+  tab: 'det' | 'doc' | 'att'
+  onTab: (t: 'det' | 'doc' | 'att') => void
+  /** Eventi di audit (null = permesso mancante). */
+  events?: PoEvent[] | null
   position?: string
   onPrev?: () => void
   onNext?: () => void
@@ -145,11 +184,11 @@ export default function PurchaseOrderDetailCard(p: Props) {
         ) : null}
       </>
     )
-  ) : (
+  ) : p.tab === 'doc' ? (
     <>
       <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>I PDF si possono caricare anche dopo il cambio di stato.</Typography>
     </>
-  )
+  ) : undefined
 
   return (
     <FloatingDetail
@@ -160,9 +199,9 @@ export default function PurchaseOrderDetailCard(p: Props) {
       status={<PoStatusBadge status={d.status} onDark />}
       title={d.description}
       subtitle={<>{d.client_name}{cust && cust !== d.client_name ? <> <ArrowForwardIcon sx={{ fontSize: 12, opacity: 0.7 }} /> {cust}</> : null}</>}
-      tabs={[{ key: 'det', label: 'Dettagli' }, { key: 'doc', label: 'Documenti', count: d.documents.length }]}
+      tabs={[{ key: 'det', label: 'Dettagli' }, { key: 'doc', label: 'Documenti', count: d.documents.length }, ...(p.events ? [{ key: 'att', label: 'Attività', count: p.events.length }] : [])]}
       tab={p.tab}
-      onTab={(k) => p.onTab(k as 'det' | 'doc')}
+      onTab={(k) => p.onTab(k as 'det' | 'doc' | 'att')}
       position={p.position}
       onPrev={p.onPrev}
       onNext={p.onNext}
@@ -262,6 +301,20 @@ export default function PurchaseOrderDetailCard(p: Props) {
             </Typography>
           ) : null}
         </>
+      ) : p.tab === 'att' ? (
+        <Box sx={{ display: 'grid', gap: 1.25 }}>
+          {(p.events ?? []).length === 0 ? (
+            <Typography sx={{ fontSize: 13, color: 'text.secondary', py: 4, textAlign: 'center' }}>Nessuna attività registrata.</Typography>
+          ) : (p.events ?? []).map((e) => (
+            <Box key={e.id} sx={{ display: 'grid', gridTemplateColumns: '24px 1fr auto', gap: 1, alignItems: 'center', fontSize: 12, color: 'text.secondary', '& b': { color: 'text.primary', fontWeight: 600 } }}>
+              <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: 'archie.neutralBg', display: 'grid', placeItems: 'center', '& svg': { fontSize: 13 } }}>
+                {e.action === 'create' ? <DescriptionOutlinedIcon /> : <EditIcon />}
+              </Box>
+              <span><b>{e.actor_username || 'Sistema'}</b> {describePoEvent(e)}</span>
+              <Box component="time" sx={{ fontSize: 11, whiteSpace: 'nowrap' }}>{new Date(e.created_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</Box>
+            </Box>
+          ))}
+        </Box>
       ) : (
         <Box sx={{ display: 'grid', gap: 2 }}>
           {SLOTS.map((slot) => {

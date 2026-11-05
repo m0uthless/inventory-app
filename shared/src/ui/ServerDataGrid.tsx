@@ -235,6 +235,7 @@ function ColumnHeader({
         whiteSpace: 'nowrap',
         flex: 1,
         minWidth: 0,
+        justifyContent: params.colDef.headerAlign === 'right' ? 'flex-end' : params.colDef.headerAlign === 'center' ? 'center' : undefined,
         paddingRight: rightPad,
         pointerEvents: 'none',
         userSelect: 'none',

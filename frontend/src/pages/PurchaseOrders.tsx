@@ -6,6 +6,8 @@ import {
   IconButton,
   Stack,
   Typography,
+  Tooltip,
+  CircularProgress,
 } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
@@ -30,14 +32,17 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 
 import { api } from '@shared/api/client'
 import PurchaseOrderDialog from '../features/purchaseorders/PurchaseOrderDialog'
-import PurchaseOrderDetailCard, { type PoPatch } from '../features/purchaseorders/PurchaseOrderDetailCard'
+import PurchaseOrderDetailCard, { type PoPatch, type PoEvent } from '../features/purchaseorders/PurchaseOrderDetailCard'
 import { Committente, PoStatusBadge } from '../features/purchaseorders/PoBadges'
 import { PageHead, ViewTabs, FilterOptionList, FilterTokens, headerFilterGridSx, useUndoToast } from '../ui/campo'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import PurchaseOrderTransitionDialog, {
   type TransitionExtraFields,
 } from '../features/purchaseorders/PurchaseOrderTransitionDialog'
-import PurchaseOrderKpis from '../features/purchaseorders/PurchaseOrderKpis'
+import PurchaseOrderKpis, { usePoYearStats } from '../features/purchaseorders/PurchaseOrderKpis'
+import { useExportCsv } from '@shared/ui/useExportCsv'
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
+import SearchIcon from '@mui/icons-material/Search'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { Can } from '../auth/Can'
@@ -111,7 +116,7 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
     {
       field: 'offer_date',
       headerName: 'Data offerta',
-      width: 116,
+      width: 104,
       renderCell: (p) => <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{formatItDate(p.row.offer_date)}</Typography>,
     },
     {
@@ -135,7 +140,7 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
     {
       field: 'kind',
       headerName: 'Tipo',
-      width: 104,
+      width: 92,
       renderCell: (p) => (
         <Box component="span" sx={{
           display: 'inline-flex', alignItems: 'center', height: 20, px: 0.875, borderRadius: '5px', fontSize: 11, fontWeight: 600, border: '1px solid',
@@ -146,13 +151,13 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
     {
       field: 'status',
       headerName: 'Stato',
-      width: 150,
+      width: 136,
       renderCell: (p) => <PoStatusBadge status={p.value as PurchaseOrderStatus} />,
     },
     {
       field: 'purchase_order',
       headerName: 'PO · fattura',
-      width: 160,
+      width: 150,
       renderCell: (p) => (
         <Box sx={{ lineHeight: 1.3, minWidth: 0 }}>
           <Box sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: p.row.purchase_order ? 'text.primary' : 'text.disabled' }}>{p.row.purchase_order || 'PO —'}</Box>
@@ -164,7 +169,7 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
     {
       field: 'amount',
       headerName: 'Importo',
-      width: 140,
+      width: 128,
       align: 'right',
       headerAlign: 'right',
       renderCell: (p) => (
@@ -176,8 +181,8 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
     },
     {
       field: 'costs_incurred',
-      headerName: 'Costi sostenuti',
-      width: 130,
+      headerName: 'Costi',
+      width: 100,
       align: 'right',
       headerAlign: 'right',
       renderCell: (p) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums', color: p.row.costs_incurred ? 'text.primary' : 'text.disabled' }}>{p.row.costs_incurred ? formatEuro(p.row.costs_incurred) : '—'}</Box>,
@@ -730,7 +735,41 @@ export default function PurchaseOrders() {
     [selectedId, toast, loadDetail, reloadList],
   )
 
-  const [poTab, setPoTab] = React.useState<'det' | 'doc'>('det')
+  const [poTab, setPoTab] = React.useState<'det' | 'doc' | 'att'>('det')
+  const canAudit = hasPerm('audit.view_auditevent')
+  const [poEvents, setPoEvents] = React.useState<PoEvent[] | null>(null)
+  React.useEffect(() => {
+    if (!detail || !canAudit) { setPoEvents(null); return }
+    let alive = true
+    api.get('/audit-events/', { params: { app_label: 'purchaseorders', model: 'purchaseorderentry', object_id: String(detail.id), ordering: '-created_at', page_size: 200 } })
+      .then((r) => { const d = r.data as { results?: PoEvent[] } | PoEvent[]; if (alive) setPoEvents(Array.isArray(d) ? d : d.results ?? []) })
+      .catch(() => { if (alive) setPoEvents(null) })
+    return () => { alive = false }
+  }, [detail, canAudit])
+  const yearStats = usePoYearStats(effectiveYear, kindFilter === 'all' ? null : kindFilter, rows)
+  const [searchOpen, setSearchOpen] = React.useState(false)
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<PurchaseOrderRow>({
+      url: '/purchase-order-entries/',
+      params,
+      filename: `purchase-order-${effectiveYear}`,
+      columns: [
+        { label: 'Data offerta', getValue: (r) => r.offer_date },
+        { label: 'Committente', getValue: (r) => r.client_name },
+        { label: 'Cliente collegato', getValue: (r) => r.customer_name || r.customer_placeholder },
+        { label: 'Descrizione', getValue: (r) => r.description },
+        { label: 'Tipo', getValue: (r) => KIND_LABEL[r.kind] || r.kind },
+        { label: 'Stato', getValue: (r) => STATUS_LABEL[r.status] || r.status },
+        { label: 'Purchase Order', getValue: (r) => r.purchase_order },
+        { label: 'N. fattura', getValue: (r) => r.invoice_number },
+        { label: 'Importo', getValue: (r) => r.amount },
+        { label: 'Costi sostenuti', getValue: (r) => r.costs_incurred },
+      ],
+    })
+  }
   const drawerIndex = drawerOpen && selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
 
   // Modifica sul posto dal pannello: salva subito, con Annulla (PATCH inverso).
@@ -934,18 +973,18 @@ export default function PurchaseOrders() {
           </Can>
         }
       />
-      <PurchaseOrderKpis year={effectiveYear} summary={summary} loading={summaryLoading} view={poView} onView={setPoView} />
+      <PurchaseOrderKpis year={effectiveYear} summary={summary} stats={yearStats} loading={summaryLoading} view={poView} onView={setPoView} />
 
       <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <ViewTabs
           value={poView}
           onChange={setPoView}
           tabs={[
-            { key: 'all', label: 'Tutti' },
-            { key: 'send', label: 'Da inviare', count: summary?.to_send },
-            { key: 'wait', label: 'In attesa del PO' },
-            { key: 'inv', label: 'Da fatturare' },
-            { key: 'done', label: 'Fatturati' },
+            { key: 'all', label: 'Tutti', count: yearStats ? yearStats.byStatus.inserito.n + yearStats.byStatus.inviato.n + yearStats.byStatus.ricevuto.n + yearStats.byStatus.fatturato.n : null },
+            { key: 'send', label: 'Da inviare', count: yearStats?.byStatus.inserito.n ?? summary?.to_send },
+            { key: 'wait', label: 'In attesa del PO', count: yearStats?.byStatus.inviato.n },
+            { key: 'inv', label: 'Da fatturare', count: yearStats?.byStatus.ricevuto.n },
+            { key: 'done', label: 'Fatturati', count: yearStats?.byStatus.fatturato.n },
           ]}
         />
         <EntityListCard
@@ -955,12 +994,35 @@ export default function PurchaseOrders() {
             compact: true,
             q: grid.q,
             onQChange: grid.setQ,
+            hideSearch: !searchOpen && !grid.q,
+            searchLabel: 'Cerca descrizione, committente, PO, fattura…',
+            alignRightActions: true,
+            children: (
+              <FilterTokens
+                filters={kindFilter !== 'all' ? [{ key: 'kind', label: 'Tipo', values: KIND_LABEL[kindFilter] }] : []}
+                onRemove={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
+                onClear={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
+                empty={searchOpen || grid.q ? undefined : 'Filtra e ordina dalle intestazioni di colonna'} />
+            ),
+            rightActions: (
+              <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
+                <Tooltip title="Esporta le righe visibili (CSV)">
+                  <span>
+                    <IconButton aria-label="Esporta le righe visibili" disabled={exporting} onClick={exportVisible}>
+                      {exporting ? <CircularProgress size={16} /> : <FileDownloadOutlinedIcon fontSize="small" />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title={searchOpen ? 'Nascondi la ricerca' : 'Cerca nella tabella'}>
+                  <IconButton aria-label="Cerca nella tabella" aria-pressed={searchOpen || !!grid.q}
+                    onClick={() => { if (searchOpen && grid.q) grid.setQ(''); setSearchOpen((v) => !v) }}
+                    sx={searchOpen || grid.q ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'archie.fieldLine' } : undefined}>
+                    <SearchIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ),
           }}
-          belowToolbar={kindFilter !== 'all' ? (
-            <FilterTokens filters={[{ key: 'kind', label: 'Tipo', values: KIND_LABEL[kindFilter] }]}
-              onRemove={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })}
-              onClear={() => setKindFilterRaw('', { patch: { page: 1 }, keepOpen: false })} />
-          ) : undefined}
           grid={{
             pageKey: 'purchase-orders',
             username: me?.username,
@@ -1001,6 +1063,7 @@ export default function PurchaseOrders() {
           canDelete={canDelete}
           tab={poTab}
           onTab={setPoTab}
+          events={poEvents}
           position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
           onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
           onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
