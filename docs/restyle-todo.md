@@ -14,10 +14,9 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - **[BE] "Visibile al cliente nel Portale"** su commenti e allegati, etichette Cliente/Interno nella cronologia.
 - **[BE] Indicatore "Entro SLA"** (percentuale e obiettivo): nessun dato SLA. Al suo posto: Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
 - **[BE] Variazione del tempo di risoluzione** ("−0,4 g sulla settimana prima"): `/issues/summary/` dà solo la media.
-- **[UI/BE] "+ Salva vista"**: viste personali salvate.
+- **[BE] "+ Salva vista"**: fatto, ma le viste sono salvate nel browser (per utente e pagina). Per averle su tutti i dispositivi serve salvarle sul server.
 - **[UI] Ricerca per colonna** (riga di campi sotto le intestazioni): oggi la lente apre la ricerca unica.
-- **[UI] Pulsante "Colonne" nella barra**: la gestione colonne c'è ma dal menu dell'intestazione.
-- **[UI] Paginazione compatta** "‹ 1 di 1 ›" e "5 di 11 issue" nel piè: oggi è quella condivisa.
+- **[UI] Avviso "nessun inventario collegato"** (triangolo accanto al titolo nella vecchia tabella): tolto dalla riga come nell'anteprima; resta nel pannello ("Nessun inventario collegato · Collega un inventario").
 - **[UI] Ricerca Ctrl K a finestra** con risultati raggruppati (clienti, siti, device, issue, azioni): oggi Ctrl K porta il cursore nel campo e Invio apre la pagina Ricerca.
 
 ### Presente nella UI di prima, tolto o non ancora ridisegnato
@@ -32,7 +31,8 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - **[BE] "Da fatturare" in `summary`**: oggi calcolato dal frontend leggendo le righe dell'anno.
 - **[DEC] Margine**: calcolato in pagina (importo − costi), non è un campo.
 - **[UI] Dialogo Nuovo/Modifica PO** (`PurchaseOrderDialog`) e **dialogo di avanzamento** (`PurchaseOrderTransitionDialog`): funzionano, non ridisegnati (l'anteprima aveva un dialogo breve con solo i campi del passo).
-- **[UI] Ricerca per colonna e paginazione compatta**: come per le Issue.
+- **[UI] Ricerca per colonna**: come per le Issue.
+- **[UI] Totali nel piè** ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
 - **[UI] Ripristino multiplo dal cestino**: la logica c'è, ma la pagina non ha più un selettore di vista "cestino" visibile (va riesposto, es. come scheda o voce di menu).
 
 ## Struttura e tema
