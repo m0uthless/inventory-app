@@ -221,13 +221,20 @@
   const copyable = (v, label) => `<span class="cpy"><span class="code">${v}</span><button type="button" class="icon-btn" data-copy aria-label="Copia ${label}" title="Copia">${ic('copy')}</button></span>`;
 
   const secH = (t, right = '') => `<div class="c-sec-h"><h4>${t}</h4>${right}</div>`;
-  const contactCard = (c) => c.contact ? `<section class="c-sec" aria-label="Contatto primario">${secH('Contatto primario', '<button type="button" class="c-link" data-tab-go="sites">Contatti dei siti</button>')}
-      <div class="c-person"><b>${c.contact[0]}</b><span>${c.contact[1]}</span></div>
-      <div class="c-acts">
-        <span class="c-act"><a class="ct" href="tel:${c.contact[2].replace(/\s+/g, '')}">${phoneB}<span class="code">${c.contact[2]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia il telefono" title="Copia">${ic('copy')}</button></span>
-        <span class="c-act"><a class="ct" href="mailto:${c.contact[3]}">${mailB}<span>${c.contact[3]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia l'email" title="Copia">${ic('copy')}</button></span>
-      </div>
-    </section>` : `<section class="c-sec">${secH('Contatto primario')}<button type="button" class="c-empty">${ic('user')}<span><b>Nessun contatto primario</b><span>Aggiungilo o scegline uno tra i contatti dei siti</span></span>${ic('plus')}</button></section>`;
+  const others = (c) => { const seen = new Set([c.contact?.[0]]); const out = []; c.site.forEach((x) => x.con.forEach(([n, d, p]) => { if (!seen.has(n)) { seen.add(n); out.push([n, d, p, x.name]); } })); return out; };
+  const tel = (p) => p.replace(/\s+/g, '');
+  const contactCard = (c) => {
+    const o = others(c); const more = o.length - 3;
+    const list = o.length ? `<ul class="c-refs" aria-label="Altri referenti">${o.slice(0, 3).map(([n, d, p, site]) => `<li><div class="fn"><b>${n}<span>${d}</span></b><span>${site}</span></div><a class="c-tel" href="tel:${tel(p)}" title="Chiama ${n}">${phoneB}<span class="code">${p}</span></a></li>`).join('')}</ul>${more > 0 ? `<button type="button" class="c-link c-more" data-tab-go="sites">Altri ${more} referenti nei siti</button>` : ''}` : '';
+    const primary = c.contact ? `<div class="c-primary">
+        <div class="c-person"><b>${c.contact[0]}<span class="c-tag">Primario</span></b><span>${c.contact[1]}</span></div>
+        <div class="c-acts">
+          <span class="c-act"><a class="ct" href="tel:${tel(c.contact[2])}">${phoneB}<span class="code">${c.contact[2]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia il telefono" title="Copia">${ic('copy')}</button></span>
+          <span class="c-act"><a class="ct" href="mailto:${c.contact[3]}">${mailB}<span>${c.contact[3]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia l'email" title="Copia">${ic('copy')}</button></span>
+        </div>
+      </div>` : `<button type="button" class="c-empty">${ic('user')}<span><b>Nessun contatto primario</b><span>${o.length ? 'Scegline uno tra i referenti qui sotto' : 'Aggiungi il referente principale del cliente'}</span></span>${ic('plus')}</button>`;
+    return `<section class="c-sec" aria-label="Contatti">${secH(`Contatti <span>${(c.contact ? 1 : 0) + o.length}</span>`, '<button type="button" class="c-link">Aggiungi</button>')}${primary}${list}</section>`;
+  };
 
   const vpnBlock = (c) => `<section class="c-sec" aria-label="Accesso remoto">${secH(`${ic('lock')}Accesso remoto`, c.vpn ? `<span class="c-app">${c.vpn.app}</span>` : '')}
     ${c.vpn ? `<div class="c-cred">

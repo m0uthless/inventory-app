@@ -246,3 +246,17 @@ a.btn { text-decoration: none; }
 .c-kpis .kpi { min-height: 116px; }
 .c-exp { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--warning); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .c-exp .i { width: 14px; height: 14px; }
+
+/* Contatti: primario in evidenza, poi i referenti dei siti a righe */
+.c-primary { display: grid; gap: 8px; }
+.c-person b { display: inline-flex; align-items: center; gap: 8px; }
+.c-tag { font-size: 10px; font-weight: 650; letter-spacing: .02em; color: var(--primary); background: var(--field); border-radius: 4px; padding: 1px 6px; }
+.c-refs { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid var(--border); }
+.c-refs li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 46px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.c-refs .fn b { font-weight: 550; font-size: 13px; }
+.c-refs .fn b span { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
+.c-refs .fn > span { font-size: 11px; color: var(--faint); }
+.c-tel { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 550; color: var(--text); text-decoration: none; white-space: nowrap; }
+.c-tel .i { width: 14px; height: 14px; color: var(--primary); }
+.c-tel:hover { color: var(--primary); }
+.c-more { justify-self: start; margin-top: -2px; }
