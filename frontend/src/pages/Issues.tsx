@@ -1422,13 +1422,13 @@ export default function Issues() {
               open: colSearchOpen,
               fields: {
                 id: { value: colQ.id, onChange: (v) => setColQ((c) => ({ ...c, id: v })), placeholder: '#' },
-                priority: { value: colQ.priority, onChange: (v) => setColQ((c) => ({ ...c, priority: v })), options: ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k].label })) },
+                priority: { value: colQ.priority, allLabel: 'Tutte', onChange: (v) => setColQ((c) => ({ ...c, priority: v })), options: ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k].label })) },
                 status: { value: colQ.status, onChange: (v) => setColQ((c) => ({ ...c, status: v })), options: Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label })) },
-                title: { value: colQ.title, onChange: (v) => setColQ((c) => ({ ...c, title: v })), placeholder: 'Contiene…' },
+                title: { value: colQ.title, onChange: (v) => setColQ((c) => ({ ...c, title: v })), placeholder: 'Cerca nel titolo' },
                 customer_name: { value: colQ.customer, onChange: (v) => setColQ((c) => ({ ...c, customer: v })), placeholder: 'Cliente o sito' },
                 servicenow_id: { value: colQ.servicenow, onChange: (v) => setColQ((c) => ({ ...c, servicenow: v })), placeholder: 'CS…' },
                 assigned_to_full_name: { value: colQ.assigned, onChange: (v) => setColQ((c) => ({ ...c, assigned: v })), placeholder: 'Nome' },
-                due_date: { value: colQ.due, onChange: (v) => setColQ((c) => ({ ...c, due: v })), options: [
+                due_date: { value: colQ.due, allLabel: 'Tutte', onChange: (v) => setColQ((c) => ({ ...c, due: v })), options: [
                   { value: 'overdue', label: 'Scadute' }, { value: 'today', label: 'Oggi' }, { value: 'week', label: 'Entro 7 giorni' },
                   { value: 'later', label: 'Oltre 7 giorni' }, { value: 'none', label: 'Senza scadenza' },
                 ] },

@@ -16,7 +16,7 @@ import {
   type GridRowId,
 } from '@mui/x-data-grid'
 import type { ReactNode } from 'react'
-import { alpha, type SxProps, type Theme } from '@mui/material/styles'
+import { alpha, useTheme, type SxProps, type Theme } from '@mui/material/styles'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
@@ -93,10 +93,13 @@ export type ColumnSearchField = {
   placeholder?: string
   /** Se presente, al posto del campo di testo compare un elenco a scelta. */
   options?: { value: string; label: string }[]
+  /** Etichetta della scelta vuota (predefinita "Tutti"). */
+  allLabel?: string
 }
 
 /** Campo della riga di ricerca: aggiorna il valore dopo una breve pausa. */
 function ColumnSearchInput({ field, label }: { field: ColumnSearchField; label: string }) {
+  const theme = useTheme()
   const [v, setV] = React.useState(field.value)
   React.useEffect(() => { setV(field.value) }, [field.value])
   React.useEffect(() => {
@@ -106,20 +109,22 @@ function ColumnSearchInput({ field, label }: { field: ColumnSearchField; label: 
   }, [v]) // eslint-disable-line react-hooks/exhaustive-deps
   const stop = (e: React.SyntheticEvent) => e.stopPropagation()
   const set = Boolean(field.value)
-  const sx = {
-    display: 'block', width: '100%', minWidth: 0, height: 30, px: '8px', border: '1px solid', borderRadius: '6px', font: 'inherit', fontSize: 12, fontWeight: 400,
-    color: 'text.primary', outline: 'none', borderColor: set ? 'archie.fieldLine' : 'divider', bgcolor: set ? 'archie.field' : 'archie.surface2',
-    '&::placeholder': { color: 'text.disabled' },
+  const sx: SxProps<Theme> = {
+    display: 'block', width: '100%', minWidth: 0, height: 30, m: 0, px: '8px', boxSizing: 'border-box', border: '1px solid', borderRadius: '6px',
+    fontFamily: theme.typography.fontFamily, fontSize: 12, fontWeight: 400, lineHeight: '28px', color: 'text.primary', outline: 'none', boxShadow: 'none',
+    borderColor: set ? 'archie.fieldLine' : 'divider', bgcolor: set ? 'archie.field' : 'archie.surface2',
+    '&::placeholder': { color: 'text.disabled', opacity: 1 },
+    '&:hover': { borderColor: set ? 'archie.fieldLine' : 'archie.borderStrong' },
     '&:focus': { borderColor: 'primary.main', bgcolor: 'background.paper', boxShadow: (t: Theme) => (t.palette as unknown as { archie: { focusRing: string } }).archie.focusRing },
   }
   const common = { draggable: false, onMouseDown: stop, onClick: stop, onKeyDown: stop, onKeyUp: stop, onDragStart: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation() }, 'aria-label': `Cerca in ${label}` }
   if (field.options) {
     return (
       <Box component="select" value={field.value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => field.onChange(e.target.value)} {...common}
-        sx={{ ...sx, appearance: 'none', pr: '24px', cursor: 'pointer', color: field.value ? 'text.primary' : 'text.disabled',
-          backgroundImage: 'linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(-45deg, transparent 50%, currentColor 50%)',
-          backgroundPosition: 'right 12px center, right 8px center', backgroundSize: '4px 4px', backgroundRepeat: 'no-repeat' }}>
-        <option value="">Tutti</option>
+        sx={[sx, { appearance: 'none', pr: '24px', cursor: 'pointer',
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='${theme.palette.text.secondary}' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>`)}")`,
+          backgroundPosition: 'right 7px center', backgroundSize: '11px 11px', backgroundRepeat: 'no-repeat' }] as SxProps<Theme>}>
+        <option value="">{field.allLabel ?? 'Tutti'}</option>
         {field.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </Box>
     )
@@ -333,8 +338,8 @@ function ColumnHeader({
     if (search === undefined) return head
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
-        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', height: 33, flex: 'none' }}>{head}</Box>
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', mx: '-7px', px: '6px', bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', height: 34, flex: 'none' }}>{head}</Box>
+        <Box className="cs-row" sx={{ flex: 1, display: 'flex', alignItems: 'center', mx: '-1px' }}>
           {search ? <ColumnSearchInput field={search} label={String(params.colDef.headerName ?? params.field)} /> : null}
         </Box>
       </Box>
@@ -697,7 +702,12 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     ...(columnSearch?.open ? {
       '& .MuiDataGrid-columnHeaderDraggableContainer, & .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': { height: '100%', width: '100%', alignItems: 'stretch' },
       '& .MuiDataGrid-columnHeader': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { borderStrong: string } }).archie.borderStrong },
-      '& .MuiDataGrid-columnHeader[aria-colindex="1"] input, & .MuiDataGrid-columnHeader[aria-colindex="1"] select': { ml: '4px' },
+      // Riga di ricerca: fascia bianca continua sotto le etichette (come .colsearch).
+      '& .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaders .MuiDataGrid-filler, & .MuiDataGrid-scrollbarFiller--header': {
+        background: (t: Theme) => `linear-gradient(to bottom, ${(t.palette as unknown as { archie: { surface2: string } }).archie.surface2} 0 34px, ${t.palette.background.paper} 34px)`,
+      },
+      '& .MuiDataGrid-columnHeader[aria-colindex="1"]': { pl: '10px' },
+      '& .MuiDataGrid-columnHeader[aria-colindex="1"] .MuiDataGrid-columnHeaderTitleContainerContent > div > div:first-of-type': { pl: '6px' },
     } : {}),
     '& .MuiDataGrid-row.Mui-selected, & .MuiDataGrid-row.Mui-selected:hover': {
       backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { field: string } }).archie.field,
@@ -830,7 +840,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         columns={columnsWithHeader}
         loading={loading}
         density={density}
-        columnHeaderHeight={campo ? (columnSearch?.open ? 78 : 34) : 32}
+        columnHeaderHeight={campo ? (columnSearch?.open ? 79 : 34) : 32}
         rowHeight={rowHeight ?? (campo ? 40 : 36)}
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}
