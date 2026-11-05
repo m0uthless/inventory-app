@@ -61,6 +61,15 @@ Portata direttamente nell'app con lo schema di Clienti e Siti.
 - **[UI] Ripristino multiplo dal cestino**: la vecchia pagina aveva il codice ma non la selezione delle righe, quindi non era raggiungibile; non riportato (resta la pagina Cestino).
 - **[DEC] Cliente di un contatto**: nel pannello è in sola lettura; si cambia da "Modifica" (il sito deve appartenere al cliente).
 
+## Pagina Inventari
+
+Portata direttamente nell'app con lo schema di Clienti, Siti e Contatti.
+
+- **[UI] Drawer inventario vecchio** (`InventoryDrawer`): ancora usato da Site Repository.
+- **[BE] Lettura delle credenziali non registrata nell'audit**: come per la VPN dei clienti, il dettaglio restituisce le password decifrate a chi ha `inventory.view_secrets` senza registrare la lettura.
+- **[UI] Targa K-Number**: il vecchio drawer mostrava il K-Number come targa grafica; ora è in testata come codice.
+- **[DEC] Cliente di un inventario**: nel pannello è in sola lettura; si cambia da "Modifica".
+
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).
