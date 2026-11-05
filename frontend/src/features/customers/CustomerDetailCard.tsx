@@ -106,7 +106,7 @@ function DirectLink({ href, icon, text, monoText, onCopy, copyLabel }: { href: s
   return (
     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '2px', minWidth: 0, maxWidth: '100%', '&:hover .cp, & .cp:focus-visible': { opacity: 1 } }}>
       <Box component="a" href={href} sx={{
-        display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0, color: 'text.primary', textDecoration: 'none', fontSize: 13, fontWeight: 550,
+        display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0, color: 'text.primary', textDecoration: 'none', fontSize: 12, fontWeight: 550,
         '& svg': { color: 'primary.main' },
         '&:hover': { color: 'primary.main', '& .tx': { textDecoration: 'underline', textUnderlineOffset: '3px' } },
       }}>
@@ -183,7 +183,7 @@ export default function CustomerDetailCard(p: Props) {
     },
     {
       key: 'vat', label: 'P.IVA', disabled: !editable,
-      text: { value: d.vat_number ?? '', placeholder: '11 cifre', mono: true },
+      text: { value: d.vat_number ?? '', placeholder: '11 cifre', mono: Boolean(d.vat_number) },
       display: d.vat_number ? <Box component="span" sx={mono}>{d.vat_number}</Box> : <Box component="span" sx={{ color: 'warning.main', fontWeight: 550, fontSize: 12 }}>Manca</Box>,
       onChange: (v: string) => p.onPatch({ vat_number: v.trim() || null }, 'P.IVA aggiornata'),
     },
@@ -209,7 +209,7 @@ export default function CustomerDetailCard(p: Props) {
         '& + &::before': { content: '""', position: 'absolute', left: 0, top: 14, bottom: 14, width: '1px', bgcolor: 'divider' },
         '&:hover b': { color: warn ? 'warning.main' : 'primary.main' },
       }}>
-        <Box component="b" sx={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.15, fontVariantNumeric: 'tabular-nums', color: warn ? 'warning.main' : 'text.primary', transition: 'color .12s' }}>
+        <Box component="b" sx={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 18, fontWeight: 650, letterSpacing: '-0.01em', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums', color: warn ? 'warning.main' : 'text.primary', transition: 'color .12s' }}>
           {value}{warn ? <CampoIcon name="clock" size={15} bold /> : null}
         </Box>
         <Box component="span" sx={{ fontSize: 11, color: 'text.secondary', whiteSpace: 'nowrap' }}>{label}</Box>
@@ -220,7 +220,7 @@ export default function CustomerDetailCard(p: Props) {
   const credRow = (label: string, value: React.ReactNode, actions: React.ReactNode) => (
     <Box sx={{ display: 'grid', gridTemplateColumns: '76px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 38, pl: 1.5, pr: 0.5, '& + &': { borderTop: '1px solid', borderColor: 'divider' } }}>
       <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
-      <Box sx={{ fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...mono }}>{value}</Box>
+      <Box sx={{ fontSize: 12, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...mono }}>{value}</Box>
       <Box sx={{ display: 'inline-flex' }}>{actions}</Box>
     </Box>
   )
@@ -255,7 +255,7 @@ export default function CustomerDetailCard(p: Props) {
         {d.primary_contact_id ? (
           <Box sx={{ display: 'grid', gap: 1 }}>
             <Box>
-              <Typography sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontSize: 14, fontWeight: 600 }}>
+              <Typography sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontSize: 13, fontWeight: 600 }}>
                 {d.primary_contact_name}
                 <Box component="span" sx={{ fontSize: 10, fontWeight: 650, letterSpacing: '.02em', color: 'primary.main', bgcolor: 'archie.field', borderRadius: '4px', px: 0.75, py: '1px' }}>Primario</Box>
               </Typography>
@@ -282,7 +282,7 @@ export default function CustomerDetailCard(p: Props) {
                   <Typography noWrap sx={{ fontSize: 11, color: 'text.disabled' }}>{c.site_display_name || c.site_name || 'Nessun sito'}</Typography>
                 </Box>
                 {c.phone ? (
-                  <Box component="a" href={`tel:${tel(c.phone)}`} title={`Chiama ${c.name}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12.5, fontWeight: 550, color: 'text.primary', textDecoration: 'none', whiteSpace: 'nowrap', '& svg': { color: 'primary.main' }, '&:hover': { color: 'primary.main' } }}>
+                  <Box component="a" href={`tel:${tel(c.phone)}`} title={`Chiama ${c.name}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12, fontWeight: 550, color: 'text.primary', textDecoration: 'none', whiteSpace: 'nowrap', '& svg': { color: 'primary.main' }, '&:hover': { color: 'primary.main' } }}>
                     <CampoIcon name="phone" size={14} bold /><Box component="span" sx={mono}>{c.phone}</Box>
                   </Box>
                 ) : c.email ? (
@@ -341,7 +341,7 @@ export default function CustomerDetailCard(p: Props) {
               p: '7px 7px 7px 10px', borderRadius: '8px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', boxShadow: '0 6px 16px -8px rgb(0 0 0 / .25)',
             }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography noWrap sx={{ fontSize: 12.5, fontWeight: 600 }}>{street}</Typography>
+                <Typography noWrap sx={{ fontSize: 12, fontWeight: 600 }}>{street}</Typography>
                 {rest.length ? <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>{rest.join(', ')}{d.province ? ` (${d.province})` : ''}</Typography> : null}
               </Box>
               <Button size="small" variant="outlined" component="a" href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(p.address)}`} target="_blank" rel="noopener"

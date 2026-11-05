@@ -18,10 +18,10 @@ export function ClockIcon({ size = 14 }: { size?: number }) {
 }
 
 /** Vendor (= "stato" del cliente): quadratino di riconoscimento + nome, mai semaforico. */
-export function VendorMark({ label, color }: { label?: string | null; color: string }) {
+export function VendorMark({ label, color, strong }: { label?: string | null; color: string; strong?: boolean }) {
   if (!label) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
   return (
-    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.875, fontWeight: 550, whiteSpace: 'nowrap', minWidth: 0 }}>
+    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.875, fontWeight: strong ? 550 : 400, whiteSpace: 'nowrap', minWidth: 0 }}>
       <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: color, flex: 'none' }} />
       <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Box>
     </Box>

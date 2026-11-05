@@ -714,7 +714,14 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     '& .MuiDataGrid-row.Mui-selected, & .MuiDataGrid-row.Mui-selected:hover': {
       backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { field: string } }).archie.field,
     },
-    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine },
+    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': {
+      borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine,
+      // Bordo superiore (come tbody tr.is-selected td dell'anteprima), senza spostare le righe.
+      boxShadow: (t: Theme) => `inset 0 1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
+    },
+    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell[data-colindex="0"]': {
+      boxShadow: (t: Theme) => { const c = (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine; return `inset 1px 0 0 ${c}, inset 0 1px 0 ${c}` },
+    },
     '& .row-odd': { backgroundColor: 'transparent' },
     '& .MuiDataGrid-virtualScrollerContent': { pb: 0 },
   } : {}

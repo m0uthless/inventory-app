@@ -72,7 +72,7 @@ function Row({ tile, title, sub, end, onClick, chevron }: { tile: React.ReactNod
     <>
       {tile}
       <Box sx={{ minWidth: 0, display: 'grid', gap: '1px', textAlign: 'left' }}>
-        <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary' }}>{title}</Typography>
+        <Typography noWrap sx={{ fontSize: 13, fontWeight: 550, color: 'text.primary' }}>{title}</Typography>
         {sub ? <Typography noWrap component="div" sx={{ fontSize: 12, color: 'text.secondary' }}>{sub}</Typography> : null}
       </Box>
       <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flex: 'none' }}>

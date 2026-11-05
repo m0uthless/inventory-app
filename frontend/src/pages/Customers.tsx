@@ -139,7 +139,7 @@ function buildColumns(onVpnClick: (row: CustomerRow) => void, vendorColor: (l: s
       field: 'display_name', headerName: 'Cliente', flex: 1, minWidth: 180,
       renderCell: (p) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-          <Box component="span" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.value as string}</Box>
+          <Box component="span" sx={{ fontWeight: 550, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.value as string}</Box>
           {p.row.has_vpn && <VpnPill row={p.row} onClick={onVpnClick} />}
         </Box>
       ),
