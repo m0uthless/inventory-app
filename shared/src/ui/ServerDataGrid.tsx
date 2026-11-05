@@ -719,12 +719,17 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
       boxShadow: 'none', // la barra di 3px del tema è per le tabelle non migrate
     },
     ...(autoHeight ? { '& .MuiDataGrid-main': { minHeight: 160 } } : {}),
-    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': {
-      borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine,
-      // Bordo superiore (come tbody tr.is-selected td dell'anteprima), senza spostare le righe.
+    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine },
+    // Filo superiore: è il bordo inferiore della riga precedente (una sola linea, come sotto).
+    '& .MuiDataGrid-row:has(+ .MuiDataGrid-row.Mui-selected) .MuiDataGrid-cell': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine },
+    // Prima riga: sopra c'è l'intestazione, il filo va disegnato dentro la riga.
+    '& .MuiDataGrid-row--firstVisible.Mui-selected .MuiDataGrid-cell': {
       boxShadow: (t: Theme) => `inset 0 1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
     },
     '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell[data-colindex="0"]': {
+      boxShadow: (t: Theme) => `inset 1px 0 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
+    },
+    '& .MuiDataGrid-row--firstVisible.Mui-selected .MuiDataGrid-cell[data-colindex="0"]': {
       boxShadow: (t: Theme) => { const c = (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine; return `inset 1px 0 0 ${c}, inset 0 1px 0 ${c}` },
     },
     '& .row-odd': { backgroundColor: 'transparent' },
