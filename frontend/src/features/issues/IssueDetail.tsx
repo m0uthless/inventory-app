@@ -11,15 +11,24 @@ import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
 import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import AddIcon from '@mui/icons-material/Add'
 
 import { FloatingDetail, DetailSection, Properties } from '../../ui/campo'
 import { inventoryDrawerPath } from '../../utils/entityPaths'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
 import {
-  WAITING_REASON_META, fmtIssueDate, fmtIssueDateTime,
+  PRIORITY_META, STATUS_META, WAITING_REASON_META, fmtIssueDate, fmtIssueDateTime,
   issueAuthorInitials, issueAuthorName, issueInventoryLabel,
   type CategoryOption, type IssueComment, type IssueRow, type UserOption,
 } from './types'
+
+export type IssueEvent = {
+  id: number
+  created_at: string
+  action: string
+  actor_username?: string | null
+  changes?: Record<string, { from?: unknown; to?: unknown } | [unknown, unknown]> | null
+}
 
 export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'category' | 'due_date' | 'servicenow_id'>>
 
@@ -33,6 +42,8 @@ type Props = {
   onClose: () => void
   comments: IssueComment[]
   commentsLoading: boolean
+  /** Eventi di audit della issue (null = permesso mancante o non caricati). */
+  events?: IssueEvent[] | null
   newComment: string
   sendingComment: boolean
   onNewCommentChange: (v: string) => void
@@ -49,6 +60,39 @@ type Props = {
 }
 
 const DAY = 864e5
+
+const FIELD_LABEL: Record<string, string> = {
+  status: 'lo stato', priority: 'la priorità', assigned_to: "l'assegnatario", due_date: 'la scadenza',
+  category: 'la categoria', servicenow_id: 'il caso ServiceNow', title: 'il titolo', description: 'la descrizione',
+  waiting_reason: 'la causale di attesa', inventory: "l'inventario collegato", site: 'il sito', customer: 'il cliente', opened_at: "la data di apertura",
+}
+const fmtVal = (field: string, v: unknown): string => {
+  if (v == null || v === '') return '—'
+  if (field === 'status') return STATUS_META[String(v)]?.label ?? String(v)
+  if (field === 'priority') return PRIORITY_META[String(v)]?.label ?? String(v)
+  if (field === 'waiting_reason') return WAITING_REASON_META[String(v)]?.label ?? String(v)
+  if (Array.isArray(v)) return v.join(', ')
+  if (typeof v === 'object') return '…'
+  return String(v)
+}
+/** Descrizione leggibile di un evento di audit. */
+function describeEvent(e: IssueEvent): React.ReactNode {
+  if (e.action === 'create') return 'ha aperto la issue'
+  if (e.action === 'delete') return 'ha eliminato la issue'
+  if (e.action === 'restore') return 'ha ripristinato la issue'
+  const ch = Object.entries(e.changes ?? {}).filter(([k]) => k !== 'updated_at')
+  if (!ch.length) return 'ha modificato la issue'
+  return ch.map(([k, v], i) => {
+    // Due formati nell'audit: {from, to} (recente) e [from, to] (storico).
+    const [from, to] = Array.isArray(v) ? v : [v?.from, v?.to]
+    return (
+      <React.Fragment key={k}>
+        {i ? '; ' : ''}ha cambiato {FIELD_LABEL[k] ?? k}
+        {['description'].includes(k) ? null : <> da <b>{fmtVal(k, from)}</b> a <b>{fmtVal(k, to)}</b></>}
+      </React.Fragment>
+    )
+  })
+}
 const durText = (ms: number) => {
   const h = Math.round(Math.abs(ms) / 36e5)
   const g = Math.floor(h / 24)
@@ -56,7 +100,7 @@ const durText = (ms: number) => {
 }
 
 /** Da quanto è aperta e quanto manca alla scadenza (DESIGN.md › Detail card). */
-function OpenTimeline({ issue }: { issue: IssueRow }) {
+function OpenTimeline({ issue, events }: { issue: IssueRow; events?: IssueEvent[] | null }) {
   const [now] = React.useState(() => Date.now())
   const opened = new Date(issue.opened_at || issue.created_at).getTime()
   const closedAt = issue.closed_at ? new Date(issue.closed_at).getTime() : null
@@ -88,6 +132,15 @@ function OpenTimeline({ issue }: { issue: IssueRow }) {
         <Tooltip title={`Aperta il ${fmtIssueDate(issue.opened_at) || fmtIssueDateTime(issue.created_at)}`}>
           <Box sx={{ position: 'absolute', top: 5, left: 0, width: 12, height: 12, ml: '-6px', borderRadius: '50%', bgcolor: 'primary.main', border: '2px solid', borderColor: 'background.paper', boxShadow: (t) => `0 0 0 1px ${t.palette.primary.main}` }} />
         </Tooltip>
+        {visibleEvents(events).filter((e) => e.action !== 'create').map((e) => {
+          const t = new Date(e.created_at).getTime()
+          if (t < opened || t > end) return null
+          return (
+            <Tooltip key={e.id} title={<>{e.actor_username ? <b>{e.actor_username} </b> : null}{describeEvent(e)} · {fmtIssueDateTime(e.created_at)}</>}>
+              <Box sx={{ position: 'absolute', top: 6, left: `${pos(t)}%`, width: 10, height: 10, ml: '-5px', borderRadius: '50%', bgcolor: 'primary.main', border: '2px solid', borderColor: 'background.paper', boxShadow: (th) => `0 0 0 1px ${th.palette.primary.main}`, cursor: 'default' }} />
+            </Tooltip>
+          )
+        })}
         {!isClosed ? (
           <Box sx={{ position: 'absolute', top: 0, bottom: 0, width: 2, ml: '-1px', left: `${pos(now)}%`, bgcolor: 'text.primary', borderRadius: 1 }}>
             <Box component="span" sx={{
@@ -214,7 +267,7 @@ export default function IssueDetail(p: Props) {
       status={<IssueStatusBadge status={issue.status} onDark />}
       title={issue.title}
       subtitle={[issue.customer_name || issue.customer_placeholder, issue.site_name].filter(Boolean).join(' · ')}
-      tabs={[{ key: 'det', label: 'Dettagli' }, { key: 'att', label: 'Commenti', count: p.comments.length }]}
+      tabs={[{ key: 'det', label: 'Dettagli' }, { key: 'att', label: p.events ? 'Attività' : 'Commenti', count: p.comments.length + visibleEvents(p.events).length }]}
       tab={p.tab}
       onTab={(k) => p.onTab(k as 'det' | 'att')}
       position={p.position}
@@ -234,7 +287,7 @@ export default function IssueDetail(p: Props) {
             props={props}
             summary={<><IssuePriorityMark priority={issue.priority} /><Box component="span" sx={{ color: 'text.primary', fontWeight: 500 }}>{issue.assigned_to_full_name || 'Non assegnata'}</Box></>}
           />
-          <OpenTimeline issue={issue} />
+          <OpenTimeline issue={issue} events={p.events} />
           <DetailSection title="Descrizione">
             <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', color: issue.description ? 'text.primary' : 'text.disabled' }}>
               {issue.description || 'Nessuna descrizione.'}
@@ -258,29 +311,72 @@ export default function IssueDetail(p: Props) {
           </Typography>
         </>
       ) : (
-        <Box sx={{ display: 'grid', gap: 1.5 }}>
-          {p.commentsLoading ? (
-            <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}><CircularProgress size={22} /></Box>
-          ) : p.comments.length === 0 ? (
-            <Box sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}>
-              <ChatBubbleOutlineIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 1 }} />
-              <Typography sx={{ fontSize: 13 }}>Nessun commento. Scrivi il primo qui sotto.</Typography>
-            </Box>
-          ) : p.comments.map((c) => (
-            <Box key={c.id} sx={{ display: 'grid', gridTemplateColumns: '24px 1fr', gap: 1, alignItems: 'start' }}>
-              <Avatar sx={{ width: 24, height: 24, fontSize: 9, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{issueAuthorInitials(c)}</Avatar>
-              <Box sx={{ bgcolor: 'archie.surface2', border: '1px solid', borderColor: 'divider', borderRadius: '4px 10px 10px 10px', px: 1.25, py: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.25 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600 }}>{issueAuthorName(c)}</Typography>
-                  <Typography sx={{ ml: 'auto', fontSize: 11, color: 'text.secondary', whiteSpace: 'nowrap' }}>{fmtIssueDateTime(c.created_at)}</Typography>
-                </Box>
-                <Typography sx={{ fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.body}</Typography>
-              </Box>
-            </Box>
-          ))}
-        </Box>
+        <ActivityFeed comments={p.comments} events={p.events} loading={p.commentsLoading} />
       )}
     </FloatingDetail>
   )
 }
 
+
+/** Eventi da mostrare: senza quelli che ripetono un commento o non cambiano nulla. */
+function visibleEvents(events?: IssueEvent[] | null) {
+  return (events ?? []).filter((e) => {
+    if (e.action !== 'update') return true
+    const keys = Object.keys(e.changes ?? {}).filter((k) => k !== 'updated_at')
+    return keys.length > 0 && !keys.every((k) => k === 'comment_added')
+  })
+}
+
+type FeedItem = { kind: 'cm'; at: string; c: IssueComment } | { kind: 'ev'; at: string; e: IssueEvent }
+
+/** Cronologia: commenti e modifiche insieme, con filtro (DESIGN.md › Detail card › Attività). */
+function ActivityFeed({ comments, events, loading }: { comments: IssueComment[]; events?: IssueEvent[] | null; loading: boolean }) {
+  const [filter, setFilter] = React.useState<'all' | 'cm' | 'ev'>('all')
+  const items: FeedItem[] = [
+    ...comments.map((c) => ({ kind: 'cm' as const, at: c.created_at, c })),
+    ...visibleEvents(events).map((e) => ({ kind: 'ev' as const, at: e.created_at, e })),
+  ].sort((a, b) => a.at.localeCompare(b.at))
+  const evCount = visibleEvents(events).length
+  const shown = items.filter((i) => filter === 'all' || i.kind === filter)
+  if (loading) return <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}><CircularProgress size={22} /></Box>
+  return (
+    <Box sx={{ display: 'grid', gap: 1.5 }}>
+      {events ? (
+        <Box role="group" aria-label="Filtra attività" sx={{ display: 'inline-flex', justifySelf: 'start', gap: '2px', p: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '7px', bgcolor: 'archie.surface2' }}>
+          {([['all', 'Tutto', items.length], ['cm', 'Commenti', comments.length], ['ev', 'Modifiche', evCount]] as const).map(([k, l, n]) => (
+            <Button key={k} size="small" aria-pressed={filter === k} onClick={() => setFilter(k)} sx={{
+              minHeight: 26, px: 1.25, gap: 0.75, color: filter === k ? 'text.primary' : 'text.secondary',
+              bgcolor: filter === k ? 'background.paper' : 'transparent', boxShadow: filter === k ? (t) => `0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px ${t.palette.divider}` : 'none',
+              '&:hover': { bgcolor: filter === k ? 'background.paper' : 'transparent' },
+            }}>{l} <Box component="span" sx={{ fontSize: 11 }}>{n}</Box></Button>
+          ))}
+        </Box>
+      ) : null}
+      {shown.length === 0 ? (
+        <Box sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}>
+          <ChatBubbleOutlineIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 1 }} />
+          <Typography sx={{ fontSize: 13 }}>{filter === 'ev' ? 'Nessuna modifica registrata.' : 'Nessun commento. Scrivi il primo qui sotto.'}</Typography>
+        </Box>
+      ) : shown.map((it) => it.kind === 'cm' ? (
+        <Box key={`c${it.c.id}`} sx={{ display: 'grid', gridTemplateColumns: '24px 1fr', gap: 1, alignItems: 'start' }}>
+          <Avatar sx={{ width: 24, height: 24, fontSize: 9, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{issueAuthorInitials(it.c)}</Avatar>
+          <Box sx={{ bgcolor: 'archie.surface2', border: '1px solid', borderColor: 'divider', borderRadius: '4px 10px 10px 10px', px: 1.25, py: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.25 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600 }}>{issueAuthorName(it.c)}</Typography>
+              <Typography sx={{ ml: 'auto', fontSize: 11, color: 'text.secondary', whiteSpace: 'nowrap' }}>{fmtIssueDateTime(it.c.created_at)}</Typography>
+            </Box>
+            <Typography sx={{ fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{it.c.body}</Typography>
+          </Box>
+        </Box>
+      ) : (
+        <Box key={`e${it.e.id}`} sx={{ display: 'grid', gridTemplateColumns: '24px 1fr auto', gap: 1, alignItems: 'center', fontSize: 12, color: 'text.secondary', '& b': { color: 'text.primary', fontWeight: 600 } }}>
+          <Box sx={{ width: 22, height: 22, ml: '1px', borderRadius: '50%', bgcolor: 'archie.neutralBg', display: 'grid', placeItems: 'center', '& svg': { fontSize: 13 } }}>
+            {it.e.action === 'create' ? <AddIcon /> : <EditIcon />}
+          </Box>
+          <span><b>{it.e.actor_username || 'Sistema'}</b> {describeEvent(it.e)}</span>
+          <Box component="time" sx={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtIssueDateTime(it.e.created_at)}</Box>
+        </Box>
+      ))}
+    </Box>
+  )
+}

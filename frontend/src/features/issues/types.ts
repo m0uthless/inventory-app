@@ -201,9 +201,12 @@ export function createEmptyIssueForm(defaultAssignedToId?: number): IssueFormDat
 }
 
 export function issueAuthorInitials(c: IssueComment) {
+  // Solo lettere: "Archie (root)" → "AR", non "A(".
+  const first = (v?: string | null) => (v ?? '').match(/\p{L}/u)?.[0] ?? ''
+  const last = (c.author_last_name ?? '').replace(/[^\p{L}\s]/gu, ' ').trim()
   return (
-    ((c.author_first_name?.[0] || '') + (c.author_last_name?.[0] || '')).toUpperCase() ||
-    c.author_username?.[0]?.toUpperCase() ||
+    (first(c.author_first_name) + first(last)).toUpperCase() ||
+    first(c.author_username).toUpperCase() ||
     '?'
   )
 }

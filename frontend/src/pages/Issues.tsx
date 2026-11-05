@@ -51,7 +51,7 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
-import IssueDetail, { type IssuePatch } from '../features/issues/IssueDetail'
+import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
@@ -199,7 +199,7 @@ function isClosedIssueRow(row: Pick<IssueRow, 'status'>) {
 export default function Issues() {
   const loc = useLocation()
   const navigate = useNavigate()
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
   const toast = useToast()
 
   // ── Grid ──────────────────────────────────────────────────────────────────
@@ -824,6 +824,17 @@ export default function Issues() {
   const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
 
   const issueCounts = useIssueCounts(kpiReload, me?.id)
+  // Eventi di audit per Attività e timeline (solo con il permesso di vedere l'audit).
+  const canAudit = hasPerm('audit.view_auditevent')
+  const [events, setEvents] = React.useState<IssueEvent[] | null>(null)
+  React.useEffect(() => {
+    if (!detailIssue || !canAudit) { setEvents(null); return }
+    let alive = true
+    api.get('/audit-events/', { params: { app_label: 'issues', model: 'issue', object_id: String(detailIssue.id), ordering: 'created_at', page_size: 200 } })
+      .then((r) => { const d = r.data as { results?: IssueEvent[] } | IssueEvent[]; if (alive) setEvents(Array.isArray(d) ? d : d.results ?? []) })
+      .catch(() => { if (alive) setEvents(null) })
+    return () => { alive = false }
+  }, [detailIssue, canAudit])
   const [searchOpen, setSearchOpen] = React.useState(false)
   const { exporting, exportCsv } = useExportCsv()
   const exportVisible = () => {
@@ -1533,6 +1544,7 @@ export default function Issues() {
         onClose={() => setDetailIssue(null)}
         comments={comments}
         commentsLoading={commentsLoading}
+        events={events}
         newComment={newComment}
         sendingComment={sendingComment}
         onNewCommentChange={setNewComment}
