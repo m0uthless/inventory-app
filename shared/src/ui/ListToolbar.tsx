@@ -13,6 +13,8 @@ type Props = {
   compact?: boolean
   q: string
   onQChange: (v: string) => void
+  /** Nasconde il campo di ricerca (es. mostrato solo dalla lente). Predefinito: visibile. */
+  hideSearch?: boolean
 
   viewMode?: ListViewMode
   onViewModeChange?: (v: ListViewMode) => void
@@ -59,6 +61,7 @@ export default function ListToolbar(props: Props) {
     searchLabel = 'Cerca',
     resetLabel = 'Reimposta',
     compact = false,
+    hideSearch = false,
   } = props
 
   return (
@@ -81,7 +84,8 @@ export default function ListToolbar(props: Props) {
           : {}),
       }}
     >
-      <TextField
+      {hideSearch ? null : <TextField
+        autoFocus={compact && Boolean(q === '' && props.hideSearch === false)}
         size="small"
         placeholder={searchLabel}
         value={q}
@@ -106,7 +110,7 @@ export default function ListToolbar(props: Props) {
           },
           '& .MuiInputBase-input': { py: 0 },
         }}
-      />
+      />}
 
       <Box
         sx={{

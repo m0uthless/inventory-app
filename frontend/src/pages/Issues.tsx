@@ -52,7 +52,10 @@ import {
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
 import IssueDetail, { type IssuePatch } from '../features/issues/IssueDetail'
-import IssuesKpis from '../features/issues/IssuesKpis'
+import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
+import { useExportCsv } from '@shared/ui/useExportCsv'
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
+import SearchIcon from '@mui/icons-material/Search'
 import { IssuePriorityMark, IssueStatusBadge } from '../features/issues/IssueBadges'
 import { PageHead, ViewTabs, FilterOptionList, FilterTokens, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
@@ -257,7 +260,7 @@ export default function Issues() {
     : grid.sortModel
 
   // ── Viste e filtri (dalle intestazioni di colonna) ──────────────────────
-  type IssueView = 'active' | 'mine' | 'closed' | 'all'
+  type IssueView = 'active' | 'mine' | 'overdue' | 'closed' | 'all'
   const [view, setView] = React.useState<IssueView>('active')
   const [fStatus, setFStatus] = React.useState<string[]>([])
   const [fPriority, setFPriority] = React.useState<string[]>([])
@@ -272,7 +275,8 @@ export default function Issues() {
   const allExtraParams = React.useMemo(() => {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
-    if (view === 'active' || view === 'mine') p.hide_closed = true
+    if (view === 'active' || view === 'mine' || view === 'overdue') p.hide_closed = true
+    if (view === 'overdue') p.due_before = overdueBefore()
     if (view === 'closed') p.only_closed = true
     if (view === 'mine' && me?.id) p.assigned_to = me.id
     else if (fAssigned.length) p.assigned_to = fAssigned[0]
@@ -819,6 +823,31 @@ export default function Issues() {
 
   const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
 
+  const issueCounts = useIssueCounts(kpiReload, me?.id)
+  const [searchOpen, setSearchOpen] = React.useState(false)
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<IssueRow>({
+      url: '/issues/',
+      params,
+      filename: 'issue',
+      columns: [
+        { label: 'ID', getValue: (r) => r.id },
+        { label: 'Priorità', getValue: (r) => r.priority_label || r.priority },
+        { label: 'Stato', getValue: (r) => r.status_label || r.status },
+        { label: 'Titolo', getValue: (r) => r.title },
+        { label: 'Cliente', getValue: (r) => r.customer_name || r.customer_placeholder },
+        { label: 'Sito', getValue: (r) => r.site_name },
+        { label: 'ServiceNow', getValue: (r) => r.servicenow_id },
+        { label: 'Assegnata a', getValue: (r) => r.assigned_to_full_name },
+        { label: 'Scadenza', getValue: (r) => r.due_date },
+        { label: 'Apertura', getValue: (r) => r.opened_at },
+      ],
+    })
+  }
+
   // Conteggi delle viste (globali, da /issues/summary/)
   const [kpiCounts, setKpiCounts] = React.useState<{ active: number; closed: number; all: number } | null>(null)
   React.useEffect(() => {
@@ -1029,22 +1058,16 @@ export default function Issues() {
 
   const columns: GridColDef<IssueRow>[] = [
     {
-      field: 'opened_at',
-      headerName: 'Data apertura',
-      width: 130,
-      renderCell: ({ row }) => {
-        const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Typography variant="body2">{d}</Typography>
-          </Box>
-        )
-      },
+      field: 'id',
+      headerName: 'ID',
+      width: 68,
+      sortable: false,
+      renderCell: ({ row }) => <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>,
     },
     {
       field: 'priority',
       headerName: 'Priorità',
-      width: 120,
+      width: 104,
       sortable: true,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
@@ -1055,7 +1078,7 @@ export default function Issues() {
     {
       field: 'status',
       headerName: 'Stato',
-      width: 200,
+      width: 168,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%' }}>
           <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
@@ -1069,20 +1092,36 @@ export default function Issues() {
       field: 'title',
       headerName: 'Titolo',
       flex: 1,
-      minWidth: 200,
+      minWidth: 220,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>
-            {row.title}
-          </Typography>
+          <Typography noWrap sx={{ fontSize: 13, fontWeight: 600 }}>{row.title}</Typography>
           {!row.inventory && <UnlinkedInventoryWarningIcon />}
+        </Box>
+      ),
+    },
+    {
+      field: 'customer_name',
+      headerName: 'Cliente · sito',
+      width: 190,
+      renderCell: ({ row }) => (
+        <Box sx={{ minWidth: 0, lineHeight: 1.3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: 13 }}>{row.customer_name || row.customer_placeholder}</Typography>
+            {row.is_customer_placeholder ? (
+              <Tooltip title="Cliente non in Site Repository">
+                <InfoOutlinedIcon sx={{ color: 'text.disabled', fontSize: 14, flexShrink: 0 }} />
+              </Tooltip>
+            ) : null}
+          </Box>
+          {row.site_name ? <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>{row.site_name}</Typography> : null}
         </Box>
       ),
     },
     {
       field: 'servicenow_id',
       headerName: 'ServiceNow',
-      width: 150,
+      width: 128,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
           {row.servicenow_id ? (
@@ -1128,21 +1167,49 @@ export default function Issues() {
       ),
     },
     {
-      field: 'customer_name',
-      headerName: 'Cliente',
-      width: 160,
+      field: 'assigned_to_full_name',
+      headerName: 'Assegnata a',
+      width: 150,
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>
-            {row.customer_name}
-          </Typography>
-          {row.is_customer_placeholder ? (
-            <Tooltip title="Cliente non in Site Repository">
-              <InfoOutlinedIcon sx={{ color: 'text.disabled', fontSize: 16, flexShrink: 0 }} />
-            </Tooltip>
-          ) : null}
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
+          {row.assigned_to_full_name ? (
+            <Typography variant="body2" noWrap>{row.assigned_to_full_name}</Typography>
+          ) : (
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>Non assegnata</Typography>
+          )}
         </Box>
       ),
+    },
+    {
+      field: 'due_date',
+      headerName: 'Scadenza',
+      width: 124,
+      renderCell: ({ row }) => {
+        if (!row.due_date) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+        const today = new Date(); today.setHours(0, 0, 0, 0)
+        const due = new Date(row.due_date + 'T00:00:00')
+        const open = !isClosedIssueRow(row)
+        const overdue = open && due < today
+        const isToday = open && due.getTime() === today.getTime()
+        return (
+          <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: overdue || isToday ? 600 : 400, color: overdue ? 'error.main' : isToday ? 'warning.main' : 'inherit' }}>
+            {fmtDate(row.due_date)?.slice(0, 5)}{overdue ? ' · scaduta' : isToday ? ' · oggi' : ''}
+          </Typography>
+        )
+      },
+    },
+    {
+      field: 'opened_at',
+      headerName: 'Apertura',
+      width: 130,
+      renderCell: ({ row }) => {
+        const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{d}</Typography>
+          </Box>
+        )
+      },
     },
     {
       field: 'category_label',
@@ -1157,51 +1224,6 @@ export default function Issues() {
           )}
         </Box>
       ),
-    },
-    {
-      field: 'assigned_to_full_name',
-      headerName: 'Assegnata a',
-      width: 180,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
-          {row.assigned_to_full_name ? (
-            <Typography variant="body2" noWrap>{row.assigned_to_full_name}</Typography>
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>Non assegnata</Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      field: 'due_date',
-      headerName: 'Scadenza',
-      width: 110,
-      renderCell: ({ row }) => {
-        const d = fmtDate(row.due_date)
-        const overdue =
-          !!d &&
-          new Date(row.due_date!) < new Date() &&
-          !['resolved', 'closed'].includes(row.status)
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            {d ? (
-              <Typography
-                variant="body2"
-                sx={{
-                  color: overdue ? 'error.main' : 'inherit',
-                  fontWeight: overdue ? 700 : 400,
-                }}
-              >
-                {d}
-              </Typography>
-            ) : (
-              <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                —
-              </Typography>
-            )}
-          </Box>
-        )
-      },
     },
     {
       field: 'comments_count',
@@ -1295,6 +1317,7 @@ export default function Issues() {
     },
   ]
 
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Stack spacing={0} sx={{ height: '100%' }}>
@@ -1304,10 +1327,11 @@ export default function Issues() {
       />
       <IssuesKpis
         reloadKey={kpiReload}
+        counts={issueCounts}
         view={view}
-        status={fStatus}
-        onView={(k) => { setView(k as IssueView); setFStatus([]) }}
-        onStatusPick={(st) => { setView('active'); setFStatus((cur) => (cur.length === 1 && cur[0] === st ? [] : [st])) }}
+        priority={fPriority}
+        onView={(k) => { setView(k as IssueView); setFPriority([]) }}
+        onPriorityPick={(pr) => { setView('active'); setFPriority((cur) => (cur.length === 1 && cur[0] === pr ? [] : [pr])) }}
       />
       <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <ViewTabs
@@ -1315,7 +1339,8 @@ export default function Issues() {
           onChange={(k) => setView(k as IssueView)}
           tabs={[
             { key: 'active', label: 'Attive', count: kpiCounts?.active },
-            { key: 'mine', label: 'Le mie' },
+            { key: 'mine', label: 'Le mie', count: issueCounts?.mine },
+            { key: 'overdue', label: 'Scadute', count: issueCounts?.overdue, tone: 'alert' },
             { key: 'closed', label: 'Risolte e chiuse', count: kpiCounts?.closed },
             { key: 'all', label: 'Tutte', count: kpiCounts?.all },
           ]}
@@ -1327,13 +1352,35 @@ export default function Issues() {
             compact: true,
             q: grid.q,
             onQChange: grid.setQ,
+            hideSearch: !searchOpen && !grid.q,
+            searchLabel: 'Cerca titolo, cliente, ServiceNow, inventario…',
             alignRightActions: true,
+            children: (
+              <FilterTokens filters={activeFilters} onRemove={removeFilter} onClear={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }}
+                empty={searchOpen || grid.q ? undefined : 'Filtra e ordina dalle intestazioni di colonna'} />
+            ),
+            rightActions: (
+              <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
+                <Tooltip title="Esporta le righe visibili (CSV)">
+                  <span>
+                    <IconButton aria-label="Esporta le righe visibili" disabled={exporting} onClick={exportVisible}>
+                      {exporting ? <CircularProgress size={16} /> : <FileDownloadOutlinedIcon fontSize="small" />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title={searchOpen ? 'Nascondi la ricerca' : 'Cerca nella tabella'}>
+                  <IconButton aria-label="Cerca nella tabella" aria-pressed={searchOpen || !!grid.q}
+                    onClick={() => { if (searchOpen && grid.q) grid.setQ(''); setSearchOpen((v) => !v) }}
+                    sx={searchOpen || grid.q ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'archie.fieldLine' } : undefined}>
+                    <SearchIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ),
           }}
-          belowToolbar={activeFilters.length ? (
-            <FilterTokens filters={activeFilters} onRemove={removeFilter} onClear={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }} />
-          ) : undefined}
           grid={{
             pageKey: 'issues',
+            rowHeight: 44,
             filterConfig,
             username: me?.username,
             rows,

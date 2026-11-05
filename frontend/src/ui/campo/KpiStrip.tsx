@@ -101,12 +101,15 @@ function Spark({ values, labels, format }: { values: number[]; labels?: string[]
 }
 
 /** Barra segmentata sottile + legenda (es. attive per priorità). Scala sequenziale a una tinta. */
-export function SegmentBar({ parts, onPick, dimmed }: {
+export function SegmentBar({ parts, onPick, dimmed, darkFirst }: {
   parts: { key: string; label: string; value: number; display?: string }[]
   onPick?: (key: string) => void
   /** Chiavi da mostrare attenuate (es. escluse dal filtro attivo). */
   dimmed?: Set<string>
+  /** Il primo segmento è il più scuro (es. priorità dalla più urgente). */
+  darkFirst?: boolean
 }) {
+  const seqIdx = (i: number) => { const k = Math.min(3, Math.round((i / Math.max(1, parts.length - 1)) * 3)); return darkFirst ? 3 - k : k }
   const total = parts.reduce((s, p) => s + p.value, 0) || 1
   return (
     <>
@@ -115,7 +118,7 @@ export function SegmentBar({ parts, onPick, dimmed }: {
           <Tooltip key={p.key} title={`${p.label} · ${p.display ?? p.value}`} placement="top">
             <Box sx={{
               flex: Math.max(p.value, 0.0001), minWidth: p.value ? 4 : 0, borderRadius: '2px', opacity: dimmed?.has(p.key) ? 0.3 : 1,
-              bgcolor: (t) => t.palette.archie.seq[Math.min(3, Math.round((i / Math.max(1, parts.length - 1)) * 3))],
+              bgcolor: (t) => t.palette.archie.seq[seqIdx(i)],
               '&:first-of-type': { borderRadius: '4px 2px 2px 4px' }, '&:last-of-type': { borderRadius: '2px 4px 4px 2px' },
             }} />
           </Tooltip>
@@ -126,7 +129,7 @@ export function SegmentBar({ parts, onPick, dimmed }: {
           <ButtonBase key={p.key} disabled={!onPick} onClick={() => onPick?.(p.key)} sx={{
             gap: 0.75, py: '2px', borderRadius: '4px', fontSize: 12, color: 'inherit', whiteSpace: 'nowrap', '&:hover': { color: 'text.primary' },
           }}>
-            <Box component="i" sx={{ width: 8, height: 8, borderRadius: '2px', opacity: dimmed?.has(p.key) ? 0.3 : 1, bgcolor: (t) => t.palette.archie.seq[Math.min(3, Math.round((i / Math.max(1, parts.length - 1)) * 3))] }} />
+            <Box component="i" sx={{ width: 8, height: 8, borderRadius: '2px', opacity: dimmed?.has(p.key) ? 0.3 : 1, bgcolor: (t) => t.palette.archie.seq[seqIdx(i)] }} />
             {p.label}
             <Box component="b" sx={{ color: dimmed?.has(p.key) ? 'text.secondary' : 'text.primary', fontWeight: dimmed?.has(p.key) ? 500 : 600, fontVariantNumeric: 'tabular-nums' }}>{p.display ?? Math.round((p.value / total) * 100) + '%'}</Box>
           </ButtonBase>
