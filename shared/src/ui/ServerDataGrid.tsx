@@ -700,7 +700,9 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     '& .MuiDataGrid-row, & .MuiDataGrid-row--firstVisible .MuiDataGrid-cell': { borderTop: 0 },
     '& .MuiDataGrid-row:hover': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
     ...(columnSearch?.open ? {
-      '& .MuiDataGrid-columnHeaderDraggableContainer, & .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': { height: '100%', width: '100%', alignItems: 'stretch' },
+      '& .MuiDataGrid-columnHeaderDraggableContainer, & .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': { height: '100%', width: '100%', alignItems: 'stretch', overflow: 'visible' },
+      // L'anello di focus dei campi (3px) non va tagliato dai contenitori dell'intestazione.
+      '& .MuiDataGrid-columnHeader:has(input:focus, select:focus)': { overflow: 'visible', zIndex: 2 },
       '& .MuiDataGrid-columnHeader': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { borderStrong: string } }).archie.borderStrong },
       // Riga di ricerca: fascia bianca continua sotto le etichette (come .colsearch).
       '& .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaders .MuiDataGrid-filler, & .MuiDataGrid-scrollbarFiller--header': {
