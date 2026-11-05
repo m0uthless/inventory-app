@@ -162,7 +162,6 @@
 a.btn { text-decoration: none; }
 [data-c-drawer] .drawer-head .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 [data-c-drawer] .drawer-head .tabs button { white-space: nowrap; flex: none; padding: 0 9px; }
-:root[data-dw] .drawer[data-c-drawer]:not(.is-fx) { width: min(500px, calc(100% - 24px)); }
 @media (max-width: 860px) {
   .c-table td { height: auto; }
   .c-table tbody tr { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
@@ -173,3 +172,73 @@ a.btn { text-decoration: none; }
   .c-inv-row { grid-template-columns: 28px minmax(0, 1fr); }
   .c-inv-row .cred, .c-inv-row > .none { grid-column: 2; }
 }
+
+/* ── Variante A rifinita: sezioni senza scatole annidate ───────────── */
+[data-c-drawer] .int-body { gap: 22px; }
+.c-sec { display: grid; gap: 10px; }
+.c-sec-h { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+.c-sec-h h4 { margin: 0; }
+.c-sec-h h4 .i { width: 13px; height: 13px; }
+.c-sec-h > :last-child:not(h4) { margin-left: auto; }
+.c-link { border: 0; background: transparent; padding: 0; font: inherit; font-size: 12px; font-weight: 550; color: var(--primary); cursor: pointer; }
+.c-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.c-app { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--neutral-bg); border-radius: 5px; padding: 1px 7px; }
+
+/* Riepilogo: una fascia unica, i numeri portano alle schede */
+.c-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.c-stats button { display: grid; align-content: start; gap: 0; padding: 7px 10px 8px; border: 1px solid transparent; border-radius: 7px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--text); min-width: 0; transition: background .12s, border-color .12s; }
+.c-stats button:hover { background: var(--surface); border-color: var(--border); }
+.c-stats button:focus-visible { outline: none; box-shadow: var(--focus); }
+.c-stats .k { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.c-stats b { font-size: 20px; font-weight: 650; letter-spacing: -.015em; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.c-stats small { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-stats .is-info b { color: var(--info); }
+.c-stats .is-warn b, .c-stats .is-warn small { color: var(--warning); }
+
+/* Contatto primario: persona + due azioni dirette */
+.c-person { display: flex; align-items: center; gap: 12px; }
+.c-person .ava { width: 38px; height: 38px; font-size: 13px; }
+.c-person .fn b { font-size: 14px; }
+.c-acts { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 8px; }
+.c-act { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) 26px; align-items: center; gap: 8px; padding: 6px 4px 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); transition: border-color .12s, background .12s; }
+.c-act:hover { border-color: var(--field-line); background: var(--field); }
+.c-act .ci { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; background: var(--field); color: var(--primary); }
+.c-act:hover .ci { background: var(--surface); }
+.c-act .ci .i { width: 15px; height: 15px; }
+.c-act .ct { display: grid; min-width: 0; color: var(--text); text-decoration: none; }
+.c-act .ct::after { content: ""; position: absolute; inset: 0; border-radius: 8px; }
+.c-act .ct small { font-size: 11px; color: var(--muted); }
+.c-act .ct b { font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-act .icon-btn { position: relative; z-index: 1; width: 26px; height: 26px; opacity: 0; transition: opacity .12s; }
+.c-act:hover .icon-btn, .c-act .icon-btn:focus-visible { opacity: 1; }
+.c-act .icon-btn .i { width: 14px; height: 14px; }
+.c-empty { display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; gap: 12px; align-items: center; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 8px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--primary); }
+.c-empty:hover { border-color: var(--primary); background: var(--field); }
+.c-empty > .i:first-child { width: 32px; height: 32px; padding: 8px; border-radius: 8px; background: var(--field); }
+.c-empty > .i:last-child { width: 16px; height: 16px; }
+.c-empty b { display: block; color: var(--text); font-weight: 600; }
+.c-empty span span { font-size: 12px; color: var(--muted); }
+
+/* Accesso remoto: righe nette, valori in mono, azioni a destra */
+.c-cred { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.cr { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 38px; padding: 0 4px 0 12px; }
+.cr + .cr { border-top: 1px solid var(--border); }
+.cr .k { font-size: 12px; color: var(--muted); }
+.cr .v { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr .port { color: var(--muted); }
+.cr > .icon-btn { width: 28px; height: 28px; }
+.cr > .icon-btn .i { width: 14px; height: 14px; }
+.cr-pw .sec { grid-column: 2 / -1; justify-content: space-between; width: 100%; }
+.cr-pw .sec .code { margin-right: auto; }
+.c-audit { margin: -2px 0 0; font-size: 11px; color: var(--faint); line-height: 1.45; }
+
+/* Sede legale con mappa segnaposto */
+.c-map { position: relative; height: 170px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);
+  --map-bg: var(--surface-2); --map-block: color-mix(in oklab, var(--border) 75%, var(--surface-2)); --map-road: var(--surface); --map-road-edge: var(--border);
+  --map-water: color-mix(in oklab, var(--info) 20%, var(--surface-2)); --map-park: color-mix(in oklab, var(--success) 16%, var(--surface-2)); }
+.c-map-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.c-map-ph { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 600; letter-spacing: .02em; color: var(--muted); background: color-mix(in oklab, var(--surface) 85%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+.c-map-bar { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 7px 7px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 16px -8px rgb(0 0 0 / .25); }
+.c-map-bar .fn b { font-size: 12.5px; }
+.c-map-bar .btn .i { width: 13px; height: 13px; }
+@media (max-width: 520px) { .c-acts { grid-template-columns: 1fr; } .c-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

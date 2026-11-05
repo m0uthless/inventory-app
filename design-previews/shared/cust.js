@@ -217,19 +217,23 @@
   const secret = (id, v, label) => v ? `<span class="sec${shown.has(id) ? ' is-shown' : ''}"><span class="code">${shown.has(id) ? v : '••••••••'}</span><button type="button" class="icon-btn" data-reveal-sec="${id}" aria-pressed="${shown.has(id)}" aria-label="${shown.has(id) ? 'Nascondi' : 'Mostra'} ${label}" title="${shown.has(id) ? 'Nascondi' : 'Mostra'} · resta visibile 30 secondi">${ic('eye')}</button><button type="button" class="icon-btn" data-copy aria-label="Copia ${label}" title="Copia">${ic('copy')}</button></span>` : '<span class="none">—</span>';
   const copyable = (v, label) => `<span class="cpy"><span class="code">${v}</span><button type="button" class="icon-btn" data-copy aria-label="Copia ${label}" title="Copia">${ic('copy')}</button></span>`;
 
-  const contactCard = (c) => c.contact ? `<section class="c-contact" aria-label="Contatto primario">
-      <span class="ava" aria-hidden="true">${c.contact[0].split(' ').map((x) => x[0]).join('').slice(0, 2)}</span>
-      <div class="cc-t"><b>${c.contact[0]}</b><span>${c.contact[1]}</span><a href="mailto:${c.contact[3]}">${mail}${c.contact[3]}</a></div>
-      <div class="cc-a"><a class="btn btn-sm" href="tel:${c.contact[2].replace(/\s+/g, '')}">${phone}<span class="code">${c.contact[2]}</span></a><button type="button" class="icon-btn" data-copy aria-label="Copia numero" title="Copia numero">${ic('copy')}</button></div>
-    </section>` : `<button type="button" class="c-contact is-empty">${ic('user')}<span><b>Nessun contatto primario</b><span>Aggiungilo o scegline uno tra i contatti dei siti</span></span></button>`;
+  const secH = (t, right = '') => `<div class="c-sec-h"><h4>${t}</h4>${right}</div>`;
+  const contactCard = (c) => c.contact ? `<section class="c-sec" aria-label="Contatto primario">${secH('Contatto primario', '<button type="button" class="c-link" data-tab-go="sites">Contatti dei siti</button>')}
+      <div class="c-person"><span class="ava" aria-hidden="true">${c.contact[0].split(' ').map((x) => x[0]).join('').slice(0, 2)}</span><div class="fn"><b>${c.contact[0]}</b><span>${c.contact[1]}</span></div></div>
+      <div class="c-acts">
+        <div class="c-act"><span class="ci">${phone}</span><a class="ct" href="tel:${c.contact[2].replace(/\s+/g, '')}"><small>Telefono</small><b class="code">${c.contact[2]}</b></a><button type="button" class="icon-btn" data-copy aria-label="Copia il telefono" title="Copia">${ic('copy')}</button></div>
+        <div class="c-act"><span class="ci">${mail}</span><a class="ct" href="mailto:${c.contact[3]}"><small>Email</small><b>${c.contact[3]}</b></a><button type="button" class="icon-btn" data-copy aria-label="Copia l'email" title="Copia">${ic('copy')}</button></div>
+      </div>
+    </section>` : `<section class="c-sec">${secH('Contatto primario')}<button type="button" class="c-empty">${ic('user')}<span><b>Nessun contatto primario</b><span>Aggiungilo o scegline uno tra i contatti dei siti</span></span>${ic('plus')}</button></section>`;
 
-  const vpnBlock = (c) => `<section class="c-vpn" aria-label="Accesso VPN"><h4>${ic('lock')}Accesso VPN${c.vpn ? '<span class="lk">visibile con il permesso Credenziali VPN</span>' : ''}</h4>
-    ${c.vpn ? `<dl class="kv">
-      <dt>Applicativo</dt><dd>${c.vpn.app}</dd>
-      <dt>Indirizzo</dt><dd>${copyable(c.vpn.host + ':' + c.vpn.port, 'indirizzo')}</dd>
-      <dt>Utenza</dt><dd>${copyable(c.vpn.user, 'utenza')}</dd>
-      <dt>Password</dt><dd>${secret('vpn' + c.id, 'Vpn-' + c.code + '!Sec', 'password VPN')}</dd>
-    </dl>` : '<p class="files-empty">Nessun accesso VPN registrato. <a href="#">Aggiungi accesso</a></p>'}</section>`;
+  const vpnBlock = (c) => `<section class="c-sec" aria-label="Accesso remoto">${secH(`${ic('lock')}Accesso remoto`, c.vpn ? `<span class="c-app">${c.vpn.app}</span>` : '')}
+    ${c.vpn ? `<div class="c-cred">
+      <div class="cr"><span class="k">Indirizzo</span><span class="v code">${c.vpn.host}<span class="port">:${c.vpn.port}</span></span><button type="button" class="icon-btn" data-copy aria-label="Copia l'indirizzo" title="Copia">${ic('copy')}</button></div>
+      <div class="cr"><span class="k">Utenza</span><span class="v code">${c.vpn.user}</span><button type="button" class="icon-btn" data-copy aria-label="Copia l'utenza" title="Copia">${ic('copy')}</button></div>
+      <div class="cr cr-pw"><span class="k">Password</span>${secret('vpn' + c.id, 'Vpn-' + c.code + '!Sec', 'la password VPN')}</div>
+    </div>
+    <p class="c-audit">Visibile solo con il permesso Credenziali VPN. Ogni visualizzazione resta nel log di audit.</p>`
+    : `<button type="button" class="c-empty">${ic('lock')}<span><b>Nessun accesso remoto</b><span>Registra VPN, utenza e password del cliente</span></span>${ic('plus')}</button>`}</section>`;
 
   const propsBlock = (c) => `<section class="pp${ppOpen ? ' is-open' : ''}" aria-label="Proprietà">
       <button type="button" class="pp-t" data-pp-toggle aria-expanded="${ppOpen}"><span class="pp-pm" aria-hidden="true"></span><span class="pp-tl">Proprietà</span>
@@ -244,16 +248,37 @@
         <button type="button" class="pp-i" data-edit="tags"><span class="k">Tag</span><span class="v">${c.tags.length ? c.tags.map((t) => `<span class="tg">${t}</span>`).join('') : '<span class="none">Nessuno</span>'}</span>${ic('chevD')}</button>
       </div></section>`;
 
-  const addrBlock = (c) => `<section class="c-addr"><h4>${ic('pin')}Sede legale</h4><div class="c-addr-r"><span>${c.addr}</span><a class="btn btn-sm" href="https://www.openstreetmap.org/search?query=${encodeURIComponent(c.addr)}" target="_blank" rel="noopener">${ic('arrowR')}Apri in Mappe</a></div></section>`;
-  const notesBlock = (c) => `<section><h4>Note</h4>${c.notes ? `<p class="desc-p">${c.notes}</p>` : '<p class="files-empty">Nessuna nota.</p>'}</section>`;
+  // Mappa segnaposto: nell'app qui va la mappa vera (Leaflet, da includere nel bundle).
+  const mapArt = `<svg class="c-map-art" viewBox="0 0 460 170" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <rect width="460" height="170" fill="var(--map-bg)"/>
+      <path d="M-10 128 C 70 112 120 150 200 138 S 330 96 470 118" fill="none" stroke="var(--map-water)" stroke-width="18" stroke-linecap="round"/>
+      <path d="M300 10 h70 a6 6 0 0 1 6 6 v38 a6 6 0 0 1 -6 6 h-70 a6 6 0 0 1 -6 -6 v-38 a6 6 0 0 1 6 -6z" fill="var(--map-park)"/>
+      <g fill="var(--map-block)">
+        <rect x="18" y="14" width="74" height="36" rx="4"/><rect x="104" y="14" width="56" height="36" rx="4"/><rect x="18" y="62" width="50" height="34" rx="4"/>
+        <rect x="80" y="62" width="80" height="34" rx="4"/><rect x="176" y="14" width="40" height="82" rx="4"/><rect x="246" y="14" width="40" height="40" rx="4"/>
+        <rect x="246" y="66" width="104" height="30" rx="4"/><rect x="390" y="14" width="56" height="46" rx="4"/><rect x="364" y="72" width="82" height="24" rx="4"/>
+      </g>
+      <g fill="none" stroke-linecap="round">
+        <path d="M-10 56 H470 M232 -10 V170" stroke="var(--map-road-edge)" stroke-width="12"/>
+        <path d="M-10 56 H470 M232 -10 V170" stroke="var(--map-road)" stroke-width="9"/>
+        <path d="M98 -10 V112 M168 -10 V108 M-10 104 H470 M380 -10 V104 M292 -10 V104" stroke="var(--map-road)" stroke-width="4"/>
+      </g>
+      <circle cx="232" cy="56" r="26" fill="var(--primary)" opacity=".1"/><circle cx="232" cy="56" r="12" fill="var(--primary)" opacity=".18"/>
+      <path d="M232 64 s-11-10-11-18a11 11 0 0 1 22 0c0 8-11 18-11 18z" fill="var(--primary)" stroke="var(--surface)" stroke-width="2"/><circle cx="232" cy="46" r="4" fill="var(--surface)"/>
+    </svg>`;
+  const addrBlock = (c) => { const [street, ...rest] = c.addr.split(', '); return `<section class="c-sec">${secH('Sede legale')}
+      <div class="c-map">${mapArt}<span class="c-map-ph">Anteprima mappa</span>
+        <div class="c-map-bar"><div class="fn"><b>${street}</b><span>${rest.join(', ')} (${c.prov})</span></div><a class="btn btn-sm" href="https://www.openstreetmap.org/search?query=${encodeURIComponent(c.addr)}" target="_blank" rel="noopener">Apri in Mappe${ic('arrowR')}</a></div>
+      </div></section>`; };
+  const notesBlock = (c) => `<section class="c-sec">${secH('Note')}${c.notes ? `<p class="desc-p">${c.notes}</p>` : '<p class="files-empty">Nessuna nota.</p>'}</section>`;
 
   const summary = (c) => {
-    const n = nextExpiry(c);
-    return `<section class="c-sum" aria-label="Riepilogo">
-      <button type="button" data-tab-go="sites"><span>Siti</span><b>${c.sites}</b></button>
-      <button type="button" data-tab-go="inv"><span>Inventari</span><b>${c.inv}</b></button>
-      <button type="button" data-tab-go="sites" class="${c.issues ? 'is-warn' : ''}"><span>Issue aperte</span><b>${c.issues}</b></button>
-      <button type="button" data-tab-go="ctr" class="${n && n[2] <= 60 ? 'is-warn' : ''}"><span>Contratti</span><b>${c.contracts.length}</b>${n ? `<small>scade ${n[1]}</small>` : ''}</button>
+    const n = nextExpiry(c); const soon = n && n[2] <= 60;
+    return `<section class="c-stats" aria-label="Riepilogo">
+      <button type="button" data-tab-go="sites"><span class="k">Siti</span><b>${c.sites}</b></button>
+      <button type="button" data-tab-go="inv"><span class="k">Inventari</span><b>${c.inv}</b></button>
+      <button type="button" data-tab-go="sites" class="${c.issues ? 'is-info' : ''}"><span class="k">Issue aperte</span><b>${c.issues}</b></button>
+      <button type="button" data-tab-go="doc" class="${soon ? 'is-warn' : ''}"><span class="k">Contratti</span><b>${c.contracts.length}</b>${n ? `<small>${soon ? 'scade' : 'fino al'} ${n[1].slice(0, 5)}</small>` : ''}</button>
     </section>`;
   };
 
@@ -276,15 +301,15 @@
   const sitesList = (c) => `<ul class="cl-sites">${c.site.map((s, i) => `<li><button type="button" data-open-site="${i}"><span class="ti">${ic('pin')}</span><div class="fn"><b>${s.name}</b><span>${s.addr}</span></div><span class="cnt">${s.inv.length} inv.${s.iss.length ? ` · <span class="w">${s.iss.length} issue</span>` : ''}</span>${ic('chevR')}</button></li>`).join('')}</ul>`;
   const invByStie = (c) => c.site.map((s, si) => `<section class="c-grp"><h4>${s.name} <span>${s.inv.length}</span></h4><ul class="c-invs">${s.inv.map((x, j) => invRow(c, si, x, j)).join('')}</ul></section>`).join('');
   const renderA = (c) => {
-    const tabs = [['det', 'Dettagli'], ['sites', 'Siti', c.sites], ['inv', 'Inventari', c.inv], ['ctr', 'Contratti', c.contracts.length], ['drv', 'Drive', c.drive], ['att', 'Attività', 5]];
+    const tabs = [['det', 'Dettagli'], ['sites', 'Siti', c.sites], ['inv', 'Inventari', c.inv], ['doc', 'Documenti', c.contracts.length + c.drive], ['att', 'Attività', 5]];
+    if (!tabs.some(([k]) => k === tab)) tab = 'det';
     $('[data-ctabs]').innerHTML = tabs.map(([k, l, n]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}${n !== undefined ? ` <span class="tn">${n}</span>` : ''}</button>`).join('');
     $('[data-cd-find]').innerHTML = '';
     const content = {
       det: () => propsBlock(c) + summary(c) + contactCard(c) + vpnBlock(c) + addrBlock(c) + notesBlock(c),
       sites: () => sitesList(c),
       inv: () => invByStie(c),
-      ctr: () => ctrList(c),
-      drv: () => driveList(c),
+      doc: () => `<section class="c-sec">${secH(`Contratti <span>${c.contracts.length}</span>`)}${ctrList(c)}</section><section class="c-sec">${secH(`Drive <span>${c.drive}</span>`, '<button type="button" class="c-link">Apri nel Drive</button>')}${driveList(c)}</section>`,
       att: () => activity(c),
     }[tab]();
     const foot = `<div class="drawer-foot"><a class="btn" href="#">${ic('server')}Site Repository</a><span class="g-spacer"></span><a class="btn btn-primary" href="h-base.html">${ic('plus')}Nuova issue</a></div>`;
