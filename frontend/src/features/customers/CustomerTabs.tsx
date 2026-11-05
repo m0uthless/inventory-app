@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, Button, ButtonBase, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material'
-import { api } from '@shared/api/client'
+import { Box, IconButton, Tooltip, Typography } from '@mui/material'
 import { buildQuery } from '@shared/utils/nav'
 import { CampoIcon, type CampoIconName } from '../../ui/campo'
+import { Empty, Group, GroupLink, Loading, mono, Row, Rows, Tile, useList } from '../../ui/campo/ListRows'
 import DeviceDialog from '../devices/DeviceDialog'
 import { deviceLabel, type DeviceListItem } from '../devices/types'
 import type { ContractListItem } from '../contracts/types'
@@ -14,96 +14,6 @@ import { daysTo, dIt } from './customerUi'
  * "Campo sterile" (design-previews/c-base.html, variante A): righe a filo con
  * riquadro icona, titolo, dettaglio e coda a destra; gruppi con titolo e conteggio.
  */
-
-type Page<T> = { results?: T[] } | T[]
-const list = <T,>(d: Page<T>): T[] => (Array.isArray(d) ? d : d.results ?? [])
-const mono = { fontFamily: '"Geist Mono", monospace' }
-
-function useList<T>(url: string, params: Record<string, unknown> | null, reloadKey?: unknown) {
-  const [rows, setRows] = React.useState<T[] | null>(null)
-  const key = JSON.stringify(params)
-  React.useEffect(() => {
-    if (!params) { setRows([]); return }
-    let alive = true
-    setRows(null)
-    api.get(url, { params }).then((r) => { if (alive) setRows(list(r.data as Page<T>)) }).catch(() => { if (alive) setRows([]) })
-    return () => { alive = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, key, reloadKey])
-  return rows
-}
-
-// ─── Elementi comuni ─────────────────────────────────────────────────────────
-
-function Group({ title, count, action, children, first }: { title: React.ReactNode; count?: number | null; action?: React.ReactNode; children: React.ReactNode; first?: boolean }) {
-  return (
-    <Box component="section" sx={{ mt: first ? 0 : 2.5 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5, minHeight: 22 }}>
-        <Typography component="h3" sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</Typography>
-        {count != null ? <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', bgcolor: 'archie.neutralBg', borderRadius: '5px', px: 0.75, lineHeight: '18px', fontVariantNumeric: 'tabular-nums' }}>{count}</Box> : null}
-        {action ? <Box sx={{ ml: 'auto', flex: 'none' }}>{action}</Box> : null}
-      </Box>
-      {children}
-    </Box>
-  )
-}
-
-const linkSx = { minWidth: 0, p: 0, height: 'auto', fontSize: 12, fontWeight: 550, color: 'primary.main', '&:hover': { bgcolor: 'transparent', textDecoration: 'underline', textUnderlineOffset: '3px' } }
-function GroupLink({ label, onClick }: { label: string; onClick: () => void }) {
-  return <Button size="small" onClick={onClick} sx={linkSx}>{label}</Button>
-}
-
-type Tone = 'brand' | 'neutral' | 'pdf'
-function Tile({ icon, text, tone = 'neutral' }: { icon?: CampoIconName; text?: string; tone?: Tone }) {
-  return (
-    <Box sx={{
-      width: 28, height: 28, flex: 'none', borderRadius: '7px', display: 'grid', placeItems: 'center',
-      ...(tone === 'brand' ? { bgcolor: 'archie.field', color: 'primary.main' } : tone === 'pdf' ? { bgcolor: 'error.light', color: 'error.main' } : { bgcolor: 'archie.neutralBg', color: 'text.secondary' }),
-      ...(text ? { ...mono, fontSize: 8.5, fontWeight: 650, letterSpacing: '.03em' } : {}),
-    }}>
-      {icon ? <CampoIcon name={icon} size={15} /> : text}
-    </Box>
-  )
-}
-
-/** Riga a filo: icona, titolo + dettaglio, coda; cliccabile se `onClick`. */
-function Row({ tile, title, sub, end, onClick, chevron }: { tile: React.ReactNode; title: React.ReactNode; sub?: React.ReactNode; end?: React.ReactNode; onClick?: () => void; chevron?: boolean }) {
-  const body = (
-    <>
-      {tile}
-      <Box sx={{ minWidth: 0, display: 'grid', gap: '1px', textAlign: 'left' }}>
-        <Typography noWrap sx={{ fontSize: 13, fontWeight: 550, color: 'text.primary' }}>{title}</Typography>
-        {sub ? <Typography noWrap component="div" sx={{ fontSize: 12, color: 'text.secondary' }}>{sub}</Typography> : null}
-      </Box>
-      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flex: 'none' }}>
-        {end}
-        {chevron ? <Box sx={{ color: 'text.disabled', display: 'inline-flex' }}><CampoIcon name="chevR" size={14} /></Box> : null}
-      </Box>
-    </>
-  )
-  const sx = {
-    display: 'grid', gridTemplateColumns: '28px minmax(0,1fr) auto', alignItems: 'center', gap: 1.25, width: '100%',
-    minHeight: 50, py: 0.75, px: 0.75, borderBottom: '1px solid', borderColor: 'divider',
-  }
-  return (
-    <Box component="li" sx={{ listStyle: 'none' }}>
-      {onClick ? (
-        <ButtonBase onClick={onClick} sx={{ ...sx, borderRadius: 0, '&:hover': { bgcolor: 'archie.surface2' }, '&.Mui-focusVisible': { boxShadow: (t) => `inset ${t.palette.archie.focusRing}` } }}>{body}</ButtonBase>
-      ) : <Box sx={sx}>{body}</Box>}
-    </Box>
-  )
-}
-
-function Rows({ children }: { children: React.ReactNode }) {
-  return <Box component="ul" sx={{ m: 0, p: 0, borderTop: '1px solid', borderColor: 'divider' }}>{children}</Box>
-}
-
-function Empty({ text }: { text: string }) {
-  return <Typography sx={{ fontSize: 12, color: 'text.secondary', py: 1.25 }}>{text}</Typography>
-}
-function Loading() {
-  return <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}><CircularProgress size={20} /></Box>
-}
 
 // ─── Siti ────────────────────────────────────────────────────────────────────
 
@@ -264,27 +174,28 @@ export function CustomerDocumentsPanel({ customerId, showContracts }: { customer
 
 type AuditEvent = { id: number; created_at: string; action: string; actor_username?: string | null; changes?: Record<string, { from?: unknown; to?: unknown } | [unknown, unknown]> | null }
 
-const FIELD: Record<string, string> = {
+const CUSTOMER_FIELDS: Record<string, string> = {
   name: 'la ragione sociale', display_name: 'il nome breve', status: 'il vendor', vat_number: 'la P.IVA', tax_code: 'il codice fiscale',
   province: 'la provincia', notes: 'le note', tags: 'i tag', custom_fields: 'i campi personalizzati', code: 'il codice',
 }
 const val = (v: unknown) => (v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v))
-function describe(e: AuditEvent): React.ReactNode {
-  if (e.action === 'create') return 'ha creato il cliente'
+function describe(e: AuditEvent, fields: Record<string, string>, noun: string): React.ReactNode {
+  if (e.action === 'create') return `ha creato ${noun}`
   if (e.action === 'delete') return 'lo ha spostato nel cestino'
   if (e.action === 'restore') return 'lo ha ripristinato'
   const ch = Object.entries(e.changes ?? {}).filter(([k]) => k !== 'updated_at' && k !== 'updated_by')
-  if (!ch.length) return 'ha modificato il cliente'
+  if (!ch.length) return `ha modificato ${noun}`
   return ch.map(([k, v], i) => {
     const [from, to] = Array.isArray(v) ? v : [v?.from, v?.to]
-    const txt = k === 'notes' || k === 'custom_fields' ? <>ha modificato {FIELD[k]}</> : <>ha cambiato {FIELD[k] ?? k} da <b>{val(from)}</b> a <b>{val(to)}</b></>
+    const txt = k === 'notes' || k === 'custom_fields' ? <>ha modificato {fields[k] ?? k}</> : <>ha cambiato {fields[k] ?? k} da <b>{val(from)}</b> a <b>{val(to)}</b></>
     return <React.Fragment key={k}>{i ? '; ' : ''}{txt}</React.Fragment>
   })
 }
 const evIcon = (a: string): CampoIconName => (a === 'create' ? 'plus' : a === 'delete' ? 'trash' : a === 'restore' ? 'restore' : 'wrench')
 
-export function CustomerActivityPanel({ customerId }: { customerId: number }) {
-  const events = useList<AuditEvent>('/audit-events/', { app_label: 'crm', model: 'customer', object_id: String(customerId), ordering: '-created_at', page_size: 100 })
+/** Registro modifiche dal log di audit, in frasi leggibili. */
+export function AuditFeedPanel({ appLabel, model, objectId, fields, noun }: { appLabel: string; model: string; objectId: number; fields: Record<string, string>; noun: string }) {
+  const events = useList<AuditEvent>('/audit-events/', { app_label: appLabel, model, object_id: String(objectId), ordering: '-created_at', page_size: 100 })
   if (!events) return <Loading />
   if (!events.length) return <Empty text="Nessuna attività registrata." />
   return (
@@ -292,10 +203,14 @@ export function CustomerActivityPanel({ customerId }: { customerId: number }) {
       {events.map((e) => (
         <Box key={e.id} sx={{ display: 'grid', gridTemplateColumns: '24px 1fr auto', gap: 1, alignItems: 'center', fontSize: 12, color: 'text.secondary', '& b': { color: 'text.primary', fontWeight: 600 } }}>
           <Box sx={{ width: 22, height: 22, ml: '1px', borderRadius: '50%', bgcolor: 'archie.neutralBg', display: 'grid', placeItems: 'center' }}><CampoIcon name={evIcon(e.action)} size={12} /></Box>
-          <span><b>{e.actor_username || 'Sistema'}</b> {describe(e)}</span>
+          <span><b>{e.actor_username || 'Sistema'}</b> {describe(e, fields, noun)}</span>
           <Box component="time" sx={{ fontSize: 11, whiteSpace: 'nowrap' }}>{new Date(e.created_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</Box>
         </Box>
       ))}
     </Box>
   )
+}
+
+export function CustomerActivityPanel({ customerId }: { customerId: number }) {
+  return <AuditFeedPanel appLabel="crm" model="customer" objectId={customerId} fields={CUSTOMER_FIELDS} noun="il cliente" />
 }

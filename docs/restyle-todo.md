@@ -42,10 +42,17 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 Fatta su `design-previews/c-base.html` (variante A · Scheda).
 
 - **[BE] Lettura della password VPN non registrata nell'audit**: l'anteprima diceva "ogni visualizzazione resta nel log"; oggi `GET /customers/<id>/vpn/` restituisce la password a chi ha il permesso senza registrare nulla. Nell'app la frase è stata tolta.
-- **[UI] Drawer cliente vecchio** (`CustomerDrawer`): ancora usato da Site Repository e Profilo.
+- **[UI] Drawer cliente vecchio** (`CustomerDrawer`): ancora usato da Profilo.
 - **[UI] Credenziali degli inventari nella scheda Inventari**: l'anteprima mostrava utenza e password per riga; l'elenco API non le include (servono la scheda dell'inventario e il permesso `inventory.view_secrets`).
 - **[UI] Città e indirizzo**: stanno nei campi personalizzati, quindi si modificano solo da "Modifica", non sul posto. Tag non mostrati nel pannello.
 - **[UI] Site Repository dal pannello**: non c'è un collegamento diretto (la pagina non accetta il cliente nell'URL).
+
+## Pagina Siti
+
+Portata direttamente nell'app con lo schema dei Clienti (nessuna anteprima dedicata).
+
+- **[UI] Site Repository**: usa ancora i suoi drawer informativi (`InfoDrawers`) per siti e clienti.
+- **[DEC] Cambio cliente di un sito**: nel pannello il cliente è in sola lettura (spostare un sito con inventari e issue fra clienti va deciso); si cambia solo da "Modifica".
 
 ## Struttura e tema
 

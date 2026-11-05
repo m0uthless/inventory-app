@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Box, Tooltip } from '@mui/material'
 import { api } from '@shared/api/client'
-import { KpiStrip, KpiTile, Meter, SegmentBar } from '../../ui/campo'
+import { KpiStrip, KpiTile, KpiTopList, Meter, SegmentBar } from '../../ui/campo'
 import { ClockIcon, dIt } from './customerUi'
 
 export type CustomerSummary = {
@@ -46,26 +46,8 @@ type Props = {
 }
 
 const MONTHS = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
-const monthLabel = (ym: string) => { const [y, m] = ym.split('-'); return `${MONTHS[Number(m) - 1]} ${y}` }
-
-/** I tre clienti con più issue aperte, con barra proporzionale. */
-function TopIssues({ rows }: { rows: CustomerSummary['top_open_issues_list'] }) {
-  const max = Math.max(1, ...rows.map((r) => r.count))
-  return (
-    <Box sx={{ display: 'grid', gap: '1px', mt: '2px' }}>
-      {rows.map((r) => (
-        <Box key={r.id} component="span"
-          sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 46px 18px', alignItems: 'center', gap: 0.75, fontSize: 11.5, lineHeight: '14px', color: 'text.secondary', textAlign: 'left' }}>
-          <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</Box>
-          <Box component="span" sx={{ height: 6, borderRadius: 3, bgcolor: 'archie.neutralBg', overflow: 'hidden' }}>
-            <Box component="span" sx={{ display: 'block', height: '100%', width: `${(r.count / max) * 100}%`, borderRadius: 3, bgcolor: (t) => t.palette.archie.seq[2] }} />
-          </Box>
-          <Box component="b" sx={{ color: 'text.primary', fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.count}</Box>
-        </Box>
-      ))}
-    </Box>
-  )
-}
+// eslint-disable-next-line react-refresh/only-export-components
+export const monthLabel = (ym: string) => { const [y, m] = ym.split('-'); return `${MONTHS[Number(m) - 1]} ${y}` }
 
 /** Prossimi N giorni come una linea: un punto per ogni contratto in scadenza. */
 function ExpiryTrack({ items, days }: { items: CustomerSummary['expiring']; days: number }) {
@@ -100,7 +82,7 @@ export default function CustomerKpis({ summary: s, view, onView, onVendor, vendo
       <KpiTile label="Con issue aperte" active={view === 'iss'} onClick={toggle('iss')}
         value={s ? s.with_open_issues : '—'} unit={s ? `${s.open_issues} issue` : undefined}
         sub={s && !s.top_open_issues_list.length ? 'nessuna issue aperta' : undefined}>
-        {s?.top_open_issues_list.length ? <TopIssues rows={s.top_open_issues_list} /> : null}
+        {s?.top_open_issues_list.length ? <KpiTopList rows={s.top_open_issues_list.map((r) => ({ key: r.id, label: r.name, value: r.count }))} /> : null}
       </KpiTile>
 
       <KpiTile label="Contratti in scadenza" active={view === 'exp'} onClick={toggle('exp')}

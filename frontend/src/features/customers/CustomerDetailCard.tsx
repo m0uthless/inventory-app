@@ -1,12 +1,11 @@
 import * as React from 'react'
-import { Box, Button, ButtonBase, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import AddIcon from '@mui/icons-material/Add'
 import { api } from '@shared/api/client'
-import { CampoIcon, DetailSection, FloatingDetail, Properties } from '../../ui/campo'
-import LeafletMap from '../../ui/LeafletMap'
+import { CampoIcon, ContactsBlock, DetailSection, EmptyAction, FloatingDetail, linkBtnSx, MapBlock, Properties, StatRow } from '../../ui/campo'
 import { daysTo, dIt, EXPIRING_DAYS, VendorMark } from './customerUi'
 
 export type CustomerCardDetail = {
@@ -73,7 +72,6 @@ type Props = {
   activityTab: React.ReactNode
 }
 
-const tel = (p: string) => p.replace(/\s+/g, '')
 const none = (t = '—') => <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>{t}</Box>
 const mono = { fontFamily: '"Geist Mono", monospace' }
 
@@ -101,42 +99,6 @@ function useCustomerVpn(id: number | null, has: boolean, reloadKey: unknown) {
   return vpn
 }
 
-/** Azione diretta (telefono / email): icona a tratto spesso + testo, copia al passaggio. */
-function DirectLink({ href, icon, text, monoText, onCopy, copyLabel }: { href: string; icon: 'phone' | 'mail'; text: string; monoText?: boolean; onCopy: () => void; copyLabel: string }) {
-  return (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '2px', minWidth: 0, maxWidth: '100%', '&:hover .cp, & .cp:focus-visible': { opacity: 1 } }}>
-      <Box component="a" href={href} sx={{
-        display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0, color: 'text.primary', textDecoration: 'none', fontSize: 12, fontWeight: 550,
-        '& svg': { color: 'primary.main' },
-        '&:hover': { color: 'primary.main', '& .tx': { textDecoration: 'underline', textUnderlineOffset: '3px' } },
-      }}>
-        <CampoIcon name={icon} size={15} bold />
-        <Box component="span" className="tx" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...(monoText ? mono : {}) }}>{text}</Box>
-      </Box>
-      <Tooltip title="Copia"><IconButton className="cp" size="small" aria-label={copyLabel} onClick={onCopy} sx={{ width: 24, height: 24, opacity: 0, transition: 'opacity .12s' }}><CampoIcon name="copy" size={13} /></IconButton></Tooltip>
-    </Box>
-  )
-}
-
-function EmptyAction({ icon, title, sub, onClick, disabled }: { icon: 'user' | 'lock'; title: string; sub: string; onClick?: () => void; disabled?: boolean }) {
-  return (
-    <ButtonBase onClick={onClick} disabled={disabled || !onClick} sx={{
-      display: 'grid', gridTemplateColumns: '32px minmax(0,1fr) 16px', gap: 1.5, alignItems: 'center', width: '100%', textAlign: 'left',
-      p: '10px 12px', border: '1px dashed', borderColor: 'archie.borderStrong', borderRadius: '8px', color: 'primary.main',
-      '&:hover': { borderColor: 'primary.main', bgcolor: 'archie.field' }, '&.Mui-disabled': { color: 'text.disabled' },
-    }}>
-      <Box sx={{ width: 32, height: 32, borderRadius: '8px', bgcolor: 'archie.field', display: 'grid', placeItems: 'center' }}><CampoIcon name={icon} size={16} /></Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600, fontSize: 13, color: 'text.primary' }}>{title}</Typography>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{sub}</Typography>
-      </Box>
-      {onClick && !disabled ? <CampoIcon name="plus" size={16} /> : <span />}
-    </ButtonBase>
-  )
-}
-
-const linkBtnSx = { minWidth: 0, p: 0, height: 'auto', fontSize: 12, fontWeight: 550, color: 'primary.main', '&:hover': { bgcolor: 'transparent', textDecoration: 'underline', textUnderlineOffset: '3px' } }
-
 /** Scheda flottante del cliente (DESIGN.md › Detail card), come Issue e Purchase Order. */
 export default function CustomerDetailCard(p: Props) {
   const d = p.detail
@@ -161,8 +123,7 @@ export default function CustomerDetailCard(p: Props) {
   const soon = next != null && next <= EXPIRING_DAYS
   const primary = contacts?.find((c) => c.id === d.primary_contact_id) ?? null
   const others = (contacts ?? []).filter((c) => c.id !== d.primary_contact_id)
-  const contactCount = (d.primary_contact_id ? 1 : 0) + others.length
-
+  
   const props = [
     {
       key: 'ven', label: 'Vendor', disabled: !editable, current: d.status ? String(d.status) : '',
@@ -202,21 +163,6 @@ export default function CustomerDetailCard(p: Props) {
     { key: 'city', label: 'Città', disabled: true, display: d.city || none() },
   ]
 
-  const stat = (key: CustomerTab, label: string, value: React.ReactNode, warn = false, tip = '') => (
-    <Tooltip title={tip} disableHoverListener={!tip}>
-      <ButtonBase onClick={() => p.onTab(key)} sx={{
-        position: 'relative', display: 'grid', justifyItems: 'center', gap: '2px', py: 1, px: 0.5, borderRadius: '8px', minWidth: 0,
-        '& + &::before': { content: '""', position: 'absolute', left: 0, top: 14, bottom: 14, width: '1px', bgcolor: 'divider' },
-        '&:hover b': { color: warn ? 'warning.main' : 'primary.main' },
-      }}>
-        <Box component="b" sx={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 18, fontWeight: 650, letterSpacing: '-0.01em', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums', color: warn ? 'warning.main' : 'text.primary', transition: 'color .12s' }}>
-          {value}{warn ? <CampoIcon name="clock" size={15} bold /> : null}
-        </Box>
-        <Box component="span" sx={{ fontSize: 11, color: 'text.secondary', whiteSpace: 'nowrap' }}>{label}</Box>
-      </ButtonBase>
-    </Tooltip>
-  )
-
   const credRow = (label: string, value: React.ReactNode, actions: React.ReactNode) => (
     <Box sx={{ display: 'grid', gridTemplateColumns: '76px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 38, pl: 1.5, pr: 0.5, '& + &': { borderTop: '1px solid', borderColor: 'divider' } }}>
       <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
@@ -242,58 +188,21 @@ export default function CustomerDetailCard(p: Props) {
         summary={<><VendorMark label={d.status_label} color={vColor} />{d.vat_number ? <Box component="span" sx={{ ...mono, color: 'text.secondary' }}>{d.vat_number}</Box> : <Box component="span" sx={{ color: 'warning.main', fontWeight: 550 }}>P.IVA mancante</Box>}</>}
       />
 
-      <Box component="section" aria-label="Riepilogo" sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', mt: -0.75 }}>
-        {stat('sites', 'Siti', d.sites_count ?? p.counts.sites ?? '—')}
-        {stat('inv', 'Inventari', d.assets_count ?? p.counts.inventories ?? '—')}
-        {stat('sites', 'Issue aperte', d.open_issues_count ?? 0)}
-        {stat('doc', 'Contratti', d.active_contracts_count ?? p.counts.contracts ?? '—', soon,
-          d.next_contract_end ? `${d.next_contract_title ? d.next_contract_title + ' · ' : ''}${soon ? 'scade' : 'prossima scadenza'} il ${dIt(d.next_contract_end)}` : '')}
-      </Box>
+      <StatRow items={[
+        { label: 'Siti', value: d.sites_count ?? p.counts.sites ?? '—', onClick: () => p.onTab('sites') },
+        { label: 'Inventari', value: d.assets_count ?? p.counts.inventories ?? '—', onClick: () => p.onTab('inv') },
+        { label: 'Issue aperte', value: d.open_issues_count ?? 0, onClick: () => p.onTab('sites') },
+        { label: 'Contratti', value: d.active_contracts_count ?? p.counts.contracts ?? '—', onClick: () => p.onTab('doc'), warn: soon,
+          tip: d.next_contract_end ? `${d.next_contract_title ? d.next_contract_title + ' · ' : ''}${soon ? 'scade' : 'prossima scadenza'} il ${dIt(d.next_contract_end)}` : undefined },
+      ]} />
 
-      <DetailSection title={<>Contatti {contacts ? <Box component="span" sx={{ ml: 0.5, px: 0.75, borderRadius: '5px', bgcolor: 'archie.neutralBg', fontSize: 11 }}>{contactCount}</Box> : null}</>}
-        end={<Button size="small" sx={linkBtnSx} onClick={p.onAllContacts}>Tutti i contatti</Button>}>
-        {d.primary_contact_id ? (
-          <Box sx={{ display: 'grid', gap: 1 }}>
-            <Box>
-              <Typography sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontSize: 13, fontWeight: 600 }}>
-                {d.primary_contact_name}
-                <Box component="span" sx={{ fontSize: 10, fontWeight: 650, letterSpacing: '.02em', color: 'primary.main', bgcolor: 'archie.field', borderRadius: '4px', px: 0.75, py: '1px' }}>Primario</Box>
-              </Typography>
-              {primary?.department ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{primary.department}</Typography> : null}
-            </Box>
-            {d.primary_contact_phone || d.primary_contact_email ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 18px', mt: -0.25 }}>
-                {d.primary_contact_phone ? <DirectLink href={`tel:${tel(d.primary_contact_phone)}`} icon="phone" text={d.primary_contact_phone} monoText onCopy={() => p.onCopy(d.primary_contact_phone!)} copyLabel="Copia il telefono" /> : null}
-                {d.primary_contact_email ? <DirectLink href={`mailto:${d.primary_contact_email}`} icon="mail" text={d.primary_contact_email} onCopy={() => p.onCopy(d.primary_contact_email!)} copyLabel="Copia l'email" /> : null}
-              </Box>
-            ) : null}
-          </Box>
-        ) : (
-          <EmptyAction icon="user" title="Nessun contatto primario" sub={others.length ? 'Sceglilo tra i referenti qui sotto, dalla pagina Contatti' : 'Aggiungi il referente principale dalla pagina Contatti'} onClick={p.onAllContacts} />
-        )}
-        {others.length ? (
-          <Box component="ul" aria-label="Altri referenti" sx={{ listStyle: 'none', m: 0, mt: 1.5, p: 0, borderTop: '1px solid', borderColor: 'divider' }}>
-            {others.slice(0, 3).map((c) => (
-              <Box component="li" key={c.id} sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'center', gap: 1.5, minHeight: 46, py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>
-                    {c.name}{c.department ? <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary', fontSize: 12, ml: 0.75 }}>{c.department}</Box> : null}
-                  </Typography>
-                  <Typography noWrap sx={{ fontSize: 11, color: 'text.disabled' }}>{c.site_display_name || c.site_name || 'Nessun sito'}</Typography>
-                </Box>
-                {c.phone ? (
-                  <Box component="a" href={`tel:${tel(c.phone)}`} title={`Chiama ${c.name}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12, fontWeight: 550, color: 'text.primary', textDecoration: 'none', whiteSpace: 'nowrap', '& svg': { color: 'primary.main' }, '&:hover': { color: 'primary.main' } }}>
-                    <CampoIcon name="phone" size={14} bold /><Box component="span" sx={mono}>{c.phone}</Box>
-                  </Box>
-                ) : c.email ? (
-                  <Box component="a" href={`mailto:${c.email}`} title={`Scrivi a ${c.name}`} sx={{ display: 'inline-flex', color: 'primary.main' }}><CampoIcon name="mail" size={15} bold /></Box>
-                ) : <span />}
-              </Box>
-            ))}
-            {others.length > 3 ? <Button size="small" sx={{ ...linkBtnSx, mt: 0.75 }} onClick={p.onAllContacts}>Altri {others.length - 3} referenti</Button> : null}
-          </Box>
-        ) : null}
-      </DetailSection>
+      <ContactsBlock
+        loaded={Boolean(contacts)}
+        primary={d.primary_contact_id ? { name: d.primary_contact_name || '—', role: primary?.department, phone: d.primary_contact_phone, email: d.primary_contact_email } : null}
+        others={others.map((c) => ({ id: c.id, name: c.name, role: c.department, where: c.site_display_name || c.site_name || 'Nessun sito', phone: c.phone, email: c.email }))}
+        onAll={p.onAllContacts}
+        onCopy={p.onCopy}
+      />
 
       <DetailSection title={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}><CampoIcon name="lock" size={13} />Accesso remoto</Box>}
         end={d.has_vpn ? (
@@ -332,24 +241,7 @@ export default function CustomerDetailCard(p: Props) {
         )}
       </DetailSection>
 
-      {p.address ? (
-        <DetailSection title="Sede">
-          <Box sx={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid', borderColor: 'divider', '& > div:first-of-type': { borderRadius: 0, border: 0 } }}>
-            <LeafletMap address={p.address} height={170} zoom={15} />
-            <Box sx={{
-              position: 'absolute', left: 8, right: 8, bottom: 8, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.25,
-              p: '7px 7px 7px 10px', borderRadius: '8px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', boxShadow: '0 6px 16px -8px rgb(0 0 0 / .25)',
-            }}>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography noWrap sx={{ fontSize: 12, fontWeight: 600 }}>{street}</Typography>
-                {rest.length ? <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>{rest.join(', ')}{d.province ? ` (${d.province})` : ''}</Typography> : null}
-              </Box>
-              <Button size="small" variant="outlined" component="a" href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(p.address)}`} target="_blank" rel="noopener"
-                endIcon={<CampoIcon name="arrowR" size={13} />} sx={{ flex: 'none' }}>Apri in Mappe</Button>
-            </Box>
-          </Box>
-        </DetailSection>
-      ) : null}
+      {p.address ? <MapBlock street={street} place={`${rest.join(', ')}${d.province ? ` (${d.province})` : ''}`} query={p.address} /> : null}
 
       <DetailSection title="Note">
         {d.notes ? <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{d.notes}</Typography> : <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Nessuna nota.</Typography>}

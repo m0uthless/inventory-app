@@ -654,6 +654,9 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
     # Site Repository solo quando ce n'è più di uno (il primo è già esposto
     # via primary_contact_*), stessa semantica di Customer.contacts_count.
     contacts_count = serializers.IntegerField(read_only=True, default=0)
+    # Restyle pagina Siti: inventari e issue attive del sito.
+    assets_count = serializers.IntegerField(read_only=True, default=0)
+    open_issues_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Site
@@ -677,12 +680,65 @@ class SiteSerializer(CustomFieldsValidationMixin, serializers.ModelSerializer):
             "primary_contact_email",
             "primary_contact_phone",
             "contacts_count",
+            "assets_count",
+            "open_issues_count",
             "notes",
             "custom_fields",
             "created_at",
             "updated_at",
             "deleted_at",
         ]
+
+
+class SiteFilter(filters.FilterSet):
+    """Filtri della lista siti: ricerca per colonna (restyle) e viste."""
+    name_q = filters.CharFilter(method="filter_name_q")
+    customer_q = filters.CharFilter(method="filter_customer_q")
+    city_q = filters.CharFilter(method="filter_city_q")
+    contact_q = filters.CharFilter(method="filter_contact_q")
+    has_open_issues = filters.BooleanFilter(method="filter_has_open_issues")
+    has_inventories = filters.BooleanFilter(method="filter_has_inventories")
+    incomplete = filters.BooleanFilter(method="filter_incomplete")
+
+    class Meta:
+        model = Site
+        fields = ["customer", "status"]
+
+    def filter_name_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(name__icontains=v) | Q(display_name__icontains=v)) if v else queryset
+
+    def filter_customer_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(customer__name__icontains=v) | Q(customer__display_name__icontains=v)) if v else queryset
+
+    def filter_city_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(city__icontains=v) | Q(province__icontains=v) | Q(address_line1__icontains=v) | Q(postal_code__icontains=v)) if v else queryset
+
+    def filter_contact_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(primary_contact_name__icontains=v) | Q(primary_contact_phone__icontains=v) | Q(primary_contact_email__icontains=v)) if v else queryset
+
+    def filter_has_open_issues(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(open_issues_count__gt=0) if value else queryset.filter(open_issues_count=0)
+
+    def filter_has_inventories(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(assets_count__gt=0) if value else queryset.filter(assets_count=0)
+
+    def filter_incomplete(self, queryset, name, value):
+        if value is None:
+            return queryset
+        cond = SITE_INCOMPLETE
+        return queryset.filter(cond) if value else queryset.exclude(cond)
+
+
+# Sito "da completare": manca l'indirizzo o il referente primario.
+SITE_INCOMPLETE = Q(address_line1__isnull=True) | Q(address_line1="") | Q(primary_contact_id__isnull=True)
 
 
 class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -694,7 +750,7 @@ class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, R
 
     # Fix P0 6.2: per utenti portale "puri" forza customer=proprio tenant
     # in create/update (tenant_owned_field="customer" è già il default).
-    filterset_fields = ["customer", "status"]
+    filterset_class = SiteFilter
     search_fields = ["name", "display_name", "city", "address_line1", "postal_code"]
     ordering_fields = [
         "name",
@@ -711,6 +767,10 @@ class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, R
         "customer__name",
         "customer__display_name",
         "status__label",
+        "province",
+        "primary_contact_name",
+        "assets_count",
+        "open_issues_count",
     ]
     ordering = ["name"]
     purge_permission = "crm.delete_site"
@@ -737,8 +797,60 @@ class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, R
                 group_field="site_id",
             ),
         )
+        from issues.models import Issue
+        qs = qs.annotate(
+            assets_count=_count_subquery(
+                Inventory.objects.filter(site_id=OuterRef("pk"), deleted_at__isnull=True),
+                group_field="site_id",
+            ),
+            open_issues_count=_count_subquery(
+                Issue.objects.filter(
+                    site_id=OuterRef("pk"), deleted_at__isnull=True,
+                    status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS, IssueStatus.WAITING],
+                ),
+                group_field="site_id",
+            ),
+        )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """Indicatori della pagina Siti (siti non cestinati, stesso perimetro della lista)."""
+        qs = self.get_queryset().filter(deleted_at__isnull=True).order_by()
+        agg = qs.aggregate(
+            total=Count("id"),
+            customers=Count("customer_id", distinct=True),
+            inventories=Sum("assets_count"),
+            with_open_issues=Count("id", filter=Q(open_issues_count__gt=0)),
+            open_issues=Sum("open_issues_count"),
+            without_inventories=Count("id", filter=Q(assets_count=0)),
+            incomplete=Count("id", filter=SITE_INCOMPLETE),
+            missing_address=Count("id", filter=Q(address_line1__isnull=True) | Q(address_line1="")),
+            missing_contact=Count("id", filter=Q(primary_contact_id__isnull=True)),
+        )
+        top3 = list(qs.filter(open_issues_count__gt=0).order_by("-open_issues_count", "name").values("id", "name", "display_name", "open_issues_count")[:3])
+        by_status = list(qs.values("status__key", "status__label").annotate(n=Count("id")).order_by("-n", "status__label"))
+        by_customer = list(qs.values("customer_id", "customer__display_name", "customer__name").annotate(n=Count("id")).order_by("-n", "customer__name"))
+        today = timezone.localdate()
+        months = []
+        y, m = today.year, today.month
+        for _ in range(12):
+            months.append((y, m))
+            y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+        months.reverse()
+        created = list(qs.values_list("created_at", flat=True))
+        growth = []
+        for (yy, mm) in months:
+            end = datetime.date(yy + (mm // 12), (mm % 12) + 1, 1)
+            growth.append({"month": f"{yy}-{mm:02d}", "count": sum(1 for c in created if c and timezone.localtime(c).date() < end)})
+        return Response({
+            **{k: (v or 0) for k, v in agg.items()},
+            "top_open_issues_list": [{"id": t["id"], "name": t["display_name"] or t["name"], "count": t["open_issues_count"]} for t in top3],
+            "by_status": [{"key": v["status__key"], "label": v["status__label"], "count": v["n"]} for v in by_status],
+            "by_customer": [{"id": v["customer_id"], "name": v["customer__display_name"] or v["customer__name"], "count": v["n"]} for v in by_customer],
+            "growth": growth,
+        })
 
 
 

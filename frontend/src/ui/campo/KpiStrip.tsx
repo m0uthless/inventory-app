@@ -161,3 +161,21 @@ export function KpiFlag({ tone, children }: { tone: 'error' | 'warning' | 'succe
     </Typography>
   )
 }
+
+/** Mini classifica (fino a 3 voci) con barra proporzionale: sta in una tile da 116px. */
+export function KpiTopList({ rows }: { rows: { key: string | number; label: string; value: number }[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.value))
+  return (
+    <Box sx={{ display: 'grid', gap: '1px', mt: '2px' }}>
+      {rows.slice(0, 3).map((r) => (
+        <Box key={r.key} component="span" sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 46px 18px', alignItems: 'center', gap: 0.75, fontSize: 11.5, lineHeight: '14px', color: 'text.secondary' }}>
+          <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</Box>
+          <Box component="span" sx={{ height: 6, borderRadius: 3, bgcolor: 'archie.neutralBg', overflow: 'hidden' }}>
+            <Box component="span" sx={{ display: 'block', height: '100%', width: `${(r.value / max) * 100}%`, borderRadius: 3, bgcolor: (t) => t.palette.archie.seq[2] }} />
+          </Box>
+          <Box component="b" sx={{ color: 'text.primary', fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.value}</Box>
+        </Box>
+      ))}
+    </Box>
+  )
+}

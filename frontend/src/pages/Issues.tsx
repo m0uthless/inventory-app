@@ -82,7 +82,7 @@ type CreateFromServiceNowCaseState = {
 type OpenCreateState = {
   openCreate?: boolean
   /** Dalla scheda cliente: nuova issue con il cliente già scelto. */
-  createForCustomer?: { customerId: number; customerName: string }
+  createForCustomer?: { customerId: number; customerName: string; siteId?: number }
   createFromInventory?: CreateFromInventoryState
   createFromServiceNowCase?: CreateFromServiceNowCaseState
 }
@@ -542,7 +542,7 @@ export default function Issues() {
     } else if (st?.createForCustomer) {
       const cfc = st.createForCustomer
       setEditIssue(null)
-      setForm({ ...createEmptyForm(me?.id), customer: { id: cfc.customerId, label: cfc.customerName } })
+      setForm({ ...createEmptyForm(me?.id), customer: { id: cfc.customerId, label: cfc.customerName }, site_id: cfc.siteId ?? '' })
       setCustFormInput(cfc.customerName)
       setFormErrors({})
       setInventoryOptions([])
