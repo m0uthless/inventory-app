@@ -47,6 +47,10 @@ const P = {
   menu: 'M4 6h16 M4 12h16 M4 18h16',
   restore: 'M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5',
   layers: 'M12 2 2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5',
+  phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z',
+  mail: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 6.5 12 13l8.5-6.5',
+  clock: 'M12 3a9 9 0 1 1 0 18a9 9 0 0 1 0-18z M12 7.5V12l3 2',
+  eyeOff: 'M3 3l18 18 M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1 M6.6 6.6C3.7 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.4-1.1 M9.9 9.9a3 3 0 0 0 4.2 4.2',
   chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M8 9h8 M8 13h5',
   message: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M12 7v4 M12 14h.01',
   funnel: 'M3 5h18l-7 8.5V19l-4 2v-7.5z',
@@ -54,9 +58,9 @@ const P = {
 
 export type CampoIconName = keyof typeof P
 
-export function CampoIcon({ name, size = 16, sx }: { name: CampoIconName; size?: number; sx?: SxProps<Theme> }) {
+export function CampoIcon({ name, size = 16, sx, bold }: { name: CampoIconName; size?: number; sx?: SxProps<Theme>; bold?: boolean }) {
   return (
-    <Box component="svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.75}
+    <Box component="svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={bold ? 2.4 : 1.75}
       strokeLinecap="round" strokeLinejoin="round" sx={{ width: size, height: size, flex: 'none', display: 'block', ...(sx as object) }}>
       <path d={P[name]} />
     </Box>

@@ -315,7 +315,7 @@ class IssueFilter(filters.FilterSet):
         if not v:
             return queryset
         return queryset.filter(
-            Q(customer__name__icontains=v) | Q(customer_placeholder__icontains=v) | Q(site__name__icontains=v)
+            Q(customer__name__icontains=v) | Q(customer__display_name__icontains=v) | Q(customer_placeholder__icontains=v) | Q(site__name__icontains=v)
         )
 
     def filter_assigned_q(self, queryset, name, value):

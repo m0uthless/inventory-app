@@ -1,10 +1,11 @@
 import io
+import datetime
 import re
 
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db import IntegrityError, transaction
-from django.db.models import OuterRef, Subquery, F, Exists, Count, IntegerField
+from django.db.models import OuterRef, Subquery, F, Exists, Count, IntegerField, Q, Sum, CharField, DateField
 from django.db.models import TextField
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce
@@ -60,9 +61,49 @@ class CustomerFilter(filters.FilterSet):
     has_vpn = filters.BooleanFilter(field_name="has_vpn")
     has_contact = filters.BooleanFilter(method="filter_has_contact")
 
+    # Ricerca per singola colonna (riga di ricerca del restyle) e viste.
+    code_q = filters.CharFilter(field_name="code", lookup_expr="icontains")
+    name_q = filters.CharFilter(method="filter_name_q")
+    city_q = filters.CharFilter(method="filter_city_q")
+    contact_q = filters.CharFilter(method="filter_contact_q")
+    vat_q = filters.CharFilter(field_name="vat_number", lookup_expr="icontains")
+    has_open_issues = filters.BooleanFilter(method="filter_has_open_issues")
+    contract_expiring = filters.BooleanFilter(method="filter_contract_expiring")
+    incomplete = filters.BooleanFilter(method="filter_incomplete")
+
     class Meta:
         model = Customer
         fields = ["status", "city", "province", "has_vpn", "has_contact"]
+
+    def filter_name_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(name__icontains=v) | Q(display_name__icontains=v)) if v else queryset
+
+    def filter_city_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(city__icontains=v) | Q(province__icontains=v)) if v else queryset
+
+    def filter_contact_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(primary_contact_name__icontains=v) | Q(primary_contact_phone__icontains=v) | Q(primary_contact_email__icontains=v)) if v else queryset
+
+    def filter_has_open_issues(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(open_issues_count__gt=0) if value else queryset.filter(open_issues_count=0)
+
+    def filter_contract_expiring(self, queryset, name, value):
+        if value is None:
+            return queryset
+        limit = timezone.localdate() + datetime.timedelta(days=CONTRACT_EXPIRING_DAYS)
+        cond = Q(next_contract_end__isnull=False, next_contract_end__lte=limit)
+        return queryset.filter(cond) if value else queryset.exclude(cond)
+
+    def filter_incomplete(self, queryset, name, value):
+        if value is None:
+            return queryset
+        cond = Q(primary_contact_id__isnull=True) | Q(vat_number__isnull=True) | Q(vat_number="")
+        return queryset.filter(cond) if value else queryset.exclude(cond)
 
     def filter_has_contact(self, queryset, name, value):
         if value is None:
@@ -81,6 +122,10 @@ class CustomerFilter(filters.FilterSet):
         return queryset.filter(
             Q(city__icontains=v)  # usa l'annotazione già presente nel queryset
         )
+
+# Finestra di "contratto in scadenza" per la vista e l'indicatore della pagina Clienti.
+CONTRACT_EXPIRING_DAYS = 60
+
 
 def _count_subquery(related_qs, *, distinct=False, group_field="customer_id"):
     """Conta le righe di `related_qs` per la entita' corrente, come subquery.
@@ -134,6 +179,12 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
     # "Contatti" nel Site Repository solo quando ce n'e' più di uno, dato
     # che il primo è già esposto via primary_contact_*).
     contacts_count = serializers.IntegerField(read_only=True, default=0)
+    # Restyle pagina Clienti: issue attive del cliente (numero di issue, non di
+    # inventari), contratti attivi e prossima scadenza.
+    open_issues_count = serializers.IntegerField(read_only=True, default=0)
+    active_contracts_count = serializers.IntegerField(read_only=True, default=0)
+    next_contract_end = serializers.DateField(read_only=True, default=None)
+    next_contract_title = serializers.CharField(read_only=True, default=None)
 
     # Chiavi riconosciute per "città" nei custom_fields (allineate con la Coalesce nel queryset).
     _CITY_KEYS = frozenset({"city", "citta", "città", "Città", "Citta"})
@@ -187,6 +238,10 @@ class CustomerSerializer(CustomFieldsValidationMixin, serializers.ModelSerialize
             "sites_with_assets_count",
             "active_issue_count",
             "contacts_count",
+            "open_issues_count",
+            "active_contracts_count",
+            "next_contract_end",
+            "next_contract_title",
             "tags",
             "custom_fields",
             "created_at",
@@ -243,6 +298,10 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
         "primary_contact_phone",
         "vat_number",
         "tax_code",
+        "sites_count",
+        "assets_count",
+        "open_issues_count",
+        "next_contract_end",
         "updated_at",
         "created_at",
         "deleted_at",
@@ -387,7 +446,59 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
             ),
         )
 
+        qs = self._annotate_restyle(qs)
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    @staticmethod
+    def _annotate_restyle(qs):
+        from django.apps import apps
+        from issues.models import Issue
+        Contract = apps.get_model("contracts", "Contract")
+        today = timezone.localdate()
+        active_contracts = Contract.objects.filter(customer_id=OuterRef("pk"), deleted_at__isnull=True, status="attivo")
+        next_qs = active_contracts.filter(end_date__gte=today).order_by("end_date", "id")
+        return qs.annotate(
+            open_issues_count=_count_subquery(
+                Issue.objects.filter(
+                    customer_id=OuterRef("pk"), deleted_at__isnull=True,
+                    status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS, IssueStatus.WAITING],
+                )
+            ),
+            active_contracts_count=_count_subquery(active_contracts.filter(end_date__gte=today)),
+            next_contract_end=Subquery(next_qs.values("end_date")[:1], output_field=DateField()),
+            next_contract_title=Subquery(next_qs.values("title")[:1], output_field=CharField()),
+        )
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """Indicatori della pagina Clienti (clienti attivi, non cestinati)."""
+        qs = self.get_queryset().filter(deleted_at__isnull=True).order_by()
+        limit = timezone.localdate() + datetime.timedelta(days=CONTRACT_EXPIRING_DAYS)
+        agg = qs.aggregate(
+            total=Count("id"),
+            sites=Sum("sites_count"),
+            inventories=Sum("assets_count"),
+            with_open_issues=Count("id", filter=Q(open_issues_count__gt=0)),
+            open_issues=Sum("open_issues_count"),
+            contracts_expiring=Count("id", filter=Q(next_contract_end__isnull=False, next_contract_end__lte=limit)),
+            incomplete=Count("id", filter=Q(primary_contact_id__isnull=True) | Q(vat_number__isnull=True) | Q(vat_number="")),
+        )
+        top = qs.filter(open_issues_count__gt=0).order_by("-open_issues_count", "name").values("id", "name", "display_name", "open_issues_count").first()
+        nearest = qs.filter(next_contract_end__isnull=False, next_contract_end__lte=limit).order_by("next_contract_end").values("id", "display_name", "name", "next_contract_end", "next_contract_title").first()
+        by_vendor = list(qs.values("status__key", "status__label").annotate(n=Count("id")).order_by("-n", "status__label"))
+        return Response({
+            "total": agg["total"] or 0,
+            "sites": agg["sites"] or 0,
+            "inventories": agg["inventories"] or 0,
+            "with_open_issues": agg["with_open_issues"] or 0,
+            "open_issues": agg["open_issues"] or 0,
+            "top_open_issues": ({"id": top["id"], "name": top["display_name"] or top["name"], "count": top["open_issues_count"]} if top else None),
+            "contracts_expiring": agg["contracts_expiring"] or 0,
+            "expiring_days": CONTRACT_EXPIRING_DAYS,
+            "nearest_expiry": ({"id": nearest["id"], "name": nearest["display_name"] or nearest["name"], "date": nearest["next_contract_end"], "title": nearest["next_contract_title"]} if nearest else None),
+            "incomplete": agg["incomplete"] or 0,
+            "by_vendor": [{"key": v["status__key"], "label": v["status__label"], "count": v["n"]} for v in by_vendor],
+        })
 
     # ── Export Excel flat (cliente → siti → inventory) ─────────────────────
     # Export scoped a UN SOLO cliente (azione detail=True): "Esporta Excel"

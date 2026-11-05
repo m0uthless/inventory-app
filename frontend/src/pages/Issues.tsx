@@ -81,6 +81,8 @@ type CreateFromServiceNowCaseState = {
 
 type OpenCreateState = {
   openCreate?: boolean
+  /** Dalla scheda cliente: nuova issue con il cliente già scelto. */
+  createForCustomer?: { customerId: number; customerName: string }
   createFromInventory?: CreateFromInventoryState
   createFromServiceNowCase?: CreateFromServiceNowCaseState
 }
@@ -257,8 +259,10 @@ export default function Issues() {
   const [fAssigned, setFAssigned] = React.useState<string[]>([])
   type ColQ = { id: string; title: string; customer: string; servicenow: string; assigned: string; priority: string; status: string; due: string }
   const EMPTY_COLQ: ColQ = { id: '', title: '', customer: '', servicenow: '', assigned: '', priority: '', status: '', due: '' }
-  const [colSearchOpen, setColSearchOpen] = React.useState(false)
-  const [colQ, setColQ] = React.useState<ColQ>(EMPTY_COLQ)
+  // ?cliente=<nome> (dalla pagina Clienti): ricerca per colonna già compilata.
+  const clienteParam = new URLSearchParams(loc.search).get('cliente') ?? ''
+  const [colSearchOpen, setColSearchOpen] = React.useState(Boolean(clienteParam))
+  const [colQ, setColQ] = React.useState<ColQ>(() => ({ ...EMPTY_COLQ, customer: clienteParam }))
   const colQActive = Object.values(colQ).some(Boolean)
   const activeFilterCount = [fStatus, fPriority, fCategory, fAssigned].filter((f) => f.length).length + (view !== 'active' ? 1 : 0)
 
@@ -481,7 +485,7 @@ export default function Issues() {
 
   React.useEffect(() => {
     const st = loc.state as OpenCreateState | null
-    const hasOpenCreate = st?.openCreate || st?.createFromInventory || st?.createFromServiceNowCase
+    const hasOpenCreate = st?.openCreate || st?.createFromInventory || st?.createFromServiceNowCase || st?.createForCustomer
     if (!hasOpenCreate) {
       openCreateOnceRef.current = false
       return
@@ -529,6 +533,17 @@ export default function Issues() {
         customerPlaceholder: cfsn.account || '',
       })
       setCustFormInput(cfsn.account || '')
+      setFormErrors({})
+      setInventoryOptions([])
+      setSelectedInventory(null)
+      setPendingInventory(null)
+      setLinkInventoryOpen(false)
+      setFormOpen(true)
+    } else if (st?.createForCustomer) {
+      const cfc = st.createForCustomer
+      setEditIssue(null)
+      setForm({ ...createEmptyForm(me?.id), customer: { id: cfc.customerId, label: cfc.customerName } })
+      setCustFormInput(cfc.customerName)
       setFormErrors({})
       setInventoryOptions([])
       setSelectedInventory(null)

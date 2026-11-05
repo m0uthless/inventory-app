@@ -37,6 +37,16 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - Pannelli di dettaglio (scheda flottante e drawer "campo"): si chiudono con un clic fuori e con Esc. I clic dentro menu, popover, dialoghi e messaggio con Annulla aperti dal pannello non lo chiudono.
 - **[UI] Mappa Leaflet** dei drawer Clienti/Siti: caricata da unpkg.com. Senza internet la richiesta resta appesa; valutare di includerla nel bundle.
 
+## Pagina Clienti
+
+Fatta su `design-previews/c-base.html` (variante A · Scheda).
+
+- **[BE] Lettura della password VPN non registrata nell'audit**: l'anteprima diceva "ogni visualizzazione resta nel log"; oggi `GET /customers/<id>/vpn/` restituisce la password a chi ha il permesso senza registrare nulla. Nell'app la frase è stata tolta.
+- **[UI] Drawer cliente vecchio** (`CustomerDrawer`): ancora usato da Site Repository e Profilo.
+- **[UI] Liste nelle schede Siti, Inventari, Documenti**: sono i componenti `RelatedList` di prima (righe a zebra), non ridisegnati.
+- **[UI] Città e indirizzo**: stanno nei campi personalizzati, quindi si modificano solo da "Modifica", non sul posto. Tag non mostrati nel pannello.
+- **[UI] Site Repository dal pannello**: non c'è un collegamento diretto (la pagina non accetta il cliente nell'URL).
+
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).
