@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
@@ -289,10 +290,41 @@ class IssueFilter(filters.FilterSet):
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
     only_closed = filters.BooleanFilter(method="filter_only_closed")
+    # Ricerca per singola colonna (riga di ricerca sotto le intestazioni).
+    id_q        = filters.CharFilter(method="filter_id_q")
+    title_q     = filters.CharFilter(field_name="title", lookup_expr="icontains")
+    customer_q  = filters.CharFilter(method="filter_customer_q")
+    servicenow_q = filters.CharFilter(field_name="servicenow_id", lookup_expr="icontains")
+    assigned_q  = filters.CharFilter(method="filter_assigned_q")
+    has_due     = filters.BooleanFilter(field_name="due_date", lookup_expr="isnull", exclude=True)
 
     class Meta:
         model  = Issue
         fields = ["status", "priority", "customer", "site", "inventory", "category", "assigned_to", "hide_closed", "only_closed"]
+
+    def filter_id_q(self, queryset, name, value):
+        digits = (value or "").strip().lstrip("#")
+        if not digits:
+            return queryset
+        if not digits.isdigit():
+            return queryset.none()
+        return queryset.filter(id=int(digits))
+
+    def filter_customer_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(customer__name__icontains=v) | Q(customer_placeholder__icontains=v) | Q(site__name__icontains=v)
+        )
+
+    def filter_assigned_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(assigned_to__first_name__icontains=v) | Q(assigned_to__last_name__icontains=v) | Q(assigned_to__username__icontains=v)
+        )
 
     def filter_hide_closed(self, queryset, name, value):
         if value:

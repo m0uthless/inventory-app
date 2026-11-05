@@ -61,7 +61,7 @@ export function KpiTile({ label, value, unit, sub, spark, onClick, active, child
   )
   const sx = {
     position: 'relative' as const, minWidth: 0, display: 'flex', flexDirection: 'column' as const, alignItems: 'stretch', textAlign: 'left' as const,
-    gap: 0.25, p: '10px 12px', minHeight: 92, bgcolor: 'background.paper', border: '1px solid', borderColor: active ? 'archie.fieldLine' : 'divider',
+    gap: 0.25, p: '10px 12px', minHeight: 116, bgcolor: 'background.paper', border: '1px solid', borderColor: active ? 'archie.fieldLine' : 'divider',
     boxShadow: active ? (t: { palette: { archie: { fieldLine: string } } }) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none',
     borderRadius: '8px', color: 'text.primary', 
     '@container (max-width: 780px)': { minHeight: 80, p: '8px 10px' },

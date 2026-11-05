@@ -13,6 +13,8 @@ type Props = {
   onExport?: () => void
   exporting?: boolean
   onColumns?: (anchor: HTMLElement) => void
+  /** Se presente, la lente apre la ricerca per colonna sotto le intestazioni (come l'anteprima). */
+  columnSearch?: { open: boolean; active: boolean; onToggle: () => void }
 }
 
 /**
@@ -20,15 +22,16 @@ type Props = {
  * suggerimento a sinistra; Esporta, lente e Colonne a destra. La lente apre
  * la riga di ricerca sotto la barra.
  */
-export function TableBar({ filters, onRemoveFilter, onClearFilters, q, onQChange, searchPlaceholder = 'Cerca…', onExport, exporting, onColumns }: Props) {
+export function TableBar({ filters, onRemoveFilter, onClearFilters, q, onQChange, searchPlaceholder = 'Cerca…', onExport, exporting, onColumns, columnSearch }: Props) {
   const [open, setOpen] = React.useState(Boolean(q))
   const inputRef = React.useRef<HTMLInputElement>(null)
   React.useEffect(() => { if (open) inputRef.current?.focus() }, [open])
-  const on = open || Boolean(q)
+  const on = columnSearch ? columnSearch.open : open || Boolean(q)
+  const dot = columnSearch ? columnSearch.active : Boolean(q)
   const iconBtn = { width: 32, height: 32 }
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 49, px: '12px', py: '8px', borderBottom: on ? 0 : '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 49, px: '12px', py: '8px', borderBottom: on && !columnSearch ? 0 : '1px solid', borderColor: 'divider' }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <FilterTokens filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters}
             empty={<Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>Nessun filtro. Usa l'imbuto accanto al nome di una colonna.</Box>} />
@@ -42,11 +45,11 @@ export function TableBar({ filters, onRemoveFilter, onClearFilters, q, onQChange
             </span>
           </Tooltip>
         ) : null}
-        <Tooltip title={on ? 'Chiudi la ricerca' : 'Cerca nella tabella'}>
+        <Tooltip title={columnSearch ? (on ? 'Chiudi la ricerca per colonna' : 'Cerca per colonna') : on ? 'Chiudi la ricerca' : 'Cerca nella tabella'}>
           <IconButton aria-label="Cerca nella tabella" aria-pressed={on} aria-expanded={on}
-            onClick={() => { if (on) { onQChange(''); setOpen(false) } else setOpen(true) }}
+            onClick={() => { if (columnSearch) { columnSearch.onToggle(); return } if (on) { onQChange(''); setOpen(false) } else setOpen(true) }}
             sx={{ ...iconBtn, position: 'relative', ...(on && { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'archie.fieldLine' }),
-              ...(q && { '&::after': { content: '""', position: 'absolute', top: 5, right: 5, width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', border: '1.5px solid', borderColor: 'background.paper' } }) }}>
+              ...(dot && { '&::after': { content: '""', position: 'absolute', top: 5, right: 5, width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', border: '1.5px solid', borderColor: 'background.paper' } }) }}>
             <CampoIcon name="search" />
           </IconButton>
         </Tooltip>
@@ -58,7 +61,7 @@ export function TableBar({ filters, onRemoveFilter, onClearFilters, q, onQChange
           </Tooltip>
         ) : null}
       </Box>
-      {on ? (
+      {on && !columnSearch ? (
         <Box sx={{ px: '12px', pb: '10px', borderBottom: '1px solid', borderColor: 'divider' }}>
           <Box sx={{
             display: 'flex', alignItems: 'center', gap: 1, height: 32, px: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: '6px',

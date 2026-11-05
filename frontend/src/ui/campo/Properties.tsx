@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Box, ButtonBase, Collapse, InputBase, Menu, MenuItem } from '@mui/material'
+import { Box, ButtonBase, Collapse, InputBase, Menu, MenuItem, Popover } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CheckIcon from '@mui/icons-material/Check'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
@@ -17,6 +17,8 @@ type PropDef = {
   /** Campo libero (testo/data): valore iniziale e segnaposto. */
   text?: { value: string; placeholder?: string; type?: 'text' | 'date'; mono?: boolean }
   onChange?: (value: string) => void
+  /** Editor personalizzato in un riquadro (es. ricerca cliente); `close` lo chiude. */
+  editor?: (close: () => void) => React.ReactNode
   /** Occupa tutta la riga. */
   full?: boolean
   disabled?: boolean
@@ -69,7 +71,8 @@ function PropRow({ p }: { p: PropDef }) {
   const [menuEl, setMenuEl] = React.useState<HTMLElement | null>(null)
   const [editing, setEditing] = React.useState(false)
   const [draft, setDraft] = React.useState(p.text?.value ?? '')
-  const editable = !p.disabled && !!p.onChange && (!!p.options || !!p.text)
+  const [editorEl, setEditorEl] = React.useState<HTMLElement | null>(null)
+  const editable = !p.disabled && (!!p.editor || (!!p.onChange && (!!p.options || !!p.text)))
   const commit = () => { setEditing(false); if (draft !== (p.text?.value ?? '')) p.onChange?.(draft) }
   return (
     <Box sx={{ gridColumn: p.full ? '1 / -1' : undefined }}>
@@ -85,8 +88,8 @@ function PropRow({ p }: { p: PropDef }) {
       ) : (
         <ButtonBase
           disabled={!editable}
-          onClick={(e) => { if (p.options) setMenuEl(e.currentTarget); else { setDraft(p.text?.value ?? ''); setEditing(true) } }}
-          aria-haspopup={p.options ? 'menu' : undefined}
+          onClick={(e) => { if (p.editor) setEditorEl(e.currentTarget); else if (p.options) setMenuEl(e.currentTarget); else { setDraft(p.text?.value ?? ''); setEditing(true) } }}
+          aria-haspopup={p.options ? 'menu' : p.editor ? 'dialog' : undefined}
           sx={{
             display: 'grid', gridTemplateColumns: '72px minmax(0,1fr) 14px', alignItems: 'center', columnGap: 0.75, width: 'calc(100% + 16px)',
             minHeight: 32, px: 1, mx: -1, borderRadius: '6px', textAlign: 'left',
@@ -96,9 +99,15 @@ function PropRow({ p }: { p: PropDef }) {
         >
           <Box component="span" sx={{ fontSize: 11, color: 'text.secondary' }}>{p.label}</Box>
           <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 12, fontWeight: 550, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontFamily: p.text?.mono ? '"Geist Mono", monospace' : undefined }}>{p.display}</Box>
-          {editable ? (p.options ? <ExpandMoreIcon className="pr-ic" sx={{ fontSize: 14, color: 'text.disabled', opacity: 0 }} /> : <EditOutlinedIcon className="pr-ic" sx={{ fontSize: 13, color: 'text.disabled', opacity: 0 }} />) : <span />}
+          {editable ? (p.options || p.editor ? <ExpandMoreIcon className="pr-ic" sx={{ fontSize: 14, color: 'text.disabled', opacity: 0 }} /> : <EditOutlinedIcon className="pr-ic" sx={{ fontSize: 13, color: 'text.disabled', opacity: 0 }} />) : <span />}
         </ButtonBase>
       )}
+      {p.editor ? (
+        <Popover open={!!editorEl} anchorEl={editorEl} onClose={() => setEditorEl(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} slotProps={{ paper: { sx: { p: 1, mt: 0.5, width: Math.max(280, editorEl?.offsetWidth ?? 0) } } }}>
+          {editorEl ? p.editor(() => setEditorEl(null)) : null}
+        </Popover>
+      ) : null}
       {p.options ? (
         <Menu anchorEl={menuEl} open={!!menuEl} onClose={() => setMenuEl(null)} slotProps={{ paper: { sx: { minWidth: menuEl?.offsetWidth } } }}>
           {p.options.map((o) => (

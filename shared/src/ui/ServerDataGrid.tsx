@@ -82,7 +82,49 @@ type Props<R extends GridValidRowModel> = {
   onOpenColumnPanel?: (anchorEl: HTMLElement) => void
   /** Mappa field → configurazione filtro URL per il kebab menu. */
   filterConfig?: Record<string, ColumnFilterConfig>
+  /** Riga di ricerca per colonna sotto le intestazioni (aspetto "campo"). */
+  columnSearch?: { open: boolean; fields: Record<string, ColumnSearchField> }
 
+}
+
+export type ColumnSearchField = {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  /** Se presente, al posto del campo di testo compare un elenco a scelta. */
+  options?: { value: string; label: string }[]
+}
+
+/** Campo della riga di ricerca: aggiorna il valore dopo una breve pausa. */
+function ColumnSearchInput({ field, label }: { field: ColumnSearchField; label: string }) {
+  const [v, setV] = React.useState(field.value)
+  React.useEffect(() => { setV(field.value) }, [field.value])
+  React.useEffect(() => {
+    if (v === field.value || field.options) return
+    const t = window.setTimeout(() => field.onChange(v), 300)
+    return () => window.clearTimeout(t)
+  }, [v]) // eslint-disable-line react-hooks/exhaustive-deps
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  const set = Boolean(field.value)
+  const sx = {
+    display: 'block', width: '100%', minWidth: 0, height: 30, px: '8px', border: '1px solid', borderRadius: '6px', font: 'inherit', fontSize: 12, fontWeight: 400,
+    color: 'text.primary', outline: 'none', borderColor: set ? 'archie.fieldLine' : 'divider', bgcolor: set ? 'archie.field' : 'archie.surface2',
+    '&::placeholder': { color: 'text.disabled' },
+    '&:focus': { borderColor: 'primary.main', bgcolor: 'background.paper', boxShadow: (t: Theme) => (t.palette as unknown as { archie: { focusRing: string } }).archie.focusRing },
+  }
+  const common = { draggable: false, onMouseDown: stop, onClick: stop, onKeyDown: stop, onKeyUp: stop, onDragStart: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation() }, 'aria-label': `Cerca in ${label}` }
+  if (field.options) {
+    return (
+      <Box component="select" value={field.value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => field.onChange(e.target.value)} {...common}
+        sx={{ ...sx, appearance: 'none', pr: '24px', cursor: 'pointer', color: field.value ? 'text.primary' : 'text.disabled',
+          backgroundImage: 'linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(-45deg, transparent 50%, currentColor 50%)',
+          backgroundPosition: 'right 12px center, right 8px center', backgroundSize: '4px 4px', backgroundRepeat: 'no-repeat' }}>
+        <option value="">Tutti</option>
+        {field.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </Box>
+    )
+  }
+  return <Box component="input" value={v} placeholder={field.placeholder ?? 'Cerca…'} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setV(e.target.value)} {...common} sx={sx} />
 }
 
 
@@ -212,10 +254,13 @@ function ColumnHeader({
   params,
   fc,
   sortDir,
+  search,
 }: {
   params: GridColumnHeaderParams
   fc?: ColumnFilterConfig
   sortDir?: 'asc' | 'desc' | null
+  /** undefined = riga di ricerca chiusa; null = aperta ma colonna senza campo. */
+  search?: ColumnSearchField | null
 }) {
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(null)
   const filterActive = Boolean(fc && fc.value !== '' && fc.value != null)
@@ -225,7 +270,7 @@ function ColumnHeader({
     // Restyle "Campo sterile": etichetta 12/550, freccia solo sulla colonna
     // ordinata, imbuto a destra visibile al passaggio o se il filtro è attivo.
     const align = params.colDef.headerAlign
-    return (
+    const head = (
       <>
         <Box component="span" sx={{
           display: 'inline-flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -284,6 +329,15 @@ function ColumnHeader({
           </>
         )}
       </>
+    )
+    if (search === undefined) return head
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', height: 33, flex: 'none' }}>{head}</Box>
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', mx: '-7px', px: '6px', bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider' }}>
+          {search ? <ColumnSearchInput field={search} label={String(params.colDef.headerName ?? params.field)} /> : null}
+        </Box>
+      </Box>
     )
   }
 
@@ -417,6 +471,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     colPrefsRef,
     onOpenColumnPanel,
     filterConfig,
+    columnSearch,
   } = props
 
   const persistEnabled = Boolean(pageKey)
@@ -461,11 +516,11 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
       return {
         ...col,
         renderHeader: col.renderHeader ?? ((params: GridColumnHeaderParams) => (
-          <ColumnHeader params={params} fc={fc} sortDir={colSortDir} />
+          <ColumnHeader params={params} fc={fc} sortDir={colSortDir} search={columnSearch?.open ? (columnSearch.fields[col.field] ?? null) : undefined} />
         )),
       } as typeof col
     })
-  }, [sizedColumns, persistEnabled, filterConfig, sortModel])
+  }, [sizedColumns, persistEnabled, filterConfig, sortModel, columnSearch])
 
   // Ref per tracciare l'ordine corrente senza re-render
   const currentOrderRef = React.useRef<string[]>([])
@@ -639,6 +694,11 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     '& .MuiDataGrid-cell': { px: '12px', py: 0, fontSize: 13, borderTop: 0, borderBottom: '1px solid', borderBottomColor: 'divider' },
     '& .MuiDataGrid-row, & .MuiDataGrid-row--firstVisible .MuiDataGrid-cell': { borderTop: 0 },
     '& .MuiDataGrid-row:hover': { backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { surface2: string } }).archie.surface2 },
+    ...(columnSearch?.open ? {
+      '& .MuiDataGrid-columnHeaderDraggableContainer, & .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': { height: '100%', width: '100%', alignItems: 'stretch' },
+      '& .MuiDataGrid-columnHeader': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { borderStrong: string } }).archie.borderStrong },
+      '& .MuiDataGrid-columnHeader[aria-colindex="1"] input, & .MuiDataGrid-columnHeader[aria-colindex="1"] select': { ml: '4px' },
+    } : {}),
     '& .MuiDataGrid-row.Mui-selected, & .MuiDataGrid-row.Mui-selected:hover': {
       backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { field: string } }).archie.field,
     },
@@ -770,7 +830,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
         columns={columnsWithHeader}
         loading={loading}
         density={density}
-        columnHeaderHeight={campo ? 34 : 32}
+        columnHeaderHeight={campo ? (columnSearch?.open ? 78 : 34) : 32}
         rowHeight={rowHeight ?? (campo ? 40 : 36)}
         disableRowSelectionOnClick={!checkboxSelection}
         checkboxSelection={!!checkboxSelection}

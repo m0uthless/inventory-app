@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Box, ListItemIcon, ListItemText, Menu, MenuItem, type MenuProps } from '@mui/material'
+import { useDrawerAppearance } from './DrawerShell'
 
 export type RowContextMenuItem = {
   key: string
@@ -22,6 +23,7 @@ type Props = {
 
 export default function RowContextMenu({ open, anchorPosition, onClose, items }: Props) {
   const visibleItems = items.filter((item) => !item.hidden)
+  const campo = useDrawerAppearance() === 'campo'
 
   return (
     <Menu
@@ -31,7 +33,13 @@ export default function RowContextMenu({ open, anchorPosition, onClose, items }:
       anchorPosition={anchorPosition ?? undefined}
       PaperProps={{
         elevation: 6,
-        sx: {
+        sx: campo ? {
+          minWidth: 200, p: 0.5,
+          '& .MuiList-root': { p: 0 },
+          '& .MuiMenuItem-root': { minHeight: 32, px: 1, borderRadius: '5px', gap: 1, fontSize: 13 },
+          '& .MuiListItemIcon-root': { minWidth: 0, color: 'text.secondary', '& svg': { fontSize: 16 } },
+          '& .MuiMenuItem-root:hover': { bgcolor: 'archie.surface2' },
+        } : {
           minWidth: 176,
           borderRadius: 1,
           '& .MuiMenuItem-root': {
@@ -58,8 +66,8 @@ export default function RowContextMenu({ open, anchorPosition, onClose, items }:
           <ListItemText
             primary={item.label}
             primaryTypographyProps={{
-              fontSize: '0.8rem',
-              fontWeight: 500,
+              fontSize: campo ? 13 : '0.8rem',
+              fontWeight: campo ? 400 : 500,
             }}
           />
           {item.badge && (

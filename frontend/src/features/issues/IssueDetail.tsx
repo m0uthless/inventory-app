@@ -13,6 +13,7 @@ import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import AddIcon from '@mui/icons-material/Add'
 
+import { api } from '@shared/api/client'
 import { FloatingDetail, DetailSection, Properties } from '../../ui/campo'
 import { inventoryDrawerPath } from '../../utils/entityPaths'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
@@ -30,7 +31,7 @@ export type IssueEvent = {
   changes?: Record<string, { from?: unknown; to?: unknown } | [unknown, unknown]> | null
 }
 
-export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'category' | 'due_date' | 'servicenow_id'>>
+export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'category' | 'due_date' | 'servicenow_id' | 'customer' | 'customer_placeholder' | 'site' | 'inventory'>>
 
 type Props = {
   issue: IssueRow | null
@@ -159,10 +160,11 @@ function OpenTimeline({ issue, events }: { issue: IssueRow; events?: IssueEvent[
   )
 }
 
-const ava = (name: string) => name.split(/[\s.]+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase()
+const ava = (name: string) => name.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase()
 
 export default function IssueDetail(p: Props) {
   const { issue } = p
+  const sites = useCustomerSites(issue && !issue.is_customer_placeholder ? issue.customer : null)
   if (!issue) return null
   const closed = issue.status === 'closed'
   const resolved = issue.status === 'resolved'
@@ -210,6 +212,28 @@ export default function IssueDetail(p: Props) {
       options: [{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuna</Box> }, ...p.categories.map((c) => ({ value: String(c.id), label: c.label }))],
       display: issue.category_label || <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>Nessuna</Box>,
       onChange: (v: string) => p.onPatch({ category: v ? Number(v) : null }, 'Categoria aggiornata'),
+    },
+    {
+      key: 'customer', label: 'Cliente', disabled: closed, full: true,
+      display: <>{issue.customer_name || issue.customer_placeholder}{issue.is_customer_placeholder ? <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>· non in anagrafica</Box> : null}</>,
+      editor: (close: () => void) => (
+        <CustomerPicker
+          current={issue.is_customer_placeholder ? null : issue.customer}
+          onPick={(c) => {
+            close()
+            if (c.id === issue.customer && !issue.is_customer_placeholder) return
+            p.onPatch({ customer: c.id, customer_placeholder: '', site: null, inventory: null },
+              issue.inventory ? 'Cliente aggiornato, sito e inventario scollegati' : 'Cliente aggiornato')
+          }}
+        />
+      ),
+    },
+    {
+      key: 'site', label: 'Sito', disabled: closed || issue.is_customer_placeholder, full: true,
+      current: issue.site ? String(issue.site) : '',
+      options: [{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessun sito</Box> }, ...sites.map((x) => ({ value: String(x.id), label: x.label }))],
+      display: issue.site_name || <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>{issue.is_customer_placeholder ? 'Non disponibile con cliente non in anagrafica' : 'Nessuno'}</Box>,
+      onChange: (v: string) => p.onPatch(issue.inventory ? { site: v ? Number(v) : null, inventory: null } : { site: v ? Number(v) : null }, issue.inventory ? 'Sito aggiornato, inventario scollegato' : 'Sito aggiornato'),
     },
     {
       key: 'sn', label: 'ServiceNow', disabled: closed,
@@ -377,6 +401,65 @@ function ActivityFeed({ comments, events, loading }: { comments: IssueComment[];
           <Box component="time" sx={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtIssueDateTime(it.e.created_at)}</Box>
         </Box>
       ))}
+    </Box>
+  )
+}
+
+type Opt = { id: number; label: string }
+
+function useCustomerSites(customerId: number | null) {
+  const [sites, setSites] = React.useState<Opt[]>([])
+  React.useEffect(() => {
+    if (!customerId) { setSites([]); return }
+    let alive = true
+    api.get('/sites/', { params: { customer: customerId, page_size: 200, ordering: 'name' } }).then((r) => {
+      const d = r.data as { results?: Record<string, unknown>[] } | Record<string, unknown>[]
+      const list = Array.isArray(d) ? d : d.results ?? []
+      if (alive) setSites(list.map((x) => ({ id: Number(x.id), label: String(x.display_name || x.name || x.id) })))
+    }).catch(() => { if (alive) setSites([]) })
+    return () => { alive = false }
+  }, [customerId])
+  return sites
+}
+
+/** Ricerca cliente in anagrafica (per il cambio cliente dal pannello). */
+function CustomerPicker({ current, onPick }: { current: number | null; onPick: (c: Opt) => void }) {
+  const [q, setQ] = React.useState('')
+  const [list, setList] = React.useState<Opt[]>([])
+  const [loading, setLoading] = React.useState(false)
+  const [active, setActive] = React.useState(0)
+  React.useEffect(() => {
+    let alive = true
+    setLoading(true)
+    const t = window.setTimeout(() => {
+      api.get('/customers/', { params: { search: q || undefined, page_size: 20, ordering: 'name' } }).then((r) => {
+        const d = r.data as { results?: Record<string, unknown>[] } | Record<string, unknown>[]
+        const rows = Array.isArray(d) ? d : d.results ?? []
+        if (alive) { setList(rows.map((x) => ({ id: Number(x.id), label: String(x.display_name || x.name || x.id) }))); setActive(0) }
+      }).catch(() => {}).finally(() => { if (alive) setLoading(false) })
+    }, 250)
+    return () => { alive = false; window.clearTimeout(t) }
+  }, [q])
+  return (
+    <Box>
+      <InputBase autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca cliente…" inputProps={{ 'aria-label': 'Cerca cliente' }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, list.length - 1)) }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
+          if (e.key === 'Enter' && list[active]) { e.preventDefault(); onPick(list[active]) }
+        }}
+        sx={{ width: '100%', height: 32, px: 1, mb: 0.5, fontSize: 13, border: '1px solid', borderColor: 'divider', borderRadius: '6px', '&.Mui-focused': { borderColor: 'primary.main' } }} />
+      <Box role="listbox" sx={{ maxHeight: 260, overflowY: 'auto', display: 'grid' }}>
+        {list.map((c, i) => (
+          <Box key={c.id} role="option" aria-selected={c.id === current} onMouseEnter={() => setActive(i)} onClick={() => onPick(c)}
+            sx={{ display: 'flex', alignItems: 'center', height: 30, px: 1, borderRadius: '5px', fontSize: 13, cursor: 'pointer',
+              bgcolor: i === active ? 'archie.surface2' : 'transparent', fontWeight: c.id === current ? 600 : 400 }}>
+            {c.label}
+            {c.id === current ? <CheckIcon sx={{ ml: 'auto', fontSize: 15, color: 'primary.main' }} /> : null}
+          </Box>
+        ))}
+        {!list.length ? <Box sx={{ p: 1, fontSize: 12, color: 'text.secondary' }}>{loading ? 'Ricerca…' : 'Nessun cliente trovato'}</Box> : null}
+      </Box>
     </Box>
   )
 }

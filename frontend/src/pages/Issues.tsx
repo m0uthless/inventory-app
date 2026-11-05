@@ -256,6 +256,11 @@ export default function Issues() {
   const [fPriority, setFPriority] = React.useState<string[]>([])
   const [fCategory, setFCategory] = React.useState<string[]>([])
   const [fAssigned, setFAssigned] = React.useState<string[]>([])
+  type ColQ = { id: string; title: string; customer: string; servicenow: string; assigned: string; priority: string; status: string; due: string }
+  const EMPTY_COLQ: ColQ = { id: '', title: '', customer: '', servicenow: '', assigned: '', priority: '', status: '', due: '' }
+  const [colSearchOpen, setColSearchOpen] = React.useState(false)
+  const [colQ, setColQ] = React.useState<ColQ>(EMPTY_COLQ)
+  const colQActive = Object.values(colQ).some(Boolean)
   const activeFilterCount = [fStatus, fPriority, fCategory, fAssigned].filter((f) => f.length).length + (view !== 'active' ? 1 : 0)
 
   const resetFilters = () => {
@@ -273,8 +278,22 @@ export default function Issues() {
     if (fStatus.length) p.status = fStatus
     if (fPriority.length) p.priority = fPriority
     if (fCategory.length) p.category = fCategory[0]
+    // Ricerca per colonna
+    const iso = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+    if (colQ.id) p.id_q = colQ.id
+    if (colQ.title) p.title_q = colQ.title
+    if (colQ.customer) p.customer_q = colQ.customer
+    if (colQ.servicenow) p.servicenow_q = colQ.servicenow
+    if (colQ.assigned) p.assigned_q = colQ.assigned
+    if (colQ.priority) p.priority = [colQ.priority]
+    if (colQ.status) p.status = [colQ.status]
+    if (colQ.due === 'overdue') p.due_before = iso(-1)
+    if (colQ.due === 'today') { p.due_after = iso(0); p.due_before = iso(0) }
+    if (colQ.due === 'week') { p.due_after = iso(1); p.due_before = iso(7) }
+    if (colQ.due === 'later') p.due_after = iso(8)
+    if (colQ.due === 'none') p.has_due = false
     return p
-  }, [grid.view, view, me?.id, fStatus, fPriority, fCategory, fAssigned])
+  }, [grid.view, view, me?.id, fStatus, fPriority, fCategory, fAssigned, colQ])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -1386,6 +1405,7 @@ export default function Issues() {
               onExport={exportVisible}
               exporting={exporting}
               onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
             />
           }
           toolbar={{
@@ -1398,6 +1418,22 @@ export default function Issues() {
             pageKey: 'issues',
             defaultHiddenColumns: ['opened_at', 'category_label', 'comments_count', 'closed_at', 'days_open'],
             filterConfig,
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                id: { value: colQ.id, onChange: (v) => setColQ((c) => ({ ...c, id: v })), placeholder: '#' },
+                priority: { value: colQ.priority, onChange: (v) => setColQ((c) => ({ ...c, priority: v })), options: ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k].label })) },
+                status: { value: colQ.status, onChange: (v) => setColQ((c) => ({ ...c, status: v })), options: Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label })) },
+                title: { value: colQ.title, onChange: (v) => setColQ((c) => ({ ...c, title: v })), placeholder: 'Contiene…' },
+                customer_name: { value: colQ.customer, onChange: (v) => setColQ((c) => ({ ...c, customer: v })), placeholder: 'Cliente o sito' },
+                servicenow_id: { value: colQ.servicenow, onChange: (v) => setColQ((c) => ({ ...c, servicenow: v })), placeholder: 'CS…' },
+                assigned_to_full_name: { value: colQ.assigned, onChange: (v) => setColQ((c) => ({ ...c, assigned: v })), placeholder: 'Nome' },
+                due_date: { value: colQ.due, onChange: (v) => setColQ((c) => ({ ...c, due: v })), options: [
+                  { value: 'overdue', label: 'Scadute' }, { value: 'today', label: 'Oggi' }, { value: 'week', label: 'Entro 7 giorni' },
+                  { value: 'later', label: 'Oltre 7 giorni' }, { value: 'none', label: 'Senza scadenza' },
+                ] },
+              },
+            },
             username: me?.username,
             rows,
             emptyState,
