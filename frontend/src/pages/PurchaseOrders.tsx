@@ -1040,7 +1040,7 @@ export default function PurchaseOrders() {
             onRowClick: openDrawer,
             onRowContextMenu: handleRowContextMenu,
             getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
-            rowHeight: 48,
+            rowHeight: 50,
             columnSearch: {
               open: colSearchOpen,
               fields: {
