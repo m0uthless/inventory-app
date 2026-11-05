@@ -69,9 +69,7 @@ type Props = {
   reloadKey?: unknown
   sitesTab: React.ReactNode
   inventoriesTab: React.ReactNode
-  devicesTab?: React.ReactNode
-  contractsTab: React.ReactNode
-  driveTab: React.ReactNode
+  documentsTab: React.ReactNode
   activityTab: React.ReactNode
 }
 
@@ -407,8 +405,8 @@ export default function CustomerDetailCard(p: Props) {
     >
       {p.tab === 'det' ? details
         : p.tab === 'sites' ? p.sitesTab
-        : p.tab === 'inv' ? <>{p.inventoriesTab}{p.devicesTab ? <Box sx={{ mt: 2.5 }}>{p.devicesTab}</Box> : null}</>
-        : p.tab === 'doc' ? <>{p.contractsTab}<Box sx={{ mt: 2.5 }}>{p.driveTab}</Box></>
+        : p.tab === 'inv' ? p.inventoriesTab
+        : p.tab === 'doc' ? p.documentsTab
         : p.activityTab}
     </FloatingDetail>
   )

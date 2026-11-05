@@ -1,26 +1,16 @@
 import * as React from 'react'
-import { alpha } from '@mui/material/styles'
 import {
   Box,
   Button,
   ButtonBase,
-  Chip,
   Stack,
   Tooltip,
   Typography,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import { Can } from '../auth/Can'
@@ -42,24 +32,19 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { useThemeTokens } from '../theme/AppThemeProvider'
 import { useUrlStringParam } from '@shared/hooks/useUrlParam'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
 import CustomerDetailCard, { type CustomerPatch, type CustomerTab } from '../features/customers/CustomerDetailCard'
 import CustomerKpis, { useCustomerSummary } from '../features/customers/CustomerKpis'
+import { CustomerActivityPanel, CustomerDocumentsPanel, CustomerInventoriesPanel, CustomerSitesPanel } from '../features/customers/CustomerTabs'
 import { daysTo, dIt, EXPIRING_DAYS, ExpiryMark, VendorMark, vendorColorOf } from '../features/customers/customerUi'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
 import { useStatusTokens } from '../theme/AppThemeProvider'
 import { useExportCsv } from '@shared/ui/useExportCsv'
-import CustomerDevicesTab from '../features/devices/CustomerDevicesTab'
-import CustomerContractsTab from '../features/contracts/CustomerContractsTab'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
-import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
-import { stripOpenParam } from '../features/entityRelations/relatedListUtils'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -112,389 +97,8 @@ type CustomerForm = {
   notes: string
 }
 
-type SiteMini = {
-  id: number
-  name?: string | null
-  display_name?: string | null
-  city?: string | null
-  status?: number | null
-  status_label?: string | null
-  deleted_at?: string | null
-}
 
-type InventoryMini = {
-  id: number
-  customer: number
-  site?: number | null
-  hostname?: string | null
-  knumber?: string | null
-  serial_number?: string | null
-  site_name?: string | null
-  site_display_name?: string | null
-  type_label?: string | null
-  status_label?: string | null
-  deleted_at?: string | null
-}
 
-function viewQuery(includeDeleted: boolean, onlyDeleted: boolean) {
-  if (onlyDeleted) return { view: 'deleted' }
-  if (includeDeleted) return { view: 'all' }
-  return {}
-}
-
-function CustomerSitesTab(props: {
-  customerId: number
-  includeDeleted: boolean
-  onlyDeleted: boolean
-  onCount?: (n: number) => void
-}) {
-  const { customerId, includeDeleted, onlyDeleted, onCount } = props
-  const toast = useToast()
-  const navigate = useNavigate()
-  const loc = useLocation()
-  const { gridZebraBase } = useThemeTokens()
-
-  const params = React.useMemo(
-    () =>
-      buildDrfListParams({
-        page0: 0,
-        pageSize: 25,
-        ordering: 'name',
-        includeDeleted,
-        onlyDeleted,
-        extra: { customer: customerId },
-      }),
-    [customerId, includeDeleted, onlyDeleted],
-  )
-
-  const { rows, rowCount, loading } = useDrfList<SiteMini>('/sites/', params, (e: unknown) =>
-    toast.error(apiErrorToMessage(e)),
-  )
-
-  React.useEffect(() => {
-    onCount?.(rowCount)
-  }, [rowCount, onCount])
-
-  return (
-    <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <RelatedListHeader
-        title="Siti"
-        count={rowCount}
-        buttonLabel="Apri lista"
-        onOpenList={() =>
-          navigate(
-            `/sites${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + stripOpenParam(loc.search) })}`,
-          )
-        }
-      />
-
-      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
-        <List
-          dense
-          disablePadding
-          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
-        >
-          {rows.map((s, idx) => {
-            const label = s.display_name || s.name || `Sito #${s.id}`
-            const q = {
-              open: s.id,
-              customer: customerId,
-              ...(s.deleted_at ? { view: 'all' } : viewQuery(includeDeleted, onlyDeleted)),
-            }
-            return (
-              <ListItem
-                key={s.id}
-                disablePadding
-                sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
-              >
-                <ListItemButton
-                  onClick={() => navigate(`/sites${buildQuery({ ...q, return: loc.pathname + stripOpenParam(loc.search) })}`)}
-                  sx={{
-                    py: 0.75,
-                    opacity: s.deleted_at ? 0.55 : 1,
-                    textDecoration: s.deleted_at ? 'line-through' : 'none',
-                  }}
-                >
-                  <ListItemText
-                    primary={label}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      variant: 'body2',
-                      sx: { fontWeight: 600 },
-                    }}
-                  />
-                  {s.deleted_at ? (
-                    <Chip size="small" color="error" label="Eliminato" sx={{ ml: 1 }} />
-                  ) : null}
-                </ListItemButton>
-              </ListItem>
-            )
-          })}
-        </List>
-      </RelatedListBody>
-    </Stack>
-  )
-}
-
-function CustomerInventoriesTab(props: {
-  customerId: number
-  includeDeleted: boolean
-  onlyDeleted: boolean
-  onCount?: (n: number) => void
-}) {
-  const { customerId, includeDeleted, onlyDeleted, onCount } = props
-  const toast = useToast()
-  const navigate = useNavigate()
-  const loc = useLocation()
-  const { gridZebraBase } = useThemeTokens()
-
-  const params = React.useMemo(
-    () =>
-      buildDrfListParams({
-        page0: 0,
-        pageSize: 25,
-        ordering: 'hostname',
-        includeDeleted,
-        onlyDeleted,
-        extra: { customer: customerId },
-      }),
-    [customerId, includeDeleted, onlyDeleted],
-  )
-
-  const { rows, rowCount, loading } = useDrfList<InventoryMini>(
-    '/inventories/',
-    params,
-    (e: unknown) => toast.error(apiErrorToMessage(e)),
-  )
-
-  React.useEffect(() => {
-    onCount?.(rowCount)
-  }, [rowCount, onCount])
-
-  return (
-    <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <RelatedListHeader
-        title="Inventari"
-        count={rowCount}
-        buttonLabel="Apri lista"
-        onOpenList={() =>
-          navigate(
-            `/inventory${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + stripOpenParam(loc.search) })}`,
-          )
-        }
-      />
-
-      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
-        <List
-          dense
-          disablePadding
-          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
-        >
-          {rows.map((inv, idx) => {
-            const name = inv.hostname || inv.knumber || inv.serial_number || `#${inv.id}`
-            const label = [inv.type_label, name].filter(Boolean).join(' · ')
-            const q = {
-              open: inv.id,
-              customer: customerId,
-              site: inv.site ?? '',
-              ...(inv.deleted_at ? { view: 'all' } : viewQuery(includeDeleted, onlyDeleted)),
-            }
-            return (
-              <ListItem
-                key={inv.id}
-                disablePadding
-                sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
-              >
-                <ListItemButton
-                  onClick={() => navigate(`/inventory${buildQuery({ ...q, return: loc.pathname + stripOpenParam(loc.search) })}`)}
-                  sx={{
-                    py: 0.75,
-                    opacity: inv.deleted_at ? 0.55 : 1,
-                    textDecoration: inv.deleted_at ? 'line-through' : 'none',
-                  }}
-                >
-                  <ListItemText
-                    primary={label}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      variant: 'body2',
-                      sx: { fontWeight: 600 },
-                    }}
-                  />
-                  {inv.deleted_at ? (
-                    <Chip size="small" color="error" label="Eliminato" sx={{ ml: 1 }} />
-                  ) : null}
-                </ListItemButton>
-              </ListItem>
-            )
-          })}
-        </List>
-      </RelatedListBody>
-    </Stack>
-  )
-}
-
-// ─── CustomerDriveTab ─────────────────────────────────────────────────────────
-
-type DriveMini = {
-  id: number
-  name: string
-  mime_type?: string
-  size_human?: string
-  updated_at: string
-  kind: 'file' | 'folder'
-}
-
-function CustomerDriveTab({ customerId }: { customerId: number }) {
-  const toast = useToast()
-  const navigate = useNavigate()
-  const { gridZebraBase } = useThemeTokens()
-  const [items, setItems] = React.useState<DriveMini[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [total, setTotal] = React.useState(0)
-
-  React.useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    const coerce = (v: unknown, kind: DriveMini['kind']): DriveMini | null => {
-      if (!isRecord(v)) return null
-      const id = Number(v['id'])
-      if (!Number.isFinite(id)) return null
-      const name = typeof v['name'] === 'string' ? v['name'] : `#${id}`
-      const updated_at = typeof v['updated_at'] === 'string' ? v['updated_at'] : ''
-      const mime_type = typeof v['mime_type'] === 'string' ? v['mime_type'] : undefined
-      const size_human = typeof v['size_human'] === 'string' ? v['size_human'] : undefined
-      return { id, name, updated_at, mime_type, size_human, kind }
-    }
-
-    Promise.allSettled([
-      api.get('/drive-folders/', {
-        params: { customer: customerId, page_size: 15, ordering: 'name' },
-      }),
-      api.get('/drive-files/', {
-        params: { customer: customerId, page_size: 15, ordering: 'name' },
-      }),
-    ])
-      .then(([fSettled, fiSettled]) => {
-        if (cancelled) return
-
-        const foldersU: unknown =
-          fSettled.status === 'fulfilled' ? (fSettled.value as { data: unknown }).data : null
-        const filesU: unknown =
-          fiSettled.status === 'fulfilled' ? (fiSettled.value as { data: unknown }).data : null
-
-        const folderList: unknown[] =
-          isRecord(foldersU) && Array.isArray(foldersU['results'])
-            ? (foldersU['results'] as unknown[])
-            : Array.isArray(foldersU)
-              ? foldersU
-              : []
-        const fileList: unknown[] =
-          isRecord(filesU) && Array.isArray(filesU['results'])
-            ? (filesU['results'] as unknown[])
-            : Array.isArray(filesU)
-              ? filesU
-              : []
-
-        const folders: DriveMini[] = folderList
-          .map((f: unknown) => coerce(f, 'folder'))
-          .filter((x): x is DriveMini => Boolean(x))
-        const files: DriveMini[] = fileList
-          .map((f: unknown) => coerce(f, 'file'))
-          .filter((x): x is DriveMini => Boolean(x))
-
-        const folderCount = isRecord(foldersU) ? Number(foldersU['count'] ?? 0) : 0
-        const fileCount = isRecord(filesU) ? Number(filesU['count'] ?? 0) : 0
-
-        setItems([...folders, ...files])
-        setTotal(folderCount + fileCount)
-
-        // Se almeno una delle due chiamate è fallita, mostra un toast
-        const errors = [fSettled, fiSettled].filter((r) => r.status === 'rejected')
-        if (errors.length) {
-          const first = (errors[0] as PromiseRejectedResult).reason
-          toast.error(apiErrorToMessage(first))
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [customerId, toast])
-
-  function fileIcon(mime?: string) {
-    if (!mime) return <FolderOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-    if (mime.startsWith('image/'))
-      return <ImageOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-    if (mime === 'application/pdf')
-      return <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-    return <DescriptionOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-  }
-
-  return (
-    <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <RelatedListHeader
-        title="File Drive"
-        count={total}
-        buttonLabel="Apri Drive"
-        onOpenList={() => navigate('/drive')}
-      />
-
-      <RelatedListBody loading={loading} isEmpty={items.length === 0} emptyText="Nessun file collegato.">
-        <List
-          dense
-          disablePadding
-          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
-        >
-          {items.map((item, idx) => (
-            <ListItem
-              key={`${item.kind}-${item.id}`}
-              disablePadding
-              sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
-            >
-              <ListItemText
-                sx={{ px: 1.5, py: 0.75 }}
-                primary={
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
-                    {item.kind === 'folder' ? (
-                      <FolderOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                    ) : (
-                      fileIcon(item.mime_type)
-                    )}
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1 }}>
-                      {item.name}
-                    </Typography>
-                    {item.size_human && (
-                      <Typography variant="caption" sx={{ color: 'text.disabled', flexShrink: 0 }}>
-                        {item.size_human}
-                      </Typography>
-                    )}
-                  </Stack>
-                }
-              />
-            </ListItem>
-          ))}
-          {total > items.length && (
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={() => navigate('/drive')}
-                sx={{ py: 0.75, justifyContent: 'center' }}
-              >
-                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                  + altri {total - items.length} elementi
-                </Typography>
-              </ListItemButton>
-            </ListItem>
-          )}
-        </List>
-      </RelatedListBody>
-    </Stack>
-  )
-}
-
-/** Testo leggibile solo dagli screen reader. */
 const srOnlySx = {
   border: 0, clip: 'rect(0 0 0 0)', height: '1px', margin: '-1px', overflow: 'hidden',
   padding: 0, position: 'absolute', whiteSpace: 'nowrap', width: '1px',
@@ -1219,12 +823,10 @@ export default function Customers() {
           onNewIssue={() => { if (detail) newIssueFor(detail) }}
           onAllContacts={() => { if (detail) navigate(`/contacts${buildQuery({ customer: detail.id })}`) }}
           reloadKey={vpnReload}
-          sitesTab={detail ? <CustomerSitesTab customerId={detail.id} includeDeleted={grid.includeDeleted} onlyDeleted={grid.onlyDeleted} /> : null}
-          inventoriesTab={detail ? <CustomerInventoriesTab customerId={detail.id} includeDeleted={grid.includeDeleted} onlyDeleted={grid.onlyDeleted} /> : null}
-          devicesTab={detail && showDevices ? <CustomerDevicesTab customerId={detail.id} /> : undefined}
-          contractsTab={detail ? <CustomerContractsTab customerId={detail.id} /> : null}
-          driveTab={detail ? <CustomerDriveTab customerId={detail.id} /> : null}
-          activityTab={detail ? <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} /> : null}
+          sitesTab={detail ? <CustomerSitesPanel customerId={detail.id} /> : null}
+          inventoriesTab={detail ? <CustomerInventoriesPanel customerId={detail.id} showDevices={showDevices} canEditDevices={hasPerm(PERMS.device.device.change)} /> : null}
+          documentsTab={detail ? <CustomerDocumentsPanel customerId={detail.id} showContracts={hasPerm(PERMS.contracts.contract.view)} /> : null}
+          activityTab={detail ? <CustomerActivityPanel customerId={detail.id} /> : null}
         />
       ) : null}
 

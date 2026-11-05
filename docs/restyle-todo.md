@@ -43,7 +43,7 @@ Fatta su `design-previews/c-base.html` (variante A · Scheda).
 
 - **[BE] Lettura della password VPN non registrata nell'audit**: l'anteprima diceva "ogni visualizzazione resta nel log"; oggi `GET /customers/<id>/vpn/` restituisce la password a chi ha il permesso senza registrare nulla. Nell'app la frase è stata tolta.
 - **[UI] Drawer cliente vecchio** (`CustomerDrawer`): ancora usato da Site Repository e Profilo.
-- **[UI] Liste nelle schede Siti, Inventari, Documenti**: sono i componenti `RelatedList` di prima (righe a zebra), non ridisegnati.
+- **[UI] Credenziali degli inventari nella scheda Inventari**: l'anteprima mostrava utenza e password per riga; l'elenco API non le include (servono la scheda dell'inventario e il permesso `inventory.view_secrets`).
 - **[UI] Città e indirizzo**: stanno nei campi personalizzati, quindi si modificano solo da "Modifica", non sul posto. Tag non mostrati nel pannello.
 - **[UI] Site Repository dal pannello**: non c'è un collegamento diretto (la pagina non accetta il cliente nell'URL).
 
