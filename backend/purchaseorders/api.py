@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -215,10 +215,30 @@ class PurchaseOrderEntryFilter(filters.FilterSet):
     year             = filters.NumberFilter(field_name="offer_date", lookup_expr="year")
     offer_date_after  = filters.DateFilter(field_name="offer_date", lookup_expr="gte")
     offer_date_before = filters.DateFilter(field_name="offer_date", lookup_expr="lte")
+    # Ricerca per singola colonna (riga di ricerca sotto le intestazioni).
+    description_q    = filters.CharFilter(field_name="description", lookup_expr="icontains")
+    client_q         = filters.CharFilter(method="filter_client_q")
+    ref_q            = filters.CharFilter(method="filter_ref_q")
+    month            = filters.NumberFilter(field_name="offer_date", lookup_expr="month")
 
     class Meta:
         model  = PurchaseOrderEntry
         fields = ["kind", "status", "amount_mode", "customer", "invoiced", "year"]
+
+    def filter_client_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(client_name__icontains=v) | Q(customer__name__icontains=v)
+            | Q(customer__display_name__icontains=v) | Q(customer_placeholder__icontains=v)
+        )
+
+    def filter_ref_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(Q(purchase_order__icontains=v) | Q(invoice_number__icontains=v))
 
     def filter_invoiced(self, queryset, name, value):
         if value is True:

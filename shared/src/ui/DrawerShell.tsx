@@ -43,6 +43,7 @@ import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTheme } from '@mui/material/styles'
+import { useCloseOnOutsideClick } from '@shared/hooks/useCloseOnOutsideClick'
 
 // ─── Aspetto (opt-in) ─────────────────────────────────────────────────────────
 // 'classic' = hero a gradiente (predefinito, Portal). 'campo' = restyle
@@ -315,12 +316,16 @@ export function DrawerShell({
   const theme = useTheme()
   const campo = appearance === 'campo' ? (theme.palette as unknown as { archie?: CampoPalette }).archie : undefined
 
+  // Clic fuori dalla scheda flottante: la chiude (comportamento globale "campo").
+  const paperRef = React.useRef<HTMLDivElement | null>(null)
+  useCloseOnOutsideClick(paperRef, Boolean(campo) && open, onClose)
+
   // Esc chiude la scheda flottante (non è modale, quindi MUI non lo gestisce).
   React.useEffect(() => {
     if (!campo || !open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (document.querySelector('.MuiModal-root:not(.MuiDrawer-docked)')) return
+      if (document.querySelector('.MuiModal-root:not(.MuiDrawer-docked):not(.MuiModal-hidden)')) return
       const t = e.target as HTMLElement | null
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return
       onClose()
@@ -430,7 +435,7 @@ export function DrawerShell({
       open={open}
       onClose={onClose}
       variant={campo ? 'persistent' : 'temporary'}
-      PaperProps={{ sx: campo ? {
+      PaperProps={{ ref: paperRef, sx: campo ? {
         width: { xs: '100%', md: `min(${Math.max(width, 440)}px, calc(100vw - 24px))` },
         top: { xs: 0, md: 64 }, right: { xs: 0, md: 12 }, bottom: { xs: 0, md: 12 }, height: 'auto',
         borderRadius: { xs: 0, md: '12px' }, border: { xs: 0, md: '1px solid' }, borderColor: 'divider',

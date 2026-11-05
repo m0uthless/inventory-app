@@ -69,6 +69,7 @@ import type {
 import {
   CURRENT_YEAR,
   STATUS_LABEL,
+  STATUS_ORDER,
   emptyForm,
   formatEuro,
   formatItDate,
@@ -106,6 +107,8 @@ const KIND_FILTER_OPTIONS: { value: KindFilterValue; label: string }[] = [
 // leggevano una palette fissa, non theme-aware. Ora è una factory chiamata
 // dentro il componente (useMemo su statusTokens = useStatusTokens()), così
 // i colori seguono il tema attivo.
+const MONTHS = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre']
+
 function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrderRow>[] {
   const custLabel = (row: PurchaseOrderRow) => row.customer_name || row.customer_code || row.customer_placeholder || ''
   return [
@@ -251,6 +254,13 @@ export default function PurchaseOrders() {
   const poView: PoView = (['all', 'send', 'wait', 'inv', 'done'] as const).includes(poViewRaw as PoView) ? (poViewRaw as PoView) : 'all'
   const setPoView = (v: string) => setPoViewRaw(v === 'all' ? '' : v, { patch: { page: 1 }, keepOpen: false })
 
+  // Ricerca per colonna (riga sotto le intestazioni, aperta dalla lente).
+  const EMPTY_COLQ = { month: '', client: '', description: '', kind: '', status: '', ref: '' }
+  const [colSearchOpen, setColSearchOpen] = React.useState(false)
+  const [colQ, setColQ] = React.useState(EMPTY_COLQ)
+  const colQActive = Object.values(colQ).some(Boolean)
+  const setCol = (k: keyof typeof EMPTY_COLQ) => (v: string) => { setColQ((c) => ({ ...c, [k]: v })); grid.onPaginationModelChange({ ...grid.paginationModel, page: 0 }) }
+
   const [selectionModel, setSelectionModel] =
     React.useState<GridRowSelectionModel>(emptySelectionModel())
   const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
@@ -306,6 +316,12 @@ export default function PurchaseOrders() {
           year: effectiveYear,
           ...(kindFilter !== 'all' ? { kind: kindFilter } : {}),
           ...(VIEW_STATUS[poView] ? { status: VIEW_STATUS[poView] } : {}),
+          ...(colQ.month ? { month: colQ.month } : {}),
+          ...(colQ.client ? { client_q: colQ.client } : {}),
+          ...(colQ.description ? { description_q: colQ.description } : {}),
+          ...(colQ.kind ? { kind: colQ.kind } : {}),
+          ...(colQ.status ? { status: colQ.status } : {}),
+          ...(colQ.ref ? { ref_q: colQ.ref } : {}),
         },
       }),
     [
@@ -318,6 +334,7 @@ export default function PurchaseOrders() {
       effectiveYear,
       kindFilter,
       poView,
+      colQ,
     ],
   )
 
@@ -999,6 +1016,7 @@ export default function PurchaseOrders() {
               onExport={exportVisible}
               exporting={exporting}
               onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
             />
           }
           toolbar={{
@@ -1023,6 +1041,17 @@ export default function PurchaseOrders() {
             onRowContextMenu: handleRowContextMenu,
             getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
             rowHeight: 48,
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                offer_date: { value: colQ.month, allLabel: 'Tutti i mesi', onChange: setCol('month'), options: MONTHS.map((m, i) => ({ value: String(i + 1), label: m })) },
+                client_name: { value: colQ.client, onChange: setCol('client'), placeholder: 'Committente o cliente' },
+                description: { value: colQ.description, onChange: setCol('description'), placeholder: 'Cerca nella descrizione' },
+                kind: { value: colQ.kind, onChange: setCol('kind'), options: [{ value: 'ordinario', label: KIND_LABEL.ordinario }, { value: 'extra', label: KIND_LABEL.extra }] },
+                status: { value: colQ.status, onChange: setCol('status'), options: STATUS_ORDER.map((k) => ({ value: k, label: STATUS_LABEL[k] })) },
+                purchase_order: { value: colQ.ref, onChange: setCol('ref'), placeholder: 'PO o fattura' },
+              },
+            },
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />

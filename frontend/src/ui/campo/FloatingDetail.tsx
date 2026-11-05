@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Box, ButtonBase, IconButton, Menu, MenuItem, Tooltip, Typography, useMediaQuery } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
+import { useCloseOnOutsideClick } from '@shared/hooks/useCloseOnOutsideClick'
 import CloseIcon from '@mui/icons-material/Close'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -45,13 +46,15 @@ export function FloatingDetail({
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const [menuEl, setMenuEl] = React.useState<HTMLElement | null>(null)
   const bodyRef = React.useRef<HTMLDivElement>(null)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  useCloseOnOutsideClick(rootRef, open, onClose)
 
   React.useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"]:not([data-floating-detail])')) return
-      if (document.querySelector('.MuiPopover-root, .MuiModal-root:not([data-floating-detail-root])') && e.key === 'Escape') return
+      if (document.querySelector('.MuiPopover-root, .MuiModal-root:not([data-floating-detail-root]):not(.MuiModal-hidden)') && e.key === 'Escape') return
       if (e.key === 'Escape') onClose()
       else if (e.key === 'j' && onNext) onNext()
       else if (e.key === 'k' && onPrev) onPrev()
@@ -69,6 +72,7 @@ export function FloatingDetail({
 
   return (
     <Box
+      ref={rootRef}
       role="dialog"
       aria-label={ariaLabel}
       data-floating-detail
