@@ -888,6 +888,39 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 
+# Contatto "senza recapiti": né telefono né email.
+CONTACT_UNREACHABLE = (Q(phone__isnull=True) | Q(phone="")) & (Q(email__isnull=True) | Q(email=""))
+
+
+class ContactFilter(filters.FilterSet):
+    """Filtri della lista contatti: ricerca per colonna (restyle) e viste."""
+    name_q = filters.CharFilter(field_name="name", lookup_expr="icontains")
+    department_q = filters.CharFilter(field_name="department", lookup_expr="icontains")
+    customer_q = filters.CharFilter(method="filter_customer_q")
+    site_q = filters.CharFilter(method="filter_site_q")
+    phone_q = filters.CharFilter(field_name="phone", lookup_expr="icontains")
+    email_q = filters.CharFilter(field_name="email", lookup_expr="icontains")
+    unreachable = filters.BooleanFilter(method="filter_unreachable")
+    has_site = filters.BooleanFilter(field_name="site", lookup_expr="isnull", exclude=True)
+
+    class Meta:
+        model = Contact
+        fields = ["customer", "site", "is_primary"]
+
+    def filter_customer_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(customer__name__icontains=v) | Q(customer__display_name__icontains=v)) if v else queryset
+
+    def filter_site_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(site__name__icontains=v) | Q(site__display_name__icontains=v) | Q(site__city__icontains=v)) if v else queryset
+
+    def filter_unreachable(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(CONTACT_UNREACHABLE) if value else queryset.exclude(CONTACT_UNREACHABLE)
+
+
 class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     # Fix P0 6.6: view/add/change/delete_contact espliciti per il portale
@@ -899,7 +932,7 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
     # verifica che il site scelto appartenga allo stesso tenant.
     tenant_related_fields = ("site",)
 
-    filterset_fields = ["customer", "site", "is_primary"]
+    filterset_class = ContactFilter
     search_fields = ["name", "email", "phone", "department", "notes"]
     ordering_fields = [
         "name",
@@ -917,6 +950,7 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
         "customer__display_name",
         "site__name",
         "site__display_name",
+        "department",
     ]
     ordering = ["-is_primary", "name"]
 
@@ -960,6 +994,48 @@ class ContactViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin
         )
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """Indicatori della pagina Contatti (contatti non cestinati, stesso perimetro della lista)."""
+        qs = self.get_queryset().filter(deleted_at__isnull=True).order_by()
+        agg = qs.aggregate(
+            total=Count("id"),
+            customers=Count("customer_id", distinct=True),
+            primaries=Count("id", filter=Q(is_primary=True)),
+            with_site=Count("id", filter=Q(site__isnull=False)),
+            without_site=Count("id", filter=Q(site__isnull=True)),
+            unreachable=Count("id", filter=CONTACT_UNREACHABLE),
+            missing_phone=Count("id", filter=Q(phone__isnull=True) | Q(phone="")),
+            missing_email=Count("id", filter=Q(email__isnull=True) | Q(email="")),
+        )
+        # Clienti (nel perimetro dell'utente) senza un contatto primario a livello cliente.
+        from issues.models import PLACEHOLDER_CUSTOMER_CODE
+        with_primary = set(qs.filter(is_primary=True, site__isnull=True).values_list("customer_id", flat=True))
+        if _is_internal_user(request.user):
+            visible_customers = set(Customer.objects.filter(deleted_at__isnull=True).exclude(code=PLACEHOLDER_CUSTOMER_CODE).values_list("id", flat=True))
+        else:
+            visible_customers = set(qs.values_list("customer_id", flat=True))
+        by_customer = list(qs.values("customer_id", "customer__display_name", "customer__name").annotate(n=Count("id")).order_by("-n", "customer__name"))
+        today = timezone.localdate()
+        months = []
+        y, m = today.year, today.month
+        for _ in range(12):
+            months.append((y, m))
+            y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+        months.reverse()
+        created = list(qs.values_list("created_at", flat=True))
+        growth = []
+        for (yy, mm) in months:
+            end = datetime.date(yy + (mm // 12), (mm % 12) + 1, 1)
+            growth.append({"month": f"{yy}-{mm:02d}", "count": sum(1 for c in created if c and timezone.localtime(c).date() < end)})
+        return Response({
+            **{k: (v or 0) for k, v in agg.items()},
+            "customers_total": len(visible_customers),
+            "customers_without_primary": len(visible_customers - with_primary),
+            "by_customer": [{"id": v["customer_id"], "name": v["customer__display_name"] or v["customer__name"], "count": v["n"]} for v in by_customer],
+            "growth": growth,
+        })
 
     @action(detail=True, methods=['post'], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):

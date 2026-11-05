@@ -54,6 +54,13 @@ Portata direttamente nell'app con lo schema dei Clienti (nessuna anteprima dedic
 - **[UI] Site Repository**: usa ancora i suoi drawer informativi (`InfoDrawers`) per siti e clienti.
 - **[DEC] Cambio cliente di un sito**: nel pannello il cliente è in sola lettura (spostare un sito con inventari e issue fra clienti va deciso); si cambia solo da "Modifica".
 
+## Pagina Contatti
+
+Portata direttamente nell'app con lo schema di Clienti e Siti.
+
+- **[UI] Ripristino multiplo dal cestino**: la vecchia pagina aveva il codice ma non la selezione delle righe, quindi non era raggiungibile; non riportato (resta la pagina Cestino).
+- **[DEC] Cliente di un contatto**: nel pannello è in sola lettura; si cambia da "Modifica" (il sito deve appartenere al cliente).
+
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).
