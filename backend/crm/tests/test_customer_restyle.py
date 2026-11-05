@@ -45,3 +45,7 @@ def test_counts_filters_and_summary(api_client, superuser, customer_status):
     assert s["contracts_expiring"] == 1 and s["nearest_expiry"]["title"] == "Full risk"
     assert s["incomplete"] == 1
     assert s["top_open_issues"]["name"] == "AUSL Imola"
+    assert s["top_open_issues_list"][0]["count"] == 2
+    assert s["expiring"][0]["days"] == 20
+    assert s["missing_vat"] == 1 and s["missing_contact"] == 1 and s["under_contract"] == 1
+    assert len(s["growth"]) == 12 and s["growth"][-1]["count"] == 2

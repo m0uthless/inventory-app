@@ -1355,7 +1355,7 @@ export default function Issues() {
         onView={(k) => { setView(k as IssueView); setFPriority([]) }}
         onPriorityPick={(pr) => { setView('active'); setFPriority((cur) => (cur.length === 1 && cur[0] === pr ? [] : [pr])) }}
       />
-      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
         <ViewTabs
           value={savedId ? `saved:${savedId}` : view}
           onChange={(k) => {
@@ -1406,6 +1406,7 @@ export default function Issues() {
           }}
           grid={{
             pageKey: 'issues',
+            autoHeight: true,
             defaultHiddenColumns: ['opened_at', 'category_label', 'comments_count', 'closed_at', 'days_open'],
             filterConfig,
             columnSearch: {

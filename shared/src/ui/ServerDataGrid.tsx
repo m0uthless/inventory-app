@@ -51,6 +51,8 @@ type Props<R extends GridValidRowModel> = {
   onRowClick?: (id: number) => void
   onRowContextMenu?: (row: R, event: React.MouseEvent<HTMLElement>) => void
   height?: number | string
+  /** Altezza in base alle righe (aspetto "campo"): niente spazio vuoto sotto pochi risultati. */
+  autoHeight?: boolean
   pageSizeOptions?: number[]
   deletedField?: keyof R | string
   /** Classe CSS extra per riga (es. per attenuare visivamente righe "chiuse"). */
@@ -455,6 +457,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     onRowClick,
     onRowContextMenu,
     height = '100%',
+    autoHeight,
     deletedField = 'deleted_at',
     getRowClassName: getRowClassNameExtra,
     getRowId,
@@ -713,7 +716,9 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     } : {}),
     '& .MuiDataGrid-row.Mui-selected, & .MuiDataGrid-row.Mui-selected:hover': {
       backgroundColor: (t: Theme) => (t.palette as unknown as { archie: { field: string } }).archie.field,
+      boxShadow: 'none', // la barra di 3px del tema è per le tabelle non migrate
     },
+    ...(autoHeight ? { '& .MuiDataGrid-main': { minHeight: 160 } } : {}),
     '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': {
       borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine,
       // Bordo superiore (come tbody tr.is-selected td dell'anteprima), senza spostare le righe.
@@ -837,7 +842,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
   return (
     <Box
       ref={gridRef}
-      sx={{ height, minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}
+      sx={autoHeight ? { minHeight: 0, display: 'flex', flexDirection: 'column', flex: 'none' } : { height, minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}
       onContextMenu={onRowContextMenu ? handleGridContextMenu : undefined}
       onTouchStart={onRowContextMenu ? handleTouchStart : undefined}
       onTouchMove={onRowContextMenu ? handleTouchMove : undefined}
@@ -845,6 +850,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
       onTouchCancel={onRowContextMenu ? handleTouchEnd : undefined}
     >
       <DataGrid hideFooter
+        autoHeight={autoHeight}
         rows={rows}
         columns={columnsWithHeader}
         loading={loading}

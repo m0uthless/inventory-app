@@ -988,7 +988,7 @@ export default function PurchaseOrders() {
       />
       <PurchaseOrderKpis year={effectiveYear} summary={summary} stats={yearStats} loading={summaryLoading} view={poView} onView={setPoView} />
 
-      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
         <ViewTabs
           value={poView}
           onChange={setPoView}
@@ -1026,6 +1026,7 @@ export default function PurchaseOrders() {
           }}
           grid={{
             pageKey: 'purchase-orders',
+            autoHeight: true,
             username: me?.username,
             filterConfig,
             emptyState,

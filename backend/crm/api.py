@@ -483,9 +483,30 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
             contracts_expiring=Count("id", filter=Q(next_contract_end__isnull=False, next_contract_end__lte=limit)),
             incomplete=Count("id", filter=Q(primary_contact_id__isnull=True) | Q(vat_number__isnull=True) | Q(vat_number="")),
         )
-        top = qs.filter(open_issues_count__gt=0).order_by("-open_issues_count", "name").values("id", "name", "display_name", "open_issues_count").first()
-        nearest = qs.filter(next_contract_end__isnull=False, next_contract_end__lte=limit).order_by("next_contract_end").values("id", "display_name", "name", "next_contract_end", "next_contract_title").first()
+        top3 = list(qs.filter(open_issues_count__gt=0).order_by("-open_issues_count", "name").values("id", "name", "display_name", "open_issues_count")[:3])
+        top = top3[0] if top3 else None
+        expiring = list(qs.filter(next_contract_end__isnull=False, next_contract_end__lte=limit).order_by("next_contract_end").values("id", "display_name", "name", "next_contract_end", "next_contract_title")[:12])
+        nearest = expiring[0] if expiring else None
         by_vendor = list(qs.values("status__key", "status__label").annotate(n=Count("id")).order_by("-n", "status__label"))
+        extra = qs.aggregate(
+            under_contract=Count("id", filter=Q(active_contracts_count__gt=0)),
+            with_vpn=Count("id", filter=Q(has_vpn=True)),
+            missing_vat=Count("id", filter=Q(vat_number__isnull=True) | Q(vat_number="")),
+            missing_contact=Count("id", filter=Q(primary_contact_id__isnull=True)),
+        )
+        # Crescita: clienti esistenti alla fine di ciascuno degli ultimi 12 mesi.
+        today = timezone.localdate()
+        months = []
+        y, m = today.year, today.month
+        for _ in range(12):
+            months.append((y, m))
+            y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+        months.reverse()
+        created = list(qs.values_list("created_at", flat=True))
+        growth = []
+        for (yy, mm) in months:
+            end = datetime.date(yy + (mm // 12), (mm % 12) + 1, 1)
+            growth.append({"month": f"{yy}-{mm:02d}", "count": sum(1 for c in created if c and timezone.localtime(c).date() < end)})
         return Response({
             "total": agg["total"] or 0,
             "sites": agg["sites"] or 0,
@@ -497,6 +518,13 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
             "expiring_days": CONTRACT_EXPIRING_DAYS,
             "nearest_expiry": ({"id": nearest["id"], "name": nearest["display_name"] or nearest["name"], "date": nearest["next_contract_end"], "title": nearest["next_contract_title"]} if nearest else None),
             "incomplete": agg["incomplete"] or 0,
+            "missing_vat": extra["missing_vat"] or 0,
+            "missing_contact": extra["missing_contact"] or 0,
+            "under_contract": extra["under_contract"] or 0,
+            "with_vpn": extra["with_vpn"] or 0,
+            "top_open_issues_list": [{"id": t["id"], "name": t["display_name"] or t["name"], "count": t["open_issues_count"]} for t in top3],
+            "expiring": [{"id": e["id"], "name": e["display_name"] or e["name"], "date": e["next_contract_end"], "title": e["next_contract_title"], "days": (e["next_contract_end"] - today).days} for e in expiring],
+            "growth": growth,
             "by_vendor": [{"key": v["status__key"], "label": v["status__label"], "count": v["n"]} for v in by_vendor],
         })
 

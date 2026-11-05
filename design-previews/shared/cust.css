@@ -260,3 +260,7 @@ a.btn { text-decoration: none; }
 .c-tel .i { width: 14px; height: 14px; color: var(--primary); }
 .c-tel:hover { color: var(--primary); }
 .c-more { justify-self: start; margin-top: -2px; }
+
+/* Pesi allineati alla pagina Issue (preferita): nome 550, vendor 400. */
+.c-table .c-name b { font-weight: 550; }
+.c-table .c-ven .cmt { font-weight: 400; }

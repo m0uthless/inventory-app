@@ -708,7 +708,7 @@ export default function Customers() {
       <CustomerKpis summary={summary} view={view} onView={setView} vendorColor={vendorColor}
         onVendor={(key) => { const st = statuses.find((x) => x.key === key); if (st) setStatusFilter(statusFilter === String(st.id) ? '' : String(st.id), filterOpts) }} />
 
-      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
         <ViewTabs
           value={savedId ? `saved:${savedId}` : view}
           onChange={(k) => { if (k.startsWith('saved:')) { applySaved(k.slice(6)); return } setView(k) }}
@@ -750,6 +750,7 @@ export default function Customers() {
           toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca clienti, siti, hostname…' }}
           grid={{
             pageKey: 'customers',
+            autoHeight: true,
             username: me?.username,
             filterConfig,
             emptyState,
