@@ -47,6 +47,7 @@ const P = {
   menu: 'M4 6h16 M4 12h16 M4 18h16',
   restore: 'M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5',
   layers: 'M12 2 2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5',
+  chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M8 9h8 M8 13h5',
   message: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M12 7v4 M12 14h.01',
   funnel: 'M3 5h18l-7 8.5V19l-4 2v-7.5z',
 } as const

@@ -1,10 +1,8 @@
 import * as React from 'react'
-import { alpha } from '@mui/material/styles'
 
 import {
   Alert,
   Autocomplete,
-  Badge,
   Box,
   Button,
   CircularProgress,
@@ -13,6 +11,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  ButtonBase,
 } from '@mui/material'
 
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material'
@@ -921,6 +920,11 @@ export default function Issues() {
           <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>
           <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
           <IssuePriorityMark priority={row.priority} compact />
+          {row.comments_count ? (
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: 20, px: '6px', borderRadius: '5px', fontSize: 11, fontWeight: 600, bgcolor: 'archie.field', color: 'primary.main' }}>
+              <CampoIcon name="chat" size={12} />{row.comments_count}
+            </Box>
+          ) : null}
           <Typography component="span" sx={{ ml: 'auto', fontSize: 12, fontWeight: overdue ? 600 : 500, color: overdue ? 'error.main' : 'text.secondary' }}>
             {row.due_date ? fmtDate(row.due_date) : ''}
           </Typography>
@@ -1260,57 +1264,28 @@ export default function Issues() {
     {
       field: 'comments_count',
       headerName: 'Commenti',
-      width: 90,
-      align: 'center',
-      headerAlign: 'center',
+      width: 104,
       renderCell: ({ row }) => {
         const count = row.comments_count ?? 0
+        const label = count ? `${count} ${count === 1 ? 'commento' : 'commenti'} · apri` : 'Nessun commento · scrivi il primo'
         return (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              width: '100%',
-            }}
-          >
-            <Tooltip
-              title={
-                count ? `${count} ${count === 1 ? 'commento' : 'commenti'}` : 'Nessun commento'
-              }
+          <Tooltip title={label}>
+            <ButtonBase
+              aria-label={label}
+              onClick={(e) => { e.stopPropagation(); openDetail(row, 1) }}
+              sx={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px', height: 22, px: '7px', borderRadius: '5px',
+                fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', border: '1px solid',
+                ...(count
+                  ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'transparent', '&:hover': { borderColor: 'archie.fieldLine' } }
+                  : { bgcolor: 'transparent', color: 'text.disabled', borderColor: 'transparent', '&:hover': { color: 'text.secondary', bgcolor: 'archie.surface2', borderColor: 'divider' } }),
+                '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+              }}
             >
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  openDetail(row, 1)
-                }}
-                sx={{
-                  color: count ? 'primary.main' : 'text.disabled',
-                  bgcolor: (theme) => alpha(theme.palette.primary.main, count ? 0.08 : 0),
-                  '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.16) },
-                }}
-              >
-                <Badge
-                  badgeContent={count || null}
-                  color="primary"
-                  max={99}
-                  sx={{
-                    '& .MuiBadge-badge': {
-                      fontSize: '0.6rem',
-                      height: 15,
-                      minWidth: 15,
-                      top: 1,
-                      right: 1,
-                    },
-                  }}
-                >
-                  <ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-          </Box>
+              <CampoIcon name="chat" size={14} />
+              {count ? (count > 99 ? '99+' : count) : null}
+            </ButtonBase>
+          </Tooltip>
         )
       },
     },
