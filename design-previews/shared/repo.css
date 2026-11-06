@@ -295,3 +295,9 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-site.is-open > .r-site-h .r-ti, .r-site.has-sel > .r-site-h .r-ti { color: var(--info); }
 .r-site.is-open > .r-site-h .r-chev, .r-site.has-sel > .r-site-h .r-chev { color: var(--info); }
 .r-pgroup.has-sel > .r-prow, .r-prov.has-sel > .r-prov-h { background: var(--surface-2); }
+
+/* Asset: colonne IP SRSA e K-Number */
+.r-ahead, .r-asset { grid-template-columns: 20px minmax(0, 1.3fr) minmax(0, 1fr) 104px 104px 76px 132px; gap: 10px; }
+.r-asset-c { grid-template-columns: 20px minmax(0, 1fr) auto; }
+@media (max-width: 1280px) { .r-ahead, .r-asset:not(.r-asset-c) { grid-template-columns: 20px minmax(0, 1.3fr) minmax(0, 1fr) 104px 104px 132px; } .r-ahead > :nth-child(6), .r-asset:not(.r-asset-c) > :nth-child(6) { display: none; } }
+@media (max-width: 760px) { .r-asset:not(.r-asset-c) { grid-template-columns: 20px minmax(0, 1fr) auto; } .r-asset:not(.r-asset-c) > :nth-child(5), .r-asset:not(.r-asset-c) > :nth-child(6) { display: none; } }

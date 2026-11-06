@@ -72,7 +72,7 @@
     id: i + 1, name, prov, city, ven, contact, phone, vpn, code: 'C-' + String(i + 17).padStart(6, '0'),
     sites: sites.map(([sname, addr, st, assets]) => ({
       id: siteId++, name: sname, addr, st,
-      assets: assets.map(([t, n, host, ip, s, prio]) => ({ id: invId++, t, name: n, host, ip, st: s, prio: prio || null, kn: 'K' + (100000 + invId * 37).toString().slice(-6) })),
+      assets: assets.map(([t, n, host, ip, s, prio]) => ({ id: invId++, t, name: n, host, ip, st: s, prio: prio || null, kn: 'K' + (100000 + invId * 37).toString().slice(-6), srsa: ip && ['pacs', 'ris', 'vna', 'mgmt', 'net'].includes(t) ? ip.replace(/^(10|192)\.\d+/, '172.16') : '' })),
     })),
   }));
   CUST.forEach((c) => c.sites.forEach((s) => { s.c = c; s.assets.forEach((a) => { a.s = s; a.c = c; }); }));
@@ -110,9 +110,11 @@
       <span class="r-an"><b>${hl(a.name)}${prio(a.prio)}</b><small>${TYPES[a.t][0]}${opts.path ? ` · ${esc(a.c.name)} › ${esc(a.s.name)}` : ''}</small></span>
       <span class="r-mono">${a.host ? hl(a.host) : '<span class="none">—</span>'}</span>
       <span class="r-mono">${a.ip ? hl(a.ip) : '<span class="miss">Nessun IP</span>'}</span>
+      <span class="r-mono">${a.srsa ? hl(a.srsa) : '<span class="none">—</span>'}</span>
+      <span class="r-mono">${a.kn ? hl(a.kn) : '<span class="none">—</span>'}</span>
       <span>${stBadge(a.st)}</span>
     </button>`;
-  const assetHead = '<div class="r-ahead"><span></span><span>Sistema</span><span>Hostname</span><span>IP</span><span>Stato</span></div>';
+  const assetHead = '<div class="r-ahead"><span></span><span>Sistema</span><span>Hostname</span><span>IP</span><span>IP SRSA</span><span>K-Number</span><span>Stato</span></div>';
   const custActions = (c) => `<span class="r-cacts">
       ${c.vpn ? `<button type="button" class="r-ib" data-toast="Si apre l'accesso VPN di ${esc(c.name)}" title="Accesso VPN"><span class="r-vpn">VPN</span></button>` : ''}
       ${c.phone ? `<a class="r-ib" href="tel:${c.phone.replace(/\s+/g, '')}" title="Chiama ${esc(c.contact)}">${phoneI}</a>` : ''}
@@ -134,7 +136,7 @@
   // ── Risultati di ricerca (comuni alle tre proposte) ──────────────
   const searchResults = () => {
     const t = q.toLowerCase();
-    const as = ALL_ASSETS.filter((a) => [a.name, a.host, a.ip, a.kn].some((v) => v && v.toLowerCase().includes(t)));
+    const as = ALL_ASSETS.filter((a) => [a.name, a.host, a.ip, a.srsa, a.kn].some((v) => v && v.toLowerCase().includes(t)));
     const ss = ALL_SITES.filter((s) => [s.name, s.addr].some((v) => v && v.toLowerCase().includes(t)));
     const cs = CUST.filter((c) => [c.name, c.city, c.code].some((v) => v && v.toLowerCase().includes(t)));
     const path = (c, s) => `<span class="r-path">${c.prov ? `<span>${provName(c.prov)}</span>${ic('chevR')}` : ''}<span>${esc(c.name)}</span>${s ? `${ic('chevR')}<span>${esc(s.name)}</span>` : ''}</span>`;
