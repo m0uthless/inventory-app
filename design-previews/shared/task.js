@@ -43,13 +43,13 @@
       files: [['csr-gw-imola.pem', '2 KB', 'Certificati / 2026', 'L. Romano', '28/10'], ['procedura-rinnovo-tls.pdf', '214 KB', 'Procedure / Integrazioni', 'F. Mutuale', '29/10']] },
     { id: 40, area: 'AVEC', title: 'Inventario monitor di refertazione Osp. Maggiore', desc: 'Censire seriali e date di calibrazione dei monitor di refertazione e caricarli in Archie.', st: 'da_fare', pr: 'media', who: 'A. Ferri', due: '14/11/2026', created: '30/10/2026', by: 'F. Mutuale', cm: [], files: [] },
     { id: 39, area: 'AVEC', title: 'Preparare il piano ferie di dicembre', desc: 'Raccogliere le richieste e verificare la copertura reperibilità tra Natale e Capodanno.', st: 'da_fare', pr: 'bassa', who: '', due: '20/11/2026', created: '02/11/2026', by: 'G. Neri', cm: [['G. Neri', 'Chi lo prende? Servono le date entro il 20.', '02/11, 09:30']], files: [] },
-    { id: 38, area: 'AVEC', title: 'Aggiornare la procedura di backup VNA in Wiki', desc: 'La procedura cita ancora il vecchio storage. Allineare screenshot e percorsi al nodo 2.', st: 'in_attesa', pr: 'media', who: 'L. Romano', due: '04/11/2026', created: '21/10/2026', by: 'L. Romano', waiting: 'in attesa delle credenziali del nuovo storage',
+    { id: 38, area: 'AVEC', title: 'Aggiornare la procedura di backup VNA in Wiki', desc: 'La procedura cita ancora il vecchio storage. Allineare screenshot e percorsi al nodo 2.', st: 'in_attesa', pr: 'media', who: 'L. Romano', due: '04/11/2026', created: '21/10/2026', by: 'L. Romano', waiting: 'Credenziali',
       cm: [['L. Romano', 'Bloccato: mi servono le credenziali della console del nodo 2.', '31/10, 15:02']], files: [['schema-backup-vna.png', '380 KB', 'Wiki / Immagini', 'L. Romano', '22/10']] },
     { id: 37, area: 'AVEC', title: 'Verificare spazio disco dei server di management', desc: 'Tre server sopra l\'85%. Pulire i log vecchi e valutare l\'espansione.', st: 'in_corso', pr: 'critica', who: 'F. Mutuale', due: '06/11/2026', created: '03/11/2026', by: 'A. Ferri', cm: [['A. Ferri', 'Management 2 di Bazzano è al 94%.', '03/11, 08:55']], files: [] },
     { id: 36, area: 'AVEC', title: 'Formazione nuovi tecnici su Archie', desc: 'Due sessioni da un\'ora: anagrafiche, issue e Site Repository.', st: 'da_fare', pr: 'bassa', who: 'G. Neri', due: '', created: '25/10/2026', by: 'F. Mutuale', cm: [], files: [['slide-archie-base.pdf', '2,1 MB', 'Formazione', 'G. Neri', '26/10']] },
     { id: 35, area: 'AVEC', title: 'Sostituire switch rack radiologia Imola', desc: 'Lo switch in sala server della radiologia perde pacchetti. Ordinare il ricambio e pianificare la sostituzione.', st: 'completato', pr: 'alta', who: 'A. Ferri', due: '05/11/2026', created: '22/10/2026', by: 'F. Mutuale', done: '04/11/2026', issue: 1047, cm: [['A. Ferri', 'Serve l\'intervento in sede con il cliente: lo trasformo in issue.', '04/11, 11:20']], files: [] },
     { id: 34, area: 'AVEC', title: 'Chiudere le issue risolte da più di 30 giorni', desc: '', st: 'completato', pr: 'bassa', who: 'L. Romano', due: '', created: '28/10/2026', by: 'L. Romano', done: '05/11/2026', cm: [], files: [] },
-    { id: 33, area: 'AVEC', title: 'Rivedere le regole di notifica email', desc: 'Troppe email sui commenti interni. Proporre un filtro per ruolo.', st: 'in_attesa', pr: 'media', who: 'F. Mutuale', due: '12/11/2026', created: '19/10/2026', by: 'G. Neri', waiting: 'in attesa del parere del responsabile', cm: [], files: [] },
+    { id: 33, area: 'AVEC', title: 'Rivedere le regole di notifica email', desc: 'Troppe email sui commenti interni. Proporre un filtro per ruolo.', st: 'in_attesa', pr: 'media', who: 'F. Mutuale', due: '12/11/2026', created: '19/10/2026', by: 'G. Neri', waiting: 'Responsabile', cm: [], files: [] },
     { id: 32, area: 'Romagna', title: 'Collaudo nuova CR Fuji Ospedale del Delta', desc: 'Verificare invio al PACS e dose SR dopo l\'installazione.', st: 'in_corso', pr: 'alta', who: 'C. Bassi', due: '10/11/2026', created: '29/10/2026', by: 'P. Righi', cm: [['P. Righi', 'Il fornitore arriva martedì alle 9.', '30/10, 12:00']], files: [] },
     { id: 31, area: 'Romagna', title: 'Aggiornare le VLAN del Portale per Lugo', desc: '', st: 'da_fare', pr: 'media', who: 'M. Lodi', due: '03/11/2026', created: '20/10/2026', by: 'C. Bassi', cm: [], files: [] },
     { id: 30, area: 'Romagna', title: 'Stampare le etichette K-Number per Faenza', desc: '', st: 'da_fare', pr: 'bassa', who: '', due: '', created: '01/11/2026', by: 'M. Lodi', cm: [], files: [] },
@@ -60,15 +60,12 @@
   const ini = (n) => n.split(/[\s.]+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase();
   const stBadge = (st) => `<span class="st st-${ST_CLS[st]}"><svg class="mk" viewBox="0 0 12 12" aria-hidden="true">${MARK[ST_CLS[st]]}</svg><span>${ST[st]}</span></span>`;
   const prBadge = (p) => `<span class="pr pr-${p}"><span class="pr-bar" aria-hidden="true"><i></i><i></i><i></i><i></i></span>${PR[p]}</span>`;
-  const whoCell = (w) => w ? `<span class="t-who"><span class="ava">${ini(w)}</span>${esc(w)}</span>` : '<span class="t-nobody">Da assegnare</span>';
   const isOpen = (r) => r.st !== 'completato';
   const isLate = (r) => isOpen(r) && r.due && days(r.due) < 0;
   const dueCell = (r) => {
     if (!r.due) return '<span class="none">—</span>';
-    if (!isOpen(r)) return `<span class="t-due-d">${r.due.slice(0, 5)}</span>`;
-    const n = days(r.due);
-    const tag = n < 0 ? `<small class="late">scaduto da ${-n} ${-n === 1 ? 'giorno' : 'giorni'}</small>` : n === 0 ? '<small class="today">oggi</small>' : n <= 3 ? `<small class="soon">tra ${n} ${n === 1 ? 'giorno' : 'giorni'}</small>` : '';
-    return `<span class="t-due-d">${r.due.slice(0, 5)}</span>${tag}`;
+    const n = days(r.due); const st = isOpen(r) ? (n < 0 ? 'scaduto' : n === 0 ? 'oggi' : '') : '';
+    return `<span class="due${st ? ' due-' + (st === 'scaduto' ? 'scaduta' : 'oggi') : ''}">${r.due.slice(0, 5)}${st ? ` · ${st}` : ''}</span>`;
   };
   const writable = (r) => r.area === MY_AREA;
 
@@ -137,12 +134,13 @@
   // ── Tabella ──────────────────────────────────────────────────────
   const dueBucket = (r) => { if (!r.due) return 'Senza scadenza'; if (!isOpen(r)) return 'Completati'; const n = days(r.due); return n < 0 ? 'Scaduti' : n === 0 ? 'Oggi' : n <= 7 ? 'Entro 7 giorni' : 'Oltre 7 giorni'; };
   const COLS = [
+    { k: 'c-id', l: 'ID', cmp: (a, b) => a.id - b.id },
     { k: 'c-pr', l: 'Priorità', set: (r) => PR[r.pr], cmp: (a, b) => PR_RANK[a.pr] - PR_RANK[b.pr] },
     { k: 'c-st', l: 'Stato', set: (r) => ST[r.st], cmp: (a, b) => ST_ORDER.indexOf(a.st) - ST_ORDER.indexOf(b.st) },
     { k: 'c-title', l: 'Titolo', cmp: (a, b) => a.title.localeCompare(b.title, 'it') },
+    { k: 'c-area', l: 'Area', set: (r) => r.area, cmp: (a, b) => a.area.localeCompare(b.area), onlyAll: true },
     { k: 'c-who', l: 'Assegnato a', set: (r) => r.who || 'Da assegnare', cmp: (a, b) => (a.who || '~').localeCompare(b.who || '~', 'it') },
     { k: 'c-due', l: 'Scadenza', set: dueBucket, cmp: (a, b) => (dt(a.due) ?? 9e15) - (dt(b.due) ?? 9e15) },
-    { k: 'c-area', l: 'Area', set: (r) => r.area, cmp: (a, b) => a.area.localeCompare(b.area), onlyAll: true },
     { k: 'c-open', l: 'Creato', cmp: (a, b) => dt(a.created) - dt(b.created) },
   ];
   const cols = () => COLS.filter((c) => !c.onlyAll || area === 'all');
@@ -162,20 +160,17 @@
   let selected = null;
   const renderRows = () => {
     const rows = visible(); const show = cols().map((c) => c.k);
-    tbody.innerHTML = rows.map((r) => `<tr data-id="${r.id}" tabindex="0" class="${r.id === selected ? 'is-selected' : ''}${isOpen(r) ? '' : ' is-done'}">
+    tbody.innerHTML = rows.map((r) => `<tr data-id="${r.id}" tabindex="0" class="${r.id === selected ? 'is-selected' : ''}">
+      <td class="c-id num">#${r.id}</td>
       <td class="c-pr">${prBadge(r.pr)}</td>
       <td class="c-st">${stBadge(r.st)}${r.st === 'in_attesa' && r.waiting ? `<span class="wait">${esc(r.waiting)}</span>` : ''}</td>
-      <td class="c-title"><span class="t">${esc(r.title)}</span><span class="t-meta2">
-        ${r.cm.length ? `<span title="${r.cm.length} commenti">${ic('chat')}${r.cm.length}</span>` : ''}
-        ${r.files.length ? `<span title="${r.files.length} allegati da Drive">${ic('folder')}${r.files.length}</span>` : ''}
-        ${r.issue ? `<span class="t-iss">${ic('arrowR')}Issue #${r.issue}</span>` : ''}
-        ${!writable(r) && area === 'all' ? `<span class="t-lock" title="Sola lettura">${ic('lock')}</span>` : ''}</span></td>
-      <td class="c-who">${whoCell(r.who)}</td>
+      <td class="c-title"><span class="t">${esc(r.title)}</span>${r.cm.length ? `<span class="cmt-chip" title="${r.cm.length} commenti">${ic('chat')}${r.cm.length}</span>` : ''}</td>
+      ${show.includes('c-area') ? `<td class="c-area">${r.area}</td>` : ''}
+      <td class="c-who">${r.who ? esc(r.who) : '<span class="none">—</span>'}</td>
       <td class="c-due num">${dueCell(r)}</td>
-      ${show.includes('c-area') ? `<td class="c-area"><span class="t-areatag${r.area === MY_AREA ? ' is-mine' : ''}">${r.area}</span></td>` : ''}
-      <td class="c-open"><span class="t-due-d">${r.created.slice(0, 5)}</span><small>${esc(r.by)}</small></td>
-    </tr>`).join('') || `<tr><td colspan="${show.length}" class="t-empty">${view === 'late' ? 'Nessun task scaduto. ' : 'Nessun task con questi filtri.'}</td></tr>`;
-    $('[data-t-foot]').innerHTML = `<span><b>${rows.length}</b> di ${inArea().length} task</span>${view === 'done' || view === 'all' ? '<span>I completati restano in elenco per 3 giorni dalla chiusura.</span>' : ''}<span class="sp"></span><span>dati fittizi</span>`;
+      <td class="c-open num">${r.created}</td>
+    </tr>`).join('') || `<tr><td colspan="${show.length}" class="t-empty">${view === 'late' ? 'Nessun task scaduto.' : 'Nessun task con questi filtri.'}</td></tr>`;
+    $('[data-t-foot]').innerHTML = `<span data-count>${rows.length === inArea().length ? rows.length : rows.length + ' di ' + inArea().length} task · dati fittizi${view === 'done' || view === 'all' ? ' · i completati restano in elenco 3 giorni' : ''}</span><div class="pager"><button class="icon-btn" type="button" aria-label="Pagina precedente" disabled>${ic('chevL')}</button><span class="num">1 di 1</span><button class="icon-btn" type="button" aria-label="Pagina successiva" disabled>${ic('chevR')}</button></div>`;
     paintTokens(); paintViews();
   };
   const paintViews = () => {
@@ -183,7 +178,7 @@
   };
   const paintTokens = () => {
     const t = Object.entries(filters).filter(([, s]) => s.size).map(([k, s]) => `<span class="token"><span class="tk">${COLS.find((c) => c.k === k).l}</span> <b>${[...s].join(', ')}</b><button type="button" class="tk-x" data-unf="${k}" aria-label="Rimuovi filtro">${ic('x')}</button></span>`);
-    $('[data-t-tokens]').innerHTML = t.length ? t.join('') + '<button type="button" class="btn btn-ghost btn-sm" data-unf="*">Azzera filtri</button>' : '<span class="none" style="font-size:12px">Filtra e ordina dalle intestazioni di colonna</span>';
+    $('[data-t-tokens]').innerHTML = t.length ? t.join('') + '<button type="button" class="btn btn-ghost btn-sm" data-unf="*">Azzera filtri</button>' : '<span class="tk-empty">Nessun filtro. Usa l\'imbuto accanto al nome di una colonna.</span>';
   };
   const refresh = () => { paintHead(); renderKpis(); paintTableHead(); renderRows(); if (selected) render(); };
 
@@ -259,7 +254,7 @@
     ${timeline(r)}
     <section class="t-desc"><div class="t-sec-h"><h4>Descrizione</h4>${w ? `<button type="button" class="c-link" data-edit-desc>Modifica</button>` : ''}</div>
       ${r.desc ? `<p class="desc-p">${esc(r.desc)}</p>` : `<p class="none t-nodesc">Nessuna descrizione.${w ? ' Aggiungi il contesto per chi prende il task.' : ''}</p>`}
-      ${r.st === 'in_attesa' && r.waiting ? `<p class="t-wait">${ic('clock')}In attesa: ${esc(r.waiting)}</p>` : ''}</section>
+      ${r.st === 'in_attesa' && r.waiting ? `<p class="t-wait">${ic('clock')}In attesa di: ${esc(r.waiting)}</p>` : ''}</section>
     <section><div class="t-sec-h"><h4>Ultimo commento</h4>${r.cm.length ? `<button type="button" class="c-link" data-tab="cm">Tutti i commenti (${r.cm.length})</button>` : ''}</div>
       ${r.cm.length ? `<div class="feed t-last">${bubble(r.cm.at(-1))}</div>` : `<button type="button" class="t-firstcm" data-tab="cm"${w ? '' : ' disabled'}>${ic('chat')}<span>${w ? 'Scrivi il primo commento' : 'Nessun commento'}</span></button>`}</section>`;
 

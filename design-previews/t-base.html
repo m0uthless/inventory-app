@@ -529,7 +529,7 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
 <link rel="stylesheet" href="shared/drawer-content.css">
 <link rel="stylesheet" href="shared/drawer-intervento.css">
 <link rel="stylesheet" href="shared/po.css?v=3">
-<link rel="stylesheet" href="shared/task.css?v=3">
+<link rel="stylesheet" href="shared/task.css?v=4">
 </head>
 <body data-view="app">
 
@@ -569,17 +569,17 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
           <div class="t-ro" data-t-ro hidden></div>
           <div class="toolbar tb-row">
             <div class="tokens" data-t-tokens aria-label="Filtri attivi" aria-live="polite"></div>
-            <span class="spacer"></span>
             <button class="icon-btn" type="button" aria-label="Esporta le righe visibili" title="Esporta le righe visibili"><i data-i="download"></i></button>
+            <button class="icon-btn colsearch-btn" type="button" aria-label="Cerca nelle colonne" title="Cerca nelle colonne"><i data-i="search"></i></button>
             <button class="icon-btn" type="button" aria-label="Colonne" title="Colonne"><i data-i="columns"></i></button>
           </div>
           <div class="table-wrap">
-            <table class="po-table t-table">
+            <table class="t-table">
               <thead><tr data-t-head></tr></thead>
               <tbody data-t-rows></tbody>
             </table>
           </div>
-          <div class="po-foot" data-t-foot></div>
+          <div class="tfoot" data-t-foot></div>
         </section>
       </main>
 
@@ -736,6 +736,6 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
     btns.forEach((b) => b.addEventListener('click', () => set(b.dataset.top)));
   })();
 </script>
-<script src="shared/task.js?v=3"></script>
+<script src="shared/task.js?v=5"></script>
 </body>
 </html>
