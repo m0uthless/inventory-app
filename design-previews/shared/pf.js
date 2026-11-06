@@ -127,7 +127,7 @@
     kpiWrap.innerHTML = `<div class="kpis" role="group" aria-label="Indicatori piano ferie">
       <button type="button" class="kpi" data-goday="${TODAY}"><span class="kpi-h">Assenti oggi<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${offToday.length}<small>su ${ps.length}</small></span>
         <span class="kpi-s pf-avas">${offToday.map((p) => { const c = cell(p, TODAY); const a = c.mat || c.pom; return `<span class="ava" title="${esc(p.name)} · ${RL[a.reason]}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}" style="background:${SW[swKey(a)][0]};color:${SW[swKey(a)][1]}">${ini(p.name)}</span>`; }).join('') || 'nessuno'}</span></button>
-      ${isCoord() ? `<button type="button" class="kpi" data-goview="pend" aria-pressed="${view === 'pend'}"><span class="kpi-h">Da validare<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${pend.length}<small>${gg(pendDays)}</small></span>
+      ${isCoord() ? `<button type="button" class="kpi" data-goview="coord" aria-pressed="${view === 'coord'}"><span class="kpi-h">Da validare<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${pend.length}<small>${gg(pendDays)}</small></span>
         <span class="kpi-s">${pend.length ? `la più vecchia del <b>${oldest.slice(0, 5)}</b>` : 'nessuna richiesta in attesa'}</span></button>`
       : (() => { const my = ABS.filter((a) => a.who.name === ME && a.status === 'proposta'); return `<button type="button" class="kpi" data-goview="mine" aria-pressed="${view === 'mine'}"><span class="kpi-h">Le tue richieste in attesa<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${my.length}<small>${gg(my.reduce((n, a) => n + workdays(a), 0))}</small></span>
         <span class="kpi-s">${my.length ? `prossima: <b>${range(my.sort((x, y) => x.from.localeCompare(y.from))[0])}</b>` : 'nessuna richiesta in attesa'}</span></button>`; })()}
@@ -143,7 +143,7 @@
 
   const paintViews = () => {
     const n = pending().length;
-    const tabs = [['cal', 'Griglia'], ...(isCoord() ? [['coord', 'Coordinamento'], ['pend', 'Da validare', n]] : []), ['mine', 'Le mie richieste', ABS.filter((a) => a.who.name === ME).length]]
+    const tabs = [['cal', 'Griglia'], ...(isCoord() ? [['coord', 'Coordinamento', n]] : []), ['mine', 'Le mie richieste', ABS.filter((a) => a.who.name === ME).length]]
     $('[data-pf-views]').innerHTML = tabs
       .map(([k, l, c]) => `<button type="button" aria-pressed="${view === k}" data-view="${k}">${l}${c !== undefined ? ` <span>${c}</span>` : ''}</button>`).join('');
     const legend = Object.entries(SW).filter(([k]) => k !== 'rifiutata').map(([k, [bg, fg, l]]) => `<button type="button" class="pf-lg${reasonFilter === k ? ' is-on' : ''}${reasonFilter && reasonFilter !== k ? ' is-dim' : ''}" data-reason="${k}" aria-pressed="${reasonFilter === k}"><i class="${k === 'ferie_p' ? 'is-prop' : ''}" style="background:${bg};border-color:${fg}"></i>${l}</button>`).join('');
@@ -225,7 +225,7 @@
       <div class="pf-cal">${cal}
       </div>
       <aside class="pf-side">${dayCard}
-        <section class="pf-side-q"><div class="pf-side-h"><h3>Da autorizzare</h3><span class="r-cnt">${pending().length}</span><button type="button" class="link-btn" data-view="pend">Vedi tutte</button></div>${authCards()}</section>
+        <section class="pf-side-q"><div class="pf-side-h"><h3>Da autorizzare</h3><span class="r-cnt">${pending().length}</span></div>${authCards()}</section>
       </aside>
     </div>`;
   };
@@ -252,18 +252,6 @@
     }).join('')}</ul>`;
   };
 
-  // Coda delle richieste (vista "Da validare" e colonna di C).
-  const queue = (compact) => {
-    const list = pending();
-    if (!list.length) return `<p class="pf-empty">${ic('task')}Nessuna richiesta da validare.</p>`;
-    return `<ul class="pf-q${compact ? ' is-compact' : ''}">${list.map((a) => { const cf = conflicts(a); const [bg, fg] = SW[swKey(a)]; return `<li>
-      <button type="button" class="pf-q-main" data-abs="${a.id}"><span class="ava" style="background:${bg};color:${fg}">${ini(a.who.name)}</span>
-        <span class="r-an"><b>${esc(a.who.name)}</b><small>${RL[a.reason]} · ${range(a)} · ${gg(workdays(a))}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}</small></span>
-        ${compact ? '' : `<span class="pf-q-req">richiesta il ${a.req.slice(0, 5)}</span>`}</button>
-      ${cf.length ? `<p class="pf-q-warn">${ic('alert')}Con questa richiesta ${a.who.area} resta con ${cf[0][1]} su ${cf[0][2]} il ${cf.map((c) => parse(c[0]).getDate()).join(', ')} ${MSH[parse(cf[0][0]).getMonth()]}</p>` : ''}
-      <div class="pf-q-act"><button type="button" class="btn btn-sm" data-reject="${a.id}">Rifiuta</button><button type="button" class="btn btn-sm btn-primary" data-validate="${a.id}">${tick}Valida</button></div>
-    </li>`; }).join('')}</ul>`;
-  };
   const mine = () => {
     const list = ABS.filter((a) => a.who.name === ME).sort((x, y) => y.from.localeCompare(x.from));
     return `<ul class="pf-q">${list.map((a) => { const [bg, fg] = SW[swKey(a)]; return `<li><button type="button" class="pf-q-main" data-abs="${a.id}"><span class="pf-sw" style="background:${bg};border-color:${fg}"></span>
@@ -315,9 +303,10 @@
   const body = $('[data-pf-body]');
   const paint = () => {
     paintHead(); renderKpis(); paintViews();
-    if (!isCoord() && (view === 'coord' || view === 'pend')) view = 'cal';
+    if (view === 'pend') view = 'coord';
+    if (!isCoord() && view === 'coord') view = 'cal';
     body.className = 'pf-body pf-v-' + view;
-    body.innerHTML = view === 'pend' ? `<div class="pf-list">${queue(false)}</div>` : view === 'mine' ? `<div class="pf-list">${mine()}</div>` : view === 'coord' ? renderC() : renderA();
+    body.innerHTML = view === 'mine' ? `<div class="pf-list">${mine()}</div>` : view === 'coord' ? renderC() : renderA();
   };
 
   // ── Interazioni ─────────────────────────────────────────────────────
@@ -328,21 +317,48 @@
 
   // Nuova richiesta (anche da trascinamento in A).
   const mdl = $('[data-mdl]');
+  const WDF = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
   const askNew = (personId, from, to, part) => {
-    const p = PEOPLE.find((x) => x.id === personId) || PEOPLE[0];
-    $('.mdl', mdl).innerHTML = `<div class="mdl-h"><h3 id="mdl-t">Nuova richiesta</h3><p>${esc(p.name)} · ${p.area}</p></div>
-      <form class="mdl-b" data-mform>
-        <div class="grid2"><div class="f"><label for="m-f">Dal</label><input id="m-f" value="${from.split('-').reverse().join('/')}"></div><div class="f"><label for="m-t">Al</label><input id="m-t" value="${to.split('-').reverse().join('/')}"></div></div>
-        <div class="f"><span class="lbl">Fascia</span><div class="r-seg pf-seg" role="group">${Object.entries(PART).map(([k, l]) => `<button type="button" aria-pressed="${k === part}">${l[0].toUpperCase() + l.slice(1)}</button>`).join('')}</div></div>
-        <div class="f"><span class="lbl">Motivo</span><div class="pf-reasons">${Object.entries(RL).map(([k, l], i) => { const sk = k === 'ferie' ? 'ferie_p' : k; return `<label class="pf-reason"><input type="radio" name="m-r"${i === 0 ? ' checked' : ''}><span class="pf-sw" style="background:${SW[sk][0]};border-color:${SW[sk][1]}"></span>${l}</label>`; }).join('')}</div></div>
-        <div class="f"><label for="m-n">Nota <span class="opt">· facoltativa</span></label><input id="m-n" placeholder="es. viaggio, visita medica"></div>
-        <p class="note-p" style="margin:0">${ic('lock')} Weekend e festività dell'area non vengono contati. La richiesta resta <b>proposta</b> finché il coordinatore non la valida.</p>
-      </form>
-      <div class="mdl-f"><button class="btn btn-ghost" type="button" data-mclose>Annulla</button><button class="btn btn-primary" type="button" data-mok>Invia richiesta</button></div>`;
-    mdl.hidden = false;
-    $('[data-mclose]', mdl).onclick = () => { mdl.hidden = true; };
-    $('[data-mok]', mdl).onclick = () => { mdl.hidden = true; const a = A(p.name, from, to, 'ferie', 'proposta', part, { req: '06/11/2026' }); ABS.push(a); paint(); toast(`Richiesta inviata · ${range(a)}`, () => { ABS.splice(ABS.indexOf(a), 1); paint(); }); };
-    mdl.querySelectorAll('.pf-seg button').forEach((b) => b.addEventListener('click', () => mdl.querySelectorAll('.pf-seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))));
+    let st = { person: personId, from, to, part, reason: 'ferie' };
+    const people0 = isCoord() ? PEOPLE.filter((p) => area === 'all' || p.area === area || p.name === ME) : PEOPLE.filter((p) => p.name === ME);
+    if (!people0.some((p) => p.id === st.person)) st.person = people0[0].id;
+    const summary = () => {
+      if (!st.from || !st.to || st.to < st.from) return `<span class="pf-sum is-err">${ic('alert')}La data di fine viene prima di quella di inizio</span>`;
+      const n = workdays({ from: st.from, to: st.to, part: st.part });
+      const f = parse(st.from); const t = parse(st.to);
+      const when = st.from === st.to ? `${WDF[f.getDay()]} ${ddmm(st.from)}` : `da ${WDF[f.getDay()]} ${ddmm(st.from)} a ${WDF[t.getDay()]} ${ddmm(st.to)}`;
+      return n ? `<span class="pf-sum">${ic('calendar')}<b>${gg(n)} lavorativ${n === 1 ? 'o' : 'i'}</b>${when}${st.part !== 'all' ? ` · ${PART[st.part]}` : ''}</span>`
+        : `<span class="pf-sum is-err">${ic('alert')}Nel periodo non ci sono giorni lavorativi</span>`;
+    };
+    const draw = () => {
+      const p = PEOPLE.find((x) => x.id === st.person);
+      $('.mdl', mdl).innerHTML = `<div class="mdl-h"><h3 id="mdl-t">Nuova richiesta</h3><p>${isCoord() ? 'Puoi inserirla per una persona della tua area: sarà già validata.' : 'Resta proposta finché il coordinatore non la autorizza.'}</p></div>
+        <form class="mdl-b pf-form" data-mform>
+          ${isCoord() ? `<div class="f"><label for="m-p">Persona</label><select id="m-p">${people0.map((x) => `<option value="${x.id}"${x.id === st.person ? ' selected' : ''}>${esc(x.name)} · ${x.area}</option>`).join('')}</select></div>`
+            : `<div class="pf-me"><span class="ava">${ini(p.name)}</span><span class="r-an"><b>${esc(p.name)}</b><small>${p.area}</small></span></div>`}
+          <div class="grid2"><div class="f"><label for="m-f">Dal</label><input id="m-f" type="date" value="${st.from}"></div><div class="f"><label for="m-t">Al</label><input id="m-t" type="date" value="${st.to}"></div></div>
+          <div class="f"><span class="lbl">Fascia</span><div class="r-seg pf-seg" role="radiogroup" aria-label="Fascia">${Object.entries(PART).map(([k, l]) => `<button type="button" role="radio" aria-checked="${k === st.part}" aria-pressed="${k === st.part}" data-part="${k}">${l[0].toUpperCase() + l.slice(1)}</button>`).join('')}</div></div>
+          <div class="f"><span class="lbl">Motivo</span><div class="pf-reasons" role="radiogroup" aria-label="Motivo">${Object.entries(RL).map(([k, l]) => { const sk = k === 'ferie' ? (isCoord() ? 'ferie_v' : 'ferie_p') : k; const on = k === st.reason; return `<button type="button" class="pf-reason${on ? ' is-on' : ''}" role="radio" aria-checked="${on}" data-r="${k}"><span class="pf-sw" style="background:${SW[sk][0]};border-color:${SW[sk][1]}"></span><span>${l}</span></button>`; }).join('')}</div></div>
+          <div class="f"><label for="m-n">Nota <span class="opt">· facoltativa</span></label><input id="m-n" placeholder="es. viaggio, visita medica"></div>
+          <div class="pf-sum-w" data-sum>${summary()}</div>
+        </form>
+        <div class="mdl-f"><span class="pf-foot-note">${ic('lock')}Weekend e festività dell'area non contano</span><button class="btn btn-ghost" type="button" data-mclose>Annulla</button><button class="btn btn-primary" type="button" data-mok>${isCoord() ? 'Inserisci' : 'Invia richiesta'}</button></div>`;
+      const ok = $('[data-mok]', mdl); const valid = () => st.from && st.to && st.to >= st.from && workdays(st) > 0;
+      ok.disabled = !valid();
+      $('[data-mclose]', mdl).onclick = () => { mdl.hidden = true; };
+      ok.onclick = () => {
+        if (!valid()) return; mdl.hidden = true;
+        const a = A(PEOPLE.find((x) => x.id === st.person).name, st.from, st.to, st.reason, isCoord() ? 'validata' : 'proposta', st.part, { req: '06/11/2026', note: $('#m-n', mdl)?.value || '' });
+        ABS.push(a); paint(); toast(`${isCoord() ? 'Inserita' : 'Richiesta inviata'} · ${range(a)}`, () => { ABS.splice(ABS.indexOf(a), 1); paint(); });
+      };
+      const refresh = () => { $('[data-sum]', mdl).innerHTML = summary(); ok.disabled = !valid(); };
+      $('#m-f', mdl).onchange = (e) => { st.from = e.target.value; if (st.to < st.from) { st.to = st.from; $('#m-t', mdl).value = st.to; } refresh(); };
+      $('#m-t', mdl).onchange = (e) => { st.to = e.target.value; refresh(); };
+      const sel = $('#m-p', mdl); if (sel) sel.onchange = (e) => { st.person = Number(e.target.value); };
+      mdl.querySelectorAll('[data-part]').forEach((b) => b.addEventListener('click', () => { st.part = b.dataset.part; draw(); }));
+      mdl.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => { st.reason = b.dataset.r; draw(); }));
+    };
+    draw(); mdl.hidden = false;
   };
   mdl.addEventListener('mousedown', (e) => { if (e.target === mdl) mdl.hidden = true; });
   $('[data-new]').addEventListener('click', () => askNew(1, '2026-11-09', '2026-11-09', 'all'));
