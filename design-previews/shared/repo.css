@@ -201,3 +201,17 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
   .r-cust-h > .r-n { display: none; }
   .r-head { flex-wrap: wrap; }
 }
+
+/* B: elenco delle province */
+.r-ptable { overflow: hidden; }
+.r-prow { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 76px 64px 64px 84px 14px; gap: 12px; align-items: center; min-height: 52px; padding: 6px 14px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.r-prow:last-child { border-bottom: 0; }
+.r-prow:hover { background: var(--surface-2); }
+.r-prow:focus-visible { outline: none; box-shadow: inset var(--focus); }
+.r-prow > .i { width: 14px; height: 14px; color: var(--faint); }
+.r-prow-h { min-height: 34px; background: var(--surface-2); font-size: 12px; font-weight: 550; color: var(--muted); cursor: default; }
+.r-prow-h:hover { background: var(--surface-2); }
+.r-prow-h > span:not(:first-child), .r-num { text-align: right; font-variant-numeric: tabular-nums; }
+.r-back-p { margin-bottom: 6px; }
+.r-pane-h > .btn { align-self: center; }
+@media (max-width: 760px) { .r-prow { grid-template-columns: minmax(0, 1fr) 56px 56px 14px; } .r-prow > :nth-child(3), .r-prow > :nth-child(5) { display: none; } }

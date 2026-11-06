@@ -84,7 +84,7 @@
   // ── Stato pagina ──────────────────────────────────────────────────
   let variant = 'a'; let group = 'prov'; let q = ''; let selected = null;
   const openProv = new Set(['BO']); const openCust = new Set([1]); const openSite = new Set([1]);
-  let bProv = 'BO'; let bRegion = 'EMR';
+  let bProv = null; let bRegion = null; // B: all'apertura Italia + tutte le province
   let cProv = 'BO'; let cCust = 1; let cSite = 1;
 
   // ── Elementi comuni ──────────────────────────────────────────────
@@ -184,31 +184,56 @@
   };
 
   // ── B · Mappa + elenco ───────────────────────────────────────────
+  // Sinistra: cartina + regioni per numero di clienti. Destra: province in
+  // ordine alfabetico (solo quelle della regione scelta); clic su una
+  // provincia → il suo contenuto, con ritorno all'elenco.
+  const provStats = (p) => {
+    const cs = CUST.filter((c) => (p === '' ? !c.prov : c.prov === p));
+    const as = cs.flatMap((c) => c.sites.flatMap((s) => s.assets));
+    return { cs, sites: cs.reduce((n, c) => n + c.sites.length, 0), assets: as.length, issues: issuesOf(as) }
+  };
   const renderB = () => {
-    const pc = provCounts();
     const provs = [...new Set(CUST.map((c) => c.prov).filter(Boolean))];
-    const byReg = {}; provs.forEach((p) => { const r = regionOf(p); (byReg[r] ||= []).push(p); });
-    const cs = CUST.filter((c) => (bProv === '' ? !c.prov : c.prov === bProv));
-    const allA = cs.flatMap((c) => c.sites.flatMap((s) => s.assets));
-    return `<div class="r-split">
-      <aside class="panel r-mapcard">
+    const regs = {}; provs.forEach((p) => { const r = regionOf(p); (regs[r] ||= { id: r, cust: 0, provs: 0 }); regs[r].cust += CUST.filter((c) => c.prov === p).length; regs[r].provs += 1; });
+    const regList = Object.values(regs).sort((a, b) => b.cust - a.cust || regionName(a.id).localeCompare(regionName(b.id)));
+    const noProv = CUST.filter((c) => !c.prov).length;
+    const left = `<aside class="panel r-mapcard">
         <div class="r-map-h">${bRegion ? `<button type="button" class="r-back" data-region-back>${ic('chevL')}Italia</button><b>${regionName(bRegion)}</b>` : '<b>Italia</b><span>scegli una regione</span>'}</div>
         <div class="r-map-w">${mapSvg(bRegion, bRegion ? bProv : null)}</div>
-        <div class="r-plist">${Object.entries(byReg).sort((a, b) => regionName(a[0]).localeCompare(regionName(b[0]))).map(([r, ps]) => `<div class="r-pl-g">${regionName(r)}</div>${ps.sort().map((p) => `<button type="button" class="r-pl${p === bProv ? ' is-sel' : ''}" data-prov="${p}"><span>${provName(p)} <span class="r-sig">${p}</span></span><span class="r-n">${CUST.filter((c) => c.prov === p).length} cl. · ${pc[p]}</span></button>`).join('')}`).join('')}
-          <div class="r-pl-g">Altro</div><button type="button" class="r-pl${bProv === '' ? ' is-sel' : ''}" data-prov=""><span><i>Senza provincia</i></span><span class="r-n">${CUST.filter((c) => !c.prov).length} cl.</span></button>
+        <div class="r-plist">
+          <div class="r-pl-g">Regioni per numero di clienti</div>
+          ${regList.map((r) => `<button type="button" class="r-pl${r.id === bRegion ? ' is-sel' : ''}" data-region="${r.id}" aria-pressed="${r.id === bRegion}"><span>${regionName(r.id)}</span><span class="r-n"><b>${r.cust}</b> ${r.cust === 1 ? 'cliente' : 'clienti'} · ${r.provs} prov.</span></button>`).join('')}
+          ${noProv ? `<button type="button" class="r-pl${bProv === '' ? ' is-sel' : ''}" data-prov=""><span><i>Senza provincia</i></span><span class="r-n"><b>${noProv}</b> ${noProv === 1 ? 'cliente' : 'clienti'}</span></button>` : ''}
         </div>
-      </aside>
-      <div class="r-pane">
-        <div class="r-pane-h"><div><h2>${bProv ? `${provName(bProv)} <span class="r-sig">${bProv}</span>` : 'Senza provincia'}</h2><span>${bProv ? regionName(regionOf(bProv)) : 'Clienti senza provincia in anagrafica'}</span></div>
-          <div class="r-stats"><span><b>${cs.length}</b>clienti</span><span><b>${cs.reduce((n, c) => n + c.sites.length, 0)}</b>siti</span><span><b>${allA.length}</b>asset</span><span class="${issuesOf(allA) ? 'w' : ''}"><b>${issuesOf(allA)}</b>con issue</span></div></div>
-        ${cs.map((c) => `<section class="panel r-bcust">
+      </aside>`;
+    let right;
+    if (bProv === null) {
+      const list = provs.filter((p) => !bRegion || regionOf(p) === bRegion).sort((a, b) => provName(a).localeCompare(provName(b), 'it'));
+      right = `<div class="r-pane">
+        <div class="r-pane-h"><div><h2>${bRegion ? `Province · ${regionName(bRegion)}` : 'Tutte le province'}</h2><span>${list.length} province con clienti, in ordine alfabetico</span></div>
+          ${bRegion ? `<button type="button" class="btn btn-ghost btn-sm" data-region-back>Mostra tutte</button>` : ''}</div>
+        <section class="panel r-ptable">
+          <div class="r-prow r-prow-h"><span>Provincia</span><span>Clienti</span><span>Siti</span><span>Asset</span><span>Con issue</span><span></span></div>
+          ${list.map((p) => { const st = provStats(p); return `<button type="button" class="r-prow" data-prov="${p}">
+            <span class="r-an"><b>${provName(p)} <span class="r-sig">${p}</span></b><small>${regionName(regionOf(p))}</small></span>
+            <span class="r-num">${st.cs.length}</span><span class="r-num">${st.sites}</span><span class="r-num">${st.assets}</span>
+            <span class="r-num">${st.issues ? `<span class="w">${st.issues}</span>` : '<span class="none">—</span>'}</span>${ic('chevR')}</button>`; }).join('')}
+        </section></div>`;
+    } else {
+      const st = provStats(bProv);
+      right = `<div class="r-pane">
+        <div class="r-pane-h"><div><button type="button" class="r-back r-back-p" data-prov-back>${ic('chevL')}${bRegion ? `Province · ${regionName(bRegion)}` : 'Tutte le province'}</button>
+          <h2>${bProv ? `${provName(bProv)} <span class="r-sig">${bProv}</span>` : 'Senza provincia'}</h2><span>${bProv ? regionName(regionOf(bProv)) : 'Clienti senza provincia in anagrafica'}</span></div>
+          <div class="r-stats"><span><b>${st.cs.length}</b>clienti</span><span><b>${st.sites}</b>siti</span><span><b>${st.assets}</b>asset</span><span class="${st.issues ? 'w' : ''}"><b>${st.issues}</b>con issue</span></div></div>
+        ${st.cs.map((c) => `<section class="panel r-bcust">
           <div class="r-cust-h"><span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ''}</small></span><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
           ${c.sites.map((s) => { const os = openSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
             <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
             ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}
         </section>`).join('')}
-      </div>
-    </div>`;
+      </div>`;
+    }
+    return `<div class="r-split">${left}${right}</div>`;
   };
 
   // ── C · Colonne ──────────────────────────────────────────────────
@@ -283,9 +308,10 @@
     if ((el = t('[data-tog-prov]'))) { const k = el.dataset.togProv; openProv.has(k) ? openProv.delete(k) : openProv.add(k); render(); return; }
     if ((el = t('[data-tog-cust]'))) { const k = Number(el.dataset.togCust); openCust.has(k) ? openCust.delete(k) : openCust.add(k); render(); return; }
     if ((el = t('[data-tog-site]'))) { const k = Number(el.dataset.togSite); openSite.has(k) ? openSite.delete(k) : openSite.add(k); render(); return; }
-    if ((el = t('[data-region-back]'))) { bRegion = null; render(); return; }
-    if ((el = t('[data-region]'))) { bRegion = el.dataset.region; if (variant === 'c') { const p = CUST.find((c) => regionOf(c.prov) === bRegion)?.prov; if (p) { cProv = p; cCust = CUST.find((c) => c.prov === p).id; cSite = null; } } render(); return; }
-    if ((el = t('[data-prov]'))) { bProv = el.dataset.prov; bRegion = regionOf(bProv) || bRegion; render(); return; }
+    if ((el = t('[data-region-back]'))) { bRegion = null; bProv = null; render(); return; }
+    if ((el = t('[data-prov-back]'))) { bProv = null; render(); return; }
+    if ((el = t('[data-region]'))) { bRegion = el.dataset.region; bProv = null; if (variant === 'c') { const p = CUST.find((c) => regionOf(c.prov) === bRegion)?.prov; if (p) { cProv = p; cCust = CUST.find((c) => c.prov === p).id; cSite = null; } } render(); return; }
+    if ((el = t('[data-prov]'))) { bProv = el.dataset.prov; if (bProv) bRegion = regionOf(bProv) || bRegion; render(); return; }
     if ((el = t('[data-cprov]'))) { cProv = el.dataset.cprov; cCust = null; cSite = null; render(); return; }
     if ((el = t('[data-ccust]'))) { cCust = Number(el.dataset.ccust); cSite = null; render(); return; }
     if ((el = t('[data-csite]'))) { cSite = Number(el.dataset.csite); render(); return; }
