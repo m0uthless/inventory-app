@@ -265,6 +265,7 @@
     $('[data-r-tools]').innerHTML = variant === 'a' && !q ? `<button type="button" class="btn btn-ghost btn-sm" data-all="close">Comprimi tutto</button><button type="button" class="btn btn-ghost btn-sm" data-all="open">Espandi tutto</button>` : '';
     body.className = 'r-body r-v' + variant;
     body.innerHTML = q ? searchResults() : variant === 'a' ? renderA() : variant === 'b' ? renderB() : renderC();
+    markSel();
   };
 
   // ── Pannello dell'inventario (credenziali solo qui) ───────────────
@@ -286,9 +287,18 @@
         <ul class="cl-sites"><li><button type="button"><span class="ti">${ic('building')}</span><div class="fn"><b>${esc(a.c.name)}</b><span>Cliente · ${provName(a.c.prov)}</span></div><span></span>${ic('chevR')}</button></li>
         <li><button type="button"><span class="ti">${ic('pin')}</span><div class="fn"><b>${esc(a.s.name)}</b><span>${esc(a.s.addr || 'Nessun indirizzo')}</span></div><span></span>${ic('chevR')}</button></li></ul></section>
     </div><div class="drawer-foot"><button class="btn" type="button">${ic('wrench')}Modifica</button><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>`;
-    document.querySelectorAll('[data-open]').forEach((b) => b.classList.toggle('is-sel', Number(b.dataset.open) === id));
+    markSel()
   };
-  const close = () => { drawer.hidden = true; selected = null; shell.classList.remove('has-drawer'); document.querySelectorAll('[data-open].is-sel').forEach((b) => b.classList.remove('is-sel')); };
+  const close = () => { drawer.hidden = true; selected = null; shell.classList.remove('has-drawer'); markSel(); };
+  // Asset selezionato: evidenzia la riga e, risalendo, il sito e il cliente che lo contengono.
+  function markSel() {
+    document.querySelectorAll('.has-sel').forEach((e) => e.classList.remove('has-sel'));
+    document.querySelectorAll('[data-open]').forEach((b) => {
+      const on = Number(b.dataset.open) === selected;
+      b.classList.toggle('is-sel', on);
+      if (on) { b.closest('.r-site')?.classList.add('has-sel'); b.closest('.r-pcust, .r-cust')?.classList.add('has-sel'); b.closest('.r-pgroup, .r-prov')?.classList.add('has-sel'); }
+    });
+  }
   $('[data-rclose]').addEventListener('click', close);
   rbody.addEventListener('click', (e) => {
     const rv = e.target.closest('[data-reveal]');

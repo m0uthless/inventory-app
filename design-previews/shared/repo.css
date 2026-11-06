@@ -278,3 +278,10 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-pcust .r-cust-h { padding-left: 8px; }
 .r-pcust:not(.is-open) > .r-cust-h { border-bottom: 0; }
 .r-cust-h .r-ti, .r-cust-t .r-ti { width: 20px; height: 20px; }
+
+/* Cliente e sito evidenziati quando aperti o quando contengono l'asset selezionato */
+.r-pcust.is-open > .r-cust-h, .r-cust.is-open > .r-cust-h, .r-site.is-open > .r-site-h { background: var(--surface-2); }
+.r-pcust.is-open > .r-cust-h .r-an b, .r-cust.is-open > .r-cust-h .r-an b, .r-site.is-open > .r-site-h .r-an b { color: var(--primary); }
+.r-pcust.has-sel > .r-cust-h, .r-cust.has-sel > .r-cust-h, .r-site.has-sel > .r-site-h, .r-pgroup.has-sel > .r-prow, .r-prov.has-sel > .r-prov-h { background: var(--field); }
+.r-pcust.has-sel > .r-cust-h .r-an b, .r-cust.has-sel > .r-cust-h .r-an b, .r-site.has-sel > .r-site-h .r-an b, .r-pgroup.has-sel > .r-prow .r-an b, .r-prov.has-sel .r-prov-n { color: var(--primary); }
+.r-pcust.has-sel { border-color: var(--field-line); }
