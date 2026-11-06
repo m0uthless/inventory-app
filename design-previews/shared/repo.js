@@ -22,7 +22,6 @@
     mod: ['Modalità', 'activity', '#b4673a'], mgmt: ['Management', 'wrench', '#4a58a6'], net: ['Router VPN', 'cloud', '#2f8fa8'], vue: ['Vue Motion', 'eye', '#6f8a3a'],
   };
   const typeTile = (t) => `<span class="r-ti r-tc" style="--tc:${TYPES[t][2]}" title="${TYPES[t][0]}">${ic(TYPES[t][1])}</span>`;
-  const typeDots = (as) => { const ks = [...new Set(as.map((a) => a.t))]; return `<span class="r-tdots" aria-label="Categorie: ${ks.map((k) => TYPES[k][0]).join(', ')}">${ks.map((k) => `<i style="--tc:${TYPES[k][2]}" title="${TYPES[k][0]}"></i>`).join('')}</span>`; };
   const ST = { in_use: 'In uso', to_install: 'Da installare', maintenance: 'In manutenzione', repair: 'Guasto', retired: 'Dismesso' };
   // [nome, provincia, città, vendor, contatto, telefono, VPN, siti: [nome, indirizzo, stato, asset: [tipo, nome, host, ip, stato, issuePrio]]]
   const RAW = [
@@ -165,7 +164,7 @@
             ${oc ? `<div class="r-sites">${c.sites.map((s) => {
               const os = openSite.has(s.id);
               return `<div class="r-site${os ? ' is-open' : ''}">
-                <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti r-brand">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
+                <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti r-brand">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
                 ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}
               </div>`;
             }).join('')}</div>` : ''}
@@ -208,7 +207,6 @@
         <div class="r-map-h">${bRegion ? `<button type="button" class="r-back" data-region-back>${ic('chevL')}Italia</button><b>${regionName(bRegion)}</b>` : '<b>Italia</b><span>scegli una regione</span>'}</div>
         <div class="r-map-w">${mapSvg(bRegion, bRegion ? bProv : null)}</div>
         <div class="r-legend" aria-hidden="true"><span>meno asset</span><i></i><span>più asset</span></div>
-        <div class="r-cats">${Object.entries(TYPES).map(([k, [l, , c]]) => `<span><i style="--tc:${c}"></i>${l} <b>${ALL_ASSETS.filter((a) => a.t === k && (!bRegion || regionOf(a.c.prov) === bRegion)).length}</b></span>`).join('')}</div>
         <div class="r-hot">
           <div class="r-pl-g">Sistemi con issue aperte${bRegion ? ` · ${regionName(bRegion)}` : ' · Italia'} <span class="r-cnt">${hot.length}</span></div>
           ${hot.length ? hot.map((a) => `<button type="button" class="r-hot-i" data-open="${a.id}">${typeTile(a.t)}<span class="r-an"><b>${esc(a.name)}${prio(a.prio)}</b><small>${esc(a.c.name)} › ${esc(a.s.name)}</small></span><span class="r-sig">${a.c.prov}</span></button>`).join('') : '<p class="r-hot-e">Nessuna issue aperta sui sistemi di questo territorio.</p>'}
@@ -220,7 +218,7 @@
     const custBlock = (c) => { const oc = bCust.has(c.id); return `<div class="r-pcust${oc ? ' is-open' : ''}">
         <div class="r-cust-h"><button type="button" class="r-cust-t" data-bcust="${c.id}" aria-expanded="${oc}">${chev(oc)}<span class="r-ti r-brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ' · <span class="miss">Nessun contatto</span>'}</small></span></button><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
         ${oc ? `<div class="r-psites">${c.sites.map((s) => { const os = bSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
-          <button type="button" class="r-site-h" data-bsite="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
+          <button type="button" class="r-site-h" data-bsite="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
           ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}</div>` : ''}
       </div>`; };
     const right = `<div class="r-pane">
