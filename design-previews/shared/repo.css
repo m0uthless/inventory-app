@@ -261,3 +261,19 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-pane-a { display: flex; gap: 4px; align-self: center; }
 @media (max-width: 760px) { .r-ptable .r-prow { grid-template-columns: 20px minmax(0, 1fr) 50px 56px; } .r-ptable .r-prow > :nth-child(4), .r-ptable .r-prow > :nth-child(6) { display: none; } .r-pexp { padding-left: 8px; } }
 .r-prow-h > span:nth-child(2) { text-align: left; }
+
+/* Icone semplici, senza riquadro (cliente, sito, asset) */
+.r-ti, .r-ti.brand, .r-tc, :root[data-theme="dark"] .r-tc { width: 20px; height: 20px; background: transparent; border-radius: 0; }
+.r-ti { color: var(--faint); }
+.r-ti.brand { color: var(--primary); }
+.r-ti .i { width: 17px; height: 17px; stroke-width: 1.75; }
+.r-tc { color: var(--tc); }
+:root[data-theme="dark"] .r-tc { color: color-mix(in oklab, var(--tc) 55%, white); }
+.r-ahead, .r-asset { grid-template-columns: 20px minmax(0, 1.4fr) minmax(0, 1fr) 128px 140px; }
+.r-asset-c { grid-template-columns: 20px minmax(0, 1fr) auto; }
+.r-hot-i { grid-template-columns: 20px minmax(0, 1fr) auto; }
+.r-row { grid-template-columns: 20px minmax(0, 1fr) auto auto 14px; }
+.r-ttl .r-ti { width: 22px; height: 22px; }
+.r-ttl .r-ti .i { width: 20px; height: 20px; }
+.r-pcust .r-cust-h { padding-left: 8px; }
+.r-pcust:not(.is-open) > .r-cust-h { border-bottom: 0; }

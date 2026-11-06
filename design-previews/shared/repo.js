@@ -87,7 +87,7 @@
   // ── Stato pagina ──────────────────────────────────────────────────
   let variant = 'a'; let group = 'prov'; let q = ''; let selected = null;
   const openProv = new Set(['BO']); const openCust = new Set([1]); const openSite = new Set([1]);
-  let bProv = null; let bRegion = null; const bOpen = new Set(); // B: all'apertura Italia + tutte le province
+  let bProv = null; let bRegion = null; const bOpen = new Set(); const bCust = new Set(); const bSite = new Set(); // B: all'apertura Italia + tutte le province
   let cProv = 'BO'; let cCust = 1; let cSite = 1;
 
   // ── Elementi comuni ──────────────────────────────────────────────
@@ -215,12 +215,12 @@
     // Destra: province in ordine alfabetico; clic → si espandono sul posto con i clienti.
     const list = provs.filter((p) => !bRegion || regionOf(p) === bRegion).sort((a, b) => provName(a).localeCompare(provName(b), 'it'));
     if (noProv && !bRegion) list.push('')
-    const custBlock = (c) => `<div class="r-pcust">
-        <div class="r-cust-h"><span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ' · <span class="miss">Nessun contatto</span>'}</small></span><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
-        <div class="r-psites">${c.sites.map((s) => { const os = openSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
-          <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
-          ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}</div>
-      </div>`;
+    const custBlock = (c) => { const oc = bCust.has(c.id); return `<div class="r-pcust${oc ? ' is-open' : ''}">
+        <div class="r-cust-h"><button type="button" class="r-cust-t" data-bcust="${c.id}" aria-expanded="${oc}">${chev(oc)}<span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ' · <span class="miss">Nessun contatto</span>'}</small></span></button><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
+        ${oc ? `<div class="r-psites">${c.sites.map((s) => { const os = bSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
+          <button type="button" class="r-site-h" data-bsite="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
+          ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}</div>` : ''}
+      </div>`; };
     const right = `<div class="r-pane">
         <div class="r-pane-h"><div><h2>${bRegion ? `Province · ${regionName(bRegion)}` : 'Tutte le province'}</h2><span>${list.filter(Boolean).length} province con clienti, in ordine alfabetico · clic per vedere i clienti</span></div>
           <div class="r-pane-a">${bOpen.size ? `<button type="button" class="btn btn-ghost btn-sm" data-pclose-all>Chiudi tutte</button>` : ''}${bRegion ? `<button type="button" class="btn btn-ghost btn-sm" data-region-back>Mostra tutte</button>` : ''}</div></div>
@@ -311,7 +311,9 @@
     if ((el = t('[data-tog-site]'))) { const k = Number(el.dataset.togSite); openSite.has(k) ? openSite.delete(k) : openSite.add(k); render(); return; }
     if ((el = t('[data-region-back]'))) { bRegion = null; bProv = null; render(); return; }
     if ((el = t('[data-ptoggle]'))) { const k = el.dataset.ptoggle; if (bOpen.has(k)) bOpen.delete(k); else { bOpen.add(k); bProv = k; } render(); return; }
-    if ((el = t('[data-pclose-all]'))) { bOpen.clear(); render(); return; }
+    if ((el = t('[data-pclose-all]'))) { bOpen.clear(); bCust.clear(); bSite.clear(); render(); return; }
+    if ((el = t('[data-bcust]'))) { const k = Number(el.dataset.bcust); bCust.has(k) ? bCust.delete(k) : bCust.add(k); render(); return; }
+    if ((el = t('[data-bsite]'))) { const k = Number(el.dataset.bsite); bSite.has(k) ? bSite.delete(k) : bSite.add(k); render(); return; }
     if ((el = t('[data-region]'))) { bRegion = el.dataset.region; bProv = null; if (variant === 'c') { const p = CUST.find((c) => regionOf(c.prov) === bRegion)?.prov; if (p) { cProv = p; cCust = CUST.find((c) => c.prov === p).id; cSite = null; } } render(); return; }
     if ((el = t('[data-prov]'))) {
       bProv = el.dataset.prov; if (bProv) bRegion = regionOf(bProv) || bRegion; bOpen.add(bProv); render();
