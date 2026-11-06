@@ -273,22 +273,78 @@
   // ── Pannello dell'inventario (credenziali solo qui) ───────────────
   const drawer = $('[data-r-drawer]'); const rbody = $('[data-rbody]'); const shell = $('.shell');
   const credRow = (l, v, secret) => `<div class="cr"><span class="k">${l}</span>${secret ? `<span class="sec"><span class="code">••••••••</span><button type="button" class="icon-btn" data-reveal="${esc(v)}" aria-label="Mostra ${l}" title="Mostra · si nasconde dopo 30 secondi">${ic('eye')}</button></span>` : `<span class="v code">${esc(v)}</span>`}<button type="button" class="icon-btn" data-copy aria-label="Copia ${l}" title="Copia">${ic('copy')}</button></div>`;
-  const openAsset = (id) => {
+  // Targa K-Number: stessa replica della targhetta fisica Philips del drawer in dev
+  // (blu del marchio fisso in entrambi i temi, eccezione intenzionale).
+  const plate = (kn, digits = 9) => {
+    const padded = String(kn || '').replace(/\D/g, '').slice(-digits).padStart(digits, '0');
+    const blue = '#1e56ff', sw = 6, lp = 22, tp = 18, gap = 10, bw = 74, bh = 74;
+    const rowW = digits * bw + (digits - 1) * gap, fw = lp * 2 + rowW, area = tp + bh + 18, by = area + 34, fh = by + 28;
+    return `<svg class="r-plate" viewBox="0 0 ${fw} ${fh}" role="img" aria-label="K-Number ${padded}">
+      <rect x="${sw / 2}" y="${sw / 2}" width="${fw - sw}" height="${area - sw}" rx="6" fill="white" stroke="${blue}" stroke-width="${sw}"/>
+      ${[...padded].map((d, i) => { const x = lp + i * (bw + gap); return `<rect x="${x}" y="${tp}" width="${bw}" height="${bh}" fill="white" stroke="black" stroke-width="4"/><text x="${x + bw / 2}" y="${tp + bh / 2 + 18}" text-anchor="middle" font-size="52" font-family="Arial, Helvetica, sans-serif" font-weight="800" fill="black">${d}</text>`; }).join('')}
+      <text x="${lp}" y="${by}" font-size="36" font-family="Arial, Helvetica, sans-serif" font-weight="900" fill="${blue}">PHILIPS</text>
+    </svg>`;
+  };
+  const MAKER = { pacs: ['Philips', 'IntelliSpace PACS 4.4'], ris: ['Philips', 'Carestream RIS'], vna: ['Philips', 'Vue VNA'], ws: ['HP', 'Z4 G5'], mod: ['Philips', 'Ingenia 1.5T'], mgmt: ['Dell', 'PowerEdge R650'], net: ['Fortinet', 'FortiGate 60F'], vue: ['Philips', 'Vue Motion 12'] };
+  const extra = (a) => ({
+    serial: 'SN' + (a.id * 7919).toString(36).toUpperCase().slice(-7), maker: MAKER[a.t][0], model: MAKER[a.t][1],
+    loc: a.t === 'ws' ? 'Sala refertazione, piano 1' : a.t === 'mod' ? 'Radiologia, sala 2' : 'Sala server CED',
+    tel: a.t === 'ws' || a.t === 'mod' ? '0' + (51 + a.id % 9) + ' 66' + (a.id % 10) + ' ' + (100 + a.id % 900) : '',
+    war: a.st === 'retired' ? '' : `${String(1 + a.id % 28).padStart(2, '0')}/${String(1 + a.id % 12).padStart(2, '0')}/${2026 + a.id % 3}`,
+  });
+  const ISSUE_T = ['Worklist vuota sulla modalità', 'Lentezza apertura studi', 'Errore DICOM send', 'Certificato HL7 in scadenza', 'Allarme spazio disco'];
+  const issuesFor = (a) => {
+    const out = [];
+    if (a.prio) out.push({ id: 1040 + (a.id % 50), t: ISSUE_T[a.id % 5], st: a.prio === 'critical' ? 'lav' : 'aperta', who: 'F. Mutuale', d: '03/11/2026' });
+    if (a.id % 3 === 0) out.push({ id: 980 + (a.id % 40), t: ISSUE_T[(a.id + 2) % 5], st: 'risolta', who: 'L. Romano', d: '12/10/2026' });
+    return out;
+  };
+  const ISSUE_ST = { aperta: ['Aperta', 'info'], lav: ['In lavorazione', 'warning'], risolta: ['Risolta', 'success'] };
+  let rTab = 'det'; let rPp = false;
+  const openAsset = (id, keepTab) => {
     const a = ALL_ASSETS.find((x) => x.id === id); if (!a) return;
+    if (!keepTab && selected !== id) rTab = 'det';
     selected = id; drawer.hidden = false; shell.classList.add('has-drawer');
+    const x = extra(a); const iss = issuesFor(a);
     $('[data-rd="kn"]').textContent = a.kn;
     $('[data-rd="st"]').innerHTML = stBadge(a.st);
     $('[data-rd="title"]').innerHTML = `<span class="r-ttl">${typeTile(a.t)}${esc(a.name)}</span>`;
     $('[data-rd="sub"]').textContent = [TYPES[a.t][0], a.host, a.c.name, a.s.name].filter(Boolean).join(' · ');
-    rbody.innerHTML = `<div class="drawer-body int-body">
-      ${a.prio ? `<div class="r-alert">${prio(a.prio)}<span>Issue aperta su questo sistema · priorità ${PRL[a.prio]}</span><button type="button" class="c-link">Vedi</button></div>` : ''}
+    $('[data-rtabs]').innerHTML = [['det', 'Dettagli'], ['iss', 'Issue', iss.length], ['att', 'Attività', 4]].map(([k, l, n]) => `<button role="tab" data-rtab="${k}" aria-selected="${rTab === k}">${l}${n !== undefined ? ` <span class="tn">${n}</span>` : ''}</button>`).join('');
+    const pi = (k, label, v, icon = 'wrench', full = false) => `<button type="button" class="pp-i${full ? ' pp-full' : ''}" data-edit="${k}"><span class="k">${label}</span><span class="v">${v}</span>${ic(icon)}</button>`;
+    const none = '<span class="none">—</span>';
+    const props = `<section class="pp${rPp ? ' is-open' : ''}" aria-label="Proprietà">
+      <button type="button" class="pp-t" data-rpp aria-expanded="${rPp}"><span class="pp-pm" aria-hidden="true"></span><span class="pp-tl">Proprietà</span>
+        <span class="pp-sum">${rPp ? '<span class="pp-hint">clic su un valore per modificarlo · si salva subito</span>' : `${stBadge(a.st)}<span class="code">${esc(x.serial)}</span>`}</span></button>
+      <div class="pp-grid"${rPp ? '' : ' hidden'}>
+        ${pi('st', 'Stato', stBadge(a.st), 'chevD')}${pi('ty', 'Tipo', `<span class="r-tcl" style="--tc:${TYPES[a.t][2]}"><i></i>${TYPES[a.t][0]}</span>`, 'chevD')}
+        ${pi('name', 'Nome', esc(a.name), 'wrench', true)}
+        ${pi('site', 'Sito', esc(a.s.name), 'chevD', true)}
+        ${pi('kn', 'K-Number', `<span class="code">${esc(a.kn)}</span>`)}${pi('sn', 'Seriale', `<span class="code">${esc(x.serial)}</span>`)}
+        ${pi('mf', 'Produttore', esc(x.maker))}${pi('md', 'Modello', esc(x.model))}
+        ${pi('loc', 'Posizione', esc(x.loc), 'wrench', true)}
+        ${pi('tel', 'Telefono', x.tel ? `<span class="code">${x.tel}</span>` : none)}${pi('war', 'Fine garanzia', x.war || none, 'calendar')}
+      </div></section>`;
+    const det = `<div class="drawer-body int-body">
+      ${a.prio ? `<div class="r-alert">${prio(a.prio)}<span>Issue aperta su questo sistema · priorità ${PRL[a.prio]}</span><button type="button" class="c-link" data-rtab="iss">Vedi</button></div>` : ''}
+      <div class="r-plate-w">${plate(a.kn)}</div>
+      ${props}
       <section class="c-sec"><div class="c-sec-h"><h4>${ic('lock')}Accesso</h4><span class="c-app">credenziali solo qui</span></div>
-        <div class="c-cred">${credRow('Hostname', a.host || '—')}${credRow('IP locale', a.ip || '—')}${a.t !== 'mod' ? credRow('Utente OS', 'administrator') + credRow('Password OS', 'Arch!e-' + a.id, true) : ''}${a.t === 'pacs' || a.t === 'ris' ? credRow('Utente app', 'pacsadmin') + credRow('Password app', 'Pacs#' + a.id, true) : ''}</div>
+        <div class="c-cred">${credRow('Hostname', a.host || '—')}${credRow('IP locale', a.ip || '—')}${credRow('IP SRSA', a.srsa || '—')}${a.t !== 'mod' ? credRow('Utente OS', 'administrator') + credRow('Password OS', 'Arch!e-' + a.id, true) : ''}${a.t === 'pacs' || a.t === 'ris' ? credRow('Utente app', 'pacsadmin') + credRow('Password app', 'Pacs#' + a.id, true) : ''}</div>
         <p class="c-audit">Le password si vedono solo con il permesso Credenziali.</p></section>
       <section class="c-sec"><div class="c-sec-h"><h4>Dove si trova</h4></div>
         <ul class="cl-sites"><li><button type="button"><span class="ti">${ic('building')}</span><div class="fn"><b>${esc(a.c.name)}</b><span>Cliente · ${provName(a.c.prov)}</span></div><span></span>${ic('chevR')}</button></li>
         <li><button type="button"><span class="ti">${ic('pin')}</span><div class="fn"><b>${esc(a.s.name)}</b><span>${esc(a.s.addr || 'Nessun indirizzo')}</span></div><span></span>${ic('chevR')}</button></li></ul></section>
-    </div><div class="drawer-foot"><button class="btn" type="button">${ic('wrench')}Modifica</button><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>`;
+    </div>`;
+    const issTab = `<div class="drawer-body int-body">
+      <section class="c-sec"><div class="c-sec-h"><h4>Issue di questo sistema <span>${iss.length}</span></h4><button type="button" class="c-link">Apri elenco</button></div>
+        ${iss.length ? `<ul class="r-iss">${iss.map((i) => `<li><button type="button" data-toast="Si apre la issue #${i.id}"><span class="r-iss-n">#${i.id}</span><span class="r-an"><b>${esc(i.t)}</b><small>${i.who} · aperta il ${i.d}</small></span><span class="r-ist r-ist-${ISSUE_ST[i.st][1]}">${ISSUE_ST[i.st][0]}</span>${ic('chevR')}</button></li>`).join('')}</ul>` : '<p class="files-empty">Nessuna issue collegata a questo sistema.</p>'}
+      </section></div>`;
+    const ev = [['plus', 'Archie', 'ha creato l\'inventario', '12/03/2024'], ['wrench', 'F. Mutuale', `ha cambiato l'IP locale in <b>${esc(a.ip || '—')}</b>`, '28/10/2026'], ['lock', 'L. Romano', 'ha aggiornato la password OS', '14/10/2026'], ['wrench', 'F. Mutuale', `ha cambiato lo stato in <b>${ST[a.st]}</b>`, '02/09/2026']];
+    const attTab = `<div class="drawer-body int-body"><div class="feed" style="border-top:0;padding-top:0">${ev.map(([i, w, t, d]) => `<div class="ev">${ic(i)}<span><b>${w}</b> ${t}</span><time>${d}</time></div>`).join('')}</div></div>`;
+    const foot = rTab === 'det' ? `<div class="drawer-foot"><button class="btn" type="button">${ic('wrench')}Modifica</button><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>`
+      : rTab === 'iss' ? `<div class="drawer-foot"><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>` : '';
+    rbody.innerHTML = (rTab === 'det' ? det : rTab === 'iss' ? issTab : attTab) + foot;
     markSel()
   };
   const close = () => { drawer.hidden = true; selected = null; shell.classList.remove('has-drawer'); markSel(); };
@@ -302,7 +358,12 @@
     });
   }
   $('[data-rclose]').addEventListener('click', close);
+  document.querySelector('[data-rtabs]')?.addEventListener('click', (e) => { const b = e.target.closest('[data-rtab]'); if (b && selected) { rTab = b.dataset.rtab; openAsset(selected, true); } });
   rbody.addEventListener('click', (e) => {
+    const tb = e.target.closest('[data-rtab]'); if (tb && selected) { rTab = tb.dataset.rtab; openAsset(selected, true); return; }
+    if (e.target.closest('[data-rpp]')) { rPp = !rPp; openAsset(selected, true); return; }
+    if (e.target.closest('[data-edit]')) { toast('Modifica sul posto, come in Clienti e Siti (con Annulla)'); return; }
+    const tt = e.target.closest('[data-toast]'); if (tt) { toast(tt.dataset.toast); return; }
     const rv = e.target.closest('[data-reveal]');
     if (rv) { const c = rv.previousElementSibling; const shown = c.textContent !== '••••••••'; c.textContent = shown ? '••••••••' : rv.dataset.reveal; rv.closest('.sec').classList.toggle('is-shown', !shown); }
     if (e.target.closest('[data-copy]')) toast('Copiato negli appunti');

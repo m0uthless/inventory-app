@@ -301,3 +301,19 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-asset-c { grid-template-columns: 20px minmax(0, 1fr) auto; }
 @media (max-width: 1280px) { .r-ahead, .r-asset:not(.r-asset-c) { grid-template-columns: 20px minmax(0, 1.3fr) minmax(0, 1fr) 104px 104px 132px; } .r-ahead > :nth-child(6), .r-asset:not(.r-asset-c) > :nth-child(6) { display: none; } }
 @media (max-width: 760px) { .r-asset:not(.r-asset-c) { grid-template-columns: 20px minmax(0, 1fr) auto; } .r-asset:not(.r-asset-c) > :nth-child(5), .r-asset:not(.r-asset-c) > :nth-child(6) { display: none; } }
+
+/* Pannello asset: targa K-Number, proprietà, issue */
+.r-plate-w { padding: 2px 0; }
+.r-plate { display: block; width: 100%; max-width: 420px; height: auto; }
+.r-tcl { display: inline-flex; align-items: center; gap: 6px; }
+.r-tcl i { width: 8px; height: 8px; border-radius: 2px; background: var(--tc); }
+.pp-i.pp-full { grid-column: 1 / -1; }
+.r-iss { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.r-iss button { width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 14px; gap: 10px; align-items: center; min-height: 52px; padding: 6px 4px; border: 0; border-bottom: 1px solid var(--border); background: transparent; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.r-iss button:hover { background: var(--surface-2); }
+.r-iss button > .i { width: 14px; height: 14px; color: var(--faint); }
+.r-iss-n { font: 500 12px "Geist Mono", monospace; color: var(--muted); }
+.r-ist { height: 22px; padding: 0 8px; border-radius: 5px; font-size: 12px; font-weight: 550; display: inline-flex; align-items: center; white-space: nowrap; }
+.r-ist-info { background: var(--info-bg); color: var(--info); }
+.r-ist-warning { background: var(--warning-bg); color: var(--warning); }
+.r-ist-success { background: var(--success-bg); color: var(--success); }
