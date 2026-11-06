@@ -83,6 +83,17 @@ Portata dall'anteprima `r-base.html` (proposta B: cartina + elenco delle provinc
 - **[DEC] Hardware**: scheda Manutenzioni per tutti i tipi tranne le applicazioni (`csap`, `wfm`, `orthoview`, `vue_motion`, `speech`), o se l'asset ha piani/interventi.
 - **[TEST] Vitest**: tolti i 3 test di accessibilità della pagina vecchia (`pages/siteRepository/Accessibility.test.tsx`); baseline ora 155/155, lint 13.
 
+## Task di area
+
+Portata dall'anteprima `t-base.html` con righe e colonne come le Issue.
+
+- **[DEC] Conversione in issue**: invariata nel backend (`convert-to-issue`: copia titolo, descrizione, priorità, commenti e, se idoneo, l'assegnatario; il task si completa e resta collegato). Nel pannello: riquadro "Trasforma in issue" nei Dettagli e voce nel menu; sui convertiti riquadro con la issue e "Apri la issue"; nella riga il segno "→ Issue #…".
+- **[DEC] Indicatori**: nuova azione `GET /area-tasks/stats/?area=`; `summary` resta com'era (contatore della barra laterale).
+- **[DEC] Completati**: le viste mostrano solo quelli chiusi negli ultimi 3 giorni, come la regola della lista (prima la pagina usava `include_hidden=1`).
+- **[UI] Card Task nella Dashboard**: apre lo stesso nuovo pannello (`AreaTaskDetail`); la card in sé non è ancora ridisegnata.
+- **[UI] Motivo dell'attesa**: le Issue hanno un motivo per "In attesa", i task no (servirebbe un campo nel modello).
+- **[TEST] Vitest**: test della pagina riscritti sul nuovo comportamento (19 al posto di 30); baseline ora 144/144, lint 13.
+
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).

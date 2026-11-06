@@ -1,8 +1,11 @@
+import type * as React from 'react'
 import { fireEvent, screen, waitFor, within } from '@testing-library/dom'
-import { act, render } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { ThemeProvider } from '@mui/material/styles'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AreaTasks from './AreaTasks'
+import { THEME_REGISTRY } from '../theme/themeRegistry'
 import type { AreaTaskRow } from '../features/areatasks/types'
 
 const apiGet = vi.fn()
@@ -18,7 +21,7 @@ vi.mock('@shared/api/client', () => ({
   },
 }))
 vi.mock('@shared/api/error', () => ({ apiErrorToMessage: () => 'Errore' }))
-const toast = { error: vi.fn(), success: vi.fn() }
+const toast = { error: vi.fn(), success: vi.fn(), warning: vi.fn() }
 vi.mock('@shared/ui/toast', () => ({ useToast: () => toast }))
 
 const auth: { me: Record<string, unknown>; hasPerm: (perm: string) => boolean; inGroup: () => boolean } = {
@@ -42,23 +45,30 @@ function row(over: Partial<AreaTaskRow>): AreaTaskRow {
   }
 }
 
-const rows = [
-  row({ id: 1, title: 'Ordine toner', priority: 'high', assigned_to_name: 'Anna Rossi', comments_count: 2 }),
-  row({ id: 2, title: 'Rapporto mensile', status: 'in_attesa' }),
-]
-
-function listCalls() {
-  return apiGet.mock.calls.filter((c) => c[0] === '/area-tasks/')
+let rows: AreaTaskRow[] = []
+const stats = {
+  open: 2, overdue: 1, due_today: 0, due_week: 1, mine: 1, mine_in_progress: 0, mine_waiting: 0, unassigned: 1,
+  done_recent: 0, converted_recent: 0, created_week: 2, da_fare: 1, in_corso: 0, in_attesa: 1, trend: [],
 }
 
-function renderPage() {
-  return render(<MemoryRouter><AreaTasks /></MemoryRouter>)
+const listCalls = () => apiGet.mock.calls.filter((c) => c[0] === '/area-tasks/')
+const lastParams = () => listCalls().at(-1)![1].params as Record<string, unknown>
+
+const theme = THEME_REGISTRY.default.build('light')
+function renderPage(path = '/tasks') {
+  const Wrap = ({ children }: { children: React.ReactNode }) => <ThemeProvider theme={theme}><MemoryRouter initialEntries={[path]}>{children}</MemoryRouter></ThemeProvider>
+  return render(<AreaTasks />, { wrapper: Wrap })
 }
 
 beforeEach(() => {
   ;[apiGet, apiPost, apiPatch, apiDelete, toast.error, toast.success].forEach((m) => m.mockReset())
+  rows = [
+    row({ id: 1, title: 'Ordine toner', priority: 'high', assigned_to: 12, assigned_to_name: 'Anna Rossi', comments_count: 2 }),
+    row({ id: 2, title: 'Rapporto mensile', status: 'in_attesa' }),
+  ]
   apiGet.mockImplementation((url: string) => {
     if (url === '/area-tasks/') return Promise.resolve({ data: { count: rows.length, results: rows } })
+    if (url === '/area-tasks/stats/') return Promise.resolve({ data: stats })
     if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }, { id: 4, label: 'Romagna' }] } })
     if (url === '/users/') return Promise.resolve({ data: [{ id: 12, full_name: 'Anna Rossi', username: 'anna' }] })
     return Promise.reject(new Error(`unexpected ${url}`))
@@ -68,190 +78,72 @@ beforeEach(() => {
 })
 
 describe('AreaTasks page', () => {
-  it('lists the tasks of the own area by default, open tasks only, including old completed ones', async () => {
+  it('lists the open tasks of the own area by default and loads the indicators for it', async () => {
     renderPage()
     expect(await screen.findByText('Ordine toner')).toBeInTheDocument()
-    expect(screen.getByText('Rapporto mensile')).toBeInTheDocument()
-    const params = listCalls()[0]![1].params
-    expect(params).toMatchObject({ include_hidden: 1, area: 3, status: ['da_fare', 'in_corso', 'in_attesa'] })
+    expect(lastParams()).toMatchObject({ area: 3, is_open: 'true' })
+    expect(apiGet).toHaveBeenCalledWith('/area-tasks/stats/', { params: { area: 3 } })
   })
 
-  it('shows priority, status, assignee and due information per row', async () => {
+  it('shows id, status, assignee and the comments chip like the Issues table', async () => {
     renderPage()
     await screen.findByText('Ordine toner')
-    expect(screen.getByText('Alta')).toBeInTheDocument()
-    expect(screen.getByText('In attesa')).toBeInTheDocument()
+    expect(screen.getByText('#1')).toBeInTheDocument()
+    expect(screen.getAllByText('In attesa').length).toBeGreaterThan(0)
     expect(screen.getByText('Anna Rossi')).toBeInTheDocument()
+    expect(within(screen.getByRole('grid')).getByText('Da assegnare')).toBeInTheDocument()
+    expect(screen.getByTitle('2 commenti')).toBeInTheDocument()
   })
 
-  it('switches the status view to "Chiusi" and reloads with that filter', async () => {
+  it.each([
+    ['I miei', { is_open: 'true', mine: 'true' }],
+    ['Scaduti', { overdue: 'true' }],
+    ['Da assegnare', { is_open: 'true', unassigned: 'true' }],
+    ['Completati', { is_open: 'false' }],
+  ])('the "%s" view sends its filter', async (label, expected) => {
     renderPage()
     await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByRole('button', { name: 'Chiusi' }))
-    await waitFor(() => expect(listCalls().some((c) => c[1].params.status === 'completato')).toBe(true))
+    fireEvent.click(screen.getByRole('tab', { name: new RegExp(`^${label}`) }))
+    await waitFor(() => expect(lastParams()).toMatchObject(expected))
   })
 
-  it('applies "Assegnati a me" as mine=true', async () => {
+  it('"Tutte" removes the area filter and marks the other areas as read-only', async () => {
     renderPage()
     await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByLabelText('Assegnati a me'))
-    await waitFor(() => expect(listCalls().some((c) => c[1].params.mine === 'true')).toBe(true))
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte' }))
+    await waitFor(() => expect(lastParams()).not.toHaveProperty('area'))
+    expect(await screen.findByText(/sola lettura/)).toBeInTheDocument()
   })
 
-  it('removes the area filter when "Tutte le aree" is chosen', async () => {
+  it('another area is read-only and does not allow creating tasks there', async () => {
     renderPage()
     await screen.findByText('Ordine toner')
-    fireEvent.mouseDown(screen.getByLabelText('Area'))
-    fireEvent.click(await screen.findByRole('option', { name: 'Tutte le aree' }))
-    await waitFor(() => expect(listCalls().some((c) => c[1].params.area === undefined)).toBe(true))
+    fireEvent.click(await screen.findByRole('button', { name: 'Romagna' }))
+    await waitFor(() => expect(lastParams()).toMatchObject({ area: 4 }))
+    expect(await screen.findByText(/sola lettura\. Puoi leggere/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Nuovo task/ })).toBeDisabled()
   })
 
   it('opens the detail when a row is clicked', async () => {
     renderPage()
-    fireEvent.click(await screen.findByText('Ordine toner'))
-    expect(await screen.findByTestId('detail')).toHaveTextContent('Ordine toner')
+    fireEvent.click(await screen.findByText('Rapporto mensile'))
+    expect(await screen.findByTestId('detail')).toHaveTextContent('Rapporto mensile')
   })
 
-  it('creates a task in the own area from the "Nuovo task" dialog', async () => {
+  it('creates a task in the own area from the "Nuovo task" dialog and opens it', async () => {
     apiPost.mockResolvedValue({ data: row({ id: 9, title: 'Nuovo' }) })
     renderPage()
     await screen.findByText('Ordine toner')
     fireEvent.click(screen.getByRole('button', { name: /Nuovo task/ }))
     const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 3 }) })))
     fireEvent.change(within(dialog).getByLabelText(/Titolo/), { target: { value: 'Nuovo' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Crea task' }))
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/area-tasks/', expect.objectContaining({ title: 'Nuovo', area: 3 })))
-    await waitFor(() => expect(listCalls().length).toBeGreaterThan(1)) // ricarica dopo la creazione
+    expect(await screen.findByTestId('detail')).toHaveTextContent('Nuovo')
   })
 
-  it('loads the assignable users of the area for the create dialog', async () => {
-    renderPage()
-    await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByRole('button', { name: /Nuovo task/ }))
-    await waitFor(() =>
-      expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 3 }) })),
-    )
-  })
-  it('resets the page to 1 when a filter changes', async () => {
-    apiGet.mockImplementation((url: string) => {
-      if (url === '/area-tasks/') return Promise.resolve({ data: { count: 80, results: rows } })
-      if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }] } })
-      return Promise.reject(new Error(`unexpected ${url}`))
-    })
-    render(<MemoryRouter initialEntries={['/?page=3']}><AreaTasks /></MemoryRouter>)
-    await screen.findByText('Ordine toner')
-    expect(listCalls()[0]![1].params).toMatchObject({ page: 3 })
-    fireEvent.click(screen.getByRole('button', { name: 'Chiusi' }))
-    await waitFor(() =>
-      expect(listCalls().some((c) => c[1].params.status === 'completato' && c[1].params.page === 1)).toBe(true),
-    )
-    fireEvent.click(screen.getByLabelText('Assegnati a me'))
-    await waitFor(() =>
-      expect(listCalls().some((c) => c[1].params.mine === 'true' && c[1].params.page === 1)).toBe(true),
-    )
-  })
-
-  it('filters by assignee, and reloads users and clears the assignee when the area changes', async () => {
-    renderPage()
-    await screen.findByText('Ordine toner')
-    await waitFor(() =>
-      expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 3, page_size: 200 }) })),
-    )
-    fireEvent.mouseDown(screen.getByLabelText('Assegnatario'))
-    fireEvent.click(await screen.findByRole('option', { name: 'Anna Rossi' }))
-    await waitFor(() => expect(listCalls().some((c) => c[1].params.assigned_to === 12)).toBe(true))
-    fireEvent.mouseDown(screen.getByLabelText('Area'))
-    fireEvent.click(await screen.findByRole('option', { name: 'Romagna' }))
-    await waitFor(() =>
-      expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 4 }) })),
-    )
-    await waitFor(() => {
-      const last = listCalls().at(-1)![1].params
-      expect(last.area).toBe(4)
-      expect(last.assigned_to).toBeUndefined()
-    })
-  })
-
-  it('loads all users when "Tutte le aree" is selected', async () => {
-    renderPage()
-    await screen.findByText('Ordine toner')
-    fireEvent.mouseDown(screen.getByLabelText('Area'))
-    fireEvent.click(await screen.findByRole('option', { name: 'Tutte le aree' }))
-    await waitFor(() =>
-      expect(apiGet.mock.calls.some((c) => c[0] === '/users/' && c[1].params.leave_area === undefined && c[1].params.page_size === 200)).toBe(true),
-    )
-  })
-
-  it('"Scaduti" sends due_before=yesterday and the open statuses even in the "Chiusi" view', async () => {
-    renderPage()
-    await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByRole('button', { name: 'Chiusi' }))
-    await waitFor(() => expect(listCalls().some((c) => c[1].params.status === 'completato')).toBe(true))
-    fireEvent.click(screen.getByLabelText('Scaduti'))
-    const d = new Date()
-    d.setDate(d.getDate() - 1)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const yesterday = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    await waitFor(() =>
-      expect(
-        listCalls().some(
-          (c) => c[1].params.due_before === yesterday && JSON.stringify(c[1].params.status) === JSON.stringify(['da_fare', 'in_corso', 'in_attesa']),
-        ),
-      ).toBe(true),
-    )
-  })
-
-  it('assignee and overdue filters reset the page to 1', async () => {
-    apiGet.mockImplementation((url: string) => {
-      if (url === '/area-tasks/') return Promise.resolve({ data: { count: 80, results: rows } })
-      if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }] } })
-      if (url === '/users/') return Promise.resolve({ data: [{ id: 12, full_name: 'Anna Rossi', username: 'anna' }] })
-      return Promise.reject(new Error(`unexpected ${url}`))
-    })
-    const { unmount } = render(<MemoryRouter initialEntries={['/?page=3']}><AreaTasks /></MemoryRouter>)
-    await screen.findByText('Ordine toner')
-    fireEvent.click(screen.getByLabelText('Scaduti'))
-    await waitFor(() => expect(listCalls().some((c) => c[1].params.due_before && c[1].params.page === 1)).toBe(true))
-    unmount()
-    // assegnatario da solo, partendo di nuovo dalla pagina 3
-    apiGet.mockClear()
-    render(<MemoryRouter initialEntries={['/?page=3']}><AreaTasks /></MemoryRouter>)
-    await screen.findByText('Ordine toner')
-    fireEvent.mouseDown(screen.getByLabelText('Assegnatario'))
-    fireEvent.click(await screen.findByRole('option', { name: 'Anna Rossi' }))
-    await waitFor(() => {
-      const last = listCalls().at(-1)![1].params
-      expect(last.assigned_to).toBe(12)
-      expect(last.page).toBe(1)
-    })
-  })
-
-  it('shows the own area in the Area select before /leave-areas/ loads, without MUI warnings', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    apiGet.mockImplementation((url: string) => {
-      if (url === '/area-tasks/') return Promise.resolve({ data: { count: 0, results: [] } })
-      if (url === '/leave-areas/') return new Promise(() => {})
-      if (url === '/users/') return Promise.resolve({ data: [] })
-      return Promise.reject(new Error(`unexpected ${url}`))
-    })
-    renderPage()
-    await waitFor(() => expect(screen.getByLabelText('Area')).toHaveTextContent('Ufficio'))
-    expect(warn.mock.calls.some((c) => String(c[0]).includes('out-of-range'))).toBe(false)
-    warn.mockRestore()
-  })
-
-  it('shows a toast when /leave-areas/ fails', async () => {
-    apiGet.mockImplementation((url: string) => {
-      if (url === '/area-tasks/') return Promise.resolve({ data: { count: 0, results: [] } })
-      if (url === '/leave-areas/') return Promise.reject(new Error('boom'))
-      if (url === '/users/') return Promise.resolve({ data: [] })
-      return Promise.reject(new Error(`unexpected ${url}`))
-    })
-    renderPage()
-    await waitFor(() => expect(toast.error).toHaveBeenCalled())
-  })
-
-  it('tooltip on the disabled "Nuovo task" says "Seleziona un\'area" for a superuser', async () => {
+  it('tooltip on the disabled "Nuovo task" says "Seleziona un\'area" for a superuser without area', async () => {
     auth.me = { id: 1, username: 'root', is_superuser: true, profile: { leave_area: null, leave_area_label: null } }
     renderPage()
     await screen.findByText('Ordine toner')
@@ -268,153 +160,65 @@ describe('AreaTasks page', () => {
     expect(await screen.findByText('Nessuna area assegnata al tuo profilo')).toBeInTheDocument()
   })
 
-  describe('never requests the old page together with a new filter', () => {
-    const cases: Array<[string, () => Promise<void>, (p: Record<string, unknown>) => boolean]> = [
-      ['status view', async () => { fireEvent.click(screen.getByRole('button', { name: 'Chiusi' })) }, (p) => p.status === 'completato'],
-      ['mine', async () => { fireEvent.click(screen.getByLabelText('Assegnati a me')) }, (p) => p.mine === 'true'],
-      [
-        'assignee',
-        async () => {
-          fireEvent.mouseDown(screen.getByLabelText('Assegnatario'))
-          fireEvent.click(await screen.findByRole('option', { name: 'Anna Rossi' }))
-        },
-        (p) => p.assigned_to === 12,
-      ],
-    ]
-    it.each(cases)('%s', async (_name, change, isNew) => {
-      apiGet.mockImplementation((url: string) => {
-        if (url === '/area-tasks/') return Promise.resolve({ data: { count: 80, results: rows } })
-        if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }] } })
-        if (url === '/users/') return Promise.resolve({ data: [{ id: 12, full_name: 'Anna Rossi', username: 'anna' }] })
-        return Promise.reject(new Error(`unexpected ${url}`))
-      })
-      render(<MemoryRouter initialEntries={['/?page=3']}><AreaTasks /></MemoryRouter>)
-      await screen.findByText('Ordine toner')
-      await waitFor(() => expect(screen.getByLabelText('Assegnatario')).toBeInTheDocument())
-      const before = listCalls().length
-      await change()
-      await waitFor(() => expect(listCalls().slice(before).some((c) => isNew(c[1].params))).toBe(true))
-      await act(async () => { await new Promise((r) => setTimeout(r, 80)) })
-      const after = listCalls().slice(before)
-      expect(after.filter((c) => isNew(c[1].params) && c[1].params.page === 3)).toHaveLength(0)
-      expect(after).toHaveLength(1)
-      expect(after[0]![1].params.page).toBe(1)
-    })
-  })
-  it('shows search, area select, the Aperti/Chiusi/Tutti chips and "Nuovo task" in the toolbar, with no reset button', async () => {
-    renderPage()
-    await screen.findByText('Ordine toner')
-    expect(screen.getByRole('button', { name: 'Aperti' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Chiusi' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Tutti' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Area')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Nuovo task/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Reimposta/ })).toBeNull()
-  })
-
   describe('context menu', () => {
-    it('opens on right-click and shows the expected items in order', async () => {
+    it('shows the actions, with "Trasforma in issue" for an open task', async () => {
       renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
+      fireEvent.contextMenu(await screen.findByText('Ordine toner'))
       const menu = await screen.findByRole('menu')
       const items = within(menu).getAllByRole('menuitem').map((el) => el.textContent)
-      expect(items).toEqual(['Apri dettaglio', 'Modifica', 'Commenta', 'Segna come In corso', 'Trasforma in issue', 'Elimina'])
+      expect(items).toEqual(['Apri', 'Commenta', 'Segna come In corso', 'Trasforma in issue', 'Elimina'])
     })
 
-    it('"Apri dettaglio" opens the detail drawer on the default tab', async () => {
+    it('"Commenta" opens the detail on the comments tab', async () => {
       renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Apri dettaglio' }))
-      const detail = await screen.findByTestId('detail')
-      expect(detail).toHaveTextContent('Ordine toner')
-      expect(detail).toHaveAttribute('data-initial-tab', '0')
-    })
-
-    it('"Modifica" opens the dialog populated with the row values and saves with PATCH', async () => {
-      apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Ordine toner aggiornato' }) })
-      renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Modifica' }))
-      const dialog = await screen.findByRole('dialog')
-      expect(within(dialog).getByLabelText(/Titolo/)).toHaveValue('Ordine toner')
-      await waitFor(() =>
-        expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 3 }) })),
-      )
-      fireEvent.change(within(dialog).getByLabelText(/Titolo/), { target: { value: 'Ordine toner aggiornato' } })
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Salva modifiche' }))
-      await waitFor(() =>
-        expect(apiPatch).toHaveBeenCalledWith('/area-tasks/1/', expect.objectContaining({ title: 'Ordine toner aggiornato' })),
-      )
-    })
-
-    it('"Commenta" opens the detail drawer on the comments tab', async () => {
-      renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
+      fireEvent.contextMenu(await screen.findByText('Ordine toner'))
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Commenta' }))
-      const detail = await screen.findByTestId('detail')
-      expect(detail).toHaveTextContent('Ordine toner')
-      expect(detail).toHaveAttribute('data-initial-tab', '1')
+      expect(await screen.findByTestId('detail')).toHaveAttribute('data-initial-tab', '1')
     })
 
-    it('"Segna come..." sends the PATCH to the next status and reloads', async () => {
-      apiPatch.mockResolvedValue({ data: row({ id: 1, title: 'Ordine toner', status: 'in_corso' }) })
+    it('"Segna come…" sends the next status and reloads', async () => {
+      apiPatch.mockResolvedValue({ data: {} })
       renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
+      fireEvent.contextMenu(await screen.findByText('Ordine toner'))
       const before = listCalls().length
-      fireEvent.contextMenu(titleCell)
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Segna come In corso' }))
       await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/area-tasks/1/', { status: 'in_corso' }))
       await waitFor(() => expect(listCalls().length).toBeGreaterThan(before))
     })
 
-    it('"Elimina" calls DELETE after confirmation and reloads', async () => {
-      apiDelete.mockResolvedValue({ data: {} })
+    it('"Elimina" calls DELETE after confirmation', async () => {
+      apiDelete.mockResolvedValue({})
       renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      const before = listCalls().length
-      fireEvent.contextMenu(titleCell)
+      fireEvent.contextMenu(await screen.findByText('Ordine toner'))
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Elimina' }))
-      const dialog = await screen.findByRole('dialog')
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }))
+      const dlg = await screen.findByRole('dialog', { name: /Eliminare il task/ })
+      fireEvent.click(within(dlg).getByRole('button', { name: 'Elimina' }))
       await waitFor(() => expect(apiDelete).toHaveBeenCalledWith('/area-tasks/1/'))
-      await waitFor(() => expect(listCalls().length).toBeGreaterThan(before))
+    })
+
+    it('"Trasforma in issue" opens the convert dialog for that task', async () => {
+      renderPage()
+      fireEvent.contextMenu(await screen.findByText('Ordine toner'))
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Trasforma in issue' }))
+      const dlg = await screen.findByRole('dialog', { name: /Trasforma in issue/ })
+      expect(within(dlg).getByDisplayValue('Ordine toner')).toBeInTheDocument()
+    })
+
+    it('a task already converted shows "Apri la issue" instead of "Trasforma in issue"', async () => {
+      rows = [row({ id: 5, title: 'Switch rack', status: 'completato', converted_to_issue: 42, converted_to_issue_title: 'Switch' })]
+      renderPage()
+      expect(await screen.findByText('Issue #42')).toBeInTheDocument()
+      fireEvent.contextMenu(screen.getByText('Switch rack'))
+      expect(await screen.findByRole('menuitem', { name: 'Apri la issue #42' })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
     })
 
     it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {
       auth.hasPerm = (perm: string) => perm !== 'issues.add_issue'
       renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
-      await screen.findByRole('menuitem', { name: 'Apri dettaglio' })
+      fireEvent.contextMenu(await screen.findByText('Ordine toner'))
+      await screen.findByRole('menu')
       expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
-    })
-
-    it('hides "Trasforma in issue" for a task already converted to an issue', async () => {
-      const convertedRow = { ...row({ id: 1, title: 'Ordine toner' }), converted_to_issue: 7 } as unknown as AreaTaskRow
-      apiGet.mockImplementation((url: string) => {
-        if (url === '/area-tasks/') return Promise.resolve({ data: { count: 1, results: [convertedRow] } })
-        if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }] } })
-        if (url === '/users/') return Promise.resolve({ data: [] })
-        return Promise.reject(new Error(`unexpected ${url}`))
-      })
-      renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
-      await screen.findByRole('menuitem', { name: 'Apri dettaglio' })
-      expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
-    })
-
-    it('"Trasforma in issue" opens the convert dialog for the right task', async () => {
-      renderPage()
-      const titleCell = await screen.findByText('Ordine toner')
-      fireEvent.contextMenu(titleCell)
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Trasforma in issue' }))
-      const dlg = await screen.findByRole('dialog')
-      expect(within(dlg).getByLabelText(/Titolo/)).toHaveValue('Ordine toner')
     })
   })
 })

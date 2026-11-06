@@ -49,12 +49,12 @@ describe('ConvertToIssueDialog', () => {
     expect(screen.getByText('Alta')).toBeInTheDocument()
   })
 
-  it('disables "Conferma" until a customer is selected', async () => {
+  it('disables "Crea la issue" until a customer is selected', async () => {
     render(<ConvertToIssueDialog open task={task} onClose={vi.fn()} onConverted={vi.fn()} />)
     const dlg = screen.getByRole('dialog')
-    expect(within(dlg).getByRole('button', { name: 'Conferma' })).toBeDisabled()
+    expect(within(dlg).getByRole('button', { name: 'Crea la issue' })).toBeDisabled()
     await selectCustomer(dlg)
-    expect(within(dlg).getByRole('button', { name: 'Conferma' })).toBeEnabled()
+    expect(within(dlg).getByRole('button', { name: 'Crea la issue' })).toBeEnabled()
   })
 
   it('submits the conversion with the selected customer and reports the result', async () => {
@@ -66,7 +66,7 @@ describe('ConvertToIssueDialog', () => {
     render(<ConvertToIssueDialog open task={task} onClose={onClose} onConverted={onConverted} />)
     const dlg = screen.getByRole('dialog')
     await selectCustomer(dlg)
-    fireEvent.click(within(dlg).getByRole('button', { name: 'Conferma' }))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Crea la issue' }))
 
     await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/area-tasks/7/convert-to-issue/', {
       customer: 9, site: undefined, title: 'Ordine toner', description: 'Chiamare il fornitore',
@@ -80,7 +80,7 @@ describe('ConvertToIssueDialog', () => {
     render(<ConvertToIssueDialog open task={task} onClose={vi.fn()} onConverted={vi.fn()} />)
     const dlg = screen.getByRole('dialog')
     await selectCustomer(dlg)
-    fireEvent.click(within(dlg).getByRole('button', { name: 'Conferma' }))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Crea la issue' }))
     expect(await within(dlg).findByText('Campo obbligatorio.')).toBeInTheDocument()
   })
 
@@ -89,7 +89,7 @@ describe('ConvertToIssueDialog', () => {
     render(<ConvertToIssueDialog open task={task} onClose={vi.fn()} onConverted={vi.fn()} />)
     const dlg = screen.getByRole('dialog')
     await selectCustomer(dlg)
-    fireEvent.click(within(dlg).getByRole('button', { name: 'Conferma' }))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Crea la issue' }))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('già stato trasformato')))
   })
 
@@ -98,11 +98,11 @@ describe('ConvertToIssueDialog', () => {
     render(<ConvertToIssueDialog open task={task} onClose={vi.fn()} onConverted={vi.fn()} />)
     const dlg = screen.getByRole('dialog')
     await selectCustomer(dlg)
-    fireEvent.click(within(dlg).getByRole('button', { name: 'Conferma' }))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Crea la issue' }))
 
     expect(await within(dlg).findByText('Non puoi modificare questo task.')).toBeInTheDocument()
     // Lo spinner si ferma e il dialog resta apribile/aperto, non bloccato a metà.
-    await waitFor(() => expect(within(dlg).getByRole('button', { name: 'Conferma' })).toBeEnabled())
+    await waitFor(() => expect(within(dlg).getByRole('button', { name: 'Crea la issue' })).toBeEnabled())
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
@@ -111,7 +111,7 @@ describe('ConvertToIssueDialog', () => {
     render(<ConvertToIssueDialog open task={task} onClose={vi.fn()} onConverted={vi.fn()} />)
     const dlg = screen.getByRole('dialog')
     await selectCustomer(dlg)
-    fireEvent.click(within(dlg).getByRole('button', { name: 'Conferma' }))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Crea la issue' }))
 
     expect(await within(dlg).findByText('Obbligatorio.')).toBeInTheDocument()
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il sito non appartiene al cliente.')))

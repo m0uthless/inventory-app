@@ -1,8 +1,9 @@
 import logging
+import datetime
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import serializers, viewsets, status
 from rest_framework.decorators import action
@@ -485,6 +486,12 @@ class AreaTaskFilter(filters.FilterSet):
     due_before  = filters.DateFilter(field_name='due_date', lookup_expr='lte')
     due_after   = filters.DateFilter(field_name='due_date', lookup_expr='gte')
     mine        = filters.BooleanFilter(method='filter_mine')
+    # Viste e ricerca per colonna della pagina (restyle).
+    is_open     = filters.BooleanFilter(method='filter_is_open')
+    overdue     = filters.BooleanFilter(method='filter_overdue')
+    unassigned  = filters.BooleanFilter(method='filter_unassigned')
+    title_q     = filters.CharFilter(field_name='title', lookup_expr='icontains')
+    assigned_q  = filters.CharFilter(method='filter_assigned_q')
 
     class Meta:
         model  = AreaTask
@@ -494,6 +501,30 @@ class AreaTaskFilter(filters.FilterSet):
         if value:
             return queryset.filter(assigned_to=self.request.user)
         return queryset
+
+    def filter_is_open(self, queryset, name, value):
+        if value is None:
+            return queryset
+        cond = Q(status=AreaTask.STATUS_COMPLETATO)
+        return queryset.exclude(cond) if value else queryset.filter(cond)
+
+    def filter_overdue(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.exclude(status=AreaTask.STATUS_COMPLETATO).filter(due_date__lt=timezone.localdate())
+
+    def filter_unassigned(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(assigned_to__isnull=bool(value))
+
+    def filter_assigned_q(self, queryset, name, value):
+        v = (value or '').strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(assigned_to__first_name__icontains=v) | Q(assigned_to__last_name__icontains=v) | Q(assigned_to__username__icontains=v)
+        )
 
 
 class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -919,6 +950,49 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             assigned_to=request.user, deleted_at__isnull=True,
         ).exclude(status=AreaTask.STATUS_COMPLETATO).count()
         return Response({'mine_open_count': mine_open})
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """Indicatori della pagina sull'area indicata (`?area=`, assente = tutte).
+        I completati contano solo se chiusi negli ultimi `HIDE_COMPLETED_AFTER_DAYS`
+        giorni, come nella lista."""
+        qs = AreaTask.objects.filter(deleted_at__isnull=True)
+        area = request.query_params.get('area')
+        if area and str(area).isdigit():
+            qs = qs.filter(area_id=int(area))
+        today = timezone.localdate()
+        recent = timezone.now() - timedelta(days=AreaTask.HIDE_COMPLETED_AFTER_DAYS)
+        open_q = ~Q(status=AreaTask.STATUS_COMPLETATO)
+        agg = qs.aggregate(
+            open=Count('id', filter=open_q),
+            overdue=Count('id', filter=open_q & Q(due_date__lt=today)),
+            due_today=Count('id', filter=open_q & Q(due_date=today)),
+            due_week=Count('id', filter=open_q & Q(due_date__gt=today, due_date__lte=today + timedelta(days=7))),
+            mine=Count('id', filter=open_q & Q(assigned_to=request.user)),
+            mine_in_progress=Count('id', filter=Q(status=AreaTask.STATUS_IN_CORSO, assigned_to=request.user)),
+            mine_waiting=Count('id', filter=Q(status=AreaTask.STATUS_IN_ATTESA, assigned_to=request.user)),
+            unassigned=Count('id', filter=open_q & Q(assigned_to__isnull=True)),
+            done_recent=Count('id', filter=Q(status=AreaTask.STATUS_COMPLETATO, completed_at__gte=recent)),
+            converted_recent=Count('id', filter=Q(status=AreaTask.STATUS_COMPLETATO, completed_at__gte=recent, converted_to_issue__isnull=False)),
+            created_week=Count('id', filter=Q(created_at__gte=timezone.now() - timedelta(days=7))),
+            da_fare=Count('id', filter=Q(status=AreaTask.STATUS_DA_FARE)),
+            in_corso=Count('id', filter=Q(status=AreaTask.STATUS_IN_CORSO)),
+            in_attesa=Count('id', filter=Q(status=AreaTask.STATUS_IN_ATTESA)),
+        )
+        # Aperti a fine giornata negli ultimi 14 giorni (creati entro il giorno e non ancora completati).
+        rows = list(qs.values_list('created_at', 'completed_at', 'status'))
+        trend = []
+        for i in range(13, -1, -1):
+            day = today - timedelta(days=i)
+            end = timezone.make_aware(datetime.datetime.combine(day + timedelta(days=1), datetime.time.min))
+            trend.append({'day': day.isoformat(), 'count': sum(
+                1 for c, done, st in rows
+                if c < end and not (st == AreaTask.STATUS_COMPLETATO and (done is None or done < end))
+            )})
+        return Response({
+            **{k: v or 0 for k, v in agg.items()},
+            'trend': trend,
+        })
 
 
 # ─── Dashboard dinamica ───────────────────────────────────────────────────────

@@ -1,586 +1,512 @@
 import * as React from 'react'
-import {
-  Box, Button, Checkbox, Chip, FormControl, FormControlLabel, InputLabel, MenuItem, Select,
-  Stack, Tooltip, Typography,
-} from '@mui/material'
+import { Box, Button, ButtonBase, Stack, Tooltip, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
-import AttachFileIcon from '@mui/icons-material/AttachFile'
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import EditIcon from '@mui/icons-material/Edit'
-import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded'
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import type { GridColDef } from '@mui/x-data-grid'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
-import { buildDrfListParams, type DrfParams } from '@shared/api/drf'
+import { buildDrfListParams } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useUrlArrayParam, useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { useToast } from '@shared/ui/toast'
+import { buildQuery } from '@shared/utils/nav'
 import EntityListCard from '@shared/ui/EntityListCard'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { IssuePriorityMark } from '../features/issues/IssueBadges'
 import AreaTaskDetail from '../features/areatasks/AreaTaskDetail'
 import AreaTaskDialog from '../features/areatasks/AreaTaskDialog'
 import ConvertToIssueDialog from '../features/areatasks/ConvertToIssueDialog'
+import AreaTaskKpis, { useAreaTaskStats } from '../features/areatasks/AreaTaskKpis'
+import { TaskDue, TaskStatusBadge, ddmmyyyy } from '../features/areatasks/taskUi'
 import {
-  NEXT_STATUS, PRIORITY_META, PRIORITY_ORDER, STATUS_META,
-  createEmptyTaskForm, extractFieldErrors, fmtTaskDate, formToPayload, taskToForm,
-  type AreaTaskRow, type AreaUser, type TaskFormData, type TaskPriority, type TaskStatus,
+  NEXT_STATUS, PRIORITY_META, STATUS_META,
+  createEmptyTaskForm, extractFieldErrors, formToPayload,
+  type AreaTaskRow, type AreaUser, type TaskFormData,
 } from '../features/areatasks/types'
 
 type AreaOption = { id: number; label: string }
 type RawUser = { id: number; full_name?: string; username?: string }
-type StatusView = 'open' | 'done' | 'all'
+type TaskView = 'open' | 'mine' | 'late' | 'nobody' | 'done' | 'all'
+const VIEWS: TaskView[] = ['open', 'mine', 'late', 'nobody', 'done', 'all']
+type ColQ = { title: string; assigned: string }
+const EMPTY_COLQ: ColQ = { title: '', assigned: '' }
+type ViewState = { view: TaskView; area: string; priority: string[]; status: string[] }
 
-const OPEN_STATUSES: TaskStatus[] = ['da_fare', 'in_corso', 'in_attesa']
-
-function priorityColor(p: TaskPriority): 'error' | 'warning' | 'default' {
-  if (p === 'critical') return 'error'
-  if (p === 'high') return 'warning'
-  return 'default'
+const VIEW_PARAMS: Record<TaskView, Record<string, string>> = {
+  open: { is_open: 'true' },
+  mine: { is_open: 'true', mine: 'true' },
+  late: { overdue: 'true' },
+  nobody: { is_open: 'true', unassigned: 'true' },
+  done: { is_open: 'false' },
+  all: {},
 }
 
-function statusColor(s: TaskStatus): 'success' | 'warning' | 'info' | 'default' {
-  if (s === 'completato') return 'success'
-  if (s === 'in_corso') return 'warning'
-  if (s === 'in_attesa') return 'info'
-  return 'default'
-}
+const commentChip = (n: number) => (
+  <Box component="span" title={`${n} ${n === 1 ? 'commento' : 'commenti'}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: 20, px: '6px', ml: 1, flex: 'none', borderRadius: '5px', fontSize: 11, fontWeight: 600, bgcolor: 'archie.field', color: 'primary.main', fontVariantNumeric: 'tabular-nums' }}>
+    <CampoIcon name="chat" size={12} />{n > 99 ? '99+' : n}
+  </Box>
+)
 
-function StatusViewChipBar({ value, onChange }: { value: StatusView; onChange: (v: StatusView) => void }) {
-  const options: { key: StatusView; label: string }[] = [
-    { key: 'open', label: 'Aperti' },
-    { key: 'done', label: 'Chiusi' },
-    { key: 'all', label: 'Tutti' },
-  ]
-  return (
-    <Stack direction="row" spacing={1}>
-      {options.map((o) => {
-        const selected = value === o.key
-        return (
-          <Chip
-            key={o.key}
-            size="small"
-            label={o.label}
-            clickable
-            onClick={() => onChange(o.key)}
-            color={selected ? (o.key === 'open' ? 'error' : o.key === 'done' ? 'default' : 'primary') : 'default'}
-            variant={selected ? 'filled' : 'outlined'}
-          />
-        )
-      })}
-    </Stack>
-  )
-}
+const renderTaskCard: MobileCardRenderFn<AreaTaskRow> = ({ row, onOpen }) => (
+  <Box role="button" tabIndex={0} onClick={() => onOpen(row.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(row.id) }}
+    sx={{ display: 'grid', gap: 0.5, p: 1.5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', cursor: 'pointer' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>
+      <TaskStatusBadge status={row.status} />
+      <IssuePriorityMark priority={row.priority} compact />
+      {row.comments_count ? commentChip(row.comments_count) : null}
+      <Box sx={{ ml: 'auto', fontSize: 12 }}><TaskDue task={row} /></Box>
+    </Box>
+    <Typography sx={{ fontWeight: 600, fontSize: 13, lineHeight: 1.35 }}>{row.title}</Typography>
+    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{[row.area_label, row.assigned_to_name || 'Da assegnare'].join(' · ')}</Typography>
+  </Box>
+)
 
 export default function AreaTasks() {
-  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
+  const undoToast = useUndoToast()
+  const navigate = useNavigate()
 
-  const myAreaId = me?.profile?.leave_area ?? null
-  const myAreaLabel = me?.profile?.leave_area_label ?? null
+  const myAreaId: number | null = me?.profile?.leave_area ?? null
+  const myAreaLabel: string | null = me?.profile?.leave_area_label ?? null
   const isSuperuser = Boolean(me?.is_superuser)
+  const canAddIssue = hasPerm(PERMS.issues.issue.add)
 
   const grid = useServerGrid({
     defaultOrdering: 'due_date',
     allowedOrderingFields: ['due_date', 'status', 'title', 'created_at', 'updated_at'],
+    defaultPageSize: 25,
   })
 
-  // ── Filtri ────────────────────────────────────────────────────────────────
+  // ── Area: la propria di default, le altre in sola lettura ─────────────────
   const [areas, setAreas] = React.useState<AreaOption[]>([])
-  const [areaFilter, setAreaFilter] = React.useState<number | ''>(myAreaId ?? '')
-  const [priorityFilter, setPriorityFilter] = React.useState<TaskPriority | ''>('')
-  const [onlyMine, setOnlyMine] = React.useState(false)
-  const [statusView, setStatusView] = React.useState<StatusView>('open')
-  const [assigneeFilter, setAssigneeFilter] = React.useState<number | ''>('')
-  const [overdue, setOverdue] = React.useState(false)
-  const [filterUsers, setFilterUsers] = React.useState<AreaUser[]>([])
-
   React.useEffect(() => {
     api.get<{ results: AreaOption[] } | AreaOption[]>('/leave-areas/', { params: { page_size: 100 } })
       .then((r) => setAreas(Array.isArray(r.data) ? r.data : r.data.results))
       .catch((e) => toast.error(apiErrorToMessage(e)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [toast])
+  const [areaRaw, setAreaRaw] = useUrlStringParam('area')
+  const area: number | '' = areaRaw === 'all' ? '' : areaRaw && /^\d+$/.test(areaRaw) ? Number(areaRaw) : (myAreaId ?? '')
+  const areaKey = area === '' ? 'all' : String(area)
+  const areaOptions = React.useMemo(() => {
+    const list = myAreaId !== null && myAreaLabel && !areas.some((a) => a.id === myAreaId) ? [{ id: myAreaId, label: myAreaLabel }, ...areas] : areas
+    return [...list].sort((a, b) => (a.id === myAreaId ? -1 : b.id === myAreaId ? 1 : a.label.localeCompare(b.label, 'it')))
+  }, [areas, myAreaId, myAreaLabel])
+  const areaLabel = (id: number | '') => (id === '' ? 'Tutte le aree' : areaOptions.find((a) => a.id === id)?.label ?? String(id))
+  const readOnlyArea = area !== myAreaId && !isSuperuser
 
-  const areaOptions = React.useMemo(
-    () =>
-      myAreaId !== null && myAreaLabel && !areas.some((a) => a.id === myAreaId)
-        ? [{ id: myAreaId, label: myAreaLabel }, ...areas]
-        : areas,
-    [areas, myAreaId, myAreaLabel],
-  )
+  // ── Vista, filtri da intestazione, ricerca per colonna ────────────────────
+  const filterOpts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const [viewRaw, setViewRaw] = useUrlStringParam('vista')
+  const view: TaskView = VIEWS.includes(viewRaw as TaskView) ? (viewRaw as TaskView) : 'open'
+  const [fPriority, setFPriority] = useUrlArrayParam('priorita')
+  const [fStatus, setFStatus] = useUrlArrayParam('stato')
+  const [fAssigned, setFAssigned] = useUrlNumberParam('assegnato')
+  const [colSearchOpen, setColSearchOpen] = React.useState(false)
+  const [colQ, setColQ] = React.useState<ColQ>(EMPTY_COLQ)
+  const colQActive = Object.values(colQ).some(Boolean)
+  const setCol = (k: keyof ColQ) => (v: string) => { setColQ((c) => ({ ...c, [k]: v })); grid.onPaginationModelChange({ ...grid.paginationModel, page: 0 }) }
+  const hasActiveFilters = fPriority.length > 0 || fStatus.length > 0 || fAssigned !== ''
+  const resetFilters = React.useCallback(() => { setFPriority([], { patch: { page: 1, stato: '', assegnato: '' }, keepOpen: true }) }, [setFPriority])
 
+  const saved = useSavedViews<ViewState>('area-tasks', me?.username)
+  const [savedId, setSavedId] = React.useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const setView = (v: string) => { setSavedId(null); setViewRaw(v === 'open' ? '' : v, filterOpts) }
+  const setArea = (k: string) => { setSavedId(null); setAreaRaw(k === String(myAreaId) ? '' : k, { patch: { page: 1, assegnato: '' }, keepOpen: false }) }
+  const applySaved = (id: string) => {
+    const v = saved.views.find((x) => x.id === id); if (!v) return
+    setSavedId(id)
+    setViewRaw(v.state.view === 'open' ? '' : v.state.view, { patch: { page: 1, area: v.state.area, priorita: v.state.priority.join(','), stato: v.state.status.join(',') }, keepOpen: false })
+  }
+
+  // ── Lista e indicatori ─────────────────────────────────────────────────────
+  const listParams = React.useMemo(() => buildDrfListParams({
+    search: grid.search,
+    ordering: grid.ordering,
+    page0: grid.paginationModel.page,
+    pageSize: grid.paginationModel.pageSize,
+    extra: {
+      ...(area !== '' ? { area } : {}),
+      ...VIEW_PARAMS[view],
+      ...(fPriority.length ? { priority: fPriority } : {}),
+      ...(fStatus.length ? { status: fStatus } : {}),
+      ...(fAssigned !== '' ? { assigned_to: fAssigned } : {}),
+      ...(colQ.title ? { title_q: colQ.title } : {}),
+      ...(colQ.assigned ? { assigned_q: colQ.assigned } : {}),
+    },
+  }), [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, area, view, fPriority, fStatus, fAssigned, colQ])
+
+  const { rows, rowCount, loading, reload: reloadList } = useDrfList<AreaTaskRow>('/area-tasks/', listParams, (e: unknown) => toast.error(apiErrorToMessage(e)))
+  const [kpiReload, setKpiReload] = React.useState(0)
+  const stats = useAreaTaskStats(area, kpiReload)
+  const reloadAll = React.useCallback(() => { reloadList(); setKpiReload((n) => n + 1) }, [reloadList])
+
+  // Persone dell'area (filtro "Assegnato a" e nuovo task).
+  const [areaUsers, setAreaUsers] = React.useState<AreaUser[]>([])
   React.useEffect(() => {
-    let cancelled = false
-    const params: Record<string, number> = { page_size: 200 }
-    if (areaFilter !== '') params.leave_area = areaFilter
-    api.get<RawUser[]>('/users/', { params })
-      .then((r) => {
-        if (cancelled) return
-        const list = Array.isArray(r.data) ? r.data : []
-        setFilterUsers(list.map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
-      })
-      .catch((e) => { if (!cancelled) toast.error(apiErrorToMessage(e)) })
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areaFilter])
+    let alive = true
+    api.get<RawUser[]>('/users/', { params: { page_size: 200, ...(area !== '' ? { leave_area: area } : {}) } })
+      .then((r) => { if (alive) setAreaUsers((Array.isArray(r.data) ? r.data : []).map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) }))) })
+      .catch(() => { if (alive) setAreaUsers([]) })
+    return () => { alive = false }
+  }, [area])
 
-  const firstPage = () => grid.syncUrl({ page: 1 }, { keepOpen: true })
-  const changeArea = (v: number | '') => { setAreaFilter(v); setAssigneeFilter(''); firstPage() }
-  const changeAssignee = (v: number | '') => { setAssigneeFilter(v); firstPage() }
-  const changeOverdue = (v: boolean) => { setOverdue(v); firstPage() }
-  const changePriority = (v: TaskPriority | '') => { setPriorityFilter(v); firstPage() }
-  const changeOnlyMine = (v: boolean) => { setOnlyMine(v); firstPage() }
-  const changeStatusView = (v: StatusView) => { setStatusView(v); firstPage() }
-
-  const activeFilterCount = [
-    areaFilter !== (myAreaId ?? '') ? 'area' : '',
-    priorityFilter,
-    onlyMine ? 'mine' : '',
-    assigneeFilter !== '' ? 'assignee' : '',
-    overdue ? 'overdue' : '',
-    statusView !== 'open' ? statusView : '',
-  ].filter(Boolean).length
-
-  const extra = React.useMemo(() => {
-    const p: DrfParams = { include_hidden: 1 }
-    if (areaFilter !== '') p.area = areaFilter
-    if (priorityFilter) p.priority = priorityFilter
-    if (onlyMine) p.mine = 'true'
-    if (assigneeFilter !== '') p.assigned_to = assigneeFilter
-    if (overdue) {
-      const d = new Date()
-      d.setDate(d.getDate() - 1)
-      const pad = (n: number) => String(n).padStart(2, '0')
-      p.due_before = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-      p.status = OPEN_STATUSES
-    } else if (statusView === 'open') p.status = OPEN_STATUSES
-    else if (statusView === 'done') p.status = 'completato'
-    return p
-  }, [areaFilter, priorityFilter, onlyMine, statusView, assigneeFilter, overdue])
-
-  // La pagina in URL si aggiorna in modo asincrono dopo un cambio filtro:
-  // finché non ha "raggiunto" i nuovi filtri, la richiesta usa la pagina 0
-  // (altrimenti partirebbe filtro nuovo + pagina vecchia, con 404 DRF).
-  const filterKey = JSON.stringify(extra)
-  const [trustedKey, setTrustedKey] = React.useState(filterKey)
-  const urlPage = grid.paginationModel.page
-  const page0 = trustedKey === filterKey ? urlPage : 0
-  React.useEffect(() => {
-    if (trustedKey !== filterKey && urlPage === 0) setTrustedKey(filterKey)
-  }, [trustedKey, filterKey, urlPage])
-
-  const listParams = React.useMemo(
-    () =>
-      buildDrfListParams({
-        page0,
-        pageSize: grid.paginationModel.pageSize,
-        ordering: grid.ordering,
-        search: grid.search,
-        extra,
-      }),
-    [page0, grid.paginationModel.pageSize, grid.ordering, grid.search, extra],
-  )
-
-  const { rows, rowCount, loading, reload } = useDrfList<AreaTaskRow>('/area-tasks/', listParams, (e) =>
-    toast.error(apiErrorToMessage(e)),
-  )
-
-  // ── Dettaglio ─────────────────────────────────────────────────────────────
+  // ── Pannello ───────────────────────────────────────────────────────────────
   const [openTask, setOpenTask] = React.useState<AreaTaskRow | null>(null)
-  const [openTaskInitialTab, setOpenTaskInitialTab] = React.useState(0)
+  const [openTab, setOpenTab] = React.useState(0)
+  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => { setOpenTab(tab); setOpenTask(row); grid.setOpenId(row.id) }, [grid])
+  const closeDetail = React.useCallback(() => { setOpenTask(null); grid.setOpenId(null) }, [grid])
+  // Apertura da URL (?open=): anche per un task fuori dalla pagina corrente.
+  React.useEffect(() => {
+    const id = grid.openId
+    if (!id || openTask?.id === id) return
+    const found = rows.find((r) => r.id === id)
+    if (found) { setOpenTask(found); return }
+    let alive = true
+    api.get<AreaTaskRow>(`/area-tasks/${id}/`).then((r) => { if (alive) setOpenTask(r.data) }).catch(() => {})
+    return () => { alive = false }
+  }, [grid.openId, rows, openTask?.id])
+  const openIndex = openTask ? rows.findIndex((r) => r.id === openTask.id) : -1
 
-  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => {
-    setOpenTaskInitialTab(tab)
-    setOpenTask(row)
-  }, [])
-
-  // ── Creazione / modifica ──────────────────────────────────────────────────
-  // Un solo dialog per crea e modifica: `editingTask` non-null discrimina la
-  // modifica (task={editingTask}, PATCH) dalla creazione (task=null, POST).
-  const createAreaId: number | null = isSuperuser ? (areaFilter !== '' ? areaFilter : myAreaId) : myAreaId
-  const createAreaLabel =
-    areas.find((a) => a.id === createAreaId)?.label ?? (createAreaId === myAreaId ? myAreaLabel : null) ?? ''
-
-  const [taskDialogOpen, setTaskDialogOpen] = React.useState(false)
-  const [editingTask, setEditingTask] = React.useState<AreaTaskRow | null>(null)
+  // ── Nuovo task ─────────────────────────────────────────────────────────────
+  const createAreaId: number | null = isSuperuser ? (area !== '' ? area : myAreaId) : myAreaId
+  const createAreaLabel = areaOptions.find((a) => a.id === createAreaId)?.label ?? myAreaLabel ?? ''
+  const [dlgOpen, setDlgOpen] = React.useState(false)
   const [form, setForm] = React.useState<TaskFormData>(createEmptyTaskForm)
-  const [users, setUsers] = React.useState<AreaUser[]>([])
+  const [createUsers, setCreateUsers] = React.useState<AreaUser[]>([])
   const [saving, setSaving] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
-
   const openCreate = async () => {
     if (createAreaId === null) return
-    setEditingTask(null)
-    setForm(createEmptyTaskForm())
-    setErrors({})
-    setUsers([])
-    setTaskDialogOpen(true)
+    setForm(createEmptyTaskForm()); setErrors({}); setCreateUsers([]); setDlgOpen(true)
     try {
       const r = await api.get<RawUser[]>('/users/', { params: { leave_area: createAreaId, page_size: 200 } })
-      const list = Array.isArray(r.data) ? r.data : []
-      setUsers(list.map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
+      setCreateUsers((Array.isArray(r.data) ? r.data : []).map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
   }
-
-  const openEditTask = async (row: AreaTaskRow) => {
-    setEditingTask(row)
-    setForm(taskToForm(row))
-    setErrors({})
-    setUsers([])
-    setTaskDialogOpen(true)
+  const saveNew = async () => {
+    if (saving || createAreaId === null) return
+    setSaving(true); setErrors({})
     try {
-      const r = await api.get<RawUser[]>('/users/', { params: { leave_area: row.area, page_size: 200 } })
-      const list = Array.isArray(r.data) ? r.data : []
-      setUsers(list.map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
-  }
-
-  const saveTask = async () => {
-    if (saving) return
-    setSaving(true)
-    setErrors({})
-    try {
-      if (editingTask) {
-        await api.patch<AreaTaskRow>(`/area-tasks/${editingTask.id}/`, formToPayload(form))
-        toast.success('Task aggiornato.')
-      } else {
-        if (createAreaId === null) { setSaving(false); return }
-        await api.post<AreaTaskRow>('/area-tasks/', { ...formToPayload(form), area: createAreaId })
-        toast.success('Task creato.')
-      }
-      setTaskDialogOpen(false)
-      setEditingTask(null)
-      reload()
+      const r = await api.post<AreaTaskRow>('/area-tasks/', { ...formToPayload(form), area: createAreaId })
+      toast.success('Task creato')
+      setDlgOpen(false)
+      reloadAll()
+      openDetail(r.data)
     } catch (e) {
       const fields = extractFieldErrors(e)
-      if (Object.keys(fields).length > 0) setErrors(fields)
-      else toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
+      if (Object.keys(fields).length) setErrors(fields); else toast.error(apiErrorToMessage(e))
+    } finally { setSaving(false) }
   }
 
-  // ── Elimina ───────────────────────────────────────────────────────────────
+  // ── Menu della riga ────────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = React.useState<{ row: AreaTaskRow; mouseX: number; mouseY: number } | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<AreaTaskRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [convertTarget, setConvertTarget] = React.useState<AreaTaskRow | null>(null)
 
-  const handleDeleteTask = async () => {
+  const setStatusFromRow = React.useCallback(async (row: AreaTaskRow) => {
+    const next = NEXT_STATUS[row.status]
+    try {
+      await api.patch(`/area-tasks/${row.id}/`, { status: next })
+      reloadAll()
+      undoToast.show(`Stato: ${STATUS_META[next].label} · salvato`, async () => {
+        try { await api.patch(`/area-tasks/${row.id}/`, { status: row.status }); reloadAll() } catch (e) { toast.error(apiErrorToMessage(e)) }
+      })
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }, [reloadAll, toast, undoToast])
+
+  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
+    const row = contextMenu?.row
+    if (!row) return []
+    const edit = row.can_edit
+    return [
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDetail(row, 0) },
+      { key: 'comment', label: 'Commenta', icon: <ChatBubbleOutlineIcon fontSize="small" />, onClick: () => openDetail(row, 1), disabled: !edit },
+      { key: 'next', label: `Segna come ${STATUS_META[NEXT_STATUS[row.status]].label}`, icon: <EditIcon fontSize="small" />, onClick: () => void setStatusFromRow(row), disabled: !edit, hidden: Boolean(row.converted_to_issue) },
+      row.converted_to_issue
+        ? { key: 'issue', label: `Apri la issue #${row.converted_to_issue}`, icon: <CampoIcon name="alert" />, onClick: () => navigate(`/issues${buildQuery({ open: row.converted_to_issue })}`) }
+        : { key: 'convert', label: 'Trasforma in issue', icon: <CampoIcon name="alert" />, onClick: () => setConvertTarget(row), disabled: !edit, hidden: !canAddIssue },
+      { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(row), tone: 'danger' as const, disabled: !edit },
+    ]
+  }, [contextMenu, openDetail, setStatusFromRow, navigate, canAddIssue])
+
+  const doDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
     try {
       await api.delete(`/area-tasks/${deleteTarget.id}/`)
-      toast.success('Task eliminato.')
+      toast.success('Task spostato nel cestino')
+      if (openTask?.id === deleteTarget.id) closeDetail()
       setDeleteTarget(null)
-      reload()
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleting(false)
-    }
+      reloadAll()
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDeleting(false) }
   }
 
-  // ── Trasforma in issue ───────────────────────────────────────────────────
-  const [convertTarget, setConvertTarget] = React.useState<AreaTaskRow | null>(null)
-
-  // ── Menu contestuale ──────────────────────────────────────────────────────
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: AreaTaskRow
-    mouseX: number
-    mouseY: number
-  } | null>(null)
-
-  const handleRowContextMenu = React.useCallback(
-    (row: AreaTaskRow, event: React.MouseEvent<HTMLElement>) => {
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
-    },
-    [],
-  )
-
-  const handleMarkNextStatus = React.useCallback(
-    async (row: AreaTaskRow) => {
-      const next = NEXT_STATUS[row.status]
-      try {
-        await api.patch<AreaTaskRow>(`/area-tasks/${row.id}/`, { status: next })
-        reload()
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      }
-    },
-    [reload, toast],
-  )
-
-  const contextMenuItems: RowContextMenuItem[] = (() => {
-    const row = contextMenu?.row
-    if (!row) return []
-
-    const canEdit = row.can_edit
-    const next = NEXT_STATUS[row.status]
-    const convertedToIssue = row.converted_to_issue
-
-    return [
-      {
-        key: 'open',
-        label: 'Apri dettaglio',
-        icon: <VisibilityOutlinedIcon fontSize="small" />,
-        onClick: () => openDetail(row, 0),
-      },
-      {
-        key: 'edit',
-        label: 'Modifica',
-        icon: <EditIcon fontSize="small" />,
-        onClick: () => { void openEditTask(row) },
-        disabled: !canEdit,
-      },
-      {
-        key: 'comment',
-        label: 'Commenta',
-        icon: <ChatBubbleOutlineIcon fontSize="small" />,
-        onClick: () => openDetail(row, 1),
-        disabled: !canEdit,
-      },
-      {
-        key: 'next_status',
-        label: `Segna come ${STATUS_META[next].label}`,
-        icon: <AutorenewRoundedIcon fontSize="small" />,
-        onClick: () => { void handleMarkNextStatus(row) },
-        disabled: !canEdit,
-      },
-      {
-        key: 'convert',
-        label: 'Trasforma in issue',
-        icon: <SwapHorizIcon fontSize="small" />,
-        onClick: () => setConvertTarget(row),
-        hidden: Boolean(convertedToIssue) || !hasPerm(PERMS.issues.issue.add),
-        disabled: !canEdit,
-      },
-      {
-        key: 'delete',
-        label: 'Elimina',
-        icon: <DeleteOutlineIcon fontSize="small" />,
-        onClick: () => setDeleteTarget(row),
-        tone: 'danger',
-        disabled: !canEdit,
-      },
-    ]
-  })()
-
-  // ── Colonne ───────────────────────────────────────────────────────────────
-  const columns: GridColDef<AreaTaskRow>[] = [
+  // ── Colonne: stessa resa delle Issue ───────────────────────────────────────
+  const columns = React.useMemo<GridColDef<AreaTaskRow>[]>(() => [
+    { field: 'id', headerName: 'ID', width: 62, sortable: false, renderCell: ({ row }) => <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography> },
+    { field: 'priority', headerName: 'Priorità', width: 91, sortable: false, renderCell: ({ row }) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><IssuePriorityMark priority={row.priority} /></Box> },
+    { field: 'status', headerName: 'Stato', width: 132, renderCell: ({ row }) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><TaskStatusBadge status={row.status} /></Box> },
     {
-      field: 'priority',
-      headerName: 'Priorità',
-      width: 100,
-      sortable: false,
+      field: 'title', headerName: 'Titolo', flex: 1, minWidth: 240,
       renderCell: ({ row }) => (
-        <Chip
-          size="small"
-          label={PRIORITY_META[row.priority].label}
-          color={priorityColor(row.priority)}
-          variant={row.priority === 'high' || row.priority === 'critical' ? 'filled' : 'outlined'}
-        />
-      ),
-    },
-    {
-      field: 'status',
-      headerName: 'Stato',
-      width: 130,
-      renderCell: ({ row }) => (
-        <Chip size="small" label={STATUS_META[row.status].label} color={statusColor(row.status)} variant="outlined" />
-      ),
-    },
-    {
-      field: 'title',
-      headerName: 'Titolo',
-      flex: 1,
-      minWidth: 220,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap sx={{ textDecoration: row.status === 'completato' ? 'line-through' : 'none' }}>
-            {row.title}
-          </Typography>
-          {row.comments_count > 0 ? (
-            <Stack direction="row" alignItems="center" spacing={0.25} sx={{ color: 'text.disabled', flexShrink: 0 }}>
-              <ChatBubbleOutlineIcon sx={{ fontSize: 14 }} />
-              <Typography variant="caption">{row.comments_count}</Typography>
-            </Stack>
-          ) : null}
-          {row.drive_files_detail.length > 0 ? (
-            <Stack direction="row" alignItems="center" spacing={0.25} sx={{ color: 'text.disabled', flexShrink: 0 }}>
-              <AttachFileIcon sx={{ fontSize: 14 }} />
-              <Typography variant="caption">{row.drive_files_detail.length}</Typography>
-            </Stack>
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{row.title}</Typography>
+          {row.comments_count ? commentChip(row.comments_count) : null}
+          {row.converted_to_issue ? (
+            <Tooltip title={`Diventato la issue #${row.converted_to_issue}`}>
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '3px', ml: 1, flex: 'none', fontSize: 11, fontWeight: 600, color: 'info.main' }}><CampoIcon name="arrowR" size={12} />Issue #{row.converted_to_issue}</Box>
+            </Tooltip>
           ) : null}
         </Box>
       ),
     },
-    { field: 'area_label', headerName: 'Area', width: 150, sortable: false },
+    { field: 'area_label', headerName: 'Area', width: 120, sortable: false, renderCell: ({ row }) => <Typography noWrap sx={{ fontSize: 13 }}>{row.area_label}</Typography> },
     {
-      field: 'assigned_to_name',
-      headerName: 'Assegnato a',
-      width: 170,
-      sortable: false,
-      valueGetter: (_value, row) => row.assigned_to_name ?? '',
+      field: 'assigned_to_name', headerName: 'Assegnato a', width: 140, sortable: false,
+      renderCell: ({ row }) => row.assigned_to_name ? <Typography noWrap sx={{ fontSize: 13 }}>{row.assigned_to_name}</Typography> : <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>Da assegnare</Typography>,
     },
-    {
-      field: 'due_date',
-      headerName: 'Scadenza',
-      width: 120,
-      renderCell: ({ row }) => {
-        const label = fmtTaskDate(row.due_date)
-        const overdue = row.due_date && row.status !== 'completato' && new Date(`${row.due_date}T00:00:00`) < new Date(new Date().setHours(0, 0, 0, 0))
-        return (
-          <Typography variant="body2" sx={{ color: overdue ? 'error.main' : 'text.primary', fontWeight: overdue ? 600 : 400 }}>
-            {label ?? '—'}
-          </Typography>
-        )
-      },
-    },
-  ]
+    { field: 'due_date', headerName: 'Scadenza', width: 123, renderCell: ({ row }) => <Typography variant="body2" component="span"><TaskDue task={row} /></Typography> },
+    { field: 'created_at', headerName: 'Creato', width: 110, renderCell: ({ row }) => <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{ddmmyyyy(row.created_at)}</Typography> },
+  ], [])
 
-  const emptyState = React.useMemo(
-    () =>
-      grid.search.trim() || activeFilterCount > 0
-        ? { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
-        : { title: 'Nessun task', subtitle: 'Non ci sono task per questa area.' },
-    [grid.search, activeFilterCount],
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
+    const make = (label: string, sel: string[], set: (v: string[]) => void, options: { value: string; label: string }[], opts?: { single?: boolean; searchable?: boolean }) => ({
+      value: sel.join(','),
+      label: `Filtra ${label.toLowerCase()}`,
+      onSet: (v: string | number | '') => set(v === '' ? [] : String(v).split(',')),
+      onReset: () => set([]),
+      children: <FilterOptionList label={label} options={options} selected={sel} onChange={set} single={opts?.single} searchable={opts?.searchable} />,
+    })
+    const cfg: Record<string, ColumnFilterConfig> = {
+      priority: make('Priorità', fPriority, (v) => setFPriority(v, filterOpts), ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k as keyof typeof PRIORITY_META].label }))),
+      status: make('Stato', fStatus, (v) => setFStatus(v, filterOpts), Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))),
+    }
+    if (view !== 'mine' && view !== 'nobody') {
+      cfg.assigned_to_name = make('Assegnato a', fAssigned === '' ? [] : [String(fAssigned)], (v) => setFAssigned(v[0] ? Number(v[0]) : '', filterOpts),
+        areaUsers.map((u) => ({ value: String(u.id), label: u.label })), { single: true, searchable: true })
+    }
+    return cfg
+  }, [fPriority, fStatus, fAssigned, setFPriority, setFStatus, setFAssigned, areaUsers, view, filterOpts])
+
+  const activeFilters: ActiveFilter[] = [
+    fPriority.length ? { key: 'priority', label: 'Priorità', values: fPriority.map((k) => PRIORITY_META[k as keyof typeof PRIORITY_META]?.label ?? k).join(', ') } : null,
+    fStatus.length ? { key: 'status', label: 'Stato', values: fStatus.map((k) => STATUS_META[k as keyof typeof STATUS_META]?.label ?? k).join(', ') } : null,
+    fAssigned !== '' ? { key: 'assigned', label: 'Assegnato a', values: areaUsers.find((u) => u.id === fAssigned)?.label ?? String(fAssigned) } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (key: string) => {
+    if (key === 'priority') setFPriority([], filterOpts)
+    if (key === 'status') setFStatus([], filterOpts)
+    if (key === 'assigned') setFAssigned('', filterOpts)
+  }
+
+  const emptyState = React.useMemo(() => {
+    const searching = Boolean(grid.search.trim()) || colQActive
+    if (searching || hasActiveFilters) {
+      return {
+        title: 'Nessun risultato', subtitle: 'Nessun task corrisponde: prova a modificare la ricerca, la vista o i filtri.',
+        action: (
+          <Stack direction="row" spacing={1} justifyContent="center">
+            {searching ? <Button variant="outlined" onClick={() => { grid.setQ(''); setColQ(EMPTY_COLQ) }}>Cancella ricerca</Button> : null}
+            {hasActiveFilters ? <Button variant="outlined" onClick={resetFilters}>Azzera filtri</Button> : null}
+          </Stack>
+        ),
+      }
+    }
+    if (view === 'late') return { title: 'Nessun task scaduto', subtitle: 'Tutti i task aperti sono nei tempi.' }
+    if (view === 'mine') return { title: 'Nessun task assegnato a te', subtitle: 'Quando qualcuno ti assegna un task lo trovi qui.' }
+    if (view === 'nobody') return { title: 'Nessun task da assegnare', subtitle: 'Ogni task aperto ha qualcuno che lo segue.' }
+    if (view === 'done') return { title: 'Nessun task completato di recente', subtitle: 'I completati restano in elenco per 3 giorni dalla chiusura.' }
+    return { title: 'Nessun task', subtitle: area === '' ? 'Non ci sono task aperti.' : `Non ci sono task aperti nell'area ${areaLabel(area)}.` }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid, colQActive, hasActiveFilters, resetFilters, view, area, areaOptions])
+
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<AreaTaskRow>({
+      url: '/area-tasks/', params, filename: 'task-di-area',
+      columns: [
+        { label: 'ID', getValue: (r) => String(r.id) },
+        { label: 'Titolo', getValue: (r) => r.title },
+        { label: 'Area', getValue: (r) => r.area_label },
+        { label: 'Stato', getValue: (r) => STATUS_META[r.status].label },
+        { label: 'Priorità', getValue: (r) => PRIORITY_META[r.priority].label },
+        { label: 'Assegnato a', getValue: (r) => r.assigned_to_name ?? '' },
+        { label: 'Scadenza', getValue: (r) => ddmmyyyy(r.due_date) },
+        { label: 'Creato', getValue: (r) => ddmmyyyy(r.created_at) },
+        { label: 'Issue', getValue: (r) => (r.converted_to_issue ? `#${r.converted_to_issue}` : '') },
+      ],
+    })
+  }
+
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
+  const canCreate = createAreaId !== null && (area === '' || area === createAreaId)
+  const createHint = createAreaId === null ? (isSuperuser ? "Seleziona un'area" : 'Nessuna area assegnata al tuo profilo') : !canCreate ? `Puoi creare task solo nell'area ${createAreaLabel}` : ''
+
+  const areaSwitch = (
+    <Box role="group" aria-label="Area" sx={{ display: 'inline-flex', p: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'archie.surface2' }}>
+      {[...areaOptions.map((a) => ({ key: String(a.id), label: a.label, mine: a.id === myAreaId })), { key: 'all', label: 'Tutte', mine: false }].map((o) => {
+        const on = o.key === areaKey
+        return (
+          <ButtonBase key={o.key} aria-pressed={on} onClick={() => setArea(o.key)} sx={{
+            height: 28, px: 1.25, gap: 0.75, borderRadius: '6px', fontSize: 13, fontWeight: 550, color: on ? 'text.primary' : 'text.secondary',
+            bgcolor: on ? 'background.paper' : 'transparent', boxShadow: on ? (t) => `0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px ${t.palette.divider}` : 'none',
+            '&:hover': { color: 'text.primary' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+          }}>
+            {o.label}
+            {o.mine ? <Box component="small" sx={{ fontSize: 10, fontWeight: 600, color: 'primary.main', bgcolor: 'archie.field', borderRadius: '4px', px: 0.625 }}>la tua</Box> : null}
+          </ButtonBase>
+        )
+      })}
+    </Box>
   )
 
-  const canCreate = createAreaId !== null
-
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
-      <EntityListCard
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-          alignRightActions: true,
-          rightActions: (
-            <Tooltip title={canCreate ? '' : isSuperuser ? "Seleziona un'area" : 'Nessuna area assegnata al tuo profilo'}>
-              <span>
-                <Button startIcon={<AddIcon />} variant="contained" disabled={!canCreate} onClick={() => { void openCreate() }}>
-                  Nuovo task
-                </Button>
-              </span>
-            </Tooltip>
-          ),
-        }}
-        grid={{
-          pageKey: 'area-tasks',
-          username: me?.username,
-          rows,
-          emptyState,
-          rowCount,
-          loading,
-          columns,
-          paginationModel: { page: page0, pageSize: grid.paginationModel.pageSize },
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: (id) => {
-            const found = rows.find((r) => r.id === id)
-            if (found) openDetail(found, 0)
-          },
-          onRowContextMenu: handleRowContextMenu,
-          getRowClassName: (r) => (r.status === 'completato' ? 'row-done-task' : undefined),
-          sx: {
-            cursor: 'pointer',
-            ...zebraSx,
-            '& .row-done-task': { opacity: 0.55 },
-            '& .row-done-task:hover': { opacity: 0.85 },
-          },
-        }}
-        belowToolbar={
-        // Tutti i filtri extra (Area, Priorità, Assegnatario, Scaduti, Assegnati a me)
-        // in un'unica area sotto la toolbar — prima erano divisi tra qui e i
-        // children di EntityListCard, incongruenza interna segnalata in revisione.
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ px: 0.5, py: 1 }}>
-          <Select
-            size="small"
-            displayEmpty
-            value={areaFilter}
-            onChange={(e) => { const v = e.target.value as number | string; changeArea(v === '' ? '' : Number(v)) }}
-            SelectDisplayProps={{ 'aria-label': 'Area' }}
-            sx={{ minWidth: 170, height: 32, fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.5 } }}
-          >
-            <MenuItem value="">Tutte le aree</MenuItem>
-            {areaOptions.map((a) => (
-              <MenuItem key={a.id} value={a.id}>{a.label}{a.id === myAreaId ? ' (mia)' : ''}</MenuItem>
-            ))}
-          </Select>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel id="priority-filter-label">Priorità</InputLabel>
-            <Select
-              labelId="priority-filter-label"
-              label="Priorità"
-              value={priorityFilter}
-              onChange={(e) => changePriority(e.target.value as TaskPriority | '')}
-            >
-              <MenuItem value="">Tutte</MenuItem>
-              {PRIORITY_ORDER.map((p) => (
-                <MenuItem key={p} value={p}>{PRIORITY_META[p].label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="assignee-filter-label">Assegnatario</InputLabel>
-            <Select
-              labelId="assignee-filter-label"
-              label="Assegnatario"
-              value={assigneeFilter === '' || filterUsers.some((u) => u.id === assigneeFilter) ? assigneeFilter : ''}
-              onChange={(e) => { const v = e.target.value as number | string; changeAssignee(v === '' ? '' : Number(v)) }}
-            >
-              <MenuItem value="">Tutti</MenuItem>
-              {filterUsers.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControlLabel
-            control={<Checkbox size="small" checked={overdue} onChange={(e) => changeOverdue(e.target.checked)} />}
-            label="Scaduti"
-          />
-          <FormControlLabel
-            control={<Checkbox size="small" checked={onlyMine} onChange={(e) => changeOnlyMine(e.target.checked)} />}
-            label="Assegnati a me"
-          />
-        </Stack>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Task di area"
+        inline={areaSwitch}
+        meta={stats ? <><b>{stats.open}</b> aperti · <Box component="b" sx={{ color: stats.overdue ? 'error.main' : undefined }}>{stats.overdue}</Box> scaduti · <b>{stats.mine}</b> assegnati a te</> : undefined}
+        actions={
+          <Tooltip title={createHint}>
+            <span><Button startIcon={<AddIcon />} variant="contained" disabled={!canCreate} onClick={() => void openCreate()}>Nuovo task</Button></span>
+          </Tooltip>
         }
-      >
-        <StatusViewChipBar value={statusView} onChange={changeStatusView} />
-      </EntityListCard>
+      />
+      <AreaTaskKpis s={stats} view={view} onView={setView} statusPick={fStatus}
+        onStatusPick={(k) => { setSavedId(null); setViewRaw('', { patch: { page: 1, stato: fStatus.length === 1 && fStatus[0] === k ? '' : k }, keepOpen: true }) }} />
+
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs
+          value={savedId ? `saved:${savedId}` : view}
+          onChange={(k) => { if (k.startsWith('saved:')) { applySaved(k.slice(6)); return } setView(k) }}
+          tabs={[
+            { key: 'open', label: 'Aperti', count: stats?.open },
+            { key: 'mine', label: 'I miei', count: stats?.mine },
+            { key: 'late', label: 'Scaduti', count: stats?.overdue, tone: stats?.overdue ? 'alert' : undefined },
+            { key: 'nobody', label: 'Da assegnare', count: stats?.unassigned },
+            { key: 'done', label: 'Completati', count: stats?.done_recent },
+            { key: 'all', label: 'Tutti', count: stats ? stats.open + stats.done_recent : undefined },
+            ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
+          ]}
+          end={
+            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+              Salva vista
+            </Button>
+          }
+        />
+        <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
+          onSave={(name) => { const v = saved.add(name, { view, area: areaRaw, priority: fPriority, status: fStatus }); setSavedId(v.id) }} />
+        {readOnlyArea ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'archie.surface2', fontSize: 12, color: 'text.secondary', '& b': { color: 'text.primary', fontWeight: 600 } }}>
+            <CampoIcon name="lock" size={14} />
+            {area === ''
+              ? <span>Stai vedendo tutte le aree: i task delle altre aree sono in <b>sola lettura</b>.</span>
+              : <span>Area <b>{areaLabel(area)}</b> · sola lettura. Puoi leggere task, commenti e allegati; li modifica chi fa parte dell'area.</span>}
+          </Box>
+        ) : null}
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={renderTaskCard}
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={activeFilters}
+              onRemoveFilter={removeFilter}
+              onClearFilters={resetFilters}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca titolo o descrizione…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
+            />
+          }
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca task…' }}
+          grid={{
+            pageKey: 'area-tasks',
+            autoHeight: true,
+            username: me?.username,
+            filterConfig,
+            emptyState,
+            defaultHiddenColumns: area === '' ? [] : ['area_label'],
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                title: { value: colQ.title, onChange: setCol('title'), placeholder: 'Titolo' },
+                assigned_to_name: { value: colQ.assigned, onChange: setCol('assigned'), placeholder: 'Nome' },
+              },
+            },
+            rows,
+            columns,
+            loading,
+            rowCount,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) openDetail(r) },
+            onRowContextMenu: (row, e) => setContextMenu({ row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 }),
+            getRowClassName: (row) => (openTask?.id === row.id ? 'Mui-selected' : undefined),
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
       <AreaTaskDetail
         task={openTask}
-        initialTab={openTaskInitialTab}
-        onClose={() => setOpenTask(null)}
-        onChanged={(next) => { setOpenTask(next); reload() }}
-        onDeleted={() => { setOpenTask(null); reload() }}
+        initialTab={openTab}
+        position={openIndex >= 0 ? `${openIndex + 1} di ${rows.length}` : undefined}
+        onPrev={openIndex > 0 ? () => openDetail(rows[openIndex - 1]) : undefined}
+        onNext={openIndex >= 0 && openIndex < rows.length - 1 ? () => openDetail(rows[openIndex + 1]) : undefined}
+        onClose={closeDetail}
+        onChanged={(next) => { setOpenTask(next); reloadAll() }}
+        onDeleted={() => { closeDetail(); reloadAll() }}
       />
 
       <AreaTaskDialog
-        open={taskDialogOpen}
-        task={editingTask}
-        areaLabel={editingTask ? editingTask.area_label : createAreaLabel}
+        open={dlgOpen}
+        task={null}
+        areaLabel={createAreaLabel}
         form={form}
-        users={users}
+        users={createUsers}
         saving={saving}
         errors={errors}
         onFormChange={setForm}
-        onSave={() => { void saveTask() }}
-        onClose={() => { setTaskDialogOpen(false); setEditingTask(null) }}
+        onSave={() => { void saveNew() }}
+        onClose={() => setDlgOpen(false)}
+      />
+
+      <ConvertToIssueDialog
+        open={Boolean(convertTarget)}
+        task={convertTarget}
+        onClose={() => setConvertTarget(null)}
+        onConverted={(result) => {
+          toast.success(`Task trasformato nella issue #${result.issue.id}.`)
+          setOpenTask((cur) => (cur?.id === result.task.id ? result.task : cur))
+          setConvertTarget(null)
+          reloadAll()
+        }}
       />
 
       <ConfirmDeleteDialog
@@ -589,7 +515,7 @@ export default function AreaTasks() {
         title="Eliminare il task?"
         description={`Il task «${deleteTarget?.title ?? ''}» verrà spostato nel cestino.`}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => { void handleDeleteTask() }}
+        onConfirm={() => { void doDelete() }}
       />
 
       <RowContextMenu
@@ -597,18 +523,6 @@ export default function AreaTasks() {
         anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
         onClose={() => setContextMenu(null)}
         items={contextMenuItems}
-      />
-
-      <ConvertToIssueDialog
-        open={Boolean(convertTarget)}
-        task={convertTarget}
-        onClose={() => setConvertTarget(null)}
-        onConverted={(result) => {
-          toast.success(`Task trasformato in issue #${result.issue.id}.`)
-          setOpenTask((current) => (current?.id === result.task.id ? result.task : current))
-          setConvertTarget(null)
-          reload()
-        }}
       />
     </Stack>
   )

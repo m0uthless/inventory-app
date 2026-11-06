@@ -1,10 +1,14 @@
 import * as React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
+import { buildQuery } from '@shared/utils/nav'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../../auth/AuthProvider'
-import AreaTaskDrawer from './AreaTaskDrawer'
+import { PERMS } from '../../auth/perms'
+import { useUndoToast } from '../../ui/campo'
+import AreaTaskDetailCard, { type AreaTaskPatch, type AreaTaskTab } from './AreaTaskDetailCard'
 import AreaTaskDialog from './AreaTaskDialog'
 import ConvertToIssueDialog from './ConvertToIssueDialog'
 import DriveFilePickerDialog from './DriveFilePickerDialog'
@@ -18,8 +22,12 @@ type Props = {
   onClose: () => void
   onChanged: (task: AreaTaskRow) => void
   onDeleted: (id: number) => void
-  /** Tab iniziale da mostrare al primo render per questo task (0 = Dettagli, 1 = Commenti). Default 0. */
+  /** Scheda iniziale al primo render per questo task (0 = Dettagli, 1 = Commenti). Default 0. */
   initialTab?: number
+  /** Scorrimento nella lista della pagina (facoltativo). */
+  position?: string
+  onPrev?: () => void
+  onNext?: () => void
 }
 
 const RENDERED_ERROR_KEYS = ['title', 'assigned_to', 'due_date', 'detail', 'non_field_errors']
@@ -35,10 +43,18 @@ function hiddenFieldMessages(e: unknown): string {
 }
 
 type RawUser = { id: number; full_name?: string; username?: string }
+const TABS: AreaTaskTab[] = ['det', 'cm', 'all', 'att']
 
-export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, initialTab }: Props) {
+/**
+ * Pannello del task di area con la sua logica (commenti, allegati Drive, modifica,
+ * conversione in issue, eliminazione). Usato dalla pagina Task di area e dalla
+ * card della Dashboard.
+ */
+export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, initialTab, position, onPrev, onNext }: Props) {
   const toast = useToast()
-  const { hasPerm } = useAuth()
+  const undoToast = useUndoToast()
+  const navigate = useNavigate()
+  const { me, hasPerm } = useAuth()
 
   const [current, setCurrentState] = React.useState<AreaTaskRow | null>(task)
   // Ultimo valore noto di `current`, sempre aggiornato in modo sincrono (evita closure obsolete nelle richieste async).
@@ -47,15 +63,15 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
     currentRef.current = next
     setCurrentState(next)
   }, [])
-  const [tab, setTab] = React.useState(0)
+  const [tab, setTab] = React.useState<AreaTaskTab>('det')
   const [comments, setComments] = React.useState<AreaTaskComment[]>([])
   const [commentsLoading, setCommentsLoading] = React.useState(false)
   const [newComment, setNewComment] = React.useState('')
   const [sendingComment, setSendingComment] = React.useState(false)
+  const [users, setUsers] = React.useState<AreaUser[]>([])
 
   const [editOpen, setEditOpen] = React.useState(false)
   const [form, setForm] = React.useState<TaskFormData>(createEmptyTaskForm)
-  const [users, setUsers] = React.useState<AreaUser[]>([])
   const [saving, setSaving] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
 
@@ -70,11 +86,9 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
 
   // Riparte da zero quando cambia il task mostrato.
   React.useEffect(() => {
-    // Con task nullo il drawer sta scorrendo fuori: non svuotare nulla, il cleanup
-    // dell'effect precedente ha gia' invalidato la richiesta commenti in corso.
     if (!task) { setCommentsLoading(false); return }
     setCurrent(task)
-    setTab(initialTab ?? 0)
+    setTab(TABS[initialTab ?? 0] ?? 'det')
     setComments([])
     setNewComment('')
     setEditOpen(false)
@@ -90,10 +104,45 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id])
 
+  // Il task può cambiare da fuori (lista ricaricata): allinea senza perdere lo stato del pannello.
+  React.useEffect(() => { if (task && task.id === currentRef.current?.id) setCurrent(task) }, [task, setCurrent])
+
+  // Persone dell'area del task (assegnatario nelle Proprietà e nel dialogo).
+  const areaId = task?.area ?? null
+  React.useEffect(() => {
+    if (areaId == null) return
+    let alive = true
+    api.get<RawUser[]>('/users/', { params: { leave_area: areaId, page_size: 200 } })
+      .then((r) => { if (alive) setUsers((Array.isArray(r.data) ? r.data : []).map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) }))) })
+      .catch(() => { if (alive) setUsers([]) })
+    return () => { alive = false }
+  }, [areaId])
+
   const apply = React.useCallback((next: AreaTaskRow) => {
     setCurrent(next)
     onChanged(next)
   }, [onChanged, setCurrent])
+
+  // ── Modifica sul posto, con annulla ─────────────────────────────────────────
+  const patch = async (p: AreaTaskPatch, label: string) => {
+    const cur = currentRef.current
+    if (!cur) return
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(p)) prev[k] = (cur as Record<string, unknown>)[k] ?? null
+    try {
+      const r = await api.patch<AreaTaskRow>(`/area-tasks/${cur.id}/`, p)
+      apply(r.data)
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          const back = await api.patch<AreaTaskRow>(`/area-tasks/${cur.id}/`, prev)
+          apply(back.data)
+        } catch (e) { toast.error(apiErrorToMessage(e)) }
+      })
+    } catch (e) {
+      const fields = extractFieldErrors(e)
+      toast.error(Object.values(fields)[0] || apiErrorToMessage(e))
+    }
+  }
 
   // ── Commenti ────────────────────────────────────────────────────────────────
   const sendComment = async () => {
@@ -113,19 +162,12 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
     }
   }
 
-  // ── Modifica ────────────────────────────────────────────────────────────────
-  const openEdit = async () => {
+  // ── Modifica completa ───────────────────────────────────────────────────────
+  const openEdit = () => {
     if (!current) return
     setForm(taskToForm(current))
     setErrors({})
     setEditOpen(true)
-    try {
-      const r = await api.get<RawUser[]>('/users/', { params: { leave_area: current.area, page_size: 200 } })
-      const list = Array.isArray(r.data) ? r.data : []
-      setUsers(list.map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
   }
 
   const save = async () => {
@@ -200,39 +242,43 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
   // ── Trasforma in issue ──────────────────────────────────────────────────────
   const handleConverted = (result: { task: AreaTaskRow; issue: { id: number; title: string } }) => {
     apply(result.task)
-    toast.success(`Task trasformato in issue #${result.issue.id}.`)
+    setTab('det')
+    toast.success(`Task trasformato nella issue #${result.issue.id}.`)
   }
 
-  // Il dialog ha sempre l'assegnatario corrente tra le opzioni, anche se la lista utenti non e' ancora arrivata.
-  const dialogUsers = React.useMemo<AreaUser[]>(() => {
-    if (current?.assigned_to != null && !users.some((u) => u.id === current.assigned_to)) {
-      return [{ id: current.assigned_to, label: current.assigned_to_name ?? String(current.assigned_to) }, ...users]
-    }
-    return users
-  }, [users, current?.assigned_to, current?.assigned_to_name])
+  const canConvert = Boolean(current?.can_edit) && !current?.converted_to_issue && hasPerm(PERMS.issues.issue.add)
 
   return (
     <>
-      <AreaTaskDrawer
-        open={Boolean(task)}
-        task={current}
-        tab={tab}
-        comments={comments}
-        commentsLoading={commentsLoading}
-        newComment={newComment}
-        sendingComment={sendingComment}
-        canLinkFiles={hasPerm('drive.view_drivefile')}
-        unlinkingId={unlinkingId}
-        onClose={onClose}
-        onEdit={() => { void openEdit() }}
-        onDelete={() => setConfirmDelete(true)}
-        onTabChange={setTab}
-        onNewCommentChange={setNewComment}
-        onSendComment={() => { void sendComment() }}
-        onLinkFiles={() => setPickerOpen(true)}
-        onUnlinkFile={(id) => { void unlinkFile(id) }}
-        onConvert={() => setConvertOpen(true)}
-      />
+      {task && current ? (
+        <AreaTaskDetailCard
+          task={current}
+          meId={typeof me?.id === 'number' ? me.id : null}
+          users={users}
+          tab={tab}
+          onTab={setTab}
+          comments={comments}
+          commentsLoading={commentsLoading}
+          newComment={newComment}
+          sendingComment={sendingComment}
+          onNewCommentChange={setNewComment}
+          onSendComment={() => { void sendComment() }}
+          canLinkFiles={Boolean(current.can_edit) && hasPerm('drive.view_drivefile')}
+          unlinkingId={unlinkingId}
+          onLinkFiles={() => setPickerOpen(true)}
+          onUnlinkFile={(id) => { void unlinkFile(id) }}
+          canConvert={canConvert}
+          onConvert={() => setConvertOpen(true)}
+          onOpenIssue={(id) => navigate(`/issues${buildQuery({ open: id })}`)}
+          onPatch={(p, label) => { void patch(p, label) }}
+          onEdit={openEdit}
+          onDelete={() => setConfirmDelete(true)}
+          onClose={onClose}
+          position={position}
+          onPrev={onPrev}
+          onNext={onNext}
+        />
+      ) : null}
       <ConvertToIssueDialog
         open={convertOpen}
         task={current}
@@ -244,7 +290,8 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
         task={current}
         areaLabel={current?.area_label ?? ''}
         form={form}
-        users={dialogUsers}
+        users={current?.assigned_to != null && !users.some((u) => u.id === current.assigned_to)
+          ? [{ id: current.assigned_to, label: current.assigned_to_name ?? String(current.assigned_to) }, ...users] : users}
         saving={saving}
         errors={errors}
         onFormChange={setForm}
