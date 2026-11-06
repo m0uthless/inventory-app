@@ -285,3 +285,13 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-pcust.has-sel > .r-cust-h, .r-cust.has-sel > .r-cust-h, .r-site.has-sel > .r-site-h, .r-pgroup.has-sel > .r-prow, .r-prov.has-sel > .r-prov-h { background: var(--field); }
 .r-pcust.has-sel > .r-cust-h .r-an b, .r-cust.has-sel > .r-cust-h .r-an b, .r-site.has-sel > .r-site-h .r-an b, .r-pgroup.has-sel > .r-prow .r-an b, .r-prov.has-sel .r-prov-n { color: var(--primary); }
 .r-pcust.has-sel { border-color: var(--field-line); }
+
+/* Livelli con colori distinti: cliente grigio, sito azzurro, asset verde (riga selezionata). */
+.r-pcust.is-open > .r-cust-h, .r-cust.is-open > .r-cust-h, .r-pcust.has-sel > .r-cust-h, .r-cust.has-sel > .r-cust-h { background: var(--neutral-bg); }
+.r-pcust.is-open > .r-cust-h .r-an b, .r-cust.is-open > .r-cust-h .r-an b, .r-pcust.has-sel > .r-cust-h .r-an b, .r-cust.has-sel > .r-cust-h .r-an b { color: var(--text); font-weight: 650; }
+.r-pcust.has-sel { border-color: var(--border-strong); }
+.r-site.is-open > .r-site-h, .r-site.has-sel > .r-site-h { background: var(--info-bg); }
+.r-site.is-open > .r-site-h .r-an b, .r-site.has-sel > .r-site-h .r-an b { color: var(--info); }
+.r-site.is-open > .r-site-h .r-ti, .r-site.has-sel > .r-site-h .r-ti { color: var(--info); }
+.r-site.is-open > .r-site-h .r-chev, .r-site.has-sel > .r-site-h .r-chev { color: var(--info); }
+.r-pgroup.has-sel > .r-prow, .r-prov.has-sel > .r-prov-h { background: var(--surface-2); }
