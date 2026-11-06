@@ -30,14 +30,12 @@ import { useThemeConstants } from '../theme/AppThemeProvider'
 import { useIdleTimer } from '@shared/hooks/useIdleTimer'
 import LockScreen from '@shared/ui/LockScreen'
 import DevEnvironmentBadge from '@shared/ui/DevEnvironmentBadge'
-import { SiteRepoV2Provider } from '../features/siterepov2/SiteRepoV2Context'
 import { DashboardEditModeProvider, useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
 import DashboardCustomizeOutlinedIcon from '@mui/icons-material/DashboardCustomizeOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 
 import { getPageTitle, type NavLeaf } from './appNav'
 import { AppSidebar } from './AppSidebar'
-import { SiteRepoV2Toolbar_Shell } from './SiteRepoV2Toolbar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
 import { UndoToastProvider } from '../ui/campo'
 import { DrawerAppearanceProvider } from '@shared/ui/DrawerShell'
@@ -253,7 +251,6 @@ export function AppLayout() {
 
   return (
     <DashboardEditModeProvider>
-    <SiteRepoV2Provider>
     <PageHeaderProvider>
     <UndoToastProvider>
     <DrawerAppearanceProvider value="campo">
@@ -322,7 +319,6 @@ export function AppLayout() {
           bgcolor: 'background.default', borderStyle: 'solid', borderColor: 'divider',
           borderWidth: { xs: '1px 0 0 0', md: '1px 0 0 1px' }, borderTopLeftRadius: { md: 14 },
         }}>
-          <SiteRepoV2Toolbar_Shell loc={loc.pathname} />
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ flex: 1, px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: { xs: 10, md: 3 } }}>
               <DashboardEditModeRouteGuard isDashboardRoute={loc.pathname === '/'} />
@@ -445,7 +441,6 @@ export function AppLayout() {
     </DrawerAppearanceProvider>
     </UndoToastProvider>
     </PageHeaderProvider>
-    </SiteRepoV2Provider>
     </DashboardEditModeProvider>
   )
 }

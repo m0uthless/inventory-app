@@ -291,6 +291,9 @@ class InventoryFilter(filters.FilterSet):
     site_q = filters.CharFilter(method="filter_site_q")
     ip_q = filters.CharFilter(method="filter_ip_q")
     code_q = filters.CharFilter(method="filter_code_q")
+    # Ricerca del Site Repository: solo gli identificativi del sistema (niente
+    # cliente/sito, che hanno risultati propri), per non elencare tutti gli asset di un cliente.
+    asset_q = filters.CharFilter(method="filter_asset_q")
     has_active_issue = filters.BooleanFilter(field_name="has_active_issue")
     not_operational = filters.BooleanFilter(method="filter_not_operational")
     incomplete = filters.BooleanFilter(method="filter_incomplete")
@@ -314,6 +317,15 @@ class InventoryFilter(filters.FilterSet):
     def filter_code_q(self, queryset, name, value):
         v = (value or "").strip()
         return queryset.filter(Q(knumber__icontains=v) | Q(serial_number__icontains=v)) if v else queryset
+
+    def filter_asset_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=v) | Q(hostname__icontains=v) | Q(local_ip__icontains=v)
+            | Q(srsa_ip__icontains=v) | Q(knumber__icontains=v) | Q(serial_number__icontains=v)
+        )
 
     def filter_not_operational(self, queryset, name, value):
         if value is None:
@@ -500,6 +512,54 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
             "issue_priority": {k: by_priority.get(k, 0) for k in ("critical", "high", "medium", "low")},
             "by_type": [{"id": t["type_id"], "key": t["type__key"], "label": t["type__label"], "count": t["n"]} for t in by_type],
             "growth": growth,
+        })
+
+    @action(detail=True, methods=["get"], url_path="maintenance")
+    def maintenance(self, request, pk=None):
+        """Piani di manutenzione che coprono il sistema e interventi registrati (con rapportino).
+
+        Un piano copre il sistema se è dello stesso cliente e include il suo tipo; la
+        scadenza è quella del piano, salvo override per il singolo sistema.
+        """
+        if not request.user.has_perm("maintenance.view_maintenanceevent"):
+            raise PermissionDenied("Serve il permesso di vedere le manutenzioni.")
+        inv = self.get_object()
+        from maintenance.models import MaintenanceEvent, MaintenancePlan, MaintenancePlanInventory
+        from maintenance.api.events import MaintenanceEventSerializer
+
+        plans: list[dict] = []
+        if inv.type_id:
+            overrides = dict(
+                MaintenancePlanInventory.objects.filter(inventory=inv, deleted_at__isnull=True)
+                .values_list("plan_id", "due_date_override")
+            )
+            qs = (
+                MaintenancePlan.objects.filter(
+                    customer_id=inv.customer_id, inventory_types=inv.type_id,
+                    is_active=True, deleted_at__isnull=True,
+                )
+                .distinct()
+                .order_by("next_due_date", "title")
+            )
+            for p in qs:
+                due = overrides.get(p.id) or p.next_due_date
+                plans.append({
+                    "id": p.id, "title": p.title, "schedule_type": p.schedule_type,
+                    "interval_value": p.interval_value, "interval_unit": p.interval_unit,
+                    "fixed_month": p.fixed_month, "fixed_day": p.fixed_day,
+                    "due_date": due.isoformat() if due else None,
+                    "alert_days_before": p.alert_days_before,
+                })
+            plans.sort(key=lambda x: x["due_date"] or "9999")
+
+        events = (
+            MaintenanceEvent.objects.filter(inventory=inv, deleted_at__isnull=True)
+            .select_related("plan", "tech", "created_by", "inventory", "inventory__site", "inventory__customer")
+            .order_by("-performed_at", "-id")[:50]
+        )
+        return Response({
+            "plans": plans,
+            "events": MaintenanceEventSerializer(events, many=True, context={"request": request}).data,
         })
 
 

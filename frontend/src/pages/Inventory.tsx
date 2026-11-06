@@ -797,6 +797,8 @@ export default function Inventory() {
           canChange={canChange}
           canDelete={canDelete}
           canViewSecrets={canViewSecrets}
+          canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
+          canUploadReports={hasPerm(PERMS.maintenance.event.change)}
           tab={drawerTab}
           onTab={setDrawerTab}
           position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}

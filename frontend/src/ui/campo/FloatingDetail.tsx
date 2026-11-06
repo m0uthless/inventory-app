@@ -7,7 +7,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 
-export type DetailTab = { key: string; label: string; count?: number | null }
+/** `warn`: al posto del conteggio un "!" in giallo (es. manutenzione in scadenza). */
+export type DetailTab = { key: string; label: string; count?: number | null; warn?: string }
 export type DetailMenuItem = { label: string; icon?: React.ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }
 
 type Props = {
@@ -119,7 +120,8 @@ export function FloatingDetail({
                   '&.Mui-focusVisible': { boxShadow: 'inset 0 0 0 2px rgb(255 255 255 / .6)' },
                 }}>
                   {t.label}
-                  {t.count != null ? <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: on ? 'primary.main' : 'inherit', opacity: on ? 1 : 0.75, fontVariantNumeric: 'tabular-nums' }}>{t.count}</Box> : null}
+                  {t.warn ? <Box component="span" title={t.warn} aria-label={t.warn} sx={{ display: 'inline-grid', placeItems: 'center', minWidth: 16, height: 16, borderRadius: '4px', fontSize: 11, fontWeight: 700, bgcolor: 'warning.light', color: 'warning.main' }}>!</Box>
+                    : t.count != null ? <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: on ? 'primary.main' : 'inherit', opacity: on ? 1 : 0.75, fontVariantNumeric: 'tabular-nums' }}>{t.count}</Box> : null}
                 </ButtonBase>
               )
             })}

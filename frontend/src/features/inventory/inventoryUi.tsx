@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Box, Tooltip } from '@mui/material'
 import { IssuePriorityMark } from '../issues/IssueBadges'
 import { PRIORITY_META } from '../issues/types'
-import type { CampoIconName } from '../../ui/campo'
+import { CampoIcon, type CampoIconName } from '../../ui/campo'
 
 // ── Campi non applicabili per tipo di inventario ─────────────────────────────
 // Per ogni tipo, i campi che non hanno senso (disabilitati nel modulo, nascosti
@@ -79,5 +79,79 @@ export function OpenIssueMark({ priority }: { priority?: string | null }) {
     <Tooltip title={`Issue aperta · priorità ${PRIORITY_META[p]?.label?.toLowerCase() ?? p}`}>
       <Box component="span" sx={{ display: 'inline-flex', flex: 'none', ml: 1 }}><IssuePriorityMark priority={p} compact /></Box>
     </Tooltip>
+  )
+}
+
+// ── Targa K-Number ───────────────────────────────────────────────────────────
+/**
+ * Replica della targhetta fisica Philips K-Number. Il blu è quello reale del
+ * marchio, non un colore dell'app: eccezione intenzionale, fisso in tutti i temi.
+ */
+export function KNumberPlate({ knumber, digits = 9, maxWidth = 420 }: { knumber: string; digits?: number; maxWidth?: number }) {
+  const padded = (knumber ?? '').replace(/\D/g, '').slice(-digits).padStart(digits, '0')
+  const blue = '#1e56ff'
+  const sw = 6, lp = 22, tp = 18, gap = 10, bw = 74, bh = 74
+  const rowW = digits * bw + (digits - 1) * gap
+  const fw = lp * 2 + rowW
+  const area = tp + bh + 18
+  const by = area + 34
+  const fh = by + 28
+  return (
+    <Box component="svg" viewBox={`0 0 ${fw} ${fh}`} role="img" aria-label={`K-Number ${padded}`} sx={{ display: 'block', width: '100%', maxWidth, height: 'auto', flexShrink: 0 }}>
+      <rect x={sw / 2} y={sw / 2} width={fw - sw} height={area - sw} rx="6" fill="white" stroke={blue} strokeWidth={sw} />
+      {Array.from(padded).map((d, i) => {
+        const x = lp + i * (bw + gap)
+        return (
+          <g key={i}>
+            <rect x={x} y={tp} width={bw} height={bh} fill="white" stroke="black" strokeWidth="4" />
+            <text x={x + bw / 2} y={tp + bh / 2 + 18} textAnchor="middle" fontSize="52" fontFamily="Arial, Helvetica, sans-serif" fontWeight="800" fill="black">{d}</text>
+          </g>
+        )
+      })}
+      <text x={lp} y={by} fontSize="36" fontFamily="Arial, Helvetica, sans-serif" fontWeight="900" fill={blue}>PHILIPS</text>
+    </Box>
+  )
+}
+
+// ── Categoria del sistema: icona e colore di riconoscimento ──────────────────
+// Tinte calme (il rosso resta per guasti e criticità). Sono etichette, non stati.
+type Category = { icon: CampoIconName; color: string }
+const CAT = {
+  pacs: { icon: 'server', color: '#3f7fbf' },
+  host: { icon: 'server', color: '#2e8b8b' },
+  storage: { icon: 'layers', color: '#6f8a3a' },
+  mgmt: { icon: 'wrench', color: '#4a58a6' },
+  net: { icon: 'cloud', color: '#2f8fa8' },
+  ws: { icon: 'monitor', color: '#5b6f86' },
+  robot: { icon: 'activity', color: '#b4673a' },
+  app: { icon: 'file', color: '#7a5bb8' },
+} satisfies Record<string, Category>
+
+export function assetCategory(typeKey?: string | null): Category {
+  const t = (typeKey || '').toLowerCase()
+  if (t === 'wfm' || t.includes('pacs')) return CAT.pacs
+  if (t.startsWith('management')) return CAT.mgmt
+  if (t.startsWith('host')) return CAT.host
+  if (t.startsWith('storage') || t.includes('vna')) return CAT.storage
+  if (t.startsWith('load_balancer') || /(rout|switch|fire|vpn)/.test(t)) return CAT.net
+  if (t.includes('robot')) return CAT.robot
+  if (/(csap|orthoview|vue|speech|ris)/.test(t)) return CAT.app
+  return CAT.ws
+}
+
+// Applicazioni (software): nessuna manutenzione hardware da mostrare di default.
+const SOFTWARE_TYPES = new Set(['csap', 'wfm', 'orthoview', 'vue_motion', 'speech'])
+export const isHardwareType = (typeKey?: string | null) => Boolean(typeKey) && !SOFTWARE_TYPES.has(typeKey!)
+
+/** Icona a tratto del sistema nel suo colore di categoria (schiarito nel tema scuro). */
+export function AssetTypeIcon({ typeKey, label, size = 17 }: { typeKey?: string | null; label?: string | null; size?: number }) {
+  const c = assetCategory(typeKey)
+  return (
+    <Box component="span" title={label ?? undefined} sx={(t) => ({
+      width: 20, height: 20, flex: 'none', display: 'grid', placeItems: 'center',
+      color: t.palette.mode === 'dark' ? `color-mix(in oklab, ${c.color} 55%, white)` : c.color,
+    })}>
+      <CampoIcon name={c.icon} size={size} />
+    </Box>
   )
 }

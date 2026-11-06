@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { keyframes } from '@mui/material/styles'
 import { Box, Button, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -10,7 +11,9 @@ import { CampoIcon, DetailSection, FloatingDetail, LinkButton, Properties } from
 import { Empty, Group, Loading, mono, Row, Rows, Tile, useList } from '../../ui/campo/ListRows'
 import { IssuePriorityMark, IssueStatusBadge } from '../issues/IssueBadges'
 import { PRIORITY_META } from '../issues/types'
-import { disabledFieldsFor, InventoryStatusBadge, invTypeIcon, type InventoryFieldName } from './inventoryUi'
+import { disabledFieldsFor, InventoryStatusBadge, invTypeIcon, isHardwareType, KNumberPlate, type InventoryFieldName } from './inventoryUi'
+import { InventoryMaintenancePanel, maintenanceDue, useInventoryMaintenance } from './InventoryMaintenancePanel'
+import type { CampoIconName } from '../../ui/campo'
 
 export type InventoryCardDetail = {
   id: number
@@ -50,7 +53,7 @@ export type InventoryCardDetail = {
 }
 
 export type InventoryPatch = Partial<Pick<InventoryCardDetail, 'status' | 'type' | 'site' | 'name' | 'knumber' | 'serial_number' | 'location' | 'telefono' | 'manufacturer' | 'model' | 'warranty_end_date'>>
-export type InventoryTab = 'det' | 'iss' | 'att'
+export type InventoryTab = 'det' | 'iss' | 'man' | 'att'
 
 type Lookup = { id: number; label: string; key?: string }
 type SiteOpt = { id: number; name: string; display_name?: string | null }
@@ -63,6 +66,9 @@ type Props = {
   canChange: boolean
   canDelete: boolean
   canViewSecrets: boolean
+  /** Scheda Manutenzioni (piani e rapportini): serve il permesso sugli interventi. */
+  canViewMaintenance?: boolean
+  canUploadReports?: boolean
   tab: InventoryTab
   onTab: (t: InventoryTab) => void
   position?: string
@@ -83,29 +89,68 @@ type Props = {
 const none = (t = '—') => <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>{t}</Box>
 const dIt = (d?: string | null) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '')
 
-/** Riga del blocco Accesso: etichetta, valore in mono, azioni (mostra/copia). */
-function AccessRow({ label, value, secret, onCopy, locked }: { label: string; value?: string | null; secret?: boolean; onCopy: (v: string) => void; locked?: boolean }) {
+const countdown = keyframes({ from: { width: '100%' }, to: { width: '0%' } })
+const copyBtnSx = { width: 28, height: 28 }
+
+/** Casella di rete (hostname, IP): valore in mono, copia al passaggio. */
+function NetTile({ label, value, onCopy }: { label: string; value?: string | null; onCopy: (v: string) => void }) {
+  return (
+    <Box sx={{
+      position: 'relative', display: 'grid', gap: '3px', minWidth: 0, p: '9px 10px 10px', borderRadius: '8px',
+      border: '1px solid', borderColor: 'divider', bgcolor: 'archie.surface2',
+      '& .net-copy': { opacity: 0, transition: 'opacity .12s' }, '&:hover .net-copy, & .net-copy.Mui-focusVisible': { opacity: 1 },
+    }}>
+      <Typography component="span" sx={{ fontSize: 11, color: 'text.secondary' }}>{label}</Typography>
+      <Box component="span" sx={{ ...mono, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || none()}</Box>
+      {value ? (
+        <Tooltip title="Copia"><IconButton className="net-copy" size="small" aria-label={`Copia ${label}`} onClick={() => onCopy(value)} sx={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24 }}><CampoIcon name="copy" size={13} /></IconButton></Tooltip>
+      ) : null}
+    </Box>
+  )
+}
+
+/** Riga di una credenziale: utente in chiaro, password mascherata che si nasconde da sola dopo 30 secondi. */
+function CredRow({ icon, label, value, secret, locked, onCopy }: { icon: CampoIconName; label: string; value?: string | null; secret?: boolean; locked?: boolean; onCopy: (v: string) => void }) {
   const [shown, setShown] = React.useState(false)
   React.useEffect(() => { if (!shown) return; const t = window.setTimeout(() => setShown(false), 30000); return () => window.clearTimeout(t) }, [shown])
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '96px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 38, pl: 1.5, pr: 0.5, '& + &': { borderTop: '1px solid', borderColor: 'divider' } }}>
-      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
-      <Box sx={{ fontSize: 12, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...mono }}>
-        {locked ? <Box component="span" sx={{ fontFamily: 'inherit', color: 'text.secondary' }}>Serve il permesso Credenziali</Box>
+    <Box sx={{
+      position: 'relative', display: 'grid', gridTemplateColumns: '96px minmax(0,1fr) auto', alignItems: 'center', gap: 0.5, minHeight: 42, pl: 1.5, pr: 0.75,
+      '& + &': { borderTop: '1px dashed', borderColor: 'divider' }, ...(shown && { bgcolor: 'warning.light' }),
+    }}>
+      <Typography component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.875, fontSize: 12, color: 'text.secondary', '& svg': { color: shown ? 'warning.main' : 'text.disabled' } }}>
+        <CampoIcon name={icon} size={14} />{label}
+      </Typography>
+      <Box sx={{ ...mono, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {locked ? <Box component="span" sx={{ fontFamily: (t) => t.typography.fontFamily, fontSize: 12, color: 'text.secondary' }}>Serve il permesso Credenziali</Box>
           : !value ? none()
-          : secret ? <Box component="span" sx={shown ? { bgcolor: 'warning.light', borderRadius: '4px', px: 0.5 } : { letterSpacing: '.08em', color: 'text.secondary' }}>{shown ? value : '••••••••'}</Box>
-          : value}
+          : secret && !shown ? <Box component="span" sx={{ letterSpacing: '.12em', color: 'text.disabled' }}>••••••••</Box>
+          : <Box component="span" sx={{ letterSpacing: '.02em', fontWeight: secret ? 550 : 400 }}>{value}</Box>}
       </Box>
       <Box sx={{ display: 'inline-flex' }}>
         {value && secret && !locked ? (
           <Tooltip title={shown ? 'Nascondi' : 'Mostra · si nasconde dopo 30 secondi'}>
-            <IconButton size="small" aria-pressed={shown} aria-label={`${shown ? 'Nascondi' : 'Mostra'} ${label}`} onClick={() => setShown((v) => !v)} sx={{ width: 28, height: 28, color: shown ? 'warning.main' : undefined }}>
-              <CampoIcon name={shown ? 'eyeOff' : 'eye'} size={14} />
+            <IconButton size="small" aria-pressed={shown} aria-label={`${shown ? 'Nascondi' : 'Mostra'} ${label.toLowerCase()}`} onClick={() => setShown((v) => !v)} sx={{ ...copyBtnSx, color: shown ? 'warning.main' : undefined }}>
+              <CampoIcon name={shown ? 'eyeOff' : 'eye'} size={15} />
             </IconButton>
           </Tooltip>
         ) : null}
-        {value && !locked ? <Tooltip title="Copia"><IconButton size="small" aria-label={`Copia ${label}`} onClick={() => onCopy(value)} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip> : null}
+        {value && !locked ? <Tooltip title="Copia"><IconButton size="small" aria-label={`Copia ${label.toLowerCase()}`} onClick={() => onCopy(value)} sx={copyBtnSx}><CampoIcon name="copy" size={15} /></IconButton></Tooltip> : null}
       </Box>
+      {shown ? <Box aria-hidden sx={{ position: 'absolute', left: 0, bottom: 0, height: 2, bgcolor: 'warning.main', animation: `${countdown} 30s linear forwards`, '@media (prefers-reduced-motion: reduce)': { animation: 'none', width: '100%' } }} /> : null}
+    </Box>
+  )
+}
+
+/** Scheda di una coppia di credenziali (sistema operativo, applicazione, VNC). */
+function CredGroup({ icon, title, children }: { icon: CampoIconName; title: string; children: React.ReactNode }) {
+  return (
+    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.paper', overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ width: 28, height: 28, flex: 'none', display: 'grid', placeItems: 'center', borderRadius: '8px', bgcolor: 'archie.neutralBg', color: 'text.secondary' }}><CampoIcon name={icon} size={15} /></Box>
+        <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{title}</Typography>
+      </Box>
+      {children}
     </Box>
   )
 }
@@ -136,6 +181,9 @@ function InventoryIssuesPanel({ inventoryId }: { inventoryId: number }) {
 export default function InventoryDetailCard(p: Props) {
   const d = p.detail
   const sites = useList<SiteOpt>('/sites/', d?.customer ? { customer: d.customer, page_size: 200, ordering: 'name' } : null)
+  const navigate = useNavigate()
+  const [maintKey, setMaintKey] = React.useState(0)
+  const maint = useInventoryMaintenance(d?.id ?? null, Boolean(p.canViewMaintenance) && !d?.deleted_at, maintKey)
 
   if (!d) {
     return (
@@ -209,11 +257,15 @@ export default function InventoryDetailCard(p: Props) {
   ]
 
   const net = ([['hostname', 'Hostname', d.hostname], ['local_ip', 'IP locale', d.local_ip], ['srsa_ip', 'IP SRSA', d.srsa_ip]] as const).filter(([f]) => has(f))
-  const creds = ([
-    ['os_user', 'Utente OS', d.os_user, false], ['os_pwd', 'Password OS', d.os_pwd, true],
-    ['app_usr', 'Utente app', d.app_usr, false], ['app_pwd', 'Password app', d.app_pwd, true],
-    ['vnc_pwd', 'Password VNC', d.vnc_pwd, true],
-  ] as const).filter(([f]) => has(f))
+  const locked = !p.canViewSecrets
+  // Una scheda per coppia di credenziali, solo se c'è qualcosa da mostrare.
+  const credGroups = ([
+    { key: 'os', icon: 'monitor', title: 'Sistema operativo', user: has('os_user') ? d.os_user : null, pwd: has('os_pwd') ? d.os_pwd : null, pwdOn: has('os_pwd') },
+    { key: 'app', icon: 'file', title: 'Applicazione', user: has('app_usr') ? d.app_usr : null, pwd: has('app_pwd') ? d.app_pwd : null, pwdOn: has('app_pwd') },
+    { key: 'vnc', icon: 'eye', title: 'Accesso remoto VNC', user: null, pwd: has('vnc_pwd') ? d.vnc_pwd : null, pwdOn: has('vnc_pwd') },
+  ] as const).filter((g) => g.user || g.pwd)
+  const hasMaint = Boolean(p.canViewMaintenance) && (isHardwareType(d.type_key) || Boolean(maint && (maint.plans.length || maint.events.length)))
+  const tab: InventoryTab = p.tab === 'man' && !hasMaint ? 'det' : p.tab
 
   const details = (
     <>
@@ -225,6 +277,8 @@ export default function InventoryDetailCard(p: Props) {
         </Box>
       ) : null}
 
+      {d.knumber && /\d/.test(d.knumber) ? <KNumberPlate knumber={d.knumber} /> : null}
+
       <Properties
         storageKey="inventory-props-open"
         props={props}
@@ -232,13 +286,20 @@ export default function InventoryDetailCard(p: Props) {
       />
 
       <DetailSection title={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}><CampoIcon name="lock" size={13} />Accesso</Box>}
-        end={!p.canViewSecrets && creds.some(([, , , s]) => s) ? <Typography component="span" sx={{ fontSize: 11, color: 'text.disabled' }}>password solo con il permesso Credenziali</Typography> : undefined}>
-        {net.length || creds.length ? (
-          <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper' }}>
-            {net.map(([f, l, v]) => <AccessRow key={f} label={l} value={v} onCopy={p.onCopy} />)}
-            {creds.map(([f, l, v, secret]) => <AccessRow key={f} label={l} value={v} secret={secret} locked={secret && !p.canViewSecrets} onCopy={p.onCopy} />)}
-          </Box>
-        ) : <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Nessun dato di accesso per questo tipo.</Typography>}
+        end={<Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', bgcolor: 'archie.neutralBg', borderRadius: '5px', px: 0.875, py: '1px' }}>credenziali solo qui</Box>}>
+        <Box sx={{ display: 'grid', gap: 1.25 }}>
+          {net.length ? <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${net.length}, minmax(0,1fr))`, gap: 1 }}>{net.map(([f, l, v]) => <NetTile key={f} label={l} value={v} onCopy={p.onCopy} />)}</Box> : null}
+          {credGroups.map((g) => (
+            <CredGroup key={g.key} icon={g.icon} title={g.title}>
+              {g.user ? <CredRow icon="user" label="Utente" value={g.user} onCopy={p.onCopy} /> : null}
+              {g.pwdOn && (g.pwd || locked) ? <CredRow icon="key" label="Password" value={g.pwd} secret locked={locked} onCopy={p.onCopy} /> : null}
+            </CredGroup>
+          ))}
+          {!credGroups.length ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Nessuna credenziale registrata per questo sistema.</Typography> : null}
+          <Typography sx={{ display: 'flex', gap: 0.75, alignItems: 'flex-start', fontSize: 11, color: 'text.disabled', lineHeight: 1.45, '& svg': { flex: 'none', mt: '2px' } }}>
+            <CampoIcon name="lock" size={12} />Le password si vedono solo con il permesso Credenziali e si nascondono da sole dopo 30 secondi.
+          </Typography>
+        </Box>
       </DetailSection>
 
       <Group title="Dove si trova">
@@ -272,7 +333,7 @@ export default function InventoryDetailCard(p: Props) {
     </>
   )
 
-  const footer = p.tab === 'det' ? (
+  const footer = tab === 'det' ? (
     deleted ? (
       <>
         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Nel cestino</Typography>
@@ -286,6 +347,10 @@ export default function InventoryDetailCard(p: Props) {
         <Button variant="contained" startIcon={<AddIcon />} onClick={p.onNewIssue}>Nuova issue</Button>
       </>
     )
+  ) : tab === 'iss' && !deleted ? (
+    <><Box sx={{ flex: 1 }} /><Button variant="contained" startIcon={<AddIcon />} onClick={p.onNewIssue}>Nuova issue</Button></>
+  ) : tab === 'man' ? (
+    <><Box sx={{ flex: 1 }} /><Button variant="outlined" startIcon={<CampoIcon name="calendar" />} onClick={() => navigate('/maintenance/rapportini')}>Apri i rapportini</Button></>
   ) : undefined
 
   return (
@@ -297,8 +362,13 @@ export default function InventoryDetailCard(p: Props) {
       status={<InventoryStatusBadge statusKey={d.status_key} label={d.status_label} onDark />}
       title={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><CampoIcon name={invTypeIcon(d.type_key)} size={18} />{d.name}</Box>}
       subtitle={[d.type_label, d.hostname, d.customer_name, siteName].filter(Boolean).join(' · ') || undefined}
-      tabs={[{ key: 'det', label: 'Dettagli' }, { key: 'iss', label: 'Issue' }, { key: 'att', label: 'Attività' }]}
-      tab={p.tab}
+      tabs={[
+        { key: 'det', label: 'Dettagli' },
+        { key: 'iss', label: 'Issue' },
+        ...(hasMaint ? [{ key: 'man', label: 'Manutenzioni', count: maint ? maint.events.length : null, warn: maintenanceDue(maint) ? 'Manutenzione scaduta o in scadenza' : undefined }] : []),
+        { key: 'att', label: 'Attività' },
+      ]}
+      tab={tab}
       onTab={(k) => p.onTab(k as InventoryTab)}
       position={p.position}
       onPrev={p.onPrev}
@@ -312,7 +382,10 @@ export default function InventoryDetailCard(p: Props) {
       ]}
       footer={footer}
     >
-      {p.tab === 'det' ? details : p.tab === 'iss' ? <InventoryIssuesPanel inventoryId={d.id} /> : p.activityTab}
+      {tab === 'det' ? details
+        : tab === 'iss' ? <InventoryIssuesPanel inventoryId={d.id} />
+        : tab === 'man' ? <InventoryMaintenancePanel data={maint} canUpload={Boolean(p.canUploadReports)} onChanged={() => setMaintKey((k) => k + 1)} onOpenModule={() => navigate('/maintenance')} />
+        : p.activityTab}
     </FloatingDetail>
   )
 }

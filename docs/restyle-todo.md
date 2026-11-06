@@ -65,10 +65,23 @@ Portata direttamente nell'app con lo schema di Clienti e Siti.
 
 Portata direttamente nell'app con lo schema di Clienti, Siti e Contatti.
 
-- **[UI] Drawer inventario vecchio** (`InventoryDrawer`): ancora usato da Site Repository.
+- **[UI] Drawer inventario vecchio** (`InventoryDrawer`): rimosso con il porting di Site Repository.
 - **[BE] Lettura delle credenziali non registrata nell'audit**: come per la VPN dei clienti, il dettaglio restituisce le password decifrate a chi ha `inventory.view_secrets` senza registrare la lettura.
-- **[UI] Targa K-Number**: il vecchio drawer mostrava il K-Number come targa grafica; ora è in testata come codice.
+- **[UI] Targa K-Number**: ripristinata nel pannello (scheda Dettagli), anche nella pagina Inventari.
 - **[DEC] Cliente di un inventario**: nel pannello è in sola lettura; si cambia da "Modifica".
+
+## Site Repository
+
+Portata dall'anteprima `r-base.html` (proposta B: cartina + elenco delle province).
+
+- **[UI] Esporta Excel di pagina**: nell'anteprima c'era in testata; il backend esporta solo il singolo cliente (azione sulla riga del cliente). Serve un export globale.
+- **[UI] Varianti A (albero) e C (colonne)**: non portate.
+- **[UI] Raggruppamento per città**: la pagina vecchia lo permetteva; ora solo per provincia.
+- **[UI] Pannello asset, scheda Manutenzioni**: "Carica" sul singolo intervento usa `upload-pdf`; "Registra intervento" non c'è (rimanda ai Rapportini, nessun link diretto).
+- **[DEC] Manutenzioni**: un piano copre l'asset se è dello stesso cliente e include il suo tipo; scadenza = override del singolo asset, altrimenti quella del piano (`GET /inventories/{id}/maintenance/`).
+- **[DEC] Accesso**: le schede delle credenziali non hanno sistema operativo né data di aggiornamento (dati non presenti nel backend).
+- **[DEC] Hardware**: scheda Manutenzioni per tutti i tipi tranne le applicazioni (`csap`, `wfm`, `orthoview`, `vue_motion`, `speech`), o se l'asset ha piani/interventi.
+- **[TEST] Vitest**: tolti i 3 test di accessibilità della pagina vecchia (`pages/siteRepository/Accessibility.test.tsx`); baseline ora 155/155, lint 13.
 
 ## Struttura e tema
 
