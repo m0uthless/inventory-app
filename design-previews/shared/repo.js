@@ -141,8 +141,8 @@
     return `<section class="panel r-res">
       <div class="r-res-h"><b>${as.length + ss.length + cs.length}</b> risultati per «${esc(q)}» <button type="button" class="btn btn-ghost btn-sm" data-clear>Cancella ricerca</button></div>
       ${as.length ? `<div class="r-gh">Sistemi <span>${as.length}</span></div>${assetHead}${as.map((a) => `<div class="r-hit">${path(a.c, a.s)}${assetRow(a)}</div>`).join('')}` : ''}
-      ${ss.length ? `<div class="r-gh">Siti <span>${ss.length}</span></div>${ss.map((s) => `<button type="button" class="r-row" data-goto-site="${s.id}"><span class="r-ti brand">${ic('pin')}</span><span class="r-an"><b>${hl(s.name)}</b><small>${esc(s.addr)}</small></span>${path(s.c)}<span class="r-n">${s.assets.length} asset</span>${ic('chevR')}</button>`).join('')}` : ''}
-      ${cs.length ? `<div class="r-gh">Clienti <span>${cs.length}</span></div>${cs.map((c) => `<button type="button" class="r-row" data-goto-cust="${c.id}"><span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${hl(c.name)}</b><small>${venDot(c.ven)}</small></span><span class="r-path">${c.prov ? provName(c.prov) : 'Senza provincia'}</span><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${ic('chevR')}</button>`).join('')}` : ''}
+      ${ss.length ? `<div class="r-gh">Siti <span>${ss.length}</span></div>${ss.map((s) => `<button type="button" class="r-row" data-goto-site="${s.id}"><span class="r-ti r-brand">${ic('pin')}</span><span class="r-an"><b>${hl(s.name)}</b><small>${esc(s.addr)}</small></span>${path(s.c)}<span class="r-n">${s.assets.length} asset</span>${ic('chevR')}</button>`).join('')}` : ''}
+      ${cs.length ? `<div class="r-gh">Clienti <span>${cs.length}</span></div>${cs.map((c) => `<button type="button" class="r-row" data-goto-cust="${c.id}"><span class="r-ti r-brand">${ic('building')}</span><span class="r-an"><b>${hl(c.name)}</b><small>${venDot(c.ven)}</small></span><span class="r-path">${c.prov ? provName(c.prov) : 'Senza provincia'}</span><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${ic('chevR')}</button>`).join('')}` : ''}
       ${!as.length && !ss.length && !cs.length ? `<p class="r-empty">Nessun sistema, sito o cliente corrisponde a «${esc(q)}». Prova con parte dell'hostname o dell'IP.</p>` : ''}
     </section>`;
   };
@@ -163,7 +163,7 @@
             ${oc ? `<div class="r-sites">${c.sites.map((s) => {
               const os = openSite.has(s.id);
               return `<div class="r-site${os ? ' is-open' : ''}">
-                <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti brand">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
+                <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti r-brand">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
                 ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}
               </div>`;
             }).join('')}</div>` : ''}
@@ -216,7 +216,7 @@
     const list = provs.filter((p) => !bRegion || regionOf(p) === bRegion).sort((a, b) => provName(a).localeCompare(provName(b), 'it'));
     if (noProv && !bRegion) list.push('')
     const custBlock = (c) => { const oc = bCust.has(c.id); return `<div class="r-pcust${oc ? ' is-open' : ''}">
-        <div class="r-cust-h"><button type="button" class="r-cust-t" data-bcust="${c.id}" aria-expanded="${oc}">${chev(oc)}<span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ' · <span class="miss">Nessun contatto</span>'}</small></span></button><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
+        <div class="r-cust-h"><button type="button" class="r-cust-t" data-bcust="${c.id}" aria-expanded="${oc}">${chev(oc)}<span class="r-ti r-brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ' · <span class="miss">Nessun contatto</span>'}</small></span></button><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
         ${oc ? `<div class="r-psites">${c.sites.map((s) => { const os = bSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
           <button type="button" class="r-site-h" data-bsite="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
           ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}</div>` : ''}

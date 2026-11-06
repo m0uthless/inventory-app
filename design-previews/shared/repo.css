@@ -32,7 +32,7 @@
 .r-an .cmt { font-weight: 400; gap: 5px; }
 .r-an .cmt .dot { width: 7px; height: 7px; }
 .r-ti { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 7px; background: var(--neutral-bg); color: var(--muted); }
-.r-ti.brand { background: var(--field); color: var(--primary); }
+.r-ti.r-brand { background: var(--field); color: var(--primary); }
 .r-ti .i { width: 15px; height: 15px; }
 .r-chev { display: inline-grid; place-items: center; width: 20px; height: 20px; color: var(--faint); transition: transform .15s; flex: none; }
 .r-chev .i { width: 14px; height: 14px; }
@@ -263,9 +263,9 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-prow-h > span:nth-child(2) { text-align: left; }
 
 /* Icone semplici, senza riquadro (cliente, sito, asset) */
-.r-ti, .r-ti.brand, .r-tc, :root[data-theme="dark"] .r-tc { width: 20px; height: 20px; background: transparent; border-radius: 0; }
+.r-ti, .r-ti.r-brand, .r-tc, :root[data-theme="dark"] .r-tc { width: 20px; height: 20px; background: transparent; border-radius: 0; }
 .r-ti { color: var(--faint); }
-.r-ti.brand { color: var(--primary); }
+.r-ti.r-brand { color: var(--primary); }
 .r-ti .i { width: 17px; height: 17px; stroke-width: 1.75; }
 .r-tc { color: var(--tc); }
 :root[data-theme="dark"] .r-tc { color: color-mix(in oklab, var(--tc) 55%, white); }
@@ -277,3 +277,4 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-ttl .r-ti .i { width: 20px; height: 20px; }
 .r-pcust .r-cust-h { padding-left: 8px; }
 .r-pcust:not(.is-open) > .r-cust-h { border-bottom: 0; }
+.r-cust-h .r-ti, .r-cust-t .r-ti { width: 20px; height: 20px; }
