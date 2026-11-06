@@ -530,7 +530,7 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
 <link rel="stylesheet" href="shared/drawer-intervento.css">
 <link rel="stylesheet" href="shared/po.css?v=3">
 <link rel="stylesheet" href="shared/cust.css?v=7">
-<link rel="stylesheet" href="shared/repo.css?v=4">
+<link rel="stylesheet" href="shared/repo.css?v=5">
 </head>
 <body data-view="app">
 
@@ -557,13 +557,12 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
     <div class="workspace">
       <main class="content">
         <div class="po-head r-head">
-          <h1>Site Repository</h1>
-          <span class="r-meta" data-r-meta></span>
+          <div class="r-title"><h1>Site Repository</h1><span class="r-meta" data-r-meta></span></div>
+          <label class="r-search"><i data-i="search"></i><input type="search" data-r-q placeholder="Cerca hostname, IP, K-Number, seriale, cliente o sito" aria-label="Cerca nel repository"><kbd>/</kbd></label>
           <div class="actions"><button class="btn" type="button"><i data-i="download"></i>Esporta Excel</button></div>
         </div>
 
-        <div class="r-bar">
-          <label class="r-search"><i data-i="search"></i><input type="search" data-r-q placeholder="Cerca hostname, IP, K-Number, seriale, cliente o sito" aria-label="Cerca nel repository"><kbd>/</kbd></label>
+        <div class="r-bar" data-r-bar>
           <div class="r-seg" role="group" aria-label="Raggruppa per" data-r-group>
             <button type="button" aria-pressed="true" data-g="prov">Provincia</button><button type="button" aria-pressed="false" data-g="city">Città</button>
           </div>
@@ -733,6 +732,6 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
   })();
 </script>
 <script src="shared/italy-geo.js?v=1"></script>
-<script src="shared/repo.js?v=3"></script>
+<script src="shared/repo.js?v=4"></script>
 </body>
 </html>

@@ -197,13 +197,15 @@
     const regs = {}; provs.forEach((p) => { const r = regionOf(p); (regs[r] ||= { id: r, cust: 0, provs: 0 }); regs[r].cust += CUST.filter((c) => c.prov === p).length; regs[r].provs += 1; });
     const regList = Object.values(regs).sort((a, b) => b.cust - a.cust || regionName(a.id).localeCompare(regionName(b.id)));
     const noProv = CUST.filter((c) => !c.prov).length;
+    const PO = { critical: 4, high: 3, medium: 2, low: 1 };
+    const hot = ALL_ASSETS.filter((a) => a.prio && (!bRegion || regionOf(a.c.prov) === bRegion)).sort((x, y) => PO[y.prio] - PO[x.prio] || x.name.localeCompare(y.name));
     const left = `<aside class="panel r-mapcard">
         <div class="r-map-h">${bRegion ? `<button type="button" class="r-back" data-region-back>${ic('chevL')}Italia</button><b>${regionName(bRegion)}</b>` : '<b>Italia</b><span>scegli una regione</span>'}</div>
         <div class="r-map-w">${mapSvg(bRegion, bRegion ? bProv : null)}</div>
-        <div class="r-plist">
-          <div class="r-pl-g">Regioni per numero di clienti</div>
-          ${regList.map((r) => `<button type="button" class="r-pl${r.id === bRegion ? ' is-sel' : ''}" data-region="${r.id}" aria-pressed="${r.id === bRegion}"><span>${regionName(r.id)}</span><span class="r-n"><b>${r.cust}</b> ${r.cust === 1 ? 'cliente' : 'clienti'} · ${r.provs} prov.</span></button>`).join('')}
-          ${noProv ? `<button type="button" class="r-pl${bProv === '' ? ' is-sel' : ''}" data-prov=""><span><i>Senza provincia</i></span><span class="r-n"><b>${noProv}</b> ${noProv === 1 ? 'cliente' : 'clienti'}</span></button>` : ''}
+        <div class="r-legend" aria-hidden="true"><span>meno asset</span><i></i><span>più asset</span></div>
+        <div class="r-hot">
+          <div class="r-pl-g">Sistemi con issue aperte${bRegion ? ` · ${regionName(bRegion)}` : ' · Italia'} <span class="r-cnt">${hot.length}</span></div>
+          ${hot.length ? hot.map((a) => `<button type="button" class="r-hot-i" data-open="${a.id}"><span class="r-an"><b>${esc(a.name)}${prio(a.prio)}</b><small>${esc(a.c.name)} › ${esc(a.s.name)}</small></span><span class="r-sig">${a.c.prov}</span></button>`).join('') : '<p class="r-hot-e">Nessuna issue aperta sui sistemi di questo territorio.</p>'}
         </div>
       </aside>`;
     let right;
@@ -218,6 +220,7 @@
             <span class="r-an"><b>${provName(p)} <span class="r-sig">${p}</span></b><small>${regionName(regionOf(p))}</small></span>
             <span class="r-num">${st.cs.length}</span><span class="r-num">${st.sites}</span><span class="r-num">${st.assets}</span>
             <span class="r-num">${st.issues ? `<span class="w">${st.issues}</span>` : '<span class="none">—</span>'}</span>${ic('chevR')}</button>`; }).join('')}
+          ${noProv && !bRegion ? (() => { const st = provStats(''); return `<button type="button" class="r-prow" data-prov=""><span class="r-an"><b><i>Senza provincia</i></b><small>clienti senza provincia in anagrafica</small></span><span class="r-num">${st.cs.length}</span><span class="r-num">${st.sites}</span><span class="r-num">${st.assets}</span><span class="r-num">${st.issues ? `<span class="w">${st.issues}</span>` : '<span class="none">—</span>'}</span>${ic('chevR')}</button>`; })() : ''}
         </section></div>`;
     } else {
       const st = provStats(bProv);
@@ -260,7 +263,7 @@
   const render = () => {
     const na = ALL_ASSETS.length; const provs = new Set(CUST.map((c) => c.prov).filter(Boolean)).size;
     $('[data-r-meta]').innerHTML = `<b>${CUST.length}</b> clienti · <b>${ALL_SITES.length}</b> siti · <b>${na}</b> asset in <b>${provs}</b> province`;
-    $('[data-r-group]').hidden = variant !== 'a';
+    $('[data-r-bar]').hidden = variant !== 'a' || Boolean(q);
     $('[data-r-tools]').innerHTML = variant === 'a' && !q ? `<button type="button" class="btn btn-ghost btn-sm" data-all="close">Comprimi tutto</button><button type="button" class="btn btn-ghost btn-sm" data-all="open">Espandi tutto</button>` : '';
     body.className = 'r-body r-v' + variant;
     body.innerHTML = q ? searchResults() : variant === 'a' ? renderA() : variant === 'b' ? renderB() : renderC();
