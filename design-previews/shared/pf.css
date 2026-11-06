@@ -269,3 +269,48 @@
 .pf-ac-act .btn { justify-content: center; }
 @media (max-width: 1180px) { .pf-coord { grid-template-columns: 1fr; } .pf-cal { border-right: 0; border-bottom: 1px solid var(--border); } }
 :root[data-theme="dark"] .pf-cb { color: color-mix(in oklab, var(--fg) 40%, white); } :root[data-theme="dark"] .pf-cb.is-prop { background: repeating-linear-gradient(135deg, var(--bg) 0 5px, transparent 5px 9px); }
+
+/* ── Coordinamento: timeline per persona ─────────────────────── */
+.pf-tl2 { min-width: 640px; }
+.pf-tlr { display: grid; grid-template-columns: 132px repeat(var(--n), minmax(16px, 1fr)); align-items: center; }
+.pf-tln { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 7px; min-width: 0; padding-right: 8px; font-size: 12px; }
+.pf-tln .nm { font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-tln .ava { width: 22px; height: 22px; font-size: 8.5px; }
+.pf-tlr-hd { position: sticky; top: 0; z-index: 3; background: var(--surface); padding-bottom: 4px; }
+.pf-tld { grid-row: 1; display: grid; justify-items: center; line-height: 1.1; padding: 3px 0; border: 0; border-radius: 5px; background: transparent; font: inherit; color: var(--text); cursor: pointer; }
+.pf-tld b { font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pf-tld small { font-size: 9px; font-weight: 600; color: var(--faint); }
+.pf-tld:hover:not(:disabled) { background: var(--surface-2); }
+.pf-tld.is-off { color: var(--faint); cursor: default; } .pf-tld.is-off b { font-weight: 500; }
+.pf-tld.is-today { background: var(--primary); color: var(--primary-ink); } .pf-tld.is-today small { color: var(--primary-ink); }
+.pf-tld.is-sel:not(.is-today) { background: var(--field); box-shadow: inset 0 0 0 1px var(--field-line); }
+.pf-tlg { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.pf-tlg + .pf-tlg { margin-top: 10px; }
+.pf-tlr-cov { min-height: 30px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.pf-tlr-cov .pf-tln { padding-left: 10px; gap: 6px; }
+.pf-tlr-cov .pf-tln b { font-size: 12px; font-weight: 650; } .pf-tlr-cov .pf-tln small { font-size: 11px; color: var(--muted); }
+.pf-tlk { grid-row: 1; height: 22px; margin: 0 1px; border: 0; border-radius: 4px; background: var(--cvb); color: var(--cv); font: 650 11px "Geist", sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; }
+.pf-tlk.cov-ok { background: transparent; color: var(--muted); font-weight: 500; }
+.pf-tlk:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.pf-tlk.is-sel { box-shadow: inset 0 0 0 1.5px var(--field-line); }
+.pf-tlr-p { min-height: 36px; }
+.pf-tlr-p + .pf-tlr-p { border-top: 1px solid var(--border); }
+.pf-tlr-p .pf-tln { padding-left: 10px; }
+.pf-tlr-p.is-me .nm { color: var(--primary); }
+.pf-tlc { grid-row: 1; align-self: stretch; min-height: 36px; border-left: 1px solid color-mix(in oklab, var(--border) 55%, transparent); }
+.pf-tlr-cov .pf-tlc { min-height: 30px; border: 0; }
+.pf-tlc.is-off { background: repeating-linear-gradient(135deg, var(--surface-2) 0 4px, transparent 4px 7px); }
+.pf-tlc.is-today { background: color-mix(in oklab, var(--primary) 8%, transparent); box-shadow: inset 1px 0 0 var(--primary), inset -1px 0 0 var(--primary); }
+.pf-tlc.is-sel { background: var(--field); }
+.pf-tlb { grid-row: 1; z-index: 1; height: 24px; margin: 0 2px; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 0 6px; border: 1px solid var(--fg); border-radius: 6px; background: var(--bg); color: var(--fg); font: 600 11px "Geist", sans-serif; white-space: nowrap; overflow: hidden; cursor: pointer; }
+.pf-tlb span { overflow: hidden; text-overflow: ellipsis; }
+.pf-tlb .i { width: 12px; height: 12px; flex: none; }
+.pf-tlb.is-prop { border-style: dashed; background: repeating-linear-gradient(135deg, var(--bg) 0 5px, var(--surface) 5px 9px); }
+.pf-tlb.is-mat { height: 13px; align-self: start; margin-top: 4px; padding: 0 2px; } .pf-tlb.is-pom { height: 13px; align-self: end; margin-bottom: 4px; padding: 0 2px; }
+.pf-tlb.cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; } .pf-tlb.cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
+.pf-tlb.is-dim { opacity: .2; }
+.pf-tlb.is-sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--fg); }
+.pf-tlb:focus-visible { outline: none; box-shadow: var(--focus); }
+:root[data-theme="dark"] .pf-tlb { color: color-mix(in oklab, var(--fg) 40%, white); }
+:root[data-theme="dark"] .pf-tlb.is-prop { background: repeating-linear-gradient(135deg, var(--bg) 0 5px, transparent 5px 9px); }
+.pf-v-coord .pf-cal { overflow-x: auto; }

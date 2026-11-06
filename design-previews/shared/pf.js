@@ -179,40 +179,34 @@
   const shortName = (n) => { const [f, ...r] = n.split(' '); return `${f} ${r.map((x) => x[0] + '.').join(' ')}`; };
   const addDays = (s0, n) => { const d = parse(s0); d.setDate(d.getDate() + n); return iso(d.getFullYear(), d.getMonth(), d.getDate()); };
   const renderC = () => {
-    const days = monthDays(); const ps = people();
-    const firstMon = addDays(days[0], -((parse(days[0]).getDay() + 6) % 7));
-    const weeks = []; for (let w = firstMon; w <= days.at(-1); w = addDays(w, 7)) weeks.push(w);
-    const list = ABS.filter((a) => a.status !== 'rifiutata' && ps.includes(a.who));
-    const weekHtml = weeks.map((mon) => {
-      const wd = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
-      // Segmenti della settimana, senza weekend/festività ai bordi.
-      const segs = [];
-      list.forEach((a) => {
-        let s0 = a.from > mon ? a.from : mon; let e0 = a.to < wd[6] ? a.to : wd[6];
-        if (s0 > e0) return;
-        while (s0 <= e0 && isOff(s0)) s0 = addDays(s0, 1);
-        while (e0 >= s0 && isOff(e0)) e0 = addDays(e0, -1);
-        if (s0 > e0) return;
-        segs.push({ a, s: wd.indexOf(s0), e: wd.indexOf(e0), cut: [a.from < s0, a.to > e0] });
+    const days = monthDays(); const ps = people(); const n = days.length;
+    // Segmenti continui di giorni lavorativi di un'assenza, nel mese.
+    const segsOf = (a) => {
+      const out = []; let cur = null;
+      days.forEach((d, i) => {
+        const on = d >= a.from && d <= a.to && !isOff(d);
+        if (on && !cur) cur = { s: i, e: i };
+        else if (on) cur.e = i;
+        else if (cur && !isOff(d)) { out.push(cur); cur = null; }
       });
-      segs.sort((x, y) => x.s - y.s || (y.e - y.s) - (x.e - x.s));
-      const lanes = []; segs.forEach((g) => { let l = lanes.findIndex((end) => end < g.s); if (l < 0) { l = lanes.length; lanes.push(-1); } lanes[l] = g.e; g.lane = l; });
-      const nl = Math.max(lanes.length, 2);
-      const cellsH = wd.map((d, i) => {
-        const inMonth = d.slice(0, 7) === days[0].slice(0, 7); const dt = parse(d); const off = isOff(d);
-        const pres = presentCount(ps, d); const lv = covLevel(pres, ps.length);
-        return `<div class="pf-wd${off ? ' is-off' : ''}${inMonth ? '' : ' is-out'}${d === TODAY ? ' is-today' : ''}${d === selDay ? ' is-sel' : ''}" style="grid-column:${i + 1}" ${!off && inMonth ? `data-selday="${d}" role="button" tabindex="0" aria-label="${dt.getDate()} ${MONTH_FULL[dt.getMonth()]}, ${pres} presenti su ${ps.length}"` : ''}>
-          <span class="pf-wd-top"><span class="pf-cal-n">${dt.getDate()}</span>${!off && inMonth ? `<span class="pf-cov cov-${lv}" title="${pres} presenti su ${ps.length}">${pres}/${ps.length}</span>` : HOL[d] && inMonth ? `<small class="pf-hol">${HOL[d]}</small>` : ''}</span>
-        </div>`;
+      if (cur) out.push(cur);
+      return out;
+    };
+    const head = `<div class="pf-tlr pf-tlr-hd"><span class="pf-tln"></span>${days.map((d, i) => { const dt = parse(d); return `<button type="button" class="pf-tld${isOff(d) ? ' is-off' : ''}${d === TODAY ? ' is-today' : ''}${d === selDay ? ' is-sel' : ''}" style="grid-column:${i + 2}" ${isOff(d) ? 'disabled' : `data-selday="${d}"`} title="${HOL[d] || ''}"><b>${dt.getDate()}</b><small>${WD[dt.getDay()][0]}</small></button>`; }).join('')}</div>`;
+    const cols = (cls = '') => days.map((d, i) => `<span class="pf-tlc${isOff(d) ? ' is-off' : ''}${d === TODAY ? ' is-today' : ''}${d === selDay ? ' is-sel' : ''}${cls}" style="grid-column:${i + 2}"></span>`).join('');
+    const groups = (area === 'all' ? AREAS : [area]).map((ar) => {
+      const pa = PEOPLE.filter((p) => p.area === ar);
+      const cov = `<div class="pf-tlr pf-tlr-cov"><span class="pf-tln"><b>${ar}</b><small>presenti</small></span>${days.map((d, i) => { if (isOff(d)) return `<span class="pf-tlc is-off" style="grid-column:${i + 2}"></span>`; const pr = presentCount(pa, d); const lv = covLevel(pr, pa.length); return `<button type="button" class="pf-tlk cov-${lv}${d === selDay ? ' is-sel' : ''}" style="grid-column:${i + 2}" data-selday="${d}" title="${ddmm(d)} · ${pr} presenti su ${pa.length}">${pr}</button>`; }).join('')}</div>`;
+      const rows = pa.map((p) => {
+        const bars = ABS.filter((x) => x.who.id === p.id && x.status !== 'rifiutata').flatMap((x) => segsOf(x).map((g, gi, all) => {
+          const k = swKey(x); const [bg, fg] = SW[k]; const dim = reasonFilter && reasonFilter !== k; const len = g.e - g.s + 1;
+          return `<button type="button" class="pf-tlb${x.status === 'proposta' ? ' is-prop' : ''}${x.part !== 'all' ? ' is-' + x.part : ''}${dim ? ' is-dim' : ''}${x.id === selected ? ' is-sel' : ''}${gi > 0 ? ' cut-l' : ''}${gi < all.length - 1 ? ' cut-r' : ''}" style="grid-column:${g.s + 2} / ${g.e + 3};--bg:${bg};--fg:${fg}" data-abs="${x.id}" title="${esc(p.name)} · ${RL[x.reason]} · ${range(x)}${x.part !== 'all' ? ' · ' + PART[x.part] : ''} · ${STL[x.status]}">${x.status === 'proposta' ? ic('clock') : ''}${len >= 3 ? `<span>${RL[x.reason]}${len >= 5 ? ` · ${gg(workdays(x))}` : ''}</span>` : ''}</button>`;
+        })).join('');
+        return `<div class="pf-tlr pf-tlr-p${p.name === ME ? ' is-me' : ''}"><span class="pf-tln"><span class="ava">${ini(p.name)}</span><span class="nm">${esc(shortName(p.name))}</span></span>${cols()}${bars}</div>`;
       }).join('');
-      const bars = segs.map((g) => {
-        const k = swKey(g.a); const [bg, fg] = SW[k]; const dim = reasonFilter && reasonFilter !== k;
-        return `<button type="button" class="pf-cb${g.a.status === 'proposta' ? ' is-prop' : ''}${g.cut[0] ? ' cut-l' : ''}${g.cut[1] ? ' cut-r' : ''}${dim ? ' is-dim' : ''}${g.a.id === selected ? ' is-sel' : ''}" style="grid-column:${g.s + 1} / ${g.e + 2};grid-row:${g.lane + 2};--bg:${bg};--fg:${fg}" data-abs="${g.a.id}" title="${esc(g.a.who.name)} · ${RL[g.a.reason]} · ${range(g.a)}${g.a.part !== 'all' ? ' · ' + PART[g.a.part] : ''} · ${STL[g.a.status]}">
-          ${g.a.status === 'proposta' ? ic('clock') : ''}<span class="nm">${esc(shortName(g.a.who.name))}</span>${g.a.part !== 'all' ? `<em>${g.a.part === 'mat' ? 'MAT' : 'POM'}</em>` : g.e > g.s ? `<em>${RL[g.a.reason]}</em>` : ''}
-        </button>`;
-      }).join('');
-      return `<div class="pf-wk" style="grid-template-rows:30px repeat(${nl}, 24px) 8px">${cellsH}${bars}</div>`;
+      return `<div class="pf-tlg">${cov}${rows}</div>`;
     }).join('');
+    const cal = `<div class="pf-tl2" style="--n:${n}">${head}${groups}</div>`;
 
     // Giorno scelto
     const sd = selDay; const sdt = parse(sd); const pres = presentCount(ps, sd); const lv = covLevel(pres, ps.length);
@@ -228,9 +222,7 @@
     </section>`;
 
     return `<div class="pf-coord">
-      <div class="pf-cal">
-        <div class="pf-cal-wd">${['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((w) => `<span>${w}</span>`).join('')}</div>
-        <div class="pf-weeks">${weekHtml}</div>
+      <div class="pf-cal">${cal}
       </div>
       <aside class="pf-side">${dayCard}
         <section class="pf-side-q"><div class="pf-side-h"><h3>Da autorizzare</h3><span class="r-cnt">${pending().length}</span><button type="button" class="link-btn" data-view="pend">Vedi tutte</button></div>${authCards()}</section>
