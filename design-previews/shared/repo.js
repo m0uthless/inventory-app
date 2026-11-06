@@ -298,17 +298,74 @@
     return out;
   };
   const ISSUE_ST = { aperta: ['Aperta', 'info'], lav: ['In lavorazione', 'warning'], risolta: ['Risolta', 'success'] };
+  // Accesso: rete in tre caselle, poi una scheda per ogni coppia di credenziali.
+  const accessBlock = (a) => {
+    const net = [['Hostname', a.host], ['IP locale', a.ip], ['IP SRSA', a.srsa]];
+    const groups = [];
+    if (a.t !== 'mod') groups.push({ icon: 'monitor', t: 'Sistema operativo', sub: a.t === 'net' ? 'FortiOS · SSH' : 'Windows Server 2022 · RDP', user: 'administrator', pw: 'Arch!e-' + a.id, upd: '14/10/2026' });
+    if (a.t === 'pacs' || a.t === 'ris') groups.push({ icon: 'server', t: 'Applicazione', sub: `${TYPES[a.t][0]} · console di amministrazione`, user: 'pacsadmin', pw: 'Pacs#' + a.id, upd: '02/06/2026' });
+    const copyBtn = (l) => `<button type="button" class="icon-btn" data-copy aria-label="Copia ${l}" title="Copia">${ic('copy')}</button>`;
+    return `<section class="c-sec r-acc"><div class="c-sec-h"><h4>${ic('lock')}Accesso</h4><span class="c-app">credenziali solo qui</span></div>
+      <div class="r-net">${net.map(([l, v]) => `<div class="r-net-i"><span class="k">${l}</span><span class="v code">${v ? esc(v) : '<span class="none">—</span>'}</span>${v ? copyBtn(l) : ''}</div>`).join('')}</div>
+      ${groups.map((g) => `<div class="r-cg">
+        <div class="r-cg-h"><span class="r-cg-i">${ic(g.icon)}</span><span class="r-an"><b>${g.t}</b><small>${g.sub}</small></span><span class="r-cg-d">aggiornata il ${g.upd}</span></div>
+        <div class="r-cg-r"><span class="k">${ic('user')}Utente</span><span class="v code">${esc(g.user)}</span>${copyBtn('utente ' + g.t)}</div>
+        <div class="r-cg-r r-cg-pw"><span class="k">${ic('key')}Password</span><span class="v code" data-pwv="${esc(g.pw)}">••••••••</span><button type="button" class="icon-btn" data-pw aria-label="Mostra password ${g.t}" title="Mostra · si nasconde dopo 30 secondi">${ic('eye')}</button>${copyBtn('password ' + g.t)}<i class="r-cg-bar" aria-hidden="true"></i></div>
+      </div>`).join('') || '<p class="files-empty">Nessuna credenziale registrata per questo sistema.</p>'}
+      <p class="c-audit r-acc-n">${ic('lock')}<span>Le password si vedono solo con il permesso Credenziali e si nascondono da sole dopo 30 secondi.</span></p>
+    </section>`;
+  };
+  // Manutenzioni: solo per i sistemi hardware.
+  const HW = ['ws', 'mod', 'net', 'mgmt'];
+  const TODAY = new Date(2026, 10, 6);
+  const fmtD = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const addM = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
+  const TECHS = ['Marco Bianchi', 'Elena Ferri', 'Davide Conti'];
+  const PLAN_T = { mod: [['Manutenzione preventiva Philips', 6], ['Controlli di qualità', 12]], ws: [['Pulizia e aggiornamento firmware', 12]], net: [['Firmware e backup configurazione', 6]], mgmt: [['Verifica RAID e backup', 3]] };
+  const RES = { ok: ['Eseguita', 'success'], partial: ['Parziale', 'warning'], ko: ['Non riuscita', 'error'], not_planned: ['Non prevista', 'neutral'] };
+  const maintFor = (a) => {
+    if (!HW.includes(a.t)) return null;
+    const offs = [6, -12, 40, 95, 150];
+    const plans = PLAN_T[a.t].map(([t, every], i) => {
+      const due = new Date(TODAY); due.setDate(due.getDate() + offs[(a.id + i) % offs.length]);
+      return { t, every, due, tech: TECHS[(a.id + i) % 3] };
+    });
+    const ev = [];
+    plans.forEach((p, pi) => { for (let k = 1; k <= (p.every >= 12 ? 2 : 3); k++) {
+      const d = addM(p.due, -p.every * k); const r = (a.id + k + pi) % 7 === 0 ? 'ko' : (a.id + k) % 5 === 0 ? 'partial' : 'ok';
+      ev.push({ d, plan: p.t, tech: TECHS[(a.id + k + pi) % 3], res: r, pdf: (a.id + k) % 4 !== 0 ? `rapportino_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.pdf` : '' });
+    } });
+    ev.sort((x, y) => y.d - x.d);
+    return { plans, ev };
+  };
+  const dueBadge = (due) => {
+    const days = Math.round((due - TODAY) / 864e5);
+    if (days < 0) return `<span class="r-ist r-ist-error">scaduta da ${-days} giorni</span>`;
+    if (days <= 30) return `<span class="r-ist r-ist-warning">tra ${days} giorni</span>`;
+    const m = Math.round(days / 30); return `<span class="r-ist r-ist-neutral">tra ${m} ${m === 1 ? 'mese' : 'mesi'}</span>`;
+  };
+  const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const maintTab = (m) => `<div class="drawer-body int-body">
+      <section class="c-sec"><div class="c-sec-h"><h4>${ic('calendar')}Piani di manutenzione <span>${m.plans.length}</span></h4><button type="button" class="c-link" data-toast="Si apre il modulo Manutenzione">Apri in Manutenzione</button></div>
+        <ul class="r-plans">${m.plans.map((p) => `<li><span class="r-an"><b>${esc(p.t)}</b><small>ogni ${p.every} mesi · tecnico ${p.tech}</small></span><span class="r-due"><b>${fmtD(p.due)}</b>${dueBadge(p.due)}</span></li>`).join('')}</ul></section>
+      <section class="c-sec"><div class="c-sec-h"><h4>${ic('file')}Interventi e rapportini <span>${m.ev.length}</span></h4></div>
+        <ol class="r-ev">${m.ev.map((e) => `<li>
+          <span class="r-ev-d"><b>${e.d.getDate()}</b><small>${MESI[e.d.getMonth()]} ${String(e.d.getFullYear()).slice(2)}</small></span>
+          <span class="r-an"><b>${esc(e.plan)}</b><small>${e.tech} · <span class="r-res r-res-${RES[e.res][1]}">${RES[e.res][0]}</span></small></span>
+          ${e.pdf ? `<button type="button" class="r-pdf" data-toast="Download di ${e.pdf}" title="${e.pdf}">${ic('file')}<span>PDF</span>${ic('download')}</button>` : `<button type="button" class="r-pdf r-pdf-miss" data-toast="Carica il rapportino">${ic('upload')}<span>Carica</span></button>`}
+        </li>`).join('')}</ol></section></div>`;
   let rTab = 'det'; let rPp = false;
   const openAsset = (id, keepTab) => {
     const a = ALL_ASSETS.find((x) => x.id === id); if (!a) return;
     if (!keepTab && selected !== id) rTab = 'det';
     selected = id; drawer.hidden = false; shell.classList.add('has-drawer');
-    const x = extra(a); const iss = issuesFor(a);
+    const x = extra(a); const iss = issuesFor(a); const mt = maintFor(a);
+    if (rTab === 'man' && !mt) rTab = 'det';
     $('[data-rd="kn"]').textContent = a.kn;
     $('[data-rd="st"]').innerHTML = stBadge(a.st);
     $('[data-rd="title"]').innerHTML = `<span class="r-ttl">${typeTile(a.t)}${esc(a.name)}</span>`;
     $('[data-rd="sub"]').textContent = [TYPES[a.t][0], a.host, a.c.name, a.s.name].filter(Boolean).join(' · ');
-    $('[data-rtabs]').innerHTML = [['det', 'Dettagli'], ['iss', 'Issue', iss.length], ['att', 'Attività', 4]].map(([k, l, n]) => `<button role="tab" data-rtab="${k}" aria-selected="${rTab === k}">${l}${n !== undefined ? ` <span class="tn">${n}</span>` : ''}</button>`).join('');
+    $('[data-rtabs]').innerHTML = [['det', 'Dettagli'], ['iss', 'Issue', iss.length], ...(mt ? [['man', 'Manutenzioni', mt.plans.some((p) => p.due - TODAY < 31 * 864e5) ? '!' : mt.ev.length]] : []), ['att', 'Attività', 4]].map(([k, l, n]) => `<button role="tab" data-rtab="${k}" aria-selected="${rTab === k}">${l}${n === '!' ? ' <span class="tn tn-w" title="Manutenzione in scadenza o scaduta">!</span>' : n !== undefined ? ` <span class="tn">${n}</span>` : ''}</button>`).join('');
     const pi = (k, label, v, icon = 'wrench', full = false) => `<button type="button" class="pp-i${full ? ' pp-full' : ''}" data-edit="${k}"><span class="k">${label}</span><span class="v">${v}</span>${ic(icon)}</button>`;
     const none = '<span class="none">—</span>';
     const props = `<section class="pp${rPp ? ' is-open' : ''}" aria-label="Proprietà">
@@ -327,9 +384,7 @@
       ${a.prio ? `<div class="r-alert">${prio(a.prio)}<span>Issue aperta su questo sistema · priorità ${PRL[a.prio]}</span><button type="button" class="c-link" data-rtab="iss">Vedi</button></div>` : ''}
       <div class="r-plate-w">${plate(a.kn)}</div>
       ${props}
-      <section class="c-sec"><div class="c-sec-h"><h4>${ic('lock')}Accesso</h4><span class="c-app">credenziali solo qui</span></div>
-        <div class="c-cred">${credRow('Hostname', a.host || '—')}${credRow('IP locale', a.ip || '—')}${credRow('IP SRSA', a.srsa || '—')}${a.t !== 'mod' ? credRow('Utente OS', 'administrator') + credRow('Password OS', 'Arch!e-' + a.id, true) : ''}${a.t === 'pacs' || a.t === 'ris' ? credRow('Utente app', 'pacsadmin') + credRow('Password app', 'Pacs#' + a.id, true) : ''}</div>
-        <p class="c-audit">Le password si vedono solo con il permesso Credenziali.</p></section>
+      ${accessBlock(a)}
       <section class="c-sec"><div class="c-sec-h"><h4>Dove si trova</h4></div>
         <ul class="cl-sites"><li><button type="button"><span class="ti">${ic('building')}</span><div class="fn"><b>${esc(a.c.name)}</b><span>Cliente · ${provName(a.c.prov)}</span></div><span></span>${ic('chevR')}</button></li>
         <li><button type="button"><span class="ti">${ic('pin')}</span><div class="fn"><b>${esc(a.s.name)}</b><span>${esc(a.s.addr || 'Nessun indirizzo')}</span></div><span></span>${ic('chevR')}</button></li></ul></section>
@@ -341,8 +396,9 @@
     const ev = [['plus', 'Archie', 'ha creato l\'inventario', '12/03/2024'], ['wrench', 'F. Mutuale', `ha cambiato l'IP locale in <b>${esc(a.ip || '—')}</b>`, '28/10/2026'], ['lock', 'L. Romano', 'ha aggiornato la password OS', '14/10/2026'], ['wrench', 'F. Mutuale', `ha cambiato lo stato in <b>${ST[a.st]}</b>`, '02/09/2026']];
     const attTab = `<div class="drawer-body int-body"><div class="feed" style="border-top:0;padding-top:0">${ev.map(([i, w, t, d]) => `<div class="ev">${ic(i)}<span><b>${w}</b> ${t}</span><time>${d}</time></div>`).join('')}</div></div>`;
     const foot = rTab === 'det' ? `<div class="drawer-foot"><button class="btn" type="button">${ic('wrench')}Modifica</button><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>`
-      : rTab === 'iss' ? `<div class="drawer-foot"><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>` : '';
-    rbody.innerHTML = (rTab === 'det' ? det : rTab === 'iss' ? issTab : attTab) + foot;
+      : rTab === 'iss' ? `<div class="drawer-foot"><span class="g-spacer"></span><button class="btn btn-primary" type="button">${ic('plus')}Nuova issue</button></div>`
+      : rTab === 'man' ? `<div class="drawer-foot"><button class="btn" type="button" data-toast="Carica un rapportino PDF">${ic('upload')}Carica rapportino</button><span class="g-spacer"></span><button class="btn btn-primary" type="button" data-toast="Registra un intervento">${ic('plus')}Registra intervento</button></div>` : '';
+    rbody.innerHTML = (rTab === 'det' ? det : rTab === 'iss' ? issTab : rTab === 'man' ? maintTab(mt) : attTab) + foot;
     markSel()
   };
   const close = () => { drawer.hidden = true; selected = null; shell.classList.remove('has-drawer'); markSel(); };
@@ -362,6 +418,13 @@
     if (e.target.closest('[data-rpp]')) { rPp = !rPp; openAsset(selected, true); return; }
     if (e.target.closest('[data-edit]')) { toast('Modifica sul posto, come in Clienti e Siti (con Annulla)'); return; }
     const tt = e.target.closest('[data-toast]'); if (tt) { toast(tt.dataset.toast); return; }
+    const pw = e.target.closest('[data-pw]');
+    if (pw) {
+      const row = pw.closest('.r-cg-pw'); const v = row.querySelector('[data-pwv]'); const on = !row.classList.contains('is-shown');
+      clearTimeout(row._t); row.classList.toggle('is-shown', on); v.textContent = on ? v.dataset.pwv : '••••••••'; pw.innerHTML = ic(on ? 'eyeOff' : 'eye'); pw.title = on ? 'Nascondi' : 'Mostra · si nasconde dopo 30 secondi';
+      if (on) row._t = setTimeout(() => { row.classList.remove('is-shown'); v.textContent = '••••••••'; pw.innerHTML = ic('eye'); }, 30000);
+      return;
+    }
     const rv = e.target.closest('[data-reveal]');
     if (rv) { const c = rv.previousElementSibling; const shown = c.textContent !== '••••••••'; c.textContent = shown ? '••••••••' : rv.dataset.reveal; rv.closest('.sec').classList.toggle('is-shown', !shown); }
     if (e.target.closest('[data-copy]')) toast('Copiato negli appunti');
