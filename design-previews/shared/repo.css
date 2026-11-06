@@ -233,3 +233,31 @@ mark { background: color-mix(in oklab, var(--warning) 28%, transparent); color: 
 .r-hot-i:focus-visible { outline: none; box-shadow: var(--focus); }
 .r-hot-e { margin: 4px; font-size: 12px; color: var(--muted); }
 @media (max-width: 760px) { .r-head .r-search { flex-basis: 100%; margin-left: 0; order: 3; max-width: none; } }
+
+/* Colori di categoria degli asset */
+.r-tc { background: color-mix(in oklab, var(--tc) 15%, var(--surface)); color: var(--tc); }
+:root[data-theme="dark"] .r-tc { background: color-mix(in oklab, var(--tc) 26%, var(--surface)); color: color-mix(in oklab, var(--tc) 55%, white); }
+.r-tdots { display: inline-flex; gap: 3px; flex: none; }
+.r-tdots i { width: 8px; height: 8px; border-radius: 2px; background: var(--tc); }
+.r-cats { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 2px 4px 8px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
+.r-cats span { display: inline-flex; align-items: center; gap: 5px; }
+.r-cats i { width: 8px; height: 8px; border-radius: 2px; background: var(--tc); }
+.r-cats b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.r-hot-i { grid-template-columns: 28px minmax(0, 1fr) auto; }
+.r-ttl .r-ti { width: 26px; height: 26px; }
+/* B: province espandibili */
+.r-ptable .r-prow { grid-template-columns: 20px minmax(0, 1fr) 70px 56px 60px 76px; }
+.r-pgroup { border-bottom: 1px solid var(--border); }
+.r-pgroup:last-child { border-bottom: 0; }
+.r-pgroup .r-prow { border-bottom: 0; }
+.r-pgroup.is-open > .r-prow { background: var(--surface-2); }
+.r-pgroup.is-open > .r-prow .r-an b { color: var(--primary); }
+.r-pexp { padding: 4px 12px 12px 34px; background: var(--surface-2); display: grid; gap: 8px; }
+.r-pcust { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.r-pcust > .r-cust-h { border-bottom: 1px solid var(--border); }
+.r-psites .r-site { border: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
+.r-psites .r-site:last-child { border-bottom: 0; }
+.r-psites .r-site + .r-site { margin-top: 0; }
+.r-pane-a { display: flex; gap: 4px; align-self: center; }
+@media (max-width: 760px) { .r-ptable .r-prow { grid-template-columns: 20px minmax(0, 1fr) 50px 56px; } .r-ptable .r-prow > :nth-child(4), .r-ptable .r-prow > :nth-child(6) { display: none; } .r-pexp { padding-left: 8px; } }
+.r-prow-h > span:nth-child(2) { text-align: left; }

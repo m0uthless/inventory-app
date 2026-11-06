@@ -16,10 +16,13 @@
 
   // ── Dati ──────────────────────────────────────────────────────────
   const VEN = { Philips: '#3f7fbf', Biotron: '#2e8b6e', 'Medical Imaging': '#b4673a' };
+  // Categorie di asset con un colore di riconoscimento (tinte calme: il rosso resta per guasti e criticità).
   const TYPES = {
-    pacs: ['PACS', 'server'], ris: ['RIS', 'server'], vna: ['VNA', 'layers'], ws: ['Workstation', 'monitor'],
-    mod: ['Modalità', 'monitor'], mgmt: ['Management', 'server'], net: ['Router VPN', 'cloud'], vue: ['Vue Motion', 'server'],
+    pacs: ['PACS', 'server', '#3f7fbf'], ris: ['RIS', 'file', '#7a5bb8'], vna: ['VNA', 'layers', '#2e8b8b'], ws: ['Workstation', 'monitor', '#5b6f86'],
+    mod: ['Modalità', 'activity', '#b4673a'], mgmt: ['Management', 'wrench', '#4a58a6'], net: ['Router VPN', 'cloud', '#2f8fa8'], vue: ['Vue Motion', 'eye', '#6f8a3a'],
   };
+  const typeTile = (t) => `<span class="r-ti r-tc" style="--tc:${TYPES[t][2]}" title="${TYPES[t][0]}">${ic(TYPES[t][1])}</span>`;
+  const typeDots = (as) => { const ks = [...new Set(as.map((a) => a.t))]; return `<span class="r-tdots" aria-label="Categorie: ${ks.map((k) => TYPES[k][0]).join(', ')}">${ks.map((k) => `<i style="--tc:${TYPES[k][2]}" title="${TYPES[k][0]}"></i>`).join('')}</span>`; };
   const ST = { in_use: 'In uso', to_install: 'Da installare', maintenance: 'In manutenzione', repair: 'Guasto', retired: 'Dismesso' };
   // [nome, provincia, città, vendor, contatto, telefono, VPN, siti: [nome, indirizzo, stato, asset: [tipo, nome, host, ip, stato, issuePrio]]]
   const RAW = [
@@ -84,7 +87,7 @@
   // ── Stato pagina ──────────────────────────────────────────────────
   let variant = 'a'; let group = 'prov'; let q = ''; let selected = null;
   const openProv = new Set(['BO']); const openCust = new Set([1]); const openSite = new Set([1]);
-  let bProv = null; let bRegion = null; // B: all'apertura Italia + tutte le province
+  let bProv = null; let bRegion = null; const bOpen = new Set(); // B: all'apertura Italia + tutte le province
   let cProv = 'BO'; let cCust = 1; let cSite = 1;
 
   // ── Elementi comuni ──────────────────────────────────────────────
@@ -103,7 +106,7 @@
   const prio = (p) => p ? `<span class="r-prio${p === 'critical' ? ' is-crit' : ''}" title="Issue aperta · priorità ${PRL[p]}">${[1, 2, 3, 4].map((i) => `<i style="height:${3 + i * 2.25}px" class="${i <= BARS[p] ? 'on' : ''}"></i>`).join('')}</span>` : '';
   const hl = (t) => { if (!q) return esc(t); const i = String(t).toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return esc(t); return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length)); };
   const assetRow = (a, opts = {}) => `<button type="button" class="r-asset${a.id === selected ? ' is-sel' : ''}" data-open="${a.id}">
-      <span class="r-ti">${ic(TYPES[a.t][1])}</span>
+      ${typeTile(a.t)}
       <span class="r-an"><b>${hl(a.name)}${prio(a.prio)}</b><small>${TYPES[a.t][0]}${opts.path ? ` · ${esc(a.c.name)} › ${esc(a.s.name)}` : ''}</small></span>
       <span class="r-mono">${a.host ? hl(a.host) : '<span class="none">—</span>'}</span>
       <span class="r-mono">${a.ip ? hl(a.ip) : '<span class="miss">Nessun IP</span>'}</span>
@@ -160,7 +163,7 @@
             ${oc ? `<div class="r-sites">${c.sites.map((s) => {
               const os = openSite.has(s.id);
               return `<div class="r-site${os ? ' is-open' : ''}">
-                <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti brand">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
+                <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti brand">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
                 ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}
               </div>`;
             }).join('')}</div>` : ''}
@@ -203,39 +206,34 @@
         <div class="r-map-h">${bRegion ? `<button type="button" class="r-back" data-region-back>${ic('chevL')}Italia</button><b>${regionName(bRegion)}</b>` : '<b>Italia</b><span>scegli una regione</span>'}</div>
         <div class="r-map-w">${mapSvg(bRegion, bRegion ? bProv : null)}</div>
         <div class="r-legend" aria-hidden="true"><span>meno asset</span><i></i><span>più asset</span></div>
+        <div class="r-cats">${Object.entries(TYPES).map(([k, [l, , c]]) => `<span><i style="--tc:${c}"></i>${l} <b>${ALL_ASSETS.filter((a) => a.t === k && (!bRegion || regionOf(a.c.prov) === bRegion)).length}</b></span>`).join('')}</div>
         <div class="r-hot">
           <div class="r-pl-g">Sistemi con issue aperte${bRegion ? ` · ${regionName(bRegion)}` : ' · Italia'} <span class="r-cnt">${hot.length}</span></div>
-          ${hot.length ? hot.map((a) => `<button type="button" class="r-hot-i" data-open="${a.id}"><span class="r-an"><b>${esc(a.name)}${prio(a.prio)}</b><small>${esc(a.c.name)} › ${esc(a.s.name)}</small></span><span class="r-sig">${a.c.prov}</span></button>`).join('') : '<p class="r-hot-e">Nessuna issue aperta sui sistemi di questo territorio.</p>'}
+          ${hot.length ? hot.map((a) => `<button type="button" class="r-hot-i" data-open="${a.id}">${typeTile(a.t)}<span class="r-an"><b>${esc(a.name)}${prio(a.prio)}</b><small>${esc(a.c.name)} › ${esc(a.s.name)}</small></span><span class="r-sig">${a.c.prov}</span></button>`).join('') : '<p class="r-hot-e">Nessuna issue aperta sui sistemi di questo territorio.</p>'}
         </div>
       </aside>`;
-    let right;
-    if (bProv === null) {
-      const list = provs.filter((p) => !bRegion || regionOf(p) === bRegion).sort((a, b) => provName(a).localeCompare(provName(b), 'it'));
-      right = `<div class="r-pane">
-        <div class="r-pane-h"><div><h2>${bRegion ? `Province · ${regionName(bRegion)}` : 'Tutte le province'}</h2><span>${list.length} province con clienti, in ordine alfabetico</span></div>
-          ${bRegion ? `<button type="button" class="btn btn-ghost btn-sm" data-region-back>Mostra tutte</button>` : ''}</div>
-        <section class="panel r-ptable">
-          <div class="r-prow r-prow-h"><span>Provincia</span><span>Clienti</span><span>Siti</span><span>Asset</span><span>Con issue</span><span></span></div>
-          ${list.map((p) => { const st = provStats(p); return `<button type="button" class="r-prow" data-prov="${p}">
-            <span class="r-an"><b>${provName(p)} <span class="r-sig">${p}</span></b><small>${regionName(regionOf(p))}</small></span>
-            <span class="r-num">${st.cs.length}</span><span class="r-num">${st.sites}</span><span class="r-num">${st.assets}</span>
-            <span class="r-num">${st.issues ? `<span class="w">${st.issues}</span>` : '<span class="none">—</span>'}</span>${ic('chevR')}</button>`; }).join('')}
-          ${noProv && !bRegion ? (() => { const st = provStats(''); return `<button type="button" class="r-prow" data-prov=""><span class="r-an"><b><i>Senza provincia</i></b><small>clienti senza provincia in anagrafica</small></span><span class="r-num">${st.cs.length}</span><span class="r-num">${st.sites}</span><span class="r-num">${st.assets}</span><span class="r-num">${st.issues ? `<span class="w">${st.issues}</span>` : '<span class="none">—</span>'}</span>${ic('chevR')}</button>`; })() : ''}
-        </section></div>`;
-    } else {
-      const st = provStats(bProv);
-      right = `<div class="r-pane">
-        <div class="r-pane-h"><div><button type="button" class="r-back r-back-p" data-prov-back>${ic('chevL')}${bRegion ? `Province · ${regionName(bRegion)}` : 'Tutte le province'}</button>
-          <h2>${bProv ? `${provName(bProv)} <span class="r-sig">${bProv}</span>` : 'Senza provincia'}</h2><span>${bProv ? regionName(regionOf(bProv)) : 'Clienti senza provincia in anagrafica'}</span></div>
-          <div class="r-stats"><span><b>${st.cs.length}</b>clienti</span><span><b>${st.sites}</b>siti</span><span><b>${st.assets}</b>asset</span><span class="${st.issues ? 'w' : ''}"><b>${st.issues}</b>con issue</span></div></div>
-        ${st.cs.map((c) => `<section class="panel r-bcust">
-          <div class="r-cust-h"><span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ''}</small></span><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
-          ${c.sites.map((s) => { const os = openSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
-            <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
-            ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}
-        </section>`).join('')}
+    // Destra: province in ordine alfabetico; clic → si espandono sul posto con i clienti.
+    const list = provs.filter((p) => !bRegion || regionOf(p) === bRegion).sort((a, b) => provName(a).localeCompare(provName(b), 'it'));
+    if (noProv && !bRegion) list.push('')
+    const custBlock = (c) => `<div class="r-pcust">
+        <div class="r-cust-h"><span class="r-ti brand">${ic('building')}</span><span class="r-an"><b>${esc(c.name)}</b><small>${venDot(c.ven)}${c.contact ? ` · ${esc(c.contact)}` : ' · <span class="miss">Nessun contatto</span>'}</small></span><span class="r-n">${c.sites.length} siti · ${assetsOf(c)} asset</span>${custActions(c)}</div>
+        <div class="r-psites">${c.sites.map((s) => { const os = openSite.has(s.id); return `<div class="r-site${os ? ' is-open' : ''}">
+          <button type="button" class="r-site-h" data-tog-site="${s.id}" aria-expanded="${os}">${chev(os)}<span class="r-ti">${ic('pin')}</span><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span>${typeDots(s.assets)}${siteSt(s.st)}<span class="r-n">${s.assets.length} asset${issuesOf(s.assets) ? ` · <span class="w">${issuesOf(s.assets)} issue</span>` : ''}</span></button>
+          ${os ? `<div class="r-assets">${assetHead}${s.assets.map((a) => assetRow(a)).join('')}</div>` : ''}</div>`; }).join('')}</div>
       </div>`;
-    }
+    const right = `<div class="r-pane">
+        <div class="r-pane-h"><div><h2>${bRegion ? `Province · ${regionName(bRegion)}` : 'Tutte le province'}</h2><span>${list.filter(Boolean).length} province con clienti, in ordine alfabetico · clic per vedere i clienti</span></div>
+          <div class="r-pane-a">${bOpen.size ? `<button type="button" class="btn btn-ghost btn-sm" data-pclose-all>Chiudi tutte</button>` : ''}${bRegion ? `<button type="button" class="btn btn-ghost btn-sm" data-region-back>Mostra tutte</button>` : ''}</div></div>
+        <section class="panel r-ptable">
+          <div class="r-prow r-prow-h"><span></span><span>Provincia</span><span>Clienti</span><span>Siti</span><span>Asset</span><span>Con issue</span></div>
+          ${list.map((p) => { const st = provStats(p); const open = bOpen.has(p); return `<div class="r-pgroup${open ? ' is-open' : ''}" data-pgroup="${p}">
+            <button type="button" class="r-prow" data-ptoggle="${p}" aria-expanded="${open}">${chev(open)}
+              <span class="r-an"><b>${p ? `${provName(p)} <span class="r-sig">${p}</span>` : '<i>Senza provincia</i>'}</b><small>${p ? regionName(regionOf(p)) : 'clienti senza provincia in anagrafica'}</small></span>
+              <span class="r-num">${st.cs.length}</span><span class="r-num">${st.sites}</span><span class="r-num">${st.assets}</span>
+              <span class="r-num">${st.issues ? `<span class="w">${st.issues}</span>` : '<span class="none">—</span>'}</span></button>
+            ${open ? `<div class="r-pexp">${st.cs.map(custBlock).join('')}</div>` : ''}
+          </div>`; }).join('')}
+        </section></div>`;
     return `<div class="r-split">${left}${right}</div>`;
   };
 
@@ -254,7 +252,7 @@
         ${col('Sito', cust ? cust.sites.length : 0, cust ? cust.sites.map((s) => `<button type="button" class="r-ci${s === site ? ' is-sel' : ''}" data-csite="${s.id}"><span class="r-an"><b>${esc(s.name)}</b><small>${esc(s.addr || 'Nessun indirizzo')}</small></span><span class="r-n">${s.assets.length}${issuesOf(s.assets) ? '<i class="r-dot"></i>' : ''}</span>${ic('chevR')}</button>`).join('') : '')}
         <div class="r-col r-col-wide"><div class="r-col-h"><b>Asset</b><span>${site ? site.assets.length : 0}</span>${cust ? `<span class="r-sp"></span>${custActions(cust)}` : ''}</div>
           <div class="r-col-b">${cust ? `<div class="r-ccust"><b>${esc(cust.name)}</b>${cust.contact ? `<span>${esc(cust.contact)} · <a href="tel:${cust.phone.replace(/\s+/g, '')}" class="r-mono">${esc(cust.phone)}</a></span>` : '<span class="miss">Nessun contatto primario</span>'}</div>` : ''}
-            ${site ? site.assets.map((a) => `<button type="button" class="r-asset r-asset-c${a.id === selected ? ' is-sel' : ''}" data-open="${a.id}"><span class="r-ti">${ic(TYPES[a.t][1])}</span><span class="r-an"><b>${esc(a.name)}${prio(a.prio)}</b><small><span class="r-mono">${esc(a.host || '—')}</span> · <span class="r-mono">${esc(a.ip || 'nessun IP')}</span></small></span><span>${stBadge(a.st)}</span></button>`).join('') : '<p class="r-empty">Nessun sito.</p>'}</div></div>
+            ${site ? site.assets.map((a) => `<button type="button" class="r-asset r-asset-c${a.id === selected ? ' is-sel' : ''}" data-open="${a.id}">${typeTile(a.t)}<span class="r-an"><b>${esc(a.name)}${prio(a.prio)}</b><small><span class="r-mono">${esc(a.host || '—')}</span> · <span class="r-mono">${esc(a.ip || 'nessun IP')}</span></small></span><span>${stBadge(a.st)}</span></button>`).join('') : '<p class="r-empty">Nessun sito.</p>'}</div></div>
       </section>`;
   };
 
@@ -277,7 +275,7 @@
     selected = id; drawer.hidden = false; shell.classList.add('has-drawer');
     $('[data-rd="kn"]').textContent = a.kn;
     $('[data-rd="st"]').innerHTML = stBadge(a.st);
-    $('[data-rd="title"]').innerHTML = `<span class="r-ttl">${ic(TYPES[a.t][1])}${esc(a.name)}</span>`;
+    $('[data-rd="title"]').innerHTML = `<span class="r-ttl">${typeTile(a.t)}${esc(a.name)}</span>`;
     $('[data-rd="sub"]').textContent = [TYPES[a.t][0], a.host, a.c.name, a.s.name].filter(Boolean).join(' · ');
     rbody.innerHTML = `<div class="drawer-body int-body">
       ${a.prio ? `<div class="r-alert">${prio(a.prio)}<span>Issue aperta su questo sistema · priorità ${PRL[a.prio]}</span><button type="button" class="c-link">Vedi</button></div>` : ''}
@@ -312,9 +310,13 @@
     if ((el = t('[data-tog-cust]'))) { const k = Number(el.dataset.togCust); openCust.has(k) ? openCust.delete(k) : openCust.add(k); render(); return; }
     if ((el = t('[data-tog-site]'))) { const k = Number(el.dataset.togSite); openSite.has(k) ? openSite.delete(k) : openSite.add(k); render(); return; }
     if ((el = t('[data-region-back]'))) { bRegion = null; bProv = null; render(); return; }
-    if ((el = t('[data-prov-back]'))) { bProv = null; render(); return; }
+    if ((el = t('[data-ptoggle]'))) { const k = el.dataset.ptoggle; if (bOpen.has(k)) bOpen.delete(k); else { bOpen.add(k); bProv = k; } render(); return; }
+    if ((el = t('[data-pclose-all]'))) { bOpen.clear(); render(); return; }
     if ((el = t('[data-region]'))) { bRegion = el.dataset.region; bProv = null; if (variant === 'c') { const p = CUST.find((c) => regionOf(c.prov) === bRegion)?.prov; if (p) { cProv = p; cCust = CUST.find((c) => c.prov === p).id; cSite = null; } } render(); return; }
-    if ((el = t('[data-prov]'))) { bProv = el.dataset.prov; if (bProv) bRegion = regionOf(bProv) || bRegion; render(); return; }
+    if ((el = t('[data-prov]'))) {
+      bProv = el.dataset.prov; if (bProv) bRegion = regionOf(bProv) || bRegion; bOpen.add(bProv); render();
+      document.querySelector(`[data-pgroup="${bProv}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); return;
+    }
     if ((el = t('[data-cprov]'))) { cProv = el.dataset.cprov; cCust = null; cSite = null; render(); return; }
     if ((el = t('[data-ccust]'))) { cCust = Number(el.dataset.ccust); cSite = null; render(); return; }
     if ((el = t('[data-csite]'))) { cSite = Number(el.dataset.csite); render(); return; }
