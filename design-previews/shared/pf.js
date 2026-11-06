@@ -90,7 +90,8 @@
   const absentFull = (p, day) => { const c = cell(p, day); return [c.mat, c.pom].every((a) => a && a.status !== 'rifiutata'); };
 
   // ── Stato pagina ────────────────────────────────────────────────────
-  let variant = 'a'; let area = MY_AREA; let view = 'cal'; let reasonFilter = null; let zoom = 'month'; let selDay = TODAY; let selected = null;
+  let role = 'coord'; let area = MY_AREA; let view = 'cal'; let reasonFilter = null; let selDay = TODAY; let selected = null;
+  const isCoord = () => role === 'coord';
   const people = () => PEOPLE.filter((p) => area === 'all' || p.area === area);
   const pending = () => ABS.filter((a) => a.status === 'proposta' && (area === 'all' || a.who.area === area));
   const presentCount = (ps, day) => ps.filter((p) => !absentFull(p, day)).length;
@@ -126,11 +127,13 @@
     kpiWrap.innerHTML = `<div class="kpis" role="group" aria-label="Indicatori piano ferie">
       <button type="button" class="kpi" data-goday="${TODAY}"><span class="kpi-h">Assenti oggi<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${offToday.length}<small>su ${ps.length}</small></span>
         <span class="kpi-s pf-avas">${offToday.map((p) => { const c = cell(p, TODAY); const a = c.mat || c.pom; return `<span class="ava" title="${esc(p.name)} · ${RL[a.reason]}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}" style="background:${SW[swKey(a)][0]};color:${SW[swKey(a)][1]}">${ini(p.name)}</span>`; }).join('') || 'nessuno'}</span></button>
-      <button type="button" class="kpi" data-goview="pend" aria-pressed="${view === 'pend'}"><span class="kpi-h">Da validare<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${pend.length}<small>${gg(pendDays)}</small></span>
-        <span class="kpi-s">${pend.length ? `la più vecchia del <b>${oldest.slice(0, 5)}</b>` : 'nessuna richiesta in attesa'}</span></button>
+      ${isCoord() ? `<button type="button" class="kpi" data-goview="pend" aria-pressed="${view === 'pend'}"><span class="kpi-h">Da validare<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${pend.length}<small>${gg(pendDays)}</small></span>
+        <span class="kpi-s">${pend.length ? `la più vecchia del <b>${oldest.slice(0, 5)}</b>` : 'nessuna richiesta in attesa'}</span></button>`
+      : (() => { const my = ABS.filter((a) => a.who.name === ME && a.status === 'proposta'); return `<button type="button" class="kpi" data-goview="mine" aria-pressed="${view === 'mine'}"><span class="kpi-h">Le tue richieste in attesa<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${my.length}<small>${gg(my.reduce((n, a) => n + workdays(a), 0))}</small></span>
+        <span class="kpi-s">${my.length ? `prossima: <b>${range(my.sort((x, y) => x.from.localeCompare(y.from))[0])}</b>` : 'nessuna richiesta in attesa'}</span></button>`; })()}
       <div class="kpi"><span class="kpi-h">Ferie validate · ${MONTHS[month].toLowerCase()}</span><span class="kpi-v">${String(ferieV).replace('.', ',')}<small>giorni</small></span>
         <span class="kpi-s"><b>${pend.filter((a) => a.reason === 'ferie').length}</b>&nbsp;richieste di ferie in attesa</span></div>
-      <button type="button" class="kpi" data-goday="${worst[0]}"><span class="kpi-h">Giorno più scoperto<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${ddmm(worst[0])}${covLevel(worst[1], ps.length) === 'low' ? ' <span class="kpi-flag warn">▲ copertura bassa</span>' : ''}</span>
+      <button type="button" class="kpi" data-goday="${worst[0]}"${isCoord() ? '' : ' disabled'}><span class="kpi-h">Giorno più scoperto<span class="go">${ic('arrowR')}</span></span><span class="kpi-v">${ddmm(worst[0])}${covLevel(worst[1], ps.length) === 'low' ? ' <span class="kpi-flag warn">▲ copertura bassa</span>' : ''}</span>
         <span class="kpi-s"><b>${worst[1]}</b>&nbsp;presenti su ${ps.length}</span></button>
       <div class="kpi kpi-prio"><span class="kpi-h">Assenze del mese per motivo · ${String(tot).replace('.', ',')} gg</span>
         <div class="bar" aria-hidden="true">${parts.map(([k, n]) => `<span style="flex:${n};background:${SW[k][1]}" data-tip="${SW[k][2]} · <b>${String(n).replace('.', ',')} gg</b>"></span>`).join('')}</div>
@@ -140,12 +143,12 @@
 
   const paintViews = () => {
     const n = pending().length;
-    $('[data-pf-views]').innerHTML = [['cal', 'Calendario'], ['pend', 'Da validare', n], ['mine', 'Le mie richieste', ABS.filter((a) => a.who.name === ME).length]]
+    const tabs = [['cal', 'Griglia'], ...(isCoord() ? [['coord', 'Coordinamento'], ['pend', 'Da validare', n]] : []), ['mine', 'Le mie richieste', ABS.filter((a) => a.who.name === ME).length]]
+    $('[data-pf-views]').innerHTML = tabs
       .map(([k, l, c]) => `<button type="button" aria-pressed="${view === k}" data-view="${k}">${l}${c !== undefined ? ` <span>${c}</span>` : ''}</button>`).join('');
     const legend = Object.entries(SW).filter(([k]) => k !== 'rifiutata').map(([k, [bg, fg, l]]) => `<button type="button" class="pf-lg${reasonFilter === k ? ' is-on' : ''}${reasonFilter && reasonFilter !== k ? ' is-dim' : ''}" data-reason="${k}" aria-pressed="${reasonFilter === k}"><i class="${k === 'ferie_p' ? 'is-prop' : ''}" style="background:${bg};border-color:${fg}"></i>${l}</button>`).join('');
-    $('[data-pf-tools]').innerHTML = view !== 'cal' ? '' : `<div class="pf-legend" role="group" aria-label="Legenda e filtro per motivo">${legend}${reasonFilter ? '<button type="button" class="link-btn" data-reason="">Mostra tutti</button>' : ''}</div>
-      ${variant === 'b' ? `<div class="r-seg" role="group" aria-label="Zoom"><button type="button" data-zoom="month" aria-pressed="${zoom === 'month'}">Mese</button><button type="button" data-zoom="2w" aria-pressed="${zoom === '2w'}">2 settimane</button></div>` : ''}
-      ${variant === 'a' ? '<span class="pf-hint">Clic = mezza giornata · trascina = più giorni</span>' : ''}`;
+    $('[data-pf-tools]').innerHTML = view !== 'cal' && view !== 'coord' ? '' : `<div class="pf-legend" role="group" aria-label="Legenda e filtro per motivo">${legend}${reasonFilter ? '<button type="button" class="link-btn" data-reason="">Mostra tutti</button>' : ''}</div>
+      ${view === 'cal' ? '<span class="pf-hint">Clic = mezza giornata · trascina = più giorni</span>' : '<span class="pf-hint">Clic su un giorno per vedere chi manca · su una barra per la richiesta</span>'}`;
   };
 
   // Blocco di una mezza giornata (A) — le proposte sono tratteggiate, le rifiutate barrate.
@@ -158,58 +161,103 @@
   // ── A · Griglia ─────────────────────────────────────────────────────
   const renderA = () => {
     const days = monthDays();
-    const head = `<div class="pf-row pf-hd"><span class="pf-name"></span>${days.map((d) => { const dt = parse(d); return `<span class="pf-day${isOff(d) ? ' is-off' : ''}${d === TODAY ? ' is-today' : ''}" title="${HOL[d] || ''}"><b>${dt.getDate()}</b><small>${WD[dt.getDay()]}</small></span>`; }).join('')}</div>`;
+    const head = `<div class="pf-row pf-hd"><span class="pf-name"></span><span></span>${days.map((d) => { const dt = parse(d); return `<span class="pf-day${isOff(d) ? ' is-off' : ''}${d === TODAY ? ' is-today' : ''}" title="${HOL[d] || ''}"><b>${dt.getDate()}</b><small>${WD[dt.getDay()]}</small></span>`; }).join('')}</div>`;
     const groups = (area === 'all' ? AREAS : [area]).map((ar) => {
       const ps = PEOPLE.filter((p) => p.area === ar);
       return `<div class="pf-grp">
-        <div class="pf-row pf-covrow"><span class="pf-name"><b>${ar}</b><small>presenti</small></span>${days.map((d) => { if (isOff(d)) return `<span class="pf-c is-off"></span>`; const n = presentCount(ps, d); const lv = covLevel(n, ps.length); return `<span class="pf-c cov-${lv}${d === TODAY ? ' is-today' : ''}" title="${ddmm(d)} · ${n} presenti su ${ps.length}">${n}</span>`; }).join('')}</div>
-        ${ps.map((p) => `<div class="pf-row pf-person${p.name === ME ? ' is-me' : ''}"><span class="pf-name"><span class="ava">${ini(p.name)}</span><span class="nm">${esc(p.name)}</span></span>${days.map((d) => { if (isOff(d)) return `<span class="pf-c is-off"></span>`; const c = cell(p, d); return `<span class="pf-c${d === TODAY ? ' is-today' : ''}" data-day="${d}" data-person="${p.id}">${half(c.mat, ' pf-mat')}${half(c.pom, ' pf-pom')}</span>`; }).join('')}</div>`).join('')}
+        <div class="pf-row pf-covrow"><span class="pf-name"><b>${ar}</b><small>presenti</small></span><span></span>${days.map((d) => { if (isOff(d)) return `<span class="pf-c is-off"></span>`; const n = presentCount(ps, d); const lv = covLevel(n, ps.length); return `<span class="pf-c cov-${lv}${d === TODAY ? ' is-today' : ''}" title="${ddmm(d)} · ${n} presenti su ${ps.length}">${n}</span>`; }).join('')}</div>
+        ${ps.map((p) => `<div class="pf-row pf-person${p.name === ME ? ' is-me' : ''}"><span class="pf-name"><span class="ava">${ini(p.name)}</span><span class="nm">${esc(p.name)}</span></span><span class="pf-parts" aria-hidden="true"><i>MAT</i><i>POM</i></span>${days.map((d) => { if (isOff(d)) return `<span class="pf-c is-off"></span>`; const c = cell(p, d); return `<span class="pf-c${d === TODAY ? ' is-today' : ''}" data-day="${d}" data-person="${p.id}">${half(c.mat, ' pf-mat')}${half(c.pom, ' pf-pom')}</span>`; }).join('')}</div>`).join('')}
       </div>`;
     }).join('');
     return `<div class="pf-grid" style="--n:${days.length}">${head}${groups}</div>`;
   };
 
-  // ── B · Timeline ────────────────────────────────────────────────────
-  const renderB = () => {
-    let days = monthDays();
-    if (zoom === '2w') { const i = Math.max(0, days.indexOf('2026-11-16')); days = days.slice(i, i + 14); }
-    const W = zoom === '2w' ? 64 : 30; const first = days[0]; const last = days.at(-1);
-    const dx = (s) => Math.round((parse(s) - parse(first)) / 864e5);
-    const ps = people();
-    const head = `<div class="pf-tl-hd" style="--w:${W}px"><span class="pf-name"></span><div class="pf-tl-days">${days.map((d) => { const dt = parse(d); return `<span class="pf-day${isOff(d) ? ' is-off' : ''}${d === TODAY ? ' is-today' : ''}"><b>${dt.getDate()}</b><small>${WD[dt.getDay()]}</small></span>`; }).join('')}</div></div>`;
-    const cov = `<div class="pf-tl-row pf-tl-cov" style="--w:${W}px"><span class="pf-name"><b>Assenti</b><small>${area === 'all' ? 'tutte le aree' : area}</small></span><div class="pf-tl-track">${days.map((d) => { if (isOff(d)) return '<span class="pf-tc is-off"></span>'; const n = ps.length - presentCount(ps, d); const lv = covLevel(ps.length - n, ps.length); return `<span class="pf-tc" title="${ddmm(d)} · ${n} assenti su ${ps.length}"><i class="cov-${lv}" style="height:${Math.max(n ? 6 : 0, n / ps.length * 100)}%"></i>${n ? `<em>${n}</em>` : ''}</span>`; }).join('')}</div></div>`;
-    const rows = ps.map((p) => {
-      const bars = ABS.filter((a) => a.who.id === p.id && a.to >= first && a.from <= last).map((a) => {
-        const s = a.from < first ? first : a.from; const e = a.to > last ? last : a.to;
-        const left = dx(s) * W + 2; const width = (dx(e) - dx(s) + 1) * W - 4; const [bg, fg] = SW[swKey(a)];
-        const dim = reasonFilter && reasonFilter !== swKey(a); const n = workdays(a);
-        const lbl = width > 90 ? `${RL[a.reason]} · ${gg(n)}` : width > 44 ? (n >= 1 ? `${String(n).replace('.', ',')} gg` : '½') : '';
-        return `<button type="button" class="pf-bar${a.status === 'proposta' ? ' is-prop' : ''}${a.status === 'rifiutata' ? ' is-rej' : ''}${a.part !== 'all' ? ' is-' + a.part : ''}${dim ? ' is-dim' : ''}${a.id === selected ? ' is-sel' : ''}" style="left:${left}px;width:${width}px;--bg:${bg};--fg:${fg}" data-abs="${a.id}" title="${esc(p.name)} · ${RL[a.reason]} · ${range(a)} · ${STL[a.status]}">${a.status === 'proposta' ? ic('clock') : ''}<span>${lbl}</span></button>`;
+  // ── C · Coordinamento (solo coordinatori) ──────────────────────────
+  // Calendario a settimane: le assenze sono barre che attraversano le caselle dei giorni.
+  const WEEKDAY_FULL = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+  const MONTH_FULL = MONTHS.map((m) => m.toLowerCase());
+  const shortName = (n) => { const [f, ...r] = n.split(' '); return `${f} ${r.map((x) => x[0] + '.').join(' ')}`; };
+  const addDays = (s0, n) => { const d = parse(s0); d.setDate(d.getDate() + n); return iso(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const renderC = () => {
+    const days = monthDays(); const ps = people();
+    const firstMon = addDays(days[0], -((parse(days[0]).getDay() + 6) % 7));
+    const weeks = []; for (let w = firstMon; w <= days.at(-1); w = addDays(w, 7)) weeks.push(w);
+    const list = ABS.filter((a) => a.status !== 'rifiutata' && ps.includes(a.who));
+    const weekHtml = weeks.map((mon) => {
+      const wd = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+      // Segmenti della settimana, senza weekend/festività ai bordi.
+      const segs = [];
+      list.forEach((a) => {
+        let s0 = a.from > mon ? a.from : mon; let e0 = a.to < wd[6] ? a.to : wd[6];
+        if (s0 > e0) return;
+        while (s0 <= e0 && isOff(s0)) s0 = addDays(s0, 1);
+        while (e0 >= s0 && isOff(e0)) e0 = addDays(e0, -1);
+        if (s0 > e0) return;
+        segs.push({ a, s: wd.indexOf(s0), e: wd.indexOf(e0), cut: [a.from < s0, a.to > e0] });
+      });
+      segs.sort((x, y) => x.s - y.s || (y.e - y.s) - (x.e - x.s));
+      const lanes = []; segs.forEach((g) => { let l = lanes.findIndex((end) => end < g.s); if (l < 0) { l = lanes.length; lanes.push(-1); } lanes[l] = g.e; g.lane = l; });
+      const nl = Math.max(lanes.length, 2);
+      const cellsH = wd.map((d, i) => {
+        const inMonth = d.slice(0, 7) === days[0].slice(0, 7); const dt = parse(d); const off = isOff(d);
+        const pres = presentCount(ps, d); const lv = covLevel(pres, ps.length);
+        return `<div class="pf-wd${off ? ' is-off' : ''}${inMonth ? '' : ' is-out'}${d === TODAY ? ' is-today' : ''}${d === selDay ? ' is-sel' : ''}" style="grid-column:${i + 1}" ${!off && inMonth ? `data-selday="${d}" role="button" tabindex="0" aria-label="${dt.getDate()} ${MONTH_FULL[dt.getMonth()]}, ${pres} presenti su ${ps.length}"` : ''}>
+          <span class="pf-wd-top"><span class="pf-cal-n">${dt.getDate()}</span>${!off && inMonth ? `<span class="pf-cov cov-${lv}" title="${pres} presenti su ${ps.length}">${pres}/${ps.length}</span>` : HOL[d] && inMonth ? `<small class="pf-hol">${HOL[d]}</small>` : ''}</span>
+        </div>`;
       }).join('');
-      return `<div class="pf-tl-row${p.name === ME ? ' is-me' : ''}" style="--w:${W}px"><span class="pf-name"><span class="ava">${ini(p.name)}</span><span class="nm">${esc(p.name)}</span>${area === 'all' ? `<small>${p.area}</small>` : ''}</span><div class="pf-tl-track">${days.map((d) => `<span class="pf-tc${isOff(d) ? ' is-off' : ''}${d === TODAY ? ' is-today' : ''}"></span>`).join('')}${bars}</div></div>`;
+      const bars = segs.map((g) => {
+        const k = swKey(g.a); const [bg, fg] = SW[k]; const dim = reasonFilter && reasonFilter !== k;
+        return `<button type="button" class="pf-cb${g.a.status === 'proposta' ? ' is-prop' : ''}${g.cut[0] ? ' cut-l' : ''}${g.cut[1] ? ' cut-r' : ''}${dim ? ' is-dim' : ''}${g.a.id === selected ? ' is-sel' : ''}" style="grid-column:${g.s + 1} / ${g.e + 2};grid-row:${g.lane + 2};--bg:${bg};--fg:${fg}" data-abs="${g.a.id}" title="${esc(g.a.who.name)} · ${RL[g.a.reason]} · ${range(g.a)}${g.a.part !== 'all' ? ' · ' + PART[g.a.part] : ''} · ${STL[g.a.status]}">
+          ${g.a.status === 'proposta' ? ic('clock') : ''}<span class="nm">${esc(shortName(g.a.who.name))}</span>${g.a.part !== 'all' ? `<em>${g.a.part === 'mat' ? 'MAT' : 'POM'}</em>` : g.e > g.s ? `<em>${RL[g.a.reason]}</em>` : ''}
+        </button>`;
+      }).join('');
+      return `<div class="pf-wk" style="grid-template-rows:30px repeat(${nl}, 24px) 8px">${cellsH}${bars}</div>`;
     }).join('');
-    return `<div class="pf-tl" style="--n:${days.length}">${head}${cov}${rows}</div>`;
+
+    // Giorno scelto
+    const sd = selDay; const sdt = parse(sd); const pres = presentCount(ps, sd); const lv = covLevel(pres, ps.length);
+    const absentSel = ps.filter((p) => absentOn(p, sd));
+    const byArea = (area === 'all' ? AREAS : [area]).map((ar) => {
+      const pa = PEOPLE.filter((p) => p.area === ar); const pr = presentCount(pa, sd);
+      return `<div class="pf-dayarea"><span>${ar}</span><span class="pf-meter cov-${covLevel(pr, pa.length)}"><i style="width:${pr / pa.length * 100}%"></i></span><b>${pr}/${pa.length}</b></div>`;
+    }).join('');
+    const dayCard = `<section class="pf-card pf-daycard">
+      <div class="pf-card-h"><div><small>${WEEKDAY_FULL[sdt.getDay()]}</small><h3>${sdt.getDate()} ${MONTH_FULL[sdt.getMonth()]}</h3></div><span class="pf-big cov-${lv}"><span><b>${pres}</b>/${ps.length}</span><small>presenti</small></span></div>
+      ${byArea}
+      ${absentSel.length ? `<ul class="pf-who">${absentSel.map((p) => { const c = cell(p, sd); const a = [c.mat, c.pom].find((x) => x && x.status !== 'rifiutata'); const [bg, fg] = SW[swKey(a)]; return `<li><button type="button" data-abs="${a.id}"><span class="pf-sw" style="background:${bg};border-color:${fg}"></span><span class="r-an"><b>${esc(p.name)}</b><small>${RL[a.reason]} · ${range(a)}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}</small></span>${a.status === 'proposta' ? '<span class="pf-st st-prop">Proposta</span>' : ''}${ic('chevR')}</button></li>`; }).join('')}</ul>` : `<p class="pf-empty">${ic('task')}Tutti presenti.</p>`}
+    </section>`;
+
+    return `<div class="pf-coord">
+      <div class="pf-cal">
+        <div class="pf-cal-wd">${['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((w) => `<span>${w}</span>`).join('')}</div>
+        <div class="pf-weeks">${weekHtml}</div>
+      </div>
+      <aside class="pf-side">${dayCard}
+        <section class="pf-side-q"><div class="pf-side-h"><h3>Da autorizzare</h3><span class="r-cnt">${pending().length}</span><button type="button" class="link-btn" data-view="pend">Vedi tutte</button></div>${authCards()}</section>
+      </aside>
+    </div>`;
   };
 
-  // ── C · Coordinamento ───────────────────────────────────────────────
-  const renderC = () => {
-    const days = monthDays(); const lead = (parse(days[0]).getDay() + 6) % 7; const ps = people();
-    const cells = Array.from({ length: lead }, () => '<div class="pf-cal-d is-pad"></div>').concat(days.map((d) => {
-      const dt = parse(d); const off = isOff(d);
-      if (off) return `<div class="pf-cal-d is-off"><span class="pf-cal-n">${dt.getDate()}</span>${HOL[d] ? `<small class="pf-hol">${HOL[d]}</small>` : ''}</div>`;
-      const absent = ps.filter((p) => absentOn(p, d)); const pres = presentCount(ps, d); const lv = covLevel(pres, ps.length);
-      return `<button type="button" class="pf-cal-d${d === TODAY ? ' is-today' : ''}${d === selDay ? ' is-sel' : ''}" data-selday="${d}">
-        <span class="pf-cal-top"><span class="pf-cal-n">${dt.getDate()}</span><span class="pf-cov cov-${lv}" title="${pres} presenti su ${ps.length}">${pres}/${ps.length}</span></span>
-        <span class="pf-cal-avas">${absent.slice(0, 4).map((p) => { const c = cell(p, d); const a = [c.mat, c.pom].find((x) => x && x.status !== 'rifiutata'); const k = swKey(a); return `<span class="ava${a.status === 'proposta' ? ' is-prop' : ''}${reasonFilter && reasonFilter !== k ? ' is-dim' : ''}" style="background:${SW[k][0]};color:${SW[k][1]};--fg:${SW[k][1]}" title="${esc(p.name)} · ${RL[a.reason]}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}">${ini(p.name)}${a.part !== 'all' ? '<i>½</i>' : ''}</span>`; }).join('')}${absent.length > 4 ? `<span class="pf-more">+${absent.length - 4}</span>` : ''}</span>
-      </button>`;
-    }));
-    const sd = selDay; const absentSel = ps.filter((p) => absentOn(p, sd));
-    const day = `<section class="pf-side-sec"><div class="pf-side-h"><h3>${WD[parse(sd).getDay()].toLowerCase().replace(/^./, (c) => c.toUpperCase())} ${ddmm(sd)}</h3><span class="pf-cov cov-${covLevel(presentCount(ps, sd), ps.length)}">${presentCount(ps, sd)} presenti su ${ps.length}</span></div>
-      ${absentSel.length ? `<ul class="pf-who">${absentSel.map((p) => { const c = cell(p, sd); const a = [c.mat, c.pom].find((x) => x && x.status !== 'rifiutata'); return `<li><button type="button" data-abs="${a.id}"><span class="ava" style="background:${SW[swKey(a)][0]};color:${SW[swKey(a)][1]}">${ini(p.name)}</span><span class="r-an"><b>${esc(p.name)}</b><small>${RL[a.reason]} · ${range(a)}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}</small></span>${a.status === 'proposta' ? '<span class="pf-st st-prop">Proposta</span>' : ''}${ic('chevR')}</button></li>`; }).join('')}</ul>` : '<p class="pf-empty">Tutti presenti.</p>'}</section>`;
-    return `<div class="pf-coord">
-      <div class="pf-cal"><div class="pf-cal-wd">${['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((w) => `<span>${w}</span>`).join('')}</div><div class="pf-cal-g">${cells.join('')}</div></div>
-      <aside class="pf-side">${day}<section class="pf-side-sec"><div class="pf-side-h"><h3>Da validare</h3><span class="r-cnt">${pending().length}</span></div>${queue(true)}</section></aside>
-    </div>`;
+  // Card di autorizzazione: chi, cosa, quando, effetto sulla copertura, decisione.
+  const authCards = () => {
+    const list = pending().sort((x, y) => x.from.localeCompare(y.from));
+    if (!list.length) return `<p class="pf-empty">${ic('task')}Nessuna richiesta da autorizzare.</p>`;
+    return `<ul class="pf-auth">${list.map((a) => {
+      const [bg, fg] = SW[swKey(a)]; const cf = conflicts(a); const ps = PEOPLE.filter((p) => p.area === a.who.area);
+      const ds = []; for (let d = a.from; d <= a.to; d = addDays(d, 1)) if (!isOff(d)) ds.push(d);
+      const strip = ds.slice(0, 7).map((d) => { const pr = ps.filter((p) => p.id === a.who.id ? false : !absentFull(p, d)).length; return `<span class="cov-${covLevel(pr, ps.length)}" title="${ddmm(d)} · ${pr}/${ps.length} presenti"><b>${parse(d).getDate()}</b><em>${pr}/${ps.length}</em></span>`; }).join('');
+      return `<li class="pf-ac${cf.length ? ' has-warn' : ''}">
+        <button type="button" class="pf-ac-main" data-abs="${a.id}">
+          <span class="ava">${ini(a.who.name)}</span>
+          <span class="r-an"><b>${esc(a.who.name)}</b><small>${a.who.area} · richiesta il ${a.req.slice(0, 5)}</small></span>
+          ${ic('chevR')}
+        </button>
+        <div class="pf-ac-what"><span class="pf-sw" style="background:${bg};border-color:${fg}"></span><b>${RL[a.reason]}</b><span>${range(a)} · ${gg(workdays(a))}${a.part !== 'all' ? ' · ' + PART[a.part] : ''}</span></div>
+        <div class="pf-ac-strip" aria-label="Presenti in ${a.who.area} nei giorni richiesti">${strip}${ds.length > 7 ? `<span class="more">+${ds.length - 7}</span>` : ''}</div>
+        ${cf.length ? `<p class="pf-q-warn">${ic('alert')}${a.who.area} resta con ${cf[0][1]} su ${cf[0][2]} il ${cf.map((c) => parse(c[0]).getDate()).join(', ')} ${MSH[parse(cf[0][0]).getMonth()]}</p>` : ''}
+        <div class="pf-ac-act"><button type="button" class="btn btn-sm" data-reject="${a.id}">${ic('x')}Rifiuta</button><button type="button" class="btn btn-sm btn-primary" data-validate="${a.id}">${tick}Autorizza</button></div>
+      </li>`;
+    }).join('')}</ul>`;
   };
 
   // Coda delle richieste (vista "Da validare" e colonna di C).
@@ -245,7 +293,7 @@
     $('[data-ptabs]').innerHTML = '<button role="tab" aria-selected="true">Dettagli</button><button role="tab" aria-selected="false">Attività <span class="tn">2</span></button>';
     const days = []; for (let d = parse(a.from); d <= parse(a.to); d.setDate(d.getDate() + 1)) days.push(iso(d.getFullYear(), d.getMonth(), d.getDate()));
     const ps = PEOPLE.filter((p) => p.area === a.who.area);
-    const coord = a.who.area === MY_AREA || area === 'all';
+    const coord = isCoord();
     pbody.innerHTML = `<div class="drawer-body int-body">
       ${cf.length ? `<div class="r-alert pf-alert">${ic('alert')}<span>Copertura bassa: ${a.who.area} resterebbe con ${cf[0][1]} su ${cf[0][2]} il ${cf.map((c) => parse(c[0]).getDate()).join(', ')} ${MSH[parse(cf[0][0]).getMonth()]}.</span></div>` : ''}
       <section class="pp is-open" aria-label="Proprietà"><div class="pp-grid">
@@ -275,8 +323,9 @@
   const body = $('[data-pf-body]');
   const paint = () => {
     paintHead(); renderKpis(); paintViews();
-    body.className = 'pf-body pf-v' + variant;
-    body.innerHTML = view === 'pend' ? `<div class="pf-list">${queue(false)}</div>` : view === 'mine' ? `<div class="pf-list">${mine()}</div>` : variant === 'a' ? renderA() : variant === 'b' ? renderB() : renderC();
+    if (!isCoord() && (view === 'coord' || view === 'pend')) view = 'cal';
+    body.className = 'pf-body pf-v-' + view;
+    body.innerHTML = view === 'pend' ? `<div class="pf-list">${queue(false)}</div>` : view === 'mine' ? `<div class="pf-list">${mine()}</div>` : view === 'coord' ? renderC() : renderA();
   };
 
   // ── Interazioni ─────────────────────────────────────────────────────
@@ -334,24 +383,23 @@
     if ((el = t('[data-area]'))) { area = el.dataset.area; paint(); return; }
     if ((el = t('[data-view]'))) { view = el.dataset.view; paint(); return; }
     if ((el = t('[data-goview]'))) { view = el.dataset.goview; paint(); return; }
-    if ((el = t('[data-goday]'))) { view = 'cal'; selDay = el.dataset.goday; if (variant !== 'c') { variant = 'c'; syncVar(); } paint(); return; }
+    if ((el = t('[data-goday]'))) { view = 'coord'; selDay = el.dataset.goday; paint(); return; }
     if ((el = t('[data-reason]'))) { reasonFilter = el.dataset.reason && reasonFilter !== el.dataset.reason ? el.dataset.reason : null; paint(); return; }
-    if ((el = t('[data-zoom]'))) { zoom = el.dataset.zoom; paint(); return; }
     if ((el = t('[data-selday]'))) { selDay = el.dataset.selday; paint(); return; }
     if ((el = t('[data-month]'))) { toast('Nell\'anteprima ci sono solo i dati di novembre'); return; }
     if (t('[data-today]')) { selDay = TODAY; paint(); }
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !mdl.hidden) { mdl.hidden = true; return; } if (e.key === 'Escape' && !drawer.hidden) close(); });
 
-  // Proposta A/B/C (ricordata).
-  const vbtns = document.querySelectorAll('[data-var-btn]');
-  const syncVar = () => vbtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.varBtn === variant)));
-  vbtns.forEach((b) => b.addEventListener('click', () => { variant = b.dataset.varBtn; view = 'cal'; try { localStorage.setItem('archie-preview-pf-var', variant); } catch (err) { /* niente */ } syncVar(); paint(); }));
-  try { variant = localStorage.getItem('archie-preview-pf-var') || 'a'; } catch (err) { /* niente */ }
+  // Ruolo (solo anteprima): Coordinamento e Da validare compaiono solo a chi coordina.
+  const rbtns = document.querySelectorAll('[data-role-btn]');
+  const syncRole = () => rbtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.roleBtn === role)));
+  rbtns.forEach((b) => b.addEventListener('click', () => { role = b.dataset.roleBtn; if (!drawer.hidden) close(); syncRole(); paint(); }));
   const q = new URLSearchParams(location.search);
-  if (q.get('var')) variant = q.get('var');
+  if (q.get('role')) role = q.get('role');
   if (q.get('area')) area = q.get('area');
   if (q.get('tab')) view = q.get('tab');
-  syncVar(); paint();
+  if (q.get('day')) selDay = q.get('day');
+  syncRole(); paint();
   if (q.get('abs')) openAbs(Number(q.get('abs')));
 })();

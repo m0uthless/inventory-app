@@ -49,7 +49,7 @@
 /* ── A · Griglia ──────────────────────────────────────────────── */
 .pf-body { overflow-x: auto; }
 .pf-grid { min-width: 760px; padding: 4px 14px 14px; }
-.pf-row { display: grid; grid-template-columns: 184px repeat(var(--n), minmax(24px, 1fr)); gap: 2px; align-items: stretch; }
+.pf-row { display: grid; grid-template-columns: 184px 30px repeat(var(--n), minmax(24px, 1fr)); gap: 2px; align-items: stretch; }
 .pf-name { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 8px; font-size: 13px; }
 .pf-name .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 550; }
 .pf-name .ava { width: 24px; height: 24px; font-size: 9px; }
@@ -188,5 +188,84 @@
 .pf-seg { display: flex; } .pf-seg button { flex: 1; }
 
 @media (max-width: 1100px) { .pf-coord { grid-template-columns: 1fr; } .pf-cal { border-right: 0; border-bottom: 1px solid var(--border); } }
-@media (max-width: 760px) { .pf-row { grid-template-columns: 120px repeat(var(--n), 26px); } .pf-cal-d { min-height: 64px; } .pf-cal-avas .ava { width: 18px; height: 18px; font-size: 7px; } }
+@media (max-width: 760px) { .pf-row { grid-template-columns: 120px 28px repeat(var(--n), 26px); } .pf-cal-d { min-height: 64px; } .pf-cal-avas .ava { width: 18px; height: 18px; font-size: 7px; } }
 .pf-list .pf-q > li .pf-q-act { grid-row: 1; grid-column: 2; } .pf-list .pf-q > li .pf-q-warn { grid-row: 2; }
+
+/* A: colonna MAT/POM prima dei giorni */
+.pf-parts { display: grid; grid-template-rows: 1fr 1fr; gap: 2px; padding: 2px 0; }
+.pf-parts i { display: grid; place-items: center; font: 650 8.5px "Geist", sans-serif; letter-spacing: .04em; font-style: normal; color: var(--muted); background: var(--surface-2); border-radius: 3px; }
+
+/* ── Coordinamento: calendario a settimane con barre ─────────── */
+.pf-coord { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 560px; }
+.pf-cal { padding: 10px 14px 16px; border-right: 1px solid var(--border); min-width: 0; }
+.pf-cal-wd, .pf-wk { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, .5fr)); column-gap: 0; }
+.pf-cal-wd span { font-size: 11px; font-weight: 600; color: var(--muted); padding: 0 8px 6px; }
+.pf-weeks { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.pf-wk { row-gap: 3px; min-height: 96px; }
+.pf-wk + .pf-wk { border-top: 1px solid var(--border); }
+.pf-wd { grid-row: 1 / -1; display: flex; flex-direction: column; padding: 5px 6px; border-left: 1px solid var(--border); background: var(--surface); cursor: pointer; min-width: 0; }
+.pf-wd:first-child { border-left: 0; }
+.pf-wd:hover { background: var(--surface-2); }
+.pf-wd:focus-visible { outline: none; box-shadow: inset var(--focus); }
+.pf-wd.is-off { background: repeating-linear-gradient(135deg, var(--surface-2) 0 4px, var(--surface) 4px 8px); cursor: default; }
+.pf-wd.is-out { background: var(--surface-2); cursor: default; }
+.pf-wd.is-out .pf-cal-n { color: var(--faint); font-weight: 500; }
+.pf-wd.is-sel { background: var(--field); box-shadow: inset 0 0 0 1.5px var(--field-line); }
+.pf-wd.is-today .pf-cal-n { background: var(--primary); color: var(--primary-ink); }
+.pf-wd-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.pf-wd.is-off .pf-cal-n { color: var(--faint); font-weight: 500; }
+.pf-hol { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-cb { position: relative; z-index: 1; display: flex; align-items: center; gap: 5px; min-width: 0; height: 22px; margin: 0 4px; padding: 0 7px; border: 1px solid var(--fg); border-radius: 6px; background: var(--bg); color: var(--fg); font: 600 11px "Geist", sans-serif; white-space: nowrap; overflow: hidden; cursor: pointer; text-align: left; }
+.pf-cb .nm { overflow: hidden; text-overflow: ellipsis; }
+.pf-cb em { font-style: normal; font-weight: 500; opacity: .8; overflow: hidden; text-overflow: ellipsis; }
+.pf-cb .i { width: 12px; height: 12px; flex: none; }
+.pf-cb.is-prop { border-style: dashed; background: repeating-linear-gradient(135deg, var(--bg) 0 5px, var(--surface) 5px 9px); }
+.pf-cb.cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; border-left-width: 3px; }
+.pf-cb.cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
+.pf-cb.is-dim { opacity: .2; }
+.pf-cb.is-sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--fg); }
+.pf-cb:hover { filter: brightness(.97); }
+.pf-cb:focus-visible { outline: none; box-shadow: var(--focus); }
+
+/* ── Coordinamento: colonna destra ───────────────────────────── */
+.pf-side { display: flex; flex-direction: column; gap: 14px; padding: 12px 14px 16px; background: var(--surface-2); }
+.pf-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.pf-card-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.pf-card-h small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.pf-card-h h3 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
+.pf-big { display: grid; justify-items: end; line-height: 1.05; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pf-big b { font-size: 26px; font-weight: 650; color: var(--cv); letter-spacing: -.02em; }
+.pf-big.cov-ok b { color: var(--text); }
+.pf-big small { font-size: 11px; }
+.pf-big > span { white-space: nowrap; }
+.pf-dayarea { display: grid; grid-template-columns: 70px minmax(0, 1fr) 34px; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); padding: 2px 0; }
+.pf-dayarea b { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.pf-meter { height: 6px; border-radius: 3px; background: var(--neutral-bg); overflow: hidden; }
+.pf-meter i { display: block; height: 100%; border-radius: 3px; background: var(--cv); }
+.pf-meter.cov-ok i { background: var(--success); }
+.pf-daycard .pf-who { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 4px; }
+.pf-who button { grid-template-columns: 12px minmax(0, 1fr) auto 14px; }
+.pf-side-q .pf-side-h { padding: 0 2px; margin-bottom: 8px; }
+.pf-side-q .pf-side-h .r-cnt { margin-left: 0; }
+.pf-side-q .pf-side-h .link-btn { margin-left: auto; }
+.pf-auth { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pf-ac { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px 12px; display: grid; gap: 8px; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.pf-ac.has-warn { border-color: color-mix(in oklab, var(--warning) 45%, var(--border)); }
+.pf-ac-main { display: grid; grid-template-columns: 30px minmax(0, 1fr) 14px; gap: 10px; align-items: center; padding: 2px; margin: -2px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.pf-ac-main:hover { background: var(--surface-2); }
+.pf-ac-main .ava { width: 30px; height: 30px; font-size: 11px; }
+.pf-ac-main > .i { width: 14px; height: 14px; color: var(--faint); }
+.pf-ac-what { display: flex; align-items: center; gap: 7px; font-size: 13px; flex-wrap: wrap; }
+.pf-ac-what b { font-weight: 650; }
+.pf-ac-what span:last-child { color: var(--muted); font-size: 12px; }
+.pf-ac-strip { display: flex; gap: 3px; }
+.pf-ac-strip > span { flex: 1; min-width: 0; display: grid; justify-items: center; padding: 3px 0; border-radius: 6px; background: var(--cvb); line-height: 1.15; }
+.pf-ac-strip > span.cov-ok { background: var(--surface-2); }
+.pf-ac-strip b { font-size: 12px; font-weight: 650; }
+.pf-ac-strip em { font-style: normal; font-size: 10px; font-weight: 650; color: var(--cv); }
+.pf-ac-strip > span.cov-ok em { color: var(--success); }
+.pf-ac-strip .more { flex: none; padding: 0 6px; align-self: center; font-size: 11px; color: var(--muted); background: transparent; }
+.pf-ac-act { display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px; }
+.pf-ac-act .btn { justify-content: center; }
+@media (max-width: 1180px) { .pf-coord { grid-template-columns: 1fr; } .pf-cal { border-right: 0; border-bottom: 1px solid var(--border); } }
+:root[data-theme="dark"] .pf-cb { color: color-mix(in oklab, var(--fg) 40%, white); } :root[data-theme="dark"] .pf-cb.is-prop { background: repeating-linear-gradient(135deg, var(--bg) 0 5px, transparent 5px 9px); }

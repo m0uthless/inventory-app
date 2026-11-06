@@ -529,7 +529,7 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
 <link rel="stylesheet" href="shared/drawer-content.css">
 <link rel="stylesheet" href="shared/drawer-intervento.css">
 <link rel="stylesheet" href="shared/po.css?v=3">
-<link rel="stylesheet" href="shared/pf.css?v=3">
+<link rel="stylesheet" href="shared/pf.css?v=6">
 </head>
 <body data-view="app">
 
@@ -643,10 +643,9 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
   <span class="pv-sep" aria-hidden="true"></span>
   <a class="pv-var pv-base" href="h-base.html" title="Pagina Issue">Issue</a>
   <span class="pv-sep" aria-hidden="true"></span>
-  <span class="pv-vars" role="group" aria-label="Proposta">
-    <button data-var-btn="a" aria-pressed="true" title="Griglia ripulita: mezze giornate leggibili, presenti per area">A · Griglia</button>
-    <button data-var-btn="b" aria-pressed="false" title="Assenze come barre continue sui giorni">B · Timeline</button>
-    <button data-var-btn="c" aria-pressed="false" title="Calendario mensile con chi manca e coda da validare">C · Coordinamento</button>
+  <span class="pv-vars" role="group" aria-label="Ruolo">
+    <button data-role-btn="coord" aria-pressed="true" title="Vede Coordinamento e Da validare">Coordinatore</button>
+    <button data-role-btn="tech" aria-pressed="false" title="Vede la griglia e le sue richieste">Tecnico</button>
   </span>
   <span class="pv-sep" aria-hidden="true"></span>
   <span class="pv-pal" role="group" aria-label="Palette">
@@ -730,6 +729,6 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
     btns.forEach((b) => b.addEventListener('click', () => set(b.dataset.top)));
   })();
 </script>
-<script src="shared/pf.js?v=2"></script>
+<script src="shared/pf.js?v=4"></script>
 </body>
 </html>
