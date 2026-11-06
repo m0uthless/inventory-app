@@ -220,7 +220,7 @@
 .pf-cb em { font-style: normal; font-weight: 500; opacity: .8; overflow: hidden; text-overflow: ellipsis; }
 .pf-cb .i { width: 12px; height: 12px; flex: none; }
 .pf-cb.is-prop { border-style: dashed; background: repeating-linear-gradient(135deg, var(--bg) 0 5px, var(--surface) 5px 9px); }
-.pf-cb.cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; border-left-width: 3px; }
+.pf-cb.cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
 .pf-cb.cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
 .pf-cb.is-dim { opacity: .2; }
 .pf-cb.is-sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--fg); }
