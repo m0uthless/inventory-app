@@ -17,7 +17,7 @@ from core.purge_policy import try_purge_instance
 from core.restore_policy import get_restore_block_reason, split_restorable
 from audit.utils import log_event
 
-from django.db.models import OuterRef, Subquery, Count, DateField
+from django.db.models import OuterRef, Subquery, Count, DateField, Q
 from django.db.models.functions import TruncYear
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from core.models import InventoryType
@@ -42,6 +42,9 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
 
     # Quanti rapportini ok/ko sono stati eseguiti nel ciclo corrente — annotato su list.
     completed_count = serializers.IntegerField(read_only=True, allow_null=True, default=None)
+    # Manutenzioni ancora da fare / scadute nel ciclo corrente (stessa regola di todo); solo in elenco.
+    todo_count = serializers.SerializerMethodField()
+    overdue_count = serializers.SerializerMethodField()
 
     # Data dell'ultimo rapportino eseguito — annotata su list, None su retrieve.
     last_done_date = serializers.DateField(read_only=True, allow_null=True)
@@ -50,6 +53,12 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
         # Usa la cache del prefetch_related già impostato nel queryset
         # (obj.inventory_types.all() non genera una nuova query se prefetchato).
         return [t.label for t in obj.inventory_types.all()]
+
+    def get_todo_count(self, obj):
+        return getattr(obj, "_todo_count", None)
+
+    def get_overdue_count(self, obj):
+        return getattr(obj, "_overdue_count", None)
 
     def get_covered_count(self, obj):
         # Usa il valore annotato nel queryset (se presente) per evitare N+1.
@@ -87,6 +96,8 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
             "inventory_type_labels",
             "covered_count",
             "completed_count",
+            "todo_count",
+            "overdue_count",
             "title",
             "schedule_type",
             "interval_unit",
@@ -165,9 +176,18 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if inv_types:
             qs = qs.filter(inventory_types__id__in=inv_types).distinct()
 
+        # Filtro stato: active | overdue | completed (piani in corso) · archived
+        # (archiviato = scadenza prima dell'anno corrente oppure non attivo).
+        today = timezone.localdate()
+        year_start = today.replace(month=1, day=1)
+        state = (self.request.query_params.get("state") or "").strip().lower()
+        if state == "archived":
+            qs = qs.filter(Q(next_due_date__lt=year_start) | Q(is_active=False))
+        elif state in ("active", "overdue", "completed"):
+            qs = qs.filter(next_due_date__gte=year_start, is_active=True)
+
         # Filtro scadenza
         due   = (self.request.query_params.get("due") or "").strip().lower()
-        today = timezone.localdate()
         if due == "overdue":
             qs = qs.filter(next_due_date__lt=today)
         elif due == "next7":
@@ -213,22 +233,43 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             for plan in plans
         }
 
+    def _plan_todo_counts(self, request):
+        """{plan_id: (da fare, scadute)} dalle stesse righe di todo."""
+        rows, _done = self._todo_rows(request)
+        today_iso = timezone.localdate().isoformat()
+        counts: dict = {}
+        for r in rows:
+            t, o = counts.get(r["plan_id"], (0, 0))
+            counts[r["plan_id"]] = (t + 1, o + (1 if (r["next_due_date"] or "") < today_iso else 0))
+        return counts
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        counts = self._plan_todo_counts(request)
+        state = (request.query_params.get("state") or "").strip().lower()
+        if state == "overdue":
+            queryset = queryset.filter(id__in=[pid for pid, (_t, o) in counts.items() if o])
+        elif state == "completed":
+            candidates = list(queryset.prefetch_related("inventory_types"))
+            covered = self._compute_covered_count_map(candidates)
+            queryset = queryset.filter(id__in=[p.id for p in candidates if covered.get(p.id) and not counts.get(p.id)])
+
+        def decorate(plans):
+            covered_count_map = self._compute_covered_count_map(plans)
+            for plan in plans:
+                plan._covered_count = covered_count_map.get(plan.id, 0)
+                t, o = counts.get(plan.id, (0, 0))
+                plan._todo_count, plan._overdue_count = t, o
 
         page = self.paginate_queryset(queryset)
         if page is not None:
             plans = list(page)
-            covered_count_map = self._compute_covered_count_map(plans)
-            for plan in plans:
-                plan._covered_count = covered_count_map.get(plan.id, 0)
+            decorate(plans)
             serializer = self.get_serializer(plans, many=True)
             return self.get_paginated_response(serializer.data)
 
         plans = list(queryset)
-        covered_count_map = self._compute_covered_count_map(plans)
-        for plan in plans:
-            plan._covered_count = covered_count_map.get(plan.id, 0)
+        decorate(plans)
         serializer = self.get_serializer(plans, many=True)
         return Response(serializer.data)
 
@@ -332,16 +373,10 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         return Response({"next_due_date": result.isoformat()})
 
 
-    @action(detail=False, methods=["get"])
-    def todo(self, request):
-        """
-        Ritorna una riga per ogni (piano, inventory) con next_due_date valorizzata.
-        Le righe sono ordinate per next_due_date, cliente, sito.
-        Filtri: ?customer=ID  ?site=ID
-
-        Ottimizzazione: una sola query per tutti gli inventory invece di N query
-        (una per piano). Il join avviene in Python dopo aver caricato i dati.
-        """
+    def _todo_rows(self, request):
+        """Righe (piano, inventory) ancora da fare nel ciclo corrente, con l'ultima
+        esecuzione. Ritorna anche quante coppie sono già completate (per la copertura).
+        Filtri di base: ?customer ?site ?plan."""
         from inventory.models import Inventory
 
         plans = (
@@ -361,7 +396,7 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         # Materializza i piani una volta sola
         plans_list = list(plans)
         if not plans_list:
-            return Response([])
+            return [], 0
 
         # Raccoglie customer_id → lista di (plan, frozenset(type_ids))
         # per filtrare gli inventory con una sola query
@@ -508,7 +543,58 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             if cycle_start <= ev["performed_at"] <= ndd:
                 completed_pairs.add((ev["plan_id"], ev["inventory_id"]))
 
+        total_pairs = len(rows)
         rows = [r for r in rows if (r["plan_id"], r["inventory_id"]) not in completed_pairs]
+
+        # Ultima esecuzione registrata per ogni coppia (piano, inventory), qualunque ciclo.
+        last: dict = {}
+        if rows:
+            for ev in (
+                MEvent.objects
+                .filter(
+                    plan_id__in={r["plan_id"] for r in rows},
+                    inventory_id__in={r["inventory_id"] for r in rows},
+                    deleted_at__isnull=True,
+                )
+                .order_by("-performed_at", "-id")
+                .values("plan_id", "inventory_id", "performed_at", "result")
+            ):
+                last.setdefault((ev["plan_id"], ev["inventory_id"]), ev)
+        for r in rows:
+            ev = last.get((r["plan_id"], r["inventory_id"]))
+            r["last_result"] = ev["result"] if ev else None
+            r["last_date"] = ev["performed_at"].isoformat() if ev else None
+        return rows, total_pairs - len(rows)
+
+
+    @staticmethod
+    def _due_state(row, today_iso, in30_iso):
+        d = row["next_due_date"] or ""
+        if d < today_iso:
+            return "overdue"
+        if d <= in30_iso:
+            return "next30"
+        return "later"
+
+    @action(detail=False, methods=["get"])
+    def todo(self, request):
+        """
+        Una riga per ogni (piano, inventory) da fare nel ciclo corrente.
+        Filtri: ?customer ?site ?plan ?type (etichetta del tipo)
+        ?due=overdue|next30|later|override ?due_before ?due_from&due_to ?year ?search
+        Ogni riga riporta anche last_result / last_date (ultima esecuzione).
+        """
+        rows, _done = self._todo_rows(request)
+        today_iso = timezone.localdate().isoformat()
+        in30_iso = (timezone.localdate() + timedelta(days=30)).isoformat()
+        type_param = request.query_params.get("type")
+        if type_param:
+            rows = [r for r in rows if (r["type_label"] or "") == type_param]
+        due = request.query_params.get("due")
+        if due == "override":
+            rows = [r for r in rows if r["due_date_override"]]
+        elif due in ("overdue", "next30", "later"):
+            rows = [r for r in rows if self._due_state(r, today_iso, in30_iso) == due]
 
         # ── Due date filters ──────────────────────────────────────────────────
         due_before = request.query_params.get("due_before")
@@ -547,7 +633,7 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
         # ── Pagination ────────────────────────────────────────────────────────
         from django.core.paginator import Paginator
-        page_size = min(int(request.query_params.get("page_size", 25)), 200)
+        page_size = min(int(request.query_params.get("page_size", 25)), 500)
         page_num  = max(int(request.query_params.get("page", 1)), 1)
         paginator = Paginator(rows, page_size)
         page_obj  = paginator.get_page(page_num)
@@ -559,4 +645,89 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             "results":  list(page_obj),
         })
 
+    @action(detail=False, methods=["get"], url_path="todo-stats")
+    def todo_stats(self, request):
+        """Indicatori della pagina Scadenze: conteggi per stato, copertura del ciclo,
+        prossime uscite (cliente · sito), carico dei prossimi 12 mesi, rapportini del
+        mese e KO/parziali recenti, scelte per i filtri. Stessi filtri di base di todo."""
+        from collections import Counter, defaultdict
+        from datetime import date as date_cls
 
+        rows, done = self._todo_rows(request)
+        today = timezone.localdate()
+        today_iso = today.isoformat()
+        in30_iso = (today + timedelta(days=30)).isoformat()
+        states = Counter(self._due_state(r, today_iso, in30_iso) for r in rows)
+
+        overdue_by_customer = Counter((r["customer_id"], r["customer_name"]) for r in rows if self._due_state(r, today_iso, in30_iso) == "overdue")
+        visits: dict = {}
+        for r in rows:
+            key = (r["customer_id"], r["site_id"])
+            v = visits.setdefault(key, {"customer_id": r["customer_id"], "customer_name": r["customer_name"], "site_id": r["site_id"], "site_name": r["site_name"], "count": 0, "first_due": r["next_due_date"]})
+            v["count"] += 1
+            v["first_due"] = min(v["first_due"], r["next_due_date"])
+
+        # Carico mese per mese: il mese corrente include le scadute.
+        months = []
+        y, m = today.year, today.month
+        for _ in range(12):
+            key = f"{y:04d}-{m:02d}"
+            in_month = [r for r in rows if (r["next_due_date"] or "").startswith(key)]
+            if (y, m) == (today.year, today.month):
+                in_month += [r for r in rows if (r["next_due_date"] or "") < f"{key}-01"]
+            c = Counter(self._due_state(r, today_iso, in30_iso) for r in in_month)
+            months.append({"month": key, "overdue": c["overdue"], "next30": c["next30"], "later": c["later"]})
+            m += 1
+            if m > 12:
+                y, m = y + 1, 1
+
+        ev_qs = MaintenanceEvent.objects.filter(deleted_at__isnull=True)
+        customer_param = request.query_params.get("customer")
+        if customer_param:
+            ev_qs = ev_qs.filter(plan__customer_id=customer_param)
+        month_start = date_cls(today.year, today.month, 1)
+
+        total = len(rows) + done
+        return Response({
+            "total": len(rows),
+            "overdue": states["overdue"],
+            "next30": states["next30"],
+            "later": states["later"],
+            "override": sum(1 for r in rows if r["due_date_override"]),
+            "first_next30": min((r["next_due_date"] for r in rows if self._due_state(r, today_iso, in30_iso) == "next30"), default=None),
+            "next30_customers": len({r["customer_id"] for r in rows if self._due_state(r, today_iso, in30_iso) == "next30"}),
+            "coverage": {"done": done, "total": total},
+            "overdue_by_customer": [{"customer_id": cid, "customer_name": name, "count": n} for (cid, name), n in overdue_by_customer.most_common(5)],
+            "next_visits": sorted(visits.values(), key=lambda v: (v["first_due"], v["customer_name"] or ""))[:6],
+            "months": months,
+            "events_this_month": ev_qs.filter(performed_at__gte=month_start).count(),
+            "follow_up": ev_qs.filter(result__in=("ko", "partial"), performed_at__gte=today - timedelta(days=60)).count(),
+            "customers": [{"id": i, "name": n} for i, n in sorted({(r["customer_id"], r["customer_name"]) for r in rows}, key=lambda x: x[1] or "")],
+            "plans": [{"id": i, "title": t} for i, t in sorted({(r["plan_id"], r["plan_title"]) for r in rows}, key=lambda x: x[1] or "")],
+            "types": sorted({r["type_label"] for r in rows if r["type_label"]}),
+        })
+
+    @action(detail=False, methods=["get"], url_path="plan-stats")
+    def plan_stats(self, request):
+        """Indicatori della pagina Piani: piani in corso, completati, con scadute,
+        archiviati e copertura del ciclo (fatte / coperte), con la regola di todo."""
+        today = timezone.localdate()
+        year_start = today.replace(month=1, day=1)
+        base = MaintenancePlan.objects.filter(deleted_at__isnull=True)
+        customer_param = request.query_params.get("customer")
+        if customer_param:
+            base = base.filter(customer_id=customer_param)
+        active = list(base.filter(next_due_date__gte=year_start, is_active=True).prefetch_related("inventory_types"))
+        covered = self._compute_covered_count_map(active)
+        counts = self._plan_todo_counts(request)
+        total = sum(covered.values())
+        todo = sum(min(counts.get(p.id, (0, 0))[0], covered.get(p.id, 0)) for p in active)
+        return Response({
+            "active": len(active),
+            "customers": len({p.customer_id for p in active}),
+            "covered": total,
+            "done": total - todo,
+            "with_overdue": sum(1 for p in active if counts.get(p.id, (0, 0))[1]),
+            "completed": sum(1 for p in active if covered.get(p.id) and not counts.get(p.id)),
+            "archived": base.filter(Q(next_due_date__lt=year_start) | Q(is_active=False)).count(),
+        })
