@@ -18,7 +18,7 @@ def inventory_path(obj_id: int | str) -> str:
 
 
 def maintenance_plan_path(obj_id: int | str) -> str:
-    return f"/maintenance?tab=plans&open={obj_id}"
+    return f"/maintenance/plans?apri={obj_id}"
 
 
 def issue_path(obj_id: int | str) -> str:
@@ -34,7 +34,7 @@ def drive_root_path() -> str:
 
 
 def drive_folder_path(obj_id: int | str) -> str:
-    return f"/drive?folder={obj_id}"
+    return f"/drive?cartella={obj_id}"
 
 
 def drive_file_path(obj_id: int | str) -> str:
@@ -67,6 +67,15 @@ def build_entity_path(app_label: str | None, model: str | None, object_id: int |
 
     if app == "issues" and mdl == "issue":
         return issue_path(obj_id)
+
+    if app == "contracts" and mdl == "contract":
+        return f"/contracts?open={obj_id}"
+
+    if app == "core" and mdl == "areatask":
+        return f"/tasks?open={obj_id}"
+
+    if app == "expenses" and mdl == "expensereport":
+        return f"/rimborso-spese/{obj_id}"
 
     if app == "wiki" and mdl == "wikipage":
         return wiki_page_path(obj_id)

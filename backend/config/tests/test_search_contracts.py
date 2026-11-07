@@ -88,7 +88,7 @@ class TestSearchContracts:
         assert by_kind["site"]["path"] == f"/sites?open={search_dataset['site'].id}"
         assert by_kind["contact"]["path"] == f"/contacts?open={search_dataset['contact'].id}"
         assert by_kind["inventory"]["path"] == f"/inventory?open={search_dataset['inventory'].id}"
-        assert by_kind["maintenance_plan"]["path"] == f"/maintenance?tab=plans&open={search_dataset['plan'].id}"
+        assert by_kind["maintenance_plan"]["path"] == f"/maintenance/plans?apri={search_dataset['plan'].id}"
         assert by_kind["wiki_page"]["path"] == f"/wiki/{search_dataset['published_page'].id}"
         assert by_kind["drive_file"]["title"] == "Alpha File"
         assert by_kind["drive_folder"]["path"] == "/drive"

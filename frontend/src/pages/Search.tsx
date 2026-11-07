@@ -138,7 +138,7 @@ export default function Search() {
       return
     }
     if (r.kind === 'maintenance_plan') {
-      navigate(`/maintenance?tab=plans&open=${r.id}&return=${encodedReturn}`)
+      navigate(`/maintenance/plans?apri=${r.id}`)
       return
     }
     if (r.kind === 'wiki_page') {

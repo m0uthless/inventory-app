@@ -172,6 +172,30 @@ Portato dall'anteprima `d-base.html`, variante **A · Esplora file** (albero car
 - **[UI] Rimossi** i componenti vecchi (`PreviewDrawer`, `FolderCard`, `FileCard`, righe, menu, `UploadZone`).
 - **[TEST] Baseline**: frontend lint 11, vitest 152/152 (test Drive riscritti sulla nuova interfaccia); backend pytest 848.
 
+## Rimborso spese (Nota spese)
+
+Portato dall'anteprima `ns-base.html`, variante **A · Foglio** (scelta da Fede): le 12 categorie come righe del modello Excel, trasferte km sotto il rimborso chilometraggio, riepilogo a destra. Componenti in `features/expenses/` (`nsModel.ts` con test, `nsUi.tsx`, `ExpenseKpis.tsx`, `ExpenseSheet.tsx`, `ExpenseSummary.tsx`, `ExpenseDialogs.tsx`).
+
+- **[BE] Campo `submitted_at`** su `ExpenseReport` (migrazione `0002`, impostato da `submit`, riempito con `updated_at` per le note già inviate): serve per "Inviata il" e "in attesa da N giorni". Resta valorizzato dopo validazione o rifiuto.
+- **[BE] `km_rate`** nel serializer della nota: la tariffa €/km del proprietario (prima il frontend conosceva solo quella di chi guarda, da `/meta/`). Test in `expenses/tests/test_submitted_at_km_rate.py`.
+- **[UI] Elenco**: per il dipendente indicatori (mese in corso, nota rifiutata, rimborsato nell'anno, spese per mese) e viste Tutte / Da completare / Inviate / Validate; per la segreteria indicatori (da validare con la più vecchia, senza scontrino, validato nel mese, rimborsato per persona), viste Da validare / Rifiutate / Validate / In compilazione / Tutte, filtro Dipendente dall'intestazione, attese oltre 14 giorni in rosso. La segreteria passa a "Le mie note" con il selettore in testata (`?ambito=mie`).
+- **[UI] Nota**: importi, descrizioni e date modificabili nelle righe (salvataggio all'uscita dal campo, importi all'italiana), scontrini come chip con anteprima (immagine o PDF), etichetta "manca" per le voci senza scontrino, suggerimento dallo scontrino (OCR) da applicare alla riga, trasferte con destinazioni già usate proposte e km riempiti.
+- **[UI] Dialoghi**: Nuova nota (griglia dei 12 mesi con quelli già usati disattivati), Rifiuto con motivi frequenti, Anteprima scontrino, **Tariffe km** per la segreteria (prima solo dall'admin di Django).
+- **[DEC] Tariffa km**: il rimborso si ricalcola solo quando si inserisce/modifica/toglie una trasferta (comportamento del backend invariato); il dialogo lo dice.
+- **[UI] Variante B · Voci** dell'anteprima (solo voci compilate, scontrini trascinati e assegnati alla categoria): non portata.
+- **[UI] Rimossa** la vecchia pagina a griglia "foglio Excel" con bordi neri.
+
+## Audit
+
+Portato dall'anteprima `au-base.html`, variante **A · Registro** (scelta da Fede), con le colonne **Data** e **Ora** separate al posto di "Quando" (richiesta di Fede). Componenti in `features/audit/` (`auditModel.ts` con test, `auditUi.tsx`, `AuditKpis.tsx`, `useAuditStats.ts`, `AuditDetailCard.tsx`); rimosso `AuditEventDrawer`.
+
+- **[BE] Azione `GET /api/audit-events/stats/`**: eventi di oggi (e modifiche), eventi per giorno degli ultimi 14 giorni, accessi falliti nelle 24 ore con la coppia nome utente/IP più frequente, eliminazioni dei 7 giorni, chi ha modificato di più (7 giorni), eventi del sistema. Test in `audit/tests/test_stats.py`.
+- **[BE] Filtri nuovi**: `actions` (più azioni insieme), `actor_null` (eventi del sistema), `ip`; campo `actor_name` nel serializer.
+- **[BE] Link "Apri …"** (`config/ui_paths.py`): piano di manutenzione su `/maintenance/plans?apri=`, cartella Drive su `?cartella=`, aggiunti contratti, task di area e note spese. Corretto anche il link della Ricerca ai piani (`pages/Search.tsx`).
+- **[UI] Viste**: Tutto, Modifiche, Eliminazioni, Accessi, Accessi falliti (parametro `vista`), con i conteggi sugli stessi filtri; **periodo** Oggi / 7 giorni / 30 giorni / Sempre (parametro `periodo`; da un link con utente o oggetto parte da "Sempre"). Filtri da intestazione per utente (anche "Sistema"), azione e tipo; esportazione CSV.
+- **[UI] Pannello**: differenze campo per campo (Prima barrato / Dopo), password mai mostrate, chi e da dove con browser leggibile, dettagli tecnici chiusi, storico dell'oggetto, per gli accessi falliti i tentativi dallo stesso IP in 24 ore e se l'indirizzo è interno; pulsanti "Solo questo oggetto", "Apri …" (dal percorso del backend) o "Apri il Cestino".
+- **[UI] Variante B · Cronologia** dell'anteprima: non portata.
+
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).
