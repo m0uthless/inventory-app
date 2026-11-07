@@ -400,6 +400,7 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
     total_due          = serializers.SerializerMethodField()
     status_label       = serializers.CharField(source="get_status_display", read_only=True)
     validated_by_name  = serializers.SerializerMethodField()
+    km_rate            = serializers.SerializerMethodField()
     items              = ExpenseItemSerializer(many=True, read_only=True)
 
     class Meta:
@@ -407,13 +408,13 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
         fields = [
             "id", "user", "user_name", "year", "month", "number", "month_label",
             "advances_total", "note", "status", "status_label", "rejection_reason",
-            "validated_by", "validated_by_name", "validated_at",
+            "submitted_at", "validated_by", "validated_by_name", "validated_at", "km_rate",
             "total_expenses", "total_due", "items",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "user", "user_name", "number", "month_label", "status", "status_label",
-            "rejection_reason", "validated_by", "validated_by_name", "validated_at",
+            "rejection_reason", "submitted_at", "validated_by", "validated_by_name", "validated_at", "km_rate",
             "total_expenses", "total_due", "items", "created_at", "updated_at",
         ]
 
@@ -422,6 +423,13 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
 
     def get_validated_by_name(self, obj):
         return _user_name(obj.validated_by) if obj.validated_by_id else None
+
+    def get_km_rate(self, obj):
+        """Tariffa €/km del proprietario della nota (non di chi la guarda)."""
+        try:
+            return str(obj.user.expense_km_rate.rate_per_km)
+        except TechnicianKmRate.DoesNotExist:
+            return None
 
     def get_total_expenses(self, obj):
         return str(obj.total_expenses)
@@ -499,7 +507,7 @@ class ExpenseReportViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         qs = (
             ExpenseReport.objects
             .filter(deleted_at__isnull=True)
-            .select_related("user", "user__profile", "validated_by")
+            .select_related("user", "user__profile", "user__expense_km_rate", "validated_by")
             .prefetch_related("items", "items__km_trips", "items__receipts")
         )
         if not is_expense_secretary(self.request.user):
@@ -562,7 +570,7 @@ class ExpenseReportViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         if not obj.items.exclude(amount=0).exists() and obj.advances_total == 0:
             return Response({"detail": "Compila almeno una voce di spesa prima di inviare."}, status=400)
         self._save_status(
-            obj, status=ExpenseReportStatus.INVIATA,
+            obj, status=ExpenseReportStatus.INVIATA, submitted_at=timezone.now(),
             rejection_reason="", validated_by=None, validated_at=None,
         )
         log_event(actor=request.user, action="update", instance=obj,

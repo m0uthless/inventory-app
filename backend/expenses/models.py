@@ -86,6 +86,7 @@ class ExpenseReport(TimeStampedModel):
         max_length=12, choices=ExpenseReportStatus.choices,
         default=ExpenseReportStatus.BOZZA, verbose_name="Stato",
     )
+    submitted_at = models.DateTimeField(null=True, blank=True, verbose_name="Inviata il")
     rejection_reason = models.TextField(blank=True, verbose_name="Motivo rifiuto")
     validated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,

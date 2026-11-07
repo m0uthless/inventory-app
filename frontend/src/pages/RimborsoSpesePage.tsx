@@ -1,129 +1,46 @@
 /**
  * RimborsoSpesePage — /rimborso-spese/:id
  *
- * Pagina intera (non drawer): layout a tabella che rispecchia il modello
- * Excel. `table-layout: fixed` + `<colgroup>` su ogni tabella per garantire
- * che le colonne restino allineate riga per riga (senza, il browser
- * ridimensiona le colonne in base al contenuto e le righe "scivolano").
- *
- * Stessa strategia di sincronizzazione del drawer precedente: dopo ogni
- * mutazione si ricarica l'intero report con una GET.
+ * Nota spese (restyle "Campo sterile", variante A · Foglio di
+ * design-previews/ns-base.html): le 12 categorie come righe del modello
+ * Excel, trasferte km sotto il rimborso chilometraggio, riepilogo a destra.
+ * Dopo ogni modifica si ricarica l'intera nota (totali calcolati dal backend).
  */
 import * as React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
-import AddIcon from '@mui/icons-material/Add'
-import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
-import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
-
+import { Box, Button, ButtonBase, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material'
+import CheckIcon from '@mui/icons-material/Check'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../auth/AuthProvider'
-import { useStatusTokens, useWidgetAccents } from '../theme/AppThemeProvider'
-import { useTheme, alpha } from '@mui/material/styles'
-import {
-  CATEGORY_ORDER,
-  STATUS_LABELS,
-  formatEuro,
-  formatItDate,
-  isReportEditable,
-  todayISO,
-  type ExpenseItemRow,
-  type ExpenseReportRow,
-} from '../features/expenses/expensesShared'
+import { CampoIcon } from '../ui/campo'
+import { useOwnPageHeader } from '../layout/PageHeaderContext'
+import { formatEuro, isReportEditable, type ExpenseItemRow, type ExpenseReceiptRow, type ExpenseReportRow } from '../features/expenses/expensesShared'
+import { MONTHS_LC, agoLabel, dShort, monthTitle, rateLabel, reportNumber } from '../features/expenses/nsModel'
+import { ExpenseStatusBadge } from '../features/expenses/nsUi'
+import ExpenseSheet, { type ItemPatch, type Suggestion } from '../features/expenses/ExpenseSheet'
+import ExpenseSummary from '../features/expenses/ExpenseSummary'
+import { ReceiptDialog, RejectDialog } from '../features/expenses/ExpenseDialogs'
 
 type ExtractResponse = { amount: string | null; date: string | null; warnings: string[] }
 type Meta = { is_secretary: boolean; user_id: number; km_rate: string | null }
 
-// ─── Stile "foglio" — bordi sottili neri come una griglia Excel ─────────────
-// La pagina imita l'aspetto di un foglio di calcolo (bordi, intestazione,
-// evidenziazione celle modificabili), ora derivato dal tema attivo invece di
-// hex fissi: bordo/intestazione seguono divider/background.default (identici
-// nei 3 temi ma theme-aware per coerenza), editableCellSx usa davvero
-// WidgetAccents.mintAccent (varia in temp). Calcolati dentro il componente
-// (vedi RimborsoSpesePage) perché serve accesso a useTheme()/useWidgetAccents().
-
-type SheetStyles = {
-  sheetBorder: string
-  cellSx: { border: string; px: number; py: number; verticalAlign: 'middle'; overflow: 'hidden' }
-  headCellSx: { border: string; px: number; py: number; verticalAlign: 'middle'; overflow: 'hidden'; fontWeight: number; fontSize: number; letterSpacing: string; bgcolor: string }
-  editableCellSx: { bgcolor: string }
-  tableSx: { width: string; tableLayout: 'fixed'; borderCollapse: 'collapse'; bgcolor: string; fontSize: number }
-}
-
-function useSheetStyles(): SheetStyles {
-  const theme = useTheme()
-  const widgetAccents = useWidgetAccents()
-  return React.useMemo(() => {
-    const sheetBorder = `1px solid ${theme.palette.text.primary}`
-    const cellSx = { border: sheetBorder, px: 1, py: 0.5, verticalAlign: 'middle' as const, overflow: 'hidden' as const }
-    return {
-      sheetBorder,
-      cellSx,
-      headCellSx: { ...cellSx, fontWeight: 700, fontSize: 11, letterSpacing: '0.03em', bgcolor: theme.palette.background.default },
-      // Celle dove il tecnico può scrivere: piccolo highlight mint (WidgetAccents, theme-aware) per segnalarlo a colpo d'occhio.
-      editableCellSx: { bgcolor: alpha(widgetAccents.mintAccent, 0.14) },
-      tableSx: { width: '100%', tableLayout: 'fixed' as const, borderCollapse: 'collapse' as const, bgcolor: theme.palette.background.paper, fontSize: 13 },
-    }
-  }, [theme, widgetAccents])
-}
-
-function euroOrBlank(value: string | number | null | undefined): string {
-  const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0)
-  if (!Number.isFinite(n) || n === 0) return ''
-  return formatEuro(value)
-}
-
-function CellInput({
-  value, onChange, onBlur, disabled, align = 'left', placeholder,
-}: {
-  value: string
-  onChange: (v: string) => void
-  onBlur: () => void
-  disabled?: boolean
-  align?: 'left' | 'right'
-  placeholder?: string
-}) {
+function Banner({ tone, icon, title, children }: { tone: 'error' | 'success' | 'info'; icon: React.ReactNode; title: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <TextField
-      variant="standard"
-      fullWidth
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      disabled={disabled}
-      InputProps={{ disableUnderline: true }}
-      inputProps={{ style: { padding: 0, fontSize: 13, textAlign: align }, 'aria-label': placeholder }}
-    />
+    <Box role="status" sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', p: '10px 14px', borderRadius: '8px', mb: 1.75, fontSize: 13, bgcolor: `${tone}.light`, color: `${tone}.main` }}>
+      <Box sx={{ mt: '2px', display: 'flex' }}>{icon}</Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Box component="b" sx={{ display: 'block', fontWeight: 600 }}>{title}</Box>
+        {children ? <Box component="span" sx={{ color: 'text.primary', whiteSpace: 'pre-wrap' }}>{children}</Box> : null}
+      </Box>
+    </Box>
   )
 }
 
 export default function RimborsoSpesePage() {
-  const statusTokens = useStatusTokens()
-  const { sheetBorder, cellSx, headCellSx, editableCellSx, tableSx } = useSheetStyles()
+  useOwnPageHeader()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const toast = useToast()
@@ -133,13 +50,14 @@ export default function RimborsoSpesePage() {
   const [meta, setMeta] = React.useState<Meta | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
-
   const [rejectOpen, setRejectOpen] = React.useState(false)
-  const [rejectReason, setRejectReason] = React.useState('')
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [receipt, setReceipt] = React.useState<{ r: ExpenseReceiptRow; item: ExpenseItemRow } | null>(null)
+  const [extracting, setExtracting] = React.useState<number | null>(null)
+  const [suggestion, setSuggestion] = React.useState<Suggestion | null>(null)
 
   const load = React.useCallback(async () => {
     if (!id) return
-    setLoading(true)
     try {
       const res = await api.get<ExpenseReportRow>(`/expense-reports/${id}/`)
       setReport(res.data)
@@ -149,482 +67,145 @@ export default function RimborsoSpesePage() {
       setLoading(false)
     }
   }, [id, toast])
-
-  React.useEffect(() => { void load() }, [load])
+  React.useEffect(() => { setLoading(true); void load() }, [load])
   React.useEffect(() => {
     api.get<Meta>('/expense-reports/meta/').then((r) => setMeta(r.data)).catch(() => {})
   }, [])
 
   const isOwner = report != null && me != null && report.user === me.id
   const editable = report != null && isOwner && isReportEditable(report)
-  const canSubmit = report != null && isOwner && isReportEditable(report)
-  const canValidateReject = report != null && Boolean(meta?.is_secretary) && report.status === 'inviata'
+  const secretary = Boolean(meta?.is_secretary)
+  const canValidate = report != null && secretary && report.status === 'inviata'
 
-  const items = React.useMemo(() => {
-    if (!report) return []
-    return [...report.items].sort(
-      (a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category),
-    )
-  }, [report])
-
-  const kmItem = items.find((i) => i.is_km_category) ?? null
-
-  // ── Note / anticipi ────────────────────────────────────────────────────
-  const [noteDraft, setNoteDraft] = React.useState('')
-  const [advancesDraft, setAdvancesDraft] = React.useState('')
-  React.useEffect(() => {
-    if (report) {
-      setNoteDraft(report.note)
-      const n = parseFloat(report.advances_total)
-      setAdvancesDraft(Number.isFinite(n) && n === 0 ? '' : report.advances_total)
-    }
-  }, [report])
-
-  const saveReportFields = async () => {
-    if (!report || !editable) return
-    try {
-      await api.patch(`/expense-reports/${report.id}/`, { note: noteDraft, advances_total: advancesDraft || '0' })
-      await load()
-    } catch (e) { toast.error(apiErrorToMessage(e)) }
-  }
-
-  // ── Voci categoria ─────────────────────────────────────────────────────
-  const patchItem = async (item: ExpenseItemRow, patch: Partial<Pick<ExpenseItemRow, 'description' | 'amount' | 'date'>>) => {
-    try {
-      await api.patch(`/expense-items/${item.id}/`, patch)
-      await load()
-    } catch (e) { toast.error(apiErrorToMessage(e)) }
-  }
-
-  // ── Trasferte km ───────────────────────────────────────────────────────
-  const [tripDate, setTripDate] = React.useState(todayISO())
-  const [tripDest, setTripDest] = React.useState('')
-  const [tripKm, setTripKm] = React.useState('')
-
-  const addTrip = async () => {
-    if (!kmItem) return
-    if (!tripDest.trim() || !tripKm) { toast.warning('Compila destinazione e km.'); return }
+  // ── Mutazioni ──
+  const run = async (fn: () => Promise<unknown>, ok?: string): Promise<boolean> => {
     setBusy(true)
-    try {
-      await api.post('/expense-km-trips/', { item: kmItem.id, date: tripDate, destination: tripDest.trim(), km: Number(tripKm) })
-      setTripDest(''); setTripKm('')
-      await load()
-    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+    try { await fn(); if (ok) toast.success(ok); await load(); return true }
+    catch (e) { toast.error(apiErrorToMessage(e)); return false }
+    finally { setBusy(false) }
   }
-
-  const removeTrip = async (tripId: number) => {
-    setBusy(true)
-    try { await api.delete(`/expense-km-trips/${tripId}/`); await load() }
-    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+  const patchItem = (item: ExpenseItemRow, patch: ItemPatch) => run(() => api.patch(`/expense-items/${item.id}/`, patch))
+  const patchReport = (patch: Partial<Pick<ExpenseReportRow, 'note' | 'advances_total'>>) => report ? run(() => api.patch(`/expense-reports/${report.id}/`, patch)) : Promise.resolve(false)
+  const addTrip = async (t: { date: string; destination: string; km: number }) => {
+    const km = report?.items.find((i) => i.is_km_category)
+    if (!km) return false
+    return run(() => api.post('/expense-km-trips/', { item: km.id, ...t }))
   }
-
-  // ── Scontrini + OCR ─────────────────────────────────────────────────────
-  const [extracting, setExtracting] = React.useState<number | null>(null)
-  const [suggestion, setSuggestion] = React.useState<{ itemId: number; amount: string | null; date: string | null } | null>(null)
-  const fileInputsRef = React.useRef<Record<number, HTMLInputElement | null>>({})
+  const removeTrip = (tripId: number) => void run(() => api.delete(`/expense-km-trips/${tripId}/`))
+  const removeReceipt = (rid: number) => void run(() => api.delete(`/expense-receipts/${rid}/`), 'Scontrino rimosso.')
 
   const uploadReceipt = async (item: ExpenseItemRow, file: File) => {
-    setBusy(true)
+    const fd = new FormData()
+    fd.append('item', String(item.id))
+    fd.append('file', file)
+    const ok = await run(() => api.post('/expense-receipts/', fd, { headers: { 'Content-Type': 'multipart/form-data' } }), 'Scontrino caricato.')
+    if (!ok || !file.type.startsWith('image/')) return
+    setExtracting(item.id)
     try {
-      const fd = new FormData()
-      fd.append('item', String(item.id))
-      fd.append('file', file)
-      await api.post('/expense-receipts/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      await load()
-      toast.success('Scontrino caricato.')
-
-      if (file.type.startsWith('image/')) {
-        setExtracting(item.id)
-        try {
-          const fd2 = new FormData()
-          fd2.append('file', file)
-          const res = await api.post<ExtractResponse>('/expense-receipts/extract/', fd2, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-          if (res.data.amount || res.data.date) {
-            setSuggestion({ itemId: item.id, amount: res.data.amount, date: res.data.date })
-          } else if (res.data.warnings?.length) {
-            toast.info('Estrazione automatica non riuscita: inserisci importo/data manualmente.')
-          }
-        } catch { /* suggerimento opzionale */ } finally { setExtracting(null) }
-      }
-    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+      const fd2 = new FormData()
+      fd2.append('file', file)
+      const res = await api.post<ExtractResponse>('/expense-receipts/extract/', fd2, { headers: { 'Content-Type': 'multipart/form-data' } })
+      if (res.data.amount || res.data.date) setSuggestion({ itemId: item.id, amount: res.data.amount, date: res.data.date })
+      else if (res.data.warnings?.length) toast.info('Importo e data non letti dallo scontrino: inseriscili a mano.')
+    } catch { /* suggerimento facoltativo */ } finally { setExtracting(null) }
   }
-
   const applySuggestion = async (item: ExpenseItemRow) => {
     if (!suggestion || suggestion.itemId !== item.id) return
-    const patch: Partial<Pick<ExpenseItemRow, 'amount' | 'date'>> = {}
-    if (suggestion.amount && !item.is_km_category) patch.amount = suggestion.amount
+    const patch: ItemPatch = {}
+    if (suggestion.amount) patch.amount = suggestion.amount
     if (suggestion.date) patch.date = suggestion.date
-    if (suggestion.amount && item.is_km_category) {
-      toast.info('Importo non applicato: per le categorie a km è calcolato automaticamente.')
-    }
-    await patchItem(item, patch)
-    setSuggestion(null)
+    if (await patchItem(item, patch)) setSuggestion(null)
   }
 
-  const removeReceipt = async (receiptId: number) => {
-    setBusy(true)
-    try { await api.delete(`/expense-receipts/${receiptId}/`); await load() }
-    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
-  }
-
-  // ── Workflow ─────────────────────────────────────────────────────────────
-  const doSubmit = async () => {
+  const submit = () => report && void run(() => api.post(`/expense-reports/${report.id}/submit/`), `Nota di ${MONTHS_LC[report.month]} inviata alla segreteria.`)
+  const validate = async () => {
     if (!report) return
-    setBusy(true)
-    try { await api.post(`/expense-reports/${report.id}/submit/`); toast.success('Nota spese inviata.'); await load() }
-    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+    if (await run(() => api.post(`/expense-reports/${report.id}/validate/`), `Nota di ${report.user_name} validata · ${formatEuro(report.total_due)}.`)) navigate('/rimborso-spese')
   }
-  const doValidate = async () => {
+  const remove = async () => {
     if (!report) return
-    setBusy(true)
-    try { await api.post(`/expense-reports/${report.id}/validate/`); toast.success('Validata.'); await load() }
-    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+    if (await run(() => api.delete(`/expense-reports/${report.id}/`), 'Nota spese spostata nel cestino.')) navigate('/rimborso-spese')
   }
-  const doReject = async () => {
-    if (!report || !rejectReason.trim()) return
-    setBusy(true)
-    try {
-      await api.post(`/expense-reports/${report.id}/reject/`, { reason: rejectReason.trim() })
-      toast.success('Rifiutata.')
-      setRejectOpen(false); setRejectReason('')
-      await load()
-    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+  const exportPdf = () => report && window.open(`/api/expense-reports/${report.id}/export-pdf/`, '_blank', 'noopener')
+
+  if (loading && !report) return <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}><CircularProgress /></Box>
+  if (!report) {
+    return (
+      <Box sx={{ py: 6, textAlign: 'center' }}>
+        <Typography sx={{ mb: 2, color: 'text.secondary' }}>Nota spese non trovata.</Typography>
+        <Button variant="outlined" onClick={() => navigate('/rimborso-spese')}>Torna alle note spese</Button>
+      </Box>
+    )
   }
-  const exportPdf = () => report && window.open(`/api/expense-reports/${report.id}/export-pdf/`, '_blank')
 
-  if (loading && !report) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
-  }
-  if (!report) return null
-
-  const colors = statusTokens.expenseReport[report.status]
-  const totalKm = kmItem ? kmItem.km_trips.reduce((s, t) => s + t.km, 0) : 0
-
+  const rate = rateLabel(report.km_rate)
+  const sentAt = report.submitted_at ?? report.updated_at
   return (
-    <Box sx={{ width: '100%', pb: 6 }}>
-      {/* ── Barra superiore ────────────────────────────────────────────── */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <IconButton size="small" onClick={() => navigate('/rimborso-spese')}>
-            <ArrowBackIcon fontSize="small" />
-          </IconButton>
-          <Typography variant="h6" fontWeight={800}>Nota spese {report.number}</Typography>
-          <Chip
-            size="small" label={STATUS_LABELS[report.status]}
-            sx={{ bgcolor: colors.bg, color: colors.color, border: `1px solid ${colors.border}`, fontWeight: 700 }}
-          />
-          {busy || loading ? <CircularProgress size={16} /> : null}
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <Button size="small" variant="outlined" startIcon={<DownloadOutlinedIcon />} onClick={exportPdf}>
-            Esporta PDF
-          </Button>
-          {canSubmit ? (
-            <Button size="small" variant="contained" startIcon={<SendOutlinedIcon />} onClick={doSubmit} disabled={busy}>
-              Invia alla segreteria
-            </Button>
+    <Box sx={{ pb: 6 }}>
+      <ButtonBase onClick={() => navigate('/rimborso-spese')} sx={{ gap: 0.25, mb: 0.75, fontSize: 12, fontWeight: 550, color: 'text.secondary', borderRadius: '4px', '&:hover': { color: 'text.primary' } }}>
+        <CampoIcon name="chevL" size={14} />Rimborso spese
+      </ButtonBase>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'grid', gap: '2px', minWidth: 0 }}>
+          <Typography variant="h4" component="h1">Nota spese di {MONTHS_LC[report.month]} {report.year}</Typography>
+          <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>
+            <Box component="span" sx={{ fontFamily: 'var(--font-mono, "Geist Mono", monospace)' }}>N. {reportNumber(report)}</Box> · {report.user_name}{rate ? ` · ${rate}` : ''}
+          </Typography>
+        </Box>
+        <Box sx={{ mt: '6px' }}><ExpenseStatusBadge status={report.status} secretary={secretary && !isOwner} /></Box>
+        {busy ? <CircularProgress size={16} sx={{ mt: '8px' }} /> : null}
+        <Box sx={{ ml: { sm: 'auto' }, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
+          {isOwner && report.status === 'bozza' ? (
+            <Tooltip title="Elimina la nota"><IconButton aria-label="Elimina la nota" onClick={() => setDeleteOpen(true)} disabled={busy}><CampoIcon name="trash" size={16} /></IconButton></Tooltip>
           ) : null}
-          {canValidateReject ? (
+          <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="download" size={15} />} onClick={exportPdf}>Esporta PDF</Button>
+          {editable ? <Button variant="contained" startIcon={<CampoIcon name="arrowR" size={15} />} onClick={submit} disabled={busy}>{report.status === 'rifiutata' ? 'Reinvia alla segreteria' : 'Invia alla segreteria'}</Button> : null}
+          {canValidate ? (
             <>
-              <Button size="small" variant="contained" color="success" startIcon={<CheckCircleOutlineIcon />} onClick={doValidate} disabled={busy}>
-                Valida
-              </Button>
-              <Button size="small" variant="outlined" color="error" startIcon={<CancelOutlinedIcon />} onClick={() => setRejectOpen(true)} disabled={busy}>
-                Rifiuta
-              </Button>
+              <Button variant="outlined" color="error" sx={{ color: "error.main", "&:hover": { borderColor: "error.main", bgcolor: "error.light" } }} onClick={() => setRejectOpen(true)} disabled={busy}>Rifiuta</Button>
+              <Button variant="contained" startIcon={<CheckIcon sx={{ fontSize: 16 }} />} onClick={validate} disabled={busy}>Valida</Button>
             </>
           ) : null}
-        </Stack>
-      </Stack>
-
-      {report.status === 'rifiutata' && report.rejection_reason ? (
-        <Alert severity="warning" sx={{ mb: 2 }}>Rifiutata: {report.rejection_reason}</Alert>
-      ) : null}
-      {report.status === 'validata' && report.validated_by_name ? (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          Validata da {report.validated_by_name}{report.validated_at ? ` il ${formatItDate(report.validated_at.slice(0, 10))}` : ''}
-        </Alert>
-      ) : null}
-
-      {editable ? (
-        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, ...editableCellSx, border: sheetBorder }} />
-          <Typography variant="caption" color="text.secondary">Celle compilabili</Typography>
-        </Stack>
-      ) : null}
-
-      {/* ── Foglio: intestazione + griglia categorie ─────────────────────── */}
-      <Box component="table" sx={tableSx}>
-        <colgroup>
-          <col style={{ width: '24%' }} />
-          <col style={{ width: '58%' }} />
-          <col style={{ width: '18%' }} />
-        </colgroup>
-        <tbody>
-          <tr>
-            <Box component="td" colSpan={3} sx={{ ...cellSx, textAlign: 'center', fontWeight: 800, py: 1, fontSize: 14 }}>
-              BIOTRON S.P.A. · VIA AVATI, 43 · 40054 BUDRIO (BO)
-            </Box>
-          </tr>
-          <tr>
-            <Box component="td" sx={headCellSx}>NOTA SPESE N. {report.number}</Box>
-            <Box component="td" sx={headCellSx}>MESE DI {report.month_label.toUpperCase()} {report.year}</Box>
-            <Box component="td" sx={headCellSx}>SIG. {report.user_name}</Box>
-          </tr>
-          <tr>
-            <Box component="td" colSpan={2} sx={headCellSx}>DESCRIZIONE</Box>
-            <Box component="td" sx={{ ...headCellSx, textAlign: 'right' }}>TOTALI GENERALI</Box>
-          </tr>
-
-          {items.map((item) => (
-            <tr key={item.id}>
-              <Box component="td" sx={{ ...cellSx, fontWeight: 600, fontSize: 12 }}>
-                {item.category_label}
-              </Box>
-              <Box component="td" sx={{ ...cellSx, ...(editable ? editableCellSx : {}) }}>
-                <ItemNoteCell
-                  item={item} editable={editable}
-                  extracting={extracting === item.id}
-                  suggestion={suggestion?.itemId === item.id ? suggestion : null}
-                  onPatch={(patch) => patchItem(item, patch)}
-                  onApplySuggestion={() => applySuggestion(item)}
-                  onDismissSuggestion={() => setSuggestion(null)}
-                  onUploadClick={() => fileInputsRef.current[item.id]?.click()}
-                  onRemoveReceipt={removeReceipt}
-                  fileInputRef={(el) => { fileInputsRef.current[item.id] = el }}
-                  onFileSelected={(f) => uploadReceipt(item, f)}
-                />
-              </Box>
-              <Box component="td" sx={{ ...cellSx, ...(editable && !item.is_km_category ? editableCellSx : {}) }}>
-                {item.is_km_category ? (
-                  <Typography variant="body2" sx={{ textAlign: 'right' }}>{euroOrBlank(item.amount)}</Typography>
-                ) : (
-                  <AmountCell
-                    value={item.amount}
-                    disabled={!editable}
-                    onCommit={(v) => v !== item.amount && patchItem(item, { amount: v })}
-                  />
-                )}
-              </Box>
-            </tr>
-          ))}
-        </tbody>
+        </Box>
       </Box>
 
-      {/* ── Foglio: log trasferte km + totali/anticipi/note ──────────────── */}
-      <Stack direction={{ xs: 'column', md: 'row' }} sx={{ mt: 3 }} alignItems="flex-start">
-        {/* Log trasferte km — più stretto per lasciare spazio prima dei totali */}
-        <Box component="table" sx={{ ...tableSx, width: '55%', flex: '0 0 auto' }}>
-          <colgroup>
-            <col style={{ width: '22%' }} />
-            <col style={{ width: '56%' }} />
-            <col style={{ width: '22%' }} />
-          </colgroup>
-          <tbody>
-            <tr>
-              <Box component="td" sx={headCellSx}>DATA</Box>
-              <Box component="td" sx={headCellSx}>LUOGO DI DESTINAZIONE</Box>
-              <Box component="td" sx={{ ...headCellSx, textAlign: 'right' }}>KM PERCORSI</Box>
-            </tr>
-            {kmItem?.km_trips.map((trip) => (
-              <tr key={trip.id}>
-                <Box component="td" sx={cellSx}>{formatItDate(trip.date)}</Box>
-                <Box component="td" sx={cellSx}>{trip.destination}</Box>
-                <Box component="td" sx={{ ...cellSx, textAlign: 'right' }}>
-                  <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                    {trip.km}
-                    {editable ? (
-                      <IconButton size="small" onClick={() => removeTrip(trip.id)} sx={{ p: 0.25 }}>
-                        <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    ) : null}
-                  </Stack>
-                </Box>
-              </tr>
-            ))}
-            {editable && kmItem ? (
-              <tr>
-                <Box component="td" sx={{ ...cellSx, ...editableCellSx }}>
-                  <TextField
-                    type="date" variant="standard" size="small" fullWidth value={tripDate}
-                    onChange={(e) => setTripDate(e.target.value)}
-                    InputProps={{ disableUnderline: true }} inputProps={{ style: { padding: 0, fontSize: 12.5 } }}
-                  />
-                </Box>
-                <Box component="td" sx={{ ...cellSx, ...editableCellSx }}>
-                  <CellInput value={tripDest} onChange={setTripDest} onBlur={() => {}} placeholder="Destinazione" />
-                </Box>
-                <Box component="td" sx={{ ...cellSx, ...editableCellSx, textAlign: 'right' }}>
-                  <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                    <TextField
-                      variant="standard" size="small" placeholder="km" value={tripKm}
-                      onChange={(e) => setTripKm(e.target.value)}
-                      InputProps={{ disableUnderline: true }}
-                      inputProps={{ style: { padding: 0, fontSize: 12.5, width: 36, textAlign: 'right' } }}
-                    />
-                    <IconButton size="small" onClick={addTrip} sx={{ p: 0.25 }}><AddIcon sx={{ fontSize: 16 }} /></IconButton>
-                  </Stack>
-                </Box>
-              </tr>
-            ) : null}
-            <tr>
-              <Box component="td" colSpan={2} sx={{ ...cellSx, fontWeight: 700 }}>TOTALE KM</Box>
-              <Box component="td" sx={{ ...cellSx, fontWeight: 700, textAlign: 'right' }}>{totalKm || ''}</Box>
-            </tr>
-          </tbody>
-        </Box>
-
-        {/* Spazio vuoto fra le due tabelle */}
-        <Box sx={{ width: '5%', flex: '0 0 auto' }} />
-
-        {/* Anticipi / totali / note — colonna importo allineata con "TOTALI GENERALI" sopra (18% pagina) */}
-        <Box component="table" sx={{ ...tableSx, width: '40%', flex: '0 0 auto' }}>
-          <colgroup>
-            <col style={{ width: '55%' }} />
-            <col style={{ width: '45%' }} />
-          </colgroup>
-          <tbody>
-            <tr>
-              <Box component="td" sx={headCellSx}>TOT. ANTICIPI</Box>
-              <Box component="td" sx={{ ...cellSx, ...(editable ? editableCellSx : {}), textAlign: 'right' }}>
-                <AmountCell value={advancesDraft || '0'} disabled={!editable} onCommit={(v) => { setAdvancesDraft(v); void saveReportFields() }} />
-              </Box>
-            </tr>
-            <tr>
-              <Box component="td" sx={{ ...headCellSx, fontSize: 12.5 }}>TOT. DA RENDERE</Box>
-              <Box component="td" sx={{ ...cellSx, textAlign: 'right', fontWeight: 800 }}>{euroOrBlank(report.total_due)}</Box>
-            </tr>
-            <tr>
-              <Box component="td" colSpan={2} sx={{ ...cellSx, ...(editable ? editableCellSx : {}) }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25 }}>Note</Typography>
-                <TextField
-                  variant="standard" fullWidth multiline minRows={2}
-                  value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onBlur={saveReportFields}
-                  disabled={!editable}
-                  InputProps={{ disableUnderline: true }} inputProps={{ style: { fontSize: 12.5 } }}
-                />
-              </Box>
-            </tr>
-          </tbody>
-        </Box>
-      </Stack>
-
-      {/* ── Note a piè di pagina (come nel modello) ──────────────────────── */}
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-        * Voce "Rimborso chilometraggio" spuntata dalle trasferte sopra, calcolata automaticamente in base alla tua
-        tariffa €/km. ** "Varie automezzi" = lavaggio, parcheggi e piccole manutenzioni fino a 50€. *** "Pasti" =
-        consumazioni al ristorante o al bar.
-      </Typography>
-
-      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Motivo del rifiuto</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus fullWidth multiline minRows={3}
-            placeholder="Es. manca lo scontrino del pernottamento…"
-            value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectOpen(false)}>Annulla</Button>
-          <Button variant="contained" color="error" disabled={!rejectReason.trim() || busy} onClick={doReject}>
-            Rifiuta nota spese
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  )
-}
-
-// ─── Cella importo (allineata a destra, vuota se zero) ───────────────────────
-
-function AmountCell({ value, disabled, onCommit }: { value: string; disabled: boolean; onCommit: (v: string) => void }) {
-  const [draft, setDraft] = React.useState('')
-  React.useEffect(() => {
-    const n = parseFloat(value)
-    setDraft(Number.isFinite(n) && n === 0 ? '' : value)
-  }, [value])
-  return (
-    <TextField
-      variant="standard" fullWidth
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => onCommit(draft === '' ? '0' : draft)}
-      disabled={disabled}
-      InputProps={{ disableUnderline: true }}
-      inputProps={{ inputMode: 'decimal', style: { padding: 0, fontSize: 13, textAlign: 'right' }, 'aria-label': 'Importo' }}
-    />
-  )
-}
-
-// ─── Cella nota + scontrini per una riga di categoria ────────────────────────
-
-function ItemNoteCell({
-  item, editable, extracting, suggestion, onPatch, onApplySuggestion, onDismissSuggestion,
-  onUploadClick, onRemoveReceipt, fileInputRef, onFileSelected,
-}: {
-  item: ExpenseItemRow
-  editable: boolean
-  extracting: boolean
-  suggestion: { amount: string | null; date: string | null } | null
-  onPatch: (patch: Partial<Pick<ExpenseItemRow, 'description' | 'amount' | 'date'>>) => void
-  onApplySuggestion: () => void
-  onDismissSuggestion: () => void
-  onUploadClick: () => void
-  onRemoveReceipt: (receiptId: number) => void
-  fileInputRef: (el: HTMLInputElement | null) => void
-  onFileSelected: (file: File) => void
-}) {
-  const [description, setDescription] = React.useState(item.description)
-  React.useEffect(() => setDescription(item.description), [item.description])
-
-  return (
-    <Box>
-      <CellInput
-        value={description} onChange={setDescription}
-        onBlur={() => description !== item.description && onPatch({ description })}
-        disabled={!editable}
-        placeholder="Note"
-      />
-      <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" sx={{ mt: 0.25 }}>
-        {item.receipts.map((r) => (
-          <Chip
-            key={r.id} size="small" sx={{ height: 20, fontSize: 10.5 }}
-            icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 13 }} />}
-            label={r.file_name || 'Scontrino'}
-            onClick={() => r.file_url && window.open(r.file_url, '_blank')}
-            onDelete={editable ? () => onRemoveReceipt(r.id) : undefined}
-          />
-        ))}
-        {editable ? (
-          <>
-            <Tooltip title="Carica scontrino">
-              <IconButton size="small" onClick={onUploadClick} disabled={extracting} sx={{ p: 0.25 }} aria-label="Carica scontrino">
-                {extracting ? <CircularProgress size={12} /> : <UploadFileOutlinedIcon sx={{ fontSize: 14 }} />}
-              </IconButton>
-            </Tooltip>
-            <input
-              ref={fileInputRef} type="file" accept="image/*,application/pdf" hidden
-              onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ''; if (f) onFileSelected(f) }}
-            />
-          </>
-        ) : null}
-      </Stack>
-      {suggestion ? (
-        <Alert
-          severity="info" sx={{ mt: 0.5, py: 0, fontSize: 11 }}
-          action={
-            <Stack direction="row" spacing={0.5}>
-              <Button size="small" onClick={onApplySuggestion} sx={{ fontSize: 10.5, minWidth: 0 }}>Applica</Button>
-              <Button size="small" onClick={onDismissSuggestion} sx={{ fontSize: 10.5, minWidth: 0 }}>Ignora</Button>
-            </Stack>
-          }
-        >
-          Da scontrino{suggestion.amount ? `: ${suggestion.amount} €` : ''}{suggestion.date ? ` — ${formatItDate(suggestion.date)}` : ''}
-        </Alert>
+      {report.status === 'rifiutata' ? (
+        <Banner tone="error" icon={<CampoIcon name="alert" size={16} />} title={`Rifiutata${report.validated_by_name ? ` da ${report.validated_by_name}` : ''}${report.validated_at ? ` il ${dShort(report.validated_at)}` : ''}`}>
+          {report.rejection_reason || 'Correggi e reinvia.'}
+        </Banner>
       ) : null}
+      {report.status === 'validata' ? (
+        <Banner tone="success" icon={<CheckIcon sx={{ fontSize: 16 }} />} title={`Validata${report.validated_by_name ? ` da ${report.validated_by_name}` : ''}${report.validated_at ? ` il ${dShort(report.validated_at, true)}` : ''}`}>
+          La nota non è più modificabile.
+        </Banner>
+      ) : null}
+      {report.status === 'inviata' && !canValidate ? (
+        <Banner tone="info" icon={<CampoIcon name="clock" size={16} />} title={`Inviata il ${dShort(sentAt)}`}>
+          In attesa della segreteria. Finché non viene validata o rifiutata non è modificabile.
+        </Banner>
+      ) : null}
+      {canValidate ? (
+        <Banner tone="info" icon={<CampoIcon name="clock" size={16} />} title={`Inviata da ${report.user_name} il ${dShort(sentAt)} · ${agoLabel(sentAt)}`}>
+          Controlla le voci e gli scontrini, poi valida o rifiuta con un motivo.
+        </Banner>
+      ) : null}
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1fr)', lg: 'minmax(0,1fr) 300px' }, gap: 2, alignItems: 'start' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <ExpenseSheet report={report} editable={editable} busy={busy} extractingId={extracting} suggestion={suggestion}
+            onPatch={patchItem} onUpload={(it, f) => void uploadReceipt(it, f)} onRemoveReceipt={removeReceipt}
+            onOpenReceipt={(r, item) => setReceipt({ r, item })} onApplySuggestion={(it) => void applySuggestion(it)} onDismissSuggestion={() => setSuggestion(null)}
+            onAddTrip={addTrip} onRemoveTrip={removeTrip} />
+        </Box>
+        <ExpenseSummary report={report} editable={editable} canValidate={canValidate} busy={busy}
+          onAdvances={(v) => patchReport({ advances_total: v })} onNote={(v) => patchReport({ note: v })}
+          onSubmit={submit} onValidate={() => void validate()} onReject={() => setRejectOpen(true)} />
+      </Box>
+
+      <RejectDialog report={rejectOpen ? report : null} onClose={() => setRejectOpen(false)} onDone={() => { setRejectOpen(false); navigate('/rimborso-spese') }} />
+      <ReceiptDialog receipt={receipt?.r ?? null} item={receipt?.item ?? null} onClose={() => setReceipt(null)} />
+      <ConfirmDeleteDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => void remove()} busy={busy}
+        title="Eliminare la nota spese?" description={`${monthTitle(report)}: la nota va nel cestino.`} />
     </Box>
   )
 }
