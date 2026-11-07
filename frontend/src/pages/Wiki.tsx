@@ -1,554 +1,64 @@
 import * as React from 'react'
-import { SHARED } from '../theme/constants'
-import {
-  Box,
-  Button,
-  Card,
-  Chip,
-  CircularProgress,
-  FormControl,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Rating,
-  Select,
-  Stack,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import SearchIcon from '@mui/icons-material/Search'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined'
-import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined'
-import ReorderIcon from '@mui/icons-material/Reorder'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
-import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined'
-import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined'
-import { useLocation, useNavigate } from 'react-router-dom'
-
+import { Box, Button, CircularProgress, Typography } from '@mui/material'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
-import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
-import FilterChip from '@shared/ui/FilterChip'
 import { useAuth } from '../auth/AuthProvider'
+import { PERMS } from '../auth/perms'
+import { CampoIcon } from '../ui/campo'
 import WikiCategoryManager from '../ui/WikiCategoryManager'
-import { useWidgetAccents } from '../theme/AppThemeProvider'
+import {
+  ArchiveRoot, FolderTabs, HeadAction, Mark, OpenFolder, PageCard, StarIcon, WikiHead,
+} from '../features/wiki/archive/archiveUi'
+import {
+  NO_CAT, catColor, catIcon, cVars, dshort, matchesPage, r1, rel, snippetOf,
+  type ApiList, type WikiCategory, type WikiPageRow,
+} from '../features/wiki/archive/archiveModel'
 
-type Category = { id: number; name: string; sort_order: number; emoji?: string; color?: string }
-
-type PageRow = {
-  id: number
-  title: string
-  slug: string
-  category?: number | null
-  category_name?: string | null
-  category_emoji?: string | null
-  category_color?: string | null
-  summary?: string | null
-  tags?: string[] | null
-  is_published: boolean
-  average_rating?: number | null
-  rating_count?: number
-  attachment_count?: number
-  view_count?: number
-  created_by_username?: string | null
-  updated_by_username?: string | null
-  updated_at?: string | null
+type Sort = 'upd' | 'views' | 'title'
+const SORTS: [Sort, string][] = [['upd', 'Aggiornate'], ['views', 'Più lette'], ['title', 'A–Z']]
+const sortFn: Record<Sort, (a: WikiPageRow, b: WikiPageRow) => number> = {
+  upd: (a, b) => String(b.updated_at).localeCompare(String(a.updated_at)),
+  views: (a, b) => (b.view_count ?? 0) - (a.view_count ?? 0),
+  title: (a, b) => a.title.localeCompare(b.title, 'it'),
 }
+// Leggera rotazione dei fogli: sempre la stessa per posizione, non casuale.
+const TILT = [-0.6, 0.4, -0.2, 0.7, -0.5, 0.2]
+const IDX_TILT = [-1.2, 0.8, -0.4, 1.1, -0.9, 0.5]
+const BOOK_H = [236, 250, 228, 244, 232, 240]
 
-type ApiPage<T> = { count: number; results: T[] }
-
-type ViewMode = 'grid' | 'list'
-type SortValue = 'title' | '-updated_at' | '-average_rating' | '-view_count' | '-created_at'
-
-const SORT_OPTIONS: { value: SortValue; label: string }[] = [
-  { value: 'title', label: 'Titolo A-Z' },
-  { value: '-updated_at', label: 'Aggiornate di recente' },
-  { value: '-average_rating', label: 'Più votate' },
-  { value: '-view_count', label: 'Più viste' },
-  { value: '-created_at', label: 'Più recenti' },
-]
-
-function fmtDate(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
-}
-
-function ratingText(page: PageRow): string {
-  if ((page.rating_count ?? 0) <= 0) return 'Ancora nessun voto'
-  return `${(page.average_rating ?? 0).toLocaleString('it-IT', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })} · ${page.rating_count} vot${(page.rating_count ?? 0) === 1 ? 'o' : 'i'}`
-}
-
-function resultLabel(count: number): string {
-  return `${count} pagin${count === 1 ? 'a' : 'e'}`
-}
-
-function statText(value?: number | null): string {
-  return (value ?? 0).toLocaleString('it-IT')
-}
-
-function WikiCard({
-  page,
-  categoryMap,
-  onClick,
-}: {
-  page: PageRow
-  categoryMap: Record<number, Category>
-  onClick: () => void
-}) {
-  const widgetAccents = useWidgetAccents()
-  const cat = page.category ? categoryMap[page.category] : null
-  const accent = cat?.color ?? widgetAccents.categoryAccents[(page.category ?? 0) % widgetAccents.categoryAccents.length]
-  const emoji = cat?.emoji ?? '📄'
-  const tags = (page.tags ?? []).slice(0, 3)
-
-  return (
-    <Card
-      onClick={onClick}
-      variant="outlined"
-      sx={{
-        cursor: 'pointer',
-        borderRadius: 1.5,
-        borderColor: 'grey.200',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.15s',
-        '&:hover': {
-          boxShadow: `0 10px 24px ${accent}18`,
-          borderColor: accent,
-          transform: 'translateY(-2px)',
-        },
-      }}
-    >
-      <Box sx={{ height: 3, bgcolor: accent, flexShrink: 0 }} />
-
-      <Stack sx={{ p: 1.75, flex: 1 }} spacing={1.15}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap">
-            <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{emoji}</Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 700,
-                color: accent,
-                bgcolor: `${accent}16`,
-                px: 0.75,
-                py: 0.3,
-                borderRadius: 0.75,
-                letterSpacing: '0.03em',
-                fontSize: 10.5,
-              }}
-            >
-              {page.category_name ?? 'Senza categoria'}
-            </Typography>
-          </Stack>
-          {!page.is_published && (
-            <Chip
-              label="Bozza"
-              size="small"
-              sx={{
-                height: 18,
-                fontSize: 10,
-                fontWeight: 700,
-                borderRadius: 0.75,
-                bgcolor: (theme) => theme.palette.warning.light,
-                color: (theme) => theme.palette.warning.dark,
-              }}
-            />
-          )}
-        </Stack>
-
-        <Typography
-          variant="subtitle2"
-          sx={{
-            fontWeight: 700,
-            color: 'text.primary',
-            lineHeight: 1.35,
-            letterSpacing: '-0.01em',
-            minHeight: 38,
-          }}
-        >
-          {page.title}
-        </Typography>
-
-        {page.summary ? (
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'text.secondary',
-              fontSize: 12.5,
-              lineHeight: 1.55,
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              minHeight: 58,
-            }}
-          >
-            {page.summary}
-          </Typography>
-        ) : (
-          <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12.5, minHeight: 58 }}>
-            Nessun riepilogo disponibile.
-          </Typography>
-        )}
-
-        <Stack direction="row" alignItems="center" spacing={0.75}>
-          <Rating
-            value={page.average_rating ?? 0}
-            precision={0.1}
-            readOnly
-            size="small"
-            sx={{
-              '& .MuiRating-iconFilled': { color: (theme) => theme.palette.warning.main },
-              '& .MuiRating-iconEmpty': { color: (theme) => theme.palette.warning.light },
-              fontSize: 16,
-            }}
-          />
-          <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-            {ratingText(page)}
-          </Typography>
-        </Stack>
-
-        <Stack direction="row" spacing={0.5} flexWrap="wrap">
-          {tags.map((t) => (
-            <Typography
-              key={t}
-              variant="caption"
-              sx={{
-                fontSize: 10.5,
-                fontWeight: 600,
-                color: 'text.disabled',
-                bgcolor: 'grey.50',
-                px: 0.75,
-                py: 0.25,
-                borderRadius: 0.75,
-              }}
-            >
-              {t}
-            </Typography>
-          ))}
-          {(page.tags?.length ?? 0) > 3 && (
-            <Typography variant="caption" sx={{ fontSize: 10.5, color: 'text.disabled' }}>
-              +{page.tags!.length - 3}
-            </Typography>
-          )}
-        </Stack>
-
-        <Stack spacing={0.75} sx={{ pt: 1, borderTop: '1px solid', borderColor: 'grey.100' }}>
-          <Stack direction="row" alignItems="center" spacing={1.2} flexWrap="wrap">
-            <Stack direction="row" alignItems="center" spacing={0.45}>
-              <VisibilityOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-                {statText(page.view_count)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={0.45}>
-              <AttachFileOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-                {statText(page.attachment_count)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={0.45}>
-              <ScheduleOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-                {fmtDate(page.updated_at) || '—'}
-              </Typography>
-            </Stack>
-          </Stack>
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <PersonOutlineOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-            <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }} noWrap>
-              {page.updated_by_username || page.created_by_username || 'Autore non disponibile'}
-            </Typography>
-          </Stack>
-        </Stack>
-      </Stack>
-    </Card>
-  )
-}
-
-function WikiListRow({
-  page,
-  categoryMap,
-  onClick,
-}: {
-  page: PageRow
-  categoryMap: Record<number, Category>
-  onClick: () => void
-}) {
-  const widgetAccents = useWidgetAccents()
-  const cat = page.category ? categoryMap[page.category] : null
-  const accent = cat?.color ?? widgetAccents.categoryAccents[(page.category ?? 0) % widgetAccents.categoryAccents.length]
-  const emoji = cat?.emoji ?? '📄'
-  const tags = (page.tags ?? []).slice(0, 4)
-
-  return (
-    <Card
-      onClick={onClick}
-      variant="outlined"
-      sx={{
-        cursor: 'pointer',
-        borderRadius: 1.5,
-        borderColor: 'grey.200',
-        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.15s',
-        '&:hover': {
-          boxShadow: `0 8px 20px ${accent}18`,
-          borderColor: accent,
-          transform: 'translateY(-1px)',
-        },
-      }}
-    >
-      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5} justifyContent="space-between" sx={{ px: 1.75, py: 1.5 }}>
-        <Stack spacing={0.95} sx={{ minWidth: 0, flex: 1 }}>
-          <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap">
-            <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{emoji}</Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 700,
-                color: accent,
-                bgcolor: `${accent}16`,
-                px: 0.75,
-                py: 0.25,
-                borderRadius: 0.75,
-                letterSpacing: '0.03em',
-                fontSize: 10.5,
-              }}
-            >
-              {page.category_name ?? 'Senza categoria'}
-            </Typography>
-            {!page.is_published && (
-              <Chip
-                label="Bozza"
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  borderRadius: 0.75,
-                  bgcolor: (theme) => theme.palette.warning.light,
-                  color: (theme) => theme.palette.warning.dark,
-                }}
-              />
-            )}
-          </Stack>
-
-          <Typography
-            variant="subtitle2"
-            sx={{
-              fontWeight: 700,
-              color: 'text.primary',
-              lineHeight: 1.3,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {page.title}
-          </Typography>
-
-          {page.summary ? (
-            <Typography
-              variant="body2"
-              sx={{
-                color: 'text.secondary',
-                fontSize: 12.5,
-                lineHeight: 1.55,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {page.summary}
-            </Typography>
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12.5 }}>
-              Nessun riepilogo disponibile.
-            </Typography>
-          )}
-
-          {!!tags.length && (
-            <Stack direction="row" spacing={0.5} flexWrap="wrap">
-              {tags.map((t) => (
-                <Typography
-                  key={t}
-                  variant="caption"
-                  sx={{
-                    fontSize: 10.5,
-                    fontWeight: 600,
-                    color: 'text.disabled',
-                    bgcolor: 'grey.50',
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: 0.75,
-                  }}
-                >
-                  {t}
-                </Typography>
-              ))}
-              {(page.tags?.length ?? 0) > 4 && (
-                <Typography variant="caption" sx={{ fontSize: 10.5, color: 'text.disabled' }}>
-                  +{page.tags!.length - 4}
-                </Typography>
-              )}
-            </Stack>
-          )}
-        </Stack>
-
-        <Stack
-          spacing={0.9}
-          alignItems={{ xs: 'flex-start', lg: 'flex-end' }}
-          justifyContent="space-between"
-          sx={{ minWidth: { xs: 0, lg: 240 }, flexShrink: 0 }}
-        >
-          <Stack direction="row" alignItems="center" spacing={0.75}>
-            <Rating
-              value={page.average_rating ?? 0}
-              precision={0.1}
-              readOnly
-              size="small"
-              sx={{
-                '& .MuiRating-iconFilled': { color: (theme) => theme.palette.warning.main },
-                '& .MuiRating-iconEmpty': { color: (theme) => theme.palette.warning.light },
-                fontSize: 16,
-              }}
-            />
-            <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-              {ratingText(page)}
-            </Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={1.15} flexWrap="wrap" justifyContent={{ xs: 'flex-start', lg: 'flex-end' }}>
-            <Stack direction="row" alignItems="center" spacing={0.4}>
-              <VisibilityOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-                {statText(page.view_count)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={0.4}>
-              <AttachFileOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-                {statText(page.attachment_count)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={0.4}>
-              <ScheduleOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }}>
-                {fmtDate(page.updated_at) || '—'}
-              </Typography>
-            </Stack>
-          </Stack>
-
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <PersonOutlineOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-            <Typography variant="caption" sx={{ fontSize: 11, color: 'text.secondary' }} noWrap>
-              {page.updated_by_username || page.created_by_username || 'Autore non disponibile'}
-            </Typography>
-          </Stack>
-        </Stack>
-      </Stack>
-    </Card>
-  )
-}
-
+/** Wiki · Archivio (restyle "Campo sterile", anteprima design-previews/w-base.html, variante E). */
 export default function Wiki() {
   const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
-  const { hasPerm } = useAuth()
-  const canManageCategories =
-    hasPerm('wiki.add_wikicategory') || hasPerm('wiki.change_wikicategory') || hasPerm('wiki.delete_wikicategory')
+  const { me, hasPerm } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const catParam = params.get('cartella')
+  const view = params.get('vista') === 'tutte' ? 'all' : 'folders'
+  const canManageCategories = hasPerm('wiki.add_wikicategory') || hasPerm('wiki.change_wikicategory') || hasPerm('wiki.delete_wikicategory')
+  const canAdd = hasPerm(PERMS.wiki.page.add)
 
-  const [pages, setPages] = React.useState<PageRow[]>([])
-  const [catManagerOpen, setCatManagerOpen] = React.useState(false)
-  const [categories, setCategories] = React.useState<Category[]>([])
-  const [categoryMap, setCategoryMap] = React.useState<Record<number, Category>>({})
-  const [loading, setLoading] = React.useState(false)
-
+  const [cats, setCats] = React.useState<WikiCategory[]>([])
+  const [pages, setPages] = React.useState<WikiPageRow[] | null>(null)
   const [q, setQ] = React.useState('')
-  const [search, setSearch] = React.useState('')
-  const [categoryId, setCategoryId] = React.useState<number | ''>('')
-  const [published, setPublished] = React.useState<'' | 'true' | 'false'>('')
-  const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
-    try {
-      return window.localStorage.getItem('wiki_view_mode') === 'list' ? 'list' : 'grid'
-    } catch {
-      return 'grid'
-    }
-  })
-  const [sortBy, setSortBy] = React.useState<SortValue>(() => {
-    try {
-      const raw = window.localStorage.getItem('wiki_sort_mode')
-      return SORT_OPTIONS.some((opt) => opt.value === raw) ? (raw as SortValue) : '-updated_at'
-    } catch {
-      return '-updated_at'
-    }
-  })
+  const [sort, setSort] = React.useState<Sort>('upd')
+  const [catManagerOpen, setCatManagerOpen] = React.useState(false)
+  const [reloadKey, setReloadKey] = React.useState(0)
 
   React.useEffect(() => {
-    try {
-      window.localStorage.setItem('wiki_view_mode', viewMode)
-    } catch {
-      // storage non disponibile (es. modalità privata): la preferenza resta solo in memoria
-    }
-  }, [viewMode])
+    let alive = true
+    Promise.all([
+      api.get<ApiList<WikiCategory>>('/wiki-categories/', { params: { ordering: 'sort_order,name', page_size: 200 } }),
+      api.get<ApiList<WikiPageRow>>('/wiki-pages/', { params: { page_size: 500, ordering: '-updated_at' } }),
+    ]).then(([c, p]) => { if (alive) { setCats(c.data.results ?? []); setPages(p.data.results ?? []) } })
+      .catch((e) => toast.error(apiErrorToMessage(e)))
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey])
 
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem('wiki_sort_mode', sortBy)
-    } catch {
-      // storage non disponibile (es. modalità privata): la preferenza resta solo in memoria
-    }
-  }, [sortBy])
-
-  const loadCategories = React.useCallback(async () => {
-    try {
-      const res = await api.get<ApiPage<Category>>('/wiki-categories/', {
-        params: { ordering: 'sort_order,name', page_size: 200 },
-      })
-      const cats = res.data.results ?? []
-      setCategories(cats)
-      setCategoryMap(Object.fromEntries(cats.map((c) => [c.id, c])))
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
-  }, [toast])
-
-  const load = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const params: Record<string, unknown> = { page_size: 500, ordering: sortBy }
-      if (search) params.search = search
-      if (categoryId !== '') params.category = categoryId
-      if (published !== '') params.is_published = published
-      const res = await api.get<ApiPage<PageRow>>('/wiki-pages/', { params })
-      setPages(res.data.results ?? [])
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [search, categoryId, published, sortBy, toast])
-
-  React.useEffect(() => {
-    loadCategories()
-  }, [loadCategories])
-
-  React.useEffect(() => {
-    load()
-  }, [load])
-
+  // Apertura della gestione cartelle da altre pagine (es. Impostazioni).
   React.useEffect(() => {
     const state = location.state as { openCategoryManager?: boolean } | null
     if (canManageCategories && state?.openCategoryManager) {
@@ -557,221 +67,226 @@ export default function Wiki() {
     }
   }, [canManageCategories, location.pathname, location.search, location.state, navigate])
 
+  const all = React.useMemo(() => pages ?? [], [pages])
+  // Cartelle nell'ordine dell'amministratore; "Senza cartella" solo se serve.
+  const folders = React.useMemo(() => (all.some((p) => !p.category) ? [...cats, NO_CAT] : cats), [cats, all])
+  const catOf = React.useCallback((p: WikiPageRow) => folders.find((c) => c.id === (p.category ?? 0)), [folders])
+  const counts = React.useMemo(() => Object.fromEntries(folders.map((c) => [c.id, all.filter((p) => (p.category ?? 0) === c.id).length])), [folders, all])
+  const openCat = catParam != null ? folders.find((c) => String(c.id) === catParam) ?? null : null
 
-  const reset = React.useCallback(() => {
+  const go = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params)
+    Object.entries(patch).forEach(([k, v]) => (v == null ? next.delete(k) : next.set(k, v)))
+    setParams(next)
     setQ('')
-    setSearch('')
-    setCategoryId('')
-    setPublished('')
-    setSortBy('-updated_at')
-  }, [])
+  }
+  const openPage = (p: WikiPageRow) => navigate(`/wiki/${p.id}`)
+  const newPage = () => navigate(openCat && openCat.id ? `/wiki/new?cartella=${openCat.id}` : '/wiki/new')
 
-  const activeFilterCount = (categoryId !== '' ? 1 : 0) + (published !== '' ? 1 : 0)
-  const selectedSortLabel = SORT_OPTIONS.find((opt) => opt.value === sortBy)?.label ?? 'Aggiornate di recente'
+  const term = q.trim()
+  const search = (
+    <label className="search w-search w-e-search">
+      <CampoIcon name="search" size={16} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={openCat ? `Cerca in ${openCat.name}…` : 'Cerca in tutta la Wiki: titolo, testo, tag…'} aria-label="Cerca nella Wiki" />
+    </label>
+  )
+  const sortSeg = (
+    <div className="seg" role="group" aria-label="Ordina">
+      {SORTS.map(([k, l]) => <button key={k} type="button" aria-pressed={sort === k} onClick={() => setSort(k)}>{l}</button>)}
+    </div>
+  )
+  const viewSwitch = (
+    <div className="seg w-e-view" role="group" aria-label="Vista">
+      <button type="button" aria-pressed={view === 'folders'} onClick={() => go({ vista: null })}><CampoIcon name="folder" size={14} />Cartelle</button>
+      <button type="button" aria-pressed={view === 'all'} onClick={() => go({ vista: 'tutte' })}><CampoIcon name="columns" size={14} />Tutte le pagine</button>
+    </div>
+  )
+
+  let body: React.ReactNode
+  if (!pages) {
+    body = <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}><CircularProgress size={24} /></Box>
+  } else if (openCat) {
+    const inCat = all.filter((p) => (p.category ?? 0) === openCat.id)
+    const list = inCat.filter((p) => !term || matchesPage(p, term)).sort(sortFn[sort])
+    body = (
+      <>
+        <nav className="w-crumbs" aria-label="Percorso"><a href="/wiki" onClick={(e) => { e.preventDefault(); go({ cartella: null }) }}><CampoIcon name="chevL" size={14} />Archivio</a></nav>
+        <OpenFolder color={catColor(openCat)} label={openCat.name}
+          tabs={<FolderTabs cats={folders} active={openCat.id} counts={counts} mode="nav" onPick={(id) => go({ cartella: String(id) })} />}>
+          <div className="w-open-h">
+            {openCat.description ? <p>{openCat.description}</p> : null}
+            <div className="w-open-tools">{search}{sortSeg}</div>
+          </div>
+          {list.length ? (
+            <ul className="w-papers">
+              {list.map((p, i) => (
+                <li key={p.id} style={{ ['--r' as string]: `${TILT[i % TILT.length]}deg` }}>
+                  <a href={`/wiki/${p.id}`} className="w-paper" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
+                    <span className="w-paper-top">
+                      {p.kb_code ? <span className="w-mono-s">{p.kb_code}</span> : null}
+                      {!p.is_published ? <span className="w-draft">Bozza</span> : null}
+                      {p.is_favorite ? <span className="w-paper-fav" title="Nei preferiti"><StarIcon size={14} /></span> : null}
+                    </span>
+                    <span className="w-paper-t"><Mark text={p.title} term={term} /></span>
+                    <span className="w-paper-s">{term ? <Mark text={snippetOf(p, term)} term={term} /> : p.summary}</span>
+                    <span className="w-paper-f">
+                      <span>{rel(p.updated_at)}{p.updated_by_username ? ` · ${p.updated_by_username}` : ''}</span>
+                      <span><CampoIcon name="eye" size={13} />{p.view_count ?? 0}{p.rating_count ? <> <StarIcon />{r1(p.average_rating)}</> : null}</span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="w-d-none"><CampoIcon name="search" size={18} /><div><b>Nessuna pagina{term ? ` per «${term}»` : ''}</b>
+              {canAdd ? <p><button type="button" className="link-btn" onClick={newPage}>Crea una pagina in {openCat.name}</button></p> : null}</div></div>
+          )}
+        </OpenFolder>
+      </>
+    )
+  } else if (view === 'all' || term) {
+    const list = all.filter((p) => !term || matchesPage(p, term)).sort(term ? sortFn.upd : sortFn[sort])
+    body = (
+      <>
+        <div className="w-d-tools">{viewSwitch}{search}{view === 'all' ? sortSeg : null}</div>
+        {term ? <div className="w-d-count">{list.length} {list.length === 1 ? 'pagina' : 'pagine'} per «{term}»</div> : null}
+        {list.length ? <ul className="w-cards">{list.map((p) => <PageCard key={p.id} p={p} cat={catOf(p)} term={term} onOpen={() => openPage(p)} />)}</ul>
+          : <div className="w-d-none"><CampoIcon name="search" size={18} /><div><b>Nessuna pagina{term ? ` per «${term}»` : ''}</b><p>Prova con un AE title, il nome del cliente o del sistema.</p></div></div>}
+      </>
+    )
+  } else {
+    const newest = [...all].filter((p) => p.is_published).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 6)
+    const favs = all.filter((p) => p.is_favorite).sort((a, b) => String(b.favorited_at).localeCompare(String(a.favorited_at)))
+    const recent = [...all].filter((p) => p.is_published).sort(sortFn.upd).slice(0, 6)
+    const drafts = all.filter((p) => !p.is_published && me && p.created_by === me.id)
+    body = (
+      <>
+        <div className="w-d-tools">{viewSwitch}{search}</div>
+        {folders.length ? (
+          <ul className="w-folders" aria-label="Cartelle">
+            {folders.map((c) => {
+              const ps = all.filter((p) => (p.category ?? 0) === c.id)
+              const top = [...ps].filter((p) => p.is_published).sort(sortFn.views).slice(0, 3)
+              const last = [...ps].sort(sortFn.upd)[0]
+              return (
+                <li key={c.id}>
+                  <button type="button" className="w-fold-btn" onClick={() => go({ cartella: String(c.id) })} aria-label={`Apri la cartella ${c.name}, ${ps.length} pagine`}>
+                    <span className="w-fold" style={cVars(catColor(c))}>
+                      <span className="w-fold-tab"><span>{ps.length} {ps.length === 1 ? 'pagina' : 'pagine'}</span></span>
+                      <span className="w-fold-back" />
+                      <span className="w-fold-sheets" aria-hidden>{top.map((p, i) => <span key={p.id} className={`w-sheet s${i}`}><b>{p.title}</b><i /><i /></span>)}</span>
+                      <span className="w-fold-front">
+                        <span className="w-fold-ico"><CampoIcon name={catIcon(c.name)} size={17} /></span>
+                        <span className="w-fold-name">{c.name}</span>
+                        {c.description ? <span className="w-fold-desc">{c.description}</span> : null}
+                        <span className="w-fold-foot">{last ? `aggiornata ${rel(last.updated_at)}` : 'ancora vuota'}</span>
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <div className="w-d-none"><CampoIcon name="folder" size={18} /><div><b>Nessuna cartella</b><p>{canManageCategories ? <button type="button" className="link-btn" onClick={() => setCatManagerOpen(true)}>Crea la prima cartella</button> : 'Chiedi a un amministratore di creare le cartelle.'}</p></div></div>
+        )}
+
+        {newest.length ? (
+          <section className="w-e-sec w-sec-new" aria-labelledby="h-new">
+            <header><h2 id="h-new">Ultime create</h2><span>le schede appena entrate in archivio</span></header>
+            <ul className="w-idx">
+              {newest.map((p, i) => {
+                const c = catOf(p) ?? NO_CAT
+                return (
+                  <li key={p.id} style={{ ...cVars(catColor(c)), ['--r' as string]: `${IDX_TILT[i]}deg` }}>
+                    <a href={`/wiki/${p.id}`} className="w-idx-card" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
+                      <span className="w-idx-tab">{c.name}</span>
+                      {p.kb_code ? <span className="w-idx-kb">{p.kb_code}</span> : null}
+                      <span className="w-idx-t">{p.title}</span>
+                      <span className="w-idx-f"><span className="w-stamp">{dshort(p.created_at)}</span>{p.created_by_username}</span>
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ) : null}
+
+        <div className="w-e-grid">
+          <section className="w-e-sec w-sec-shelf" aria-labelledby="h-fav">
+            <header><h2 id="h-fav"><StarIcon size={16} />I tuoi preferiti</h2><span>{favs.length ? `${favs.length} sullo scaffale` : ''}</span></header>
+            <div className="w-shelf-wood">
+              <ul className="w-books">
+                {favs.map((p, i) => (
+                  <li key={p.id}>
+                    <a href={`/wiki/${p.id}`} className="w-book" title={p.title} style={{ ...cVars(catColor(catOf(p))), ['--h' as string]: `${BOOK_H[i % BOOK_H.length]}px` }}
+                      onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
+                      <span className="w-book-band" /><span className="w-book-t">{p.title}</span><span className="w-book-kb">{p.kb_code?.slice(-3)}</span>
+                    </a>
+                  </li>
+                ))}
+                <li><span className="w-book is-ghost" style={{ ['--h' as string]: '170px' }}><span className="w-book-t">{favs.length ? 'Stella in un articolo per aggiungerne altri' : 'Premi la stella in un articolo per metterlo qui'}</span></span></li>
+              </ul>
+            </div>
+          </section>
+
+          <section className="w-e-sec w-sec-ledger" aria-labelledby="h-rec">
+            <header><h2 id="h-rec">Registro delle modifiche</h2><span>aggiornate di recente</span></header>
+            {recent.length ? (
+              <ol className="w-ledger">
+                {recent.map((p) => {
+                  const d = p.updated_at ? new Date(p.updated_at) : null
+                  const c = catOf(p) ?? NO_CAT
+                  return (
+                    <li key={p.id}>
+                      <span className="w-led-d"><b>{d ? d.getDate() : ''}</b><small>{d ? d.toLocaleDateString('it-IT', { month: 'short' }) : ''}</small></span>
+                      <a href={`/wiki/${p.id}`} className="w-led-e" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
+                        <span className="w-led-t">{p.title}</span>
+                        <span className="w-led-m"><span className="w-sw" style={cVars(catColor(c))} />{c.name}{p.updated_by_username ? ` · ${p.updated_by_username}` : ''}</span>
+                      </a>
+                    </li>
+                  )
+                })}
+              </ol>
+            ) : <p className="w-rail-none">Ancora nessuna pagina.</p>}
+          </section>
+
+          <section className="w-e-sec w-sec-notes" aria-labelledby="h-dr">
+            <header><h2 id="h-dr">Le tue bozze</h2><span>{drafts.length ? 'da finire e pubblicare' : ''}</span></header>
+            <ul className="w-notes">
+              {drafts.map((p, i) => (
+                <li key={p.id} style={{ ['--r' as string]: `${i % 2 ? 1.6 : -1.8}deg` }}>
+                  <a href={`/wiki/${p.id}`} className="w-note-p" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
+                    <span className="w-tape" /><b>{p.title}</b><small>modificata {rel(p.updated_at)}</small>
+                  </a>
+                </li>
+              ))}
+              {canAdd ? <li style={{ ['--r' as string]: '.8deg' }}><button type="button" className="w-note-p is-new" onClick={newPage}><CampoIcon name="plus" size={20} /><b>Nuova bozza</b></button></li> : null}
+            </ul>
+            {!drafts.length && !canAdd ? <p className="w-rail-none">Nessuna bozza.</p> : null}
+          </section>
+        </div>
+      </>
+    )
+  }
 
   return (
-    <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 1.5, p: 1.25 }}>
-        <Stack spacing={1.15}>
-          <Stack
-            direction={{ xs: 'column', lg: 'row' }}
-            spacing={1}
-            alignItems={{ xs: 'stretch', lg: 'center' }}
-            sx={{
-              flexWrap: { lg: 'nowrap' },
-              '& .MuiButton-root': { height: 40 },
-              '& .MuiToggleButton-root': { height: 40 },
-            }}
-          >
-            <TextField
-              size="small"
-              placeholder="Cerca"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') setSearch(q)
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                width: { xs: '100%', lg: 360 },
-                flexShrink: 0,
-                '& .MuiInputBase-root': {
-                  height: 40,
-                  fontSize: '0.95rem',
-                  borderRadius: 1.5,
-                  bgcolor: 'transparent',
-                },
-                '& .MuiInputBase-input': { py: 0 },
-              }}
-            />
-
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                width: { xs: '100%', lg: 'auto' },
-                flexWrap: 'wrap',
-              }}
-            >
-              <FilterChip
-                compact
-                activeCount={activeFilterCount}
-                onReset={() => {
-                  setCategoryId('')
-                  setPublished('')
-                }}
-              >
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Categoria</InputLabel>
-                  <Select
-                    label="Categoria"
-                    value={categoryId === '' ? '' : String(categoryId)}
-                    onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <MenuItem value="">Tutte</MenuItem>
-                    {categories.map((c) => (
-                      <MenuItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Stato</InputLabel>
-                  <Select
-                    label="Stato"
-                    value={published}
-                    onChange={(e) => setPublished(e.target.value as '' | 'true' | 'false')}
-                  >
-                    <MenuItem value="">Tutti</MenuItem>
-                    <MenuItem value="true">Pubblicato</MenuItem>
-                    <MenuItem value="false">Bozza</MenuItem>
-                  </Select>
-                </FormControl>
-              </FilterChip>
-
-              <FormControl size="small" sx={{ minWidth: 190 }}>
-                <InputLabel>Ordina</InputLabel>
-                <Select label="Ordina" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortValue)}>
-                  {SORT_OPTIONS.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={viewMode}
-                onChange={(_e, value: ViewMode | null) => {
-                  if (!value) return
-                  setViewMode(value)
-                }}
-                sx={{
-                  borderRadius: 1.5,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  overflow: 'hidden',
-                  '& .MuiToggleButtonGroup-grouped': {
-                    px: 1.1,
-                    py: 0,
-                    border: 0,
-                    borderRadius: '0 !important',
-                    color: 'text.secondary',
-                  },
-                  '& .MuiToggleButton-root.Mui-selected': {
-                    bgcolor: 'primary.main',
-                    color: SHARED.pureWhite,
-                    '&:hover': { bgcolor: 'primary.dark' },
-                  },
-                  '& .MuiToggleButton-root:not(.Mui-selected):hover': { bgcolor: 'grey.100' },
-                }}
-              >
-                <ToggleButton value="grid" aria-label="Vista griglia">
-                  <Tooltip title="Griglia">
-                    <GridViewOutlinedIcon sx={{ fontSize: 18 }} />
-                  </Tooltip>
-                </ToggleButton>
-                <ToggleButton value="list" aria-label="Vista elenco">
-                  <Tooltip title="Elenco">
-                    <ReorderIcon sx={{ fontSize: 18 }} />
-                  </Tooltip>
-                </ToggleButton>
-              </ToggleButtonGroup>
-
-              <Tooltip title="Reimposta" arrow>
-                <Button size="small" variant="contained" onClick={reset} aria-label="Reimposta" sx={compactResetButtonSx}>
-                  <RestartAltIcon />
-                </Button>
-              </Tooltip>
-            </Box>
-          </Stack>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} justifyContent="space-between">
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 12 }}>
-              {resultLabel(pages.length)} · ordinamento: {selectedSortLabel}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 12 }}>
-              Vista {viewMode === 'grid' ? 'griglia' : 'elenco'}
-            </Typography>
-          </Stack>
-        </Stack>
-      </Card>
-
-      {loading ? (
-        <Stack alignItems="center" py={6}>
-          <CircularProgress size={28} />
-        </Stack>
-      ) : pages.length === 0 ? (
-        <Stack alignItems="center" py={8} spacing={1}>
-          <ArticleOutlinedIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
-          <Typography color="text.secondary">Nessuna pagina trovata.</Typography>
-          {(search || categoryId !== '' || published !== '') && (
-            <Button size="small" onClick={reset}>
-              Azzera filtri
-            </Button>
-          )}
-        </Stack>
-      ) : viewMode === 'grid' ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(245px, 1fr))',
-            gap: 1.5,
-          }}
-        >
-          {pages.map((p) => (
-            <WikiCard key={p.id} page={p} categoryMap={categoryMap} onClick={() => navigate(`/wiki/${p.id}`)} />
-          ))}
-        </Box>
-      ) : (
-        <Stack spacing={1.25}>
-          {pages.map((p) => (
-            <WikiListRow key={p.id} page={p} categoryMap={categoryMap} onClick={() => navigate(`/wiki/${p.id}`)} />
-          ))}
-        </Stack>
-      )}
-
-      {canManageCategories && (
-        <WikiCategoryManager
-          open={catManagerOpen}
-          onClose={() => setCatManagerOpen(false)}
-          onChanged={() => {
-            loadCategories()
-            load()
-          }}
-        />
-      )}
-    </Stack>
+    <Box>
+      <WikiHead
+        section="pages"
+        canQueries={hasPerm(PERMS.wiki.query.view)}
+        actions={
+          <>
+            {canManageCategories ? <Button color="inherit" startIcon={<CampoIcon name="folder" size={16} />} onClick={() => setCatManagerOpen(true)}>Cartelle</Button> : null}
+            {canAdd ? <HeadAction label="Nuova pagina" onClick={newPage} /> : null}
+          </>
+        }
+      />
+      <ArchiveRoot>{body}</ArchiveRoot>
+      {pages && !all.length ? <Typography sx={{ mt: 2, fontSize: 13, color: 'text.secondary' }}>La Wiki è vuota: crea la prima pagina.</Typography> : null}
+      {canManageCategories ? (
+        <WikiCategoryManager open={catManagerOpen} onClose={() => setCatManagerOpen(false)} onChanged={() => setReloadKey((k) => k + 1)} />
+      ) : null}
+    </Box>
   )
 }

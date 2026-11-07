@@ -21,7 +21,8 @@ from django.db import models as django_models
 from django.http import HttpResponse
 from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
-from wiki.models import WikiPage, WikiPageRating, WikiPageRevision
+from wiki.models import WikiPage, WikiPageFavorite, WikiPageRating, WikiPageRevision
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from wiki.api.helpers import _markdown_to_html, _markdown_to_plain_text, _slug_is_available, _suggest_available_slug
 from wiki.api.stats import invalidate_wiki_stats_cache
 
@@ -30,6 +31,8 @@ class WikiPageSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
     rating_count = serializers.SerializerMethodField()
     current_user_rating = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
+    favorited_at = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
     created_by_username = serializers.SerializerMethodField()
     updated_by_username = serializers.SerializerMethodField()
@@ -57,6 +60,23 @@ class WikiPageSerializer(serializers.ModelSerializer):
             return None
 
         return obj.ratings.filter(user=user).values_list("rating", flat=True).first()
+
+    def _current_user_favorite(self, obj):
+        prefetched = getattr(obj, "_current_user_favorites", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+        return obj.favorites.filter(user=user).first()
+
+    def get_is_favorite(self, obj):
+        return self._current_user_favorite(obj) is not None
+
+    def get_favorited_at(self, obj):
+        fav = self._current_user_favorite(obj)
+        return fav.created_at.isoformat() if fav else None
 
     def get_attachment_count(self, obj):
         value = getattr(obj, "attachment_count", None)
@@ -95,17 +115,20 @@ class WikiPageSerializer(serializers.ModelSerializer):
             "average_rating",
             "rating_count",
             "current_user_rating",
+            "is_favorite",
+            "favorited_at",
             "attachment_count",
             "custom_fields",
             "pdf_template_key",
             "pdf_options",
+            "created_by",
             "created_by_username",
             "updated_by_username",
             "created_at",
             "updated_at",
             "deleted_at",
         ]
-        read_only_fields = ["kb_code", "view_count"]
+        read_only_fields = ["kb_code", "view_count", "created_by"]
 
 
 class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -148,8 +171,16 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                     "ratings",
                     queryset=WikiPageRating.objects.filter(user=user),
                     to_attr="_current_user_ratings",
-                )
+                ),
+                django_models.Prefetch(
+                    "favorites",
+                    queryset=WikiPageFavorite.objects.filter(user=user),
+                    to_attr="_current_user_favorites",
+                ),
             )
+            # ?favorite=1: solo le pagine con la stella dell'utente corrente.
+            if self.request.query_params.get("favorite") in ("1", "true"):
+                qs = qs.filter(favorites__user=user)
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
@@ -287,6 +318,22 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         """Incrementa il contatore visualizzazioni atomicamente."""
         WikiPage.objects.filter(pk=pk).update(view_count=django_models.F("view_count") + 1)
         return Response({"ok": True})
+
+    @action(
+        detail=True, methods=["post", "delete"], url_path="favorite",
+        # Personale come il voto (nessun permesso di modello), ma chiusa al Portal:
+        # dichiarando permission_classes il default globale non si applica, quindi
+        # la barriera WP-03 va ripetuta qui esplicitamente.
+        permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp],
+    )
+    def favorite(self, request, pk=None):
+        """POST mette la stella, DELETE la toglie. Entrambe idempotenti."""
+        page = self.get_object()
+        if request.method == "DELETE":
+            WikiPageFavorite.objects.filter(page=page, user=request.user).delete()
+            return Response({"is_favorite": False})
+        fav, _ = WikiPageFavorite.objects.get_or_create(page=page, user=request.user)
+        return Response({"is_favorite": True, "favorited_at": fav.created_at.isoformat()})
 
     @action(detail=True, methods=["post"], url_path="rate", permission_classes=[IsAuthenticated])
     def rate_page(self, request, pk=None):
