@@ -1,998 +1,445 @@
 import * as React from 'react'
-import { alpha } from '@mui/material/styles'
-import {
-  Autocomplete,
-  Box,
-  Button,
-  Chip,
-  IconButton,
-  LinearProgress,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material'
+import { Autocomplete, Box, Button, IconButton, TextField, Tooltip } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
+import { useSearchParams } from 'react-router-dom'
 
-import AddIcon from '@mui/icons-material/Add'
-import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined'
-import FolderIcon from '@mui/icons-material/Folder'
-import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined'
-import ReorderIcon from '@mui/icons-material/Reorder'
-import CheckBoxIcon from '@mui/icons-material/CheckBox'
-import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
-
-import { Can } from '../auth/Can'
+import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import { CampoIcon, PageHead } from '../ui/campo'
+import { archiveVars } from '../features/wiki/archive/archiveModel'
+import { FileIcon, FolderIcon } from '../features/drive/DriveIcons'
+import DriveDetail from '../features/drive/DriveDetail'
+import { extOf, kindOf, rel } from '../features/drive/driveModel'
+import '../features/drive/drive.css'
 
 import type { BreadcrumbItem, CustomerMini, DrawerItem, DriveFile, DriveFolder } from './drive/types'
-import { UploadZone } from './drive/UploadZone'
-import { PreviewDrawer } from './drive/PreviewDrawer'
-import { FolderCard } from './drive/FolderCard'
-import { FileCard } from './drive/FileCard'
-import { FolderListRow } from './drive/FolderListRow'
-import { FileListRow } from './drive/FileListRow'
 import { CreateFolderDialog } from './drive/CreateFolderDialog'
 import { RenameDialog } from './drive/RenameDialog'
 import { MoveDialog } from './drive/MoveDialog'
-import { useWidgetAccents } from '../theme/AppThemeProvider'
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+type Upload = { current: number; total: number; fileName: string; overall: number }
+const listOf = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { results?: T[] })?.results ?? [])) as T[]
+const badgeOf = (f: DriveFolder) => ((f.access ?? []).some((r) => r.id === f.id) || (f.allowed_groups ?? []).length ? 'lock' : f.customers.length ? 'customer' : null)
 
+/** Drive (restyle "Campo sterile", anteprima design-previews/d-base.html, variante A · Esplora file). */
 // prettier-ignore
 export default function Drive() {
   const toast = useToast()
-  const widgetAccents = useWidgetAccents()
+  const theme = useTheme()
+  const { hasPerm } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const canAddFolder = hasPerm(PERMS.drive.folder.add)
+  const canUpload = hasPerm(PERMS.drive.file.add)
+  const canChange = hasPerm(PERMS.drive.file.change) || hasPerm(PERMS.drive.folder.change)
+  const canDelete = hasPerm(PERMS.drive.file.delete) || hasPerm(PERMS.drive.folder.delete)
+  const canSeeAudit = hasPerm(PERMS.audit.view)
 
-  const [folderId, setFolderId] = React.useState<number | null>(null)
+  const [folderId, setFolderId] = React.useState<number | null>(() => (Number(params.get('cartella')) > 0 ? Number(params.get('cartella')) : null))
   const [breadcrumb, setBreadcrumb] = React.useState<BreadcrumbItem[]>([])
   const [folders, setFolders] = React.useState<DriveFolder[]>([])
   const [files, setFiles] = React.useState<DriveFile[]>([])
   const [loading, setLoading] = React.useState(false)
+  const [tree, setTree] = React.useState<DriveFolder[]>([])
+  const [open, setOpen] = React.useState<Set<number>>(new Set())
+  const [recent, setRecent] = React.useState<DriveFile[]>([])
+  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>(() => { try { return localStorage.getItem('drive_view') === 'grid' ? 'grid' : 'list' } catch { return 'list' } })
+  const [q, setQ] = React.useState('')
+  const [search, setSearch] = React.useState('')
+  const [customerFilter, setCustomerFilter] = React.useState<CustomerMini | null>(null)
+  const [allCustomers, setAllCustomers] = React.useState<CustomerMini[]>([])
+  const [detail, setDetail] = React.useState<DrawerItem | null>(null)
+  const [selected, setSelected] = React.useState<Set<string>>(new Set())
+  const [dragging, setDragging] = React.useState(false)
+  const [upload, setUpload] = React.useState<Upload | null>(null)
+  const [reloadKey, setReloadKey] = React.useState(0)
 
-  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('list')
-  const [drawerItem, setDrawerItem] = React.useState<DrawerItem | null>(null)
-  const [selectedId, setSelectedId] = React.useState<string | null>(null)
-
-  // Dialogs
+  // Dialoghi
   const [createFolderOpen, setCreateFolderOpen] = React.useState(false)
   const [createFolderName, setCreateFolderName] = React.useState('')
   const [createFolderBusy, setCreateFolderBusy] = React.useState(false)
-
   const [renameItem, setRenameItem] = React.useState<DrawerItem | null>(null)
   const [renameName, setRenameName] = React.useState('')
   const [renameBusy, setRenameBusy] = React.useState(false)
-
   const [deleteItem, setDeleteItem] = React.useState<DrawerItem | null>(null)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
-
   const [moveItem, setMoveItem] = React.useState<DrawerItem | null>(null)
-  const [moveFolders, setMoveFolders] = React.useState<DriveFolder[]>([])
   const [moveTarget, setMoveTarget] = React.useState<number | null>(null)
   const [moveBusy, setMoveBusy] = React.useState(false)
 
-  const [uploadProgress, setUploadProgress] = React.useState<{
-    active: boolean
-    current: number // file index (1-based)
-    total: number // total files
-    fileName: string
-    fileProgress: number // 0-100 for current file
-    overallProgress: number // 0-100 overall
-  } | null>(null)
+  React.useEffect(() => { try { localStorage.setItem('drive_view', viewMode) } catch { /* solo in memoria */ } }, [viewMode])
+  React.useEffect(() => { const t = setTimeout(() => setSearch(q.trim()), 300); return () => clearTimeout(t) }, [q])
 
-  const [selected, setSelected] = React.useState<Set<string>>(new Set())
-
-  const toggleSelect = (key: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-      return next
-    })
-  }
-  const clearSelection = () => setSelected(new Set())
-
-  const selectedFolderIds = [...selected]
-    .filter((k) => k.startsWith('folder-'))
-    .map((k) => Number(k.replace('folder-', '')))
-  const selectedFileIds = [...selected]
-    .filter((k) => k.startsWith('file-'))
-    .map((k) => Number(k.replace('file-', '')))
-  const [customerFilter, setCustomerFilter] = React.useState<CustomerMini | null>(null)
-  const [allCustomers, setAllCustomers] = React.useState<CustomerMini[]>([])
-
-  // Load customers for filter autocomplete
   React.useEffect(() => {
-    api
-      .get('/customers/', { params: { page_size: 500, ordering: 'display_name' } })
-      .then((r) => setAllCustomers(r.data?.results ?? r.data ?? []))
-      .catch(() => {})
+    api.get('/customers/', { params: { page_size: 500, ordering: 'display_name' } }).then((r) => setAllCustomers(listOf<CustomerMini>(r.data))).catch(() => {})
   }, [])
 
-  // ── Load current folder contents ──────────────────────────────────────────
-
-  // Fix P1 7.4: incrementale, permette a loadFolder di riconoscere ed
-  // ignorare risposte "in ritardo" rispetto a una richiesta più recente
-  // (es. navigazione rapida o cambio filtro cliente durante un fetch).
-  const loadFolderRequestId = React.useRef(0)
-
-  const loadFolder = React.useCallback(
-    async (id: number | null, custFilter?: CustomerMini | null) => {
-      const requestId = ++loadFolderRequestId.current
-      setLoading(true)
-      setFolders([])
-      setFiles([])
-      try {
-        const cust = custFilter ?? undefined
-        const custParam = cust ? { customer: cust.id } : {}
-
-        if (id === null) {
-          // Root: top-level folders + root files (filtered by customer if set)
-          const [fRes, fileRes] = await Promise.all([
-            api.get('/drive-folders/', { params: { root: 'true', page_size: 200, ...custParam } }),
-            api.get('/drive-files/', { params: { root: 'true', page_size: 200, ...custParam } }),
-          ])
-          if (loadFolderRequestId.current !== requestId) return // risposta obsoleta, ignorata
-          setFolders(fRes.data?.results ?? fRes.data ?? [])
-          setFiles(fileRes.data?.results ?? fileRes.data ?? [])
-          setBreadcrumb([])
-        } else {
-          const res = await api.get(`/drive-folders/${id}/children/`, { params: custParam })
-          if (loadFolderRequestId.current !== requestId) return // risposta obsoleta, ignorata
-          setFolders(res.data.folders ?? [])
-          setFiles(res.data.files ?? [])
-          // Breadcrumb
-          const bcRes = await api.get(`/drive-folders/${id}/breadcrumb/`)
-          if (loadFolderRequestId.current !== requestId) return // risposta obsoleta, ignorata
-          setBreadcrumb(bcRes.data ?? [])
-        }
-      } catch (e) {
-        if (loadFolderRequestId.current !== requestId) return // richiesta superata, non mostrare errore
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        if (loadFolderRequestId.current === requestId) setLoading(false)
-      }
-    },
-    [toast],
-  )
-
+  // Albero completo delle cartelle accessibili (si aggiorna dopo ogni modifica).
   React.useEffect(() => {
-    void loadFolder(folderId, customerFilter)
-  }, [folderId, customerFilter, loadFolder])
+    api.get('/drive-folders/', { params: { page_size: 500, ordering: 'name' } }).then((r) => setTree(listOf<DriveFolder>(r.data))).catch(() => {})
+  }, [reloadKey])
 
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // ── Contenuto: cartella corrente, oppure risultati di ricerca o filtro cliente ──
+  const flat = Boolean(search || customerFilter)
+  const loadRequestId = React.useRef(0)
+  const load = React.useCallback(async (id: number | null, cust: CustomerMini | null, term: string) => {
+    const requestId = ++loadRequestId.current
+    setLoading(true)
+    try {
+      if (term || cust) {
+        const p: Record<string, unknown> = { page_size: 200 }
+        if (term) p.search = term
+        if (cust) p.customer = cust.id
+        const [fo, fi] = await Promise.all([api.get('/drive-folders/', { params: p }), api.get('/drive-files/', { params: { ...p, ordering: '-updated_at' } })])
+        if (loadRequestId.current !== requestId) return // risposta superata da una più recente
+        setFolders(listOf<DriveFolder>(fo.data)); setFiles(listOf<DriveFile>(fi.data)); setBreadcrumb([])
+      } else if (id === null) {
+        const [fo, fi, rc] = await Promise.all([
+          api.get('/drive-folders/', { params: { root: 'true', page_size: 200 } }),
+          api.get('/drive-files/', { params: { root: 'true', page_size: 200 } }),
+          api.get('/drive-files/', { params: { ordering: '-updated_at', page_size: 6 } }),
+        ])
+        if (loadRequestId.current !== requestId) return
+        setFolders(listOf<DriveFolder>(fo.data)); setFiles(listOf<DriveFile>(fi.data)); setRecent(listOf<DriveFile>(rc.data)); setBreadcrumb([])
+      } else {
+        const res = await api.get(`/drive-folders/${id}/children/`)
+        if (loadRequestId.current !== requestId) return
+        setFolders(res.data.folders ?? []); setFiles(res.data.files ?? [])
+        const bc = await api.get(`/drive-folders/${id}/breadcrumb/`)
+        if (loadRequestId.current !== requestId) return
+        const crumbs: BreadcrumbItem[] = bc.data ?? []
+        setBreadcrumb(crumbs)
+        setOpen((prev) => new Set([...prev, ...crumbs.map((c) => c.id)]))
+      }
+    } catch (e) {
+      if (loadRequestId.current !== requestId) return
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      if (loadRequestId.current === requestId) setLoading(false)
+    }
+  }, [toast])
+
+  React.useEffect(() => { void load(folderId, customerFilter, search) }, [folderId, customerFilter, search, reloadKey, load])
+  const refresh = () => setReloadKey((k) => k + 1)
+
+  // Link diretto a un file: /drive?file=<id> apre la sua cartella e il pannello.
+  React.useEffect(() => {
+    const fid = Number(params.get('file'))
+    if (!fid) return
+    api.get<DriveFile>(`/drive-files/${fid}/`).then((r) => { setFolderId(r.data.folder); setDetail({ kind: 'file', data: r.data }) }).catch((e) => toast.error(apiErrorToMessage(e)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const navigateTo = (id: number | null) => {
-    // Fix P1 7.2: prima chiamava anche loadFolder(id, ...) qui, mentre
-    // l'useEffect sopra osserva folderId e richiama loadFolder a sua volta:
-    // ogni cambio cartella produceva due richieste. Ora si limita ad
-    // aggiornare lo stato; il caricamento resta responsabilità dell'effect.
-    setFolderId(id)
-    setSelectedId(null)
-    setDrawerItem(null)
+    setFolderId(id); setQ(''); setSearch(''); setCustomerFilter(null); setSelected(new Set()); setDetail(null)
+    const next = new URLSearchParams(params); next.delete('file')
+    if (id) next.set('cartella', String(id)); else next.delete('cartella')
+    setParams(next, { replace: true })
   }
+  const pickCustomer = (c: CustomerMini | null) => { setCustomerFilter(c); setSelected(new Set()); setDetail(null) }
 
-  const selectItem = (key: string, item: DrawerItem) => {
-    if (selectedId === key) {
-      setDrawerItem(null)
-      setSelectedId(null)
-    } else {
-      setSelectedId(key)
-      setDrawerItem(item)
-    }
-  }
-
-  // ── Upload ────────────────────────────────────────────────────────────────
-
-  const handleUpload = async (fileList: FileList) => {
-    const files = Array.from(fileList)
-    const total = files.length
+  // ── Caricamento dei file ──
+  const handleUpload = async (list: FileList | File[]) => {
+    const items = Array.from(list)
+    if (!items.length) return
     let failed = 0
-
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i]
-      setUploadProgress({
-        active: true,
-        current: i + 1,
-        total,
-        fileName: f.name,
-        fileProgress: 0,
-        overallProgress: Math.round((i / total) * 100),
-      })
-
+    for (let i = 0; i < items.length; i++) {
+      const f = items[i]
+      setUpload({ current: i + 1, total: items.length, fileName: f.name, overall: Math.round((i / items.length) * 100) })
       const fd = new FormData()
-      fd.append('file', f)
-      fd.append('name', f.name)
-      if (folderId !== null) fd.append('folder', String(folderId))
-
+      fd.append('file', f); fd.append('name', f.name)
+      if (folderId !== null && !flat) fd.append('folder', String(folderId))
       try {
         await api.post('/drive-files/', fd, {
           onUploadProgress: (evt) => {
-            const fileProgress = evt.total ? Math.round((evt.loaded / evt.total) * 100) : 0
-            const overallProgress = Math.round(((i + fileProgress / 100) / total) * 100)
-            setUploadProgress((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    fileProgress,
-                    overallProgress,
-                  }
-                : null,
-            )
+            const part = evt.total ? evt.loaded / evt.total : 0
+            setUpload((prev) => (prev ? { ...prev, overall: Math.round(((i + part) / items.length) * 100) } : prev))
           },
         })
-      } catch {
-        failed++
-      }
+      } catch { failed++ }
     }
-
-    setUploadProgress(null)
+    setUpload(null)
     if (failed) toast.error(`${failed} file non caricati.`)
-    else toast.success(`${total} file caricati`)
-    void loadFolder(folderId, customerFilter)
+    else toast.success(`${items.length} file caricat${items.length === 1 ? 'o' : 'i'}`)
+    refresh()
   }
-
-  // ── Create folder ─────────────────────────────────────────────────────────
 
   const doCreateFolder = async () => {
     if (!createFolderName.trim()) return
     setCreateFolderBusy(true)
     try {
-      await api.post('/drive-folders/', {
-        name: createFolderName.trim(),
-        parent: folderId ?? null,
-      })
-      toast.success('Cartella creata')
-      setCreateFolderOpen(false)
-      setCreateFolderName('')
-      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setCreateFolderBusy(false)
-    }
-  }
-
-  // ── Rename ────────────────────────────────────────────────────────────────
-
-  const openRename = (item: DrawerItem) => {
-    setRenameItem(item)
-    setRenameName(item.data.name)
+      await api.post('/drive-folders/', { name: createFolderName.trim(), parent: flat ? null : folderId })
+      toast.success('Cartella creata'); setCreateFolderOpen(false); setCreateFolderName(''); refresh()
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setCreateFolderBusy(false) }
   }
 
   const doRename = async () => {
     if (!renameItem || !renameName.trim()) return
     setRenameBusy(true)
     try {
-      const url =
-        renameItem.kind === 'folder'
-          ? `/drive-folders/${renameItem.data.id}/`
-          : `/drive-files/${renameItem.data.id}/`
-      await api.patch(url, { name: renameName.trim() })
-      toast.success('Rinominato')
-      setRenameItem(null)
-      setDrawerItem(null)
-      setSelectedId(null)
-      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setRenameBusy(false)
-    }
+      const url = renameItem.kind === 'folder' ? `/drive-folders/${renameItem.data.id}/` : `/drive-files/${renameItem.data.id}/`
+      const r = await api.patch(url, { name: renameName.trim() })
+      toast.success('Rinominato'); setRenameItem(null)
+      if (detail && detail.data.id === renameItem.data.id && detail.kind === renameItem.kind) setDetail({ kind: detail.kind, data: { ...detail.data, ...r.data } } as DrawerItem)
+      refresh()
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setRenameBusy(false) }
   }
-
-  // ── Delete ────────────────────────────────────────────────────────────────
-
-  const openDelete = (item: DrawerItem) => setDeleteItem(item)
 
   const doDelete = async () => {
     if (!deleteItem) return
     setDeleteBusy(true)
     try {
-      const url =
-        deleteItem.kind === 'folder'
-          ? `/drive-folders/${deleteItem.data.id}/`
-          : `/drive-files/${deleteItem.data.id}/`
-      await api.delete(url)
-      toast.success('Eliminato')
-      setDeleteItem(null)
-      setDrawerItem(null)
-      setSelectedId(null)
-      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleteBusy(false)
-    }
+      await api.delete(deleteItem.kind === 'folder' ? `/drive-folders/${deleteItem.data.id}/` : `/drive-files/${deleteItem.data.id}/`)
+      toast.success('Spostato nel cestino'); setDeleteItem(null); setDetail(null); refresh()
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDeleteBusy(false) }
   }
 
-  // ── Move ──────────────────────────────────────────────────────────────────
-
-  const openMove = async (item: DrawerItem) => {
-    setMoveItem(item)
-    setMoveTarget(null)
-    try {
-      const res = await api.get('/drive-folders/', { params: { page_size: 200 } })
-      const allFolders: DriveFolder[] = res.data?.results ?? res.data ?? []
-      // Exclude the item itself if it's a folder
-      const filtered =
-        item.kind === 'folder' ? allFolders.filter((f) => f.id !== item.data.id) : allFolders
-      setMoveFolders(filtered)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
-  }
-
+  const openMove = (item: DrawerItem) => { setMoveItem(item); setMoveTarget(null) }
   const doMove = async () => {
     if (!moveItem) return
     setMoveBusy(true)
     try {
-      const url =
-        moveItem.kind === 'folder'
-          ? `/drive-folders/${moveItem.data.id}/move/`
-          : `/drive-files/${moveItem.data.id}/move/`
-      const body = moveItem.kind === 'folder' ? { parent: moveTarget } : { folder: moveTarget }
-      await api.post(url, body)
-      toast.success('Spostato')
-      setMoveItem(null)
-      setDrawerItem(null)
-      setSelectedId(null)
-      void loadFolder(folderId, customerFilter) // Fix P1 7.3: preserva il filtro cliente dopo la mutazione
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setMoveBusy(false)
-    }
+      const url = moveItem.kind === 'folder' ? `/drive-folders/${moveItem.data.id}/move/` : `/drive-files/${moveItem.data.id}/move/`
+      await api.post(url, moveItem.kind === 'folder' ? { parent: moveTarget } : { folder: moveTarget })
+      toast.success('Spostato'); setMoveItem(null); setDetail(null); refresh()
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setMoveBusy(false) }
   }
 
-  // ── Bulk delete ──────────────────────────────────────────────────────────────
+  const selectedFolderIds = [...selected].filter((k) => k.startsWith('folder-')).map((k) => Number(k.slice(7)))
+  const selectedFileIds = [...selected].filter((k) => k.startsWith('file-')).map((k) => Number(k.slice(5)))
+  const toggle = (key: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n })
   const doBulkDelete = async () => {
-    const folderReqs = selectedFolderIds.map((id) => api.delete(`/drive-folders/${id}/`))
-    const fileReqs = selectedFileIds.map((id) => api.delete(`/drive-files/${id}/`))
     try {
-      await Promise.all([...folderReqs, ...fileReqs])
-      toast.success(`${selected.size} elementi eliminati`)
-    } catch {
-      toast.error('Alcuni elementi non sono stati eliminati.')
-    }
-    clearSelection()
-    void loadFolder(folderId, customerFilter)
+      await Promise.all([...selectedFolderIds.map((id) => api.delete(`/drive-folders/${id}/`)), ...selectedFileIds.map((id) => api.delete(`/drive-files/${id}/`))])
+      toast.success(`${selected.size} elementi spostati nel cestino`)
+    } catch { toast.error('Alcuni elementi non sono stati eliminati.') }
+    setSelected(new Set()); refresh()
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Viste ──
+  const kids = (parent: number | null) => tree.filter((f) => f.parent === parent)
+  const treeNodes = (parent: number | null, depth: number): React.ReactNode => kids(parent).map((f) => {
+    const has = kids(f.id).length > 0
+    const isOpen = open.has(f.id)
+    const locked = badgeOf(f) === 'lock'
+    return (
+      <li key={f.id}>
+        <div className={`d-tn${f.id === folderId && !flat ? ' is-on' : ''}`} style={{ ['--d' as string]: depth }}>
+          {has ? (
+            <button type="button" className="d-tw" aria-expanded={isOpen} aria-label={`${isOpen ? 'Chiudi' : 'Apri'} ${f.name}`} onClick={() => setOpen((prev) => { const n = new Set(prev); if (n.has(f.id)) n.delete(f.id); else n.add(f.id); return n })}>
+              <CampoIcon name={isOpen ? 'chevD' : 'chevR'} size={13} />
+            </button>
+          ) : <span className="d-tw" />}
+          <button type="button" className="dr-tl" aria-current={f.id === folderId && !flat ? 'page' : undefined} onClick={() => navigateTo(f.id)}>
+            <FolderIcon size={16} /><span>{f.name}</span>{locked ? <span className="d-lock" title="Visibile solo ad alcuni gruppi"><CampoIcon name="lock" size={13} /></span> : null}<small>{f.files_count}</small>
+          </button>
+        </div>
+        {has && isOpen ? <ul>{treeNodes(f.id, depth + 1)}</ul> : null}
+      </li>
+    )
+  })
+
+  const treeCustomers = React.useMemo(() => {
+    const ids = new Set(tree.flatMap((f) => f.customers))
+    return allCustomers.filter((c) => ids.has(c.id)).map((c) => ({ ...c, n: tree.filter((f) => f.customers.includes(c.id)).length }))
+  }, [tree, allCustomers])
+
+  const customerNames = (ids: number[]) => allCustomers.filter((c) => ids.includes(c.id))
+  const custCell = (ids: number[]) => {
+    const cs = customerNames(ids)
+    return cs.length ? cs.slice(0, 2).map((c) => <span key={c.id} className="d-cust"><CampoIcon name="building" size={13} />{c.display_name}</span>) : <span className="none">—</span>
+  }
+  const openFile = (f: DriveFile) => setDetail({ kind: 'file', data: f })
+  const isOpen = (kind: 'file' | 'folder', id: number) => detail?.kind === kind && detail.data.id === id
+  const crumbs = [{ id: null as number | null, name: 'Drive' }, ...breadcrumb.map((b) => ({ id: b.id as number | null, name: b.name }))]
+  const showRecent = !flat && folderId === null && recent.length > 0
+  const empty = !loading && !folders.length && !files.length
+
+  const onDragOver = (e: React.DragEvent) => {
+    if (!canUpload || !Array.from(e.dataTransfer.types).includes('Files')) return
+    e.preventDefault()
+    if (!dragging) setDragging(true)
+  }
+  const onDragLeave = (e: React.DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }
+  const onDrop = (e: React.DragEvent) => {
+    if (!canUpload) return
+    e.preventDefault(); setDragging(false)
+    if (e.dataTransfer.files?.length) void handleUpload(e.dataTransfer.files)
+  }
+  const currentName = flat ? 'Drive' : crumbs[crumbs.length - 1].name
+  const siblings = detail?.kind === 'file' ? files.filter((f) => f.folder === (detail.data as DriveFile).folder && f.id !== detail.data.id) : []
 
   return (
-    <Stack spacing={2}>
-      {/* OneDrive disclaimer */}
-      {/* Il tint del box (blu Microsoft chiaro) è pensato per accompagnare
-          visivamente il logo OneDrive sotto — stessa eccezione strutturale
-          del logo stesso, non segue il tema di ARCHIE. */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.25,
-          px: 1.5,
-          py: 1,
-          borderRadius: 1.5,
-          bgcolor: '#e8f0fe',
-          border: '1px solid #c2d4f8',
-        }}
-      >
-        {/* OneDrive logo SVG inline — colori brand ufficiali Microsoft
-            (#0078D4/#1490DF), eccezione strutturale al sistema di tema:
-            un logo di terze parti non può seguire il tema di ARCHIE. */}
-        <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-          <svg width="22" height="16" viewBox="0 0 22 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8.5 13.5H18.5C19.88 13.5 21 12.38 21 11C21 9.74 20.09 8.69 18.89 8.52C18.96 8.18 19 7.84 19 7.5C19 5.01 16.99 3 14.5 3C13.23 3 12.08 3.52 11.26 4.36C10.7 3.53 9.76 3 8.7 3C7.04 3 5.66 4.21 5.44 5.8C4.06 6.16 3 7.42 3 8.9C3 10.63 4.37 12 6.1 12H8.5V13.5Z" fill="#0078D4"/>
-            <path d="M13.5 13.5H18.5C19.88 13.5 21 12.38 21 11C21 9.74 20.09 8.69 18.89 8.52C18.96 8.18 19 7.84 19 7.5C19 5.01 16.99 3 14.5 3C13.23 3 12.08 3.52 11.26 4.36L13.5 13.5Z" fill="#1490DF"/>
-          </svg>
-        </Box>
-        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#1a3a6e', lineHeight: 1.4 }}>
-          Si ricorda che per condividere file di grosse dimensioni la piattaforma corretta è{' '}
-          <Box component="span" sx={{ fontWeight: 700 }}>OneDrive</Box>.
-        </Typography>
-      </Box>
+    <div className="dv" style={archiveVars(theme)}>
+      <PageHead
+        title="Drive"
+        inline={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12, color: 'text.secondary' }}><CampoIcon name="cloud" size={15} />File oltre 25 MB: usa OneDrive</Box>}
+        actions={
+          <>
+            {canAddFolder ? <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="folder" size={16} />} onClick={() => { setCreateFolderName(''); setCreateFolderOpen(true) }}>Nuova cartella</Button> : null}
+            {canUpload ? (
+              <Button variant="contained" component="label" disabled={Boolean(upload)} startIcon={<CampoIcon name="upload" size={16} />}>
+                {upload ? `Caricamento ${upload.current}/${upload.total}…` : 'Carica file'}
+                <input type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) void handleUpload(e.target.files); e.target.value = '' }} />
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      {/* Topbar: breadcrumb + search + actions */}
-      <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
-        {/* Breadcrumb */}
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flex: 1, flexWrap: 'wrap' }}>
-          <Typography
-            variant="body2"
-            onClick={() => navigateTo(null)}
-            sx={{
-              cursor: 'pointer',
-              color: folderId === null ? 'text.primary' : 'text.disabled',
-              fontWeight: folderId === null ? 600 : 400,
-              '&:hover': { color: 'primary.main' },
-            }}
-          >
-            Root
-          </Typography>
-          {breadcrumb.map((bc, i) => (
-            <React.Fragment key={bc.id}>
-              <Typography variant="body2" sx={{ color: 'grey.300' }}>
-                /
-              </Typography>
-              <Typography
-                variant="body2"
-                onClick={() => navigateTo(bc.id)}
-                sx={{
-                  cursor: 'pointer',
-                  color: i === breadcrumb.length - 1 ? 'text.primary' : 'text.disabled',
-                  fontWeight: i === breadcrumb.length - 1 ? 600 : 400,
-                  '&:hover': { color: 'primary.main' },
-                }}
-              >
-                {bc.name}
-              </Typography>
-            </React.Fragment>
-          ))}
-        </Stack>
+      <section className={`d-a${dragging ? ' is-drop' : ''}`} aria-label="Drive" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+        <aside className="dr-side" aria-label="Cartelle e clienti">
+          <label className="search"><CampoIcon name="search" size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca in tutto il Drive" aria-label="Cerca nel Drive" /></label>
+          <div className="dr-side-h">Cartelle</div>
+          <ul className="d-tree">
+            <li><div className={`d-tn${folderId === null && !flat ? ' is-on' : ''}`} style={{ ['--d' as string]: 0 }}><span className="d-tw" />
+              <button type="button" className="dr-tl" onClick={() => navigateTo(null)}><CampoIcon name="cloud" size={16} /><span>Tutto il Drive</span></button></div></li>
+            {treeNodes(null, 0)}
+          </ul>
+          <div className="dr-side-h">Clienti</div>
+          <Autocomplete size="small" options={allCustomers} value={customerFilter} onChange={(_e, v) => pickCustomer(v)}
+            getOptionLabel={(o) => o.display_name} isOptionEqualToValue={(a, b) => a.id === b.id} noOptionsText="Nessun cliente" clearOnEscape
+            renderInput={(p) => <TextField {...p} placeholder="Filtra per cliente…" sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' } }} />} />
+          <ul className="d-custs">
+            {treeCustomers.map((c) => (
+              <li key={c.id}><button type="button" aria-pressed={customerFilter?.id === c.id} onClick={() => pickCustomer(customerFilter?.id === c.id ? null : c)}>
+                <CampoIcon name="building" size={15} /><span>{c.display_name}</span><small>{c.n}</small></button></li>
+            ))}
+          </ul>
+        </aside>
 
-        {/* Customer filter */}
-        <Autocomplete
-          size="small"
-          options={allCustomers}
-          value={customerFilter}
-          onChange={(_e, val) => {
-            setCustomerFilter(val)
-            setFolderId(null)
-            setBreadcrumb([])
-          }}
-          getOptionLabel={(o) => o.display_name}
-          isOptionEqualToValue={(a, b) => a.id === b.id}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder="Filtra per cliente…"
-              size="small"
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, bgcolor: 'background.paper' }, width: 210 }}
-            />
+        <div className="d-main">
+          <div className="d-bar">
+            <nav className="d-crumbs" aria-label="Percorso">
+              {flat ? <button type="button" onClick={() => navigateTo(null)}><CampoIcon name="cloud" size={15} />Drive</button>
+                : crumbs.map((c, i) => <React.Fragment key={c.id ?? 'root'}>{i ? <span>/</span> : null}<button type="button" aria-current={i === crumbs.length - 1 ? 'page' : undefined} onClick={() => navigateTo(c.id)}>{i === 0 ? <CampoIcon name="cloud" size={15} /> : null}{c.name}</button></React.Fragment>)}
+            </nav>
+            {customerFilter ? <span className="d-filter"><CampoIcon name="building" size={13} />{customerFilter.display_name}<button type="button" aria-label="Togli il filtro cliente" onClick={() => pickCustomer(null)}><CampoIcon name="x" size={12} /></button></span> : null}
+            <span className="g-spacer" />
+            <div className="seg" role="group" aria-label="Vista">
+              <button type="button" aria-pressed={viewMode === 'list'} title="Elenco" aria-label="Elenco" onClick={() => setViewMode('list')}><CampoIcon name="menu" size={15} /></button>
+              <button type="button" aria-pressed={viewMode === 'grid'} title="Griglia" aria-label="Griglia" onClick={() => setViewMode('grid')}><CampoIcon name="dashboard" size={15} /></button>
+            </div>
+          </div>
+
+          {upload ? (
+            <div className="d-progress" role="status">
+              <span>Caricamento di <b>{upload.fileName}</b> · {upload.current} di {upload.total} · {upload.overall}%</span>
+              <span className="d-progress-bar"><i style={{ width: `${upload.overall}%` }} /></span>
+            </div>
+          ) : null}
+
+          {selected.size ? (
+            <div className="d-bulk" role="toolbar" aria-label="Elementi selezionati">
+              <b>{selected.size} selezionat{selected.size === 1 ? 'o' : 'i'}</b>
+              {canChange && selected.size === 1 ? (
+                <Button size="small" variant="outlined" color="inherit" startIcon={<CampoIcon name="folder" size={14} />} onClick={() => {
+                  const fo = folders.find((x) => x.id === selectedFolderIds[0]); const fi = files.find((x) => x.id === selectedFileIds[0])
+                  if (fo) openMove({ kind: 'folder', data: fo }); else if (fi) openMove({ kind: 'file', data: fi })
+                }}>Sposta</Button>
+              ) : null}
+              {canDelete ? <Button size="small" variant="outlined" color="inherit" startIcon={<CampoIcon name="trash" size={14} />} onClick={() => void doBulkDelete()}>Sposta nel cestino</Button> : null}
+              <button type="button" className="link-btn" onClick={() => setSelected(new Set())}>Annulla selezione</button>
+            </div>
+          ) : null}
+
+          {showRecent ? (
+            <div className="d-recent">
+              <div className="dr-side-h">Recenti</div>
+              <ul>
+                {recent.map((f) => (
+                  <li key={f.id}><button type="button" onClick={() => openFile(f)}>
+                    <FileIcon kind={kindOf(f.name, f.mime_type)} ext={extOf(f.name)} size={38} />
+                    <span className="d-n"><b>{f.name}</b><small>{f.folder_name ?? 'Drive'} · {rel(f.updated_at)}</small></span>
+                  </button></li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {flat && !loading ? <div className="d-count">{folders.length + files.length} risultati{search ? ` per «${search}»` : ''}{customerFilter ? ` · cliente ${customerFilter.display_name}` : ''}</div> : null}
+
+          {empty ? (
+            <div className="d-empty"><CampoIcon name="upload" size={20} /><div><b>{flat ? 'Nessun risultato' : 'Cartella vuota'}</b><p>{flat ? 'Prova con un altro nome o togli il filtro.' : canUpload ? 'Trascina qui i file o usa «Carica file».' : 'Non ci sono ancora file.'}</p></div></div>
+          ) : viewMode === 'grid' ? (
+            <ul className="d-grid">
+              {folders.map((f) => (
+                <li key={`folder-${f.id}`}><button type="button" className="d-gi" aria-label={`Apri cartella ${f.name}`} onClick={() => navigateTo(f.id)}>
+                  <span className="d-gthumb"><FolderIcon size={56} badge={badgeOf(f)} /></span><b>{f.name}</b><small>{f.files_count} file</small></button></li>
+              ))}
+              {files.map((f) => (
+                <li key={`file-${f.id}`}><button type="button" className={`d-gi${isOpen('file', f.id) ? ' is-open' : ''}`} onClick={() => openFile(f)}>
+                  <span className="d-gthumb">{f.is_image ? <img src={`/api/drive-files/${f.id}/preview/`} alt="" loading="lazy" /> : <FileIcon kind={kindOf(f.name, f.mime_type)} ext={extOf(f.name)} size={64} />}</span>
+                  <b>{f.name}</b><small>{f.size_human} · {rel(f.updated_at)}</small></button></li>
+              ))}
+            </ul>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="d-tbl">
+                <thead><tr><th className="d-c-sel" /><th>Nome</th><th>Cliente</th><th className="num">Dimensione</th><th>Modificato</th><th /></tr></thead>
+                <tbody>
+                  {folders.map((f) => (
+                    <tr key={`folder-${f.id}`} className={`is-folder${selected.has(`folder-${f.id}`) ? ' is-sel' : ''}`} tabIndex={0}
+                      onClick={() => navigateTo(f.id)} onKeyDown={(e) => { if (e.key === 'Enter') navigateTo(f.id) }}>
+                      <td className="d-c-sel" onClick={(e) => e.stopPropagation()}>{canDelete ? <input type="checkbox" aria-label={`Seleziona cartella ${f.name}`} checked={selected.has(`folder-${f.id}`)} onChange={() => toggle(`folder-${f.id}`)} /> : null}</td>
+                      <td className="d-c-name"><span className="d-nm"><FolderIcon size={22} badge={badgeOf(f)} /><span className="d-n"><b>{f.name}</b>{flat ? <small>{f.full_path}</small> : null}</span></span></td>
+                      <td>{custCell(f.customers)}</td>
+                      <td className="num">{f.files_count} file</td>
+                      <td className="d-c-upd">{rel(f.updated_at)}</td>
+                      <td className="d-c-act" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title="Dettagli della cartella"><IconButton size="small" aria-label={`Dettagli di ${f.name}`} onClick={() => setDetail({ kind: 'folder', data: f })}><CampoIcon name="more" size={16} /></IconButton></Tooltip>
+                      </td>
+                    </tr>
+                  ))}
+                  {files.map((f) => (
+                    <tr key={`file-${f.id}`} className={`${selected.has(`file-${f.id}`) ? 'is-sel' : ''}${isOpen('file', f.id) ? ' is-open' : ''}`} tabIndex={0}
+                      onClick={() => openFile(f)} onKeyDown={(e) => { if (e.key === 'Enter') openFile(f) }}>
+                      <td className="d-c-sel" onClick={(e) => e.stopPropagation()}>{canDelete || canChange ? <input type="checkbox" aria-label={`Seleziona file ${f.name}`} checked={selected.has(`file-${f.id}`)} onChange={() => toggle(`file-${f.id}`)} /> : null}</td>
+                      <td className="d-c-name"><span className="d-nm"><FileIcon kind={kindOf(f.name, f.mime_type)} ext={extOf(f.name)} size={28} /><span className="d-n"><b>{f.name}</b>{flat ? <small>{f.folder_name ?? 'Drive'}</small> : null}</span></span></td>
+                      <td>{custCell(f.customers)}</td>
+                      <td className="num">{f.size_human}</td>
+                      <td className="d-c-upd">{rel(f.updated_at)}<small>{f.updated_by_name ?? f.created_by_name ?? ''}</small></td>
+                      <td className="d-c-act" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title="Scarica"><IconButton size="small" aria-label={`Scarica ${f.name}`} onClick={() => window.open(`/api/drive-files/${f.id}/download/`, '_blank')}><CampoIcon name="download" size={16} /></IconButton></Tooltip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-          noOptionsText="Nessun cliente"
-          clearOnEscape
-        />
 
-        {/* View toggle */}
-        <Stack
-          direction="row"
-          spacing={0.25}
-          sx={{
-            border: '1px solid',
-            borderColor: 'grey.200',
-            borderRadius: 1.5,
-            p: 0.25,
-            bgcolor: 'background.paper',
-          }}
-        >
-          {(
-            [
-              ['grid', <GridViewOutlinedIcon fontSize="small" />],
-              ['list', <ReorderIcon fontSize="small" />],
-            ] as const
-          ).map(([m, icon]) => (
-            <Tooltip key={m} title={m === 'grid' ? 'Griglia' : 'Lista'}>
-              <IconButton
-                size="small"
-                aria-label={m === 'grid' ? 'Griglia' : 'Lista'}
-                onClick={() => setViewMode(m)}
-                sx={{
-                  borderRadius: 1.25,
-                  bgcolor: viewMode === m ? 'primary.main' : 'transparent',
-                  color: viewMode === m ? 'common.white' : 'grey.500',
-                  '&:hover': { bgcolor: viewMode === m ? 'primary.dark' : 'grey.100' },
-                }}
-              >
-                {icon}
-              </IconButton>
-            </Tooltip>
-          ))}
-        </Stack>
+          <div className="d-drop" aria-hidden={!dragging}><CampoIcon name="upload" size={30} /><b>Rilascia per caricare in {currentName}</b><small>max 25 MB per file · niente eseguibili</small></div>
+        </div>
+      </section>
 
-        {/* Create folder */}
-        <Can perm={PERMS.drive.folder.add}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<CreateNewFolderIcon />}
-            onClick={() => {
-              setCreateFolderName('')
-              setCreateFolderOpen(true)
-            }}
-            sx={{
-              borderColor: 'grey.300',
-              color: 'text.secondary',
-              '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
-            }}
-          >
-            Nuova cartella
-          </Button>
-        </Can>
-
-        {/* Upload */}
-        <Can perm={PERMS.drive.file.add}>
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<AddIcon />}
-            component="label"
-            disabled={!!uploadProgress}
-          >
-            {uploadProgress
-              ? `Caricamento ${uploadProgress.current}/${uploadProgress.total}…`
-              : 'Carica file'}
-            <input
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => {
-                if (e.target.files?.length) handleUpload(e.target.files)
-              }}
-            />
-          </Button>
-        </Can>
-      </Stack>
-
-      {/* Loading bar */}
-      {loading && <LinearProgress sx={{ borderRadius: 1 }} />}
-
-      {/* Upload progress */}
-      {uploadProgress && (
-        <Box
-          sx={{
-            bgcolor: widgetAccents.softTealBg,
-            border: '1px solid',
-            borderColor: 'primary.light',
-            borderRadius: 1,
-            px: 2,
-            py: 1.5,
-          }}
-        >
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
-            <UploadFileOutlinedIcon sx={{ color: 'primary.main', fontSize: 18, flexShrink: 0 }} />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 0.5 }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 600,
-                    color: 'primary.main',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '70%',
-                  }}
-                >
-                  {uploadProgress.fileName}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.disabled', flexShrink: 0 }}>
-                  {uploadProgress.current}/{uploadProgress.total} file ·{' '}
-                  {uploadProgress.overallProgress}%
-                </Typography>
-              </Stack>
-              {/* Overall progress */}
-              <Box
-                sx={{
-                  height: 6,
-                  bgcolor: (t) => alpha(t.palette.primary.main, 0.15),
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                }}
-              >
-                <Box
-                  sx={{
-                    height: '100%',
-                    width: `${uploadProgress.overallProgress}%`,
-                    bgcolor: 'primary.main',
-                    borderRadius: 1,
-                    transition: 'width 0.2s ease',
-                  }}
-                />
-              </Box>
-              {/* Per-file progress */}
-              {uploadProgress.total === 1 ? null : (
-                <Box
-                  sx={{
-                    height: 3,
-                    bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                    mt: 0.5,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      height: '100%',
-                      width: `${uploadProgress.fileProgress}%`,
-                      bgcolor: (t) => alpha(t.palette.primary.main, 0.5),
-                      borderRadius: 1,
-                      transition: 'width 0.15s ease',
-                    }}
-                  />
-                </Box>
-              )}
-            </Box>
-          </Stack>
-        </Box>
-      )}
-
-      {/* Active filter chip */}
-      {customerFilter && (
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            Filtro attivo:
-          </Typography>
-          <Chip
-            size="small"
-            label={customerFilter.display_name}
-            onDelete={() => {
-              setCustomerFilter(null)
-              setFolderId(null)
-              setBreadcrumb([])
-            }}
-            color="primary"
-            variant="outlined"
-            sx={{ fontSize: 11 }}
-          />
-        </Stack>
-      )}
-
-      {/* Upload drop zone */}
-      <Can perm={PERMS.drive.file.add}>
-        <UploadZone onFiles={handleUpload} />
-      </Can>
-
-      {/* Bulk action bar */}
-      {selected.size > 0 && (
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={1.5}
-          sx={{
-            px: 2,
-            py: 1.25,
-            bgcolor: widgetAccents.softTealBg,
-            border: '1px solid',
-            borderColor: 'primary.light',
-            borderRadius: 1,
-          }}
-        >
-          <CheckBoxIcon sx={{ color: 'primary.main', fontSize: 18 }} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', flex: 1 }}>
-            {selected.size} selezionati
-          </Typography>
-          <Can perm={PERMS.drive.folder.change}>
-            <Tooltip
-              title={
-                selected.size > 1
-                  ? 'Sposta uno alla volta: lo spostamento multiplo non è ancora supportato'
-                  : ''
-              }
-            >
-              <span>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<DriveFileMoveOutlinedIcon />}
-                  disabled={selected.size > 1}
-                  onClick={() => {
-                    // Bulk move not supported: only enabled when exactly one item is selected.
-                    const firstFolder = selectedFolderIds[0]
-                    const firstFile = selectedFileIds[0]
-                    if (firstFolder) {
-                      const f = folders.find((x) => x.id === firstFolder)
-                      if (f) openMove({ kind: 'folder', data: f })
-                    } else if (firstFile) {
-                      const f = files.find((x) => x.id === firstFile)
-                      if (f) openMove({ kind: 'file', data: f })
-                    }
-                  }}
-                  sx={{ borderColor: 'primary.light' }}
-                >
-                  Sposta
-                </Button>
-              </span>
-            </Tooltip>
-          </Can>
-          <Can perm={PERMS.drive.file.delete}>
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteOutlineIcon />}
-              onClick={doBulkDelete}
-            >
-              Elimina ({selected.size})
-            </Button>
-          </Can>
-          <Button
-            size="small"
-            variant="text"
-            onClick={clearSelection}
-            sx={{ color: 'text.disabled' }}
-          >
-            Annulla
-          </Button>
-        </Stack>
-      )}
-
-      {/* Unified folders + files */}
-      {(folders.length > 0 || files.length > 0) &&
-        (viewMode === 'grid' ? (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))',
-              gap: 1.25,
-            }}
-          >
-            {folderId !== null && (
-              <Box
-                onClick={() => {
-                  const parent =
-                    breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2].id : null
-                  navigateTo(parent)
-                }}
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                  borderRadius: 1,
-                  p: 1.5,
-                  cursor: 'pointer',
-                  bgcolor: 'background.paper',
-                  transition: 'all 0.13s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.300' },
-                }}
-              >
-                <Typography sx={{ fontSize: 20, color: 'text.disabled', lineHeight: 1 }}>
-                  ‹
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.disabled' }}>
-                  ..
-                </Typography>
-              </Box>
-            )}
-            {folders.map((f) => (
-              <FolderCard
-                key={`folder-${f.id}`}
-                folder={f}
-                onOpen={() => navigateTo(f.id)}
-                onRename={() => openRename({ kind: 'folder', data: f })}
-                onMove={() => openMove({ kind: 'folder', data: f })}
-                onDelete={() => openDelete({ kind: 'folder', data: f })}
-                onLinkCustomers={() => selectItem(`folder-${f.id}`, { kind: 'folder', data: f })}
-              />
-            ))}
-            {files.map((f) => (
-              <FileCard
-                key={`file-${f.id}`}
-                file={f}
-                selected={selectedId === `file-${f.id}`}
-                onSelect={() => selectItem(`file-${f.id}`, { kind: 'file', data: f })}
-                onRename={() => openRename({ kind: 'file', data: f })}
-                onMove={() => openMove({ kind: 'file', data: f })}
-                onDelete={() => openDelete({ kind: 'file', data: f })}
-                onLinkCustomers={() => selectItem(`file-${f.id}`, { kind: 'file', data: f })}
-              />
-            ))}
-          </Box>
-        ) : (
-          <Box
-            sx={{
-              border: '1px solid',
-              borderColor: 'grey.200',
-              borderRadius: 1,
-              overflow: 'hidden',
-              bgcolor: 'background.paper',
-            }}
-          >
-            {/* ".." back row — shown only when not in root */}
-            {folderId !== null && (
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={1.5}
-                onClick={() => {
-                  const parent =
-                    breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2].id : null
-                  navigateTo(parent)
-                }}
-                sx={{
-                  px: 2,
-                  py: 1,
-                  borderBottom: '1px solid',
-                  borderColor: 'grey.100',
-                  cursor: 'pointer',
-                  transition: 'background 0.1s',
-                  '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 1,
-                    bgcolor: (theme) => theme.palette.background.default,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Typography
-                    sx={{ fontSize: 14, fontWeight: 700, color: 'text.disabled', lineHeight: 1 }}
-                  >
-                    ‹
-                  </Typography>
-                </Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.disabled' }}>
-                  ..
-                </Typography>
-              </Stack>
-            )}
-            {folders.map((f, i) => (
-              <FolderListRow
-                key={f.id}
-                folder={f}
-                idx={i}
-                total={folders.length + files.length + (folderId !== null ? 1 : 0)}
-                onOpen={() => navigateTo(f.id)}
-                onRename={() => openRename({ kind: 'folder', data: f })}
-                onMove={() => openMove({ kind: 'folder', data: f })}
-                onDelete={() => openDelete({ kind: 'folder', data: f })}
-                onLinkCustomers={() => selectItem(`folder-${f.id}`, { kind: 'folder', data: f })}
-                isSelected={selected.has(`folder-${f.id}`)}
-                onToggleSelect={(e) => toggleSelect(`folder-${f.id}`, e)}
-              />
-            ))}
-            {files.map((f, i) => (
-              <FileListRow
-                key={f.id}
-                file={f}
-                idx={i}
-                globalIdx={folders.length + i + (folderId !== null ? 1 : 0)}
-                totalItems={folders.length + files.length + (folderId !== null ? 1 : 0)}
-                selected={selectedId === `file-${f.id}`}
-                onSelect={() => selectItem(`file-${f.id}`, { kind: 'file', data: f })}
-                onRename={() => openRename({ kind: 'file', data: f })}
-                onMove={() => openMove({ kind: 'file', data: f })}
-                onDelete={() => openDelete({ kind: 'file', data: f })}
-                onLinkCustomers={() => selectItem(`file-${f.id}`, { kind: 'file', data: f })}
-                isChecked={selected.has(`file-${f.id}`)}
-                onToggleCheck={(e) => toggleSelect(`file-${f.id}`, e)}
-              />
-            ))}
-          </Box>
-        ))}
-
-      {/* Empty state — show ".." back row even when folder is empty */}
-      {!loading && folders.length === 0 && files.length === 0 && (
-        <Box>
-          {folderId !== null && (
-            <Box
-              sx={{
-                border: '1px solid',
-                borderColor: 'grey.200',
-                borderRadius: 1,
-                overflow: 'hidden',
-                bgcolor: 'background.paper',
-                mb: 2,
-              }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={1.5}
-                onClick={() => {
-                  const parent =
-                    breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2].id : null
-                  navigateTo(parent)
-                }}
-                sx={{
-                  px: 2,
-                  py: 1,
-                  cursor: 'pointer',
-                  '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 1,
-                    bgcolor: (theme) => theme.palette.background.default,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Typography
-                    sx={{ fontSize: 14, fontWeight: 700, color: 'text.disabled', lineHeight: 1 }}
-                  >
-                    ‹
-                  </Typography>
-                </Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.disabled' }}>
-                  ..
-                </Typography>
-              </Stack>
-            </Box>
-          )}
-          <Box sx={{ textAlign: 'center', py: 6, color: 'text.disabled' }}>
-            <FolderIcon sx={{ fontSize: 48, mb: 1, opacity: 0.3 }} />
-            <Typography variant="body2">Cartella vuota</Typography>
-            <Typography variant="caption">Carica file o crea una nuova cartella.</Typography>
-          </Box>
-        </Box>
-      )}
-
-      {/* ── Preview Drawer ── */}
-      <PreviewDrawer
-        item={drawerItem}
-        onClose={() => {
-          setDrawerItem(null)
-          setSelectedId(null)
+      <DriveDetail
+        item={detail}
+        customers={allCustomers}
+        siblings={siblings}
+        canChange={canChange}
+        canDelete={canDelete}
+        canSeeAudit={canSeeAudit}
+        onClose={() => setDetail(null)}
+        onOpenFolder={(id) => navigateTo(id)}
+        onOpenFile={openFile}
+        onRename={(it) => { setRenameItem(it); setRenameName(it.data.name) }}
+        onMove={openMove}
+        onDelete={(it) => setDeleteItem(it)}
+        onChanged={(it) => {
+          setDetail(it)
+          if (it.kind === 'file') setFiles((prev) => prev.map((x) => (x.id === it.data.id ? (it.data as DriveFile) : x)))
+          else { setFolders((prev) => prev.map((x) => (x.id === it.data.id ? (it.data as DriveFolder) : x))); setTree((prev) => prev.map((x) => (x.id === it.data.id ? (it.data as DriveFolder) : x))) }
         }}
       />
 
-      {/* ── Create folder dialog ── */}
-      <CreateFolderDialog
-        open={createFolderOpen}
-        name={createFolderName}
-        busy={createFolderBusy}
-        onNameChange={setCreateFolderName}
-        onClose={() => setCreateFolderOpen(false)}
-        onCreate={doCreateFolder}
-      />
-
-      {/* ── Rename dialog ── */}
-      <RenameDialog
-        item={renameItem}
-        name={renameName}
-        busy={renameBusy}
-        onNameChange={setRenameName}
-        onClose={() => setRenameItem(null)}
-        onRename={doRename}
-      />
-
-      {/* ── Move dialog ── */}
-      <MoveDialog
-        item={moveItem}
-        folders={moveFolders}
-        target={moveTarget}
-        busy={moveBusy}
-        onSelectTarget={setMoveTarget}
-        onClose={() => setMoveItem(null)}
-        onMove={doMove}
-      />
-
-      {/* ── Delete confirm ── */}
-      <ConfirmDeleteDialog
-        open={!!deleteItem}
-        busy={deleteBusy}
-        title="Confermi eliminazione?"
-        description={`"${deleteItem?.data.name}" verrà spostato nel cestino.`}
-        onClose={() => setDeleteItem(null)}
-        onConfirm={doDelete}
-      />
-    </Stack>
+      <CreateFolderDialog open={createFolderOpen} name={createFolderName} busy={createFolderBusy} onNameChange={setCreateFolderName} onClose={() => setCreateFolderOpen(false)} onCreate={doCreateFolder} />
+      <RenameDialog item={renameItem} name={renameName} busy={renameBusy} onNameChange={setRenameName} onClose={() => setRenameItem(null)} onRename={doRename} />
+      <MoveDialog item={moveItem} folders={tree.filter((f) => !(moveItem?.kind === 'folder' && f.id === moveItem.data.id))} target={moveTarget} busy={moveBusy} onSelectTarget={setMoveTarget} onClose={() => setMoveItem(null)} onMove={doMove} />
+      <ConfirmDeleteDialog open={!!deleteItem} busy={deleteBusy} title="Spostare nel cestino?" description={`«${deleteItem?.data.name}» verrà spostato nel cestino e potrà essere ripristinato.`} onClose={() => setDeleteItem(null)} onConfirm={doDelete} />
+    </div>
   )
 }

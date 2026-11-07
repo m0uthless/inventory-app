@@ -93,12 +93,52 @@ MAX_UPLOAD_SIZE = MAX_UPLOAD_MB * 1024 * 1024
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+
+# ── Restrizioni per gruppo lungo la catena (campo "access") ─────────────────
+# L'ACL è ereditaria (vedi access.py): un elemento è visibile solo se si supera
+# ogni livello con allowed_groups. Qui le si elenca, dal più vicino alla radice,
+# così l'interfaccia può spiegare "chi può vederlo" e da dove viene la regola.
+# Cache per richiesta: negli elenchi i file della stessa cartella la riusano.
+_ACCESS_MAX_DEPTH = 50
+
+
+def _group_names(obj) -> list[str]:
+    return sorted(g.name for g in obj.allowed_groups.all())
+
+
+def _folder_chain_access(folder, context) -> list[dict]:
+    cache = context.setdefault("_drive_access_cache", {}) if context is not None else {}
+    out: list[dict] = []
+    node, depth, chain = folder, 0, []
+    while node is not None and depth < _ACCESS_MAX_DEPTH:
+        if node.pk in cache:
+            out_tail = cache[node.pk]
+            break
+        chain.append(node)
+        node = node.parent
+        depth += 1
+    else:
+        out_tail = []
+    # Risolve dal fondo verso l'alto, riempiendo la cache per ogni cartella vista.
+    acc = list(out_tail)
+    for n in reversed(chain):
+        names = _group_names(n)
+        acc = ([{"level": "folder", "id": n.pk, "name": n.name, "groups": names}] if names else []) + acc
+        cache[n.pk] = acc
+    out = acc if chain else list(out_tail)
+    return out
+
+
 class DriveFolderSerializer(serializers.ModelSerializer):
     children_count = serializers.IntegerField(source="children_count_db", read_only=True)
     files_count = serializers.IntegerField(source="files_count_db", read_only=True)
     full_path = serializers.CharField(read_only=True)
     created_by_name = serializers.SerializerMethodField()
     updated_by_name = serializers.SerializerMethodField()
+    access = serializers.SerializerMethodField()
+
+    def get_access(self, obj):
+        return _folder_chain_access(obj, self.context)
 
     class Meta:
         model = DriveFolder
@@ -109,6 +149,7 @@ class DriveFolderSerializer(serializers.ModelSerializer):
             "full_path",
             "customers",
             "allowed_groups",
+            "access",
             "children_count",
             "files_count",
             "created_by",
@@ -158,6 +199,12 @@ class DriveFileSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
     updated_by_name = serializers.SerializerMethodField()
     folder_name = serializers.CharField(source="folder.name", read_only=True)
+    access = serializers.SerializerMethodField()
+
+    def get_access(self, obj):
+        own = _group_names(obj)
+        mine = [{"level": "file", "id": obj.pk, "name": obj.name, "groups": own}] if own else []
+        return mine + (_folder_chain_access(obj.folder, self.context) if obj.folder_id else [])
 
     # Write-only to avoid leaking direct media URLs.
     file = serializers.FileField(write_only=True, required=False)
@@ -179,6 +226,7 @@ class DriveFileSerializer(serializers.ModelSerializer):
             "is_pdf",
             "customers",
             "allowed_groups",
+            "access",
             "created_by",
             "created_by_name",
             "updated_by",
