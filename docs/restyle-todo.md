@@ -159,6 +159,8 @@ Portata sullo schema delle pagine anagrafiche (Siti, PO): testata, indicatori, v
 - **[UI] Nel dialogo**: durata a scelta rapida (1/2/3/5 anni o «Fino al…»), preavviso 30/60/90/180 o altro, titolo composto da tipo e cliente finché non lo si cambia, codice proposto come successivo dell'ultimo dell'anno, società proposta dal cliente, importi all'italiana («36.000» = trentaseimila), «Salva come bozza» o «Crea contratto».
 - **[UI] PDF già in creazione**: caricato subito dopo il salvataggio (solo con `view_contract_value`); se fallisce il contratto resta creato e compare un avviso.
 
+- **[UI] Colori delle cartelle in pastello** (2026-11-08, richiesta di Fede): il colore salvato viene ricondotto alla tinta pastello più vicina della Dashboard (`tintOf`/`catColor` in `features/wiki/archive/archiveModel.ts`, chiaro e scuro); il gestore cartelle propone solo le 7 tinte più il grigio (rimossi i colori accesi e il selettore libero, `ui/wikiCategoryColors.ts` eliminato); il colore mostrato è tenue come la Dashboard (via di mezzo tra il fondo chiaro della tinta e il suo tono medio; in scuro tra il fondo scuro e il tono medio), testi su cartelle e linguette con l'inchiostro calcolato sul colore. Nessuna migrazione: i colori vecchi restano nel database e si vedono in pastello.
+
 ## Drive
 
 Portato dall'anteprima `d-base.html`, variante **A · Esplora file** (albero cartelle e clienti, Recenti, tabella o griglia, trascinamento su tutto il riquadro, pannello del file). Stili in `features/drive/drive.css`, icone dei file in `features/drive/DriveIcons.tsx` (disegnate, stile icone di sistema; colori fissi come un'immagine, tipo sempre scritto).
@@ -207,6 +209,20 @@ Portata dall'anteprima `db-base.html`, variante **A · Tinte** (scelta da Fede d
 - **[UI] Issue** accetta `?vista=mine|overdue|closed|all` (link dalla Dashboard).
 - **[UI] Telefono**: widget uno sotto l'altro al posto del carosello.
 - **[TODO] Layout predefinito**: i nuovi utenti partono da quello impostato con "Imposta come predefinito" (superuser); quello dell'anteprima va impostato da Fede in produzione. In dev l'ho applicato all'utente `verifica-ui`.
+
+## Cestino e Bug e feature
+- Fatte da `cb-base.html` (2026-11-08): Cestino variante A · Tabella, Bug e feature variante B · Bacheca. Niente KPI né sottotitolo (richiesta di Fede).
+- Cestino: schede per tipo con conteggi, selezione multipla con barra Ripristina / Elimina definitivamente, stato per riga (Ripristinabile, Prima il padre, Ha collegati attivi), dialogo di eliminazione con "Ho capito", "Svuota il cestino". Nuovo endpoint `GET /api/trash/info/` (core/trash_api.py): blocchi di ripristino/eliminazione e "eliminato da" ricavato dall'Audit.
+- Bug e feature: bacheca Bug aperti / Funzionalità richieste / Chiuse di recente (ultime 10, link a /bug-feature/resolved che mostra Risolte e Rifiutate). Scheda flottante con screenshot (anche incolla/trascina), Segna come risolta, Rifiuta con motivi pronti, Riapri. Dialogo "Segnala". `BugFeatureDrawer` rimosso; `NsDialog` spostato in `ui/campo/CampoDialog`.
+- Da valutare: issue, contratti, PO e altri tipi nel Cestino (oggi hanno il cestino nella loro pagina).
+
+## Titolo nella linguetta (mockup, in attesa di decisione interna)
+
+Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.
+
+- **[DEC] Titolo della pagina in una linguetta del foglio**: il foglio del contenuto sale nella barra in alto fino al titolo e scende con una curva prima della ricerca (che resta centrata).
+- **[DEC] Pulsanti principali nella riga delle viste**, a destra dopo "Salva vista"; la riga dei pulsanti sopra gli indicatori sparisce. Su telefono tutto resta com'è.
+- **[UI] Se approvato**: va nella struttura generale (`layout/AppLayout.tsx`, `PageHead`) per tutte le pagine; le pagine senza viste tengono i pulsanti dove sono.
 
 ## Colore per modulo (rimandato)
 

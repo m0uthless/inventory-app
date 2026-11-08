@@ -101,7 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         label: 'Bug e feature', path: '/bug-feature', icon: <CampoIcon name="message" />, count: 'feedback',
         match: (p) => prefix('/bug-feature')(p) && !p.startsWith('/bug-feature/resolved'),
-        children: [{ label: 'Risolte', path: '/bug-feature/resolved' }],
+        children: [{ label: 'Chiuse', path: '/bug-feature/resolved' }],
       },
     ],
   },
@@ -121,7 +121,7 @@ export function entryActive(entry: NavEntry, pathname: string): boolean {
 // Titoli di pagina (sentence case) per le pagine che non hanno ancora una
 // testata propria. Ordine: prefisso più specifico prima.
 const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
-  ['/bug-feature/resolved', 'Bug e feature risolte'],
+  ['/bug-feature/resolved', 'Segnalazioni chiuse'],
   ['/maintenance/plans', 'Piani di manutenzione'],
   ['/maintenance/rapportini', 'Rapportini'],
   ['/wiki/stats', 'Statistiche Wiki'],

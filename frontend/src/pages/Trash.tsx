@@ -1,171 +1,40 @@
 import * as React from 'react'
-
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  FormControl,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
-  Tooltip,
-  Typography,
-  Stack,
-} from '@mui/material'
-import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
-
+import { Box, Button, IconButton, InputBase, Stack, Tooltip, Typography } from '@mui/material'
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
 import { api } from '@shared/api/client'
-import { collectionActionPath, type CollectionPath } from '@shared/api/apiPaths'
 import { buildDrfListParams } from '@shared/api/drf'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useToast } from '@shared/ui/toast'
-import { emptySelectionModel, selectionSize, selectionToIds } from '@shared/utils/gridSelection'
+import { emptySelectionModel, selectionToIds } from '@shared/utils/gridSelection'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { useAuth } from '../auth/AuthProvider'
-import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
-import { PERMS } from '../auth/perms'
-import { compactCreateButtonSx } from '@shared/ui/toolbarStyles'
+import { CampoIcon, PageHead, ViewTabs } from '../ui/campo'
+import {
+  TRASH_RESOURCES, agoLabel, groupByKind, resourceOf, toRow,
+  type TrashInfo, type TrashKind, type TrashRow,
+} from '../features/trash/trashModel'
+import { PurgeDialog, TrashItemCell, TrashState, TrashWhen } from '../features/trash/trashUi'
 
-type TrashResourceKey =
-  | 'customers'
-  | 'sites'
-  | 'contacts'
-  | 'inventory'
-  | 'monitors'
-  | 'maintenance-plans'
-  | 'techs'
-type TrashTypeKey = 'all' | TrashResourceKey
+type Tab = 'all' | TrashKind
+type ApiPage<T> = { count: number; next: string | null; results: T[] }
+type Raw = Record<string, unknown>
+type InfoResp = Partial<Record<TrashKind, Record<string, TrashInfo>>>
 
-type ResourceCfg = {
-  key: TrashResourceKey
-  label: string
-  collectionPath: CollectionPath
-  endpoint: string
-  restoreEndpoint: string
-  purgeEndpoint: string
-  viewPerm: string
-  restorePerm: string
-  purgePerm: string
-  buildTitle: (row: Record<string, unknown>) => string
-}
-
-type ResourceCfgInput = Omit<ResourceCfg, 'endpoint' | 'restoreEndpoint' | 'purgeEndpoint'>
-
-function makeResourceCfg(input: ResourceCfgInput): ResourceCfg {
-  return {
-    ...input,
-    endpoint: input.collectionPath,
-    restoreEndpoint: collectionActionPath(input.collectionPath, 'bulk_restore'),
-    purgeEndpoint: collectionActionPath(input.collectionPath, 'bulk_purge'),
+/** Aggiunge alle righe i blocchi e "eliminato da" (GET /trash/info/). */
+async function withInfo(rows: TrashRow[]): Promise<TrashRow[]> {
+  if (!rows.length) return rows
+  const groups = groupByKind(rows)
+  const params: Record<string, string> = {}
+  ;(Object.keys(groups) as TrashKind[]).forEach((k) => { params[k] = (groups[k] ?? []).join(',') })
+  try {
+    const { data } = await api.get<InfoResp>('/trash/info/', { params })
+    return rows.map((r) => ({ ...r, info: data[r.kind]?.[String(r.id)] }))
+  } catch {
+    return rows
   }
-}
-
-type TrashRow = Record<string, unknown> & {
-  id: number
-  deleted_at?: string | null
-  updated_at?: string | null
-  __kind?: TrashResourceKey
-  __rid?: string
-  __title?: string
-}
-
-const RESOURCES: ResourceCfg[] = [
-  makeResourceCfg({
-    key: 'customers',
-    label: 'Clienti',
-    collectionPath: '/customers/',
-    viewPerm: PERMS.crm.customer.view,
-    restorePerm: PERMS.crm.customer.change,
-    purgePerm: PERMS.crm.customer.delete,
-    buildTitle: (r) =>
-      `${String(r.code ?? '')} — ${String(r.display_name ?? r.name ?? 'Cliente')}`.trim(),
-  }),
-  makeResourceCfg({
-    key: 'sites',
-    label: 'Siti',
-    collectionPath: '/sites/',
-    viewPerm: PERMS.crm.site.view,
-    restorePerm: PERMS.crm.site.change,
-    purgePerm: PERMS.crm.site.delete,
-    buildTitle: (r) =>
-      `${r.customer_code ? String(r.customer_code) + ' · ' : ''}${String(r.display_name ?? r.name ?? 'Sito')}`.trim(),
-  }),
-  makeResourceCfg({
-    key: 'contacts',
-    label: 'Contatti',
-    collectionPath: '/contacts/',
-    viewPerm: PERMS.crm.contact.view,
-    restorePerm: PERMS.crm.contact.change,
-    purgePerm: PERMS.crm.contact.delete,
-    buildTitle: (r) =>
-      `${String(r.full_name ?? r.display_name ?? 'Contatto')}${r.email ? ' — ' + String(r.email) : ''}`.trim(),
-  }),
-  makeResourceCfg({
-    key: 'inventory',
-    label: 'Inventari',
-    collectionPath: '/inventories/',
-    viewPerm: PERMS.inventory.inventory.view,
-    restorePerm: PERMS.inventory.inventory.change,
-    purgePerm: PERMS.inventory.inventory.delete,
-    buildTitle: (r) =>
-      `${String(r.hostname ?? r.name ?? 'Inventario')}${r.knumber ? ' · ' + String(r.knumber) : ''}`.trim(),
-  }),
-  makeResourceCfg({
-    key: 'monitors',
-    label: 'Monitor',
-    collectionPath: '/monitors/',
-    viewPerm: PERMS.inventory.monitor.view,
-    restorePerm: PERMS.inventory.monitor.change,
-    purgePerm: PERMS.inventory.monitor.delete,
-    buildTitle: (r) =>
-      `${String(r.produttore ?? 'Monitor')}${r.modello ? ' ' + String(r.modello) : ''}${r.seriale ? ' · ' + String(r.seriale) : ''}`.trim(),
-  }),
-  makeResourceCfg({
-    key: 'maintenance-plans',
-    label: 'Piani manutenzione',
-    collectionPath: '/maintenance-plans/',
-    viewPerm: PERMS.maintenance.plan.view,
-    restorePerm: PERMS.maintenance.plan.change,
-    purgePerm: PERMS.maintenance.plan.delete,
-    buildTitle: (r) =>
-      `${r.customer_code ? String(r.customer_code) + ' · ' : ''}${String(r.title ?? 'Piano')}`.trim(),
-  }),
-  makeResourceCfg({
-    key: 'techs',
-    label: 'Tecnici',
-    collectionPath: '/techs/',
-    viewPerm: PERMS.maintenance.tech.view,
-    restorePerm: PERMS.maintenance.tech.change,
-    purgePerm: PERMS.maintenance.tech.delete,
-    buildTitle: (r) => {
-      const fn = String(r.first_name ?? '').trim()
-      const ln = String(r.last_name ?? '').trim()
-      const full = String(r.full_name ?? '').trim() || `${fn} ${ln}`.trim() || 'Tecnico'
-      return `${full}${r.email ? ' — ' + String(r.email) : ''}`.trim()
-    },
-  }),
-]
-
-type ApiPage<T> = {
-  count: number
-  next: string | null
-  previous: string | null
-  results: T[]
-}
-
-function fmt(ts?: string | null) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return ts
-  return d.toLocaleString()
 }
 
 export default function Trash() {
@@ -173,674 +42,274 @@ export default function Trash() {
   const { hasPerm } = useAuth()
 
   const grid = useServerGrid({
-    defaultOrdering: '-updated_at',
-    allowedOrderingFields: ['updated_at', 'created_at', 'id', 'deleted_at'],
+    defaultOrdering: '-deleted_at',
+    allowedOrderingFields: ['deleted_at', 'updated_at', 'created_at', 'id'],
     defaultPageSize: 25,
   })
-
-  const [typeKey, setTypeKey] = React.useState<TrashTypeKey>('all')
-  const cfg = React.useMemo(
-    () => (typeKey === 'all' ? null : RESOURCES.find((r) => r.key === typeKey)!),
-    [typeKey],
-  )
-
   React.useEffect(() => {
     if (grid.view !== 'deleted') grid.setViewMode('deleted', { keepOpen: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const visible = React.useMemo(() => TRASH_RESOURCES.filter((r) => hasPerm(r.viewPerm)), [hasPerm])
+  const [tab, setTab] = React.useState<Tab>('all')
   const [rows, setRows] = React.useState<TrashRow[]>([])
   const [rowCount, setRowCount] = React.useState(0)
   const [loading, setLoading] = React.useState(false)
+  const [counts, setCounts] = React.useState<Partial<Record<TrashKind, number>>>({})
+  const [tick, setTick] = React.useState(0)
+  const reload = () => setTick((t) => t + 1)
+  const [selection, setSelection] = React.useState<GridRowSelectionModel>(emptySelectionModel())
+  const [busy, setBusy] = React.useState(false)
+  const [purgeRows, setPurgeRows] = React.useState<TrashRow[] | null>(null)
+  const [searchOpen, setSearchOpen] = React.useState(Boolean(grid.q))
 
-  const [selectionModel, setSelectionModel] =
-    React.useState<GridRowSelectionModel>(emptySelectionModel())
+  // Conteggi per le schede.
+  React.useEffect(() => {
+    let alive = true
+    Promise.all(visible.map((r) => api.get<ApiPage<Raw>>(r.endpoint, { params: { only_deleted: 1, include_deleted: 1, page_size: 1 } })
+      .then((x) => [r.key, x.data.count || 0] as const).catch(() => [r.key, 0] as const)))
+      .then((list) => { if (alive) setCounts(Object.fromEntries(list)) })
+    return () => { alive = false }
+  }, [visible, tick])
 
-  const [restoreBusy, setRestoreBusy] = React.useState(false)
-  const [purgeBusy, setPurgeBusy] = React.useState(false)
-  const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
-  const [bulkPurgeDlgOpen, setBulkPurgeDlgOpen] = React.useState(false)
-
-  const visibleResources = React.useMemo(
-    () => RESOURCES.filter((r) => hasPerm(r.viewPerm)),
-    [hasPerm],
-  )
-
-  const selectionToIdStrings = React.useCallback(
-    (m: GridRowSelectionModel): string[] => selectionToIds(m).map((v) => String(v)),
-    [],
-  )
-
-  const selectedByType = React.useMemo(() => {
-    const ids = selectionToIdStrings(selectionModel)
-    const groups: Record<TrashResourceKey, number[]> = {
-      customers: [],
-      sites: [],
-      contacts: [],
-      inventory: [],
-      monitors: [],
-      'maintenance-plans': [],
-      techs: [],
-    }
-
-    if (typeKey !== 'all') {
-      for (const s of ids) {
-        const n = Number(s)
-        if (!Number.isNaN(n)) groups[typeKey].push(n)
-      }
-      return groups
-    }
-
-    for (const s of ids) {
-      const [k, idStr] = s.split(':', 2)
-      if (!k || !idStr) continue
-      if (!Object.prototype.hasOwnProperty.call(groups, k)) continue
-      const n = Number(idStr)
-      if (!Number.isNaN(n)) groups[k as TrashResourceKey].push(n)
-    }
-    return groups
-  }, [selectionModel, selectionToIdStrings, typeKey])
-
-  const selectedCount = React.useMemo(() => selectionSize(selectionModel), [selectionModel])
-
-  const emptyState = React.useMemo(() => {
-    if (!grid.search.trim()) {
-      return {
-        title: 'Cestino vuoto',
-        subtitle:
-          typeKey === 'all'
-            ? 'Non ci sono elementi eliminati.'
-            : 'Non ci sono elementi eliminati per questo tipo.',
-      }
-    }
-    return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o tipo.' }
-  }, [grid.search, typeKey])
-
-  const listParams = React.useMemo(
-    () =>
-      buildDrfListParams({
-        search: grid.search,
-        ordering: grid.ordering,
-        page0: grid.paginationModel.page,
-        pageSize: grid.paginationModel.pageSize,
-        includeDeleted: grid.includeDeleted,
-        onlyDeleted: grid.onlyDeleted,
-      }),
-    [
-      grid.search,
-      grid.ordering,
-      grid.paginationModel.page,
-      grid.paginationModel.pageSize,
-      grid.includeDeleted,
-      grid.onlyDeleted,
-    ],
-  )
-
-  const load = React.useCallback(async () => {
-    // "Tutti" = merge client-side of visible resources.
-    if (typeKey === 'all') {
-      if (visibleResources.length === 0) {
-        setRows([])
-        setRowCount(0)
-        return
-      }
-
-      setLoading(true)
-      try {
-        // Fetch enough items per resource to cover the current page after merging.
-        const need = (grid.paginationModel.page + 1) * grid.paginationModel.pageSize
-        const params = {
-          ...listParams,
-          page: 1,
-          page_size: need,
-        }
-
-        const resps = await Promise.all(
-          visibleResources.map((r) =>
-            api
-              .get<ApiPage<Record<string, unknown>>>(r.endpoint, { params })
-              .then((x) => ({ cfg: r, data: x.data })),
-          ),
-        )
-
-        const all: TrashRow[] = []
-        let total = 0
-        for (const rr of resps) {
-          total += rr.data.count || 0
-          for (const row of rr.data.results || []) {
-            const rowId = Number((row as Record<string, unknown>)['id'])
-            if (!Number.isFinite(rowId)) continue
-            all.push({
-              ...row,
-              __kind: rr.cfg.key,
-              id: rowId,
-              __rid: `${rr.cfg.key}:${rowId}`,
-              __title: rr.cfg.buildTitle(row),
-            })
-          }
-        }
-
-        // Apply ordering client-side (best-effort)
-        const ord = (grid.ordering || '-deleted_at').trim()
-        const dir = ord.startsWith('-') ? -1 : 1
-        const field = ord.replace(/^[-+]/, '')
-        all.sort((a, b) => {
-          const av = a[field]
-          const bv = b[field]
-          if (av == null && bv == null) return 0
-          if (av == null) return 1
-          if (bv == null) return -1
-
-          const avC = typeof av === 'number' ? av : String(av)
-          const bvC = typeof bv === 'number' ? bv : String(bv)
-          if (avC < bvC) return -1 * dir
-          if (avC > bvC) return 1 * dir
-          return 0
-        })
-
-        const start = grid.paginationModel.page * grid.paginationModel.pageSize
-        const end = start + grid.paginationModel.pageSize
-        setRows(all.slice(start, end))
-        setRowCount(total)
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        setLoading(false)
-      }
-      return
-    }
-
-    // Single resource.
-    if (!cfg || !hasPerm(cfg.viewPerm)) {
-      setRows([])
-      setRowCount(0)
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await api.get<ApiPage<TrashRow>>(cfg.endpoint, { params: listParams })
-      setRows((res.data.results || []) as TrashRow[])
-      setRowCount(res.data.count || 0)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [
-    cfg,
-    grid.ordering,
-    grid.paginationModel.page,
-    grid.paginationModel.pageSize,
-    hasPerm,
-    listParams,
-    toast,
-    typeKey,
-    visibleResources,
-  ])
+  const listParams = React.useMemo(() => buildDrfListParams({
+    search: grid.search, ordering: grid.ordering, page0: grid.paginationModel.page, pageSize: grid.paginationModel.pageSize, onlyDeleted: true,
+  }), [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize])
 
   React.useEffect(() => {
-    setSelectionModel(emptySelectionModel())
-    load()
-  }, [load, typeKey])
-
-  const canBulkPurge =
-    !purgeBusy &&
-    grid.view === 'deleted' &&
-    selectedCount > 0 &&
-    (typeKey === 'all'
-      ? RESOURCES.some((r) => hasPerm(r.purgePerm) && selectedByType[r.key].length)
-      : cfg != null && hasPerm(cfg.purgePerm))
-
-  const canBulkRestore =
-    !restoreBusy &&
-    grid.view === 'deleted' &&
-    selectedCount > 0 &&
-    (typeKey === 'all'
-      ? RESOURCES.some((r) => hasPerm(r.restorePerm) && selectedByType[r.key].length)
-      : cfg != null && hasPerm(cfg.restorePerm))
-
-  const doBulkRestore = async (): Promise<boolean> => {
-    if (!canBulkRestore) return false
-    setRestoreBusy(true)
-    try {
-      if (typeKey === 'all') {
-        const calls: Promise<unknown>[] = []
-        let restored = 0
-        let skipped = 0
-        for (const r of RESOURCES) {
-          const ids = selectedByType[r.key]
-          if (!ids?.length) continue
-          if (!hasPerm(r.restorePerm)) {
-            skipped += ids.length
-            continue
-          }
-          restored += ids.length
-          calls.push(api.post(r.restoreEndpoint, { ids }))
+    let alive = true
+    const run = async () => {
+      setLoading(true)
+      try {
+        if (tab === 'all') {
+          // "Tutto": unione lato client dei tipi visibili, ordinata per data di eliminazione.
+          const need = (grid.paginationModel.page + 1) * grid.paginationModel.pageSize
+          const resps = await Promise.all(visible.map((r) => api.get<ApiPage<Raw>>(r.endpoint, { params: { ...listParams, page: 1, page_size: need } }).then((x) => ({ r, data: x.data }))))
+          let total = 0
+          const all: TrashRow[] = []
+          resps.forEach(({ r, data }) => { total += data.count || 0; (data.results || []).forEach((raw) => { const row = toRow(r.key, raw); if (row) all.push(row) }) })
+          const desc = !String(grid.ordering || '-deleted_at').startsWith('deleted_at')
+          all.sort((a, b) => (a.deleted_at ?? '').localeCompare(b.deleted_at ?? '') * (desc ? -1 : 1))
+          const start = grid.paginationModel.page * grid.paginationModel.pageSize
+          const page = await withInfo(all.slice(start, start + grid.paginationModel.pageSize))
+          if (alive) { setRows(page); setRowCount(total) }
+        } else {
+          const r = resourceOf(tab)
+          const { data } = await api.get<ApiPage<Raw>>(r.endpoint, { params: listParams })
+          const page = await withInfo((data.results || []).map((raw) => toRow(tab, raw)).filter((x): x is TrashRow => x !== null))
+          if (alive) { setRows(page); setRowCount(data.count || 0) }
         }
-        await Promise.all(calls)
-        if (restored > 0) toast.success(`Ripristinati ${restored} elementi`)
-        if (skipped > 0) toast.warning(`Saltati ${skipped} elementi (permessi mancanti).`)
-      } else {
-        const ids = selectedByType[typeKey]
-        await api.post(cfg!.restoreEndpoint, { ids })
-        toast.success(`Ripristinati ${selectedCount} elementi`)
+      } catch (e) {
+        if (alive) toast.error(apiErrorToMessage(e))
+      } finally {
+        if (alive) setLoading(false)
       }
-      setSelectionModel(emptySelectionModel())
-      load()
-      return true
+    }
+    if (tab !== 'all' && !visible.some((r) => r.key === tab)) { setRows([]); setRowCount(0); return }
+    void run()
+    return () => { alive = false }
+  }, [tab, visible, listParams, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, toast, tick])
+
+  React.useEffect(() => { setSelection(emptySelectionModel()) }, [tab, tick])
+
+  const selectedIds = new Set(selectionToIds(selection).map(String))
+  const selected = rows.filter((r) => selectedIds.has(r.rid))
+  const canPurgeAny = visible.some((r) => hasPerm(r.purgePerm))
+
+  // ── Azioni ──
+  const restore = async (list: TrashRow[]) => {
+    const ok = list.filter((r) => !r.info?.restore_block && hasPerm(resourceOf(r.kind).restorePerm))
+    const skipped = list.length - ok.length
+    if (!ok.length) { toast.warning('Nessuno degli elementi selezionati si può ripristinare ora.'); return }
+    setBusy(true)
+    try {
+      const groups = groupByKind(ok)
+      await Promise.all((Object.keys(groups) as TrashKind[]).map((k) => api.post(resourceOf(k).restoreEndpoint, { ids: groups[k] })))
+      toast.success(ok.length === 1 ? `«${ok[0].title}» ripristinato.` : `${ok.length} elementi ripristinati.`)
+      if (skipped) toast.warning(`${skipped} ${skipped === 1 ? 'elemento resta' : 'elementi restano'} nel cestino: va ripristinato prima il padre o mancano i permessi.`)
+      reload()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
-      setRestoreBusy(false)
+      setBusy(false)
     }
-    return false
   }
 
-  const doBulkPurge = async (): Promise<boolean> => {
-    if (!canBulkPurge) return false
-    setPurgeBusy(true)
+  const purge = async (list: TrashRow[]) => {
+    const ok = list.filter((r) => hasPerm(resourceOf(r.kind).purgePerm))
+    setBusy(true)
     try {
-      const blockedReasons: string[] = []
-      let purged = 0
-      let blockedCount = 0
-      let skipped = 0
+      const groups = groupByKind(ok)
+      let purged = 0; const blocked: string[] = []
+      for (const k of Object.keys(groups) as TrashKind[]) {
+        const { data } = await api.post<{ count?: number; blocked?: { reason?: string }[] }>(resourceOf(k).purgeEndpoint, { ids: groups[k] })
+        purged += data.count ?? 0
+        ;(data.blocked ?? []).forEach((b) => blocked.push(b.reason ?? ''))
+      }
+      if (purged) toast.success(purged === 1 ? 'Elemento eliminato definitivamente.' : `${purged} elementi eliminati definitivamente.`)
+      if (blocked.length) toast.warning(`${blocked.length} ${blocked.length === 1 ? 'elemento è rimasto' : 'elementi sono rimasti'} nel cestino. ${blocked[0]}`.trim())
+      if (list.length > ok.length) toast.warning(`Saltati ${list.length - ok.length} elementi: permessi mancanti.`)
+      setPurgeRows(null)
+      reload()
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
-      const handleResp = (data: unknown) => {
-        const payload = (data && typeof data === 'object') ? (data as Record<string, unknown>) : {}
-        const count = typeof payload.count === 'number' ? payload.count : 0
-        purged += count
-        const blocked = Array.isArray(payload.blocked) ? payload.blocked : []
-        blockedCount += typeof payload.blocked_count === 'number' ? payload.blocked_count : blocked.length
-        for (const item of blocked.slice(0, 3)) {
-          if (item && typeof item === 'object' && typeof (item as Record<string, unknown>).reason === 'string') {
-            blockedReasons.push(String((item as Record<string, unknown>).reason))
-          }
+  /** "Svuota il cestino": tutti gli elementi dei tipi che l'utente può eliminare. */
+  const askEmpty = async () => {
+    setBusy(true)
+    try {
+      const all: TrashRow[] = []
+      for (const r of visible.filter((x) => hasPerm(x.purgePerm))) {
+        for (let page = 1; page < 50; page++) {
+          const { data } = await api.get<ApiPage<Raw>>(r.endpoint, { params: { only_deleted: 1, include_deleted: 1, page, page_size: 200 } })
+          ;(data.results || []).forEach((raw) => { const row = toRow(r.key, raw); if (row) all.push(row) })
+          if (!data.next) break
         }
       }
-
-      if (typeKey === 'all') {
-        for (const r of RESOURCES) {
-          const ids = selectedByType[r.key]
-          if (!ids?.length) continue
-          if (!hasPerm(r.purgePerm)) {
-            skipped += ids.length
-            continue
-          }
-          const resp = await api.post(r.purgeEndpoint, { ids })
-          handleResp(resp.data)
-        }
-      } else {
-        const ids = selectedByType[typeKey]
-        const resp = await api.post(cfg!.purgeEndpoint, { ids })
-        handleResp(resp.data)
-      }
-
-      if (purged > 0) toast.success(`Eliminati definitivamente ${purged} elementi`)
-      if (blockedCount > 0) {
-        const extra = blockedReasons.length ? ` ${blockedReasons[0]}` : ''
-        toast.warning(`Bloccati ${blockedCount} elementi.${extra}`)
-      }
-      if (skipped > 0) toast.warning(`Saltati ${skipped} elementi (permessi mancanti).`)
-      setSelectionModel(emptySelectionModel())
-      load()
-      return true
+      if (!all.length) { toast.info('Il cestino è già vuoto.'); return }
+      setPurgeRows(await withInfo(all))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
-      setPurgeBusy(false)
+      setBusy(false)
     }
-    return false
   }
 
-  // ─── Azioni su singola riga (usate dalla card mobile) ───────────────────────
-
-  const [rowTarget, setRowTarget] = React.useState<{ row: TrashRow; mode: 'restore' | 'purge' } | null>(null)
-
-  const resolveRowCfg = React.useCallback(
-    (row: TrashRow): ResourceCfg | null =>
-      RESOURCES.find((r) => r.key === (row.__kind ?? typeKey)) ?? null,
-    [typeKey],
-  )
-
-  const doSingleRestore = async (row: TrashRow): Promise<boolean> => {
-    const rcfg = resolveRowCfg(row)
-    if (!rcfg || !hasPerm(rcfg.restorePerm)) return false
-    setRestoreBusy(true)
-    try {
-      await api.post(rcfg.restoreEndpoint, { ids: [row.id] })
-      toast.success('Elemento ripristinato')
-      load()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setRestoreBusy(false)
-    }
-    return false
-  }
-
-  const doSinglePurge = async (row: TrashRow): Promise<boolean> => {
-    const rcfg = resolveRowCfg(row)
-    if (!rcfg || !hasPerm(rcfg.purgePerm)) return false
-    setPurgeBusy(true)
-    try {
-      const resp = await api.post(rcfg.purgeEndpoint, { ids: [row.id] })
-      const payload = (resp.data && typeof resp.data === 'object') ? (resp.data as Record<string, unknown>) : {}
-      const count = typeof payload.count === 'number' ? payload.count : 0
-      const blocked = Array.isArray(payload.blocked) ? payload.blocked : []
-      if (count > 0) toast.success('Elemento eliminato definitivamente')
-      if (blocked.length > 0) {
-        const first = blocked[0]
-        const reason =
-          first && typeof first === 'object' && typeof (first as Record<string, unknown>).reason === 'string'
-            ? String((first as Record<string, unknown>).reason)
-            : null
-        toast.warning(`Elemento bloccato.${reason ? ' ' + reason : ''}`)
-      }
-      load()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setPurgeBusy(false)
-    }
-    return false
-  }
-
-  // ─── Mobile card ─────────────────────────────────────────────────────────────
-
-  const renderTrashCard: MobileCardRenderFn<TrashRow> = ({ row }) => {
-    const rcfg = resolveRowCfg(row)
-    const kindLabel = rcfg?.label ?? row.__kind ?? cfg?.label ?? '—'
-    const title = row.__title || (cfg ? cfg.buildTitle(row) : '—')
-    const canRestoreRow = Boolean(rcfg && hasPerm(rcfg.restorePerm))
-    const canPurgeRow = Boolean(rcfg && hasPerm(rcfg.purgePerm))
-
+  // ── Tabella ──
+  const actionsCell = (row: TrashRow) => {
+    const r = resourceOf(row.kind)
+    const canRestore = hasPerm(r.restorePerm)
+    const canPurge = hasPerm(r.purgePerm)
+    const blockedRestore = row.info?.restore_block
     return (
-      <Box
-        sx={{
-          bgcolor: 'background.paper',
-          border: '0.5px solid', borderColor: 'divider', borderRadius: 1,
-          p: 1.25, display: 'flex', flexDirection: 'column', gap: 0.75,
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {title}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Eliminato il {fmt(row.deleted_at)}
-            </Typography>
-          </Box>
-          {typeKey === 'all' && (
-            <Chip
-              size="small"
-              label={kindLabel}
-              variant="outlined"
-              sx={{ height: 22, fontSize: '0.68rem', fontWeight: 600, flexShrink: 0 }}
-            />
-          )}
-        </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-          <Tooltip title={canRestoreRow ? 'Ripristina' : 'Permessi mancanti'} arrow>
-            <span>
-              <IconButton
-                size="small"
-                color="success"
-                disabled={!canRestoreRow || restoreBusy}
-                onClick={() => setRowTarget({ row, mode: 'restore' })}
-              >
-                <RestoreFromTrashIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={canPurgeRow ? 'Elimina definitivamente' : 'Permessi mancanti'} arrow>
-            <span>
-              <IconButton
-                size="small"
-                color="error"
-                disabled={!canPurgeRow || purgeBusy}
-                onClick={() => setRowTarget({ row, mode: 'purge' })}
-              >
-                <DeleteForeverIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, height: '100%' }} onClick={(e) => e.stopPropagation()}>
+        <Tooltip title={blockedRestore ?? (canRestore ? '' : 'Permessi mancanti')}>
+          <span>
+            <Button size="small" variant="outlined" disabled={!canRestore || Boolean(blockedRestore) || busy} onClick={() => void restore([row])}
+              startIcon={<CampoIcon name="restore" size={14} />} sx={{ height: 28, fontSize: 12 }}>Ripristina</Button>
+          </span>
+        </Tooltip>
+        <Tooltip title={canPurge ? 'Elimina definitivamente' : 'Permessi mancanti'}>
+          <span>
+            <IconButton size="small" aria-label={`Elimina definitivamente ${row.title}`} disabled={!canPurge || busy} onClick={() => setPurgeRows([row])}
+              sx={{ width: 28, height: 28, color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+              <CampoIcon name="trash" size={15} />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Box>
     )
   }
 
-  const cols: GridColDef<TrashRow>[] = [
-    {
-      field: '__kind',
-      headerName: 'Tipo',
-      width: 120,
-      sortable: false,
-      valueGetter: (_v, row) => {
-        const k = row.__kind
-        if (!k) return cfg?.label || '—'
-        return RESOURCES.find((r) => r.key === k)?.label || k
-      },
-    },
-    {
-      field: '__id',
-      headerName: 'ID',
-      width: 90,
-      sortable: false,
-      valueGetter: (_v, row) => row.id,
-    },
-    {
-      field: '__title',
-      headerName: 'Oggetto',
-      flex: 1,
-      minWidth: 320,
-      sortable: false,
-      valueGetter: (_v, row) => row.__title || (cfg ? cfg.buildTitle(row) : '—'),
-    },
-    {
-      field: 'deleted_at',
-      headerName: 'Eliminato il',
-      width: 190,
-      sortable: true,
-      valueGetter: (v) => v,
-      renderCell: (p) => <span>{fmt(typeof p.value === 'string' ? p.value : null)}</span>,
-    },
-    {
-      field: 'updated_at',
-      headerName: 'Aggiornato',
-      width: 190,
-      sortable: true,
-      valueGetter: (v) => v,
-      renderCell: (p) => <span>{fmt(typeof p.value === 'string' ? p.value : null)}</span>,
-    },
+  const columns: GridColDef<TrashRow>[] = [
+    { field: 'title', headerName: 'Elemento', flex: 1, minWidth: 260, sortable: false, renderCell: (p) => <TrashItemCell row={p.row} /> },
+    { field: 'kind', headerName: 'Tipo', width: 110, sortable: false, valueGetter: (_v, row) => resourceOf(row.kind).one,
+      renderCell: (p) => <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: '56px' }}>{p.value as string}</Typography> },
+    { field: 'deleted_at', headerName: 'Eliminato', width: 180, sortable: true,
+      renderCell: (p) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><TrashWhen ago={agoLabel(p.row.deleted_at)} by={p.row.info?.deleted_by} /></Box> },
+    { field: 'state', headerName: 'Stato', width: 170, sortable: false, renderCell: (p) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><TrashState row={p.row} /></Box> },
+    { field: 'actions', headerName: '', width: 170, sortable: false, disableColumnMenu: true, renderCell: (p) => actionsCell(p.row) },
   ]
 
-  const noPermMessage =
-    typeKey === 'all' && visibleResources.length === 0
-      ? 'Non hai i permessi per visualizzare alcun tipo di dati.'
-      : typeKey !== 'all' && cfg && !hasPerm(cfg.viewPerm)
-        ? 'Non hai i permessi per visualizzare questo tipo di dati.'
-        : null
+  const mobileCard: MobileCardRenderFn<TrashRow> = ({ row }) => (
+    <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, display: 'grid', gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}><TrashItemCell row={row} /></Box>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary', flex: 'none' }}>{resourceOf(row.kind).one}</Typography>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}><TrashWhen ago={agoLabel(row.deleted_at)} by={row.info?.deleted_by} /></Box>
+        <TrashState row={row} />
+      </Box>
+      {actionsCell(row)}
+    </Box>
+  )
+
+  const tabs = [
+    { key: 'all', label: 'Tutto', count: visible.reduce((s, r) => s + (counts[r.key] ?? 0), 0) },
+    ...visible.filter((r) => (counts[r.key] ?? 0) > 0 || tab === r.key).map((r) => ({ key: r.key, label: r.label, count: counts[r.key] ?? 0 })),
+  ]
+
+  const bar = (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 49, px: '12px', py: '8px', borderBottom: searchOpen ? 0 : '1px solid', borderColor: 'divider', flexWrap: 'wrap' }}>
+        {selected.length ? (
+          <Box role="toolbar" aria-label="Elementi selezionati" sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, flexWrap: 'wrap' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 650, mr: 0.5 }}>{selected.length} selezionat{selected.length === 1 ? 'o' : 'i'}</Typography>
+            <Button size="small" variant="contained" disabled={busy} onClick={() => void restore(selected)} startIcon={<CampoIcon name="restore" size={14} />} sx={{ height: 30 }}>Ripristina</Button>
+            <Button size="small" variant="outlined" color="error" disabled={busy} onClick={() => setPurgeRows(selected)} startIcon={<CampoIcon name="trash" size={14} />} sx={{ height: 30 }}>Elimina definitivamente</Button>
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" variant="text" onClick={() => setSelection(emptySelectionModel())}>Annulla selezione</Button>
+          </Box>
+        ) : (
+          <Typography sx={{ flex: 1, fontSize: 12, color: 'text.disabled' }}>Seleziona più elementi per ripristinarli o eliminarli insieme.</Typography>
+        )}
+        <Tooltip title={searchOpen ? 'Chiudi la ricerca' : 'Cerca nel cestino'}>
+          <IconButton aria-label="Cerca nel cestino" aria-pressed={searchOpen} onClick={() => { if (searchOpen) grid.setQ(''); setSearchOpen(!searchOpen) }}
+            sx={{ width: 32, height: 32, ...(searchOpen && { bgcolor: 'archie.field', color: 'primary.main' }) }}>
+            <CampoIcon name="search" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      {searchOpen ? (
+        <Box sx={{ px: '12px', pb: '8px', borderBottom: '1px solid', borderColor: 'divider' }}>
+          <InputBase autoFocus fullWidth value={grid.q} onChange={(e) => grid.setQ(e.target.value)} placeholder="Cerca per nome, codice, email…"
+            inputProps={{ 'aria-label': 'Cerca nel cestino' }}
+            sx={{ height: 34, px: 1.25, fontSize: 13, border: '1px solid', borderColor: 'divider', borderRadius: '6px', bgcolor: 'background.paper' }} />
+        </Box>
+      ) : null}
+    </Box>
+  )
 
   return (
-    <Stack spacing={2}>
-      <ConfirmActionDialog
-        open={bulkRestoreDlgOpen}
-        busy={restoreBusy}
-        title={`Ripristinare ${selectedCount} elementi?`}
-        description={
-          typeKey === 'all'
-            ? `Verranno ripristinati ${selectedCount} elementi dal cestino.`
-            : `Verranno ripristinati ${selectedCount} ${cfg!.label.toLowerCase()} dal cestino.`
-        }
-        confirmText="Ripristina"
-        confirmColor="success"
-        onClose={() => setBulkRestoreDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkRestore()
-          if (ok) setBulkRestoreDlgOpen(false)
-        }}
-      />
-
-      <ConfirmActionDialog
-        open={bulkPurgeDlgOpen}
-        busy={purgeBusy}
-        title={`Eliminare definitivamente ${selectedCount} elementi?`}
-        description={
-          typeKey === 'all'
-            ? `Gli elementi selezionati verranno rimossi in modo permanente. L'operazione non è reversibile.`
-            : `I ${selectedCount} ${cfg!.label.toLowerCase()} selezionati verranno rimossi in modo permanente. L'operazione non è reversibile.`
-        }
-        confirmText="Elimina definitivamente"
-        confirmColor="error"
-        confirmStartIcon={<DeleteForeverIcon />}
-        onClose={() => setBulkPurgeDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkPurge()
-          if (ok) setBulkPurgeDlgOpen(false)
-        }}
-      />
-
-      <ConfirmActionDialog
-        open={rowTarget !== null}
-        busy={rowTarget?.mode === 'restore' ? restoreBusy : purgeBusy}
-        title={rowTarget?.mode === 'restore' ? 'Ripristinare questo elemento?' : 'Eliminare definitivamente questo elemento?'}
-        description={
-          rowTarget?.mode === 'restore'
-            ? "L'elemento verrà ripristinato dal cestino."
-            : "L'elemento verrà rimosso in modo permanente. L'operazione non è reversibile."
-        }
-        confirmText={rowTarget?.mode === 'restore' ? 'Ripristina' : 'Elimina definitivamente'}
-        confirmColor={rowTarget?.mode === 'restore' ? 'success' : 'error'}
-        confirmStartIcon={rowTarget?.mode === 'purge' ? <DeleteForeverIcon /> : undefined}
-        onClose={() => setRowTarget(null)}
-        onConfirm={async () => {
-          if (!rowTarget) return
-          const ok =
-            rowTarget.mode === 'restore'
-              ? await doSingleRestore(rowTarget.row)
-              : await doSinglePurge(rowTarget.row)
-          if (ok) setRowTarget(null)
-        }}
-      />
-
-      {noPermMessage ? (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              {noPermMessage}
-            </Typography>
-          </CardContent>
-        </Card>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead title="Cestino" actions={canPurgeAny ? (
+        <Button variant="outlined" disabled={busy} onClick={() => void askEmpty()} startIcon={<CampoIcon name="trash" size={15} />}>Svuota il cestino</Button>
+      ) : null} />
+      {!visible.length ? (
+        <Box sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper' }}>
+          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Non hai i permessi per vedere nessun tipo di elemento nel cestino.</Typography>
+        </Box>
       ) : (
-        <EntityListCard<TrashRow>
-          toolbar={{
-            q: grid.q,
-            onQChange: grid.setQ,
-            compact: true,
-            rightActions: (
-              <Stack direction="row" spacing={1}>
-                <Tooltip
-                  title={
-                    canBulkRestore
-                      ? 'Ripristina selezionati'
-                      : 'Seleziona almeno un elemento da ripristinare'
-                  }
-                  arrow
-                >
-                  <span>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="success"
-                      disabled={!canBulkRestore}
-                      onClick={() => setBulkRestoreDlgOpen(true)}
-                      sx={compactCreateButtonSx}
-                    >
-                      <RestoreFromTrashIcon />
-                    </Button>
-                  </span>
-                </Tooltip>
-
-                <Tooltip
-                  title={
-                    canBulkPurge
-                      ? 'Elimina definitivamente selezionati'
-                      : 'Seleziona almeno un elemento da eliminare definitivamente'
-                  }
-                  arrow
-                >
-                  <span>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      disabled={!canBulkPurge}
-                      onClick={() => setBulkPurgeDlgOpen(true)}
-                      sx={[
-                        compactCreateButtonSx,
-                        (theme) => ({
-                          bgcolor: theme.palette.error.main,
-                          '&:hover': { bgcolor: theme.palette.error.dark },
-                          '&:disabled': { bgcolor: theme.palette.action.disabledBackground },
-                        }),
-                      ]}
-                    >
-                      <DeleteForeverIcon />
-                    </Button>
-                  </span>
-                </Tooltip>
-              </Stack>
-            ),
-          }}
-          grid={{
-            rows,
-            columns: cols,
-            loading,
-            rowCount,
-            emptyState,
-            columnVisibilityModel: { __kind: typeKey === 'all' },
-            paginationModel: grid.paginationModel,
-            onPaginationModelChange: grid.onPaginationModelChange,
-            sortModel: grid.sortModel,
-            onSortModelChange: grid.onSortModelChange,
-            checkboxSelection: grid.view === 'deleted',
-            rowSelectionModel: selectionModel,
-            onRowSelectionModelChange: (m) => setSelectionModel(m as GridRowSelectionModel),
-            height: 680,
-            deletedField: 'deleted_at',
-            getRowId: typeKey === 'all' ? (r: TrashRow) => r.__rid || r.id : undefined,
-          }}
-          mobileCard={renderTrashCard}
-        >
-          <FormControl
-            size="small"
-            sx={{
-              width: { xs: '100%', md: 220 },
-              '& .MuiInputBase-root': {
-                height: 40,
-                fontSize: '0.95rem',
-                borderRadius: 1.5,
-              },
+        <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+          <ViewTabs value={tab} onChange={(k) => { setTab(k as Tab); grid.onPaginationModelChange({ ...grid.paginationModel, page: 0 }) }} tabs={tabs} />
+          <EntityListCard<TrashRow>
+            sx={{ border: 0, borderRadius: 0 }}
+            flush
+            header={bar}
+            mobileCard={mobileCard}
+            toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca nel cestino…' }}
+            grid={{
+              autoHeight: true,
+              rows,
+              columns,
+              loading,
+              rowCount,
+              rowHeight: 56,
+              getRowId: (r: TrashRow) => r.rid,
+              columnVisibilityModel: { kind: tab === 'all' },
+              emptyState: grid.search.trim()
+                ? { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o tipo.' }
+                : { title: 'Il cestino è vuoto', subtitle: tab === 'all' ? 'Non ci sono elementi eliminati.' : 'Non ci sono elementi eliminati di questo tipo.' },
+              paginationModel: grid.paginationModel,
+              onPaginationModelChange: grid.onPaginationModelChange,
+              sortModel: grid.sortModel,
+              onSortModelChange: grid.onSortModelChange,
+              checkboxSelection: true,
+              rowSelectionModel: selection,
+              onRowSelectionModelChange: (m) => setSelection(m as GridRowSelectionModel),
+              deletedField: '__none__',
+              sx: { '& .MuiDataGrid-row.Mui-selected': { bgcolor: 'archie.field' } },
             }}
-          >
-            <InputLabel>Tipo</InputLabel>
-            <Select
-              label="Tipo"
-              value={typeKey}
-              onChange={(e) => setTypeKey(e.target.value as TrashTypeKey)}
-            >
-              <MenuItem value="all">Tutti</MenuItem>
-              {visibleResources.map((r) => (
-                <MenuItem key={r.key} value={r.key}>
-                  {r.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </EntityListCard>
+          />
+        </Box>
       )}
+      <PurgeDialog rows={purgeRows} busy={busy} onClose={() => setPurgeRows(null)} onConfirm={(list) => void purge(list)} />
     </Stack>
   )
 }

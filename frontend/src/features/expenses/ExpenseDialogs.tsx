@@ -3,10 +3,9 @@ import { Box, Button, ButtonBase, CircularProgress, IconButton, InputBase, TextF
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
-import { CampoIcon } from '../../ui/campo'
+import { CampoIcon, CampoDialog as NsDialog } from '../../ui/campo'
 import { formatEuro, type ExpenseItemRow, type ExpenseReceiptRow, type ExpenseReportRow } from './expensesShared'
 import { CATEGORY_META, MONTHS_LC, cap, dShort, firstFreeMonth, missingReceipts, monthTitle, parseEuroInput, statusLabel, toNum } from './nsModel'
-import { NsDialog } from './nsUi'
 
 const chipSx = {
   minHeight: 28, px: 1.25, py: 0.5, borderRadius: '14px', border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',

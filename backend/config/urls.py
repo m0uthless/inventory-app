@@ -41,6 +41,7 @@ from core.api import (
     BirthdaysView,
 )
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
+from core.trash_api import TrashInfoView
 from notifications.api import NotificationViewSet
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
@@ -195,6 +196,7 @@ urlpatterns = [
     path("api/me/change-password/", ChangePasswordView.as_view()),
     path("api/sticky-note/", StickyNoteView.as_view()),
     path("api/birthdays/", BirthdaysView.as_view()),
+    path("api/trash/info/", TrashInfoView.as_view()),
 
     # Changelog (modal al login + voce menu utente)
     path("api/changelog/unseen/", ChangelogUnseenView.as_view()),
