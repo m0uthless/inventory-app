@@ -1,121 +1,31 @@
 import * as React from 'react'
-import { Box, Button, CircularProgress, Chip, Stack, Typography } from '@mui/material'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded'
+import { Box, Button, ButtonBase, CircularProgress } from '@mui/material'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
-import WeatherHeroCard from '../ui/WeatherHeroCard'
-import ContributorCard from '../ui/ContributorCard'
-import RecentIssuesCard from '../ui/RecentIssuesCard'
-import AnnouncementsCard from '../ui/AnnouncementsCard'
-import TodoCard from '../ui/TodoCard'
-import AreaTaskCard from '../ui/AreaTaskCard'
-import MaintenanceAlertsCard from '../ui/MaintenanceAlertsCard'
+import { CampoIcon } from '../ui/campo'
+import { useOwnPageHeader } from '../layout/PageHeaderContext'
 import DashboardGrid from '../features/dashboard/DashboardGrid'
 import { useDashboardLayout } from '../features/dashboard/useDashboardLayout'
 import { useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
-import { findFreeSlot } from '../features/dashboard/dashboardTypes'
+import { WIDGET_REGISTRY, findFreeSlot } from '../features/dashboard/dashboardTypes'
 
-// ─── Widget carousel (mobile) ─────────────────────────────────────────────────
-
-const WIDGETS = [
-  <RecentIssuesCard key="issues" />,
-  <AreaTaskCard key="area-tasks" />,
-  <AnnouncementsCard key="announcements" />,
-  <TodoCard key="todo" />,
-  <MaintenanceAlertsCard key="maintenance" />,
+// Ordine e altezza dei widget quando la griglia non c'è (telefono, o catalogo non raggiungibile).
+const STACK: [string, number][] = [
+  ['weather', 0], ['quick-actions-pair', 76], ['issues', 330], ['area-tasks', 330], ['maintenance', 330], ['team', 150],
+  ['announcements', 260], ['todo', 260], ['sticky-note', 220], ['birthdays', 130], ['contributor', 250],
 ]
-const TOTAL = WIDGETS.length
 
-function WidgetCarousel() {
-  const [index, setIndex] = React.useState(0)
-  const touchStartX = React.useRef<number | null>(null)
-
-  const prev = () => setIndex(i => (i - 1 + TOTAL) % TOTAL)
-  const next = () => setIndex(i => (i + 1) % TOTAL)
-
-  const onTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX }
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return
-    const dx = e.changedTouches[0].clientX - touchStartX.current
-    if (Math.abs(dx) > 40) {
-      if (dx < 0) next()
-      else prev()
-    }
-    touchStartX.current = null
-  }
-
+/** Widget uno sotto l'altro (telefono e ripiego). */
+function StackedWidgets({ columns = 1 }: { columns?: number }) {
   return (
-    <>
-      <Box
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        sx={{ overflow: 'hidden', borderRadius: 1 }}
-      >
-        {WIDGETS[index]}
-      </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.75, mt: 1.25 }}>
-        {Array.from({ length: TOTAL }, (_, i) => (
-          <Box
-            key={i}
-            role="button"
-            tabIndex={0}
-            aria-label={`Vai al widget ${i + 1} di ${TOTAL}`}
-            aria-current={i === index}
-            onClick={() => setIndex(i)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                setIndex(i)
-              }
-            }}
-            sx={{
-              width: i === index ? 18 : 7,
-              height: 7,
-              borderRadius: '999px',
-              bgcolor: i === index ? 'primary.main' : 'divider',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer',
-              '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
-            }}
-          />
-        ))}
-      </Box>
-    </>
-  )
-}
-
-// ─── Dashboard desktop legacy (fallback se il caricamento del layout dinamico fallisce) ─
-
-function LegacyDesktopLayout() {
-  return (
-    <>
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: '1fr 350px' },
-        gap: 2,
-        alignItems: 'stretch',
-      }}>
-        <WeatherHeroCard />
-        <ContributorCard />
-      </Box>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, alignItems: 'stretch', mt: 2.5 }}>
-        <RecentIssuesCard />
-        <AreaTaskCard />
-      </Box>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, alignItems: 'stretch', mt: 2.5 }}>
-        <AnnouncementsCard />
-        <TodoCard />
-      </Box>
-
-      <Box sx={{ mt: 2.5 }}>
-        <MaintenanceAlertsCard />
-      </Box>
-    </>
+    <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: '12px' }}>
+      {STACK.map(([k, h]) => {
+        const W = WIDGET_REGISTRY[k]
+        return W ? <Box key={k} sx={{ minHeight: h || undefined, display: 'flex', gridColumn: k === 'weather' || k === 'quick-actions-pair' ? '1 / -1' : undefined }}><W /></Box> : null
+      })}
+    </Box>
   )
 }
 
@@ -188,7 +98,7 @@ function DynamicDesktopLayout() {
   if (widgets.length === 0) {
     // Catalogo widget non disponibile (endpoint non raggiungibile/errore):
     // ripiega sul layout fisso storico invece di mostrare una dashboard vuota.
-    return <LegacyDesktopLayout />
+    return <StackedWidgets columns={2} />
   }
 
   const hiddenWidgets = widgets.filter(w => {
@@ -222,37 +132,28 @@ function DynamicDesktopLayout() {
 
   return (
     <>
-      {editMode && me?.is_superuser && (
-        <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<PushPinRoundedIcon sx={{ fontSize: 16 }} />}
-            onClick={handleSetDefaultLayout}
-            disabled={settingDefault}
-          >
-            Imposta come layout predefinito
-          </Button>
-        </Stack>
-      )}
-      {editMode && hiddenWidgets.length > 0 && (
-        <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Widget nascosti:
-          </Typography>
-          {hiddenWidgets.map(w => (
-            <Chip
-              key={w.key}
-              size="small"
-              label={w.label}
-              icon={<VisibilityOutlinedIcon sx={{ fontSize: 15 }} />}
-              onClick={() => handleShowWidget(w.key)}
-              variant="outlined"
-              sx={{ cursor: 'pointer' }}
-            />
-          ))}
-        </Stack>
-      )}
+      {editMode ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap', p: '8px 12px', mb: 1.75, borderRadius: '10px', border: '1px solid', borderColor: 'archie.fieldLine', bgcolor: 'archie.field', fontSize: 12.5 }}>
+          <CampoIcon name="columns" size={16} />
+          <Box component="span"><b>Personalizza</b> · trascina dalla maniglia, ridimensiona dai bordi, nascondi con l'occhio. Si salva da solo.</Box>
+          {hiddenWidgets.length ? (
+            <Box sx={{ display: 'inline-flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Box component="span" sx={{ color: 'text.secondary' }}>Nascosti:</Box>
+              {hiddenWidgets.map((w) => (
+                <ButtonBase key={w.key} onClick={() => handleShowWidget(w.key)} sx={{ gap: 0.5, height: 24, px: 1, borderRadius: '12px', fontSize: 11.5, border: '1px dashed', borderColor: 'archie.borderStrong', bgcolor: 'background.paper', color: 'text.secondary', '&:hover': { borderColor: 'primary.main', color: 'primary.main' } }}>
+                  <CampoIcon name="eye" size={12} />{w.label}
+                </ButtonBase>
+              ))}
+            </Box>
+          ) : null}
+          <Box sx={{ flex: 1 }} />
+          {me?.is_superuser ? (
+            <Button size="small" variant="outlined" color="inherit" sx={{ bgcolor: 'background.paper' }} onClick={handleSetDefaultLayout} disabled={settingDefault}>
+              Imposta come predefinito
+            </Button>
+          ) : null}
+        </Box>
+      ) : null}
       <DashboardGrid
         widgets={widgets}
         layoutItems={layoutItems}
@@ -263,32 +164,27 @@ function DynamicDesktopLayout() {
   )
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+// ─── Dashboard ──────────────────────────────────────────────────────────────
 
+/** Dashboard "Tinte" (anteprima design-previews/db-base.html): widget con tinte tenui, griglia personalizzabile. */
 export default function Dashboard() {
+  useOwnPageHeader()
+  const { editMode, toggleEditMode } = useDashboardEditMode()
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, width: '100%' }}>
-
-      {/* Desktop: griglia dinamica personalizzabile */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <Box sx={{ display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', mb: 1.25 }}>
+        <Button variant={editMode ? 'contained' : 'outlined'} color={editMode ? 'primary' : 'inherit'} startIcon={<CampoIcon name="columns" size={15} />} onClick={toggleEditMode}>
+          {editMode ? 'Fine' : 'Personalizza'}
+        </Button>
+      </Box>
+      {/* Desktop: griglia personalizzabile */}
       <Box sx={{ display: { xs: 'none', md: 'block' } }}>
         <DynamicDesktopLayout />
       </Box>
-
-      {/* Mobile: carousel swipe (layout fisso, non personalizzabile) */}
+      {/* Telefono: widget uno sotto l'altro */}
       <Box sx={{ display: { xs: 'block', md: 'none' } }}>
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: 2,
-          alignItems: 'stretch',
-          mb: 2,
-        }}>
-          <WeatherHeroCard />
-          <ContributorCard />
-        </Box>
-        <WidgetCarousel />
+        <StackedWidgets />
       </Box>
-
     </Box>
   )
 }

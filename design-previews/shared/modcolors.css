@@ -1,0 +1,23 @@
+/* Colore per modulo (proposta): un'identità tenue per ogni modulo, ripetuta in sidebar, testata e widget. */
+:root {
+  --mc-mint: #3f8f7b; --mc-sky: #4a82c6; --mc-lilac: #7d70cf; --mc-rose: #d4685b;
+  --mc-sand: #b98a30; --mc-peach: #d27f52; --mc-muted: #7b8a86;
+}
+:root[data-theme="dark"] {
+  --mc-mint: #5fb8a3; --mc-sky: #6fa8e0; --mc-lilac: #9d93ec; --mc-rose: #f07466;
+  --mc-sand: #d9a94a; --mc-peach: #e8936a; --mc-muted: #93a4a0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --mc-mint: #5fb8a3; --mc-sky: #6fa8e0; --mc-lilac: #9d93ec; --mc-rose: #f07466; --mc-sand: #d9a94a; --mc-peach: #e8936a; --mc-muted: #93a4a0; }
+}
+/* Sidebar: icona nel colore del modulo, tratto più deciso; scritte neutre */
+:root[data-mc="on"] .nav-item .i { color: var(--mc); stroke-width: 2.2; }
+:root[data-mc="on"] .nav-item:hover .i { color: var(--mc); }
+/* Voce attiva: verde (selezione) oppure nel colore del modulo */
+:root[data-mc="on"][data-mc-active="mod"] .nav-item.is-active { background: color-mix(in srgb, var(--mc) 13%, var(--surface)); border-color: color-mix(in srgb, var(--mc) 55%, transparent); }
+:root[data-mc="on"][data-mc-active="mod"] .nav-item.is-active .nav-count { background: color-mix(in srgb, var(--mc) 22%, var(--surface)); color: var(--text); }
+/* Eco nella pagina del modulo: icona accanto al titolo */
+.mc-ic { display: none; }
+:root[data-mc="on"] .mc-ic { display: inline-grid; place-items: center; align-self: center; margin-right: 2px; color: var(--mc); }
+:root[data-mc="on"] .mc-ic .i { width: 24px; height: 24px; stroke-width: 2.4; }
+:root[data-mc="on"] .page-head h1 { display: inline-flex; align-items: center; gap: 10px; }

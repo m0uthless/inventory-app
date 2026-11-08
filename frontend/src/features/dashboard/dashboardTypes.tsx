@@ -1,14 +1,13 @@
-import * as React from 'react'
-import WeatherHeroCard from '../../ui/WeatherHeroCard'
-import ContributorCard from '../../ui/ContributorCard'
-import RecentIssuesCard from '../../ui/RecentIssuesCard'
+import type * as React from 'react'
 import AreaTaskCard from '../../ui/AreaTaskCard'
-import AnnouncementsCard from '../../ui/AnnouncementsCard'
-import TodoCard from '../../ui/TodoCard'
-import MaintenanceAlertsCard from '../../ui/MaintenanceAlertsCard'
-import StickyNoteCard from '../../ui/StickyNoteCard'
-import BirthdaysCard from '../../ui/BirthdaysCard'
-import QuickActionsPairCard from '../../ui/QuickActionsPairCard'
+import WelcomeWidget from './widgets/WelcomeWidget'
+import QuickActionsWidget from './widgets/QuickActionsWidget'
+import IssuesWidget from './widgets/IssuesWidget'
+import MaintenanceWidget from './widgets/MaintenanceWidget'
+import AnnouncementsWidget from './widgets/AnnouncementsWidget'
+import TodoWidget from './widgets/TodoWidget'
+import NoteWidget from './widgets/NoteWidget'
+import { BirthdaysWidget, ContributorWidget, TeamWidget } from './widgets/PeopleWidgets'
 
 // ─── Tipi (rispecchiano DashboardWidget / UserDashboardLayout nel backend) ─────
 
@@ -36,28 +35,21 @@ export type DashboardLayoutItem = {
 
 // ─── Registry: chiave backend → componente React ───────────────────────────────
 // La chiave deve coincidere esattamente con `key` nel catalogo backend
-// (core/migrations/0019_seed_dashboard_widgets.py).
-
-// WeatherHeroCard usa di default `aspectRatio` per calcolare la propria
-// altezza (comportamento corretto per l'hero mobile e il fallback statico,
-// dove il contenitore non ha un'altezza fissa). Nella griglia dinamica la
-// cella ha invece un'altezza fissa (righe della griglia): serve `fillHeight`
-// per farla aderire, altrimenti resta uno spazio vuoto sotto la card.
-function WeatherWidgetGridItem() {
-  return <WeatherHeroCard fillHeight />
-}
+// (core/migrations/0019_seed_dashboard_widgets.py, 0043_dashboard_tinte_widgets.py).
+// Stile "Tinte" (anteprima design-previews/db-base.html).
 
 export const WIDGET_REGISTRY: Record<string, React.ComponentType> = {
-  weather:       WeatherWidgetGridItem,
-  contributor:   ContributorCard,
-  issues:        RecentIssuesCard,
+  weather:       WelcomeWidget,
+  contributor:   ContributorWidget,
+  issues:        IssuesWidget,
   'area-tasks':  AreaTaskCard,
-  announcements: AnnouncementsCard,
-  todo:          TodoCard,
-  maintenance:   MaintenanceAlertsCard,
-  'sticky-note': StickyNoteCard,
-  birthdays:     BirthdaysCard,
-  'quick-actions-pair': QuickActionsPairCard,
+  announcements: AnnouncementsWidget,
+  todo:          TodoWidget,
+  maintenance:   MaintenanceWidget,
+  'sticky-note': NoteWidget,
+  birthdays:     BirthdaysWidget,
+  'quick-actions-pair': QuickActionsWidget,
+  team:          TeamWidget,
 }
 
 // ─── Griglia: 6 colonne, altezza riga in px ────────────────────────────────────
@@ -68,7 +60,7 @@ export const DASHBOARD_COLS = 6
 // con h=2 e margine verticale 16px, altezza_totale = h*rowHeight + (h-1)*margine
 // → 238.72 ≈ 2*rowHeight + 16 → rowHeight ≈ 112.
 export const DASHBOARD_ROW_HEIGHT = 112
-export const DASHBOARD_MARGIN: [number, number] = [16, 16]
+export const DASHBOARD_MARGIN: [number, number] = [14, 14]
 
 /** Trova la coppia [w,h] ammessa più vicina a (w,h) per distanza Manhattan
  * in unità di griglia (usato per lo snap del resize libero ai formati

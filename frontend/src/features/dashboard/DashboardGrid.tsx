@@ -142,42 +142,35 @@ export default function DashboardGrid({ widgets, layoutItems, onLayoutItemsChang
                   width: '100%',
                   position: 'relative',
                   ...(editMode && {
-                    outline: '2px dashed',
-                    outlineColor: 'primary.main',
+                    outline: '1.5px dashed',
+                    outlineColor: 'archie.fieldLine',
                     outlineOffset: 2,
-                    borderRadius: 1,
+                    borderRadius: '14px',
                   }),
                 }}
               >
                 {editMode && (
                   <Box
-                    className={DRAG_HANDLE_CLASS}
                     sx={{
-                      position: 'absolute',
-                      top: 0, left: 0, right: 0,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      // px inset per non sovrapporsi alle maniglie di resize
-                      // agli angoli (20px), che restano comunque sopra e
-                      // cliccabili grazie all'ordine nel DOM.
-                      px: '22px',
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
-                      borderTopLeftRadius: 4,
-                      borderTopRightRadius: 4,
-                      cursor: 'move',
-                      opacity: 0.85,
+                      position: 'absolute', top: 8, right: 8, zIndex: 3,
+                      display: 'flex', alignItems: 'center', gap: 0.25, p: '2px',
+                      bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px',
+                      boxShadow: (t) => t.palette.archie.shadowFloat,
                     }}
                   >
-                    <DragIndicatorRoundedIcon sx={{ fontSize: 18 }} />
+                    <Box
+                      className={DRAG_HANDLE_CLASS}
+                      aria-label="Trascina il widget"
+                      sx={{ display: 'grid', placeItems: 'center', width: 26, height: 26, color: 'text.secondary', cursor: 'move' }}
+                    >
+                      <DragIndicatorRoundedIcon sx={{ fontSize: 18 }} />
+                    </Box>
                     <IconButton
                       size="small"
                       aria-label="Nascondi widget"
                       onClick={() => handleHideWidget(item.i)}
                       onMouseDown={(e) => e.stopPropagation()}
-                      sx={{ color: 'inherit', p: 0.25 }}
+                      sx={{ width: 26, height: 26, color: 'text.secondary' }}
                     >
                       <VisibilityOffOutlinedIcon sx={{ fontSize: 15 }} />
                     </IconButton>

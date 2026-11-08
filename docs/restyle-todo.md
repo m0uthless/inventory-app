@@ -196,6 +196,26 @@ Portato dall'anteprima `au-base.html`, variante **A · Registro** (scelta da Fed
 - **[UI] Pannello**: differenze campo per campo (Prima barrato / Dopo), password mai mostrate, chi e da dove con browser leggibile, dettagli tecnici chiusi, storico dell'oggetto, per gli accessi falliti i tentativi dallo stesso IP in 24 ore e se l'indirizzo è interno; pulsanti "Solo questo oggetto", "Apri …" (dal percorso del backend) o "Apri il Cestino".
 - **[UI] Variante B · Cronologia** dell'anteprima: non portata.
 
+## Dashboard
+
+Portata dall'anteprima `db-base.html`, variante **A · Tinte** (scelta da Fede dopo due proposte bocciate perché troppo sobrie): widget a tinte tenui, griglia personalizzabile come prima. Widget in `features/dashboard/widgets/` (`WidgetShell`, `tints.ts`, `WelcomeWidget`, `QuickActionsWidget`, `IssuesWidget`, `MaintenanceWidget`, `AnnouncementsWidget`, `TodoWidget`, `NoteWidget`, `PeopleWidgets`); `ui/AreaTaskCard.tsx` ridisegnato sul posto (test invariati, ora con il tema). Rimossi i vecchi `WeatherHeroCard`, `weatherPalette`, `RecentIssuesCard`, `AnnouncementsCard`, `TodoCard`, `MaintenanceAlertsCard`, `StickyNoteCard`, `BirthdaysCard`, `QuickActionsPairCard`, `QuickActionTile`, `ContributorCard`.
+
+- **[DEC] Colore solo in Dashboard**: tinte pastello nel tema (`palette.archie.tints`, uguali in tutte le palette, chiaro/scuro); le pagine operative restano sulla regola "colore per azione, selezione, stato". Icone dei widget piene e colorate, senza tessera.
+- **[BE] Migrazione `core/0043_dashboard_tinte_widgets`**: nuovo widget `team` ("Il team oggi", assenze di oggi dal Piano ferie, 2×1–3×2) e formati in più per `contributor` (2×2), `birthdays` (2×1, 2×2), `quick-actions-pair` (2×1). I formati vecchi restano validi: i layout salvati non cambiano.
+- **[UI] Widget**: benvenuto con saluto per ora del giorno, data, riepilogo (issue tue, task tuoi, manutenzioni scadute, con link alle viste) e meteo Open-Meteo con 4 giorni (limite 8 s); issue aperte con barra per priorità e Tutte/Mie; manutenzioni con scadute, prossimi 14 giorni e clienti con più scadute (da `todo-stats`); comunicazioni (staff: aggiungi, modifica, elimina); da fare; nota a quadernino (righe e margine, salvataggio automatico); compleanni; contributor del mese come prima (coriandoli, trofeo, anello) in pastello; il team oggi (solo per chi è nel Piano ferie).
+- **[FIX] Nota**: il vecchio widget salvava a ogni tasto (pulizia dell'effetto legata al testo); ora salva dopo 800 ms e allo smontaggio.
+- **[UI] Issue** accetta `?vista=mine|overdue|closed|all` (link dalla Dashboard).
+- **[UI] Telefono**: widget uno sotto l'altro al posto del carosello.
+- **[TODO] Layout predefinito**: i nuovi utenti partono da quello impostato con "Imposta come predefinito" (superuser); quello dell'anteprima va impostato da Fede in produzione. In dev l'ho applicato all'utente `verifica-ui`.
+
+## Colore per modulo (rimandato)
+
+Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); anteprima `design-previews/hm-base.html` (Issue) e interruttore "Colori modulo" in `db-base.html`, file `design-previews/shared/modcolors.css|js`.
+
+- **[DEC] Un colore tenue per modulo o per categoria**, sempre lo stesso: icona della sidebar nel colore del modulo (in grassetto, scritte neutre), eco nell'icona accanto al titolo della pagina, widget della Dashboard nello stesso colore del loro modulo. Selezione sempre verde (consigliato) oppure nel colore del modulo: da decidere.
+- **[DEC] Da aggiornare in `frontend/DESIGN.md`** la regola "nessun colore proprio per i moduli"; i colori di stato devono restare distinguibili dai colori dei moduli.
+- **[UI] Da valutare** colori per modulo o per categoria della sidebar (Operatività, Anagrafiche, …): i moduli sono una ventina e i colori sei.
+
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).

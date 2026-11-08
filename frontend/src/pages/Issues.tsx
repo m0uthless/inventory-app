@@ -252,7 +252,8 @@ export default function Issues() {
 
   // ── Viste e filtri (dalle intestazioni di colonna) ──────────────────────
   type IssueView = 'active' | 'mine' | 'overdue' | 'closed' | 'all'
-  const [view, setView] = React.useState<IssueView>('active')
+  // `?vista=mine|overdue|closed|all` dalla Dashboard; poi la vista vive nello stato della pagina.
+  const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
   const [fStatus, setFStatus] = React.useState<string[]>([])
   const [fPriority, setFPriority] = React.useState<string[]>([])
   const [fCategory, setFCategory] = React.useState<string[]>([])

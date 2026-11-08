@@ -38,6 +38,35 @@ export type ArchieTokens = {
   shadowFloat: string
   /** Anello di focus. */
   focusRing: string
+  /**
+   * Tinte tenui della Dashboard (fondo, inchiostro, tono medio per icone e
+   * grafici). Uguali in tutte le palette, diverse tra chiaro e scuro. Solo per
+   * la Dashboard: le pagine operative restano sulla regola "colore solo per
+   * azione, selezione e stato" (frontend/DESIGN.md).
+   */
+  tints: Record<TintKey, TintTriple>
+}
+
+export type TintKey = 'mint' | 'sky' | 'lilac' | 'rose' | 'sand' | 'peach' | 'butter'
+export type TintTriple = { bg: string; ink: string; mid: string }
+
+const TINTS_LIGHT: Record<TintKey, TintTriple> = {
+  mint: { bg: '#e2f2eb', ink: '#175a4c', mid: '#4f9b88' },
+  sky: { bg: '#e3eefa', ink: '#1f4f86', mid: '#5b8fd0' },
+  lilac: { bg: '#ece9f8', ink: '#4b3f9a', mid: '#8b7fd6' },
+  rose: { bg: '#fbe8e5', ink: '#9e2f25', mid: '#e07a6e' },
+  sand: { bg: '#f6efe0', ink: '#7a5413', mid: '#c99a43' },
+  peach: { bg: '#fcebdf', ink: '#93451c', mid: '#e3936a' },
+  butter: { bg: '#fbf4d4', ink: '#6a560c', mid: '#d6b843' },
+}
+const TINTS_DARK: Record<TintKey, TintTriple> = {
+  mint: { bg: '#15302a', ink: '#a6e3d3', mid: '#5fb8a3' },
+  sky: { bg: '#172a40', ink: '#b9d6f5', mid: '#6fa8e0' },
+  lilac: { bg: '#231f3e', ink: '#d4cff8', mid: '#9d93ec' },
+  rose: { bg: '#36201d', ink: '#f6c2bb', mid: '#f07466' },
+  sand: { bg: '#30281a', ink: '#f0d9a6', mid: '#d9a94a' },
+  peach: { bg: '#36251a', ink: '#f6c9ad', mid: '#e8936a' },
+  butter: { bg: '#2f2b15', ink: '#eedf9f', mid: '#d6bd4a' },
 }
 
 export type PaletteSpec = {
@@ -78,6 +107,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       divider: '#d5dedb',
       ...STATUS_LIGHT,
       archie: {
+        tints: TINTS_LIGHT,
         frame: '#e3eae8', surface2: '#f5f8f7', borderStrong: '#b9c7c3', textFaint: '#66766f',
         field: '#e2f0eb', fieldLine: '#1f6b5c', neutralBg: '#edf1f0',
         band: '#17463c', band2: '#1f5a4d',
@@ -94,6 +124,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       divider: '#2a3734',
       ...STATUS_DARK,
       archie: {
+        tints: TINTS_DARK,
         frame: '#121a19', surface2: '#1a2523', borderStrong: '#3b4c48', textFaint: '#849591',
         field: '#183a33', fieldLine: '#5fb8a3', neutralBg: '#1e2928',
         band: '#123a32', band2: '#1a5045',
@@ -114,6 +145,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       // In Blu clinico "info" passa al verde acqua per non confondersi col primario.
       info: { main: '#1d6f86', bg: '#e0f1f5' },
       archie: {
+        tints: TINTS_LIGHT,
         frame: '#e3e8ef', surface2: '#f5f7fa', borderStrong: '#b8c3d1', textFaint: '#657182',
         field: '#e1ebf6', fieldLine: '#1f5f99', neutralBg: '#edf0f4',
         band: '#153e66', band2: '#1c4f80',
@@ -131,6 +163,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       ...STATUS_DARK,
       info: { main: '#6cc0d4', bg: '#14303a' },
       archie: {
+        tints: TINTS_DARK,
         frame: '#121821', surface2: '#1a212c', borderStrong: '#3a4555', textFaint: '#8592a3',
         field: '#18304a', fieldLine: '#6fa8e0', neutralBg: '#1e2530',
         band: '#132f4e', band2: '#1b4168',
@@ -149,6 +182,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       divider: '#d9d9e4',
       ...STATUS_LIGHT,
       archie: {
+        tints: TINTS_LIGHT,
         frame: '#e6e6ef', surface2: '#f7f7fa', borderStrong: '#bfbfd0', textFaint: '#69697f',
         field: '#e8e8f7', fieldLine: '#4a48a6', neutralBg: '#efeff4',
         band: '#2b2a6b', band2: '#383788',
@@ -165,6 +199,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       divider: '#2d2d3a',
       ...STATUS_DARK,
       archie: {
+        tints: TINTS_DARK,
         frame: '#15151c', surface2: '#1d1d26', borderStrong: '#3f3f50', textFaint: '#8d8da1',
         field: '#2a2952', fieldLine: '#9d9cec', neutralBg: '#23232d',
         band: '#232254', band2: '#302f70',

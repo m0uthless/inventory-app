@@ -7,7 +7,7 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
 import { CampoIcon } from '../ui/campo'
-import type { ContributorData } from '../ui/ContributorCard'
+import type { ContributorData } from '../features/dashboard/widgets/PeopleWidgets'
 import { ArchiveRoot, StarIcon, WikiHead } from '../features/wiki/archive/archiveUi'
 import { cVars, r1, type ApiList, type WikiCategory } from '../features/wiki/archive/archiveModel'
 
