@@ -521,6 +521,32 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
 .u-txt span { font-size: 11px; color: var(--muted); }
 .user-btn .i { width: 14px; height: 14px; }
 @media (max-width: 1100px) { .u-txt { display: none; } }
+
+/* Pulsanti della pagina nella riga delle viste (modalità linguetta) */
+.vrow { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.vrow .vtabs { flex: 1; min-width: 0; border-bottom: 0; }
+.vrow-act { display: none; gap: 8px; align-items: center; padding: 0 12px 0 4px; flex: none; }
+.vrow-act .btn { height: 30px; }
+.vrow-act .btn .i { width: 15px; height: 15px; }
+/* Titolo in una linguetta del foglio (richiesta di Fede, title-page-card.png):
+   il foglio del contenuto sale fino alla barra, avvolge il titolo e scende con una curva prima della ricerca. */
+.tb-title { display: none; }
+@media (min-width: 861px) {
+  :root[data-title="tab"] .topbar { position: relative; }
+  :root[data-title="tab"] .tb-title {
+    display: flex; align-items: center; position: absolute; z-index: 3; left: 0; bottom: -1px; height: 44px;
+    width: calc(50% - min(260px, 21vw) - 28px); min-width: 180px; margin: 0; padding: 0 22px;
+    background: var(--bg); border: 1px solid var(--border); border-bottom: 0; border-radius: 14px 14px 0 0;
+    font-size: 22px; font-weight: 650; letter-spacing: -.015em; white-space: nowrap; color: var(--text);
+  }
+  :root[data-title="tab"] .tb-title::after {
+    content: ""; position: absolute; right: -13px; bottom: 0; width: 14px; height: 14px;
+    border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); border-bottom-left-radius: 14px;
+    box-shadow: -6px 6px 0 0 var(--bg);
+  }
+  :root[data-title="tab"][data-top] .workspace { border-top-left-radius: 0; }
+  :root[data-title="tab"] .ct-head { display: none; }
+}
 </style>
 <link rel="stylesheet" href="shared/kpi.css">
 <link rel="stylesheet" href="shared/palettes.css">
@@ -547,6 +573,7 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
   <div class="main">
     <header class="topbar gtop g2">
       <button class="icon-btn menu-mobile" data-mobile-nav aria-label="Apri il menu"><i data-i="menu"></i></button>
+      <h1 class="tb-title" data-tb-title>Contratti</h1>
       <div class="search-global" role="search" data-palette><i data-i="search"></i><span>Cerca clienti, siti, device, credenziali…</span><kbd>Ctrl K</kbd></div>
       <span class="g-spacer"></span>
       <button class="icon-btn bell" aria-label="Notifiche, 2 non lette" title="Notifiche"><i data-i="bell"></i></button>
@@ -556,14 +583,14 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
     <div class="workspace">
       <main class="content">
         <div class="po-head ct-head">
-          <h1>Contratti</h1>
+          <h1 class="pg-title">Contratti</h1>
           <div class="actions"><button class="btn" type="button"><i data-i="users"></i> Venditori</button><button class="btn btn-primary" type="button" data-new><i data-i="plus"></i> Nuovo contratto</button></div>
         </div>
 
         <div class="kpi-wrap" data-ct-kpis></div>
 
         <section class="panel" aria-label="Elenco contratti">
-          <div class="vtabs" role="group" aria-label="Viste" data-ct-views></div>
+          <div class="vrow"><div class="vtabs" role="group" aria-label="Viste" data-ct-views></div><div class="vrow-act" data-vrow-act></div></div>
           <div class="toolbar tb-row">
             <div class="tokens" data-ct-tokens aria-label="Filtri attivi" aria-live="polite"></div>
             <span class="spacer"></span>
@@ -661,6 +688,10 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
     <button data-pal="indaco" aria-pressed="false" title="Indaco" aria-label="Palette indaco"><span class="sw" style="background:#4a48a6"></span></button>
   </span>
   <span class="pv-sep" aria-hidden="true"></span>
+  <span role="group" aria-label="Titolo della pagina" style="display:inline-flex;gap:2px;align-items:center"><span class="pv-name" style="padding:0 4px 0 2px">Titolo</span>
+    <button data-title-btn="page" aria-pressed="false">Nella pagina</button>
+    <button data-title-btn="tab" aria-pressed="true">Linguetta</button></span>
+  <span class="pv-sep" aria-hidden="true"></span>
   <button data-view-btn="app" aria-pressed="true">App</button>
   <button data-view-btn="login" aria-pressed="false">Login</button>
   <button data-theme-toggle aria-label="Cambia tema chiaro/scuro"><i data-i="moon"></i>Tema</button>
@@ -737,5 +768,17 @@ th:hover .th-filter, .th-filter:focus-visible, .th-filter.is-on, .th-filter.is-o
   })();
 </script>
 <script src="shared/ct.js?v=2"></script>
+<script>
+  (() => {
+    const html = document.documentElement; const btns = document.querySelectorAll('[data-title-btn]');
+    const acts = document.querySelector('.ct-head .actions'); const head = document.querySelector('.ct-head'); const slot = document.querySelector('[data-vrow-act]');
+    const place = () => { const tab = html.getAttribute('data-title') === 'tab' && window.innerWidth > 860; if (acts) (tab ? slot : head).appendChild(acts); slot.style.display = tab ? 'flex' : 'none'; };
+    window.addEventListener('resize', place);
+    const set = (v) => { html.setAttribute('data-title', v); place(); btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.titleBtn === v))); try { localStorage.setItem('archie-preview-title', v); } catch (e) { /* niente */ } };
+    let saved = null; try { saved = localStorage.getItem('archie-preview-title'); } catch (e) { /* niente */ }
+    set(new URLSearchParams(location.search).get('titolo') || (saved === 'page' ? 'page' : 'tab'));
+    btns.forEach((b) => b.addEventListener('click', () => set(b.dataset.titleBtn)));
+  })();
+</script>
 </body>
 </html>
