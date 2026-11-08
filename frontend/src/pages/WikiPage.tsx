@@ -331,6 +331,7 @@ const DEFAULT_TEMPLATE = `<h1>Titolo della pagina</h1>
 type Mode = 'view' | 'edit'
 
 export default function WikiPage() {
+  const catDark = useTheme().palette.mode === 'dark'
   const { id } = useParams<{ id: string }>()
   const isNew = !id || id === 'new'
   const navigate = useNavigate()
@@ -908,7 +909,7 @@ export default function WikiPage() {
             </Button>
           </div>
         </div>
-        <OpenFolder className="w-ed-fold" color={catColor(editCat)} label="Pagina in modifica"
+        <OpenFolder className="w-ed-fold" color={catColor(editCat, catDark)} label="Pagina in modifica"
           tabs={<FolderTabs cats={folders} active={editCat.id} mode="edit" onPick={(cid) => setForm((f) => ({ ...f, category: cid === 0 ? '' : cid }))} />}>
           <div className="w-ed-b">
             <div className="w-ed-main">
@@ -1009,7 +1010,7 @@ export default function WikiPage() {
         <span>/</span>
         <a href={`/wiki?cartella=${viewCat.id}`} onClick={(e) => { e.preventDefault(); navigate(`/wiki?cartella=${viewCat.id}`) }}>{viewCat.name}</a>
       </nav>
-      <OpenFolder color={catColor(viewCat)} label={viewCat.name}
+      <OpenFolder color={catColor(viewCat, catDark)} label={viewCat.name}
         tabs={<FolderTabs cats={folders.filter((c) => c.id !== 0 || viewCat.id === 0)} active={viewCat.id} mode="art" onPick={(cid) => navigate(`/wiki?cartella=${cid}`)} />}>
         <article className="w-art is-sheet">
           <header className="w-art-h">

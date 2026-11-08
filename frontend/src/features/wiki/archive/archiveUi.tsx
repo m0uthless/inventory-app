@@ -74,10 +74,11 @@ export function FolderTabs({ cats, active, counts, mode, onPick }: {
   mode: 'nav' | 'art' | 'edit'
   onPick: (id: number) => void
 }) {
+  const dark = useTheme().palette.mode === 'dark'
   return (
     <div className="w-open-tabs" role={mode === 'edit' ? 'radiogroup' : 'tablist'} aria-label={mode === 'edit' ? 'Cartella della pagina' : 'Cartelle'}>
       {cats.map((c) => {
-        const color = catColor(c)
+        const color = catColor(c, dark)
         const n = counts?.[c.id]
         if (c.id === active) {
           const inner = <><span className="w-fold-ico"><CampoIcon name={catIcon(c.name)} size={17} /></span><h2>{c.name}</h2><small>{mode === 'edit' ? 'cartella della pagina' : n != null ? `${n} ${n === 1 ? 'pagina' : 'pagine'}` : ''}</small></>
@@ -127,12 +128,13 @@ export function ClipIcon() {
 /** Scheda di una pagina (vista "Tutte le pagine" e risultati di ricerca). */
 export function PageCard({ p, cat, term, onOpen }: { p: WikiPageRow; cat?: WikiCategory; term?: string; onOpen: () => void }) {
   const t = term?.trim() ?? ''
+  const dark = useTheme().palette.mode === 'dark'
   return (
     <li>
       <a href={`/wiki/${p.id}`} className="w-card" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); onOpen() }}>
         <span className="w-card-top">
           {p.kb_code ? <span className="w-mono-s">{p.kb_code}</span> : null}
-          {cat ? <span className="w-cat"><span className="w-sw" style={cVars(catColor(cat))} />{cat.name}</span> : null}
+          {cat ? <span className="w-cat"><span className="w-sw" style={cVars(catColor(cat, dark))} />{cat.name}</span> : null}
           {!p.is_published ? <span className="w-draft">Bozza</span> : null}
         </span>
         <span className="w-card-t"><Mark text={p.title} term={t} /></span>

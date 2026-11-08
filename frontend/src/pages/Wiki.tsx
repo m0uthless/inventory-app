@@ -1,3 +1,4 @@
+import { useTheme } from '@mui/material/styles'
 import * as React from 'react'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -30,6 +31,7 @@ const BOOK_H = [236, 250, 228, 244, 232, 240]
 
 /** Wiki · Archivio (restyle "Campo sterile", anteprima design-previews/w-base.html, variante E). */
 export default function Wiki() {
+  const dark = useTheme().palette.mode === 'dark'
   const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -111,7 +113,7 @@ export default function Wiki() {
     body = (
       <>
         <nav className="w-crumbs" aria-label="Percorso"><a href="/wiki" onClick={(e) => { e.preventDefault(); go({ cartella: null }) }}><CampoIcon name="chevL" size={14} />Archivio</a></nav>
-        <OpenFolder color={catColor(openCat)} label={openCat.name}
+        <OpenFolder color={catColor(openCat, dark)} label={openCat.name}
           tabs={<FolderTabs cats={folders} active={openCat.id} counts={counts} mode="nav" onPick={(id) => go({ cartella: String(id) })} />}>
           <div className="w-open-h">
             {openCat.description ? <p>{openCat.description}</p> : null}
@@ -171,7 +173,7 @@ export default function Wiki() {
               return (
                 <li key={c.id}>
                   <button type="button" className="w-fold-btn" onClick={() => go({ cartella: String(c.id) })} aria-label={`Apri la cartella ${c.name}, ${ps.length} pagine`}>
-                    <span className="w-fold" style={cVars(catColor(c))}>
+                    <span className="w-fold" style={cVars(catColor(c, dark))}>
                       <span className="w-fold-tab"><span>{ps.length} {ps.length === 1 ? 'pagina' : 'pagine'}</span></span>
                       <span className="w-fold-back" />
                       <span className="w-fold-sheets" aria-hidden>{top.map((p, i) => <span key={p.id} className={`w-sheet s${i}`}><b>{p.title}</b><i /><i /></span>)}</span>
@@ -198,7 +200,7 @@ export default function Wiki() {
               {newest.map((p, i) => {
                 const c = catOf(p) ?? NO_CAT
                 return (
-                  <li key={p.id} style={{ ...cVars(catColor(c)), ['--r' as string]: `${IDX_TILT[i]}deg` }}>
+                  <li key={p.id} style={{ ...cVars(catColor(c, dark)), ['--r' as string]: `${IDX_TILT[i]}deg` }}>
                     <a href={`/wiki/${p.id}`} className="w-idx-card" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
                       <span className="w-idx-tab">{c.name}</span>
                       {p.kb_code ? <span className="w-idx-kb">{p.kb_code}</span> : null}
@@ -219,7 +221,7 @@ export default function Wiki() {
               <ul className="w-books">
                 {favs.map((p, i) => (
                   <li key={p.id}>
-                    <a href={`/wiki/${p.id}`} className="w-book" title={p.title} style={{ ...cVars(catColor(catOf(p))), ['--h' as string]: `${BOOK_H[i % BOOK_H.length]}px` }}
+                    <a href={`/wiki/${p.id}`} className="w-book" title={p.title} style={{ ...cVars(catColor(catOf(p), dark)), ['--h' as string]: `${BOOK_H[i % BOOK_H.length]}px` }}
                       onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
                       <span className="w-book-band" /><span className="w-book-t">{p.title}</span><span className="w-book-kb">{p.kb_code?.slice(-3)}</span>
                     </a>
@@ -242,7 +244,7 @@ export default function Wiki() {
                       <span className="w-led-d"><b>{d ? d.getDate() : ''}</b><small>{d ? d.toLocaleDateString('it-IT', { month: 'short' }) : ''}</small></span>
                       <a href={`/wiki/${p.id}`} className="w-led-e" onClick={(e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openPage(p) }}>
                         <span className="w-led-t">{p.title}</span>
-                        <span className="w-led-m"><span className="w-sw" style={cVars(catColor(c))} />{c.name}{p.updated_by_username ? ` · ${p.updated_by_username}` : ''}</span>
+                        <span className="w-led-m"><span className="w-sw" style={cVars(catColor(c, dark))} />{c.name}{p.updated_by_username ? ` · ${p.updated_by_username}` : ''}</span>
                       </a>
                     </li>
                   )

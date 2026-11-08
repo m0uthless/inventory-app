@@ -4,11 +4,11 @@
  * Features: lista, crea, modifica, elimina, riordina (sort_order), emoji picker, color picker.
  */
 import * as React from 'react'
-import { SHARED } from '../theme/constants'
-import { PRESET_COLORS } from './wikiCategoryColors'
+import { CATEGORY_SWATCHES, catColor, tintOf } from '../features/wiki/archive/archiveModel'
 import {
   Box,
   Button,
+  ButtonBase,
   Card,
   CircularProgress,
   Dialog,
@@ -52,11 +52,7 @@ export type WikiCategory = {
 
 type ApiPage<T> = { count: number; results: T[] }
 
-// ── Palette colori predefiniti ────────────────────────────────────────────────
-// Eccezione intenzionale: sono le swatch che l'utente sceglie per la categoria
-// (persistite in `color`), devono restare stabili a prescindere dal tema.
-// Spostata in wikiCategoryColors.ts (anche per uso da WikiStats.tsx) per non
-// esportare una costante da un file di componente (react-refresh warning).
+// La tavolozza delle cartelle sono le tinte pastello della Dashboard: CATEGORY_SWATCHES in archiveModel.ts.
 
 // ── Emoji veloci per categoria ────────────────────────────────────────────────
 
@@ -114,61 +110,37 @@ const QUICK_EMOJIS = [
 // ── Color Picker ──────────────────────────────────────────────────────────────
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  // Tinte pastello (le stesse della Dashboard): il colore salvato è il tono medio chiaro;
+  // in pagina viene mostrato nella versione adatta al tema.
+  const current = tintOf(value)
   return (
     <Stack spacing={1}>
       <Typography variant="caption" color="text.secondary" fontWeight={600}>
         Colore
       </Typography>
-      <Stack direction="row" flexWrap="wrap" gap={0.75}>
-        {PRESET_COLORS.map((c) => (
-          <Box
-            key={c}
-            onClick={() => onChange(c)}
-            sx={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              bgcolor: c,
-              cursor: 'pointer',
-              border: '2px solid',
-              borderColor: value === c ? 'text.primary' : 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 0.1s',
-              '&:hover': { transform: 'scale(1.15)' },
-            }}
-          >
-            {value === c && <CheckIcon sx={{ fontSize: 14, color: SHARED.pureWhite }} />}
-          </Box>
-        ))}
-        {/* Custom hex input */}
-        <Tooltip title="Colore personalizzato (hex)">
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Box
-              component="input"
-              type="color"
-              value={value}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
-              sx={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                border: '2px solid',
-                borderColor: 'grey.300',
-                cursor: 'pointer',
-                padding: 0,
-                background: 'none',
-                '&::-webkit-color-swatch-wrapper': { padding: 0, borderRadius: '50%' },
-                '&::-webkit-color-swatch': { borderRadius: '50%', border: 'none' },
-              }}
-            />
-          </Box>
-        </Tooltip>
+      <Stack direction="row" flexWrap="wrap" gap={0.75} role="radiogroup" aria-label="Colore della cartella">
+        {CATEGORY_SWATCHES.map((c) => {
+          const on = current === c.key
+          return (
+            <Tooltip key={c.key} title={c.label}>
+              <ButtonBase
+                role="radio"
+                aria-checked={on}
+                aria-label={c.label}
+                onClick={() => onChange(c.hex)}
+                sx={{
+                  width: 30, height: 30, borderRadius: '50%', bgcolor: c.hex,
+                  boxShadow: (t) => (on ? `0 0 0 2px ${t.palette.background.paper}, 0 0 0 4px ${c.hex}` : 'none'),
+                  transition: 'transform 0.1s', '&:hover': { transform: 'scale(1.1)' },
+                  '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 3 },
+                }}
+              >
+                {on ? <CheckIcon sx={{ fontSize: 15, color: '#fff' }} /> : null}
+              </ButtonBase>
+            </Tooltip>
+          )
+        })}
       </Stack>
-      <Typography variant="caption" color="text.disabled" fontFamily="monospace">
-        {value}
-      </Typography>
     </Stack>
   )
 }
@@ -287,7 +259,7 @@ function CategoryFormDialog({
 }) {
   const theme = useTheme()
   const toast = useToast()
-  const [form, setForm] = React.useState<FormState>({ ...EMPTY_FORM_BASE, color: theme.palette.primary.main })
+  const [form, setForm] = React.useState<FormState>({ ...EMPTY_FORM_BASE, color: CATEGORY_SWATCHES[0].hex })
   const [saving, setSaving] = React.useState(false)
 
   React.useEffect(() => {
@@ -298,7 +270,7 @@ function CategoryFormDialog({
         description: initial.description ?? '',
         sort_order: String(initial.sort_order),
         emoji: initial.emoji || '📄',
-        color: initial.color || theme.palette.primary.main,
+        color: initial.color || CATEGORY_SWATCHES[0].hex,
       })
     } else {
       setForm({ ...EMPTY_FORM_BASE, color: theme.palette.primary.main })
@@ -480,7 +452,7 @@ function CategoryRow({
           width: 36,
           height: 36,
           borderRadius: 1.5,
-          bgcolor: cat.color,
+          bgcolor: catColor(cat),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -509,7 +481,7 @@ function CategoryRow({
           width: 16,
           height: 16,
           borderRadius: '50%',
-          bgcolor: cat.color,
+          bgcolor: catColor(cat),
           flexShrink: 0,
           border: '1.5px solid rgba(0,0,0,0.1)',
         }}

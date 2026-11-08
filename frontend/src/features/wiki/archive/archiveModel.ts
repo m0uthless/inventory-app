@@ -1,4 +1,5 @@
 import type * as React from 'react'
+import { TINTS_DARK, TINTS_LIGHT, type TintKey } from '../../../theme/palettes'
 import type { Theme } from '@mui/material/styles'
 import type { CampoIconName } from '../../../ui/campo'
 
@@ -73,9 +74,56 @@ export function archiveVars(t: Theme): React.CSSProperties {
   }
 }
 
-const FALLBACK = '#5b6b67'
-/** Colore della categoria (dato scelto dall'amministratore). */
-export const catColor = (c?: WikiCategory | null) => (c?.color && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : FALLBACK)
+// ── Colori delle categorie: tinte pastello (le stesse della Dashboard) ──────
+// Il colore salvato è un esadecimale (scelto dalla tavolozza del gestore cartelle);
+// qui viene sempre ricondotto alla tinta pastello più vicina, con la versione per il
+// tema scuro. I grigi diventano il neutro.
+export type CatTint = TintKey | 'neutral'
+const NEUTRAL = { light: '#7b8a86', dark: '#93a4a0' }
+const hsl = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16)
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1))
+  let h = 0
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return { h: (h * 60 + 360) % 360, s, l }
+}
+const TINT_HUES = (Object.keys(TINTS_LIGHT) as TintKey[]).map((k) => ({ k, h: hsl(TINTS_LIGHT[k].mid).h }))
+/** Tinta pastello più vicina a un colore esadecimale. */
+export function tintOf(hex?: string | null): CatTint {
+  if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return 'neutral'
+  const { h, s } = hsl(hex)
+  if (s < 0.16) return 'neutral'
+  let best = TINT_HUES[0], bd = 360
+  for (const t of TINT_HUES) { const d = Math.min(Math.abs(t.h - h), 360 - Math.abs(t.h - h)); if (d < bd) { bd = d; best = t } }
+  return best.k
+}
+const mixHex = (a: string, b: string, wa: number) => {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16)
+  const ch = (sh: number) => Math.round(((pa >> sh) & 255) * wa + ((pb >> sh) & 255) * (1 - wa))
+  return `#${[16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, '0')).join('')}`
+}
+const NEUTRAL_BG = { light: '#edf1f0', dark: '#1e2928' }
+/**
+ * Colore di una categoria, tenue come la Dashboard: una via di mezzo tra il fondo
+ * chiaro della tinta e il suo tono medio (in scuro: tra il fondo scuro e il tono medio).
+ * Il testo sopra prende l'inchiostro calcolato da `inkOn`.
+ */
+export const catColor = (c?: WikiCategory | null, dark = false) => {
+  const k = tintOf(c?.color)
+  const mode = dark ? 'dark' : 'light'
+  const mid = k === 'neutral' ? NEUTRAL[mode] : (dark ? TINTS_DARK : TINTS_LIGHT)[k].mid
+  const bg = k === 'neutral' ? NEUTRAL_BG[mode] : (dark ? TINTS_DARK : TINTS_LIGHT)[k].bg
+  return mixHex(mid, bg, dark ? 0.42 : 0.38)
+}
+/** Tavolozza del gestore cartelle: le 7 tinte (tono medio, chiaro) più il neutro. */
+export const CATEGORY_SWATCHES: { key: CatTint; label: string; hex: string }[] = [
+  { key: 'mint', label: 'Menta', hex: TINTS_LIGHT.mint.mid }, { key: 'sky', label: 'Azzurro', hex: TINTS_LIGHT.sky.mid },
+  { key: 'lilac', label: 'Lilla', hex: TINTS_LIGHT.lilac.mid }, { key: 'rose', label: 'Rosa', hex: TINTS_LIGHT.rose.mid },
+  { key: 'peach', label: 'Pesca', hex: TINTS_LIGHT.peach.mid }, { key: 'sand', label: 'Sabbia', hex: TINTS_LIGHT.sand.mid },
+  { key: 'butter', label: 'Giallo', hex: TINTS_LIGHT.butter.mid }, { key: 'neutral', label: 'Grigio', hex: NEUTRAL.light },
+]
 
 /** Testo leggibile sopra il colore della categoria (bianco o inchiostro scuro). */
 export function inkOn(hex: string): string {

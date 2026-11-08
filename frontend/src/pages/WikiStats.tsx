@@ -1,3 +1,4 @@
+import { useTheme } from '@mui/material/styles'
 import * as React from 'react'
 import { Box, CircularProgress } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
@@ -9,7 +10,7 @@ import { PERMS } from '../auth/perms'
 import { CampoIcon } from '../ui/campo'
 import type { ContributorData } from '../features/dashboard/widgets/PeopleWidgets'
 import { ArchiveRoot, StarIcon, WikiHead } from '../features/wiki/archive/archiveUi'
-import { cVars, r1, type ApiList, type WikiCategory } from '../features/wiki/archive/archiveModel'
+import { catColor, cVars, r1, type ApiList, type WikiCategory } from '../features/wiki/archive/archiveModel'
 
 type Totals = { total: number; published: number; drafts: number; total_views: number; rated_pages: number; unrated_pages: number; total_votes: number; average_rating: number }
 type CategoryStat = { name: string; color: string; count: number }
@@ -38,6 +39,7 @@ function Bar({ value, max, label, tone }: { value: number; max: number; label: s
 
 /** Statistiche della Wiki come registro dell'archivio (anteprima w-base, variante E). */
 export default function WikiStats() {
+  const dark = useTheme().palette.mode === 'dark'
   const toast = useToast()
   const navigate = useNavigate()
   const { hasPerm } = useAuth()
@@ -92,7 +94,7 @@ export default function WikiStats() {
                   const cat = cats.find((x) => x.name === c.name)
                   return (
                     <button key={c.name} type="button" className="w-cab-f" title={`${c.name}: ${c.count} pagine`}
-                      style={{ ...cVars(okHex(c.color)), ['--h' as string]: `${Math.round(40 + (c.count / maxCat) * 140)}px` }}
+                      style={{ ...cVars(catColor({ id: 0, name: c.name, color: c.color }, dark)), ['--h' as string]: `${Math.round(40 + (c.count / maxCat) * 140)}px` }}
                       onClick={() => navigate(cat ? `/wiki?cartella=${cat.id}` : '/wiki')}>
                       <b>{c.count}</b><span className="w-cab-body"><span className="w-cab-tab" /></span><span className="w-cab-l">{c.name}</span>
                     </button>

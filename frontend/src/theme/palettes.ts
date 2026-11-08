@@ -50,7 +50,7 @@ export type ArchieTokens = {
 export type TintKey = 'mint' | 'sky' | 'lilac' | 'rose' | 'sand' | 'peach' | 'butter'
 export type TintTriple = { bg: string; ink: string; mid: string }
 
-const TINTS_LIGHT: Record<TintKey, TintTriple> = {
+export const TINTS_LIGHT: Record<TintKey, TintTriple> = {
   mint: { bg: '#e2f2eb', ink: '#175a4c', mid: '#4f9b88' },
   sky: { bg: '#e3eefa', ink: '#1f4f86', mid: '#5b8fd0' },
   lilac: { bg: '#ece9f8', ink: '#4b3f9a', mid: '#8b7fd6' },
@@ -59,7 +59,7 @@ const TINTS_LIGHT: Record<TintKey, TintTriple> = {
   peach: { bg: '#fcebdf', ink: '#93451c', mid: '#e3936a' },
   butter: { bg: '#fbf4d4', ink: '#6a560c', mid: '#d6b843' },
 }
-const TINTS_DARK: Record<TintKey, TintTriple> = {
+export const TINTS_DARK: Record<TintKey, TintTriple> = {
   mint: { bg: '#15302a', ink: '#a6e3d3', mid: '#5fb8a3' },
   sky: { bg: '#172a40', ink: '#b9d6f5', mid: '#6fa8e0' },
   lilac: { bg: '#231f3e', ink: '#d4cff8', mid: '#9d93ec' },

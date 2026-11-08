@@ -287,9 +287,9 @@
 .wa .w-fold-btn {display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 12px;}
 .wa .w-fold-btn:focus-visible {outline: none; box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--primary);}
 .wa .w-fold {position: relative; display: block; height: 240px; perspective: 900px;}
-.wa .w-fold-tab {position: absolute; top: 0; left: 0; height: 30px; width: 44%; padding: 0 14px; display: flex; align-items: center; border-radius: 10px 10px 0 0; background: color-mix(in oklab, var(--c) 72%, #000); color: rgb(255 255 255 / .85); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;}
-.wa .w-fold-tab::after {content: ""; position: absolute; right: -16px; bottom: 0; width: 18px; height: 18px; background: radial-gradient(circle at 100% 0, transparent 17px, color-mix(in oklab, var(--c) 72%, #000) 18px);}
-.wa .w-fold-back {position: absolute; top: 26px; left: 0; right: 0; bottom: 0; border-radius: 0 12px 12px 12px; background: color-mix(in oklab, var(--c) 72%, #000);}
+.wa .w-fold-tab {position: absolute; top: 0; left: 0; height: 30px; width: 44%; padding: 0 14px; display: flex; align-items: center; border-radius: 10px 10px 0 0; background: color-mix(in oklab, var(--c) 86%, #000); color: var(--c-ink, #fff); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;}
+.wa .w-fold-tab::after {content: ""; position: absolute; right: -16px; bottom: 0; width: 18px; height: 18px; background: radial-gradient(circle at 100% 0, transparent 17px, color-mix(in oklab, var(--c) 86%, #000) 18px);}
+.wa .w-fold-back {position: absolute; top: 26px; left: 0; right: 0; bottom: 0; border-radius: 0 12px 12px 12px; background: color-mix(in oklab, var(--c) 86%, #000);}
 .wa .w-fold-sheets {position: absolute; top: 40px; left: 16px; right: 16px; height: 120px;}
 .wa .w-sheet {position: absolute; left: 0; right: 0; height: 110px; padding: 6px 12px; border-radius: 4px; background: var(--paper); border-top: 1px solid rgb(0 0 0 / .06); color: var(--text); box-shadow: 0 1px 0 rgb(0 0 0 / .08); transition: transform .35s cubic-bezier(.2,.8,.2,1); display: grid; align-content: start; gap: 6px;}
 .wa .w-sheet b {font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
@@ -301,8 +301,8 @@
 .wa .w-fold-front {position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; height: 51%; padding: 18px 18px 14px; display: grid; grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: auto 1fr auto; column-gap: 12px; align-content: start; border-radius: 6px 6px 12px 12px; background: var(--c); color: var(--c-ink, #fff); clip-path: polygon(0 10%, 3% 0, 100% 0, 100% 100%, 0 100%); transform-origin: 50% 100%; transition: transform .35s cubic-bezier(.2,.8,.2,1);}
 .wa .w-fold-front::before {content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: rgb(255 255 255 / .28);}
 .wa .w-fold-name {grid-column: 2; align-self: center; font-size: 19px; font-weight: 650; letter-spacing: -.015em; line-height: 1.2;}
-.wa .w-fold-desc {grid-column: 1 / -1; margin-top: 8px; font-size: 13px; line-height: 1.45; color: rgb(255 255 255 / .86); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;}
-.wa .w-fold-foot {grid-column: 1 / -1; font-size: 12px; color: rgb(255 255 255 / .72);}
+.wa .w-fold-desc {grid-column: 1 / -1; margin-top: 8px; font-size: 13px; line-height: 1.45; color: color-mix(in oklab, var(--c-ink, #fff) 86%, transparent); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;}
+.wa .w-fold-foot {grid-column: 1 / -1; font-size: 12px; color: color-mix(in oklab, var(--c-ink, #fff) 72%, transparent);}
 .wa .w-fold-btn:hover .w-fold-front, .wa .w-fold-btn:focus-visible .w-fold-front {transform: rotateX(-14deg);}
 .wa .w-fold-btn:hover .w-sheet.s0 {transform: translateY(-14px) rotate(-2deg);}
 .wa .w-fold-btn:hover .w-sheet.s1 {transform: translateY(-20px) rotate(3deg);}
@@ -375,16 +375,16 @@
 .wa .w-open-tabs::-webkit-scrollbar {display: none;}
 .wa .w-open-tab {flex: none; position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 12px; height: 52px; padding: 0 22px 0 14px; border-radius: 14px 14px 0 0; background: var(--c); color: var(--c-ink, #fff);}
 .wa .w-side-tab {flex: none; position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; height: 38px; margin-bottom: -2px; padding: 0 14px 2px 11px; border: 0; border-radius: 11px 11px 0 0;
-  background: color-mix(in oklab, var(--c) 82%, #000); color: rgb(255 255 255 / .9); font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  background: color-mix(in oklab, var(--c) 90%, #000); color: var(--c-ink, #fff); font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
   box-shadow: inset 0 -6px 6px -4px rgb(0 0 0 / .18); transition: height .2s cubic-bezier(.2,.8,.2,1), background-color .2s;}
 .wa .w-side-tab .i {width: 15px; height: 15px; stroke-width: 2; opacity: .85;}
-.wa .w-side-tab:hover {height: 44px; background: var(--c);}
+.wa .w-side-tab:hover {height: 44px; background: var(--c); color: var(--c-ink, #fff);}
 .wa .w-side-tab:focus-visible {outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);}
 @media (prefers-reduced-motion: reduce) {
   .wa .w-side-tab {transition: none;}
 }
 .wa .w-open-tab h2 {margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.015em;}
-.wa .w-open-tab small {font-size: 12px; color: rgb(255 255 255 / .8); font-variant-numeric: tabular-nums;}
+.wa .w-open-tab small {font-size: 12px; color: color-mix(in oklab, var(--c-ink, #fff) 80%, transparent); font-variant-numeric: tabular-nums;}
 .wa .w-open-in {padding: 18px 20px 26px; border-radius: 0 14px 14px 14px; background: color-mix(in oklab, var(--c) 16%, var(--bg)); box-shadow: inset 0 6px 0 var(--c); padding-top: 24px;}
 .wa .w-open-h p {margin: 0 0 12px; font-size: 14px; color: color-mix(in oklab, var(--c) 45%, var(--text));}
 .wa .w-open-tools {display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;}
