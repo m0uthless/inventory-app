@@ -320,13 +320,14 @@ export function AppLayout() {
           borderWidth: { xs: '1px 0 0 0', md: '1px 0 0 1px' }, borderTopLeftRadius: { md: 14 },
         }}>
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ flex: 1, px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: { xs: 10, md: 3 } }}>
+            <Box sx={{ flex: 1, px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: { xs: 3, md: 3 } }}>
               <DashboardEditModeRouteGuard isDashboardRoute={loc.pathname === '/'} />
               <ShellPageTitle pathname={loc.pathname} />
               <Outlet />
             </Box>
-            <AppFooter />
           </Box>
+          {/* Il footer resta sempre visibile: fuori dall'area che scorre (richiesta di Fede). */}
+          <Box sx={{ flexShrink: 0, bgcolor: 'background.default', mb: { xs: '64px', md: 0 } }}><AppFooter /></Box>
         </Box>
       </Box>
 

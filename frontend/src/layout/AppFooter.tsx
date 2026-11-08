@@ -5,7 +5,7 @@ export default function AppFooter() {
   const version = import.meta.env.VITE_APP_VERSION ?? 'dev'
 
   return (
-    <Box component="footer" sx={{ mt: 2 }}>
+    <Box component="footer">
       <Divider />
       <Box sx={{ py: 1.25, px: { xs: 2, md: 3 } }}>
         <Stack
