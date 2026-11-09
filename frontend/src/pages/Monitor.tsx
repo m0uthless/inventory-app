@@ -1,474 +1,200 @@
 import * as React from 'react'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
-import {
-  Box,
-  Chip,
-  Stack,
-  Typography,
-} from '@mui/material'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-
-import { useAuth } from '../auth/AuthProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { isRecord } from '@shared/utils/guards'
+import { Box, Button, Stack, Typography } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
-import { useServerGrid } from '@shared/hooks/useServerGrid'
+
 import { api } from '@shared/api/client'
-import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import { itemPath, itemActionPath, type CollectionPath } from '@shared/api/apiPaths'
-import { useDrfList } from '@shared/hooks/useDrfList'
-import { useToast } from '@shared/ui/toast'
+import { buildDrfListParams } from '@shared/api/drf'
+import { itemActionPath, itemPath } from '@shared/api/apiPaths'
 import { apiErrorToMessage } from '@shared/api/error'
-import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import { PERMS } from '../auth/perms'
-import { useStatusTokens } from '../theme/AppThemeProvider'
-import type { DomainStatusTokens } from '../theme/statusTokens'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useUrlStringParam } from '@shared/hooks/useUrlParam'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import MonitorDrawer from '../features/monitor/MonitorDrawer'
-import MonitorFormDrawer, { type MonitorForm } from '../features/monitor/MonitorFormDrawer'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
+import { useToast } from '@shared/ui/toast'
+import { isRecord } from '@shared/utils/guards'
+import { useAuth } from '../auth/AuthProvider'
+import { PERMS } from '../auth/perms'
+import { CampoIcon, FilterOptionList, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
+import {
+  MONO, TIPO_LABEL, VIEWS, formFrom, monitorTitle, viewCount, viewParams, wsWhere,
+  type MonitorForm, type MonitorRow, type MonitorStats, type MonitorStato, type MonitorView,
+} from '../features/monitor/monitorModel'
+import { MonitorDetailCard, MonitorDialog, StatoBadge, TipoCell, TwoLine } from '../features/monitor/monitorUi'
 
-// ─── Tipi ────────────────────────────────────────────────────────────────────
-
-export type MonitorRow = {
-  id: number
-  inventory: number | null
-  inventory_name: string | null
-  site_name: string | null
-  produttore: string
-  modello: string | null
-  seriale: string | null
-  stato: string
-  stato_label: string
-  tipo: string
-  tipo_label: string
-  radinet: boolean
-  updated_at: string | null
-  deleted_at: string | null
-}
-
-const MONITORS_PATH = '/monitors/' as const satisfies CollectionPath
-
-// ─── Chip stato ───────────────────────────────────────────────────────────────
-// STATO_COLOR era qui, con `theme.palette.X.dark` da import statico — spostato
-// in DomainStatusTokens.monitor/monitorFallback (theme/statusTokens.ts), letto
-// via useStatusTokens() dentro il componente (vedi makeRenderMonitorCard).
-
-// Colore semantico del tema (coerente con Issues.tsx: Chip standard MUI,
-// palette pastello definita centralmente in theme.ts).
-const STATO_SEMANTIC: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
-  in_uso: 'success',
-  da_installare: 'warning',
-  guasto: 'error',
-  rma: 'default',
-}
-
-function StatoChip({ stato, label }: { stato: string; label: string }) {
-  const color = STATO_SEMANTIC[stato] ?? 'default'
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-      <Chip size="small" label={label} color={color} variant={color === 'default' ? 'outlined' : 'filled'} />
-    </Box>
-  )
-}
-
-// ─── Mobile card ──────────────────────────────────────────────────────────────
-
-function makeRenderMonitorCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<MonitorRow> {
-  return ({ row, onOpen }) => {
-  const c = statusTokens.monitor[row.stato as keyof DomainStatusTokens['monitor']] ?? statusTokens.monitorFallback
-  return (
-    <Box
-      onClick={() => onOpen(row.id)}
-      sx={{
-        bgcolor: 'background.paper',
-        border: '0.5px solid', borderColor: 'divider', borderRadius: 1,
-        p: 1.25, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 0.75,
-        '&:active': { bgcolor: 'action.hover' },
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.produttore}{row.modello ? ` ${row.modello}` : ''}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">{row.tipo_label}</Typography>
-        </Box>
-        <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: c.bg, color: c.color, border: `0.5px solid ${c.border}`, whiteSpace: 'nowrap' }}>
-          {row.stato_label}
-        </Box>
-      </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {[
-          { label: 'Workstation', value: row.inventory_name },
-          { label: 'Sede',        value: row.site_name },
-          { label: 'Seriale',     value: row.seriale, mono: true },
-          { label: 'Radinet',     value: row.radinet ? 'Sì' : null },
-        ].map(({ label, value, mono }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', fontFamily: mono && value ? 'monospace' : 'inherit', lineHeight: 1.3 }}>
-              {value || '—'}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-    </Box>
-  )
-  }
-}
-
-// ─── Colonne DataGrid ─────────────────────────────────────────────────────────
-
-const COLUMNS: GridColDef<MonitorRow>[] = [
-  { field: 'produttore',     headerName: 'Produttore',  width: 140 },
-  { field: 'modello',        headerName: 'Modello',     flex: 1, minWidth: 130 },
-  { field: 'seriale',        headerName: 'Seriale',     width: 150 },
-  { field: 'inventory_name', headerName: 'Workstation', flex: 1.2, minWidth: 160 },
-  { field: 'site_name',      headerName: 'Sede',        width: 150 },
-  {
-    field: 'tipo_label',
-    headerName: 'Tipo',
-    width: 140,
-    renderCell: ({ value }) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-        <Chip size="small" label={value as string} variant="outlined" />
-      </Box>
-    ),
-  },
-  {
-    field: 'stato_label',
-    headerName: 'Stato',
-    width: 150,
-    renderCell: ({ row }) => <StatoChip stato={row.stato} label={row.stato_label} />,
-  },
-  {
-    field: 'radinet',
-    headerName: 'Radinet',
-    width: 90,
-    renderCell: (p) => p.value
-      ? (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip label="Sì" size="small" color="info" variant="outlined" />
-        </Box>
-      )
-      : null,
-  },
-]
-
-const ALLOWED_ORDERING = ['produttore', 'modello', 'seriale', 'stato', 'tipo', 'created_at', 'updated_at', 'deleted_at'] as const
-
-// ─── Pagina Monitor ───────────────────────────────────────────────────────────
+const PATH = '/monitors/' as const
 
 export default function Monitor() {
-  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
-
+  const canAdd = hasPerm(PERMS.inventory.monitor.add)
   const canChange = hasPerm(PERMS.inventory.monitor.change)
-  const canDelete  = hasPerm(PERMS.inventory.monitor.delete)
-  const statusTokens = useStatusTokens()
-  const renderMonitorCard = React.useMemo(() => makeRenderMonitorCard(statusTokens), [statusTokens])
+  const canDelete = hasPerm(PERMS.inventory.monitor.delete)
+  const canAudit = hasPerm(PERMS.audit.view)
 
-  const grid = useServerGrid({
-    defaultOrdering: 'produttore',
-    allowedOrderingFields: ALLOWED_ORDERING,
-  })
+  const grid = useServerGrid({ defaultOrdering: 'produttore', allowedOrderingFields: ['produttore', 'modello', 'seriale', 'stato', 'tipo', 'inventory__name', 'updated_at'] })
+  const opts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const [vista, setVista] = useUrlStringParam('vista')
+  const [tipo, setTipo] = useUrlStringParam('tipo')
+  const view: MonitorView = VIEWS.find((v) => v.key === vista)?.key ?? 'all'
 
-  // ── Lista ─────────────────────────────────────────────────────────────────
+  const [tick, setTick] = React.useState(0)
+  const [stats, setStats] = React.useState<MonitorStats | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    api.get<MonitorStats>(`${PATH}stats/`).then((r) => { if (alive) setStats(r.data) }).catch(() => {})
+    return () => { alive = false }
+  }, [tick])
+
   const listParams = React.useMemo(() => buildDrfListParams({
-    search:         grid.search,
-    ordering:       grid.ordering,
-    page0:          grid.paginationModel.page,
-    pageSize:       grid.paginationModel.pageSize,
-    includeDeleted: grid.includeDeleted,
-    onlyDeleted:    grid.onlyDeleted,
-  }), [grid.search, grid.ordering, grid.paginationModel, grid.includeDeleted, grid.onlyDeleted])
+    search: grid.search, ordering: grid.ordering, page0: grid.paginationModel.page, pageSize: grid.paginationModel.pageSize,
+    extra: { ...viewParams(view), ...(tipo ? { tipo } : {}) },
+  }), [grid.search, grid.ordering, grid.paginationModel, view, tipo])
+  const { rows, rowCount, loading, reload } = useDrfList<MonitorRow>(PATH, listParams, (e) => toast.error(apiErrorToMessage(e)))
+  const reloadAll = React.useCallback(() => { reload(); setTick((t) => t + 1) }, [reload])
 
-  const { rows, rowCount, loading, reload: reloadList } = useDrfList<MonitorRow>(
-    MONITORS_PATH,
-    listParams,
-    (e) => toast.error(apiErrorToMessage(e)),
-  )
+  // ── Dettaglio ──
+  const [detail, setDetail] = React.useState<MonitorRow | null>(null)
+  const [busy, setBusy] = React.useState(false)
+  const openId = grid.openId
+  React.useEffect(() => {
+    if (!openId) { setDetail(null); return }
+    let alive = true
+    const fromList = rows.find((r) => r.id === openId)
+    if (fromList) setDetail(fromList)
+    api.get<MonitorRow>(itemPath(PATH, openId), { params: { include_deleted: 1 } })
+      .then((r) => { if (alive) setDetail(r.data) })
+      .catch((e) => { if (alive) toast.error(apiErrorToMessage(e)) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, tick])
+  const idx = detail ? rows.findIndex((r) => r.id === detail.id) : -1
 
-  // ── Detail drawer ─────────────────────────────────────────────────────────
-  const [drawerOpen, setDrawerOpen]       = React.useState(false)
-  const [drawerTab, setDrawerTab]         = React.useState(0)
-  const [selectedId, setSelectedId]       = React.useState<number | null>(null)
-  const [detail, setDetail]               = React.useState<MonitorRow | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
+  const act = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true)
+    try { await fn(); toast.success(ok); reloadAll(); return true } catch (e) { toast.error(apiErrorToMessage(e)); return false } finally { setBusy(false) }
+  }
+  const setStato = (m: MonitorRow, s: MonitorStato) => void act(() => api.patch(itemPath(PATH, m.id), { stato: s }), 'Stato aggiornato.')
+  const remove = (m: MonitorRow) => void act(() => api.delete(itemPath(PATH, m.id)), 'Monitor spostato nel cestino.')
+  const restore = (m: MonitorRow) => void act(() => api.post(itemActionPath(PATH, m.id, 'restore')), 'Monitor ripristinato.')
 
-  const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean) => {
-    setDetailLoading(true)
-    setDetail(null)
+  // ── Nuovo / modifica ──
+  const [dlg, setDlg] = React.useState<{ initial: MonitorRow | null } | null>(null)
+  const [form, setForm] = React.useState<MonitorForm>(formFrom(null))
+  const openForm = React.useCallback((m: MonitorRow | null) => { setForm(formFrom(m)); setDlg({ initial: m }) }, [])
+  const save = async () => {
+    if (!dlg) return
+    setBusy(true)
     try {
-      const inc = forceIncludeDeleted ?? grid.includeDeleted
-      const incParams = includeDeletedParams(inc)
-      const res = await api.get<MonitorRow>(
-        itemPath(MONITORS_PATH, id),
-        incParams ? { params: incParams } : undefined,
-      )
-      setDetail(res.data)
+      const body = { ...form, produttore: form.produttore.trim() }
+      if (dlg.initial) {
+        await api.patch(itemPath(PATH, dlg.initial.id), body)
+        toast.success('Monitor aggiornato.')
+      } else {
+        const { data } = await api.post<MonitorRow>(PATH, body)
+        toast.success('Monitor creato.')
+        grid.setOpenId(data.id)
+      }
+      setDlg(null)
+      reloadAll()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
-      setDetailLoading(false)
+      setBusy(false)
     }
-  }, [toast, grid.includeDeleted])
-
-  // Apertura drawer da URL (?open=ID)
-  const lastOpenRef = React.useRef<number | null>(null)
-  React.useEffect(() => {
-    if (!grid.openId) { lastOpenRef.current = null; return }
-    const id = grid.openId
-    if (lastOpenRef.current === id) return
-    lastOpenRef.current = id
-    setSelectedId(id); setDrawerOpen(true); setDrawerTab(0)
-    void loadDetail(id)
-  }, [grid.openId, loadDetail])
-
-  const openDrawer = React.useCallback((id: number) => {
-    lastOpenRef.current = id
-    setSelectedId(id); setDrawerOpen(true); setDrawerTab(0)
-    void loadDetail(id)
-    grid.setOpenId(id)
-  }, [grid, loadDetail])
-
-  const closeDrawer = () => {
-    lastOpenRef.current = null
-    setDrawerOpen(false)
-    grid.setOpenId(null)
   }
-
-  // ── Form drawer create/edit ───────────────────────────────────────────────
-  const [formOpen, setFormOpen]     = React.useState(false)
-  const [formTarget, setFormTarget] = React.useState<MonitorRow | null>(null)
-  const [formSaving, setFormSaving] = React.useState(false)
-
-  const openEdit     = () => { if (detail) { setFormTarget(detail); setFormOpen(true) } }
-  const openCreate   = React.useCallback(() => { setFormTarget(null); setFormOpen(true) }, [])
-
-  // Apri form create se navigato con state { openCreate: true } (da SpeedDial / mobile nav)
-  const openCreateOnceRef = React.useRef(false)
+  // "Nuovo monitor" da altre parti dell'app (pulsante rapido, barra in basso).
   React.useEffect(() => {
     const st = loc.state as unknown
-    if (!isRecord(st) || st['openCreate'] !== true) { openCreateOnceRef.current = false; return }
-    if (openCreateOnceRef.current) return
-    openCreateOnceRef.current = true
-    navigate(loc.pathname, { replace: true, state: {} })
-    openCreate()
-  }, [loc, navigate, openCreate])
+    if (isRecord(st) && st['openCreate'] === true) { navigate(loc.pathname + loc.search, { replace: true, state: {} }); openForm(null) }
+  }, [loc, navigate, openForm])
 
-  const handleSave = async (form: MonitorForm) => {
-    setFormSaving(true)
-    try {
-      if (formTarget) {
-        await api.patch(itemPath(MONITORS_PATH, formTarget.id), form)
-        toast.success('Monitor aggiornato')
-        if (selectedId === formTarget.id) await loadDetail(formTarget.id)
-        reloadList()
-      } else {
-        const res = await api.post<MonitorRow>(MONITORS_PATH, form)
-        toast.success('Monitor creato')
-        reloadList()
-        openDrawer(res.data.id)
-      }
-      setFormOpen(false)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setFormSaving(false)
-    }
+  // ── Filtri ──
+  const activeFilters: ActiveFilter[] = tipo ? [{ key: 'tipo', label: 'Tipo', values: TIPO_LABEL[tipo as keyof typeof TIPO_LABEL] ?? tipo }] : []
+  const filterConfig: Record<string, ColumnFilterConfig> = {
+    tipo: {
+      value: tipo, label: 'Filtra tipo', onSet: (v) => setTipo(String(v), opts), onReset: () => setTipo('', opts),
+      children: <FilterOptionList label="Tipo" single selected={tipo ? [tipo] : []} options={Object.entries(TIPO_LABEL).map(([value, label]) => ({ value, label }))} onChange={(v) => setTipo(v[0] ?? '', opts)} />,
+    },
   }
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-  const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
-  const [deleteBusy, setDeleteBusy]       = React.useState(false)
+  const columns: GridColDef<MonitorRow>[] = [
+    { field: 'produttore', headerName: 'Monitor', flex: 1.1, minWidth: 220, renderCell: (p) => <TwoLine icon={<CampoIcon name="monitor" size={17} />} title={monitorTitle(p.row)} /> },
+    { field: 'seriale', headerName: 'Seriale', width: 140, renderCell: (p) => <Box component="span" sx={{ ...MONO, display: 'flex', alignItems: 'center', height: '100%' }}>{p.row.seriale || '—'}</Box> },
+    { field: 'tipo', headerName: 'Tipo', width: 180, renderCell: (p) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><TipoCell m={p.row} /></Box> },
+    { field: 'inventory__name', headerName: 'Workstation', flex: 1.2, minWidth: 220,
+      renderCell: (p) => p.row.inventory ? <TwoLine title={p.row.inventory_name} sub={wsWhere(p.row)} /> : <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', color: 'text.secondary', fontSize: 13 }}>Non assegnato</Box> },
+    { field: 'stato', headerName: 'Stato', width: 140, renderCell: (p) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><StatoBadge stato={p.row.stato} /></Box> },
+  ]
 
-  const openDelete = (id: number) => {
-    if (selectedId !== id) {
-      void loadDetail(id)
-      setSelectedId(id); setDrawerOpen(true)
-    }
-    setDeleteDlgOpen(true)
-  }
-
-  const doDelete = async () => {
-    if (!detail) return
-    setDeleteBusy(true)
-    try {
-      await api.delete(itemPath(MONITORS_PATH, detail.id))
-      toast.success('Monitor eliminato')
-      grid.setViewMode('all', { keepOpen: true })
-      reloadList()
-      await loadDetail(detail.id, true)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleteBusy(false)
-      setDeleteDlgOpen(false)
-    }
-  }
-
-  // ── Restore ───────────────────────────────────────────────────────────────
-  const [restoreBusy, setRestoreBusy] = React.useState(false)
-
-  const doRestore = async () => {
-    if (!detail) return
-    setRestoreBusy(true)
-    try {
-      await api.post(itemActionPath(MONITORS_PATH, detail.id, 'restore'))
-      toast.success('Monitor ripristinato')
-      reloadList()
-      await loadDetail(detail.id)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setRestoreBusy(false)
-    }
-  }
-
-  // ── Context menu ──────────────────────────────────────────────────────────
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: MonitorRow; mouseX: number; mouseY: number
-  } | null>(null)
-
-  const handleRowContextMenu = React.useCallback(
-    (row: MonitorRow, event: React.MouseEvent<HTMLElement>) => {
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
-    }, [],
+  const mobileCard: MobileCardRenderFn<MonitorRow> = ({ row, onOpen }) => (
+    <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, display: 'grid', gap: 0.75, cursor: 'pointer' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}><TwoLine icon={<CampoIcon name="monitor" size={17} />} title={monitorTitle(row)} sub={row.seriale ? `S/N ${row.seriale}` : undefined} /></Box>
+        <StatoBadge stato={row.stato} />
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
+        <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary', minWidth: 0 }}>{row.inventory ? [row.inventory_name, wsWhere(row)].filter(Boolean).join(' · ') : 'Non assegnato'}</Typography>
+        <TipoCell m={row} />
+      </Box>
+    </Box>
   )
 
-  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
-    const row = contextMenu?.row
-    if (!row) return []
-    if (row.deleted_at) {
-      return [
-        {
-          key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />,
-          onClick: () => { openDrawer(row.id); setContextMenu(null) },
-        },
-        {
-          key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />,
-          disabled: restoreBusy,
-          onClick: async () => {
-            setContextMenu(null)
-            setRestoreBusy(true)
-            try {
-              await api.post(itemActionPath(MONITORS_PATH, row.id, 'restore'))
-              toast.success('Monitor ripristinato')
-              reloadList()
-            } catch (e) { toast.error(apiErrorToMessage(e)) }
-            finally { setRestoreBusy(false) }
-          },
-        },
-      ]
-    }
-    return [
-      { key: 'open',   label: 'Apri',     icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => { openDrawer(row.id); setContextMenu(null) } },
-      { key: 'edit',   label: 'Modifica', icon: <EditIcon fontSize="small" />,               hidden: !canChange, onClick: () => { setFormTarget(row); setFormOpen(true); setContextMenu(null) } },
-      { key: 'delete', label: 'Elimina',  icon: <DeleteOutlineIcon fontSize="small" />,      hidden: !canDelete, tone: 'danger' as const, onClick: () => { openDelete(row.id); setContextMenu(null) } },
-    ]
-  }, [contextMenu, canChange, canDelete, restoreBusy, openDrawer, reloadList, toast])
-
-  // ── Empty state ───────────────────────────────────────────────────────────
-  const emptyState = React.useMemo(() => {
-    if (grid.view === 'deleted' && !grid.search.trim())
-      return { title: 'Cestino vuoto', subtitle: 'Non ci sono monitor eliminati.' }
-    if (!grid.search.trim())
-      return { title: 'Nessun monitor', subtitle: 'Crea un nuovo monitor.' }
-    return { title: 'Nessun risultato', subtitle: 'Prova a cambiare i termini di ricerca.' }
-  }, [grid.view, grid.search])
-
-  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead title="Monitor" actions={canAdd ? <Button variant="contained" startIcon={<CampoIcon name="plus" size={15} />} onClick={() => openForm(null)}>Nuovo monitor</Button> : null} />
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs value={view} onChange={(k) => setVista(k === 'all' ? '' : k, opts)}
+          tabs={VIEWS.map((v) => ({ key: v.key, label: v.label, count: viewCount(v.key, stats), tone: v.alert ? 'alert' : 'default' }))} />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={mobileCard}
+          header={<TableBar filters={activeFilters} onRemoveFilter={() => setTipo('', opts)} onClearFilters={() => setTipo('', opts)} q={grid.q} onQChange={grid.setQ} searchPlaceholder="Cerca modello, seriale, workstation, sito…" />}
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca monitor…' }}
+          grid={{
+            pageKey: 'monitors',
+            autoHeight: true,
+            username: me?.username,
+            filterConfig,
+            emptyState: grid.search.trim() || tipo
+              ? { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
+              : { title: view === 'all' ? 'Nessun monitor' : 'Nessun monitor in questa vista', subtitle: view === 'all' ? 'Crea un nuovo monitor.' : '' },
+            rows,
+            columns,
+            loading,
+            rowCount,
+            rowHeight: 52,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: (id) => grid.setOpenId(id),
+            getRowClassName: (row) => (detail?.id === row.id ? 'Mui-selected' : undefined),
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
-      <EntityListCard
-        mobileCard={renderMonitorCard}
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-        }}
-        grid={{
-          pageKey: 'monitors',
-          username: me?.username,
-          emptyState,
-          rows,
-          columns: COLUMNS,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          onRowContextMenu: handleRowContextMenu,
-          sx: {
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-      />
-
-      {/* ── Drawer dettaglio ── */}
-      <MonitorDrawer
-        open={drawerOpen}
-        onClose={closeDrawer}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        drawerTab={drawerTab}
-        onTabChange={setDrawerTab}
-        canChange={canChange}
-        canDelete={canDelete}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        onEdit={openEdit}
-        onDelete={() => setDeleteDlgOpen(true)}
-        onRestore={doRestore}
-        onNavigateToInventory={(inventoryId) =>
-          navigate(`/inventory?open=${inventoryId}&return=${encodeURIComponent(loc.pathname + loc.search)}`)
-        }
-      />
-
-      {/* ── Form drawer create/edit ── */}
-      <MonitorFormDrawer
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSave={handleSave}
-        initial={formTarget}
-        saving={formSaving}
-      />
-
-      {/* ── Conferma eliminazione ── */}
-      <ConfirmDeleteDialog
-        open={deleteDlgOpen}
-        busy={deleteBusy}
-        title="Confermi eliminazione?"
-        description="Il monitor verrà spostato nel cestino e potrà essere ripristinato."
-        onClose={() => setDeleteDlgOpen(false)}
-        onConfirm={doDelete}
-      />
-
-      {/* ── Context menu ── */}
-      <RowContextMenu
-        open={Boolean(contextMenu)}
-        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
-        onClose={() => setContextMenu(null)}
-        items={contextMenuItems}
-      />
-
+      {detail && openId === detail.id ? (
+        <MonitorDetailCard m={detail} canChange={canChange} canDelete={canDelete} canAudit={canAudit} busy={busy}
+          position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
+          onPrev={idx > 0 ? () => grid.setOpenId(rows[idx - 1].id) : undefined}
+          onNext={idx >= 0 && idx < rows.length - 1 ? () => grid.setOpenId(rows[idx + 1].id) : undefined}
+          onClose={() => grid.setOpenId(null)}
+          onStato={(s) => setStato(detail, s)}
+          onEdit={() => openForm(detail)}
+          onDelete={() => remove(detail)}
+          onRestore={() => restore(detail)}
+          onOpenInventory={(id) => navigate(`/inventory?open=${id}&return=${encodeURIComponent(loc.pathname + loc.search)}`)}
+          onOpenMonitor={(id) => grid.setOpenId(id)}
+        />
+      ) : null}
+      <MonitorDialog open={dlg !== null} initial={dlg?.initial ?? null} form={form} onForm={setForm} busy={busy} onClose={() => setDlg(null)} onSave={() => void save()} />
     </Stack>
   )
 }

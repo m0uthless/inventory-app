@@ -91,7 +91,8 @@ class TestSearchContracts:
         assert by_kind["maintenance_plan"]["path"] == f"/maintenance/plans?apri={search_dataset['plan'].id}"
         assert by_kind["wiki_page"]["path"] == f"/wiki/{search_dataset['published_page'].id}"
         assert by_kind["drive_file"]["title"] == "Alpha File"
-        assert by_kind["drive_folder"]["path"] == "/drive"
+        assert by_kind["drive_file"]["path"] == f"/drive?file={by_kind['drive_file']['id']}"
+        assert by_kind["drive_folder"]["path"] == f"/drive?cartella={by_kind['drive_folder']['id']}"
         assert "code" in by_kind["customer"]["meta"]
         assert all(r["title"] != "Alpha Draft" for r in results)
 

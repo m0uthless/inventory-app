@@ -572,6 +572,7 @@ class MonitorSerializer(serializers.ModelSerializer):
     # Campi leggibili in sola lettura per il frontend
     inventory_name = serializers.CharField(source="inventory.name", read_only=True, default=None)
     site_name      = serializers.SerializerMethodField()
+    customer_name  = serializers.SerializerMethodField()
     stato_label    = serializers.CharField(source="get_stato_display", read_only=True)
     tipo_label     = serializers.CharField(source="get_tipo_display", read_only=True)
 
@@ -582,6 +583,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "inventory",
             "inventory_name",
             "site_name",
+            "customer_name",
             "produttore",
             "modello",
             "seriale",
@@ -594,13 +596,20 @@ class MonitorSerializer(serializers.ModelSerializer):
             "updated_at",
             "deleted_at",
         ]
-        read_only_fields = ["id", "inventory_name", "site_name", "stato_label", "tipo_label", "created_at", "updated_at", "deleted_at"]
+        read_only_fields = ["id", "inventory_name", "site_name", "customer_name", "stato_label", "tipo_label", "created_at", "updated_at", "deleted_at"]
 
     def get_site_name(self, obj) -> str | None:
         try:
             return obj.inventory.site.name if obj.inventory.site else None
         except Exception:
             return None
+
+    def get_customer_name(self, obj) -> str | None:
+        inv = obj.inventory
+        if inv is None or inv.customer_id is None:
+            return None
+        c = inv.customer
+        return c.display_name or c.name
 
     def validate(self, attrs):
         # Ricostruisce l'istanza parziale per eseguire il clean() del modello
@@ -620,17 +629,29 @@ class MonitorViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin,
 
     serializer_class   = MonitorSerializer
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields   = ["inventory", "stato", "tipo", "radinet"]
-    search_fields      = ["produttore", "modello", "seriale"]
-    ordering_fields    = ["produttore", "modello", "stato", "tipo", "created_at", "updated_at"]
+    # inventory__isnull=true → monitor senza workstation (vista "Senza workstation").
+    filterset_fields   = {"inventory": ["exact", "isnull"], "stato": ["exact"], "tipo": ["exact"], "radinet": ["exact"]}
+    search_fields      = ["produttore", "modello", "seriale", "inventory__name", "inventory__site__name", "inventory__customer__name"]
+    ordering_fields    = ["produttore", "modello", "seriale", "stato", "tipo", "inventory__name", "created_at", "updated_at", "deleted_at"]
     ordering           = ["produttore", "modello"]
+
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        """Conteggi per le schede della pagina Monitor (solo monitor attivi)."""
+        qs = Monitor.objects.filter(deleted_at__isnull=True)
+        by_stato = dict(qs.values_list("stato").annotate(n=Count("id")).values_list("stato", "n"))
+        return Response({
+            "total": qs.count(),
+            "by_stato": {k: by_stato.get(k, 0) for k in Monitor.Stato.values},
+            "unassigned": qs.filter(inventory__isnull=True).count(),
+        })
 
     # Monitor non ha updated_by
     restore_has_updated_by = False
     purge_permission = "inventory.delete_monitor"
 
     def get_queryset(self):
-        qs = Monitor.objects.select_related("inventory", "inventory__site")
+        qs = Monitor.objects.select_related("inventory", "inventory__site", "inventory__customer")
         return apply_soft_delete_filters(
             qs,
             request=self.request,
