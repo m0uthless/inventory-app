@@ -3,106 +3,131 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Direzioni ARCHIE</title>
+<title>Anteprime ARCHIE</title>
 <style>
 @font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
-@font-face { font-family: "Overpass"; src: url("fonts/Overpass-300_900-normal.woff2") format("woff2"); font-weight: 300 900; font-display: swap; }
-@font-face { font-family: "Archivo"; src: url("fonts/Archivo-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-stretch: 62% 125%; font-display: swap; }
-:root { color-scheme: light; --bg: #f4f5f7; --surface: #fff; --text: #14181f; --muted: #555d6b; --line: #dde1e7; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #101318; --surface: #171b22; --text: #e7eaf0; --muted: #9aa3b2; --line: #2a303b; } }
-:root[data-theme="dark"] { color-scheme: dark; --bg: #101318; --surface: #171b22; --text: #e7eaf0; --muted: #9aa3b2; --line: #2a303b; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+:root { color-scheme: light; --bg: #eef2f1; --surface: #fff; --surface-2: #f5f8f7; --text: #14201d; --muted: #566661; --faint: #7a8985; --line: #d3dcd9; --primary: #1f6b5c; --field: #e3efea; --warn: #8a5a00; --warn-bg: #fdf1d8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #0f1513; --surface: #161e1b; --surface-2: #1b2421; --text: #e2ebe8; --muted: #9aaaa5; --faint: #7f8e8a; --line: #2a3632; --primary: #5fb8a3; --field: #183a33; --warn: #e5b65c; --warn-bg: #352a14; } }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #0f1513; --surface: #161e1b; --surface-2: #1b2421; --text: #e2ebe8; --muted: #9aaaa5; --faint: #7f8e8a; --line: #2a3632; --primary: #5fb8a3; --field: #183a33; --warn: #e5b65c; --warn-bg: #352a14; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.55 "Geist", system-ui, sans-serif; }
-main { max-width: 1120px; margin: 0 auto; padding: 48px 16px 64px; }
-h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.02em; font-weight: 650; }
-.lead { color: var(--muted); margin: 0 0 32px; max-width: 70ch; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; text-decoration: none; color: inherit; transition: border-color .15s; }
-.card:hover { border-color: var(--muted); }
-.card h2 { margin: 0; font-size: 22px; line-height: 1.2; }
-.card p { margin: 0; color: var(--muted); font-size: 14px; }
-.sw { display: flex; gap: 0; border-radius: 4px; overflow: hidden; height: 28px; border: 1px solid var(--line); }
-.sw span { flex: 1; }
-.meta { font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
-.meta b { color: var(--text); font-weight: 600; }
-.go { margin-top: auto; font-weight: 600; font-size: 14px; }
-.a h2 { font-family: "Geist"; font-weight: 650; }
-.b h2 { font-family: "Overpass"; font-weight: 900; }
-.c h2 { font-family: "Archivo"; font-stretch: 75%; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
-.sec { font-size: 18px; margin: 36px 0 8px; }
-.heads { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 6px; }
-.heads a { color: var(--text); }
-.note { margin-top: 28px; color: var(--muted); font-size: 13px; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 14px/1.5 "Geist", system-ui, sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 40px 16px 64px; }
+h1 { font-size: 26px; line-height: 1.15; margin: 0 0 6px; letter-spacing: -.01em; font-weight: 700; }
+.lead { color: var(--muted); margin: 0 0 28px; max-width: 75ch; }
+.lead code, td code { font-family: "Geist Mono", monospace; font-size: 12.5px; }
+section { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+section > h2 { margin: 0; padding: 10px 16px; font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+td { padding: 10px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.pg { width: 240px; font-weight: 600; }
+td.pg small { display: block; font-weight: 400; color: var(--faint); font-size: 12px; }
+td.var { color: var(--muted); }
+td.var b { color: var(--text); font-weight: 600; }
+td.go { width: 230px; text-align: right; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); color: var(--text); text-decoration: none; font-size: 12.5px; font-weight: 550; margin-left: 4px; }
+.btn:hover { border-color: var(--muted); }
+.btn.app { background: var(--field); border-color: transparent; color: var(--primary); }
+.none { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; font-size: 12px; color: var(--faint); }
+.tag { display: inline-block; font-size: 11px; font-weight: 650; padding: 0 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); margin-left: 6px; vertical-align: 1px; }
+.arch td.pg { width: 240px; }
+.foot { margin-top: 20px; color: var(--faint); font-size: 12.5px; }
+@media (max-width: 760px) {
+  tr { display: grid; grid-template-columns: 1fr; border-bottom: 1px solid var(--line); }
+  td { border: 0; padding: 6px 16px; }
+  td.pg { padding-top: 12px; }
+  td.go { text-align: left; padding-bottom: 12px; }
+  .btn:first-child { margin-left: 0; }
+}
 </style>
 </head>
 <body>
 <main>
-  <h1>Tre direzioni per ARCHIE</h1>
-  <p class="lead">Anteprime statiche: shell con sidebar, elenco Issue con pannello di modifica, login. Ogni pagina ha i comandi App / Login / Tema in basso; la sidebar si comprime dal pulsante in alto. Tutti i dati sono fittizi.</p>
-  <div class="grid">
-    <a class="card a" href="a-campo-sterile.html">
-      <h2>A · Campo sterile</h2>
-      <p>La calma di una sala operatoria: acciaio freddo e verde chirurgico. La riga aperta e il suo pannello condividono lo stesso «campo».</p>
-      <div class="sw" aria-label="Palette chiara"><span style="background:#1f6b5c"></span><span style="background:#eef2f1"></span><span style="background:#ffffff"></span><span style="background:#e2f0eb"></span><span style="background:#d5dedb"></span><span style="background:#2e7d4f"></span><span style="background:#9a5b00"></span><span style="background:#c2362b"></span></div>
-      <div class="sw" aria-label="Palette scura"><span style="background:#5fb8a3"></span><span style="background:#0f1615"></span><span style="background:#151e1c"></span><span style="background:#183a33"></span><span style="background:#2a3734"></span><span style="background:#5cc48a"></span><span style="background:#e0a43a"></span><span style="background:#f07466"></span></div>
-      <div class="meta"><span><b>Geist</b> 13px · Geist Mono per i codici</span><span>Sidebar chiara 232px → icone 64px · densità media</span></div>
-      <span class="go">Apri anteprima →</span>
-    </a>
-    <a class="card b" href="b-segnaletica.html">
-      <h2>B · Segnaletica</h2>
-      <p>La segnaletica ospedaliera: ogni area di moduli ha il suo colore di reparto e la testata dice dove sei, come un cartello di corridoio.</p>
-      <div class="sw" aria-label="Palette chiara"><span style="background:#12284a"></span><span style="background:#1b4f9c"></span><span style="background:#0e6f78"></span><span style="background:#6a3fa0"></span><span style="background:#8a5a2b"></span><span style="background:#f3f5f8"></span><span style="background:#1f7a47"></span><span style="background:#c8312b"></span></div>
-      <div class="sw" aria-label="Palette scura"><span style="background:#0a1426"></span><span style="background:#6ea0f0"></span><span style="background:#4cc3cc"></span><span style="background:#b18cf0"></span><span style="background:#d4a067"></span><span style="background:#0c1220"></span><span style="background:#5dc98a"></span><span style="background:#f2736b"></span></div>
-      <div class="meta"><span><b>Overpass</b> 14px · Overpass Mono per i codici</span><span>Sidebar blu 248px → icone 72px · righe alte, adatta al touch</span></div>
-      <span class="go">Apri anteprima →</span>
-    </a>
-    <a class="card c" href="c-modulo.html">
-      <h2>C · Modulo</h2>
-      <p>Il modulo a ricalco: caselle rigate, valori scritti in «carbone», stati timbrati. Nulla sparisce: si annulla, e resta leggibile.</p>
-      <div class="sw" aria-label="Palette chiara"><span style="background:#1d2b5c"></span><span style="background:#4636a8"></span><span style="background:#eef0f4"></span><span style="background:#ffffff"></span><span style="background:#c9cfdb"></span><span style="background:#1e7a4a"></span><span style="background:#9b5c00"></span><span style="background:#c2272d"></span></div>
-      <div class="sw" aria-label="Palette scura"><span style="background:#9db0f5"></span><span style="background:#b3a8ff"></span><span style="background:#0e1220"></span><span style="background:#151a2b"></span><span style="background:#2c3550"></span><span style="background:#5ccb8d"></span><span style="background:#e6ab48"></span><span style="background:#f0656a"></span></div>
-      <div class="meta"><span><b>Archivo</b> 13px (condensato per le etichette) · JetBrains Mono</span><span>Rail a gruppi 60px + elenco 208px · densità alta</span></div>
-      <span class="go">Apri anteprima →</span>
-    </a>
-    <a class="card a" href="e-campo-doppia.html">
-      <h2>A · Sidebar doppia</h2>
-      <p>Direzione A con la navigazione di C: rail delle aree a icone più l'elenco dei moduli dell'area. Il pannello di modifica si apre cliccando una riga.</p>
-      <div class="sw" aria-label="Palette chiara"><span style="background:#1f6b5c"></span><span style="background:#eef2f1"></span><span style="background:#ffffff"></span><span style="background:#e2f0eb"></span><span style="background:#d5dedb"></span><span style="background:#2e7d4f"></span><span style="background:#9a5b00"></span><span style="background:#c2362b"></span></div>
-      <div class="sw" aria-label="Palette scura"><span style="background:#5fb8a3"></span><span style="background:#0f1615"></span><span style="background:#151e1c"></span><span style="background:#183a33"></span><span style="background:#2a3734"></span><span style="background:#5cc48a"></span><span style="background:#e0a43a"></span><span style="background:#f07466"></span></div>
-      <div class="meta"><span><b>Geist</b> 13px · Geist Mono per i codici</span><span>Rail 60px + elenco 216px (nascondibile) · pannello chiuso di default</span></div>
-      <span class="go">Apri anteprima →</span>
-    </a>
-  </div>
-  <h2 class="sec">Nuova base</h2>
-  <ul class="heads">
-    <li><a href="h-base.html"><b>H · Sidebar A + Issue g2</b></a> — barra laterale unica di A, pagina Issue della proposta 2 con indicatori; tre palette: verde, blu, indaco.</li>
-    <li><a href="po-base.html"><b>Purchase Order</b></a> — stessa base applicata al modulo PO: flusso Inserito → Inviato → Ricevuto → Fatturato, importi e documenti per tipo.</li>
-    <li><a href="c-base.html"><b>Clienti</b></a> — stessa base sull'anagrafica clienti, con due varianti del pannello da confrontare: A · Scheda (come Issue e PO) e B · Fascicolo (dal sito al sistema, con ricerca dentro il cliente).</li>
-    <li><a href="r-base.html"><b>Site Repository</b></a> — tre proposte con il territorio come asse: A · Albero (provincia → cliente → sito → asset, ricerca a risultati con percorso), B · Mappa (cartina fissa + elenco della provincia), C · Colonne (Provincia → Cliente → Sito → Asset). Credenziali solo nel pannello.</li>
-    <li><a href="t-base.html"><b>Task di area</b></a> — stessa base delle Issue sui task delle aree: selettore di area (le altre in sola lettura), indicatori, viste, pannello con proprietà modificabili, commenti, allegati da Drive e conversione in issue.</li>
-    <li><a href="mt-base.html"><b>Manutenzione</b></a> — Scadenze in tre varianti (A · Elenco, B · Calendario con carico dei 12 mesi e giorni colorati per urgenza, C · Tabellone clienti × mesi), Piani con copertura del ciclo, Rapportini con esiti da seguire; due varianti del dialogo Rapportino (1 · Esito unico, 2 · Lista di controllo). Si scelgono dalla barra in basso.</li>
-    <li><a href="hm-base.html"><b>Issue · colori per modulo</b></a> — la pagina Issue con la proposta del colore per modulo: icone della sidebar nel colore del loro modulo, eco nell'icona del titolo; voce attiva verde o nel colore del modulo (barra in basso).</li>
-    <li><a href="lg-base.html"><b>Login</b></a> — A · Foto e scheda (come oggi, rinnovata), B · Metà e metà (foto a sinistra, modulo su fondo pulito), C · Tinte senza foto, D · Tinte animate (sfondo ShaderGradient in WebGL). Dalla barra: stato normale, errore, accesso in corso e tema scuro.</li>
-    <li><a href="sn-base.html"><b>ServiceNow</b></a> — Casi: A · Tabella con il riquadro "Oggi" (triage per tecnico, chi è assente, da assegnare) o B · Smistamento (una colonna per tecnico); dialogo "Nuovo caso" da screenshot. Statistiche: A · Grafico per mese e mappa tecnico × mese, B · una scheda per tecnico. Assenze: A · Settimana (mattina/pomeriggio) o B · Mese.</li>
-    <li><a href="up-base.html"><b>Profilo · Utenti e gruppi</b></a> — Profilo: A · Schede (testata con identità e schede Dati, Aspetto, Sicurezza, Permessi, Attività) o B · Pagina unica (colonna con identità e indice, sezioni una sotto l'altra). Utenti e gruppi: A · Tabella con viste e scheda flottante, oppure B · Elenco e scheda affiancati; Gruppi come schede con la mappa dei permessi.</li>
-    <li><a href="mr-base.html"><b>404 · Monitor · Ricerca</b></a> — 404: A · Sobria o B · Cartella vuota. Monitor: A · Tabella con viste per stato o B · Per workstation; scheda con stato, workstation e monitor vicini. Ricerca: A · Per tipo (colonna dei tipi e gruppi) o B · Con anteprima (elenco navigabile da tastiera e pannello a destra). Pagina e variante dalla barra in basso.</li>
-    <li><a href="cb-base.html"><b>Cestino · Bug e feature</b></a> — Cestino: indicatori, tipi come viste, A · Tabella con selezione multipla o B · Per giorno con gli elementi eliminati insieme raggruppati; conferma dell'eliminazione definitiva con i bloccati. Bug e feature: A · Elenco o B · Bacheca, scheda con screenshot, rifiuto con motivo, dialogo "Segnala". Pagina e variante dalla barra in basso.</li>
-    <li><a href="db-base.html"><b>Dashboard</b></a> — a widget con tinte tenui, tre varianti: A · Tinte (ogni widget con la sua tinta pastello), B · Bento (tre riquadri colorati in evidenza, numeri grandi), C · Fascia pastello (apertura sfumata con saluto e quattro indicatori, widget bianchi). Griglia personalizzabile.</li>
-    <li><a href="au-base.html"><b>Audit</b></a> — indicatori (eventi di oggi, accessi falliti, eliminazioni, chi modifica di più), viste Tutto / Modifiche / Eliminazioni / Accessi / Accessi falliti, periodo, filtri da intestazione; due varianti dell'elenco: A · Registro (tabella con "cosa è cambiato") e B · Cronologia (per giorno, eventi della stessa persona raggruppati). Pannello con differenze campo per campo e storico dell'oggetto.</li>
-    <li><a href="ns-base.html"><b>Nota spese</b></a> — elenco per il tecnico (mese in corso, nota rifiutata, andamento) e per la segreteria (da validare, senza scontrino, per persona); la nota in due varianti: A · Foglio (le 12 categorie come righe, trasferte km sotto il rimborso chilometraggio) e B · Voci (solo le voci compilate, scontrini trascinati e assegnati alla categoria). Ruolo e variante dalla barra in basso.</li>
-    <li><a href="ct-base.html"><b>Contratti</b></a> — la pagina com'è in dev (indicatori, viste per scadenza, periodo come linea, scheda flottante) e due varianti del dialogo «Nuovo contratto»: A · Scheda unica (modulo con riepilogo che si aggiorna) e B · Passi (cliente e tipo → periodo → valore e documenti). Si scelgono dalla barra in basso.</li>
-    <li><a href="d-base.html"><b>Drive</b></a> — scelta: A · Esplora file (albero, clienti, recenti, tabella, icone dei file in stile desktop, pannello del file con anteprima, clienti, visibilità, note, attività). B · Archivio per confronto.</li>
-    <li><a href="w-base.html"><b>Wiki</b></a> — scelta: <b>E · Archivio</b> (cartelle per categoria con vista alternativa «Tutte le pagine»; articolo ed editor come fogli nella cartella, spostamento con le linguette; Query come schedario per linguaggio; Statistiche come registro dell'archivio). Restano per confronto A · Tabella, B · Biblioteca, D · Schede; C scartata.</li>
-    <li><a href="pf-base.html"><b>Piano ferie</b></a> — tre proposte: A · Griglia (la griglia attuale ripulita, presenti per area, legenda che filtra), B · Timeline (assenze come barre, zoom Mese/2 settimane), C · Coordinamento (calendario con chi manca e coda da validare con avvisi di copertura).</li>
-  </ul>
-  <h2 class="sec">Base precedente e proposte per topbar e testata</h2>
-  <ul class="heads">
-    <li><a href="f2-viste.html"><b>Base · Viste salvate</b></a> — sidebar doppia, viste a schede, filtri e ordinamento dalle intestazioni.</li>
-    <li><a href="g1-testata-in-topbar.html"><b>1 · Testata nella topbar</b></a> — titolo, conteggi, ricerca e «Nuova issue» in una sola barra.</li>
-    <li><a href="g2-topbar-globale.html"><b>2 · Topbar globale</b></a> — in alto solo ciò che vale ovunque (ricerca, notifiche, profilo); testata di pagina su una riga.</li>
-    <li><a href="g3-senza-topbar.html"><b>3 · Senza topbar</b></a> — la ricerca va nella rail, la pagina comincia dal titolo.</li>
-  </ul>
-  <p class="note">I font sono serviti in locale da <code>fonts/</code>. Nessun file dell'applicazione è stato modificato.</p>
+  <h1>Anteprime ARCHIE</h1>
+  <p class="lead">Le pagine nell'ordine del menu dell'app. Per ognuna: la variante scelta (l'anteprima si apre già su quella, quando la pagina lo permette), il link all'anteprima e quello alla pagina vera in dev. Le anteprime hanno dati finti e non sempre sono aggiornate alle ultime modifiche fatte nell'app. In fondo l'archivio con le direzioni iniziali, le prove e le idee rimandate.</p>
+
+  <section aria-label="Operatività">
+    <h2>Operatività</h2>
+    <table>
+      <tr><td class="pg">Dashboard</td><td class="var"><b>A · Tinte</b>: widget a tinte tenui, griglia personalizzabile.</td><td class="go"><a class="btn" href="db-base.html?variante=a">Anteprima</a><a class="btn app" data-app="/">App</a></td></tr>
+      <tr><td class="pg">Issue</td><td class="var"><b>Sidebar A + Issue g2</b>: indicatori, viste salvate, filtri dalle intestazioni, scheda flottante.</td><td class="go"><a class="btn" href="h-base.html">Anteprima</a><a class="btn app" data-app="/issues">App</a></td></tr>
+      <tr><td class="pg">Task di area</td><td class="var">Selettore di area, indicatori, viste, scheda con commenti e allegati, conversione in issue.</td><td class="go"><a class="btn" href="t-base.html">Anteprima</a><a class="btn app" data-app="/tasks">App</a></td></tr>
+      <tr><td class="pg">Manutenzione<small>Scadenze · Piani · Rapportini</small></td><td class="var">Scadenze <b>A · Elenco</b> con <b>B · Calendario</b> come alternativa; dialogo Rapportino <b>1 · Esito unico</b>.</td><td class="go"><a class="btn" href="mt-base.html?variante=a&amp;rapportino=a">Anteprima</a><a class="btn app" data-app="/maintenance">App</a></td></tr>
+      <tr><td class="pg">ServiceNow · Casi</td><td class="var"><b>A · Tabella e Oggi</b>, con le colonne di sempre e Crea issue / Crea task dal menu.</td><td class="go"><a class="btn" href="sn-base.html?pagina=cases&amp;variante=a">Anteprima</a><a class="btn app" data-app="/servicenow-cases">App</a></td></tr>
+      <tr><td class="pg">ServiceNow · Dashboard casi</td><td class="var"><b>B · Dashboard casi</b>: andamento, per tecnico, oggi e assenze della settimana. Sostituisce Statistiche e Assenze tecnici.</td><td class="go"><a class="btn" href="sn-base.html?pagina=stats&amp;variante=b">Anteprima</a><a class="btn app" data-app="/servicenow-dashboard">App</a></td></tr>
+    </table>
+  </section>
+
+  <section aria-label="Anagrafiche">
+    <h2>Anagrafiche</h2>
+    <table>
+      <tr><td class="pg">Site Repository</td><td class="var"><b>B · Mappa</b>: cartina e elenco delle province.</td><td class="go"><a class="btn" href="r-base.html?var=b">Anteprima</a><a class="btn app" data-app="/site-repository">App</a></td></tr>
+      <tr><td class="pg">Clienti</td><td class="var"><b>A · Scheda</b>: lo schema seguito anche da Siti, Contatti e Inventari.</td><td class="go"><a class="btn" href="c-base.html">Anteprima</a><a class="btn app" data-app="/customers">App</a></td></tr>
+      <tr><td class="pg">Siti</td><td class="var">Fatta direttamente nell'app sullo schema dei Clienti.</td><td class="go"><span class="none">nessuna anteprima</span><a class="btn app" data-app="/sites">App</a></td></tr>
+      <tr><td class="pg">Contatti</td><td class="var">Fatta direttamente nell'app sullo schema di Clienti e Siti.</td><td class="go"><span class="none">nessuna anteprima</span><a class="btn app" data-app="/contacts">App</a></td></tr>
+      <tr><td class="pg">Inventari</td><td class="var">Fatta direttamente nell'app sullo schema di Clienti, Siti e Contatti.</td><td class="go"><span class="none">nessuna anteprima</span><a class="btn app" data-app="/inventory">App</a></td></tr>
+      <tr><td class="pg">Monitor</td><td class="var"><b>A · Tabella</b>: viste per stato, scheda con cambio stato e monitor vicini.</td><td class="go"><a class="btn" href="mr-base.html?pagina=mon&amp;variante=a">Anteprima</a><a class="btn app" data-app="/monitors">App</a></td></tr>
+    </table>
+  </section>
+
+  <section aria-label="Conoscenza">
+    <h2>Conoscenza</h2>
+    <table>
+      <tr><td class="pg">Wiki<small>Pagine · Query · Statistiche</small></td><td class="var"><b>E · Archivio</b>: cartelle per categoria, fogli, schedario delle query, registro.</td><td class="go"><a class="btn" href="w-base.html?v=e">Anteprima</a><a class="btn app" data-app="/wiki">App</a></td></tr>
+      <tr><td class="pg">Drive</td><td class="var"><b>A · Esplora file</b>: albero, clienti, recenti, pannello del file.</td><td class="go"><a class="btn" href="d-base.html?v=a">Anteprima</a><a class="btn app" data-app="/drive">App</a></td></tr>
+    </table>
+  </section>
+
+  <section aria-label="Amministrazione">
+    <h2>Amministrazione</h2>
+    <table>
+      <tr><td class="pg">Contratti</td><td class="var">La pagina sullo schema delle anagrafiche; dialogo «Nuovo contratto» <b>B · Passi</b>. Contiene anche il mockup del titolo a linguetta.</td><td class="go"><a class="btn" href="ct-base.html">Anteprima</a><a class="btn app" data-app="/contracts">App</a></td></tr>
+      <tr><td class="pg">Purchase Order</td><td class="var">Flusso Inserito → Inviato → Ricevuto → Fatturato, importi e documenti.</td><td class="go"><a class="btn" href="po-base.html">Anteprima</a><a class="btn app" data-app="/purchase-orders">App</a></td></tr>
+      <tr><td class="pg">Rimborso spese</td><td class="var"><b>A · Foglio</b>: le 12 categorie come righe del modello Excel.</td><td class="go"><a class="btn" href="ns-base.html?variante=a">Anteprima</a><a class="btn app" data-app="/rimborso-spese">App</a></td></tr>
+      <tr><td class="pg">Piano ferie</td><td class="var">Griglia per area con richieste e coordinamento; colori dei motivi invariati (legenda HR).</td><td class="go"><a class="btn" href="pf-base.html">Anteprima</a><a class="btn app" data-app="/piano-ferie">App</a></td></tr>
+    </table>
+  </section>
+
+  <section aria-label="Sistema">
+    <h2>Sistema</h2>
+    <table>
+      <tr><td class="pg">Audit</td><td class="var"><b>A · Registro</b>, con le colonne Data e Ora separate.</td><td class="go"><a class="btn" href="au-base.html?variante=a">Anteprima</a><a class="btn app" data-app="/audit">App</a></td></tr>
+      <tr><td class="pg">Cestino</td><td class="var"><b>A · Tabella</b>: tipi come viste, selezione multipla, stato di ripristino; niente indicatori.</td><td class="go"><a class="btn" href="cb-base.html?pagina=trash&amp;variante=a">Anteprima</a><a class="btn app" data-app="/trash">App</a></td></tr>
+      <tr><td class="pg">Bug e feature</td><td class="var"><b>B · Bacheca</b>: bug aperti, funzionalità richieste, chiuse di recente.</td><td class="go"><a class="btn" href="cb-base.html?pagina=bug&amp;variante=b">Anteprima</a><a class="btn app" data-app="/bug-feature">App</a></td></tr>
+      <tr><td class="pg">Utenti e gruppi<small>menu utente</small></td><td class="var"><b>A · Tabella</b> con scheda utente flottante; gruppi come schede con la striscia dei permessi.</td><td class="go"><a class="btn" href="up-base.html?pagina=usr&amp;variante=a">Anteprima</a><a class="btn app" data-app="/utenti">App</a></td></tr>
+      <tr><td class="pg">Accesso Portal<small>menu utente</small></td><td class="var">Fatta direttamente nell'app nello stile di Utenti e gruppi.</td><td class="go"><span class="none">nessuna anteprima</span><a class="btn app" data-app="/accesso-portal">App</a></td></tr>
+    </table>
+  </section>
+
+  <section aria-label="Altre pagine">
+    <h2>Altre pagine</h2>
+    <table>
+      <tr><td class="pg">Profilo<small>menu utente</small></td><td class="var"><b>A · Schede</b>, nell'app come scheda flottante delle stesse misure dei dettagli.<span class="tag">diversa dall'anteprima</span></td><td class="go"><a class="btn" href="up-base.html?pagina=pro&amp;variante=a">Anteprima</a><a class="btn app" data-app="/profile">App</a></td></tr>
+      <tr><td class="pg">Ricerca</td><td class="var"><b>A · Per tipo</b>: colonna dei tipi con conteggi e gruppi.</td><td class="go"><a class="btn" href="mr-base.html?pagina=search&amp;variante=a">Anteprima</a><a class="btn app" data-app="/search?search=bologna">App</a></td></tr>
+      <tr><td class="pg">404</td><td class="var"><b>A · Sobria</b>: dentro l'app, con ricerca e scorciatoie.</td><td class="go"><a class="btn" href="mr-base.html?pagina=nf&amp;variante=a">Anteprima</a><a class="btn app" data-app="/pagina-che-non-esiste">App</a></td></tr>
+      <tr><td class="pg">Login</td><td class="var"><b>D · Tinte animate</b>: sfondo ShaderGradient nei colori dell'app, scheda larga, logo segnaposto.</td><td class="go"><a class="btn" href="lg-base.html?variante=d">Anteprima</a><a class="btn app" data-app="/login">App</a></td></tr>
+    </table>
+  </section>
+
+  <section class="arch" aria-label="Archivio">
+    <h2>Archivio · direzioni iniziali, prove e idee rimandate</h2>
+    <table>
+      <tr><td class="pg">A · Campo sterile</td><td class="var">La direzione scelta: acciaio freddo e verde chirurgico, Geist.</td><td class="go"><a class="btn" href="a-campo-sterile.html">Apri</a></td></tr>
+      <tr><td class="pg">B · Segnaletica</td><td class="var">Direzione scartata: colori di reparto, Overpass.</td><td class="go"><a class="btn" href="b-segnaletica.html">Apri</a></td></tr>
+      <tr><td class="pg">C · Modulo</td><td class="var">Direzione scartata: modulo a ricalco, Archivo.</td><td class="go"><a class="btn" href="c-modulo.html">Apri</a></td></tr>
+      <tr><td class="pg">A · Sidebar doppia</td><td class="var">Prova: rail delle aree più elenco dei moduli.</td><td class="go"><a class="btn" href="e-campo-doppia.html">Apri</a></td></tr>
+      <tr><td class="pg">Viste salvate · topbar e testata</td><td class="var">Prove della base: viste a schede e tre soluzioni per la topbar (2 · Topbar globale è quella adottata).</td><td class="go"><a class="btn" href="f2-viste.html">Viste</a><a class="btn" href="g1-testata-in-topbar.html">1</a><a class="btn" href="g2-topbar-globale.html">2</a><a class="btn" href="g3-senza-topbar.html">3</a></td></tr>
+      <tr><td class="pg">Colore per modulo<span class="tag">rimandato</span></td><td class="var">Icone della sidebar nel colore del loro modulo, eco nel titolo della pagina.</td><td class="go"><a class="btn" href="hm-base.html">Apri</a></td></tr>
+      <tr><td class="pg">Titolo nella linguetta<span class="tag">da decidere</span></td><td class="var">Il titolo della pagina come linguetta della scheda: nell'anteprima Contratti, interruttore «Titolo» nella barra in basso.</td><td class="go"><a class="btn" href="ct-base.html">Apri</a></td></tr>
+    </table>
+  </section>
+
+  <p class="foot">I font sono serviti in locale da <code>fonts/</code>. Le anteprime non modificano l'app; il link «App» apre la stessa pagina sullo stack dev (stesso indirizzo di questa pagina, porta 80).</p>
 </main>
+<script>
+  // «App» punta allo stack dev sullo stesso host di questa pagina.
+  document.querySelectorAll('[data-app]').forEach((a) => { a.href = `${location.protocol}//${location.hostname}${a.dataset.app}`; a.target = '_blank'; a.rel = 'noopener'; });
+</script>
 </body>
 </html>
