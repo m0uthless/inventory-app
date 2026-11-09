@@ -1,27 +1,13 @@
 import * as React from 'react'
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormHelperText,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-} from '@mui/material'
+import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined'
 
 import CustomFieldsEditor from '../../ui/CustomFieldsEditor'
-import ProvinceAutocomplete from '../../ui/ProvinceAutocomplete'
+import ProvincePill from '../../ui/ProvincePill'
+import { QuickField, QuickFields, QuickForm, SelectPill, TextPill } from '../../ui/campo'
 import type { CustomerForm, LookupItem } from './types'
-
-const asId = (v: unknown): number | '' => {
-  const s = String(v)
-  return s === '' ? '' : Number(s)
-}
 
 type CustomerDialogProps = {
   open: boolean
@@ -36,158 +22,55 @@ type CustomerDialogProps = {
   onFieldErrorsChange: React.Dispatch<React.SetStateAction<Record<string, string>>>
 }
 
+const FIELD_LABEL: Record<string, string> = { status: 'Vendor', name: 'Nome', display_name: 'Nome visualizzato', vat_number: 'P.IVA', tax_code: 'Codice fiscale', province: 'Provincia', notes: 'Note', custom_fields: 'Campi personalizzati' }
+
+/** Nuovo cliente / modifica: inserimento rapido (nome come titolo, note come descrizione, il resto in pillole). */
 export default function CustomerDialog({
-  open,
-  mode,
-  saving,
-  errors,
-  statuses,
-  form,
-  onClose,
-  onSave,
-  onFormChange,
-  onFieldErrorsChange,
+  open, mode, saving, errors, statuses, form, onClose, onSave, onFormChange, onFieldErrorsChange,
 }: CustomerDialogProps) {
+  // Ogni modifica toglie l'errore di quel campo (come prima).
+  const set = <K extends keyof CustomerForm>(k: K, v: CustomerForm[K]) => {
+    onFormChange((f) => ({ ...f, [k]: v }))
+    onFieldErrorsChange((er) => { if (!(k in er)) return er; const n = { ...er }; delete n[k as string]; return n })
+  }
+  const errs = Object.entries(errors).filter(([, m]) => m).map(([k, m]) => (k === '_error' || !FIELD_LABEL[k] ? m : `${FIELD_LABEL[k]}: ${m}`))
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{mode === 'create' ? 'Nuovo cliente' : 'Modifica cliente'}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={1.5} sx={{ mt: 1 }}>
-          <FormControl size="small" fullWidth error={Boolean(errors.status)}>
-            <InputLabel>Vendor</InputLabel>
-            <Select
-              label="Vendor"
-              value={form.status}
-              onChange={(e) => {
-                onFormChange((f) => ({ ...f, status: asId(e.target.value) }))
-                onFieldErrorsChange((er) => { const n = { ...er }; delete n.status; return n })
-              }}
-            >
-              <MenuItem value="">Seleziona…</MenuItem>
-              {statuses.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.label}
-                </MenuItem>
-              ))}
-            </Select>
-            {errors.status ? <FormHelperText>{errors.status}</FormHelperText> : null}
-          </FormControl>
-
-          <TextField
-            size="small"
-            label="Nome"
-            value={form.name}
-            onChange={(e) => {
-              const name = e.target.value
-              onFormChange((f) => ({
-                ...f,
-                name,
-                // Pre-popola display_name solo se l'utente non l'ha ancora modificato
-                display_name: f.display_name.trim() === '' ? name : f.display_name,
-              }))
-              onFieldErrorsChange((er) => {
-                const next = { ...er }
-                delete next.name
-                return next
-              })
-            }}
-            error={Boolean(errors.name)}
-            helperText={errors.name || ' '}
-            fullWidth
-          />
-
-          <TextField
-            size="small"
-            label="Nome visualizzato"
-            value={form.display_name}
-            onChange={(e) => {
-              onFormChange((f) => ({ ...f, display_name: e.target.value }))
-              onFieldErrorsChange((er) => {
-                const next = { ...er }
-                delete next.display_name
-                return next
-              })
-            }}
-            error={Boolean(errors.display_name)}
-            helperText={errors.display_name || 'Se vuoto, verrà usato Nome.'}
-            fullWidth
-          />
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="P.IVA"
-              value={form.vat_number}
-              onChange={(e) => {
-                onFormChange((f) => ({ ...f, vat_number: e.target.value }))
-                onFieldErrorsChange((er) => {
-                  const next = { ...er }
-                  delete next.vat_number
-                  return next
-                })
-              }}
-              error={Boolean(errors.vat_number)}
-              helperText={errors.vat_number || ' '}
-              fullWidth
-            />
-            <TextField
-              size="small"
-              label="Codice fiscale"
-              value={form.tax_code}
-              onChange={(e) => {
-                onFormChange((f) => ({ ...f, tax_code: e.target.value }))
-                onFieldErrorsChange((er) => {
-                  const next = { ...er }
-                  delete next.tax_code
-                  return next
-                })
-              }}
-              error={Boolean(errors.tax_code)}
-              helperText={errors.tax_code || ' '}
-              fullWidth
-            />
-          </Stack>
-
-          <ProvinceAutocomplete
-            value={form.province}
-            onChange={(sigla) => {
-              onFormChange((f) => ({ ...f, province: sigla }))
-              onFieldErrorsChange((er) => {
-                const next = { ...er }
-                delete next.province
-                return next
-              })
-            }}
-            error={Boolean(errors.province)}
-            helperText={errors.province}
-          />
-
-          <CustomFieldsEditor
-            entity="customer"
-            value={form.custom_fields}
-            onChange={(v) => onFormChange((f) => ({ ...f, custom_fields: v }))}
-            mode="inline"
-          />
-
-          <TextField
-            size="small"
-            label="Note"
-            value={form.notes}
-            onChange={(e) => onFormChange((f) => ({ ...f, notes: e.target.value }))}
-            fullWidth
-            multiline
-            minRows={4}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={saving}>
-          Annulla
-        </Button>
-        <Button variant="contained" onClick={onSave} disabled={saving}>
-          {saving ? 'Salvataggio…' : 'Salva'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <QuickForm
+      dialogLabel={mode === 'create' ? 'Nuovo cliente' : 'Modifica cliente'}
+      open={open} onClose={onClose} mode={mode} saving={saving} onSubmit={onSave}
+      crumb={{ icon: <ApartmentOutlinedIcon />, label: 'Clienti' }}
+      submitLabel={mode === 'create' ? 'Crea cliente' : 'Salva modifiche'}
+      title={{
+        value: form.name, placeholder: 'Ragione sociale', label: 'Nome', error: errors.name,
+        onChange: (name) => {
+          // Il nome visualizzato segue il nome finché non lo si cambia a mano.
+          onFormChange((f) => ({ ...f, name, display_name: f.display_name.trim() === '' || f.display_name === f.name ? name : f.display_name }))
+          onFieldErrorsChange((er) => { if (!('name' in er)) return er; const n = { ...er }; delete n.name; return n })
+        },
+      }}
+      description={{ value: form.notes, onChange: (v) => set('notes', v), placeholder: 'Note sul cliente…', label: 'Note' }}
+      errors={errs}
+      pills={
+        <>
+          <SelectPill icon={<StorefrontOutlinedIcon />} placeholder="Vendor" value={form.status} error={Boolean(errors.status)}
+            options={statuses.map((s) => ({ value: s.id, label: s.label }))} onChange={(v) => set('status', v === '' ? '' : Number(v))} />
+          <ProvincePill value={form.province} onChange={(v) => set('province', v)} error={Boolean(errors.province)} />
+          <TextPill icon={<ReceiptLongOutlinedIcon />} placeholder="P.IVA" mono inputMode="numeric" value={form.vat_number} onChange={(v) => set('vat_number', v)} error={Boolean(errors.vat_number)} width={90} />
+          <TextPill icon={<BadgeOutlinedIcon />} placeholder="Codice fiscale" mono value={form.tax_code} onChange={(v) => set('tax_code', v)} error={Boolean(errors.tax_code)} />
+        </>
+      }
+      more={{
+        hint: 'nome visualizzato, campi personalizzati',
+        defaultOpen: Boolean(errors.display_name || errors.custom_fields) || (mode === 'edit' && form.display_name.trim() !== '' && form.display_name !== form.name),
+        children: (
+          <>
+            <QuickFields>
+              <QuickField label="Nome visualizzato" value={form.display_name} onChange={(v) => set('display_name', v)} error={errors.display_name} help="Se vuoto, si usa il nome." />
+            </QuickFields>
+            <CustomFieldsEditor entity="customer" value={form.custom_fields} onChange={(v) => onFormChange((f) => ({ ...f, custom_fields: v }))} mode="inline" />
+          </>
+        ),
+      }}
+    />
   )
 }

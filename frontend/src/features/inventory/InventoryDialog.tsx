@@ -1,76 +1,18 @@
 import * as React from 'react'
-import {
-  Box,
-  Button,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormHelperText,
-  IconButton,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-} from '@mui/material'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import { Box, Chip, InputBase } from '@mui/material'
+import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
+import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined'
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
+import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
+import TagRoundedIcon from '@mui/icons-material/TagRounded'
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded'
+import ComputerOutlinedIcon from '@mui/icons-material/ComputerOutlined'
+import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
 
 import CustomFieldsEditor from '../../ui/CustomFieldsEditor'
-import type {
-  CustomerItem,
-  InventoryFieldName,
-  InventoryForm,
-  LookupItem,
-  SiteItem,
-} from './types'
-
-const asId = (v: unknown): number | '' => {
-  const s = String(v)
-  return s === '' ? '' : Number(s)
-}
-
-function PasswordField(props: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-  helperText?: string
-}) {
-  const { label, value, onChange, disabled, helperText } = props
-  const [show, setShow] = React.useState(false)
-
-  return (
-    <TextField
-      size="small"
-      label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      fullWidth
-      disabled={disabled}
-      helperText={helperText}
-      type={show ? 'text' : 'password'}
-      InputProps={{
-        endAdornment: (
-          <InputAdornment position="end">
-            <IconButton
-              aria-label={show ? 'Nascondi' : 'Mostra'}
-              edge="end"
-              onClick={() => setShow((s) => !s)}
-              size="small"
-            >
-              {show ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-            </IconButton>
-          </InputAdornment>
-        ),
-      }}
-    />
-  )
-}
+import { QuickField, QuickFields, QuickForm, QuickGroup, SelectPill, TextPill } from '../../ui/campo'
+import type { CustomerItem, InventoryFieldName, InventoryForm, LookupItem, SiteItem } from './types'
 
 type InventoryDialogProps = {
   open: boolean
@@ -94,359 +36,98 @@ type InventoryDialogProps = {
   fieldHelpText: (field: InventoryFieldName) => string | undefined
 }
 
+const FIELD_LABEL: Record<string, string> = {
+  customer: 'Cliente', site: 'Sito', status: 'Stato', type: 'Tipo', name: 'Nome', knumber: 'K-number', serial_number: 'Seriale', hostname: 'Hostname',
+  local_ip: 'IP locale', srsa_ip: 'SRSA IP', location: 'Posizione', telefono: 'Telefono', os_user: 'Utente OS', os_pwd: 'Password OS', app_usr: 'Utente App',
+  app_pwd: 'Password App', vnc_pwd: 'Password VNC', manufacturer: 'Produttore', model: 'Modello', warranty_end_date: 'Fine garanzia', notes: 'Note', tags: 'Tag', custom_fields: 'Campi personalizzati',
+}
+const MORE_FIELDS = ['srsa_ip', 'location', 'telefono', 'os_user', 'os_pwd', 'app_usr', 'app_pwd', 'vnc_pwd', 'manufacturer', 'model', 'warranty_end_date', 'tags', 'custom_fields'] as const
+
+/**
+ * Nuovo inventario / modifica: inserimento rapido. Il nome è il titolo, le note la descrizione;
+ * in pillole i dati che servono sempre, in "Altri campi" rete, credenziali, apparecchio e tag.
+ * Le password si vedono e si scrivono solo con il permesso sulle credenziali (come prima).
+ */
 export default function InventoryDialog({
-  open,
-  mode,
-  saving,
-  canViewSecrets,
-  errors,
-  customers,
-  sites,
-  statuses,
-  types,
-  form,
-  tagInput,
-  onClose,
-  onSave,
-  onTagInputChange,
-  onFormChange,
-  onErrorsChange,
-  onCustomerChange,
-  isFieldDisabled,
-  fieldHelpText,
+  open, mode, saving, canViewSecrets, errors, customers, sites, statuses, types, form, tagInput,
+  onClose, onSave, onTagInputChange, onFormChange, onErrorsChange, onCustomerChange, isFieldDisabled, fieldHelpText,
 }: InventoryDialogProps) {
+  const set = <K extends keyof InventoryForm>(k: K, v: InventoryForm[K]) => {
+    onFormChange((prev) => ({ ...prev, [k]: v }))
+    if (errors[k as string]) onErrorsChange((prev) => ({ ...prev, [k]: undefined }))
+  }
+  const errs = Object.entries(errors).filter(([, m]) => m).map(([k, m]) => (FIELD_LABEL[k] ? `${FIELD_LABEL[k]}: ${m}` : String(m)))
+  const field = (k: InventoryFieldName & keyof InventoryForm, extra?: { secret?: boolean; mono?: boolean; type?: string }) => {
+    if (extra?.secret && !canViewSecrets) return <QuickField key={k} label={FIELD_LABEL[k]} value="" onChange={() => {}} disabled help="Non autorizzato" />
+    return (
+      <QuickField key={k} label={FIELD_LABEL[k]} value={String(form[k] ?? '')} onChange={(v) => set(k, v as never)} error={errors[k]}
+        disabled={isFieldDisabled(k)} help={fieldHelpText(k)} secret={extra?.secret} mono={extra?.mono} type={extra?.type} />
+    )
+  }
+  const addTag = () => {
+    const tag = tagInput.trim().toLowerCase()
+    if (!tag) return
+    if (!form.tags.includes(tag)) onFormChange((prev) => ({ ...prev, tags: [...prev.tags, tag] }))
+    onTagInputChange('')
+  }
+  const moreFilled = MORE_FIELDS.some((k) => (k === 'tags' ? form.tags.length : k === 'custom_fields' ? Object.keys(form.custom_fields ?? {}).length : String(form[k] ?? '').trim()) || errors[k])
+
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{mode === 'create' ? 'Nuovo inventario' : 'Modifica inventario'}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={1.5} sx={{ mt: 1 }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <FormControl size="small" fullWidth required error={Boolean(errors.customer)}>
-              <InputLabel required>Cliente</InputLabel>
-              <Select
-                label="Cliente"
-                value={form.customer}
-                onChange={async (e) => {
-                  const value = asId(e.target.value)
-                  onFormChange((prev) => ({ ...prev, customer: value, site: '' }))
-                  onErrorsChange((prev) => ({ ...prev, customer: undefined }))
-                  await onCustomerChange(value)
-                }}
-              >
-                <MenuItem value="">Seleziona…</MenuItem>
-                {customers.map((customer) => (
-                  <MenuItem key={customer.id} value={customer.id}>
-                    {customer.code} — {customer.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.customer ? <FormHelperText>{errors.customer}</FormHelperText> : null}
-            </FormControl>
-
-            <FormControl size="small" fullWidth disabled={form.customer === ''}>
-              <InputLabel>Sito</InputLabel>
-              <Select
-                label="Sito"
-                value={form.site}
-                onChange={(e) => onFormChange((prev) => ({ ...prev, site: asId(e.target.value) }))}
-              >
-                <MenuItem value="">(nessuno)</MenuItem>
-                {sites.map((site) => (
-                  <MenuItem key={site.id} value={site.id}>
-                    {site.display_name || site.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <FormControl size="small" fullWidth required error={Boolean(errors.status)}>
-              <InputLabel required>Stato</InputLabel>
-              <Select
-                label="Stato"
-                value={form.status}
-                onChange={(e) => {
-                  const value = asId(e.target.value)
-                  onFormChange((prev) => ({ ...prev, status: value }))
-                  onErrorsChange((prev) => ({ ...prev, status: undefined }))
-                }}
-              >
-                <MenuItem value="">Seleziona…</MenuItem>
-                {statuses.map((status) => (
-                  <MenuItem key={status.id} value={status.id}>
-                    {status.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.status ? <FormHelperText>{errors.status}</FormHelperText> : null}
-            </FormControl>
-
-            <FormControl size="small" fullWidth>
-              <InputLabel>Tipo</InputLabel>
-              <Select
-                label="Tipo"
-                value={form.type}
-                onChange={(e) => onFormChange((prev) => ({ ...prev, type: asId(e.target.value) }))}
-              >
-                <MenuItem value="">(nessuno)</MenuItem>
-                {types.map((type) => (
-                  <MenuItem key={type.id} value={type.id}>
-                    {type.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-
-          <TextField
-            size="small"
-            label="Nome / Descrizione"
-            required
-            value={form.name}
-            onChange={(e) => {
-              onFormChange((prev) => ({ ...prev, name: e.target.value }))
-              onErrorsChange((prev) => ({ ...prev, name: undefined }))
-            }}
-            error={Boolean(errors.name)}
-            helperText={
-              errors.name ||
-              'Breve descrizione per identificare l\'apparecchio (es. "Server principale sala CED")'
-            }
-            fullWidth
-          />
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="K-number"
-              value={form.knumber}
-              onChange={(e) => {
-                onFormChange((prev) => ({ ...prev, knumber: e.target.value }))
-                onErrorsChange((prev) => ({ ...prev, knumber: undefined }))
-              }}
-              error={Boolean(errors.knumber)}
-              helperText={errors.knumber ?? ' '}
-              fullWidth
-            />
-            <TextField
-              size="small"
-              label="Seriale"
-              value={form.serial_number}
-              onChange={(e) => {
-                onFormChange((prev) => ({ ...prev, serial_number: e.target.value }))
-                onErrorsChange((prev) => ({ ...prev, serial_number: undefined }))
-              }}
-              error={Boolean(errors.serial_number)}
-              helperText={errors.serial_number ?? ' '}
-              fullWidth
-            />
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="Hostname"
-              value={form.hostname}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, hostname: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('hostname')}
-              helperText={fieldHelpText('hostname')}
-            />
-            <TextField
-              size="small"
-              label="IP locale"
-              value={form.local_ip}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, local_ip: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('local_ip')}
-              helperText={fieldHelpText('local_ip')}
-            />
-            <TextField
-              size="small"
-              label="SRSA IP"
-              value={form.srsa_ip}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, srsa_ip: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('srsa_ip')}
-              helperText={fieldHelpText('srsa_ip')}
-            />
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="Posizione"
-              value={form.location}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, location: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('location')}
-              helperText={fieldHelpText('location')}
-            />
-            <TextField
-              size="small"
-              label="Telefono"
-              value={form.telefono}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, telefono: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('telefono')}
-              helperText={fieldHelpText('telefono')}
-            />
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="Utente OS"
-              value={form.os_user}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, os_user: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('os_user')}
-              helperText={fieldHelpText('os_user')}
-            />
-            {canViewSecrets ? (
-              <PasswordField
-                label="Password OS"
-                value={form.os_pwd}
-                onChange={(value) => onFormChange((prev) => ({ ...prev, os_pwd: value }))}
-                disabled={isFieldDisabled('os_pwd')}
-                helperText={fieldHelpText('os_pwd')}
-              />
-            ) : (
-              <TextField size="small" label="Password OS" value="" fullWidth disabled helperText="Non autorizzato" />
-            )}
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="Utente App"
-              value={form.app_usr}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, app_usr: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('app_usr')}
-              helperText={fieldHelpText('app_usr')}
-            />
-            {canViewSecrets ? (
-              <PasswordField
-                label="Password App"
-                value={form.app_pwd}
-                onChange={(value) => onFormChange((prev) => ({ ...prev, app_pwd: value }))}
-                disabled={isFieldDisabled('app_pwd')}
-                helperText={fieldHelpText('app_pwd')}
-              />
-            ) : (
-              <TextField size="small" label="Password App" value="" fullWidth disabled helperText="Non autorizzato" />
-            )}
-            {canViewSecrets ? (
-              <PasswordField
-                label="Password VNC"
-                value={form.vnc_pwd}
-                onChange={(value) => onFormChange((prev) => ({ ...prev, vnc_pwd: value }))}
-                disabled={isFieldDisabled('vnc_pwd')}
-                helperText={fieldHelpText('vnc_pwd')}
-              />
-            ) : (
-              <TextField size="small" label="Password VNC" value="" fullWidth disabled helperText="Non autorizzato" />
-            )}
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField
-              size="small"
-              label="Produttore"
-              value={form.manufacturer}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, manufacturer: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('manufacturer')}
-              helperText={fieldHelpText('manufacturer')}
-            />
-            <TextField
-              size="small"
-              label="Modello"
-              value={form.model}
-              onChange={(e) => onFormChange((prev) => ({ ...prev, model: e.target.value }))}
-              fullWidth
-              disabled={isFieldDisabled('model')}
-              helperText={fieldHelpText('model')}
-            />
-            <TextField
-              size="small"
-              label="Fine garanzia (YYYY-MM-DD)"
-              value={form.warranty_end_date}
-              onChange={(e) =>
-                onFormChange((prev) => ({ ...prev, warranty_end_date: e.target.value }))
-              }
-              fullWidth
-              disabled={isFieldDisabled('warranty_end_date')}
-              helperText={fieldHelpText('warranty_end_date')}
-            />
-          </Stack>
-
-          <CustomFieldsEditor
-            entity="inventory"
-            value={form.custom_fields}
-            onChange={(value) => onFormChange((prev) => ({ ...prev, custom_fields: value }))}
-            mode="accordion"
-          />
-
-          <TextField
-            size="small"
-            label="Note"
-            value={form.notes}
-            onChange={(e) => onFormChange((prev) => ({ ...prev, notes: e.target.value }))}
-            fullWidth
-            multiline
-            minRows={4}
-          />
-
-          <Box>
-            <TextField
-              size="small"
-              fullWidth
-              label="Tag (premi Invio per aggiungere)"
-              value={tagInput}
-              onChange={(e) => onTagInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && tagInput.trim()) {
-                  e.preventDefault()
-                  const tag = tagInput.trim().toLowerCase()
-                  if (!form.tags.includes(tag)) {
-                    onFormChange((prev) => ({ ...prev, tags: [...prev.tags, tag] }))
-                  }
-                  onTagInputChange('')
-                }
-              }}
-            />
-            {form.tags.length > 0 ? (
-              <Stack direction="row" flexWrap="wrap" spacing={0.5} sx={{ mt: 0.75 }}>
+    <QuickForm
+      dialogLabel={mode === 'create' ? 'Nuovo inventario' : 'Modifica inventario'}
+      open={open} onClose={onClose} mode={mode} saving={saving} onSubmit={onSave}
+      crumb={{ icon: <DnsOutlinedIcon />, label: 'Inventari' }}
+      submitLabel={mode === 'create' ? 'Crea inventario' : 'Salva modifiche'}
+      title={{ value: form.name, onChange: (v) => set('name', v), placeholder: 'Nome, es. Server principale sala CED', label: 'Nome / Descrizione', error: errors.name }}
+      description={{ value: form.notes, onChange: (v) => set('notes', v), placeholder: 'Note…', label: 'Note' }}
+      errors={errs}
+      pills={
+        <>
+          <SelectPill icon={<ApartmentOutlinedIcon />} placeholder="Cliente" value={form.customer} error={Boolean(errors.customer)} required
+            options={customers.map((c) => ({ value: c.id, label: c.name || c.code || `Cliente #${c.id}`, sub: c.code || undefined }))}
+            onChange={(v) => { const id = v === '' ? '' : Number(v); onFormChange((prev) => ({ ...prev, customer: id, site: '' })); onErrorsChange((prev) => ({ ...prev, customer: undefined })); void onCustomerChange(id) }} />
+          <SelectPill icon={<PlaceOutlinedIcon />} placeholder="Sito" value={form.site} emptyLabel="Nessun sito" disabled={form.customer === ''} disabledHint="Scegli prima il cliente"
+            options={sites.map((s) => ({ value: s.id, label: s.display_name || s.name }))} onChange={(v) => set('site', v === '' ? '' : Number(v))} />
+          <SelectPill icon={<FlagOutlinedIcon />} placeholder="Stato" value={form.status} error={Boolean(errors.status)} required
+            options={statuses.map((s) => ({ value: s.id, label: s.label }))} onChange={(v) => set('status', v === '' ? '' : Number(v))} />
+          <SelectPill icon={<CategoryOutlinedIcon />} placeholder="Tipo" value={form.type} emptyLabel="Nessun tipo"
+            options={types.map((t) => ({ value: t.id, label: t.label }))} onChange={(v) => set('type', v === '' ? '' : Number(v))} />
+          <TextPill icon={<TagRoundedIcon />} placeholder="K-number" mono value={form.knumber} onChange={(v) => set('knumber', v)} error={Boolean(errors.knumber)} width={80} />
+          <TextPill icon={<QrCode2RoundedIcon />} placeholder="Seriale" mono value={form.serial_number} onChange={(v) => set('serial_number', v)} error={Boolean(errors.serial_number)} width={80} />
+          <TextPill icon={<ComputerOutlinedIcon />} placeholder="Hostname" mono value={form.hostname} onChange={(v) => set('hostname', v)} error={Boolean(errors.hostname)}
+            disabled={isFieldDisabled('hostname')} title={fieldHelpText('hostname')} width={90} />
+          <TextPill icon={<LanOutlinedIcon />} placeholder="IP locale" mono value={form.local_ip} onChange={(v) => set('local_ip', v)} error={Boolean(errors.local_ip)}
+            disabled={isFieldDisabled('local_ip')} title={fieldHelpText('local_ip')} width={90} />
+        </>
+      }
+      more={{
+        hint: 'rete, credenziali, apparecchio, tag', defaultOpen: Boolean(mode === 'edit' && moreFilled) || MORE_FIELDS.some((k) => errors[k]),
+        children: (
+          <>
+            <QuickGroup title="Rete e posizione">
+              <QuickFields cols={3}>{field('srsa_ip', { mono: true })}{field('location')}{field('telefono')}</QuickFields>
+            </QuickGroup>
+            <QuickGroup title="Credenziali">
+              <QuickFields>{field('os_user', { mono: true })}{field('os_pwd', { secret: true })}{field('app_usr', { mono: true })}{field('app_pwd', { secret: true })}{field('vnc_pwd', { secret: true })}</QuickFields>
+            </QuickGroup>
+            <QuickGroup title="Apparecchio">
+              <QuickFields cols={3}>{field('manufacturer')}{field('model')}{field('warranty_end_date', { type: 'date' })}</QuickFields>
+            </QuickGroup>
+            <QuickGroup title="Tag">
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
                 {form.tags.map((tag) => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    size="small"
-                    onDelete={() =>
-                      onFormChange((prev) => ({
-                        ...prev,
-                        tags: prev.tags.filter((item) => item !== tag),
-                      }))
-                    }
-                  />
+                  <Chip key={tag} label={tag} size="small" onDelete={() => onFormChange((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }))} />
                 ))}
-              </Stack>
-            ) : null}
-          </Box>
-        </Stack>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={saving}>
-          Annulla
-        </Button>
-        <Button variant="contained" onClick={onSave} disabled={saving}>
-          {saving ? 'Salvataggio…' : 'Salva'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+                <InputBase value={tagInput} onChange={(e) => onTagInputChange(e.target.value)} placeholder={form.tags.length ? 'Altro tag…' : 'Scrivi un tag e premi Invio'}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && tagInput.trim()) { e.preventDefault(); e.stopPropagation(); addTag() } }}
+                  inputProps={{ 'aria-label': 'Nuovo tag' }}
+                  sx={{ flex: 1, minWidth: 180, height: 32, px: 1.25, fontSize: 13, border: '1px dashed', borderColor: 'archie.borderStrong', borderRadius: '7px', '&.Mui-focused': { borderStyle: 'solid', borderColor: 'primary.main' } }} />
+              </Box>
+            </QuickGroup>
+            <CustomFieldsEditor entity="inventory" value={form.custom_fields} onChange={(value) => onFormChange((prev) => ({ ...prev, custom_fields: value }))} mode="inline" />
+          </>
+        ),
+      }}
+    />
   )
 }

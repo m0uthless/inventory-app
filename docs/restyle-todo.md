@@ -221,6 +221,15 @@ Sostituisce "Tinte": anteprima `db-base.html`, variante **F · Aurora**, scelta 
 - **[BE] Migrazione `core/0044_dashboard_aurora`**: disattiva i widget `weather` e `quick-actions-pair` (ora nella fascia), Contributor e Compleanni predefiniti 1×2, layout con Contributor 2×2 dimezzati. Rimossi `WelcomeWidget` e `QuickActionsWidget`; meteo e riepilogo in `features/dashboard/weather.ts`.
 - **[TODO] Layout predefinito**: i layout salvati restano (i buchi lasciati dai widget tolti si richiudono da soli); quello per i nuovi utenti va reimpostato da Fede con "Imposta come predefinito".
 
+## Inserimento dati (2026-11-09)
+
+Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapido**: titolo grande, descrizione (o note), proprietà come pillole che aprono un selettore con ricerca e tastiera, i campi rari in "Altri campi" con etichette sopra; Ctrl+Invio salva; stessa forma per creare e modificare. Componente `ui/campo/QuickForm.tsx` (`QuickForm`, `SelectPill`, `TextPill`, `DatePill`, `TogglePill`, `QuickField`, `QuickFields`, `QuickGroup`) e `ui/ProvincePill.tsx`.
+
+- **[UI] Portati**: Task di area, Clienti, Siti, Inventari, Contatti (stesse props dei vecchi dialoghi, le pagine non cambiano). Inventari: rete, credenziali (stesse regole sul permesso), apparecchio, tag e campi personalizzati in "Altri campi", aperto da solo in modifica se c'è già qualcosa. Clienti: il nome visualizzato segue il nome finché non lo si cambia a mano.
+- **[UI] Issue e Bug e feature** (2026-11-09): Issue con il cliente cercato sul server e "Non è in anagrafica? Scrivi il nome" in fondo al selettore (testo libero), Sito dopo il cliente, "In attesa di" con lo stato In attesa, inventario collegato come pillola, issue chiusa in sola lettura. Bug e feature: la frase principale come titolo e i dettagli sotto (salvati come un unico testo, prima riga = titolo), Tipo, Dove e Screenshot in pillole, Ctrl+V incolla lo screenshot ovunque nel modulo.
+- **[TODO] Da portare**: Caso ServiceNow; "Creane un altro" è pronto nel componente ma va collegato nelle pagine che lo vogliono.
+- **[DEC] Dove non usarlo**: Purchase Order, Contratti, Piani di manutenzione, Rimborso spese, Rapportino (importi, cadenze, righe, passi).
+
 ## Cestino e Bug e feature
 - Fatte da `cb-base.html` (2026-11-08): Cestino variante A · Tabella, Bug e feature variante B · Bacheca. Niente KPI né sottotitolo (richiesta di Fede).
 - Cestino: schede per tipo con conteggi, selezione multipla con barra Ripristina / Elimina definitivamente, stato per riga (Ripristinabile, Prima il padre, Ha collegati attivi), dialogo di eliminazione con "Ho capito", "Svuota il cestino". Nuovo endpoint `GET /api/trash/info/` (core/trash_api.py): blocchi di ripristino/eliminazione e "eliminato da" ricavato dall'Audit.

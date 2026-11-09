@@ -3,7 +3,7 @@ import { Box, Button, ButtonBase, Link, TextField, Typography } from '@mui/mater
 import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import DoneRoundedIcon from '@mui/icons-material/DoneRounded'
-import { CampoDialog, CampoIcon, DetailSection, FloatingDetail } from '../../ui/campo'
+import { CampoDialog, CampoIcon, DetailSection, FloatingDetail, Pill, QuickForm, SelectPill } from '../../ui/campo'
 import { agoLabel } from '../../utils/agoLabel'
 import {
   KIND_LABEL, KIND_TONE, REJECT_REASONS, SECTIONS, STATUS_LABEL, appendReason, closedBy, firstLine, firstName, initials, sectionLabel,
@@ -118,51 +118,42 @@ const imageFromPaste = (e: React.ClipboardEvent) => Array.from(e.clipboardData?.
 export type NewReport = { kind: ReportKind; section: string; description: string; screenshot: File | null }
 
 export function ReportDialog({ open, busy, onClose, onSubmit }: { open: boolean; busy: boolean; onClose: () => void; onSubmit: (v: NewReport) => void }) {
+  // Inserimento rapido: la frase principale come titolo, i dettagli sotto; al salvataggio diventano
+  // un unico testo (la bacheca usa la prima riga come titolo).
   const [v, setV] = React.useState<NewReport>({ kind: 'bug', section: 'dashboard', description: '', screenshot: null })
-  React.useEffect(() => { if (open) setV({ kind: 'bug', section: 'dashboard', description: '', screenshot: null }) }, [open])
-  const chip = (on: boolean) => ({
-    minHeight: 28, px: 1.25, py: 0.5, borderRadius: '14px', border: '1px solid', fontSize: 12.5, fontWeight: 550,
-    borderColor: on ? 'archie.fieldLine' : 'divider', bgcolor: on ? 'archie.field' : 'background.paper', color: on ? 'primary.main' : 'text.secondary',
-  })
+  const [head, setHead] = React.useState('')
+  const fileRef = React.useRef<HTMLInputElement>(null)
+  React.useEffect(() => { if (open) { setV({ kind: 'bug', section: 'dashboard', description: '', screenshot: null }); setHead('') } }, [open])
+  const bug = v.kind === 'bug'
   return (
-    <CampoDialog open={open} onClose={onClose} busy={busy} labelId="bf-new-title" title="Segnala" sub="Un problema da correggere o un'idea per migliorare Archie."
-      footer={<>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>Ti avvisiamo quando viene gestita.</Typography>
-        <Box sx={{ flex: 1 }} />
-        <Button variant="text" onClick={onClose} disabled={busy}>Annulla</Button>
-        <Button variant="contained" disabled={!v.description.trim() || busy} onClick={() => onSubmit(v)} startIcon={<CampoIcon name="arrowR" size={15} />}>Invia</Button>
-      </>}>
-      <Box onPaste={(e: React.ClipboardEvent) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); setV((x) => ({ ...x, screenshot: f })) } }} sx={{ display: 'grid', gap: 1.75 }}>
-        <Box role="radiogroup" aria-label="Tipo" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
-          {(['bug', 'feature'] as ReportKind[]).map((k) => {
-            const on = v.kind === k
-            return (
-              <ButtonBase key={k} role="radio" aria-checked={on} onClick={() => setV((x) => ({ ...x, kind: k }))} sx={{
-                display: 'grid', justifyContent: 'stretch', justifyItems: 'start', alignItems: 'start', gap: 0.5, p: 1.5, textAlign: 'left', border: '1px solid', borderRadius: '10px',
-                borderColor: on ? 'archie.fieldLine' : 'divider', bgcolor: on ? 'archie.field' : 'background.paper', boxShadow: on ? (t) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none',
-              }}>
-                <Box component="span" sx={{ width: 30, height: 30, borderRadius: '8px', display: 'grid', placeItems: 'center', bgcolor: KIND_TONE[k].bg, color: KIND_TONE[k].fg }}><KindIcon kind={k} size={18} /></Box>
-                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{k === 'bug' ? 'Qualcosa non funziona' : 'Vorrei una funzionalità'}</Typography>
-                <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>{k === 'bug' ? 'un errore, un dato sbagliato, un blocco' : 'un miglioramento o qualcosa che manca'}</Typography>
-              </ButtonBase>
-            )
-          })}
-        </Box>
-        <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 0.75 }}>Dove</Typography>
-          <Box role="group" aria-label="Sezione" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-            {SECTIONS.map((s) => <ButtonBase key={s.value} aria-pressed={v.section === s.value} onClick={() => setV((x) => ({ ...x, section: s.value }))} sx={chip(v.section === s.value)}>{s.label}</ButtonBase>)}
-          </Box>
-        </Box>
-        <TextField label={v.kind === 'bug' ? 'Cosa succede?' : 'Cosa ti servirebbe?'} required multiline minRows={4} value={v.description}
-          onChange={(e) => setV((x) => ({ ...x, description: e.target.value }))}
-          placeholder={v.kind === 'bug' ? 'Cosa stavi facendo, cosa ti aspettavi e cosa è successo invece' : 'Descrivi cosa vorresti fare e perché ti sarebbe utile'} />
-        <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 0.75 }}>Screenshot <Box component="span" sx={{ fontWeight: 400 }}>· facoltativo</Box></Typography>
-          <ImageDrop file={v.screenshot} onFile={(f) => setV((x) => ({ ...x, screenshot: f }))} />
-        </Box>
-      </Box>
-    </CampoDialog>
+    <QuickForm
+      dialogLabel="Segnala" open={open} onClose={onClose} mode="create" saving={busy} canSubmit={Boolean(head.trim())} submitLabel="Invia"
+      onSubmit={() => onSubmit({ ...v, description: [head.trim(), v.description.trim()].filter(Boolean).join('\n\n') })}
+      crumb={{ icon: <BugReportOutlinedIcon />, label: 'Bug e feature' }}
+      title={{ value: head, onChange: setHead, placeholder: bug ? 'Cosa non funziona?' : 'Cosa ti servirebbe?', label: bug ? 'Cosa non funziona' : 'Cosa ti servirebbe', maxLength: 200 }}
+      description={{
+        value: v.description, onChange: (d) => setV((x) => ({ ...x, description: d })), label: 'Dettagli',
+        placeholder: bug ? 'Cosa stavi facendo, cosa ti aspettavi e cosa è successo invece…' : 'Cosa vorresti fare e perché ti sarebbe utile…',
+      }}
+      onPaste={(e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); setV((x) => ({ ...x, screenshot: f })) } }}
+      footerStart={<Typography sx={{ fontSize: 12, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>Ti avvisiamo quando viene gestita.</Typography>}
+      pills={
+        <>
+          <SelectPill placeholder="Tipo" value={v.kind} onChange={(k) => k && setV((x) => ({ ...x, kind: k as ReportKind }))}
+            options={(['bug', 'feature'] as ReportKind[]).map((k) => ({
+              value: k, label: KIND_LABEL[k], sub: k === 'bug' ? 'non funziona' : 'un\'idea',
+              node: <><Box component="span" sx={{ display: 'inline-grid', placeItems: 'center', width: 20, height: 20, borderRadius: '5px', bgcolor: KIND_TONE[k].bg, color: KIND_TONE[k].fg }}><KindIcon kind={k} size={14} /></Box>{KIND_LABEL[k]}</>,
+            }))}
+            render={(o) => <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>{o.node}</Box>} />
+          <SelectPill icon={<CampoIcon name="pin" size={15} />} placeholder="Dove" title="Sezione di Archie" value={v.section}
+            options={SECTIONS.map((x) => ({ value: x.value, label: x.label }))} onChange={(x) => x && setV((y) => ({ ...y, section: String(x) }))} />
+          <Pill icon={<CampoIcon name="upload" size={15} />} placeholder="Screenshot" label={v.screenshot?.name}
+            title="Scegli un'immagine, oppure incollala con Ctrl+V" onClick={() => fileRef.current?.click()} />
+          {v.screenshot ? <Pill icon={<CampoIcon name="x" size={14} />} placeholder="Togli lo screenshot" onClick={() => setV((x) => ({ ...x, screenshot: null }))} /> : null}
+          <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) setV((x) => ({ ...x, screenshot: f })); e.target.value = '' }} />
+        </>
+      }
+    />
   )
 }
 
