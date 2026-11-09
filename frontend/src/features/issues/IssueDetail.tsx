@@ -18,7 +18,8 @@ import { FloatingDetail, DetailSection, Properties } from '../../ui/campo'
 import { inventoryDrawerPath } from '../../utils/entityPaths'
 import { useAuth } from '../../auth/AuthProvider'
 import { PERMS } from '../../auth/perms'
-import IssueProcedure from './IssueProcedure'
+import IssueProcedure, { NextStepCard } from './IssueProcedure'
+import { useIssueWiki } from './useIssueWiki'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
 import {
   PRIORITY_META, STATUS_META, WAITING_REASON_META, fmtIssueDate, fmtIssueDateTime,
@@ -169,6 +170,7 @@ export default function IssueDetail(p: Props) {
   const { issue } = p
   const sites = useCustomerSites(issue && !issue.is_customer_placeholder ? issue.customer : null)
   const { hasPerm } = useAuth()
+  const wiki = useIssueWiki(issue?.id ?? null, hasPerm(PERMS.wiki.page.view))
   if (!issue) return null
   const closed = issue.status === 'closed'
   const resolved = issue.status === 'resolved'
@@ -315,8 +317,9 @@ export default function IssueDetail(p: Props) {
             props={props}
             summary={<><IssuePriorityMark priority={issue.priority} /><Box component="span" sx={{ color: 'text.primary', fontWeight: 500 }}>{issue.assigned_to_full_name || 'Non assegnata'}</Box></>}
           />
+          <NextStepCard wiki={wiki} canEdit={!closed && hasPerm(PERMS.issues.issue.change)} />
           <OpenTimeline issue={issue} events={p.events} />
-          <IssueProcedure issueId={issue.id} canViewWiki={hasPerm(PERMS.wiki.page.view)} canEdit={!closed && hasPerm(PERMS.issues.issue.change)} />
+          <IssueProcedure wiki={wiki} canEdit={!closed && hasPerm(PERMS.issues.issue.change)} />
           <DetailSection title="Descrizione">
             <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', color: issue.description ? 'text.primary' : 'text.disabled' }}>
               {issue.description || 'Nessuna descrizione.'}

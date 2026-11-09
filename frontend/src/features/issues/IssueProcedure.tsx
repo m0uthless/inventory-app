@@ -4,88 +4,31 @@ import { Box, Button, Checkbox, IconButton, InputBase, Link, Popover, Tooltip, T
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
 import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
+import CheckIcon from '@mui/icons-material/Check'
 
 import { api } from '@shared/api/client'
-import { apiErrorToMessage } from '@shared/api/error'
-import { useToast } from '@shared/ui/toast'
 import { DetailSection } from '../../ui/campo'
-
-export type IssueWikiLink = {
-  id: number
-  page: number
-  page_title: string
-  page_slug: string
-  kb_code: string
-  page_available: boolean
-  steps: { text: string; checked: boolean }[]
-}
+import type { IssueWiki } from './useIssueWiki'
 
 type PageOpt = { id: number; title: string; kb_code?: string; summary?: string | null }
 
 /**
  * «Procedura» nella scheda della issue (anteprima h-base, scheda intervento): articoli Wiki
  * collegati, con i passi dell'articolo da spuntare. Le spunte restano sulla issue.
- * Nascosta a chi non può vedere la Wiki.
+ * Nascosta a chi non può vedere la Wiki. Il primo passo da fare compare anche in cima alla scheda (NextStepCard).
  */
-export default function IssueProcedure({ issueId, canEdit, canViewWiki }: { issueId: number; canEdit: boolean; canViewWiki: boolean }) {
-  const toast = useToast()
-  const [links, setLinks] = React.useState<IssueWikiLink[] | null>(null)
+export default function IssueProcedure({ wiki, canEdit }: { wiki: IssueWiki; canEdit: boolean }) {
+  const { links, toggle, unlink } = wiki
   const [pickEl, setPickEl] = React.useState<HTMLElement | null>(null)
+  if (links === null) return null
+  const link = async (pageId: number) => { setPickEl(null); await wiki.link(pageId) }
 
-  React.useEffect(() => {
-    if (!canViewWiki) return
-    let alive = true
-    setLinks(null)
-    api.get<IssueWikiLink[]>(`/issues/${issueId}/wiki/`)
-      .then((r) => { if (alive) setLinks(r.data) })
-      .catch(() => { if (alive) setLinks([]) })
-    return () => { alive = false }
-  }, [issueId, canViewWiki])
-
-  if (!canViewWiki || links === null) return null
-
-  const replace = (l: IssueWikiLink) => setLinks((ls) => (ls ?? []).map((x) => (x.id === l.id ? l : x)))
-
-  const toggle = async (l: IssueWikiLink, text: string, checked: boolean) => {
-    replace({ ...l, steps: l.steps.map((s) => (s.text === text ? { ...s, checked } : s)) })
-    try {
-      const r = await api.patch<IssueWikiLink>(`/issues/${issueId}/wiki/${l.id}/`, { step: text, checked })
-      replace(r.data)
-    } catch (e) {
-      replace(l)
-      toast.error(apiErrorToMessage(e))
-    }
-  }
-
-  const link = async (pageId: number) => {
-    setPickEl(null)
-    try {
-      const r = await api.post<IssueWikiLink>(`/issues/${issueId}/wiki/`, { page: pageId })
-      setLinks((ls) => [...(ls ?? []).filter((x) => x.id !== r.data.id), r.data])
-      toast.success(`Collegato «${r.data.page_title}»`)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
-  }
-
-  const unlink = async (l: IssueWikiLink) => {
-    setLinks((ls) => (ls ?? []).filter((x) => x.id !== l.id))
-    try {
-      await api.delete(`/issues/${issueId}/wiki/${l.id}/`)
-      toast.success(`Scollegato «${l.page_title}»`)
-    } catch (e) {
-      setLinks((ls) => [...(ls ?? []), l])
-      toast.error(apiErrorToMessage(e))
-    }
-  }
-
-  const allSteps = links.flatMap((l) => l.steps)
-  const done = allSteps.filter((s) => s.checked).length
+  const { done, total } = wiki
 
   return (
     <DetailSection
       title="Procedura"
-      end={allSteps.length ? <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: done === allSteps.length ? 'success.main' : 'text.secondary' }}>{done} di {allSteps.length}</Typography> : undefined}
+      end={total ? <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: done === total ? 'success.main' : 'text.secondary' }}>{done} di {total}</Typography> : undefined}
     >
       <Box sx={{ display: 'grid', gap: 1.25 }}>
         {links.map((l) => (
@@ -174,6 +117,44 @@ function WikiPagePicker({ exclude, onPick }: { exclude: number[]; onPick: (id: n
         ))}
         {!list.length ? <Box sx={{ p: 1, fontSize: 12, color: 'text.secondary' }}>{loading ? 'Ricerca…' : 'Nessun articolo trovato'}</Box> : null}
       </Box>
+    </Box>
+  )
+}
+
+/**
+ * «Prossimo passo» in cima alla scheda (anteprima h-base): il primo passo non spuntato della
+ * procedura collegata, con «Fatto» per spuntarlo; a procedura finita, una riga di conferma.
+ */
+export function NextStepCard({ wiki, canEdit }: { wiki: IssueWiki; canEdit: boolean }) {
+  const { links, next, done, total } = wiki
+  if (!links || !total) return null
+  const finished = !next
+  return (
+    <Box component="section" aria-label="Prossimo passo" sx={{
+      display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', columnGap: 1.25, rowGap: 0.5, px: 1.75, py: 1.5, borderRadius: '10px', border: '1px solid',
+      bgcolor: finished ? 'success.light' : 'archie.field',
+      borderColor: (t) => `color-mix(in srgb, ${finished ? t.palette.success.main : t.palette.primary.main} 35%, ${t.palette.divider})`,
+    }}>
+      <Box sx={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 1, fontSize: 12, fontWeight: 650, color: finished ? 'success.main' : 'primary.main' }}>
+        <span>{finished ? 'Procedura completata' : 'Prossimo passo'}</span>
+        <Box component="span" sx={{ ml: 'auto', display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 500, color: 'text.secondary', minWidth: 0 }}>
+          <MenuBookOutlinedIcon sx={{ fontSize: 14 }} />
+          <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next ? next.link.page_title : links.length === 1 ? links[0].page_title : `${links.length} articoli`} · {done} di {total}</Box>
+        </Box>
+      </Box>
+      {next ? (
+        <>
+          <Typography sx={{ fontSize: 14, fontWeight: 550, lineHeight: 1.45 }}>{next.step.text}</Typography>
+          {canEdit ? (
+            <Button size="small" variant="outlined" color="inherit" startIcon={<CheckIcon sx={{ fontSize: 16 }} />} onClick={() => void wiki.toggle(next.link, next.step.text, true)}
+              sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: 'background.paper' } }}>
+              Fatto
+            </Button>
+          ) : null}
+        </>
+      ) : (
+        <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Tutti i {total} passi sono stati fatti.</Typography>
+      )}
     </Box>
   )
 }

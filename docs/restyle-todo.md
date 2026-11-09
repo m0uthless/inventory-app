@@ -8,7 +8,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 
 ### Presente nell'anteprima, non ancora nell'app
 - **[BE] Prossimo passo** (chi, cosa, quando, "Fatto"): non esiste un campo sulla issue.
-- ~~**[BE] Procedura dalla Wiki**~~ fatto (2026-11-09): articoli Wiki collegati alla issue (`WikiLink` con `entity_type="issue"`, migrazione `wiki/0015`), passi ricavati dall'articolo (lista `- [ ]`, altrimenti il primo elenco numerato; `wiki/procedure.py`) e spunte salvate sul collegamento (`checked_steps`). Endpoint `GET/POST /issues/{id}/wiki/`, `PATCH/DELETE /issues/{id}/wiki/{link}/` (lettura: issue + Wiki; scrittura: modifica issue), audit sulla issue. Sezione «Procedura» nella scheda (`features/issues/IssueProcedure.tsx`). Test in `issues/tests/test_issue_wiki.py`. In dev c'è l'articolo dimostrativo «Riavvio servizio MWL».
+- ~~**[BE] Procedura dalla Wiki**~~ fatto (2026-11-09): articoli Wiki collegati alla issue (`WikiLink` con `entity_type="issue"`, migrazione `wiki/0015`), passi ricavati dall'articolo (lista `- [ ]`, altrimenti il primo elenco numerato; `wiki/procedure.py`) e spunte salvate sul collegamento (`checked_steps`). Endpoint `GET/POST /issues/{id}/wiki/`, `PATCH/DELETE /issues/{id}/wiki/{link}/` (lettura: issue + Wiki; scrittura: modifica issue), audit sulla issue. Sezione «Procedura» nella scheda (`features/issues/IssueProcedure.tsx`) e, in cima sotto le Proprietà, la card «Prossimo passo» con il primo passo da fare e «Fatto» (a procedura finita: «Procedura completata»); stato condiviso in `useIssueWiki.ts`. Test in `issues/tests/test_issue_wiki.py`. In dev c'è l'articolo dimostrativo «Riavvio servizio MWL».
 - **[BE] Dove intervenire completo**: referente di reparto con telefono, device con seriale, credenziali bloccate. Oggi mostriamo cliente, sito, inventario collegato e ServiceNow.
 - **[BE] Scheda Allegati**: le issue non hanno allegati (solo i task di area hanno `drive_files`).
 - **[BE] "Visibile al cliente nel Portale"** su commenti e allegati, etichette Cliente/Interno nella cronologia.
@@ -209,6 +209,17 @@ Portata dall'anteprima `db-base.html`, variante **A · Tinte** (scelta da Fede d
 - **[UI] Issue** accetta `?vista=mine|overdue|closed|all` (link dalla Dashboard).
 - **[UI] Telefono**: widget uno sotto l'altro al posto del carosello.
 - **[TODO] Layout predefinito**: i nuovi utenti partono da quello impostato con "Imposta come predefinito" (superuser); quello dell'anteprima va impostato da Fede in produzione. In dev l'ho applicato all'utente `verifica-ui`.
+
+### Dashboard "Aurora" (2026-11-09)
+
+Sostituisce "Tinte": anteprima `db-base.html`, variante **F · Aurora**, scelta da Fede perché la versione precedente aveva troppi colori estranei all'app.
+
+- **[UI] Fascia in testa** (`features/dashboard/DashboardHero.tsx`): lo stesso sfondo animato della login (ShaderGradient, chunk `vendor-login-bg` caricato solo qui e nella login; gradiente fermo senza WebGL), saluto, data, settimana e meteo in una riga, Nuova issue e Triage, quattro numeri (issue tue, task tuoi, manutenzioni scadute, colleghi assenti oggi; l'ultimo solo per chi vede il Piano ferie). La prima riga di widget sale sulla fascia con un'ombra leggera.
+- **[UI] Pausa delle animazioni**: pulsante accanto a Personalizza, ferma sfondo, coriandoli e palloncini; scelta ricordata nel browser (`archie-dash-anim`). Con "riduci movimento" restano ferme comunque.
+- **[DEC] Colori**: solo verde, salvia e acciaio (il blu della login) più il giallo post-it della nota (`palette.archie.dash`, separato da `tints`, che restano per Wiki e ServiceNow). Il rosso resta allo stato "scaduto". Widget distinti per trattamento (`WidgetShell` `look`): Issue scuro (fascia delle schede), Manutenzioni, Comunicazioni e Da fare su carta, Task di area salvia, Il team oggi acciaio, Nota post-it con angolo piegato.
+- **[UI] Compleanni**: se qualcuno compie gli anni oggi il widget festeggia (ritratto con anello che pulsa, palloncini che salgono); altrimenti riga tranquilla. Contributor del mese grande la metà (1×2), nei verdi.
+- **[BE] Migrazione `core/0044_dashboard_aurora`**: disattiva i widget `weather` e `quick-actions-pair` (ora nella fascia), Contributor e Compleanni predefiniti 1×2, layout con Contributor 2×2 dimezzati. Rimossi `WelcomeWidget` e `QuickActionsWidget`; meteo e riepilogo in `features/dashboard/weather.ts`.
+- **[TODO] Layout predefinito**: i layout salvati restano (i buchi lasciati dai widget tolti si richiudono da soli); quello per i nuovi utenti va reimpostato da Fede con "Imposta come predefinito".
 
 ## Cestino e Bug e feature
 - Fatte da `cb-base.html` (2026-11-08): Cestino variante A · Tabella, Bug e feature variante B · Bacheca. Niente KPI né sottotitolo (richiesta di Fede).
