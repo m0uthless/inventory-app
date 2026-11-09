@@ -8,7 +8,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 
 ### Presente nell'anteprima, non ancora nell'app
 - **[BE] Prossimo passo** (chi, cosa, quando, "Fatto"): non esiste un campo sulla issue.
-- **[BE] Procedura dalla Wiki** con spunte e "Cerca nella Wiki": manca il collegamento issue ↔ articolo.
+- ~~**[BE] Procedura dalla Wiki**~~ fatto (2026-11-09): articoli Wiki collegati alla issue (`WikiLink` con `entity_type="issue"`, migrazione `wiki/0015`), passi ricavati dall'articolo (lista `- [ ]`, altrimenti il primo elenco numerato; `wiki/procedure.py`) e spunte salvate sul collegamento (`checked_steps`). Endpoint `GET/POST /issues/{id}/wiki/`, `PATCH/DELETE /issues/{id}/wiki/{link}/` (lettura: issue + Wiki; scrittura: modifica issue), audit sulla issue. Sezione «Procedura» nella scheda (`features/issues/IssueProcedure.tsx`). Test in `issues/tests/test_issue_wiki.py`. In dev c'è l'articolo dimostrativo «Riavvio servizio MWL».
 - **[BE] Dove intervenire completo**: referente di reparto con telefono, device con seriale, credenziali bloccate. Oggi mostriamo cliente, sito, inventario collegato e ServiceNow.
 - **[BE] Scheda Allegati**: le issue non hanno allegati (solo i task di area hanno `drive_files`).
 - **[BE] "Visibile al cliente nel Portale"** su commenti e allegati, etichette Cliente/Interno nella cronologia.

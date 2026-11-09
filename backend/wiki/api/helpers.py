@@ -199,6 +199,11 @@ def _label_for_wiki_link(entity_type: str, entity_id: int) -> str | None:
         from inventory.models import Inventory
 
         return Inventory.objects.filter(pk=entity_id).values_list("name", flat=True).first()
+    if entity_type == "issue":
+        from issues.models import Issue
+
+        title = Issue.objects.filter(pk=entity_id).values_list("title", flat=True).first()
+        return f"#{entity_id} {title}" if title else None
     return None
 
 
@@ -209,6 +214,8 @@ def _path_for_wiki_link(entity_type: str, entity_id: int) -> str | None:
         return f"/sites?open={entity_id}"
     if entity_type == "inventory":
         return f"/inventory?open={entity_id}"
+    if entity_type == "issue":
+        return f"/issues?open={entity_id}"
     return None
 
 

@@ -17,6 +17,8 @@ from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
 from servicenow.models import ServiceNowCase
+from rest_framework.permissions import IsAuthenticated
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 User = get_user_model()
 
@@ -614,6 +616,117 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         ]
 
         return Response(counts)
+
+    # ── Articoli Wiki collegati e procedura ──────────────────────────────────
+    # Il collegamento è un WikiLink(entity_type="issue"); le spunte dei passi
+    # stanno sul collegamento (checked_steps). Lettura: vedere la issue e la Wiki.
+    # Scrittura: modificare la issue (le spunte fanno parte del lavoro sulla issue).
+
+    def _wiki_guard(self, request, write: bool):
+        if not request.user.has_perm("wiki.view_wikipage"):
+            return Response({"detail": "Non hai i permessi per vedere la Wiki."}, status=403)
+        if write and not request.user.has_perm("issues.change_issue"):
+            return Response({"detail": "Non hai i permessi per modificare la issue."}, status=403)
+        return None
+
+    @staticmethod
+    def _wiki_link_payload(link):
+        from wiki.procedure import procedure_steps
+
+        steps = procedure_steps(link.page.content_markdown)
+        checked = set(link.checked_steps or [])
+        return {
+            "id": link.id,
+            "page": link.page_id,
+            "page_title": link.page.title,
+            "page_slug": link.page.slug,
+            "kb_code": link.page.kb_code,
+            "page_available": link.page.deleted_at is None and link.page.is_published,
+            "steps": [{"text": t, "checked": t in checked} for t in steps],
+            "created_at": link.created_at,
+        }
+
+    @action(
+        detail=True, methods=["get", "post"], url_path="wiki",
+        permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp],
+    )
+    def wiki(self, request, pk=None):
+        from wiki.models import WikiEntityType, WikiLink, WikiPage
+
+        denied = self._wiki_guard(request, write=request.method != "GET")
+        if denied:
+            return denied
+        if not request.user.has_perm("issues.view_issue"):
+            return Response({"detail": "Non autorizzato."}, status=403)
+        issue = self.get_object()
+        links = WikiLink.objects.select_related("page").filter(
+            entity_type=WikiEntityType.ISSUE, entity_id=issue.id, deleted_at__isnull=True,
+        )
+
+        if request.method == "GET":
+            return Response([self._wiki_link_payload(link) for link in links.order_by("created_at")])
+
+        try:
+            page_id = int(request.data.get("page"))
+        except (TypeError, ValueError):
+            return Response({"page": "Indica l'articolo da collegare."}, status=400)
+        page = WikiPage.objects.filter(pk=page_id, deleted_at__isnull=True, is_published=True).first()
+        if page is None:
+            return Response({"page": "Articolo non trovato o non pubblicato."}, status=400)
+        existing = links.filter(page=page).first()
+        if existing:
+            return Response(self._wiki_link_payload(existing), status=200)
+        link = WikiLink.objects.create(page=page, entity_type=WikiEntityType.ISSUE, entity_id=issue.id)
+        log_event(
+            request.user, action="update", instance=issue,
+            changes={"wiki_linked": {"from": None, "to": page.title}}, request=request,
+        )
+        return Response(self._wiki_link_payload(link), status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True, methods=["patch", "delete"], url_path=r"wiki/(?P<link_pk>\d+)",
+        permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp],
+    )
+    def wiki_detail(self, request, pk=None, link_pk=None):
+        from wiki.models import WikiEntityType, WikiLink
+        from wiki.procedure import procedure_steps
+
+        denied = self._wiki_guard(request, write=True)
+        if denied:
+            return denied
+        issue = self.get_object()
+        link = WikiLink.objects.select_related("page").filter(
+            pk=link_pk, entity_type=WikiEntityType.ISSUE, entity_id=issue.id, deleted_at__isnull=True,
+        ).first()
+        if link is None:
+            return Response({"detail": "Collegamento non trovato."}, status=404)
+
+        if request.method == "DELETE":
+            link.deleted_at = timezone.now()
+            link.save(update_fields=["deleted_at", "updated_at"])
+            log_event(
+                request.user, action="update", instance=issue,
+                changes={"wiki_unlinked": {"from": link.page.title, "to": None}}, request=request,
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        step = request.data.get("step")
+        checked = request.data.get("checked")
+        if not isinstance(step, str) or not isinstance(checked, bool):
+            return Response({"detail": "Indica il passo e se è fatto."}, status=400)
+        if step not in procedure_steps(link.page.content_markdown):
+            return Response({"step": "Questo passo non è nella procedura dell'articolo."}, status=400)
+        done = [s for s in (link.checked_steps or []) if s != step]
+        if checked:
+            done.append(step)
+        link.checked_steps = done
+        link.save(update_fields=["checked_steps", "updated_at"])
+        log_event(
+            request.user, action="update", instance=issue,
+            changes={"procedure_step": {"from": None if checked else step, "to": step if checked else None}},
+            request=request,
+        )
+        return Response(self._wiki_link_payload(link))
 
     # ── Comments nested endpoint ──────────────────────────────────────────────
 

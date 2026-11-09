@@ -196,6 +196,7 @@ class WikiEntityType(models.TextChoices):
     CUSTOMER = "customer", "Customer"
     SITE = "site", "Site"
     INVENTORY = "inventory", "Inventory"
+    ISSUE = "issue", "Issue"
 
 
 class WikiLink(TimeStampedModel):
@@ -203,6 +204,9 @@ class WikiLink(TimeStampedModel):
     entity_type = models.CharField(max_length=16, choices=WikiEntityType.choices)
     entity_id = models.BigIntegerField()
     notes = models.TextField(null=True, blank=True)
+    # Solo per i collegamenti a una issue: i passi della procedura già spuntati
+    # (testo del passo, così una modifica all'articolo non sposta le spunte).
+    checked_steps = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name = "Link"
