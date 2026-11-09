@@ -118,11 +118,8 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
       }}>
         {!mini && (
           <>
-            <Box aria-hidden sx={{ width: 28, height: 28, borderRadius: '7px', bgcolor: 'primary.main', color: 'primary.contrastText', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, flex: 'none' }}>A</Box>
-            <Box sx={{ minWidth: 0, lineHeight: 1.2 }}>
-              <Typography sx={{ fontWeight: 650, fontSize: 14, letterSpacing: '0.01em' }} noWrap>ARCHIE</Typography>
-              <Typography sx={{ fontSize: 11, color: 'text.secondary' }} noWrap>Biotron S.p.A.</Typography>
-            </Box>
+            {/* Logo (segnaposto: sostituire /logo.svg con quello definitivo, è lo stesso della login). */}
+            <Box component="img" src="/logo.svg" alt="Archie · Biotron S.p.A." sx={{ display: 'block', height: 32, width: 'auto', maxWidth: 'calc(100% - 44px)', objectFit: 'contain', objectPosition: 'left center' }} />
           </>
         )}
         {!mobile && onToggleMini ? (

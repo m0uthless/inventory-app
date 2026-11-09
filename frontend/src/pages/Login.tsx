@@ -112,8 +112,8 @@ export default function Login() {
           border: '1px solid', borderColor: (t) => `color-mix(in srgb, ${t.palette.background.paper} 60%, transparent)`,
           boxShadow: '0 24px 60px -24px rgb(10 40 30 / .35), 0 2px 8px rgb(10 40 30 / .06)',
         }}>
-          {/* Logo: sostituire /login-logo.svg con il logo definitivo. */}
-          <Box component="img" src="/login-logo.svg" alt="Archie" sx={{ display: 'block', height: 48, width: 'auto', maxWidth: '100%', mb: 2.75 }} />
+          {/* Logo: sostituire /logo.svg con il logo definitivo. */}
+          <Box component="img" src="/logo.svg" alt="Archie" sx={{ display: 'block', height: 48, width: 'auto', maxWidth: '100%', mb: 2.75 }} />
           <Typography component="h1" id="login-title" sx={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>Accedi</Typography>
           <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5, mb: 2.25 }}>Usa le credenziali aziendali.</Typography>
 

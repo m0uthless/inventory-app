@@ -255,7 +255,7 @@ export function AppLayout() {
     <UndoToastProvider>
     <DrawerAppearanceProvider value="campo">
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'archie.frame' }}>
-      <DevEnvironmentBadge />
+      <DevEnvironmentBadge frame={false} />
 
       {/* Sidebar desktop */}
       <Box sx={{ display: { xs: 'none', md: 'block' }, flexShrink: 0, height: '100%' }}>
