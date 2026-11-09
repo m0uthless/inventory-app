@@ -65,6 +65,8 @@ export default defineConfig({
           if (id.includes('/quill') || id.includes('/parchment') || id.includes('quill-delta')) return 'vendor-quill'
           if (id.includes('/recharts') || id.includes('recharts-scale') || id.includes('/d3-') || id.includes('/victory-')) return 'vendor-charts'
           if (id.includes('/axios/')) return 'vendor-axios'
+          // Sfondo animato della login: three.js e ShaderGradient solo in un chunk a parte, caricato da quella pagina.
+          if (id.includes('/three/') || id.includes('/three-stdlib/') || id.includes('/@react-three/') || id.includes('/@shadergradient/') || id.includes('/camera-controls/')) return 'vendor-login-bg'
           return 'vendor'
         },
       },

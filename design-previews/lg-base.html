@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c; --primary-hover: #18584c; --primary-ink: #fff;
+  --bg: #eef2f1; --surface: #fff; --surface-2: #f5f8f7;
+  --border: #d3dcd9; --border-strong: #b5c3bf;
+  --text: #14201d; --muted: #566661; --faint: #6c7b77;
+  --field: #e3efea; --field-line: #1f6b5c;
+  --error: #b3261e; --error-bg: #fbe9e7; --warning: #8a5a00; --warning-bg: #fdf1d8;
+  --band: #173f37;
+  --focus: 0 0 0 3px rgb(31 107 92 / .25);
+  --mint-b: #e2f2eb; --mint-i: #175a4c; --mint-m: #4f9b88;
+  --sky-b: #e3eefa; --sky-i: #1f4f86; --sky-m: #5b8fd0;
+  --lilac-b: #ece9f8; --lilac-m: #8b7fd6;
+  --sand-b: #f6efe0; --sand-m: #c99a43;
+  --portal: #1a6bb5; --portal-b: #e3eefa;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --primary-hover: #77c7b4; --primary-ink: #0d1714;
+  --bg: #0f1513; --surface: #161e1b; --surface-2: #1b2421;
+  --border: #2a3632; --border-strong: #3b4945;
+  --text: #e2ebe8; --muted: #9aaaa5; --faint: #8a9a95;
+  --field: #183a33; --field-line: #5fb8a3;
+  --error: #f2867c; --error-bg: #3a1d1a; --warning: #e5b65c; --warning-bg: #352a14;
+  --band: #10241f;
+  --mint-b: #15302a; --mint-i: #a6e3d3; --mint-m: #5fb8a3;
+  --sky-b: #172a40; --sky-i: #b9d6f5; --sky-m: #6fa8e0;
+  --lilac-b: #231f3e; --lilac-m: #9d93ec;
+  --sand-b: #30281a; --sand-m: #d9a94a;
+  --portal: #6fa8e0; --portal-b: #172a40;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: "Geist", system-ui, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+.i { width: 16px; height: 16px; flex: none; }
+
+/* Scheda di accesso (comune) */
+.card { width: 100%; max-width: 456px; background: var(--surface); border-radius: 16px; padding: 30px 32px 26px; box-shadow: 0 18px 50px -18px rgb(10 30 25 / .35), 0 2px 6px rgb(10 30 25 / .08); }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+.brand .logo { display: block; height: 48px; width: auto; max-width: 100%; }
+.mark { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--primary); color: var(--primary-ink); font-weight: 800; font-size: 16px; }
+.brand b { display: block; font-size: 15px; font-weight: 750; letter-spacing: .02em; }
+.brand small { display: block; font-size: 11.5px; color: var(--muted); }
+.card h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.card .sub { margin: 4px 0 18px; font-size: 13px; color: var(--muted); }
+.amb { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+.amb button { height: 34px; border: 0; border-radius: 7px; background: none; cursor: pointer; font-size: 13px; font-weight: 550; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.amb button[aria-checked="true"] { background: var(--field); color: var(--primary); font-weight: 650; }
+.amb button.portal[aria-checked="true"] { background: var(--portal-b); color: var(--portal); }
+.f { display: grid; gap: 5px; margin-bottom: 12px; }
+.f label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.in { display: flex; align-items: center; height: 42px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 0 6px 0 12px; }
+.in:focus-within { border-color: var(--field-line); box-shadow: var(--focus); }
+.in input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 14px; }
+.in .eye { width: 30px; height: 30px; border: 0; background: none; border-radius: 6px; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.in .eye:hover { background: var(--surface-2); }
+.f.err .in { border-color: var(--error); }
+.caps { display: none; align-items: center; gap: 5px; font-size: 11.5px; color: var(--warning); }
+.caps.on { display: inline-flex; }
+.alert { display: flex; gap: 8px; align-items: flex-start; padding: 9px 11px; border-radius: 8px; background: var(--error-bg); color: var(--error); font-size: 12.5px; margin-bottom: 14px; }
+.go { width: 100%; height: 42px; border: 0; border-radius: 9px; background: var(--primary); color: var(--primary-ink); font-weight: 650; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+.go:hover { background: var(--primary-hover); }
+.go.portal { background: var(--portal); }
+.go .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgb(255 255 255 / .4); border-top-color: #fff; animation: sp .8s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.help { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: center; }
+.help a { color: var(--primary); font-weight: 550; text-decoration: none; }
+.foot { display: flex; justify-content: space-between; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--faint); }
+
+/* Foto a rotazione */
+.photo { position: absolute; inset: 0; overflow: hidden; }
+.photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.4s ease-in-out; }
+.photo img.on { opacity: 1; }
+
+/* A · Foto e scheda */
+.va { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: flex-end; padding: 24px 7%; }
+.va .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgb(8 22 19 / .62) 0%, rgb(8 22 19 / .2) 55%, rgb(8 22 19 / .1) 100%); }
+.va .cap { position: absolute; left: 48px; bottom: 44px; color: #fff; max-width: 420px; }
+.va .cap span { font-size: 11px; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; opacity: .6; }
+.va .cap h2 { margin: 6px 0 6px; font-size: 34px; font-weight: 750; letter-spacing: -.02em; }
+.va .cap p { margin: 0; font-size: 13.5px; opacity: .7; line-height: 1.55; }
+.va .card { position: relative; }
+.dots { display: flex; gap: 6px; margin-top: 16px; }
+.dots i { width: 18px; height: 3px; border-radius: 2px; background: rgb(255 255 255 / .35); }
+.dots i.on { background: #fff; }
+
+/* B · Metà e metà */
+.vb { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(420px, 1fr); }
+.vb .left { position: relative; overflow: hidden; }
+.vb .left .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgb(8 22 19 / .05) 40%, rgb(8 22 19 / .7) 100%); }
+.vb .left .cap { position: absolute; left: 40px; right: 40px; bottom: 36px; color: #fff; }
+.vb .left .cap h2 { margin: 0 0 6px; font-size: 28px; font-weight: 750; letter-spacing: -.01em; }
+.vb .left .cap p { margin: 0; font-size: 13.5px; opacity: .75; max-width: 440px; line-height: 1.55; }
+.vb .right { display: grid; place-items: center; padding: 32px; background: var(--surface); }
+.vb .card { box-shadow: none; padding: 0; max-width: 432px; }
+
+/* C · Tinte, senza foto */
+.vc { position: relative; min-height: 100vh; display: grid; place-items: center; padding: 24px; overflow: hidden; background: var(--bg); }
+.blob { position: absolute; border-radius: 50%; filter: blur(2px); }
+.vc .b1 { width: 520px; height: 520px; left: -140px; top: -120px; background: var(--mint-b); }
+.vc .b2 { width: 420px; height: 420px; right: -100px; top: 10%; background: var(--sky-b); }
+.vc .b3 { width: 380px; height: 380px; left: 20%; bottom: -160px; background: var(--lilac-b); }
+.vc .b4 { width: 200px; height: 200px; right: 22%; bottom: 8%; background: var(--sand-b); }
+.vc .grid { position: absolute; inset: 0; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 48px 48px; opacity: .35; mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%); }
+.vc .card { position: relative; box-shadow: 0 24px 60px -24px rgb(10 40 30 / .35), 0 2px 8px rgb(10 40 30 / .06); }
+.vc .tag { position: relative; margin-top: 18px; font-size: 12px; color: var(--muted); text-align: center; }
+
+/* La scheda prende tutta la larghezza disponibile fino a 456px (+20%) */
+.vc > div, .vd > div { width: min(456px, 100%); position: relative; }
+
+/* D · Tinte animate (ShaderGradient) */
+.sg { position: fixed; inset: 0; z-index: 0; background: linear-gradient(135deg, var(--mint-b), var(--sky-b) 55%, var(--lilac-b)); }
+.sg canvas { display: block; }
+.vd { position: relative; z-index: 1; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.vd .card { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(14px) saturate(1.1); -webkit-backdrop-filter: blur(14px) saturate(1.1); border: 1px solid color-mix(in srgb, var(--surface) 60%, transparent); box-shadow: 0 24px 60px -24px rgb(10 40 30 / .35); }
+.vd .tag { margin-top: 18px; font-size: 12px; color: var(--text); opacity: .7; text-align: center; }
+
+/* Barra dell'anteprima */
+.pv-bar { position: fixed; z-index: 50; left: 50%; transform: translateX(-50%); bottom: 14px; display: flex; gap: 4px; padding: 4px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px -10px rgb(0 0 0 / .3); white-space: nowrap; max-width: calc(100vw - 16px); overflow-x: auto; }
+.pv-bar a { color: var(--muted); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; text-decoration: none; }
+.pv-bar button { border: 0; background: transparent; height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 13px; }
+.pv-bar button[aria-pressed="true"] { background: var(--field); color: var(--text); }
+.pv-bar .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.pv-bar .nm { font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 6px; min-width: 110px; }
+
+@media (max-width: 900px) {
+  .vb { grid-template-columns: 1fr; }
+  .vb .left { height: 220px; }
+  .vb .left .cap { left: 20px; right: 20px; bottom: 18px; }
+  .vb .left .cap h2 { font-size: 22px; }
+  .vb .right { place-items: start center; padding: 24px 20px 90px; }
+}
+@media (max-width: 640px) {
+  .va { justify-content: center; padding: 16px 16px 90px; }
+  .va .cap { display: none; }
+  .card { padding: 24px 20px 20px; }
+  .vc .b2, .vc .b4 { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="sg" id="sg" hidden></div>
+<div data-lg></div>
+<div class="pv-bar" role="toolbar" aria-label="Controlli anteprima">
+  <a href="index.html" aria-label="Torna all'indice">‹</a>
+  <span class="sep"></span>
+  <button data-v="a" aria-pressed="true">A</button><button data-v="b" aria-pressed="false">B</button><button data-v="c" aria-pressed="false">C</button><button data-v="d" aria-pressed="false">D</button>
+  <span class="nm" data-vname></span>
+  <span class="sep"></span>
+  <button data-st="ok" aria-pressed="true">Normale</button><button data-st="err" aria-pressed="false">Errore</button><button data-st="load" aria-pressed="false">Accesso…</button>
+  <span class="sep"></span>
+  <button data-theme-t aria-pressed="false">Scuro</button>
+</div>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const EYE = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const ALERT = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>';
+  const ARROW = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  const qs = new URLSearchParams(location.search);
+  let v = qs.get('variante') || (() => { try { return localStorage.getItem('archie-preview-lg') || 'a'; } catch { return 'a'; } })();
+  let st = 'ok'; let amb = 'archie'; let pw = false; let slide = 0;
+  const NAMES = { a: 'Foto e scheda', b: 'Metà e metà', c: 'Tinte', d: 'Tinte animate' };
+  const card = (flat) => `<form class="card" onsubmit="return false" aria-labelledby="lg-t">
+      <div class="brand"><img class="logo" src="shared/img/logo-placeholder.svg" alt="Logo" width="240" height="56"></div>
+      <h1 id="lg-t">Accedi</h1><p class="sub">Usa le credenziali aziendali.</p>
+      <div class="amb" role="radiogroup" aria-label="Dove entri"><button type="button" role="radio" aria-checked="${amb === 'archie'}" data-amb="archie">Archie</button><button type="button" role="radio" class="portal" aria-checked="${amb === 'portal'}" data-amb="portal">Portale clienti</button></div>
+      ${st === 'err' ? `<div class="alert" role="alert">${ALERT}<span>Nome utente o password non corretti.</span></div>` : ''}
+      <div class="f${st === 'err' ? ' err' : ''}"><label for="lg-u">Nome utente</label><div class="in"><input id="lg-u" autocomplete="username" placeholder="nome.cognome" value="${st === 'ok' ? '' : 'f.mutuale'}"></div></div>
+      <div class="f${st === 'err' ? ' err' : ''}"><label for="lg-p">Password</label><div class="in"><input id="lg-p" type="${pw ? 'text' : 'password'}" autocomplete="current-password" value="${st === 'ok' ? '' : 'password-demo'}"><button class="eye" type="button" data-eye aria-label="${pw ? 'Nascondi' : 'Mostra'} la password" aria-pressed="${pw}">${EYE}</button></div>
+        <span class="caps${st === 'err' ? ' on' : ''}">⇪ Il blocco maiuscole è attivo</span></div>
+      <button class="go${amb === 'portal' ? ' portal' : ''}" type="submit">${st === 'load' ? '<span class="spin" aria-hidden="true"></span>Accesso in corso…' : `${amb === 'portal' ? 'Entra nel Portale' : 'Entra'}${ARROW}`}</button>
+      <p class="help">Problemi di accesso? <a href="#">Scrivi all'amministratore</a></p>
+      ${flat ? '' : '<div class="foot"><span>Biotron S.p.A.</span><span>v0.10.0</span></div>'}
+    </form>`;
+  const photos = () => `<div class="photo">${[1, 2].map((n, i) => `<img src="shared/img/login-bg-${n}.jpg" alt="" class="${i === slide ? 'on' : ''}">`).join('')}</div>`;
+  const render = () => {
+    const root = $('[data-lg]');
+    root.innerHTML = v === 'a'
+      ? `<main class="va">${photos()}<div class="shade"></div><div class="cap"><span>Biotron · RIS/PACS</span><h2>Clienti, siti e sistemi in un solo posto.</h2><p>Inventari, credenziali, manutenzioni e issue dei clienti sanitari, per i tecnici Biotron.</p><div class="dots">${[0, 1].map((i) => `<i class="${i === slide ? 'on' : ''}"></i>`).join('')}</div></div>${card(false)}</main>`
+      : v === 'b'
+        ? `<main class="vb"><div class="left">${photos()}<div class="shade"></div><div class="cap"><h2>Clienti, siti e sistemi in un solo posto.</h2><p>La piattaforma operativa dei tecnici Biotron: inventari, credenziali, manutenzioni e issue dei clienti sanitari.</p></div></div><div class="right">${card(false)}</div></main>`
+        : v === 'd'
+          ? `<main class="vd"><div>${card(false)}<p class="tag">Clienti, siti e sistemi dei clienti sanitari, in un solo posto.</p></div></main>`
+          : `<main class="vc"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i><i class="grid"></i><div>${card(false)}<p class="tag">Clienti, siti e sistemi dei clienti sanitari, in un solo posto.</p></div></main>`;
+    document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+    document.querySelectorAll('[data-st]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.st === st)));
+    $('[data-vname]').textContent = NAMES[v];
+    $('#sg').hidden = v !== 'd';
+    if (v === 'd') window.paintSG?.();
+  };
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.v) { v = b.dataset.v; try { localStorage.setItem('archie-preview-lg', v); } catch { /* niente */ } render(); }
+    if (b.dataset.st) { st = b.dataset.st; render(); }
+    if (b.dataset.amb) { amb = b.dataset.amb; render(); }
+    if (b.matches('[data-eye]')) { pw = !pw; render(); }
+    if (b.matches('[data-theme-t]')) { const d = document.documentElement.dataset.theme === 'dark'; document.documentElement.dataset.theme = d ? 'light' : 'dark'; b.setAttribute('aria-pressed', String(!d)); window.paintSG?.(); }
+  });
+  setInterval(() => { slide = (slide + 1) % 2; document.querySelectorAll('.photo img').forEach((im, i) => im.classList.toggle('on', i === slide)); document.querySelectorAll('.dots i').forEach((d, i) => d.classList.toggle('on', i === slide)); }, 5000);
+  render();
+})();
+</script>
+<script type="module">
+// Sfondo animato con ShaderGradient (MIT, github.com/ruucm/shadergradient), caricato solo per la variante D.
+// shared/sg-bundle.js = React 19 + three + @react-three/fiber + @shadergradient/react 2.4.20, impacchettati in locale.
+const PALETTE = {
+  light: { color1: '#6fae9b', color2: '#c3e0d6', color3: '#93acc4', brightness: 1.15 },
+  dark: { color1: '#1f5a4c', color2: '#173f37', color3: '#2b4258', brightness: 0.85 },
+}
+let mod = null
+window.paintSG = async () => {
+  const el = document.getElementById('sg'); if (el.hidden) return
+  mod ??= await import('./shared/sg-bundle.js')
+  const dark = document.documentElement.dataset.theme === 'dark'
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  mod.paint(el, {
+    control: 'props', type: 'waterPlane', animate: still ? 'off' : 'on', uTime: 2, uSpeed: 0.32, uStrength: 3.2, uDensity: 1.7, uFrequency: 5.5, uAmplitude: 0,
+    positionX: 0, positionY: 0, positionZ: 0, rotationX: 0, rotationY: 10, rotationZ: 50,
+    cAzimuthAngle: 180, cPolarAngle: 90, cDistance: 3.6, cameraZoom: 1, lightType: '3d', reflection: 0.1, grain: 'off', ...PALETTE[dark ? 'dark' : 'light'],
+  })
+}
+if (!document.getElementById('sg').hidden) window.paintSG()
+</script>
+</body>
+</html>
