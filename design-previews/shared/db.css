@@ -293,3 +293,285 @@
 .news li.one { display: flex; align-items: center; gap: 8px; }
 .news li.one b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
 .news li.one small { flex: none; }
+
+/* ═════ Varianti D · E · F: solo i colori di Archie ═════════════════
+   Verde (primario), salvia (verde chiaro) e acciaio (il blu della login).
+   Il rosso resta allo stato "scaduto"; la priorità usa la scala verde. */
+:root {
+  --gv-b: #e2f0eb; --gv-i: #17463c; --gv-m: #2f7f6d;
+  --gg-b: #ecf3ef; --gg-i: #1f5a4d; --gg-m: #6aa898;
+  --gs-b: #e7eef4; --gs-i: #2b4258; --gs-m: #6f8fa8;
+  --au-ink: #0f2e27; --au-sub: #24453c;
+}
+:root[data-theme="dark"] {
+  --gv-b: #183a33; --gv-i: #a6e3d3; --gv-m: #5fb8a3;
+  --gg-b: #1a2d28; --gg-i: #b5d4cb; --gg-m: #6aa898;
+  --gs-b: #1c2834; --gs-i: #c4d4e4; --gs-m: #7e9cbb;
+  --au-ink: #eef5f3; --au-sub: #c2d3cf;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --gv-b: #183a33; --gv-i: #a6e3d3; --gv-m: #5fb8a3;
+    --gg-b: #1a2d28; --gg-i: #b5d4cb; --gg-m: #6aa898;
+    --gs-b: #1c2834; --gs-i: #c4d4e4; --gs-m: #7e9cbb;
+    --au-ink: #eef5f3; --au-sub: #c2d3cf;
+  }
+}
+.t-gv { --tb: var(--gv-b); --ti: var(--gv-i); --tm: var(--gv-m); }
+.t-gg { --tb: var(--gg-b); --ti: var(--gg-i); --tm: var(--gg-m); }
+.t-gs { --tb: var(--gs-b); --ti: var(--gs-i); --tm: var(--gs-m); }
+
+/* Comune alle tre: scala verde per la priorità, rosso solo per lo scaduto */
+:is(.v-d, .v-e, .v-f) .p-alta { background: var(--gv-i); }
+:is(.v-d, .v-e, .v-f) .p-media { background: var(--gg-m); }
+:is(.v-d, .v-e, .v-f) .p-bassa { background: color-mix(in srgb, var(--gg-m) 35%, var(--surface)); }
+:is(.v-d, .v-e, .v-f) .dot.late { background: var(--error); }
+:is(.v-d, .v-e, .v-f) .big.al b { color: var(--error); }
+:is(.v-d, .v-e, .v-f) .days i { background: var(--gg-m); }
+:is(.v-d, .v-e, .v-f) .wel-chips li.al b { color: var(--error); }
+:is(.v-d, .v-e, .v-f) .grid { gap: 12px; }
+:is(.v-d, .v-e, .v-f) .wg { border-radius: 12px; }
+/* Azioni rapide: primaria piena + secondaria su carta */
+:is(.v-d, .v-e, .v-f) .qb { background: var(--primary); color: var(--primary-ink, #fff); }
+:is(.v-d, .v-e, .v-f) .qb:hover { filter: none; background: var(--primary-hover); }
+:is(.v-d, .v-e, .v-f) .qb.alt { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+:is(.v-d, .v-e, .v-f) .qb.alt:hover { background: var(--surface-2); }
+:is(.v-d, .v-e, .v-f) .qb.alt > .i { color: var(--gs-m); }
+:is(.v-d, .v-e, .v-f) .qb.alt small { color: var(--muted); opacity: 1; }
+:root[data-theme="dark"] :is(.v-d, .v-e, .v-f) .qb:not(.alt) { color: #0b1513; }
+/* Nota: righe salvia, margine acciaio */
+:is(.v-d, .v-e, .v-f) .wg.w-sticky-note { background: var(--surface); border-color: var(--border); }
+:is(.v-d, .v-e, .v-f) .w-sticky-note .note {
+  background-image:
+    linear-gradient(to right, transparent 34px, color-mix(in srgb, var(--gs-m) 45%, transparent) 34px, color-mix(in srgb, var(--gs-m) 45%, transparent) 35.5px, transparent 35.5px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), color-mix(in srgb, var(--gg-m) 30%, transparent) calc(var(--lh) - 1px), color-mix(in srgb, var(--gg-m) 30%, transparent) var(--lh));
+}
+/* Contributor: stessi coriandoli e anello, nei verdi e nell'acciaio */
+:is(.v-d, .v-e, .v-f) .wg.w-contributor { background: linear-gradient(165deg, var(--gv-b) 0%, color-mix(in srgb, var(--gs-b) 80%, var(--surface)) 100%); border-color: transparent; }
+:is(.v-d, .v-e, .v-f) .conf .c0 { background: var(--gv-m); } :is(.v-d, .v-e, .v-f) .conf .c1 { background: var(--gs-m); }
+:is(.v-d, .v-e, .v-f) .conf .c2 { background: var(--gg-m); } :is(.v-d, .v-e, .v-f) .conf .c3 { background: var(--gv-i); opacity: .5; }
+:is(.v-d, .v-e, .v-f) .conf .c4 { background: var(--surface); }
+:is(.v-d, .v-e, .v-f) .trophy-bg { color: var(--gv-m); opacity: .12; }
+:is(.v-d, .v-e, .v-f) .ctb-t { color: var(--gv-i); }
+:is(.v-d, .v-e, .v-f) .tr-s { color: var(--gv-m); }
+:is(.v-d, .v-e, .v-f) .ctb-av .ring { border-color: var(--gv-m); box-shadow: 0 0 0 5px color-mix(in srgb, var(--gv-m) 14%, transparent); }
+:is(.v-d, .v-e, .v-f) .ctb-av .av { color: var(--gv-i); background: var(--surface); }
+:is(.v-d, .v-e, .v-f) .ctb-av .badge { background: var(--primary); }
+
+/* ── D · Verde Archie: widget su carta, il saluto sullo sfondo animato della login ── */
+.v-d .wg { background: var(--surface); }
+.v-d .wh h2 { color: var(--text); }
+.v-d .big b { color: var(--text); }
+.v-d .wg.w-weather { position: relative; border: 0; background: linear-gradient(135deg, #6fae9b, #c3e0d6 55%, #93acc4); isolation: isolate; }
+:root[data-theme="dark"] .v-d .wg.w-weather { background: linear-gradient(135deg, #1f5a4c, #173f37 55%, #2b4258); }
+.sg-slot { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; }
+.sg-host { position: absolute; inset: 0; }
+.sg-host canvas { display: block; }
+.v-d .wel { position: relative; }
+.v-d .wel h1 { color: var(--au-ink); font-size: 34px; }
+.v-d .wel p { color: var(--au-sub); }
+.v-d .wel-chips li { background: color-mix(in srgb, var(--surface) 82%, transparent); backdrop-filter: blur(6px); }
+.v-d .wel-chips li b { color: var(--gv-i); }
+.v-d .wx .sun { fill: color-mix(in srgb, #fff 85%, transparent); } .v-d .wx .rays { stroke: color-mix(in srgb, #fff 85%, transparent); }
+.v-d .wx .cl { fill: color-mix(in srgb, #fff 92%, transparent); stroke: none; }
+.v-d .tt b { color: var(--au-ink); } .v-d .tt span { color: var(--au-sub); }
+.v-d .nx li { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+
+/* ── E · Campo verde: widget in tinte tenui di verde, salvia e acciaio ── */
+.v-e .wg.tinted { background: color-mix(in srgb, var(--tb) 70%, var(--surface)); border-color: color-mix(in srgb, var(--tm) 18%, transparent); }
+.v-e .wg.w-weather.tinted { background:
+  radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, #6fae9b 40%, transparent) 0, transparent 60%),
+  radial-gradient(100% 120% at 100% 100%, color-mix(in srgb, #93acc4 45%, transparent) 0, transparent 60%),
+  var(--gv-b); border-color: transparent; }
+:root[data-theme="dark"] .v-e .wg.w-weather.tinted { background:
+  radial-gradient(120% 140% at 0% 0%, #1f5a4c 0, transparent 60%), radial-gradient(100% 120% at 100% 100%, #2b4258 0, transparent 60%), var(--gv-b); }
+.v-e .wel h1 { color: var(--gv-i); }
+.v-e .wel-chips li b { color: var(--gv-i); }
+.v-e .wx .sun { fill: var(--gg-m); } .v-e .wx .rays { stroke: var(--gg-m); } .v-e .wx .cl { stroke: var(--gs-m); }
+.v-e .tt b { color: var(--gv-i); }
+.v-e .big b { font-size: 44px; }
+
+/* ── F · Aurora: lo sfondo della login in testa alla pagina, i widget ci galleggiano sopra ── */
+.v-f .db-head { position: relative; z-index: 2; margin-bottom: -46px; padding: 12px 14px 0 0; }
+.v-f .db-head .btn { background: color-mix(in srgb, var(--surface) 80%, transparent); border-color: transparent; }
+.aur { position: relative; isolation: isolate; overflow: hidden; border-radius: 16px; min-height: 300px; padding: 34px 32px 92px; background: linear-gradient(135deg, #6fae9b, #c3e0d6 55%, #93acc4); }
+:root[data-theme="dark"] .aur { background: linear-gradient(135deg, #1f5a4c, #173f37 55%, #2b4258); }
+.au-in { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.au-l h1 { margin: 0; font-size: 38px; line-height: 1.08; font-weight: 650; letter-spacing: -.028em; color: var(--au-ink); text-wrap: balance; }
+.au-l p { margin: 8px 0 0; font-size: 13.5px; color: var(--au-sub); }
+.au-act { display: flex; gap: 8px; margin-top: 18px; }
+.au-act .btn .i { width: 15px; height: 15px; }
+.au-act .btn:not(.btn-primary) { background: color-mix(in srgb, var(--surface) 82%, transparent); border-color: transparent; backdrop-filter: blur(6px); }
+.au-st { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(118px, 1fr)); gap: 1px; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--au-ink) 10%, transparent); }
+.au-st li { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; padding: 12px 14px; background: color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter: blur(8px); }
+.au-st .i { width: 16px; height: 16px; color: var(--gv-m); }
+.au-st b { font-size: 26px; line-height: 1.05; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+.au-st span { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.au-st li.al b, .au-st li.al .i { color: var(--error); }
+.v-f .grid { position: relative; z-index: 1; margin: -64px 14px 0; }
+.v-f .wg { background: var(--surface); }
+.v-f .cell:nth-child(-n+3) .wg { box-shadow: 0 14px 34px -14px rgb(16 40 34 / .28), 0 2px 6px rgb(16 40 34 / .06); border-color: transparent; }
+.v-f .big b { color: var(--text); }
+
+@media (max-width: 1180px) {
+  .au-st { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .aur { padding: 22px 18px 80px; }
+  .au-l h1 { font-size: 28px; }
+  .v-f .grid { margin: -56px 8px 0; }
+  .v-f .db-head { margin-bottom: -40px; }
+}
+/* E: tinte piene (tenui), così si distingue da D */
+.v-e .wg.tinted { background: var(--tb); border-color: transparent; }
+.v-e .wg.tinted .li li:hover { background: color-mix(in srgb, var(--tm) 16%, transparent); }
+.v-e .wg.tinted .seg { background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.v-e .wg.tinted .cb, .v-e .wg.tinted .dav { background: color-mix(in srgb, var(--surface) 75%, transparent); }
+.v-e .wg.tinted .news li { background: color-mix(in srgb, var(--surface) 72%, transparent); }
+.v-e .wg.w-sticky-note { background: var(--gg-b); border-color: transparent; }
+@media (max-width: 760px) {
+  .v-f .db-head { margin-bottom: 10px; padding: 0; }
+  .v-f .db-head .btn { background: var(--surface); border-color: var(--border); }
+}
+
+/* ═════ E · Campo verde, seconda passata: ogni widget con un trattamento suo ═════
+   Scuro (Issue), tinti (Task, Comunicazioni, Team, Compleanni), carta (Manutenzioni, Da fare),
+   e la nota come un post-it giallo: l'unico colore caldo, perché è un oggetto. */
+:root { --pi-b: #fbf1b8; --pi-i: #5b4a0a; --pi-l: #ecd97a; }
+:root[data-theme="dark"] { --pi-b: #3a341a; --pi-i: #f0e2a6; --pi-l: #5c522a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pi-b: #3a341a; --pi-i: #f0e2a6; --pi-l: #5c522a; } }
+
+/* Issue: il widget scuro, nel verde della testata delle schede */
+.v-e .wg.w-issues { background: linear-gradient(160deg, var(--band-2, #1f5a4d), var(--band, #17463c)); border-color: transparent; color: #eef6f3;
+  --ti: #ffffff; --tm: #8fd0bf; }
+.v-e .w-issues .wh h2 { color: #fff; }
+.v-e .w-issues .wic { color: #8fd0bf; }
+.v-e .w-issues .wlink { color: #cfeee5; }
+.v-e .w-issues .big b { color: #fff; }
+.v-e .w-issues .big span, .v-e .w-issues .li .tx small { color: #b7d3cb; }
+.v-e .w-issues .li li:hover { background: rgb(255 255 255 / .07); }
+.v-e .w-issues .p-alta { background: #ffffff; } .v-e .w-issues .p-media { background: #8fd0bf; } .v-e .w-issues .p-bassa { background: rgb(255 255 255 / .25); }
+.v-e .w-issues .seg { background: rgb(255 255 255 / .10); }
+.v-e .w-issues .seg button { color: #cfe3dd; }
+.v-e .w-issues .seg button[aria-pressed="true"] { background: #fff; color: var(--band, #17463c); }
+:root[data-theme="dark"] .v-e .wg.w-issues { background: linear-gradient(160deg, #1d4f44, #123a32); }
+
+/* Manutenzioni e Da fare: carta, come le tabelle dell'app */
+.v-e .wg.w-maintenance, .v-e .wg.w-todo { background: var(--surface); border-color: var(--border); }
+.v-e .w-maintenance .days { height: 46px; }
+
+/* Task di area: salvia; Comunicazioni e Team: acciaio; Compleanni: salvia chiaro */
+.v-e .wg.w-area-tasks { background: var(--gg-b); }
+.v-e .wg.w-announcements, .v-e .wg.w-team { background: var(--gs-b); }
+.v-e .wg.w-birthdays { background: color-mix(in srgb, var(--gg-b) 60%, var(--surface)); }
+.v-e .wg.w-quick-actions-pair { background: transparent; border-color: transparent; }
+.v-e .w-quick-actions-pair .qa2 { padding: 0; }
+
+/* Nota: post-it giallo pastello, angolo piegato e ombra da foglietto */
+.v-e .wg.w-sticky-note { position: relative; background: var(--pi-b); border-color: transparent; border-radius: 4px 4px 4px 4px;
+  box-shadow: 0 10px 18px -12px rgb(90 70 0 / .35), 0 1px 2px rgb(90 70 0 / .08); --ti: var(--pi-i); --tm: var(--pi-i); }
+.v-e .wg.w-sticky-note::after { content: ""; position: absolute; right: 0; bottom: 0; width: 26px; height: 26px;
+  background: linear-gradient(315deg, var(--canvas, var(--bg)) 0 50%, var(--pi-l) 50% 100%); border-top-left-radius: 4px; box-shadow: -2px -2px 4px rgb(90 70 0 / .10); }
+.v-e .w-sticky-note .wh h2 { color: var(--pi-i); }
+.v-e .w-sticky-note .wic { color: var(--pi-i); opacity: .75; }
+.v-e .w-sticky-note .note { background-image: none; padding-left: 16px; color: var(--pi-i); font-size: 14px; }
+.v-e .wg.w-issues .seg { background: rgb(255 255 255 / .10); }
+.v-e .wg.w-issues .seg button { color: #d8ebe5; }
+.v-e .wg.w-issues .seg button[aria-pressed="true"] { background: #fff; color: var(--band, #17463c); }
+
+/* ═════ F · Aurora, seconda passata: widget diversi tra loro, post-it, foto ═════ */
+/* Testata fotografica: foto dell'app virata nel verde (luminosità della foto, tinta del verde) */
+.dph { position: relative; flex: none; height: 96px; overflow: hidden; isolation: isolate; background: linear-gradient(135deg, var(--gv-m), var(--band, #17463c)); }
+.dph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.08) brightness(1.05); mix-blend-mode: luminosity; opacity: .9; }
+.dph::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgb(10 35 29 / .72), rgb(10 35 29 / .05) 70%); }
+.dph-in { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; align-items: center; gap: 9px; padding: 10px 16px; }
+.dph-in h2 { margin: 0; font-size: 14px; font-weight: 650; color: #fff; }
+.dph-in .wic, .ph-in .wlink { color: #e2f3ed !important; }
+.dph-in .sp { flex: 1; }
+.v-f .w-maintenance .wb, .v-f .w-announcements .wb { padding-top: 12px; }
+
+/* Issue: il widget scuro (stesso trattamento di E) */
+.v-f .wg.w-issues { background: linear-gradient(160deg, var(--band-2, #1f5a4d), var(--band, #17463c)); color: #eef6f3; --ti: #fff; --tm: #8fd0bf; }
+.v-f .w-issues .wh h2, .v-f .w-issues .big b { color: #fff; }
+.v-f .w-issues .wic { color: #8fd0bf; }
+.v-f .w-issues .wlink { color: #cfeee5; }
+.v-f .w-issues .big span, .v-f .w-issues .li .tx small { color: #b7d3cb; }
+.v-f .w-issues .li li:hover { background: rgb(255 255 255 / .07); }
+.v-f .w-issues .p-alta { background: #fff; } .v-f .w-issues .p-media { background: #8fd0bf; } .v-f .w-issues .p-bassa { background: rgb(255 255 255 / .25); }
+.v-f .wg.w-issues .seg { background: rgb(255 255 255 / .10); }
+.v-f .wg.w-issues .seg button { color: #d8ebe5; }
+.v-f .wg.w-issues .seg button[aria-pressed="true"] { background: #fff; color: var(--band, #17463c); }
+:root[data-theme="dark"] .v-f .wg.w-issues { background: linear-gradient(160deg, #1d4f44, #123a32); }
+
+/* Task di area: salvia; Compleanni: salvia chiaro; Team: acciaio */
+.v-f .wg.w-area-tasks { background: var(--gg-b); }
+.v-f .wg.w-area-tasks .cb, .v-f .wg.w-area-tasks .dav { background: color-mix(in srgb, var(--surface) 75%, transparent); }
+.v-f .wg.w-birthdays { background: color-mix(in srgb, var(--gg-b) 60%, var(--surface)); }
+.v-f .wg.w-team { background: var(--gs-b); --ti: var(--gs-i); --tm: var(--gs-m); }
+.v-f .wg.w-announcements .news li { background: var(--surface-2); }
+
+/* Nota: post-it giallo chiaro pastello */
+:root { --pi-b: #fdf4c4; --pi-i: #5b4a0a; --pi-l: #f0de86; }
+:root[data-theme="dark"] { --pi-b: #3a341a; --pi-i: #f0e2a6; --pi-l: #5c522a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pi-b: #3a341a; --pi-i: #f0e2a6; --pi-l: #5c522a; } }
+.v-f .wg.w-sticky-note { position: relative; background: var(--pi-b); border-color: transparent; border-radius: 4px;
+  box-shadow: 0 12px 20px -12px rgb(90 70 0 / .38), 0 1px 2px rgb(90 70 0 / .08); --ti: var(--pi-i); --tm: var(--pi-i); transform: rotate(-.6deg); }
+.v-f .wg.w-sticky-note::after { content: ""; position: absolute; right: 0; bottom: 0; width: 26px; height: 26px;
+  background: linear-gradient(315deg, var(--bg) 0 50%, var(--pi-l) 50% 100%); border-top-left-radius: 4px; box-shadow: -2px -2px 4px rgb(90 70 0 / .10); }
+.v-f .w-sticky-note .wh h2 { color: var(--pi-i); }
+.v-f .w-sticky-note .wic { color: var(--pi-i); opacity: .75; }
+.v-f .w-sticky-note .note { background-image: none; padding-left: 16px; color: var(--pi-i); font-size: 14px; }
+.dph, .dph * { font-style: normal; }
+.dph-in .wic, .dph-in .wlink { color: #e2f3ed !important; }
+
+/* ═════ F, terza passata ═════ */
+/* Le caselle del Da fare ereditavano il padding di .cb da ct.css */
+.dbv .cb { padding: 0; }
+/* Contributor della metà: 1×2, compatto */
+.v-f .w-contributor.s-1x2 .ctb-in { padding: 10px 8px; gap: 0; }
+.v-f .w-contributor.s-1x2 .ctb-t { font-size: 12px; gap: 4px; }
+.v-f .w-contributor.s-1x2 .tr-s { width: 14px; height: 14px; }
+.v-f .w-contributor.s-1x2 .ctb-m { font-size: 11px; margin-bottom: 10px; }
+.v-f .w-contributor.s-1x2 .ctb-av, .v-f .w-contributor.s-1x2 .ctb-av .av { width: 58px; height: 58px; }
+.v-f .w-contributor.s-1x2 .ctb-av .av { font-size: 22px; }
+.v-f .w-contributor.s-1x2 .ctb-av .ring { inset: -5px; border-width: 2px; }
+.v-f .w-contributor.s-1x2 .ctb-av .badge { width: 20px; height: 20px; right: -6px; bottom: -4px; }
+.v-f .w-contributor.s-1x2 .ctb-n { font-size: 13px; margin-top: 4px; }
+.v-f .w-contributor.s-1x2 .ctb-c { font-size: 11.5px; }
+.v-f .w-contributor.s-1x2 .trophy-bg { width: 80px; height: 80px; right: -12px; bottom: -12px; }
+
+/* Compleanno di oggi: stesso schema del Contributor, salvia e giallo post-it, palloncini che salgono */
+.v-f .wg.w-bday-today { background: linear-gradient(165deg, color-mix(in srgb, var(--pi-b) 75%, var(--surface)) 0%, var(--gg-b) 100%); border-color: transparent; }
+.bdt { position: relative; flex: 1; overflow: hidden; display: flex; }
+.balloons { position: absolute; inset: 0; pointer-events: none; }
+.bl { position: absolute; bottom: -40px; width: 16px; height: 27px; animation: blUp var(--t) var(--d) infinite cubic-bezier(.3, .1, .5, 1); opacity: 0; }
+.bl svg { width: 100%; height: 100%; overflow: visible; }
+.bl ellipse, .bl path:not(.str) { fill: var(--c); }
+.bl .str { stroke: color-mix(in srgb, var(--c) 70%, var(--muted)); stroke-width: .8; }
+.bl.b0 { --c: var(--gv-m); } .bl.b1 { --c: var(--pi-l); } .bl.b2 { --c: var(--gs-m); }
+@keyframes blUp {
+  0% { transform: translate(0, 0) rotate(-4deg); opacity: 0; }
+  12% { opacity: .9; }
+  50% { transform: translate(var(--sw), -130px) rotate(4deg); }
+  85% { opacity: .9; }
+  100% { transform: translate(0, -270px) rotate(-3deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .bl { animation: none; opacity: .8; bottom: 8px; } .bl:nth-child(n+4) { display: none; } }
+.bdt-in { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 8px; text-align: center; }
+.bdt-t { margin: 0 0 12px; font-size: 12px; font-weight: 700; color: var(--gv-i); }
+.bdt-av { position: relative; width: 58px; height: 58px; display: grid; place-items: center; }
+.bdt-av .ring { position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--gv-m); box-shadow: 0 0 0 5px color-mix(in srgb, var(--gv-m) 14%, transparent); animation: ringBeat 2.4s ease-in-out infinite; }
+@keyframes ringBeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .bdt-av .ring { animation: none; } }
+.bdt-av .av { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; font-weight: 700; color: var(--gv-i); background: var(--surface); }
+.bdt-av .badge { position: absolute; right: -6px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--pi-l); color: var(--pi-i); box-shadow: 0 2px 6px rgb(16 40 34 / .2); }
+.bdt-av .badge svg { width: 13px; height: 13px; }
+.bdt-n { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.bdt-c { font-size: 11.5px; color: var(--muted); }
+.v-f .w-contributor.s-1x2 .ctb-t { gap: 6px; }
+/* Pausa delle animazioni */
+.db-head .actions { display: flex; align-items: center; gap: 6px; }
+.anim-btn { width: 32px; height: 32px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; }
+.anim-btn .i { width: 14px; height: 14px; }
+.v-f .db-head .anim-btn { background: color-mix(in srgb, var(--surface) 80%, transparent); border-color: transparent; }
+.anim-off .conf i, .anim-off .bl, .anim-off .bdt-av .ring { animation-play-state: paused; }
