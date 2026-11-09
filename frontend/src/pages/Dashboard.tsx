@@ -1,5 +1,7 @@
 import * as React from 'react'
-import { Box, Button, ButtonBase, CircularProgress } from '@mui/material'
+import { Box, Button, ButtonBase, CircularProgress, IconButton, Tooltip } from '@mui/material'
+import PauseRoundedIcon from '@mui/icons-material/PauseRounded'
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
@@ -10,11 +12,13 @@ import DashboardGrid from '../features/dashboard/DashboardGrid'
 import { useDashboardLayout } from '../features/dashboard/useDashboardLayout'
 import { useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
 import { WIDGET_REGISTRY, findFreeSlot } from '../features/dashboard/dashboardTypes'
+import DashboardHero from '../features/dashboard/DashboardHero'
+import { ANIM_CLASS } from '../features/dashboard/widgets/tints'
 
 // Ordine e altezza dei widget quando la griglia non c'è (telefono, o catalogo non raggiungibile).
 const STACK: [string, number][] = [
-  ['weather', 0], ['quick-actions-pair', 76], ['issues', 330], ['area-tasks', 330], ['maintenance', 330], ['team', 150],
-  ['announcements', 260], ['todo', 260], ['sticky-note', 220], ['birthdays', 130], ['contributor', 250],
+  ['issues', 330], ['maintenance', 330], ['area-tasks', 330], ['team', 150], ['birthdays', 230],
+  ['announcements', 260], ['todo', 260], ['sticky-note', 220], ['contributor', 250],
 ]
 
 /** Widget uno sotto l'altro (telefono e ripiego). */
@@ -23,7 +27,7 @@ function StackedWidgets({ columns = 1 }: { columns?: number }) {
     <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: '12px' }}>
       {STACK.map(([k, h]) => {
         const W = WIDGET_REGISTRY[k]
-        return W ? <Box key={k} sx={{ minHeight: h || undefined, display: 'flex', gridColumn: k === 'weather' || k === 'quick-actions-pair' ? '1 / -1' : undefined }}><W /></Box> : null
+        return W ? <Box key={k} sx={{ minHeight: h || undefined, display: 'flex' }}><W /></Box> : null
       })}
     </Box>
   )
@@ -166,23 +170,44 @@ function DynamicDesktopLayout() {
 
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 
-/** Dashboard "Tinte" (anteprima design-previews/db-base.html): widget con tinte tenui, griglia personalizzabile. */
+const ANIM_KEY = 'archie-dash-anim'
+
+/**
+ * Dashboard "Aurora" (anteprima design-previews/db-base.html, variante F): fascia con lo sfondo
+ * animato della login in testa, widget nei colori dell'app che vi salgono sopra, griglia personalizzabile.
+ * Le animazioni (sfondo, coriandoli, palloncini) si mettono in pausa con un pulsante, scelta ricordata nel browser.
+ */
 export default function Dashboard() {
   useOwnPageHeader()
   const { editMode, toggleEditMode } = useDashboardEditMode()
+  const [paused, setPaused] = React.useState(() => { try { return localStorage.getItem(ANIM_KEY) === 'off' } catch { return false } })
+  const togglePaused = () => setPaused((p) => { try { localStorage.setItem(ANIM_KEY, p ? 'on' : 'off') } catch { /* niente */ } return !p })
+  const onBand = { borderColor: 'transparent', boxShadow: '0 14px 34px -14px rgb(16 40 34 / .28), 0 2px 6px rgb(16 40 34 / .06)' }
+
+  const actions = (
+    <>
+      <Tooltip title={paused ? 'Riprendi le animazioni' : 'Metti in pausa le animazioni'}>
+        <IconButton aria-label={paused ? 'Riprendi le animazioni' : 'Metti in pausa le animazioni'} aria-pressed={paused} onClick={togglePaused}
+          sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: (t) => `color-mix(in srgb, ${t.palette.background.paper} 80%, transparent)`, '&:hover': { bgcolor: 'background.paper' } }}>
+          {paused ? <PlayArrowRoundedIcon sx={{ fontSize: 18 }} /> : <PauseRoundedIcon sx={{ fontSize: 18 }} />}
+        </IconButton>
+      </Tooltip>
+      <Button variant={editMode ? 'contained' : 'outlined'} color={editMode ? 'primary' : 'inherit'} startIcon={<CampoIcon name="columns" size={15} />} onClick={toggleEditMode}
+        sx={{ display: { xs: 'none', md: 'inline-flex' }, ...(editMode ? {} : { borderColor: 'transparent', bgcolor: (t) => `color-mix(in srgb, ${t.palette.background.paper} 80%, transparent)`, '&:hover': { bgcolor: 'background.paper', borderColor: 'transparent' } }) }}>
+        {editMode ? 'Fine' : 'Personalizza'}
+      </Button>
+    </>
+  )
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <Box sx={{ display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', mb: 1.25 }}>
-        <Button variant={editMode ? 'contained' : 'outlined'} color={editMode ? 'primary' : 'inherit'} startIcon={<CampoIcon name="columns" size={15} />} onClick={toggleEditMode}>
-          {editMode ? 'Fine' : 'Personalizza'}
-        </Button>
-      </Box>
-      {/* Desktop: griglia personalizzabile */}
-      <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+    <Box className={paused ? 'anim-off' : undefined} sx={{ display: 'flex', flexDirection: 'column', width: '100%', [`&.anim-off .${ANIM_CLASS}`]: { animationPlayState: 'paused' } }}>
+      <DashboardHero paused={paused} actions={actions} />
+      {/* Desktop: griglia personalizzabile; la prima riga sale sulla fascia */}
+      <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'relative', zIndex: 1, mt: editMode ? 2 : '-64px', mx: editMode ? 0 : '14px', '& .on-band > div:last-of-type > section': editMode ? {} : onBand }}>
         <DynamicDesktopLayout />
       </Box>
       {/* Telefono: widget uno sotto l'altro */}
-      <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+      <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 1.5 }}>
         <StackedWidgets />
       </Box>
     </Box>

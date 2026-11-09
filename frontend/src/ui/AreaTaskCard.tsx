@@ -150,10 +150,11 @@ export default function AreaTaskCard() {
   const openCount = tasks.filter((t) => t.status !== 'completato').length
   return (
     <WidgetShell
-      tone="lilac"
+      tone="salvia"
+      look="tint"
       icon={AssignmentTurnedInRoundedIcon}
       title="Task di area"
-      extra={selectedArea && !loading ? <CountPill tone="lilac">{openCount} aperti</CountPill> : null}
+      extra={selectedArea && !loading ? <CountPill tone="salvia">{openCount} aperti</CountPill> : null}
       link={{ label: 'Vedi tutti', to: '/tasks' }}
       actions={areas.length > 1 || isSuperuser ? (
         <Select
@@ -198,7 +199,7 @@ export default function AreaTaskCard() {
             inputProps={{ 'aria-label': 'Scadenza' }}
             sx={{ width: 122, fontSize: 12, color: dueDate ? 'text.primary' : 'text.secondary' }}
           />
-          <IconButton size="small" aria-label="Aggiungi il task" onClick={() => void addTask()} disabled={!input.trim() || saving} sx={{ width: 26, height: 26, color: (t) => t.palette.archie.tints.lilac.ink }}>
+          <IconButton size="small" aria-label="Aggiungi il task" onClick={() => void addTask()} disabled={!input.trim() || saving} sx={{ width: 26, height: 26, color: (t) => t.palette.archie.dash.salvia.ink }}>
             <AddRoundedIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
@@ -266,7 +267,7 @@ function TaskRow({
         '&:hover .task-actions': { opacity: canAct ? 1 : 0 },
         '&:focus-within .task-actions': { opacity: canAct ? 1 : 0 },
         transition: 'background 0.12s',
-        '&:hover': { bgcolor: (t) => tintVeil(t, 'lilac', 12) },
+        '&:hover': { bgcolor: (t) => tintVeil(t, 'salvia', 30) },
       }}
     >
       <Tooltip title={canAct ? `Segna come "${STATUS_META[NEXT_STATUS[task.status]].label}"` : ''}>
@@ -333,7 +334,7 @@ function TaskRow({
       ) : null}
       {task.assigned_to_name ? (
         <Tooltip title={task.assigned_to_name}>
-          <Avatar sx={{ width: 24, height: 24, fontSize: 10, fontWeight: 700, color: (t) => t.palette.archie.tints.lilac.ink, bgcolor: (t) => tintVeil(t, 'lilac', 26) }}>
+          <Avatar sx={{ width: 24, height: 24, fontSize: 10, fontWeight: 700, color: (t) => t.palette.archie.dash.salvia.ink, bgcolor: (t) => tintVeil(t, 'salvia', 26) }}>
             {personInitials(task.assigned_to_name)}
           </Avatar>
         </Tooltip>

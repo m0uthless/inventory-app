@@ -1,7 +1,5 @@
 import type * as React from 'react'
 import AreaTaskCard from '../../ui/AreaTaskCard'
-import WelcomeWidget from './widgets/WelcomeWidget'
-import QuickActionsWidget from './widgets/QuickActionsWidget'
 import IssuesWidget from './widgets/IssuesWidget'
 import MaintenanceWidget from './widgets/MaintenanceWidget'
 import AnnouncementsWidget from './widgets/AnnouncementsWidget'
@@ -35,11 +33,11 @@ export type DashboardLayoutItem = {
 
 // ─── Registry: chiave backend → componente React ───────────────────────────────
 // La chiave deve coincidere esattamente con `key` nel catalogo backend
-// (core/migrations/0019_seed_dashboard_widgets.py, 0043_dashboard_tinte_widgets.py).
-// Stile "Tinte" (anteprima design-previews/db-base.html).
+// (core/migrations/0019_seed_dashboard_widgets.py, 0043_dashboard_tinte_widgets.py,
+// 0044_dashboard_aurora.py). Stile "Aurora" (anteprima design-previews/db-base.html, variante F):
+// saluto, meteo e azioni rapide stanno nella fascia in testa (DashboardHero), non più nei widget.
 
 export const WIDGET_REGISTRY: Record<string, React.ComponentType> = {
-  weather:       WelcomeWidget,
   contributor:   ContributorWidget,
   issues:        IssuesWidget,
   'area-tasks':  AreaTaskCard,
@@ -48,7 +46,6 @@ export const WIDGET_REGISTRY: Record<string, React.ComponentType> = {
   maintenance:   MaintenanceWidget,
   'sticky-note': NoteWidget,
   birthdays:     BirthdaysWidget,
-  'quick-actions-pair': QuickActionsWidget,
   team:          TeamWidget,
 }
 

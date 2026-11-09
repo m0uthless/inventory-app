@@ -45,10 +45,29 @@ export type ArchieTokens = {
    * azione, selezione e stato" (frontend/DESIGN.md).
    */
   tints: Record<TintKey, TintTriple>
+  /**
+   * Toni della Dashboard "Aurora" (anteprima db-base.html, variante F): solo i colori
+   * dell'app (verde, salvia, acciaio della login) più il giallo post-it della nota.
+   */
+  dash: Record<DashTone, TintTriple>
 }
 
 export type TintKey = 'mint' | 'sky' | 'lilac' | 'rose' | 'sand' | 'peach' | 'butter'
 export type TintTriple = { bg: string; ink: string; mid: string }
+export type DashTone = 'verde' | 'salvia' | 'acciaio' | 'postit'
+
+export const DASH_LIGHT: Record<DashTone, TintTriple> = {
+  verde: { bg: '#e2f0eb', ink: '#17463c', mid: '#2f7f6d' },
+  salvia: { bg: '#ecf3ef', ink: '#1f5a4d', mid: '#6aa898' },
+  acciaio: { bg: '#e7eef4', ink: '#2b4258', mid: '#6f8fa8' },
+  postit: { bg: '#fdf4c4', ink: '#5b4a0a', mid: '#f0de86' },
+}
+export const DASH_DARK: Record<DashTone, TintTriple> = {
+  verde: { bg: '#183a33', ink: '#a6e3d3', mid: '#5fb8a3' },
+  salvia: { bg: '#1a2d28', ink: '#b5d4cb', mid: '#6aa898' },
+  acciaio: { bg: '#1c2834', ink: '#c4d4e4', mid: '#7e9cbb' },
+  postit: { bg: '#3a341a', ink: '#f0e2a6', mid: '#5c522a' },
+}
 
 export const TINTS_LIGHT: Record<TintKey, TintTriple> = {
   mint: { bg: '#e2f2eb', ink: '#175a4c', mid: '#4f9b88' },
@@ -108,6 +127,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       ...STATUS_LIGHT,
       archie: {
         tints: TINTS_LIGHT,
+        dash: DASH_LIGHT,
         frame: '#e3eae8', surface2: '#f5f8f7', borderStrong: '#b9c7c3', textFaint: '#66766f',
         field: '#e2f0eb', fieldLine: '#1f6b5c', neutralBg: '#edf1f0',
         band: '#17463c', band2: '#1f5a4d',
@@ -125,6 +145,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       ...STATUS_DARK,
       archie: {
         tints: TINTS_DARK,
+        dash: DASH_DARK,
         frame: '#121a19', surface2: '#1a2523', borderStrong: '#3b4c48', textFaint: '#849591',
         field: '#183a33', fieldLine: '#5fb8a3', neutralBg: '#1e2928',
         band: '#123a32', band2: '#1a5045',
@@ -146,6 +167,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       info: { main: '#1d6f86', bg: '#e0f1f5' },
       archie: {
         tints: TINTS_LIGHT,
+        dash: DASH_LIGHT,
         frame: '#e3e8ef', surface2: '#f5f7fa', borderStrong: '#b8c3d1', textFaint: '#657182',
         field: '#e1ebf6', fieldLine: '#1f5f99', neutralBg: '#edf0f4',
         band: '#153e66', band2: '#1c4f80',
@@ -164,6 +186,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       info: { main: '#6cc0d4', bg: '#14303a' },
       archie: {
         tints: TINTS_DARK,
+        dash: DASH_DARK,
         frame: '#121821', surface2: '#1a212c', borderStrong: '#3a4555', textFaint: '#8592a3',
         field: '#18304a', fieldLine: '#6fa8e0', neutralBg: '#1e2530',
         band: '#132f4e', band2: '#1b4168',
@@ -183,6 +206,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       ...STATUS_LIGHT,
       archie: {
         tints: TINTS_LIGHT,
+        dash: DASH_LIGHT,
         frame: '#e6e6ef', surface2: '#f7f7fa', borderStrong: '#bfbfd0', textFaint: '#69697f',
         field: '#e8e8f7', fieldLine: '#4a48a6', neutralBg: '#efeff4',
         band: '#2b2a6b', band2: '#383788',
@@ -200,6 +224,7 @@ export const PALETTES: Record<PaletteKey, Record<ColorMode, PaletteSpec>> = {
       ...STATUS_DARK,
       archie: {
         tints: TINTS_DARK,
+        dash: DASH_DARK,
         frame: '#15151c', surface2: '#1d1d26', borderStrong: '#3f3f50', textFaint: '#8d8da1',
         field: '#2a2952', fieldLine: '#9d9cec', neutralBg: '#23232d',
         band: '#232254', band2: '#302f70',

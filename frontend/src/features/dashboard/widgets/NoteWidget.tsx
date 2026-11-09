@@ -5,14 +5,13 @@ import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import WidgetShell from './WidgetShell'
-import { tintedBg, tintVeil } from './tints'
 
 type StickyNote = { text: string; updated_at: string }
 const AUTOSAVE_MS = 800
 const MAX_LENGTH = 2000
 const LINE = 26
 
-/** Nota personale come un quadernino (righe e margine), salvataggio automatico su /sticky-note/. */
+/** Nota personale come un post-it giallo, salvataggio automatico su /sticky-note/. */
 export default function NoteWidget() {
   const toast = useToast()
   const [text, setText] = React.useState('')
@@ -42,17 +41,13 @@ export default function NoteWidget() {
   }, [])
 
   return (
-    <WidgetShell tone="butter" icon={StickyNote2RoundedIcon} title="Nota" sx={{ bgcolor: (t) => tintedBg(t, 'butter', 70) }}
-      actions={<Typography component="span" aria-live="polite" sx={{ fontSize: 11, color: 'archie.textFaint' }}>{state === 'saving' ? 'Salvataggio…' : state === 'saved' ? 'Salvata' : 'La vedi solo tu'}</Typography>}>
+    <WidgetShell tone="postit" look="postit" icon={StickyNote2RoundedIcon} title="Nota"
+      actions={<Typography component="span" aria-live="polite" sx={{ fontSize: 11, color: 'inherit', opacity: 0.7 }}>{state === 'saving' ? 'Salvataggio…' : state === 'saved' ? 'Salvata' : 'La vedi solo tu'}</Typography>}>
       <InputBase multiline value={text} onChange={(e) => change(e.target.value)} placeholder="Scrivi un appunto…" inputProps={{ maxLength: MAX_LENGTH, 'aria-label': 'Nota personale' }}
         sx={{
-          flex: 1, minHeight: 0, alignItems: 'flex-start', overflow: 'auto', fontSize: 13.5, lineHeight: `${LINE}px`, p: 0,
-          '& textarea': { minHeight: '100% !important', pl: '44px', pr: 2, pb: 1.5, pt: '2px', lineHeight: `${LINE}px` },
-          backgroundImage: (t) => [
-            `linear-gradient(to right, transparent 34px, ${tintVeil(t, 'rose', 55)} 34px, ${tintVeil(t, 'rose', 55)} 35.5px, transparent 35.5px)`,
-            `repeating-linear-gradient(to bottom, transparent 0, transparent ${LINE - 1}px, ${tintVeil(t, 'sky', 35)} ${LINE - 1}px, ${tintVeil(t, 'sky', 35)} ${LINE}px)`,
-          ].join(', '),
-          backgroundAttachment: 'local', backgroundPosition: '0 2px',
+          flex: 1, minHeight: 0, alignItems: 'flex-start', overflow: 'auto', fontSize: 14, lineHeight: `${LINE}px`, p: 0, color: 'inherit',
+          '& textarea': { minHeight: '100% !important', px: 2, pb: 1.5, pt: '2px', lineHeight: `${LINE}px` },
+          '& textarea::placeholder': { color: 'inherit', opacity: 0.55 },
         }} />
       <Box aria-hidden sx={{ height: 6 }} />
     </WidgetShell>

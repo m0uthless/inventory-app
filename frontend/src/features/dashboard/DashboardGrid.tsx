@@ -137,6 +137,7 @@ export default function DashboardGrid({ widgets, layoutItems, onLayoutItemsChang
             return (
               <Box
                 key={item.i}
+                className={item.y === 0 ? 'on-band' : undefined}
                 sx={{
                   height: '100%',
                   width: '100%',
@@ -145,7 +146,7 @@ export default function DashboardGrid({ widgets, layoutItems, onLayoutItemsChang
                     outline: '1.5px dashed',
                     outlineColor: 'archie.fieldLine',
                     outlineOffset: 2,
-                    borderRadius: '14px',
+                    borderRadius: '12px',
                   }),
                 }}
               >

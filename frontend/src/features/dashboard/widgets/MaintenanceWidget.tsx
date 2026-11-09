@@ -5,7 +5,6 @@ import BuildRoundedIcon from '@mui/icons-material/BuildRounded'
 import { api } from '@shared/api/client'
 import { isoOf, type TodoStats } from '../../maintenance/mtModel'
 import WidgetShell, { BigNumber, WidgetNote } from './WidgetShell'
-import { tintVeil } from './tints'
 
 type Row = { next_due_date: string }
 
@@ -31,16 +30,16 @@ export default function MaintenanceWidget() {
 
   const max = Math.max(1, ...(days ?? []).map((d) => d.n))
   return (
-    <WidgetShell tone="rose" icon={BuildRoundedIcon} title="Manutenzioni" link={{ label: 'Scadenze', to: '/maintenance' }} bodySx={{ px: 2, pb: 1.75, gap: 1.25 }}>
+    <WidgetShell tone="salvia" icon={BuildRoundedIcon} title="Manutenzioni" link={{ label: 'Scadenze', to: '/maintenance' }} bodySx={{ px: 2, pb: 1.75, gap: 1.25 }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
-        <BigNumber tone="rose" value={stats ? stats.overdue : '–'} unit={stats?.overdue === 1 ? 'scaduta' : 'scadute'} />
+        <BigNumber alert={Boolean(stats?.overdue)} value={stats ? stats.overdue : '–'} unit={stats?.overdue === 1 ? 'scaduta' : 'scadute'} />
         {stats ? <Typography sx={{ fontSize: 12, color: 'text.secondary', pb: 0.5, '& b': { color: 'text.primary', fontWeight: 650 } }}><b>{stats.next30}</b> nei prossimi 30 giorni</Typography> : null}
       </Box>
       {days && days.length ? (
-        <Box aria-label="Manutenzioni in scadenza nei prossimi 14 giorni" sx={{ display: 'grid', gridTemplateColumns: 'repeat(14, 1fr)', gap: '4px', alignItems: 'end', height: 34 }}>
+        <Box aria-label="Manutenzioni in scadenza nei prossimi 14 giorni" sx={{ display: 'grid', gridTemplateColumns: 'repeat(14, 1fr)', gap: '4px', alignItems: 'end', height: 46 }}>
           {days.map((d) => (
             <Tooltip key={d.iso} title={`${new Date(`${d.iso}T12:00:00`).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })}: ${d.n}`}>
-              <Box sx={{ height: d.n ? 6 + (d.n / max) * 26 : 3, borderRadius: '3px', bgcolor: (t) => t.palette.archie.tints.rose.mid, opacity: d.n ? 0.85 : 0.25 }} />
+              <Box sx={{ height: d.n ? 6 + (d.n / max) * 38 : 3, borderRadius: '3px', bgcolor: (t) => t.palette.archie.dash.salvia.mid, opacity: d.n ? 0.9 : 0.3 }} />
             </Tooltip>
           ))}
         </Box>
@@ -51,11 +50,11 @@ export default function MaintenanceWidget() {
             <Box component="li" key={c.customer_id}>
               <ButtonBase onClick={() => navigate(`/maintenance?vista=over&m_customer=${c.customer_id}`)} sx={{
                 width: '100%', display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 1.25, px: 1, mx: -1, py: 0.75, borderRadius: '8px', textAlign: 'left',
-                '&:hover': { bgcolor: (t) => tintVeil(t, 'rose', 12) }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+                '&:hover': { bgcolor: 'archie.surface2' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
               }}>
-                <Box component="span" sx={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', bgcolor: (t) => t.palette.archie.tints.rose.mid }} />
+                <Box component="span" sx={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', bgcolor: 'error.main' }} />
                 <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 550 }}>{c.customer_name}</Typography>
-                <Typography sx={{ fontSize: 12, fontWeight: 650, color: (t) => t.palette.archie.tints.rose.ink, whiteSpace: 'nowrap' }}>{c.count} {c.count === 1 ? 'scaduta' : 'scadute'}</Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 650, color: 'error.main', whiteSpace: 'nowrap' }}>{c.count} {c.count === 1 ? 'scaduta' : 'scadute'}</Typography>
               </ButtonBase>
             </Box>
           ))}

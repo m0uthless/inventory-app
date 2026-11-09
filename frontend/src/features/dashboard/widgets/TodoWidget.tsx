@@ -5,7 +5,6 @@ import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import { api } from '@shared/api/client'
 import WidgetShell, { CountPill, WidgetNote } from './WidgetShell'
-import { tintVeil } from './tints'
 
 type Task = { id: number; text: string; done: boolean; created_at: string }
 
@@ -36,8 +35,8 @@ export default function TodoWidget() {
   const open = tasks?.filter((t) => !t.done).length ?? 0
 
   return (
-    <WidgetShell tone="mint" icon={ChecklistRoundedIcon} title="Da fare" extra={tasks && open ? <CountPill tone="mint">{open}</CountPill> : null} bodySx={{ px: 2, pb: 1.5, gap: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, height: 32, px: 1.25, borderRadius: '8px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'transparent', '&:focus-within': { borderColor: 'primary.main' } }}>
+    <WidgetShell tone="verde" icon={ChecklistRoundedIcon} title="Da fare" extra={tasks && open ? <CountPill tone="verde">{open}</CountPill> : null} bodySx={{ px: 2, pb: 1.5, gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, height: 32, px: 1.25, borderRadius: '8px', bgcolor: 'archie.surface2', border: '1px solid', borderColor: 'transparent', '&:focus-within': { borderColor: 'primary.main' } }}>
         <InputBase inputRef={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void add() }}
           placeholder="Aggiungi un promemoria" inputProps={{ maxLength: 200, 'aria-label': 'Nuovo promemoria' }} sx={{ flex: 1, fontSize: 13 }} />
         <Box component="kbd" sx={{ font: '500 10px "Geist Mono", monospace', color: 'archie.textFaint' }}>Invio</Box>
@@ -45,11 +44,11 @@ export default function TodoWidget() {
       {!list ? <WidgetNote>Caricamento…</WidgetNote> : !list.length ? <WidgetNote>Niente da fare: aggiungi un promemoria qui sopra.</WidgetNote> : (
         <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: '2px', overflowY: 'auto', minHeight: 0 }}>
           {list.map((t) => (
-            <Box component="li" key={t.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.1, px: 0.75, mx: -0.75, py: 0.4, borderRadius: '6px', '&:hover': { bgcolor: (th) => tintVeil(th, 'mint', 10) }, '&:hover .td-del, &:focus-within .td-del': { opacity: 1 } }}>
+            <Box component="li" key={t.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.1, px: 0.75, mx: -0.75, py: 0.4, borderRadius: '6px', '&:hover': { bgcolor: 'archie.surface2' }, '&:hover .td-del, &:focus-within .td-del': { opacity: 1 } }}>
               <ButtonBase role="checkbox" aria-checked={t.done} aria-label={t.done ? `Riapri ${t.text}` : `Fatto: ${t.text}`} onClick={() => void toggle(t)} sx={{
                 width: 18, height: 18, borderRadius: '6px', flex: 'none',
-                border: '1.5px solid', borderColor: (th) => (t.done ? th.palette.archie.tints.mint.mid : `color-mix(in srgb, ${th.palette.archie.tints.mint.mid} 55%, ${th.palette.divider})`),
-                bgcolor: (th) => (t.done ? th.palette.archie.tints.mint.mid : th.palette.background.paper), color: '#fff',
+                border: '1.5px solid', borderColor: (th) => (t.done ? th.palette.primary.main : th.palette.archie.borderStrong),
+                bgcolor: (th) => (t.done ? th.palette.primary.main : th.palette.background.paper), color: (th) => th.palette.primary.contrastText,
                 '&.Mui-focusVisible': { boxShadow: (th) => th.palette.archie.focusRing },
               }}>{t.done ? <CheckRoundedIcon sx={{ fontSize: 13 }} /> : null}</ButtonBase>
               <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: 13, color: t.done ? 'archie.textFaint' : 'text.primary', textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</Typography>
