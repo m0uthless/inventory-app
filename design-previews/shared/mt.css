@@ -39,7 +39,7 @@
 .mt-table tr.is-checked td { background: color-mix(in oklab, var(--field) 55%, var(--surface)); }
 .bulk { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--field); border-bottom: 1px solid var(--field-line); }
 .bulk b { font-weight: 600; margin-right: 6px; }
-.bulk .btn { background: var(--surface); }
+.bulk .btn:not(.btn-primary) { background: var(--surface); }
 .bulk .sp { flex: 1; }
 
 /* Esito: tinta + segno */
@@ -369,3 +369,17 @@
 .ovr-i .i { width: 12px; height: 12px; }
 .pc { display: grid; gap: 1px; font-size: 12.5px; line-height: 1.3; }
 .pc .ovr { font-size: 11.5px; }
+
+/* Menu del tasto destro (Scadenze) */
+.ctxm { position: fixed; z-index: 80; min-width: 240px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-float); }
+.ctxm-h { padding: 6px 10px 8px; font-size: 12.5px; font-weight: 650; display: grid; line-height: 1.3; }
+.ctxm-h small { font-weight: 400; color: var(--muted); font-size: 11.5px; }
+.ctxm hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.ctxm button { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13px; color: var(--text); text-align: left; cursor: pointer; }
+.ctxm button .i { width: 15px; height: 15px; color: var(--muted); }
+.ctxm button:hover, .ctxm button:focus-visible { background: var(--surface-2); outline: 0; }
+.ctxm button.strong { font-weight: 600; color: var(--primary); }
+.ctxm button.strong .i { color: var(--primary); }
+/* La colonna delle caselle entra con la selezione */
+.sel-on .c-sel { animation: selIn .18s ease-out; }
+@keyframes selIn { from { opacity: 0; } to { opacity: 1; } }

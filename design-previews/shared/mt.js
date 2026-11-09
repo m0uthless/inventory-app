@@ -181,24 +181,25 @@
   const funnel = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/></svg>';
   const dueA = () => {
     const rows = visible(); const allOn = rows.length && rows.every((r) => checked.has(r.id));
-    return `<section class="panel" aria-label="Scadenze">
+    const sm = checked.size > 0; // la colonna delle caselle compare solo con una selezione in corso
+    return `<section class="panel${sm ? ' sel-on' : ''}" aria-label="Scadenze">
       <div class="vtabs" role="group" aria-label="Viste">${VIEWS.map(([k, l, f]) => `<button type="button" aria-pressed="${k === view}" data-view="${k}"${k === 'over' ? ' class="v-alert"' : ''}>${l} <span>${todo().filter(f).length}</span></button>`).join('')}<button type="button" class="v-add">${ic('plus')}Salva vista</button></div>
       <div class="toolbar tb-row"><div class="tokens">${tokens()}</div><span class="spacer"></span><button class="icon-btn" type="button" aria-label="Esporta">${ic('download')}</button><button class="icon-btn" type="button" aria-label="Cerca">${ic('search')}</button></div>
       ${bulkBar()}
       <div class="table-wrap"><table class="po-table mt-table"><thead><tr>
-        <th class="c-sel"><input type="checkbox" data-check-all aria-label="Seleziona tutte" ${allOn ? 'checked' : ''}></th>
+        ${sm ? `<th class="c-sel"><input type="checkbox" data-check-all aria-label="Seleziona tutte" ${allOn ? 'checked' : ''}></th>` : ''}
         <th>Scadenza</th><th><div class="th-in">Cliente · sito<button type="button" class="th-filter${custFilter ? ' is-on' : ''}" data-filter="cust" aria-label="Filtra cliente">${funnel}</button></div></th>
         <th>Inventario</th><th class="c-type">Tipo</th><th class="c-plan"><div class="th-in">Piano<button type="button" class="th-filter${planFilter ? ' is-on' : ''}" data-filter="plan" aria-label="Filtra piano">${funnel}</button></div></th><th class="c-last">Ultima esecuzione</th><th class="c-act"></th></tr></thead>
         <tbody>${rows.map((it) => { const le = lastEvent(it); return `<tr data-item="${it.id}" tabindex="0" class="${checked.has(it.id) ? 'is-checked' : ''}${sel?.kind === 'item' && sel.id === it.id ? ' is-selected' : ''}">
-          <td class="c-sel"><input type="checkbox" data-check="${it.id}" aria-label="Seleziona ${esc(it.name)}" ${checked.has(it.id) ? 'checked' : ''}></td>
+          ${sm ? `<td class="c-sel"><input type="checkbox" data-check="${it.id}" aria-label="Seleziona ${esc(it.name)}" ${checked.has(it.id) ? 'checked' : ''}></td>` : ''}
           <td>${dueCell(it)}</td>
           <td class="cs"><b>${CUSTS[it.cust].n}</b><small>${it.site}${AREAS_ON && areaF === 'all' ? ` · ${areaName(it.cust)}` : ''}</small></td>
           <td class="inv"><b>${it.name}</b><small>${it.kn} · ${it.host}</small></td>
           <td class="c-type"><span class="tchips"><span>${it.type}</span></span></td>
           <td class="c-plan">${planCell(it)}</td>
           <td class="c-last">${le ? `<span class="lastx">${resBadge(le.res)}${dShort(le.date)}</span>` : '<span class="none">—</span>'}</td>
-          <td class="c-act"><button class="btn btn-sm" type="button" data-rp-one="${it.id}">${ic('check')}Registra</button></td></tr>`; }).join('') || `<tr><td colspan="8" style="height:110px;text-align:center;color:var(--muted)">${view === 'over' ? 'Nessuna manutenzione scaduta: tutto in regola.' : 'Nessuna manutenzione con questi filtri.'}</td></tr>`}</tbody></table></div>
-      <div class="po-foot"><span><b>${rows.length}</b> di ${todo().length} manutenzioni da fare</span><span class="sp"></span><span>Selezionane più di una per registrarle insieme</span></div></section>`;
+          <td class="c-act"><button class="btn btn-sm" type="button" data-rp-one="${it.id}">${ic('check')}Registra</button></td></tr>`; }).join('') || `<tr><td colspan="${sm ? 8 : 7}" style="height:110px;text-align:center;color:var(--muted)">${view === 'over' ? 'Nessuna manutenzione scaduta: tutto in regola.' : 'Nessuna manutenzione con questi filtri.'}</td></tr>`}</tbody></table></div>
+      <div class="po-foot"><span><b>${rows.length}</b> di ${todo().length} manutenzioni da fare</span><span class="sp"></span><span>${sm ? 'Esc o «Annulla selezione» per uscire' : 'Tasto destro su una riga → <b>Seleziona</b> per registrarne più di una insieme'}</span></div></section>`;
   };
 
   // ── Scadenze B · Calendario ──────────────────────────────────────
@@ -533,6 +534,60 @@
     if (b.dataset.plan) { openDrawer('plan', Number(b.dataset.plan)); return; }
     if (b.dataset.event) { openDrawer('event', Number(b.dataset.event)); return; }
   });
+  // ── Menu del tasto destro sulle righe delle Scadenze ──
+  const ctxm = document.createElement('div'); ctxm.className = 'ctxm'; ctxm.setAttribute('role', 'menu'); ctxm.hidden = true; document.body.appendChild(ctxm);
+  const openCtx = (id, x, y) => {
+    const it = todo().find((i) => i.id === id); if (!it) return;
+    const on = checked.has(id); const many = on && checked.size > 1;
+    const item = (act, icon, label, extra = '') => `<button type="button" role="menuitem" data-ctx="${act}" class="${extra}">${ic(icon)}<span>${label}</span></button>`;
+    ctxm.innerHTML = `<div class="ctxm-h">${esc(it.name)}<small>${CUSTS[it.cust].n}</small></div>
+      ${item(on ? 'unselect' : 'select', 'check', on ? 'Togli dalla selezione' : (checked.size ? 'Aggiungi alla selezione' : 'Seleziona'))}
+      ${checked.size ? '' : item('selectall', 'task', 'Seleziona tutte le visibili')}
+      <hr>
+      ${many ? item('rp-many', 'check', `Registra rapportino per le ${checked.size} selezionate`, 'strong') : item('rp', 'check', 'Registra rapportino')}
+      ${many ? item('np-many', 'x', `Non prevista per le ${checked.size} selezionate`) : item('np', 'x', 'Non prevista')}
+      <hr>
+      ${item('open', 'eye', 'Apri')}
+      ${item('plan', 'wrench', 'Apri il piano')}`;
+    ctxm.dataset.id = id; ctxm.hidden = false;
+    const r = ctxm.getBoundingClientRect();
+    ctxm.style.left = `${Math.min(x, innerWidth - r.width - 8)}px`; ctxm.style.top = `${Math.min(y, innerHeight - r.height - 8)}px`;
+    ctxm.querySelector('button')?.focus();
+  };
+  const closeCtx = () => { ctxm.hidden = true; };
+  root.addEventListener('contextmenu', (e) => {
+    const tr = e.target.closest('tr[data-item]'); if (!tr) return;
+    e.preventDefault(); openCtx(Number(tr.dataset.item), e.clientX + 2, e.clientY - 4);
+  });
+  root.addEventListener('keydown', (e) => {
+    if (!(e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10'))) return;
+    const tr = e.target.closest('tr[data-item]'); if (!tr) return;
+    e.preventDefault(); const r = tr.getBoundingClientRect(); openCtx(Number(tr.dataset.item), r.left + 40, r.bottom - 6);
+  });
+  ctxm.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ctx]'); if (!b) return;
+    const id = Number(ctxm.dataset.id); const it = todo().find((i) => i.id === id); closeCtx();
+    const a = b.dataset.ctx;
+    if (a === 'select') checked.add(id);
+    else if (a === 'unselect') checked.delete(id);
+    else if (a === 'selectall') visible().forEach((r) => checked.add(r.id));
+    else if (a === 'rp') return openRp([id]);
+    else if (a === 'rp-many') return openRp([...checked]);
+    else if (a === 'np') return markNP([id]);
+    else if (a === 'np-many') return markNP([...checked]);
+    else if (a === 'open') return openDrawer('item', id);
+    else if (a === 'plan') return openDrawer('plan', it.plan.id);
+    render();
+  });
+  ctxm.addEventListener('keydown', (e) => {
+    const items = [...ctxm.querySelectorAll('button')]; const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    if (e.key === 'Escape') { e.stopPropagation(); closeCtx(); }
+  });
+  document.addEventListener('mousedown', (e) => { if (!ctxm.hidden && !e.target.closest('.ctxm')) closeCtx(); });
+  addEventListener('scroll', closeCtx, true); addEventListener('resize', closeCtx);
+
   root.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const r = e.target.closest('[data-item], [data-plan], [data-event]'); if (r && e.target === r) r.click(); });
   cpop.addEventListener('click', (e) => {
     const k = cpop.dataset.k; const v = cpop.querySelector('input:checked')?.value;
@@ -542,7 +597,7 @@
     cpop.hidden = true; render();
   });
   document.addEventListener('click', (e) => { if (!cpop.hidden && !e.target.closest('.cpop')) cpop.hidden = true; });
-  document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (!mdl.hidden) closeRp(); else if (!drawer.hidden) closeDrawer(); });
+  document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (!ctxm.hidden) closeCtx(); else if (!mdl.hidden) closeRp(); else if (!drawer.hidden) closeDrawer(); else if (checked.size && page === 'due') { checked = new Set(); render(); } });
 
   // Barra anteprima: variante Scadenze e variante Rapportino
   document.querySelectorAll('[data-mtv]').forEach((b) => b.addEventListener('click', () => { dueVar = b.dataset.mtv; page = 'due'; try { localStorage.setItem('archie-preview-mt-v', dueVar); } catch { /* niente */ } render(); }));

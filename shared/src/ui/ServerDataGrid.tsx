@@ -722,15 +722,13 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine },
     // Filo superiore: è il bordo inferiore della riga precedente (una sola linea, come sotto).
     '& .MuiDataGrid-row:has(+ .MuiDataGrid-row.Mui-selected) .MuiDataGrid-cell': { borderBottomColor: (t: Theme) => (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine },
-    // Prima riga: sopra c'è l'intestazione, il filo va disegnato dentro la riga.
-    '& .MuiDataGrid-row--firstVisible.Mui-selected .MuiDataGrid-cell': {
-      boxShadow: (t: Theme) => `inset 0 1px 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
+    // Prima riga: il filo superiore è il bordo inferiore dell'intestazione, ricolorato
+    // (un filo in più dentro la riga si sommerebbe a quel bordo e sembrerebbe di 2px).
+    '& .MuiDataGrid-main:has(.MuiDataGrid-row--firstVisible.Mui-selected) :is(.MuiDataGrid-columnHeader, .MuiDataGrid-columnHeaders .MuiDataGrid-filler, .MuiDataGrid-scrollbarFiller--header)': {
+      borderBottomColor: (t: Theme) => `${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine} !important`,
     },
     '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell[data-colindex="0"]': {
       boxShadow: (t: Theme) => `inset 1px 0 0 ${(t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine}`,
-    },
-    '& .MuiDataGrid-row--firstVisible.Mui-selected .MuiDataGrid-cell[data-colindex="0"]': {
-      boxShadow: (t: Theme) => { const c = (t.palette as unknown as { archie: { fieldLine: string } }).archie.fieldLine; return `inset 1px 0 0 ${c}, inset 0 1px 0 ${c}` },
     },
     '& .row-odd': { backgroundColor: 'transparent' },
     '& .MuiDataGrid-virtualScrollerContent': { pb: 0 },

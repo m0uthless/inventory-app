@@ -1,6 +1,11 @@
 import * as React from 'react'
 import { Box, Button, ButtonBase, Checkbox, Stack, Typography } from '@mui/material'
 import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
+import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined'
+import LibraryAddCheckOutlinedIcon from '@mui/icons-material/LibraryAddCheckOutlined'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import type { GridColDef } from '@mui/x-data-grid'
 
 import { api } from '@shared/api/client'
@@ -12,6 +17,7 @@ import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 
 import { useAuth } from '../auth/AuthProvider'
@@ -125,15 +131,17 @@ export default function Maintenance() {
   }
 
   // ── Colonne e filtri da intestazione ──
+  // La colonna delle caselle compare solo con una selezione in corso (si entra dal tasto destro → Seleziona).
+  const selecting = selected.size > 0
   const columns = React.useMemo<GridColDef<TodoRow & { id: number }>[]>(() => [
-    {
+    ...(selecting ? [{
       field: '__sel', headerName: '', width: 52, sortable: false, disableColumnMenu: true,
       renderHeader: () => {
         const all = rows.length > 0 && rows.every((r) => checked.has(rowKey(r)))
         return <Checkbox size="small" checked={all} indeterminate={!all && rows.some((r) => checked.has(rowKey(r)))} onChange={() => toggleMany(rows)} slotProps={{ input: { 'aria-label': 'Seleziona la pagina' } }} />
       },
       renderCell: (p) => <Checkbox size="small" checked={checked.has(rowKey(p.row))} onClick={(e) => e.stopPropagation()} onChange={() => toggle(p.row)} slotProps={{ input: { 'aria-label': `Seleziona ${p.row.inventory_name}` } }} />,
-    },
+    } satisfies GridColDef<TodoRow & { id: number }>] : []),
     { field: 'next_due_date', headerName: 'Scadenza', width: 128, renderCell: (p) => <DueCell due={p.row.next_due_date} /> },
     {
       field: 'customer_name', headerName: 'Cliente · sito', width: 200,
@@ -153,7 +161,7 @@ export default function Maintenance() {
       field: '__act', headerName: '', width: 112, sortable: false, disableColumnMenu: true, align: 'right', headerAlign: 'right',
       renderCell: (p) => <Button className="row-act" size="small" variant="outlined" color="inherit" startIcon={<CheckIcon sx={{ fontSize: 15 }} />} onClick={(e) => { e.stopPropagation(); setRpRows([p.row]) }}>Registra</Button>,
     } satisfies GridColDef<TodoRow & { id: number }>] : []),
-  ], [rows, checked, toggle, toggleMany, canRegister])
+  ], [rows, checked, toggle, toggleMany, canRegister, selecting])
 
   const custName = (id: number | '') => stats?.customers.find((c) => c.id === id)?.name ?? `#${id}`
   const planName = (id: number | '') => stats?.plans.find((p) => p.id === id)?.title ?? `Piano #${id}`
@@ -223,6 +231,28 @@ export default function Maintenance() {
   const idx = open ? rows.findIndex((r) => rowKey(r) === rowKey(open)) : -1
   const selectedList = [...selected.values()]
 
+  // ── Tasto destro sulla riga: seleziona e azioni ──
+  const [ctx, setCtx] = React.useState<{ row: TodoRow; x: number; y: number } | null>(null)
+  const ctxItems: RowContextMenuItem[] = (() => {
+    if (!ctx) return []
+    const r = ctx.row; const on = checked.has(rowKey(r)); const many = on && selected.size > 1
+    return [
+      { key: 'sel', label: on ? 'Togli dalla selezione' : selected.size ? 'Aggiungi alla selezione' : 'Seleziona', icon: <CheckBoxOutlinedIcon />, onClick: () => toggle(r) },
+      { key: 'selall', label: 'Seleziona tutte le visibili', icon: <LibraryAddCheckOutlinedIcon />, hidden: selected.size > 0, onClick: () => toggleMany(rows) },
+      { key: 'rp', label: many ? `Registra rapportino per le ${selected.size} selezionate` : 'Registra rapportino', icon: <CheckIcon />, hidden: !canRegister, dividerBefore: true, strong: many, onClick: () => setRpRows(many ? selectedList : [r]) },
+      { key: 'np', label: many ? `Non prevista per le ${selected.size} selezionate` : 'Non prevista', icon: <CloseIcon />, hidden: !canRegister, onClick: () => void markNotPlanned(many ? selectedList : [r]) },
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon />, dividerBefore: true, onClick: () => openRow(r) },
+      { key: 'plan', label: 'Apri il piano', icon: <BuildOutlinedIcon />, onClick: () => navigate(`/maintenance/plans?apri=${r.plan_id}`) },
+    ]
+  })()
+  // Esc esce dalla selezione (se non c'è una scheda o un dialogo aperto).
+  React.useEffect(() => {
+    if (!selected.size) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !open && rpRows === null && !overrideRow && !ctx && !document.querySelector('.MuiModal-root:not(.MuiModal-hidden)')) setSelected(new Map()) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected.size, open, rpRows, overrideRow, ctx])
+
   return (
     <Stack spacing={0} sx={{ height: '100%' }}>
       <PageHead
@@ -289,6 +319,7 @@ export default function Maintenance() {
                 sortModel: grid.sortModel,
                 onSortModelChange: grid.onSortModelChange,
                 onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) openRow(r) },
+                onRowContextMenu: (r, e) => setCtx({ row: r, x: e.clientX + 2, y: e.clientY - 6 }),
                 getRowClassName: (r) => [open && rowKey(r) === rowKey(open) ? 'Mui-selected' : '', checked.has(rowKey(r)) ? 'is-checked' : ''].join(' '),
                 sx: {
                   ...headerFilterGridSx, cursor: 'pointer',
@@ -298,6 +329,11 @@ export default function Maintenance() {
                 },
               }}
             />
+            {canRegister && !selected.size ? (
+              <Typography sx={{ display: { xs: 'none', md: 'block' }, px: 1.75, py: 0.75, fontSize: 12, color: 'text.disabled', borderTop: '1px solid', borderColor: 'divider' }}>
+                Tasto destro su una riga → <b>Seleziona</b> per registrarne più di una insieme.
+              </Typography>
+            ) : null}
           </>
         )}
       </Box>
@@ -321,6 +357,8 @@ export default function Maintenance() {
         />
       ) : null}
 
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems}
+        title={ctx?.row.inventory_name} subtitle={ctx ? [ctx.row.customer_name, ctx.row.site_name].filter(Boolean).join(' · ') : undefined} />
       <RapportinoDialog open={rpRows !== null} rows={rpRows ?? []} techs={techs} customers={stats?.customers ?? []} canAddIssue={canAddIssue} onClose={() => setRpRows(null)} onSaved={afterSave} />
       <DueDateOverrideDialog open={Boolean(overrideRow)} row={overrideRow} onClose={() => setOverrideRow(null)} onSaved={() => { reloadAll(); setOpen(null) }} />
     </Stack>
