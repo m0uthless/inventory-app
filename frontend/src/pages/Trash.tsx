@@ -1,5 +1,7 @@
 import * as React from 'react'
 import { Box, Button, IconButton, InputBase, Stack, Tooltip, Typography } from '@mui/material'
+import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined'
+import LibraryAddCheckOutlinedIcon from '@mui/icons-material/LibraryAddCheckOutlined'
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
 import { api } from '@shared/api/client'
@@ -9,6 +11,7 @@ import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useToast } from '@shared/ui/toast'
 import { emptySelectionModel, selectionToIds } from '@shared/utils/gridSelection'
 import EntityListCard from '@shared/ui/EntityListCard'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon, PageHead, ViewTabs } from '../ui/campo'
@@ -113,9 +116,17 @@ export default function Trash() {
 
   React.useEffect(() => { setSelection(emptySelectionModel()) }, [tab, tick])
 
-  const selectedIds = new Set(selectionToIds(selection).map(String))
-  const selected = rows.filter((r) => selectedIds.has(r.rid))
+  // La tabella può descrivere "seleziona tutti" come { type: 'exclude', ids: esclusi }.
+  const selModel = selection as unknown as { type?: string; ids?: Set<string | number> }
+  const selected = selModel.type === 'exclude'
+    ? rows.filter((r) => !selModel.ids?.has(r.rid))
+    : rows.filter((r) => new Set(selectionToIds(selection).map(String)).has(r.rid))
+  const selectedIds = new Set(selected.map((r) => r.rid))
   const canPurgeAny = visible.some((r) => hasPerm(r.purgePerm))
+  // La colonna delle caselle compare solo con una selezione in corso (tasto destro → Seleziona).
+  const selecting = selected.length > 0
+  const clearSelection = () => setSelection(emptySelectionModel())
+  const setSelectedIds = (ids: string[]) => setSelection({ type: 'include', ids: new Set(ids) } as unknown as GridRowSelectionModel)
 
   // ── Azioni ──
   const restore = async (list: TrashRow[]) => {
@@ -244,10 +255,10 @@ export default function Trash() {
             <Button size="small" variant="contained" disabled={busy} onClick={() => void restore(selected)} startIcon={<CampoIcon name="restore" size={14} />} sx={{ height: 30 }}>Ripristina</Button>
             <Button size="small" variant="outlined" color="error" disabled={busy} onClick={() => setPurgeRows(selected)} startIcon={<CampoIcon name="trash" size={14} />} sx={{ height: 30 }}>Elimina definitivamente</Button>
             <Box sx={{ flex: 1 }} />
-            <Button size="small" variant="text" onClick={() => setSelection(emptySelectionModel())}>Annulla selezione</Button>
+            <Button size="small" variant="text" onClick={clearSelection}>Annulla selezione</Button>
           </Box>
         ) : (
-          <Typography sx={{ flex: 1, fontSize: 12, color: 'text.disabled' }}>Seleziona più elementi per ripristinarli o eliminarli insieme.</Typography>
+          <Typography sx={{ flex: 1, fontSize: 12, color: 'text.disabled' }}>Tasto destro su una riga → <b>Seleziona</b> per ripristinare o eliminare più elementi insieme.</Typography>
         )}
         <Tooltip title={searchOpen ? 'Chiudi la ricerca' : 'Cerca nel cestino'}>
           <IconButton aria-label="Cerca nel cestino" aria-pressed={searchOpen} onClick={() => { if (searchOpen) grid.setQ(''); setSearchOpen(!searchOpen) }}
@@ -265,6 +276,31 @@ export default function Trash() {
       ) : null}
     </Box>
   )
+
+  // ── Tasto destro sulla riga: seleziona e azioni ──
+  const [ctx, setCtx] = React.useState<{ row: TrashRow; x: number; y: number } | null>(null)
+  const ctxItems: RowContextMenuItem[] = (() => {
+    if (!ctx) return []
+    const row = ctx.row; const r = resourceOf(row.kind)
+    const on = selectedIds.has(row.rid); const many = on && selected.length > 1
+    const list = many ? selected : [row]
+    return [
+      { key: 'sel', label: on ? 'Togli dalla selezione' : selected.length ? 'Aggiungi alla selezione' : 'Seleziona', icon: <CheckBoxOutlinedIcon />,
+        onClick: () => setSelectedIds(on ? [...selectedIds].filter((id) => id !== row.rid) : [...selectedIds, row.rid]) },
+      { key: 'selall', label: 'Seleziona tutti i visibili', icon: <LibraryAddCheckOutlinedIcon />, hidden: selected.length > 0, onClick: () => setSelectedIds(rows.map((x) => x.rid)) },
+      { key: 'restore', label: many ? `Ripristina i ${selected.length} selezionati` : 'Ripristina', icon: <CampoIcon name="restore" size={16} />, dividerBefore: true, strong: many,
+        disabled: busy || (!many && (!hasPerm(r.restorePerm) || Boolean(row.info?.restore_block))), onClick: () => void restore(list) },
+      { key: 'purge', label: many ? `Elimina definitivamente i ${selected.length} selezionati` : 'Elimina definitivamente', icon: <CampoIcon name="trash" size={16} />, tone: 'danger',
+        disabled: busy || (!many && !hasPerm(r.purgePerm)), onClick: () => setPurgeRows(list) },
+    ]
+  })()
+  // Esc esce dalla selezione (se non c'è un dialogo aperto).
+  React.useEffect(() => {
+    if (!selecting) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !purgeRows && !ctx && !document.querySelector('.MuiModal-root:not(.MuiModal-hidden)')) setSelection(emptySelectionModel()) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selecting, purgeRows, ctx])
 
   return (
     <Stack spacing={0} sx={{ height: '100%' }}>
@@ -300,7 +336,8 @@ export default function Trash() {
               onPaginationModelChange: grid.onPaginationModelChange,
               sortModel: grid.sortModel,
               onSortModelChange: grid.onSortModelChange,
-              checkboxSelection: true,
+              checkboxSelection: selecting,
+              onRowContextMenu: (r, e) => setCtx({ row: r, x: e.clientX + 2, y: e.clientY - 6 }),
               rowSelectionModel: selection,
               onRowSelectionModelChange: (m) => setSelection(m as GridRowSelectionModel),
               deletedField: '__none__',
@@ -309,6 +346,8 @@ export default function Trash() {
           />
         </Box>
       )}
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems}
+        title={ctx?.row.title} />
       <PurgeDialog rows={purgeRows} busy={busy} onClose={() => setPurgeRows(null)} onConfirm={(list) => void purge(list)} />
     </Stack>
   )
