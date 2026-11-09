@@ -216,6 +216,23 @@ Portata dall'anteprima `db-base.html`, variante **A · Tinte** (scelta da Fede d
 - Bug e feature: bacheca Bug aperti / Funzionalità richieste / Chiuse di recente (ultime 10, link a /bug-feature/resolved che mostra Risolte e Rifiutate). Scheda flottante con screenshot (anche incolla/trascina), Segna come risolta, Rifiuta con motivi pronti, Riapri. Dialogo "Segnala". `BugFeatureDrawer` rimosso; `NsDialog` spostato in `ui/campo/CampoDialog`.
 - Da valutare: issue, contratti, PO e altri tipi nel Cestino (oggi hanno il cestino nella loro pagina).
 
+## 404, Monitor e Ricerca
+- Fatte da `mr-base.html` (2026-11-08), variante A per tutte e tre, senza KPI né sottotitolo.
+- 404: dentro l'app, "404" a contorno nelle tinte, indirizzo sbagliato, Torna indietro / Vai alla Dashboard, campo di ricerca e scorciatoie.
+- Monitor: schede per stato + "Senza workstation" (azione `stats`, filtro `inventory__isnull`, `customer_name` nel serializer, ricerca anche per workstation/sito/cliente), filtro Tipo nell'intestazione, scheda flottante con cambio stato al clic, workstation, monitor vicini e storia dall'Audit; dialogo Nuovo/Modifica con ricerca della workstation. Rimossi `MonitorDrawer` e `MonitorFormDrawer`.
+- Ricerca: campo grande, colonna dei tipi con conteggi (`?tipo=`), gruppi per tipo con evidenziazione, ricerche recenti nel browser. Backend: risultati Drive aprono cartella/file, sottotitoli di ripiego in italiano, `SearchAPIView` ora con `IsInternalOrPortalDedicatedApp`.
+
+## Profilo e Utenti e gruppi
+- Fatte da `up-base.html` (2026-11-08), variante A. Il Profilo è una scheda flottante della stessa misura dei dettagli delle altre pagine (aperta dal menu utente e da /profile), con schede Dati, Aspetto, Sicurezza, Permessi, Attività. Backend: `/me` con `last_login` e `date_joined`, nuovo `GET /api/me/logins/` (ultimi 5 accessi riusciti).
+- Utenti e gruppi: interruttore Utenti/Gruppi nella testata, viste Attivi / Solo Portal / Account funzionali / Disattivati / Tutti, scheda utente flottante (Permessi con livelli e origine "gruppo X" o "assegnato a mano", Portal e clienti, permessi speciali; Anagrafica e ruoli; Attività), gruppi come schede con la striscia dei permessi e scheda del gruppo. La stessa scheda utente è usata da Accesso Portal. Rimossi `UserDrawer`/`GroupDrawer` e il vecchio drawer del Profilo.
+- Da valutare: descrizione dei gruppi (serve un campo), restyle della pagina Accesso Portal.
+
+## ServiceNow
+- Fatte da `sn-base.html` (2026-11-09): Casi variante A e Dashboard casi (variante B delle statistiche), che sostituisce le pagine Statistiche e Assenze tecnici (i vecchi indirizzi portano alla Dashboard).
+- Casi: riquadro "Oggi" senza gradiente, viste Tutti / Oggi / Miei / Da assegnare (filtri backend `opened_date` e `unassigned`), stesse colonne di prima, nessuno stato (il caso è solo una registrazione). Menu contestuale: Apri, Crea issue, Crea task (nuovo: apre il task già compilato), Messaggio (Philips), Modifica, Elimina. Scheda flottante e dialogo "Nuovo caso" con screenshot (stessa lettura OCR).
+- Dashboard casi: Andamento (torta dei type e colonne per periodo, palette verificata), Per tecnico (mappa con assenze segnate), Oggi, Assenze della settimana. Backend: filtro `user` sulle assenze (prima ignorato).
+- Da valutare: i type Philips tornano visibili quando si riattiva la categoria (visibleCategories.ts).
+
 ## Titolo nella linguetta (mockup, in attesa di decisione interna)
 
 Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.

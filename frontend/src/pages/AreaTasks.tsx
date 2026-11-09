@@ -6,7 +6,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import type { GridColDef } from '@mui/x-data-grid'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { buildDrfListParams } from '@shared/api/drf'
@@ -79,6 +79,7 @@ export default function AreaTasks() {
   const toast = useToast()
   const undoToast = useUndoToast()
   const navigate = useNavigate()
+  const loc = useLocation()
 
   const myAreaId: number | null = me?.profile?.leave_area ?? null
   const myAreaLabel: string | null = me?.profile?.leave_area_label ?? null
@@ -190,14 +191,36 @@ export default function AreaTasks() {
   const [createUsers, setCreateUsers] = React.useState<AreaUser[]>([])
   const [saving, setSaving] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
-  const openCreate = async () => {
+  const openCreate = async (prefill?: Partial<TaskFormData>) => {
     if (createAreaId === null) return
-    setForm(createEmptyTaskForm()); setErrors({}); setCreateUsers([]); setDlgOpen(true)
+    setForm({ ...createEmptyTaskForm(), ...prefill }); setErrors({}); setCreateUsers([]); setDlgOpen(true)
     try {
       const r = await api.get<RawUser[]>('/users/', { params: { leave_area: createAreaId, page_size: 200 } })
       setCreateUsers((Array.isArray(r.data) ? r.data : []).map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) })))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }
+  // "Crea task" da un caso ServiceNow: il dialogo si apre già compilato. Se manca l'area
+  // (superuser senza area) i dati restano in attesa finché non se ne sceglie una.
+  const pendingPrefillRef = React.useRef<{ title: string; description: string } | null>(null)
+  React.useEffect(() => {
+    const st = loc.state as { createTaskPrefill?: { title: string; description: string } } | null
+    if (!st?.createTaskPrefill) return
+    pendingPrefillRef.current = st.createTaskPrefill
+    navigate(loc.pathname + loc.search, { replace: true, state: {} })
+    if (createAreaId === null) {
+      if (isSuperuser) toast.info("Scegli l'area del task: il modulo si apre con i dati del caso.")
+      else { toast.warning("Per creare un task serve un'area del piano ferie nel tuo profilo."); pendingPrefillRef.current = null }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc.state])
+  React.useEffect(() => {
+    if (!pendingPrefillRef.current || createAreaId === null) return
+    const prefill = pendingPrefillRef.current
+    pendingPrefillRef.current = null
+    void openCreate(prefill)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createAreaId, loc.state])
+
   const saveNew = async () => {
     if (saving || createAreaId === null) return
     setSaving(true); setErrors({})

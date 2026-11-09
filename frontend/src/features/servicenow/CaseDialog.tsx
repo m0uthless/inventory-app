@@ -1,34 +1,18 @@
 /**
- * ServiceNowCaseFormDrawer — form create/edit ServiceNow Case in DrawerShell.
+ * CaseDialog — crea o modifica un caso ServiceNow (dialogo Campo sterile).
  * Flusso principale: upload screenshot → estrazione OCR server-side
  * (POST /servicenow-cases/extract/, non salva nulla) → form precompilato
  * ed editabile → conferma/correzione → salvataggio.
  */
 import * as React from 'react'
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  CircularProgress,
-  Divider,
-  MenuItem,
-  Stack,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from '@mui/material'
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined'
-import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import { Box, Button, ButtonBase, CircularProgress, TextField, Typography } from '@mui/material'
 
-import { DrawerShell } from '@shared/ui/DrawerShell'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { isRecord } from '@shared/utils/guards'
-import type { ServiceNowCaseRow } from '../../pages/ServiceNowCases'
+import { initialsOf, type ServiceNowCaseRow } from './snModel'
+import { CampoDialog, CampoIcon } from '../../ui/campo'
 import { todayISO } from './absenceShared'
 
 // Ora corrente "HH:MM" (locale) — usata per precompilare l'ora apertura
@@ -82,22 +66,9 @@ type ExtractResponse = {
   warnings: string[]
 }
 
-// ─── Helper campo ─────────────────────────────────────────────────────────────
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box>
-      <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, display: 'block', mb: 0.5 }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  )
-}
-
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-export interface ServiceNowCaseFormDrawerProps {
+export interface CaseDialogProps {
   open: boolean
   onClose: () => void
   onSave: (form: ServiceNowCaseForm, screenshotFile: File | null) => Promise<void>
@@ -108,7 +79,7 @@ export interface ServiceNowCaseFormDrawerProps {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initial, saving }: ServiceNowCaseFormDrawerProps) {
+export default function CaseDialog({ open, onClose, onSave, initial, saving }: CaseDialogProps) {
   const isEdit = initial !== null
   const toast = useToast()
   const [form, setForm] = React.useState<ServiceNowCaseForm>(EMPTY_FORM)
@@ -242,8 +213,6 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
     }))
   }
 
-  const isSm = { size: 'small' as const, fullWidth: true }
-
   // ── Upload + estrazione OCR ───────────────────────────────────────────────
   // Logica condivisa tra upload da file system e incolla (Ctrl+V) da clipboard.
   const processScreenshotFile = async (file: File) => {
@@ -320,223 +289,88 @@ export default function ServiceNowCaseFormDrawer({ open, onClose, onSave, initia
   }, [open])
 
 
-  const title    = isEdit ? initial!.number : 'Nuovo ServiceNow Case'
-  const subtitle = isEdit ? initial!.account : undefined
-
   const canSave = Boolean(
     form.number.trim() && form.account.trim() && form.category && form.case_type !== '',
   ) && (!form.opened_date || Boolean(form.opened_time)) && !extracting
 
+  const techs = userRows.filter((u) => u.is_servicenow_technician && (form.category === 'philips' ? u.is_philips : !u.is_philips))
+  const chip = (on: boolean) => ({
+    height: 30, px: 1.25, gap: 0.75, borderRadius: '15px', border: '1px solid', fontSize: 12.5,
+    borderColor: on ? 'archie.fieldLine' : 'divider', bgcolor: on ? 'archie.field' : 'background.paper', color: on ? 'primary.main' : 'text.primary', fontWeight: on ? 600 : 400,
+    '&.Mui-disabled': { color: 'text.disabled' },
+  })
+  const seg = (on: boolean) => ({ height: 28, px: 1.25, borderRadius: '5px', fontSize: 12.5, fontWeight: on ? 600 : 400, color: on ? 'primary.main' : 'text.secondary', bgcolor: on ? 'archie.field' : 'transparent' })
+
   return (
-    <DrawerShell
-      open={open}
-      onClose={onClose}
-      width={420}
-      gradient="teal"
-      title={title}
-      subtitle={subtitle}
-      statusLabel={isEdit ? '● Modifica' : '● Nuovo'}
-    >
-      <Stack spacing={1.5}>
-
-        {/* Upload screenshot */}
-        <FormField label={isEdit ? 'Screenshot (sostituisci)' : 'Screenshot ServiceNow'}>
-          <Stack spacing={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              component="label"
-              startIcon={extracting ? <CircularProgress size={14} /> : <UploadFileOutlinedIcon sx={{ fontSize: 16 }} />}
-              disabled={extracting}
-            >
-              {extracting ? 'Estrazione in corso…' : 'Carica screenshot'}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={handleFileChange}
-              />
-            </Button>
-
-            {screenshotPreviewUrl && (
-              <Box
-                component="img"
-                src={screenshotPreviewUrl}
-                alt="Anteprima screenshot"
-                sx={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
-              />
-            )}
-
-            {!screenshotPreviewUrl && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.disabled' }}>
-                <ImageOutlinedIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption">Nessuno screenshot caricato — oppure incolla con Ctrl+V</Typography>
-              </Box>
-            )}
-
-            {extractWarnings.length > 0 && (
-              <Alert severity="warning" sx={{ fontSize: '0.75rem' }}>
-                <Stack spacing={0.25}>
-                  {extractWarnings.map((w, i) => <span key={i}>{w}</span>)}
-                </Stack>
-              </Alert>
-            )}
-          </Stack>
-        </FormField>
-
-        <Divider />
-
-        {/* Numero + Account */}
-        <FormField label="Numero case *">
-          <TextField
-            {...isSm}
-            value={form.number}
-            onChange={(e) => set('number', e.target.value)}
-            error={!form.number.trim()}
-            placeholder="es. CS0628228"
-            inputProps={{ style: { fontFamily: 'monospace' } }}
-          />
-        </FormField>
-
-        <FormField label="Account *">
-          <TextField
-            {...isSm}
-            value={form.account}
-            onChange={(e) => set('account', e.target.value)}
-            error={!form.account.trim()}
-          />
-        </FormField>
-
-        {/* Categoria */}
-        <FormField label="Categoria *">
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            fullWidth
-            value={form.category}
-            onChange={(_e, v) => v && handleCategoryChange(v)}
-          >
-            {CATEGORY_OPTIONS.map((o) => (
-              <ToggleButton key={o.value} value={o.value}>{o.label}</ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        </FormField>
-
-        {/* Type */}
-        <FormField label="Type *">
-          <TextField
-            {...isSm}
-            select
-            value={form.case_type}
-            onChange={(e) => set('case_type', Number(e.target.value))}
-            error={form.case_type === ''}
-          >
-            {caseTypeOptions.map((o) => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
-          </TextField>
-        </FormField>
-
-        {/* Data + ora apertura */}
-        <Stack direction="row" spacing={1}>
-          <FormField label="Data apertura">
-            <TextField
-              {...isSm}
-              type="date"
-              value={form.opened_date}
-              onChange={(e) => applyOpenedDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-          </FormField>
-          <FormField label={form.opened_date ? 'Ora apertura *' : 'Ora apertura'}>
-            <TextField
-              {...isSm}
-              type="time"
-              value={form.opened_time}
-              onChange={(e) => set('opened_time', e.target.value)}
-              error={Boolean(form.opened_date) && !form.opened_time}
-              disabled={!form.opened_date}
-              helperText={Boolean(form.opened_date) && !form.opened_time ? 'Obbligatoria' : ' '}
-              InputLabelProps={{ shrink: true }}
-            />
-          </FormField>
-        </Stack>
-
-        {/* Descrizione breve */}
-        <FormField label="Descrizione breve">
-          <TextField
-            {...isSm}
-            multiline
-            minRows={2}
-            maxRows={5}
-            value={form.short_description}
-            onChange={(e) => set('short_description', e.target.value)}
-          />
-        </FormField>
-
-        {/* URL esterno (facoltativo) */}
-        <FormField label="URL">
-          <TextField
-            {...isSm}
-            value={form.external_url}
-            onChange={(e) => set('external_url', e.target.value)}
-            placeholder="https://..."
-          />
-        </FormField>
-
-        <Divider />
-
-        {/* Assegnato a */}
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem' }}>
-          Assegnazione
-        </Typography>
-
-        <FormField label="Assegnato a">
-          <TextField
-            {...isSm}
-            select
-            value={form.assigned_to ?? ''}
-            onChange={(e) => set('assigned_to', e.target.value === '' ? null : Number(e.target.value))}
-          >
-            <MenuItem value=""><em>Nessuno</em></MenuItem>
-            {userRows
-              .filter((u) => u.is_servicenow_technician && (form.category === 'philips' ? u.is_philips : !u.is_philips) && !absentUserIds.has(u.id))
-              .map((u) => (
-                <MenuItem key={u.id} value={u.id}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar sx={{ width: 20, height: 20, fontSize: '0.65rem' }}>{u.username.charAt(0).toUpperCase()}</Avatar>
-                    <Typography variant="body2">
-                      {(u.full_name || u.username).trim()}
-                    </Typography>
-                  </Stack>
-                </MenuItem>
-              ))}
-          </TextField>
-          {absentUserIds.size > 0 && (
-            <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mt: 0.5 }}>
-              {absentUserIds.size === 1 ? '1 tecnico assente' : `${absentUserIds.size} tecnici assenti`} in questa data non {absentUserIds.size === 1 ? 'è proponibile' : 'sono proponibili'}.
-            </Typography>
-          )}
-        </FormField>
-
-        <Divider />
-
-        {/* Azioni */}
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
-          <Button variant="text" size="small" onClick={onClose} disabled={saving}>
-            Annulla
-          </Button>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveOutlinedIcon sx={{ fontSize: 16 }} />}
-            onClick={() => void onSave(form, screenshotFileRef.current)}
-            disabled={saving || !canSave}
-          >
-            {isEdit ? 'Salva modifiche' : 'Crea case'}
-          </Button>
-        </Stack>
-
-      </Stack>
-    </DrawerShell>
+    <CampoDialog open={open} onClose={onClose} busy={saving} labelId="sn-case-title" width={560}
+      title={isEdit ? `Modifica ${initial!.number}` : 'Nuovo caso'}
+      sub={isEdit ? initial!.account : extracting ? 'Sto leggendo lo screenshot…' : screenshotPreviewUrl ? 'Controlla i campi letti dallo screenshot e completa.' : 'Incolla lo screenshot del caso: numero, account, data e descrizione si compilano da soli.'}
+      footer={<>
+        <Box sx={{ flex: 1 }} />
+        <Button variant="text" onClick={onClose} disabled={saving}>Annulla</Button>
+        <Button variant="contained" onClick={() => void onSave(form, screenshotFileRef.current)} disabled={saving || !canSave}>{isEdit ? 'Salva' : 'Crea caso'}</Button>
+      </>}>
+      <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+      {screenshotPreviewUrl ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box component="img" src={screenshotPreviewUrl} alt="Screenshot del caso" sx={{ width: 96, height: 56, objectFit: 'cover', objectPosition: 'top left', borderRadius: '6px', border: '1px solid', borderColor: 'divider', flex: 'none' }} />
+          <Typography sx={{ flex: 1, fontSize: 13, color: extracting ? 'text.secondary' : extractWarnings.length ? 'warning.main' : 'success.main', display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+            {extracting ? <><CircularProgress size={14} />Lettura in corso…</> : extractWarnings.length ? extractWarnings.join(' ') : 'Campi letti dallo screenshot'}
+          </Typography>
+          <Button size="small" variant="text" onClick={() => fileInputRef.current?.click()} disabled={extracting}>Cambia</Button>
+        </Box>
+      ) : (
+        <ButtonBase onClick={() => fileInputRef.current?.click()} disabled={extracting} sx={{
+          display: 'grid', justifyItems: 'center', gap: 0.5, py: 3, px: 2, borderRadius: '12px', border: '1.5px dashed', borderColor: 'archie.borderStrong', bgcolor: 'archie.surface2', color: 'text.secondary',
+          '&:hover': { borderColor: 'archie.fieldLine', bgcolor: 'archie.field' },
+        }}>
+          <Box component="span" sx={{ color: 'primary.main', display: 'inline-flex' }}><CampoIcon name="upload" size={24} /></Box>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary' }}>Incolla lo screenshot</Typography>
+          <Typography sx={{ fontSize: 12.5 }}>Ctrl+V, oppure clicca per sceglierlo · puoi anche compilare a mano</Typography>
+        </ButtonBase>
+      )}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+        <TextField label="Numero" required value={form.number} onChange={(e) => set('number', e.target.value)} placeholder="es. CS0628228"
+          slotProps={{ htmlInput: { style: { fontFamily: '"Geist Mono", ui-monospace, monospace' } } }} />
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>Categoria</Typography>
+          <Box role="radiogroup" aria-label="Categoria" sx={{ display: 'inline-flex', gap: '2px', p: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '7px' }}>
+            {CATEGORY_OPTIONS.map((o) => <ButtonBase key={o.value} role="radio" aria-checked={form.category === o.value} onClick={() => handleCategoryChange(o.value)} sx={seg(form.category === o.value)}>{o.label}</ButtonBase>)}
+          </Box>
+        </Box>
+      </Box>
+      <TextField label="Account" required value={form.account} onChange={(e) => set('account', e.target.value)} />
+      <TextField label="Descrizione breve" multiline minRows={2} maxRows={5} value={form.short_description} onChange={(e) => set('short_description', e.target.value)} />
+      <Box>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>Type <Box component="span" sx={{ color: 'error.main' }}>*</Box></Typography>
+        <Box role="radiogroup" aria-label="Type" sx={{ display: 'inline-flex', flexWrap: 'wrap', gap: '2px', p: '2px', border: '1px solid', borderColor: form.case_type === '' ? 'warning.main' : 'divider', borderRadius: '7px' }}>
+          {caseTypeOptions.map((o) => <ButtonBase key={o.id} role="radio" aria-checked={form.case_type === o.id} onClick={() => set('case_type', o.id)} sx={seg(form.case_type === o.id)}>{o.name}</ButtonBase>)}
+        </Box>
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+        <TextField type="date" label="Aperto il" value={form.opened_date} onChange={(e) => applyOpenedDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+        <TextField type="time" label="Ora" value={form.opened_time} onChange={(e) => set('opened_time', e.target.value)} disabled={!form.opened_date}
+          required={Boolean(form.opened_date)} error={Boolean(form.opened_date) && !form.opened_time} slotProps={{ inputLabel: { shrink: true } }} />
+      </Box>
+      <TextField label="Link al caso" value={form.external_url} onChange={(e) => set('external_url', e.target.value)} placeholder="https://…" />
+      <Box>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 0.75 }}>Assegna a</Typography>
+        <Box role="radiogroup" aria-label="Assegna a" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+          <ButtonBase role="radio" aria-checked={form.assigned_to === null} onClick={() => set('assigned_to', null)} sx={chip(form.assigned_to === null)}>Nessuno</ButtonBase>
+          {techs.map((u) => {
+            const away = absentUserIds.has(u.id)
+            const on = form.assigned_to === u.id
+            return (
+              <ButtonBase key={u.id} role="radio" aria-checked={on} disabled={away} title={away ? 'Assente in questa data' : ''} onClick={() => set('assigned_to', u.id)} sx={{ ...chip(on), pl: 0.5 }}>
+                <Box component="span" sx={{ display: 'inline-grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700, bgcolor: (t) => t.palette.archie.tints.mint.bg, color: (t) => t.palette.archie.tints.mint.ink }}>{initialsOf(u.full_name || u.username)}</Box>
+                {(u.full_name || u.username).trim().split(/\s+/)[0]}
+                {away ? <Box component="span" sx={{ fontSize: 10.5, fontWeight: 600, px: 0.5, borderRadius: '4px', bgcolor: (t) => t.palette.archie.tints.peach.bg, color: (t) => t.palette.archie.tints.peach.ink }}>assente</Box> : null}
+              </ButtonBase>
+            )
+          })}
+        </Box>
+        {absentUserIds.size ? <Typography sx={{ fontSize: 11.5, color: 'text.secondary', mt: 0.75 }}>Chi è assente in questa data non si può scegliere.</Typography> : null}
+      </Box>
+    </CampoDialog>
   )
 }

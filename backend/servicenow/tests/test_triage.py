@@ -189,3 +189,30 @@ def test_triage_functional_account_cases_not_counted_in_total(api_client, superu
     philips_names = [t["name"] for t in resp.data["categories"]["philips"]["technicians"]]
     assert "JollyPhilips Test" not in philips_names
     assert resp.data["categories"]["philips"]["total"] == 0
+
+
+@pytest.mark.django_db
+def test_technician_absences_filter_by_user(api_client, superuser):
+    a = _make_tech(name="Primo")
+    b = _make_tech(name="Secondo")
+    Absence.objects.create(user=a, date=date.today(), day_part=DayPart.MATTINA, reason="ferie")
+    Absence.objects.create(user=b, date=date.today(), day_part=DayPart.MATTINA, reason="ferie")
+    api_client.force_authenticate(user=superuser)
+    resp = api_client.get("/api/servicenow-technician-absences/", {"user": a.id})
+    assert resp.status_code == 200
+    assert {r["user"] for r in resp.data} == {a.id}
+
+
+@pytest.mark.django_db
+def test_case_list_filters_unassigned_and_opened_date(api_client, superuser):
+    api_client.force_authenticate(user=superuser)
+    tech = _make_tech(name="Filtro")
+    ct = _make_case_type("biotron")
+    mine = _create_case_today(api_client, ct, "biotron", assigned_to=tech)
+    free = _create_case_today(api_client, ct, "biotron")
+    resp = api_client.get("/api/servicenow-cases/", {"unassigned": "true"})
+    assert [r["id"] for r in resp.data["results"]] == [free["id"]]
+    resp = api_client.get("/api/servicenow-cases/", {"opened_date": date.today().isoformat()})
+    assert {r["id"] for r in resp.data["results"]} == {mine["id"], free["id"]}
+    resp = api_client.get("/api/servicenow-cases/", {"opened_date": (date.today() - timedelta(days=1)).isoformat()})
+    assert resp.data["results"] == []

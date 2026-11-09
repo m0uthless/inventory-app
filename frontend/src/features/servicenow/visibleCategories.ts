@@ -1,6 +1,6 @@
 // Categorie ServiceNow mostrate nelle viste di riepilogo: pannello Triage
-// (ServiceNowCases.tsx), Statistiche (ServiceNowStats.tsx) e Assenze tecnici
-// (ServiceNowAbsences.tsx). Filtro solo frontend: il backend continua a
+// (ServiceNowCases.tsx) e Dashboard casi (ServiceNowDashboard.tsx: statistiche e
+// assenze tecnici). Filtro solo frontend: il backend continua a
 // calcolare e restituire tutte le categorie, e i case/utenti Philips restano
 // intatti. Philips è temporaneamente nascosto: per riattivarlo basta
 // aggiungerlo di nuovo a questo elenco.

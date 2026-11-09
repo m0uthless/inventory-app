@@ -273,6 +273,8 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
             qs = qs.filter(date__gte=p["date_from"])
         if p.get("date_to"):
             qs = qs.filter(date__lte=p["date_to"])
+        if str(p.get("user", "")).isdigit():
+            qs = qs.filter(user_id=int(p["user"]))
         return qs
 
     def perform_create(self, serializer):
@@ -388,10 +390,13 @@ class ServiceNowCaseFilter(filters.FilterSet):
     case_type   = filters.ModelMultipleChoiceFilter(queryset=ServiceNowCaseType.objects.all())
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
     number      = filters.CharFilter(field_name="number", lookup_expr="iexact")
+    # Viste della pagina Casi: "Da assegnare" e "Oggi".
+    unassigned  = filters.BooleanFilter(field_name="assigned_to", lookup_expr="isnull")
+    opened_date = filters.DateFilter(field_name="opened_date")
 
     class Meta:
         model  = ServiceNowCase
-        fields = ["status", "priority", "category", "case_type", "assigned_to", "number"]
+        fields = ["status", "priority", "category", "case_type", "assigned_to", "number", "unassigned", "opened_date"]
 
 
 # ─── ViewSet Type (sola lettura, popolato da admin) ──────────────────────────

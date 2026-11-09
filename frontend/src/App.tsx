@@ -28,8 +28,7 @@ const Drive = lazy(() => import('./pages/Drive'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
-const ServiceNowStats = lazy(() => import('./pages/ServiceNowStats'))
-const ServiceNowAbsences = lazy(() => import('./pages/ServiceNowAbsences'))
+const ServiceNowDashboard = lazy(() => import('./pages/ServiceNowDashboard'))
 const PianoFerie = lazy(() => import('./pages/PianoFerie'))
 const AreaTasks = lazy(() => import('./pages/AreaTasks'))
 const RimborsoSpese = lazy(() => import('./pages/RimborsoSpese'))
@@ -201,13 +200,12 @@ const router = createBrowserRouter([
         element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowCases />)}</RequirePerm>,
       },
       {
-        path: 'servicenow-stats',
-        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowStats />)}</RequirePerm>,
+        path: 'servicenow-dashboard',
+        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowDashboard />)}</RequirePerm>,
       },
-      {
-        path: 'servicenow-absences',
-        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowAbsences />)}</RequirePerm>,
-      },
+      // Statistiche e Assenze tecnici sono confluite nella Dashboard casi.
+      { path: 'servicenow-stats', element: <Navigate to="/servicenow-dashboard" replace /> },
+      { path: 'servicenow-absences', element: <Navigate to="/servicenow-dashboard" replace /> },
       {
         path: 'piano-ferie',
         element: <RequireAuth>{lazyEl(<PianoFerie />)}</RequireAuth>,

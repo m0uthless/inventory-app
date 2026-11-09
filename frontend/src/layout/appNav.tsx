@@ -52,8 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         label: 'ServiceNow', path: '/servicenow-cases', icon: <CampoIcon name="cloud" />, perm: 'servicenow.view_servicenowcase',
         children: [
-          { label: 'Statistiche', path: '/servicenow-stats', perm: 'servicenow.view_servicenowcase' },
-          { label: 'Assenze tecnici', path: '/servicenow-absences', perm: 'servicenow.view_servicenowcase' },
+          { label: 'Dashboard casi', path: '/servicenow-dashboard', perm: 'servicenow.view_servicenowcase' },
         ],
       },
     ],
@@ -136,8 +135,7 @@ const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
   ['/maintenance', 'Manutenzione'],
   ['/issues', 'Issue'],
   ['/tasks', 'Task di area'],
-  ['/servicenow-stats', 'Statistiche ServiceNow'],
-  ['/servicenow-absences', 'Assenze tecnici'],
+  ['/servicenow-dashboard', 'Dashboard casi'],
   ['/servicenow-cases', 'ServiceNow'],
   ['/piano-ferie', 'Piano ferie'],
   ['/rimborso-spese', 'Rimborso spese'],
