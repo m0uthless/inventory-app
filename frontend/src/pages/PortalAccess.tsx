@@ -30,7 +30,8 @@ import {
   type AdminGroupRow,
   type PermissionModule,
 } from '../types/adminUsers'
-import { UserDrawer, type LeaveAreaOption } from './UsersAdmin'
+import UserDetailCard from '../features/users/UserDetailCard'
+import type { LeaveAreaOption } from '../features/users/usersModel'
 
 const LEVEL_LABEL: Record<string, string> = Object.fromEntries(
   RWD_LEVEL_OPTIONS.map((o) => [o.key, o.label]),
@@ -232,17 +233,18 @@ export default function PortalAccess() {
         </TableContainer>
       )}
 
-      <UserDrawer
-        open={!!selectedUser}
-        user={selectedUser}
-        groups={groups}
-        modules={modules}
-        leaveAreas={leaveAreas}
-        initialTab="permessi"
-        onClose={() => setSelectedUser(null)}
-        onSaved={handleSaved}
-        onDeleted={handleDeleted}
-      />
+      {selectedUser ? (
+        <UserDetailCard
+          user={selectedUser}
+          groups={groups}
+          modules={modules}
+          leaveAreas={leaveAreas}
+          initialTab="permessi"
+          onClose={() => setSelectedUser(null)}
+          onSaved={handleSaved}
+          onDeleted={handleDeleted}
+        />
+      ) : null}
     </Box>
   )
 }

@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.routers import DefaultRouter
 
 from audit.api import AuditEventViewSet
-from core.me_api import ChangePasswordView, MeAPIView
+from core.me_api import ChangePasswordView, MeAPIView, MeLoginsView
 from core.admin_users_api import (
     GroupAdminViewSet,
     PermissionModulesView,
@@ -194,6 +194,7 @@ urlpatterns = [
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
+    path("api/me/logins/", MeLoginsView.as_view()),
     path("api/sticky-note/", StickyNoteView.as_view()),
     path("api/birthdays/", BirthdaysView.as_view()),
     path("api/trash/info/", TrashInfoView.as_view()),

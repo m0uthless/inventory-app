@@ -16,6 +16,7 @@ from rest_framework.throttling import UserRateThrottle
 from audit.utils import log_event
 from core.models import UserProfile
 from crm.models import Customer
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 
 class ChangePasswordThrottle(UserRateThrottle):
@@ -142,6 +143,8 @@ class MeAPIView(APIView):
             "last_name": user.last_name or "",
             "is_staff": bool(user.is_staff),
             "is_superuser": bool(user.is_superuser),
+            "last_login": user.last_login.isoformat() if user.last_login else None,
+            "date_joined": user.date_joined.isoformat() if getattr(user, "date_joined", None) else None,
             "groups": list(user.groups.values_list("name", flat=True)),
             "permissions": sorted(list(user.get_all_permissions())),
             "profile": {
@@ -342,3 +345,22 @@ class ChangePasswordView(APIView):
             pass  # non bloccare la risposta per un errore di audit
 
         return Response({"detail": "Password aggiornata con successo."}, status=status.HTTP_200_OK)
+
+
+class MeLoginsView(APIView):
+    """Ultimi accessi riusciti dell'utente (scheda Sicurezza del Profilo)."""
+
+    # Esplicite: solo Archie (il Portal non mostra questa scheda).
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
+
+    def get(self, request):
+        from audit.models import AuthAttempt
+
+        rows = (
+            AuthAttempt.objects.filter(username__iexact=request.user.get_username(), success=True)
+            .order_by("-created_at")[:5]
+        )
+        return Response([
+            {"created_at": r.created_at.isoformat(), "ip": r.ip, "user_agent": r.user_agent or ""}
+            for r in rows
+        ])

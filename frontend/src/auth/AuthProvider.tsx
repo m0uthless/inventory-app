@@ -11,6 +11,8 @@ export type Me = {
   last_name: string
   is_staff: boolean
   is_superuser: boolean
+  last_login?: string | null
+  date_joined?: string | null
   groups: string[]
   permissions: string[]
   profile?: {
