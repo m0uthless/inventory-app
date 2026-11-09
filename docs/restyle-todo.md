@@ -233,6 +233,14 @@ Portata dall'anteprima `db-base.html`, variante **A · Tinte** (scelta da Fede d
 - Dashboard casi: Andamento (torta dei type e colonne per periodo, palette verificata), Per tecnico (mappa con assenze segnate), Oggi, Assenze della settimana. Backend: filtro `user` sulle assenze (prima ignorato).
 - Da valutare: i type Philips tornano visibili quando si riattiva la categoria (visibleCategories.ts).
 
+## Login
+- Fatta da `lg-base.html` (2026-11-09), variante D · Tinte animate: scheda di accesso larga 456px al centro, sfondo animato con ShaderGradient (MIT) nei colori dell'app, fermo con "riduci animazioni", gradiente fisso senza WebGL. three.js e ShaderGradient in un chunk a parte (`vendor-login-bg`, ~290 kB gzip) caricato solo dalla login.
+- Logo: `frontend/public/login-logo.svg` è un segnaposto da sostituire con il logo definitivo.
+- La login di Archie non usa più `@shared/ui/LoginPage` (che resta per il Portale clienti); le foto `login-bg-*.jpg` in `frontend/public` non sono più usate da Archie.
+
+## Accesso Portal
+- Fatta il 2026-11-09 direttamente nello stile di Utenti e gruppi (senza anteprima, su richiesta di Fede): viste Tutti / Attivi / Sospesi / Anche in Archie, filtro Cliente dall'intestazione, colonne Utente, Livello, Cliente predefinito, Altri clienti, Archie, Ultimo accesso; la scheda utente si apre con la sezione Portal in cima (`portalFirst`).
+
 ## Titolo nella linguetta (mockup, in attesa di decisione interna)
 
 Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.

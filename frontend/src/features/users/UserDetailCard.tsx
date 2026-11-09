@@ -37,6 +37,8 @@ export type UserDetailCardProps = {
   leaveAreas: LeaveAreaOption[]
   currentUserId?: number
   initialTab?: 'anagrafica' | 'permessi'
+  /** Sezione Portal in cima (scheda aperta da Accesso Portal). */
+  portalFirst?: boolean
   position?: string
   onPrev?: () => void
   onNext?: () => void
@@ -46,7 +48,7 @@ export type UserDetailCardProps = {
 }
 
 /** Scheda utente (anteprima up-base, variante A): Permessi, Anagrafica e ruoli, Attività. */
-export default function UserDetailCard({ user, groups, modules, leaveAreas, currentUserId, initialTab, position, onPrev, onNext, onClose, onSaved, onDeleted }: UserDetailCardProps) {
+export default function UserDetailCard({ user, groups, modules, leaveAreas, currentUserId, initialTab, portalFirst, position, onPrev, onNext, onClose, onSaved, onDeleted }: UserDetailCardProps) {
   const toast = useToast()
   const [tab, setTab] = React.useState<Tab>(initialTab === 'anagrafica' ? 'ana' : 'perm')
   const [busy, setBusy] = React.useState(false)
@@ -137,6 +139,30 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
   const groupFloorPortal = rwdToLevel(user.group_permissions.modules.portal)
   const activity = useList<AuditEvent>('/audit-events/', tab === 'act' ? { actor: user.id, page_size: 15, ordering: '-created_at' } : null, user.id)
 
+  const portalSection = (
+          <DetailSection title="Portal">
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Typography sx={{ fontSize: 13, flex: 1 }}>Accesso al Portal</Typography>
+        <LevelPicker label="Accesso al Portal" value={maxLevel(portalLevel, groupFloorPortal)} floor={groupFloorPortal} disabled={philips} onChange={setPortalLevel} />
+      </Box>
+      {portalLevel !== 'none' ? (
+        <Box sx={{ display: 'grid', gap: 1.5, mt: 1.5 }}>
+          <Autocomplete multiple options={custOpts} filterOptions={(x) => x} inputValue={custQ} onInputChange={(_e, q) => setCustQ(q)}
+            value={portalCustomers} getOptionLabel={(o) => o.label} isOptionEqualToValue={(a, b) => a.id === b.id}
+            onChange={(_e, list) => { setPortalCustomers(list); if (!list.some((c) => c.id === portalDefault)) setPortalDefault(list[0]?.id ?? null) }}
+            renderInput={(p) => <TextField {...p} label="Clienti che vede" required error={!portalCustomers.length} />} />
+          {portalCustomers.length ? (
+            <TextField select label="Cliente predefinito" value={portalDefault ?? ''} onChange={(e) => setPortalDefault(Number(e.target.value))} helperText="Quello che vede appena entra.">
+              {portalCustomers.map((c) => <MenuItem key={c.id} value={c.id}>{c.label}</MenuItem>)}
+            </TextField>
+          ) : null}
+          <Typography sx={help}>Per fargli vedere device, inventari e VLAN assegna anche i moduli qui sotto.</Typography>
+          <ModuleLevels modules={portalModules(modules)} get={get} onChange={setLevel} />
+        </Box>
+      ) : null}
+    </DetailSection>
+  )
+
   return (
     <FloatingDetail open onClose={onClose} ariaLabel="Dettaglio utente"
       idLabel={<Box component="span" sx={{ fontFamily: '"Geist Mono", ui-monospace, monospace', fontSize: 12 }}>@{user.username}</Box>}
@@ -163,6 +189,7 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
       {tab === 'perm' ? (
         <Box sx={{ display: 'grid', gap: 2.25 }}>
           {philips ? <Typography sx={{ fontSize: 12.5, p: '8px 10px', borderRadius: '8px', bgcolor: 'info.light', color: 'info.main' }}>Profilo Philips: limitato a ServiceNow, senza gruppi né permessi Archie o Portal.</Typography> : null}
+          {portalFirst ? portalSection : null}
           <DetailSection title="Gruppi">
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
               {groupIds.map((id) => <GroupTag key={id} name={groups.find((g) => g.id === id)?.name ?? `#${id}`} onRemove={philips ? undefined : () => setGroupIds((x) => x.filter((y) => y !== id))} />)}
@@ -183,27 +210,7 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
                 onToggle={(c, on) => setExtra((s) => { const n = new Set(s); if (on) n.add(c); else n.delete(c); return n })} />
             </DetailSection>
           ) : null}
-          <DetailSection title="Portal">
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-              <Typography sx={{ fontSize: 13, flex: 1 }}>Accesso al Portal</Typography>
-              <LevelPicker label="Accesso al Portal" value={maxLevel(portalLevel, groupFloorPortal)} floor={groupFloorPortal} disabled={philips} onChange={setPortalLevel} />
-            </Box>
-            {portalLevel !== 'none' ? (
-              <Box sx={{ display: 'grid', gap: 1.5, mt: 1.5 }}>
-                <Autocomplete multiple options={custOpts} filterOptions={(x) => x} inputValue={custQ} onInputChange={(_e, q) => setCustQ(q)}
-                  value={portalCustomers} getOptionLabel={(o) => o.label} isOptionEqualToValue={(a, b) => a.id === b.id}
-                  onChange={(_e, list) => { setPortalCustomers(list); if (!list.some((c) => c.id === portalDefault)) setPortalDefault(list[0]?.id ?? null) }}
-                  renderInput={(p) => <TextField {...p} label="Clienti che vede" required error={!portalCustomers.length} />} />
-                {portalCustomers.length ? (
-                  <TextField select label="Cliente predefinito" value={portalDefault ?? ''} onChange={(e) => setPortalDefault(Number(e.target.value))} helperText="Quello che vede appena entra.">
-                    {portalCustomers.map((c) => <MenuItem key={c.id} value={c.id}>{c.label}</MenuItem>)}
-                  </TextField>
-                ) : null}
-                <Typography sx={help}>Per fargli vedere device, inventari e VLAN assegna anche i moduli qui sotto.</Typography>
-                <ModuleLevels modules={portalModules(modules)} get={get} onChange={setLevel} />
-              </Box>
-            ) : null}
-          </DetailSection>
+          {portalFirst ? null : portalSection}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="contained" disabled={busy} onClick={savePerms}>Salva i permessi</Button></Box>
         </Box>
       ) : tab === 'ana' ? (
