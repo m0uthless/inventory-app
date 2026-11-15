@@ -1,12 +1,12 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Autocomplete, Avatar, Box, Button, ButtonBase, CircularProgress, IconButton, InputAdornment, TextField, Typography } from '@mui/material'
+import { Autocomplete, Avatar, Box, Button, ButtonBase, CircularProgress, IconButton, InputBase, Typography } from '@mui/material'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { isRecord } from '@shared/utils/guards'
 import { useAuth, type Me } from '../../auth/AuthProvider'
-import { CampoIcon, DetailSection, FloatingDetail } from '../../ui/campo'
+import { CampoIcon, DetailSection, FloatingDetail, QuickField, QuickFields, QuickGroup, quickFieldSx } from '../../ui/campo'
 import { useList } from '../../ui/campo/ListRows'
 import { THEME_REGISTRY, resolveColorModePref, resolveThemeKey, type ColorModePref, type ThemeKey } from '../../theme/themeRegistry'
 import { actionMeta, entityIcon, entityLabel, objectTitle, whenLabel, type AuditEvent } from '../audit/auditModel'
@@ -29,15 +29,32 @@ const customerLabel = (c: Record<string, unknown>) => {
   return code ? `${code} — ${base}` : base
 }
 
-function DatiTab({ me, onSaved }: { me: Me; onSaved: () => Promise<void> }) {
+type DatiForm = ReturnType<typeof useDatiForm>
+function useDatiForm(me: Me | null, onSaved: () => Promise<void>) {
   const toast = useToast()
-  const [email, setEmail] = React.useState(me.email || '')
-  const [first, setFirst] = React.useState(me.first_name || '')
-  const [last, setLast] = React.useState(me.last_name || '')
-  const [cust, setCust] = React.useState<CustomerOption | null>(me.profile?.preferred_customer && me.profile.preferred_customer_name ? { id: me.profile.preferred_customer, label: me.profile.preferred_customer_name } : null)
+  const initial = React.useCallback(() => ({
+    email: me?.email || '', first: me?.first_name || '', last: me?.last_name || '',
+    cust: me?.profile?.preferred_customer && me.profile.preferred_customer_name ? { id: me.profile.preferred_customer, label: me.profile.preferred_customer_name } as CustomerOption : null,
+  }), [me])
+  const [v, setV] = React.useState(initial)
+  const [busy, setBusy] = React.useState(false)
+  const id = me?.id
+  React.useEffect(() => { setV(initial()) }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const set = <K extends keyof typeof v>(k: K, x: (typeof v)[K]) => setV((o) => ({ ...o, [k]: x }))
+  const dirty = !!me && (v.email !== (me.email || '') || v.first !== (me.first_name || '') || v.last !== (me.last_name || '') || (v.cust?.id ?? null) !== (me.profile?.preferred_customer ?? null))
+  const save = async () => {
+    setBusy(true)
+    try { await api.patch('/me/', { email: v.email, first_name: v.first, last_name: v.last, preferred_customer: v.cust?.id ?? null }); await onSaved(); toast.success('Profilo aggiornato.') }
+    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+  }
+  return { v, set, dirty, busy, save, reset: () => setV(initial()) }
+}
+
+function DatiTab({ me, form, onSaved }: { me: Me; form: DatiForm; onSaved: () => Promise<void> }) {
+  const toast = useToast()
+  const { v, set } = form
   const [custQ, setCustQ] = React.useState('')
   const [opts, setOpts] = React.useState<CustomerOption[]>([])
-  const [busy, setBusy] = React.useState(false)
   const [uploading, setUploading] = React.useState(false)
   React.useEffect(() => {
     let alive = true
@@ -50,12 +67,6 @@ function DatiTab({ me, onSaved }: { me: Me; onSaved: () => Promise<void> }) {
     }, 300)
     return () => { alive = false; window.clearTimeout(t) }
   }, [custQ])
-  const dirty = email !== (me.email || '') || first !== (me.first_name || '') || last !== (me.last_name || '') || (cust?.id ?? null) !== (me.profile?.preferred_customer ?? null)
-  const save = async () => {
-    setBusy(true)
-    try { await api.patch('/me/', { email, first_name: first, last_name: last, preferred_customer: cust?.id ?? null }); await onSaved(); toast.success('Profilo aggiornato.') }
-    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
-  }
   const avatar = async (file: File | null) => {
     setUploading(true)
     try {
@@ -85,19 +96,28 @@ function DatiTab({ me, onSaved }: { me: Me; onSaved: () => Promise<void> }) {
           {me.profile?.avatar ? <Box><Button size="small" variant="text" onClick={() => void avatar(null)} disabled={uploading} sx={{ px: 0, minWidth: 0 }}>Togli la foto</Button></Box> : null}
         </Box>
       </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-        <TextField label="Nome" value={first} onChange={(e) => setFirst(e.target.value)} />
-        <TextField label="Cognome" value={last} onChange={(e) => setLast(e.target.value)} />
-      </Box>
-      <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <TextField label="Nome utente" value={me.username} disabled helperText="Il nome utente non si può cambiare." />
-      <Autocomplete value={cust} onChange={(_e, v) => setCust(v)} inputValue={custQ} onInputChange={(_e, v) => setCustQ(v)}
-        options={cust && !opts.some((o) => o.id === cust.id) ? [cust, ...opts] : opts} filterOptions={(x) => x}
-        isOptionEqualToValue={(a, b) => a.id === b.id} getOptionLabel={(o) => o.label} noOptionsText="Nessun cliente"
-        renderInput={(p) => <TextField {...p} label="Cliente preferito" helperText="Viene proposto per primo quando crei issue, inventari e rapportini." />} />
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button variant="contained" disabled={!dirty || busy} onClick={() => void save()}>Salva</Button>
-      </Box>
+      <QuickGroup title="Dati personali">
+        <QuickFields>
+          <QuickField label="Nome" value={v.first} onChange={(x) => set('first', x)} autoComplete="given-name" />
+          <QuickField label="Cognome" value={v.last} onChange={(x) => set('last', x)} autoComplete="family-name" />
+          <QuickField label="Email" type="email" value={v.email} onChange={(x) => set('email', x)} span={2} autoComplete="email" />
+          <QuickField label="Nome utente" value={me.username} onChange={() => {}} disabled span={2} help="Il nome utente non si può cambiare." />
+        </QuickFields>
+      </QuickGroup>
+      <QuickGroup title="Preferenze">
+        <Box sx={{ display: 'grid', gap: 0.6 }}>
+          <Typography component="label" htmlFor="profile-preferred-customer" sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary' }}>Cliente preferito</Typography>
+          <Autocomplete id="profile-preferred-customer" value={v.cust} onChange={(_e, x) => set('cust', x)} inputValue={custQ} onInputChange={(_e, x) => setCustQ(x)}
+            options={v.cust && !opts.some((o) => o.id === v.cust?.id) ? [v.cust, ...opts] : opts} filterOptions={(x) => x}
+            isOptionEqualToValue={(a, b) => a.id === b.id} getOptionLabel={(o) => o.label} noOptionsText="Nessun cliente"
+            slotProps={{ paper: { sx: { fontSize: 13.5 } } }}
+            renderInput={(p) => (
+              <InputBase ref={p.InputProps.ref} className={p.InputProps.className} endAdornment={p.InputProps.endAdornment} onMouseDown={p.InputProps.onMouseDown}
+                inputProps={p.inputProps} id={p.id} disabled={p.disabled} fullWidth placeholder="Nessuno" sx={[quickFieldSx(), { pr: '56px !important' }]} />
+            )} />
+          <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>Proposto per primo quando crei issue, inventari e rapportini.</Typography>
+        </Box>
+      </QuickGroup>
     </Box>
   )
 }
@@ -156,14 +176,6 @@ function AspettoTab({ me, onSaved }: { me: Me; onSaved: () => Promise<void> }) {
 }
 
 // ── Sicurezza ─────────────────────────────────────────────────────────────
-function PasswordInput({ label, value, onChange, error, auto }: { label: string; value: string; onChange: (v: string) => void; error?: string; auto: string }) {
-  const [show, setShow] = React.useState(false)
-  return (
-    <TextField label={label} type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={auto} error={Boolean(error)} helperText={error || undefined}
-      slotProps={{ input: { endAdornment: <InputAdornment position="end"><IconButton size="small" aria-label={show ? 'Nascondi la password' : 'Mostra la password'} onClick={() => setShow(!show)}><CampoIcon name={show ? 'eyeOff' : 'eye'} size={15} /></IconButton></InputAdornment> } }} />
-  )
-}
-
 function SicurezzaTab() {
   const toast = useToast()
   const [oldP, setOldP] = React.useState('')
@@ -196,9 +208,9 @@ function SicurezzaTab() {
     <Box sx={{ display: 'grid', gap: 2.5 }}>
       <DetailSection title="Cambia password">
         <Box sx={{ display: 'grid', gap: 1.5 }}>
-          <PasswordInput label="Password attuale" value={oldP} onChange={setOldP} error={err.old_password} auto="current-password" />
+          <QuickField label="Password attuale" secret value={oldP} onChange={setOldP} error={err.old_password} autoComplete="current-password" />
           <Box>
-            <PasswordInput label="Nuova password" value={newP} onChange={setNewP} error={err.new_password} auto="new-password" />
+            <QuickField label="Nuova password" secret value={newP} onChange={setNewP} error={err.new_password} autoComplete="new-password" />
             {newP ? (
               <Box sx={{ mt: 0.75 }}>
                 <Box sx={{ display: 'flex', gap: 0.5 }}>{[1, 2, 3, 4].map((i) => <Box key={i} sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: i <= score ? (score <= 1 ? 'error.main' : score === 2 ? 'warning.main' : 'success.main') : 'archie.neutralBg' }} />)}</Box>
@@ -206,7 +218,7 @@ function SicurezzaTab() {
               </Box>
             ) : null}
           </Box>
-          <PasswordInput label="Ripeti la nuova password" value={newP2} onChange={setNewP2} error={err.new_password2} auto="new-password" />
+          <QuickField label="Ripeti la nuova password" secret value={newP2} onChange={setNewP2} error={err.new_password2} autoComplete="new-password" />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="contained" disabled={busy || !oldP || !newP} onClick={() => void submit()}>Cambia password</Button>
           </Box>
@@ -292,15 +304,24 @@ export default function ProfileCard({ onClose }: { onClose: () => void }) {
   const { me, refreshMe } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = React.useState<Tab>('dati')
+  const form = useDatiForm(me, refreshMe)
   if (!me) return null
+  const footer = tab === 'dati' ? (
+    <>
+      <Typography sx={{ fontSize: 12, color: form.dirty ? 'text.secondary' : 'text.disabled' }}>{form.dirty ? 'Modifiche non salvate' : 'Nessuna modifica'}</Typography>
+      <Box sx={{ flex: 1 }} />
+      {form.dirty ? <Button size="small" variant="text" onClick={form.reset} disabled={form.busy}>Annulla</Button> : null}
+      <Button size="small" variant="contained" disabled={!form.dirty || form.busy} onClick={() => void form.save()}>Salva</Button>
+    </>
+  ) : undefined
   const role = me.is_superuser ? 'Superuser' : me.is_staff ? 'Staff' : null
   return (
     <FloatingDetail open onClose={onClose} ariaLabel="Profilo"
       idLabel={`@${me.username}`}
       status={role ? <Box component="span" sx={{ ...tag, bgcolor: 'rgba(255,255,255,.14)', color: '#fff' }}>{role}</Box> : undefined}
       title={fullName(me)} subtitle={[me.email, me.groups?.length ? me.groups.join(', ') : null].filter(Boolean).join(' · ')}
-      tabs={TABS} tab={tab} onTab={(k) => setTab(k as Tab)}>
-      {tab === 'dati' ? <DatiTab key={me.id} me={me} onSaved={refreshMe} />
+      tabs={TABS} tab={tab} onTab={(k) => setTab(k as Tab)} footer={footer}>
+      {tab === 'dati' ? <DatiTab key={me.id} me={me} form={form} onSaved={refreshMe} />
         : tab === 'aspetto' ? <AspettoTab me={me} onSaved={refreshMe} />
           : tab === 'sicurezza' ? <SicurezzaTab />
             : tab === 'permessi' ? <PermessiTab me={me} />

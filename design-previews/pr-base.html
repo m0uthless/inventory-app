@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profilo · campi · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+
+/* ── Token: chiaro ─────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c;        /* verde chirurgico */
+  --primary-hover: #18584c;
+  --primary-ink: #ffffff;
+  --bg: #eef2f1;             /* acciaio freddo */
+  --surface: #ffffff;
+  --surface-2: #f5f8f7;
+  --rail: #e3eae8;           /* sidebar */
+  --border: #d5dedb;
+  --border-strong: #b9c7c3;
+  --text: #15201e;
+  --muted: #5b6b67;
+  --faint: #66766f;
+  --field: #e2f0eb;          /* campo sterile: selezione */
+  --field-line: #1f6b5c;
+  --success: #2e7d4f; --success-bg: #e3f3e9;
+  --warning: #9a5b00; --warning-bg: #fbefd9;
+  --error: #c2362b;   --error-bg: #fbe5e2;
+  --info: #2f5f9e;    --info-bg: #e5edf8;
+  --neutral-bg: #edf1f0;
+  --shadow-float: 0 12px 32px -12px rgb(16 40 34 / .22), 0 2px 6px rgb(16 40 34 / .06);
+  --focus: 0 0 0 3px rgb(31 107 92 / .28);
+}
+/* ── Token: scuro ──────────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --primary-hover: #7ccab7; --primary-ink: #0b1513;
+  --bg: #0f1615; --surface: #151e1c; --surface-2: #1a2523; --rail: #121a19;
+  --border: #2a3734; --border-strong: #3b4c48;
+  --text: #e4ecea; --muted: #93a4a0; --faint: #849591;
+  --field: #183a33; --field-line: #5fb8a3;
+  --success: #5cc48a; --success-bg: #173327;
+  --warning: #e0a43a; --warning-bg: #3a2c12;
+  --error: #f07466;   --error-bg: #3c1d1a;
+  --info: #7fa8e0;    --info-bg: #1b2a40;
+  --neutral-bg: #1e2928;
+  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / .6);
+  --focus: 0 0 0 3px rgb(95 184 163 / .35);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --primary: #5fb8a3; --primary-hover: #7ccab7; --primary-ink: #0b1513;
+    --bg: #0f1615; --surface: #151e1c; --surface-2: #1a2523; --rail: #121a19;
+    --border: #2a3734; --border-strong: #3b4c48;
+    --text: #e4ecea; --muted: #93a4a0; --faint: #849591;
+    --field: #183a33; --field-line: #5fb8a3;
+    --success: #5cc48a; --success-bg: #173327;
+    --warning: #e0a43a; --warning-bg: #3a2c12;
+    --error: #f07466;   --error-bg: #3c1d1a;
+    --info: #7fa8e0;    --info-bg: #1b2a40;
+    --neutral-bg: #1e2928;
+    --shadow-float: 0 16px 40px -12px rgb(0 0 0 / .6);
+    --focus: 0 0 0 3px rgb(95 184 163 / .35);
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 400 13px/1.5 "Geist", system-ui, sans-serif;
+  font-feature-settings: "ss01", "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--field); color: var(--text); }
+a { color: var(--primary); text-underline-offset: 3px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+.i { width: 16px; height: 16px; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; }
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+:root { --mint-b: #e2f2eb; --mint-i: #175a4c; --sky-b: #e3eef9; --sky-i: #24507f; --lilac-b: #ece8f7; --lilac-i: #4d3d8a; --sand-b: #f6eedb; --sand-i: #6e5113; }
+:root[data-theme="dark"] { --mint-b: #15302a; --mint-i: #a6e3d3; --sky-b: #172739; --sky-i: #b4d0f0; --lilac-b: #241f36; --lilac-i: #cfc4f2; --sand-b: #2f2817; --sand-i: #ecd9a8; }
+
+/* Sfondo finto dell'app */
+.stage { min-height: 100vh; padding: 24px; display: flex; justify-content: flex-end; background: var(--bg); }
+.stage::before { content: ""; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 46px, color-mix(in srgb, var(--border) 50%, transparent) 46px 47px); opacity: .6; pointer-events: none; }
+
+/* Scheda flottante (come FloatingDetail) */
+.fd { position: relative; width: 560px; max-width: 100%; height: calc(100vh - 48px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-float); overflow: hidden; }
+.fd-h { padding: 14px 18px 0; background: var(--primary); color: #fff; }
+:root[data-theme="dark"] .fd-h { background: #1d4a40; }
+.fd-top { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .85; }
+.fd-top .code { color: #fff; }
+.fd-top .sp { flex: 1; }
+.fd-x { width: 28px; height: 28px; border: 0; border-radius: 7px; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.role { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.16); color: #fff; }
+.fd-h h1 { margin: 6px 0 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.fd-h p { margin: 1px 0 10px; font-size: 12.5px; opacity: .8; }
+.tabs { display: flex; gap: 2px; }
+.tabs button { border: 0; background: none; color: rgba(255,255,255,.75); height: 34px; padding: 0 12px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 7px 7px 0 0; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: 600; }
+.fd-b { flex: 1; overflow: auto; padding: 18px; }
+.fd-f { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border); background: var(--surface-2); font-size: 12px; color: var(--muted); }
+.fd-f .sp { flex: 1; }
+.fd-f.idle { color: var(--faint); }
+
+/* Bottoni */
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 13px; font-weight: 550; cursor: pointer; color: var(--text); }
+.btn.pri { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.btn.pri:disabled { opacity: .45; cursor: default; }
+.btn.txt { border-color: transparent; background: none; color: var(--primary); padding: 0 6px; }
+
+/* Testata identità */
+.idc { display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 18px;
+  background: linear-gradient(120deg, var(--mint-b) 0%, var(--sky-b) 60%, var(--lilac-b) 100%); }
+.ava { position: relative; flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--mint-i); font-size: 19px; font-weight: 750; }
+.ava button { position: absolute; right: -5px; bottom: -3px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: grid; place-items: center; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(3, auto); gap: 2px 20px; margin: 0; }
+.facts dt { font-size: 11.5px; color: var(--muted); }
+.facts dd { margin: 0; font-size: 13px; font-weight: 600; }
+
+.sec { margin-bottom: 20px; }
+.sec h3 { margin: 0 0 10px; font-size: 12px; font-weight: 650; color: var(--primary); }
+.help { font-size: 11.5px; color: var(--muted); }
+
+/* ── Variante 0 · Attuale (TextField MUI) ─────────────────────── */
+.mui { display: grid; gap: 18px; }
+.mui .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mf { position: relative; }
+.mf input { width: 100%; height: 56px; padding: 16px 14px 0; border: 1px solid var(--border-strong); border-radius: 4px; background: transparent; font-size: 16px; }
+.mf label { position: absolute; left: 10px; top: -8px; padding: 0 4px; background: var(--surface); font-size: 12px; color: var(--muted); }
+.mf input:disabled { color: var(--faint); border-style: dashed; }
+.mf small { display: block; margin: 4px 14px 0; font-size: 12px; color: var(--muted); }
+
+/* ── Variante A · Campi compatti (QuickField) ─────────────────── */
+.qf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qf { display: grid; gap: 5px; align-content: start; min-width: 0; }
+.qf.wide { grid-column: 1 / -1; }
+.qf label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.qf .in { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface); }
+.qf .in:focus-within { border-color: var(--primary); box-shadow: var(--focus); }
+.qf .in input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 13.5px; height: 100%; padding: 0; }
+.qf .in.ro { background: var(--surface-2); border-color: var(--border); color: var(--muted); }
+.qf .in .i { width: 15px; height: 15px; color: var(--muted); }
+.qf .in .lock { font-size: 11px; color: var(--faint); }
+.pw-meter { display: flex; gap: 4px; margin-top: 2px; }
+.pw-meter i { flex: 1; height: 4px; border-radius: 2px; background: var(--neutral-bg); }
+.pw-meter i.on { background: var(--success); }
+
+/* ── Variante B · Righe proprietà ─────────────────────────────── */
+.props { display: grid; border-top: 1px solid var(--border); }
+.pr { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; min-height: 40px; border-bottom: 1px solid var(--border); column-gap: 10px; }
+.pr > span { font-size: 12px; color: var(--muted); font-weight: 550; }
+.pr .v { display: flex; align-items: center; gap: 8px; min-height: 30px; margin: 0 -8px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px; background: none; font-size: 13.5px; text-align: left; cursor: pointer; color: var(--text); width: calc(100% + 16px); }
+.pr .v:hover { background: var(--surface-2); }
+.pr .v .ed { margin-left: auto; width: 14px; height: 14px; color: var(--faint); opacity: 0; }
+.pr .v:hover .ed { opacity: 1; }
+.pr .v.ro { cursor: default; color: var(--muted); }
+.pr .v.ro:hover { background: none; }
+.pr .v.empty { color: var(--faint); }
+.pr .v input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 13.5px; padding: 0; height: 28px; }
+.pr .v.editing { border-color: var(--primary); box-shadow: var(--focus); background: var(--surface); cursor: text; }
+.pr .hint { grid-column: 2; font-size: 11.5px; color: var(--muted); padding: 0 0 8px; margin-top: -4px; }
+.saved { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.saved.on { opacity: 1; }
+.saved b { color: var(--mint-b); margin-left: 10px; font-weight: 600; }
+
+/* Barra anteprima */
+.pv-bar { position: fixed; z-index: 50; left: 24px; bottom: 16px; display: flex; gap: 4px; padding: 4px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-float); }
+.pv-bar .pv-name { padding: 0 10px 0 8px; font-weight: 600; color: var(--muted); font-size: 12px; }
+.pv-bar button { border: 0; background: transparent; height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; }
+.pv-bar button[aria-pressed="true"] { background: var(--field); color: var(--text); }
+.pv-bar a { color: var(--muted); padding: 0 8px; font-size: 12px; }
+.note { position: fixed; left: 24px; top: 24px; width: 300px; font-size: 12.5px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.note b { color: var(--text); }
+@media (max-width: 1000px) { .note { display: none; } .stage { justify-content: center; padding: 12px; } .fd { height: calc(100vh - 80px); } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="note" id="note"></aside>
+  <section class="fd" aria-label="Profilo">
+    <header class="fd-h">
+      <div class="fd-top"><span class="code">@fmutuale</span><span class="role">Superuser</span><span class="sp"></span><button class="fd-x" aria-label="Chiudi">✕</button></div>
+      <h1>Federico Mutuale</h1>
+      <p>fede@biotron.it · Tecnici, Amministrazione</p>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-t="dati" aria-selected="true">Dati</button>
+        <button role="tab" data-t="aspetto">Aspetto</button>
+        <button role="tab" data-t="sic">Sicurezza</button>
+        <button role="tab" data-t="perm">Permessi</button>
+        <button role="tab" data-t="att">Attività</button>
+      </div>
+    </header>
+    <div class="fd-b" id="body"></div>
+    <footer class="fd-f" id="foot"></footer>
+  </section>
+</div>
+<div class="saved" id="toast">Salvato<b>Annulla</b></div>
+
+<nav class="pv-bar" aria-label="Anteprima">
+  <span class="pv-name">Profilo · campi</span>
+  <button data-v="0">Attuale</button>
+  <button data-v="a">A · Campi compatti</button>
+  <button data-v="b">B · Righe proprietà</button>
+  <button id="theme">◐ Tema</button>
+  <a href="index.html">Indice</a>
+</nav>
+
+<script>
+const ID = `<div class="idc"><div class="ava">FM<button aria-label="Cambia la foto">↑</button></div>
+  <dl class="facts"><div><dt>Ultimo accesso</dt><dd>2 ore fa</dd></div><div><dt>In Archie da</dt><dd>mar 2024</dd></div><div><dt>Area ferie</dt><dd>Bologna</dd></div></dl></div>`;
+const NOTE = {
+  0: '<b>Attuale.</b> TextField MUI standard: 56px, testo 16px, etichetta sul bordo. Fuori scala rispetto al resto dell\'app.',
+  a: '<b>A · Campi compatti.</b> Gli stessi campi dell\'inserimento rapido e dei dialoghi (QuickField): etichetta sopra, 36px, testo 13,5px. Il pulsante Salva sta nel piede della scheda e si accende solo quando c\'è qualcosa da salvare, con Annulla.',
+  b: '<b>B · Righe proprietà.</b> Come le Proprietà delle schede di Clienti, Siti, Inventari: etichetta a sinistra, valore a destra; clic sul valore per modificarlo, Invio salva subito con «Annulla» nel toast. Niente pulsante Salva. La password resta un piccolo modulo a campi compatti.',
+};
+const qf = (l, v, o = {}) => `<div class="qf${o.wide ? ' wide' : ''}"><label>${l}</label><div class="in${o.ro ? ' ro' : ''}">${o.ico || ''}<input value="${v}" ${o.ro ? 'disabled' : ''} ${o.pw ? 'type="password"' : ''} placeholder="${o.ph || ''}">${o.ro ? '<span class="lock">non modificabile</span>' : ''}${o.pw ? '<span class="i">👁</span>' : ''}${o.sel ? '<span class="i">▾</span>' : ''}</div>${o.help ? `<span class="help">${o.help}</span>` : ''}</div>`;
+const mf = (l, v, o = {}) => `<div class="mf"><label>${l}</label><input value="${v}" ${o.ro ? 'disabled' : ''} ${o.pw ? 'type="password"' : ''}>${o.help ? `<small>${o.help}</small>` : ''}</div>`;
+const pr = (k, l, v, o = {}) => `<div class="pr"><span>${l}</span><button class="v${o.ro ? ' ro' : ''}${v ? '' : ' empty'}" data-k="${k}" ${o.ro ? 'tabindex="-1"' : ''}><span class="val">${v || '—'}</span>${o.ro ? '' : '<span class="ed">✎</span>'}</button>${o.hint ? `<span class="hint">${o.hint}</span>` : ''}</div>`;
+const CUST = 'AUSLBO — AUSL di Bologna';
+const VIEW = {
+  0: {
+    dati: () => ID + `<div class="mui"><div class="row2">${mf('Nome', 'Federico')}${mf('Cognome', 'Mutuale')}</div>${mf('Email', 'fede@biotron.it')}${mf('Nome utente', 'fmutuale', { ro: 1, help: 'Il nome utente non si può cambiare.' })}${mf('Cliente preferito', CUST, { help: 'Viene proposto per primo quando crei issue, inventari e rapportini.' })}<div style="text-align:right"><button class="btn pri" disabled>Salva</button></div></div>`,
+    sic: () => `<div class="sec"><h3>Cambia password</h3><div class="mui">${mf('Password attuale', '', { pw: 1 })}${mf('Nuova password', '', { pw: 1 })}${mf('Ripeti la nuova password', '', { pw: 1 })}<div style="text-align:right"><button class="btn pri" disabled>Cambia password</button></div></div></div>`,
+    foot: () => '',
+  },
+  a: {
+    dati: () => ID + `<div class="sec"><h3>Dati personali</h3><div class="qf-grid">${qf('Nome', 'Federico')}${qf('Cognome', 'Mutuale')}${qf('Email', 'fede@biotron.it', { wide: 1 })}${qf('Nome utente', 'fmutuale', { wide: 1, ro: 1 })}</div></div>
+      <div class="sec"><h3>Preferenze</h3><div class="qf-grid">${qf('Cliente preferito', CUST, { wide: 1, sel: 1, help: 'Proposto per primo quando crei issue, inventari e rapportini.' })}</div></div>`,
+    sic: () => `<div class="sec"><h3>Cambia password</h3><div class="qf-grid">${qf('Password attuale', '', { wide: 1, pw: 1 })}<div class="qf"><label>Nuova password</label><div class="in"><input type="password" value="correct-horse"><span class="i">👁</span></div><div class="pw-meter"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div><span class="help">Buona. Almeno 12 caratteri, meglio una frase.</span></div>${qf('Ripeti la nuova password', '', { pw: 1 })}</div></div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn pri">Cambia password</button></div>`,
+    foot: (dirty) => dirty ? `<span>Modifiche non salvate</span><span class="sp"></span><button class="btn txt" data-act="undo">Annulla</button><button class="btn pri" data-act="save">Salva</button>` : `<span>Nessuna modifica</span><span class="sp"></span><button class="btn pri" disabled>Salva</button>`,
+  },
+  b: {
+    dati: () => ID + `<div class="sec"><h3>Dati personali</h3><div class="props">${pr('first', 'Nome', 'Federico')}${pr('last', 'Cognome', 'Mutuale')}${pr('email', 'Email', 'fede@biotron.it')}${pr('user', 'Nome utente', 'fmutuale', { ro: 1 })}</div></div>
+      <div class="sec"><h3>Preferenze</h3><div class="props">${pr('cust', 'Cliente preferito', CUST, { hint: 'Proposto per primo quando crei issue, inventari e rapportini.' })}</div></div>`,
+    sic: () => VIEW.a.sic(),
+    foot: () => `<span class="idle">clic su un valore per modificarlo · si salva subito</span>`,
+  },
+};
+const OTHER = { aspetto: 'Aspetto', perm: 'Permessi', att: 'Attività' };
+let v = new URLSearchParams(location.search).get('variante') || 'a', t = 'dati', dirty = false;
+const $ = (s) => document.querySelector(s);
+function render() {
+  document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  document.querySelectorAll('[data-t]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.t === t)));
+  const V = VIEW[v];
+  $('#body').innerHTML = V[t] ? V[t]() : `<p class="help">Scheda «${OTHER[t]}» invariata in questa anteprima.</p>`;
+  $('#foot').innerHTML = t === 'dati' ? V.foot(dirty) : '';
+  $('#foot').hidden = !$('#foot').innerHTML;
+  $('#note').innerHTML = NOTE[v];
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.v) { v = b.dataset.v; dirty = false; history.replaceState(null, '', '?variante=' + v); render(); }
+  else if (b.dataset.t) { t = b.dataset.t; render(); }
+  else if (b.id === 'theme') { const r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; }
+  else if (b.dataset.act) { dirty = false; render(); if (b.dataset.act === 'save') flash(); }
+  else if (b.classList.contains('v') && !b.classList.contains('ro') && !b.classList.contains('editing')) edit(b);
+});
+document.addEventListener('input', (e) => { if (v === 'a' && t === 'dati' && !dirty) { dirty = true; $('#foot').innerHTML = VIEW.a.foot(true); } });
+function edit(b) {
+  const span = b.querySelector('.val'), old = span.textContent;
+  b.classList.add('editing');
+  span.outerHTML = `<input value="${old === '—' ? '' : old}">`;
+  b.querySelector('.ed')?.remove();
+  const inp = b.querySelector('input'); inp.focus(); inp.select();
+  const done = (save) => { const val = save ? inp.value : old; b.classList.remove('editing'); inp.outerHTML = `<span class="val">${val || '—'}</span>`; b.insertAdjacentHTML('beforeend', '<span class="ed">✎</span>'); if (save && val !== old) flash(); };
+  inp.addEventListener('keydown', (k) => { if (k.key === 'Enter') done(true); if (k.key === 'Escape') done(false); });
+  inp.addEventListener('blur', () => b.classList.contains('editing') && done(true));
+}
+function flash() { const el = $('#toast'); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 2200); }
+render();
+</script>
+</body>
+</html>

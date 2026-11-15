@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Box, Button, ButtonBase, Checkbox, CircularProgress, Collapse, Dialog, FormControlLabel, IconButton, InputBase, Popover, Typography, type Theme } from '@mui/material'
 import type { SystemStyleObject } from '@mui/system'
+import { quickFieldSx } from './quickFieldSx'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
@@ -305,15 +306,10 @@ export function QuickGroup({ title, children }: { title: string; children: React
   )
 }
 
-const fieldSx = (error: boolean): SystemStyleObject<Theme> => ({
-  minHeight: 36, px: 1.25, fontSize: 13.5, border: '1px solid', borderColor: error ? 'error.main' : 'archie.borderStrong', borderRadius: '7px', bgcolor: 'background.paper',
-  '&.Mui-focused': { borderColor: error ? 'error.main' : 'primary.main', boxShadow: (t: Theme) => t.palette.archie.focusRing },
-  '&.Mui-disabled': { bgcolor: 'archie.surface2' }, '&.MuiInputBase-multiline': { py: 1 },
-})
 
-export function QuickField({ label, value, onChange, error, help, disabled, mono, multiline, type = 'text', secret, span, placeholder }: {
+export function QuickField({ label, value, onChange, error, help, disabled, mono, multiline, type = 'text', secret, span, placeholder, autoComplete }: {
   label: string; value: string; onChange: (v: string) => void; error?: string; help?: string; disabled?: boolean; mono?: boolean
-  multiline?: boolean; type?: string; secret?: boolean; span?: number; placeholder?: string
+  multiline?: boolean; type?: string; secret?: boolean; span?: number; placeholder?: string; autoComplete?: string
 }) {
   const [show, setShow] = React.useState(false)
   const id = React.useId()
@@ -321,14 +317,14 @@ export function QuickField({ label, value, onChange, error, help, disabled, mono
     <Box sx={{ display: 'grid', alignContent: 'start', gap: 0.6, minWidth: 0, gridColumn: span ? `span ${span}` : undefined }}>
       <Typography component="label" htmlFor={id} sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary' }}>{label}</Typography>
       <InputBase id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} multiline={multiline} minRows={multiline ? 3 : undefined}
-        type={secret && !show ? 'password' : type} placeholder={placeholder} autoComplete={secret ? 'new-password' : undefined}
+        type={secret && !show ? 'password' : type} placeholder={placeholder} autoComplete={autoComplete ?? (secret ? 'new-password' : undefined)}
         inputProps={{ 'aria-invalid': Boolean(error) }}
         endAdornment={secret ? (
           <IconButton size="small" aria-label={show ? `Nascondi ${label}` : `Mostra ${label}`} onClick={() => setShow((s) => !s)} disabled={disabled} sx={{ width: 26, height: 26, mr: -0.5 }}>
             {show ? <VisibilityOffOutlinedIcon sx={{ fontSize: 16 }} /> : <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />}
           </IconButton>
         ) : undefined}
-        sx={[fieldSx(Boolean(error)), mono ? { fontFamily: '"Geist Mono", monospace', fontSize: 13 } : {}]} />
+        sx={[quickFieldSx(Boolean(error)), mono ? { fontFamily: '"Geist Mono", monospace', fontSize: 13 } : {}]} />
       {error ? <Typography sx={{ fontSize: 12, color: 'error.main' }}>{error}</Typography> : help ? <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>{help}</Typography> : null}
     </Box>
   )
