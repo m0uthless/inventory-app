@@ -9,6 +9,17 @@ class IsAuthenticatedDjangoModelPermissions(DjangoModelPermissions):
     authenticated_users_only = True
 
 
+def _passes_portal_barrier(request, view) -> bool:
+    """H-02 (QA 2026-11-15): le action restore/purge dichiarano
+    `permission_classes` proprie, che in DRF *sostituiscono* quelle del
+    ViewSet: senza questo controllo una sessione Portal ripristinava o
+    eliminava record dei moduli interni (403 in lista, 200 sul restore).
+    Import locale: portal.permissions importa da questo modulo."""
+    from portal.permissions import IsInternalOrPortalDedicatedApp
+
+    return IsInternalOrPortalDedicatedApp().has_permission(request, view)
+
+
 class CanRestoreModelPermission(BasePermission):
     """Generic permission helper for `restore` actions.
 
@@ -19,6 +30,8 @@ class CanRestoreModelPermission(BasePermission):
     def has_permission(self, request, view) -> bool:
         user = getattr(request, "user", None)
         if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if not _passes_portal_barrier(request, view):
             return False
 
         explicit = getattr(view, "restore_permission", None)
@@ -78,6 +91,8 @@ class CanPurgeModelPermission(BasePermission):
     def has_permission(self, request, view) -> bool:
         user = getattr(request, "user", None)
         if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if not _passes_portal_barrier(request, view):
             return False
 
         explicit = getattr(view, "purge_permission", None)
