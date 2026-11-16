@@ -18,6 +18,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Fixed
 
 - ServiceNow: il flag "Tecnico ServiceNow" ora nasce disattivato per i nuovi utenti. La migrazione `core 0045` lo toglie a chi non ha un profilo interno (né accesso ad Archie, né tecnico Philips, né account funzionale), stampando l'elenco degli utenti modificati. Assegnazione di case e issue, elenchi dei tecnici, Triage, assenze tecnici ed email "nuova issue" considerano solo i tecnici interni: prima i clienti del Portal risultavano assegnabili e ricevevano le email delle nuove issue.
+- Contratti: il caricamento del PDF falliva con errore 500 quando la cartella `media/contracts` era stata creata da un comando lanciato come root. All'avvio, il backend riallinea ora al proprio utente ogni file o cartella di `media/` che non gli appartiene, non solo la cartella principale; un errore di scrittura dei file restituisce un messaggio leggibile e finisce nel log. I test non scrivono più nel volume media reale.
 
 ## [0.10.0] - 2026-11-04
 

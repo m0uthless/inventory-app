@@ -15,10 +15,15 @@ echo "[entrypoint] Verifica permessi volumi (root -> appuser)..."
 # lento: lo eseguiamo solo se serve davvero (owner attuale != appuser),
 # non ad ogni singolo restart del container. Su un'installazione già
 # migrata questo è un semplice `stat`, non un giro ricorsivo.
+# B-16 (QA 2026-11-15): controllare solo la radice non bastava. Comandi
+# lanciati con `--entrypoint ""` (girano come root: seed, import, test)
+# creano sottocartelle root-owned, es. media/contracts/documents, e l'upload
+# successivo di gunicorn falliva con PermissionError. Ora si cerca qualunque
+# elemento non di appuser e si corregge solo quello.
 for _dir in /app/data /app/staticfiles /app/media; do
-  if [ -d "$_dir" ] && [ "$(stat -c '%u' "$_dir" 2>/dev/null || echo -1)" != "1000" ]; then
+  if [ -d "$_dir" ] && [ -n "$(find "$_dir" ! -user 1000 -print -quit 2>/dev/null)" ]; then
     echo "[entrypoint]   allineamento $_dir ..."
-    chown -R appuser:appuser "$_dir" 2>/dev/null || true
+    find "$_dir" ! -user 1000 -exec chown appuser:appuser {} + 2>/dev/null || true
   fi
 done
 

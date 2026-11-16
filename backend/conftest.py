@@ -1,6 +1,14 @@
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _isolated_media_root(settings, tmp_path_factory):
+    """I file caricati dai test vanno in una cartella temporanea, mai nel
+    volume media reale (in dev i test girano nel container con il volume
+    montato, e da root: lasciavano cartelle root-owned, causa di B-16)."""
+    settings.MEDIA_ROOT = str(tmp_path_factory.mktemp("media"))
+
+
 @pytest.fixture
 def api_client():
     from rest_framework.test import APIClient
