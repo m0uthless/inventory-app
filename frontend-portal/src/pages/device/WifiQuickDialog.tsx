@@ -55,16 +55,16 @@ export default function WifiQuickDialog({ deviceId, onClose, onSaved }: WifiQuic
       if (scad) fd.append('scad_certificato', scad)
       if (certFile) fd.append('certificato', certFile)
 
-      // Prova PUT su device-wifi esistente, altrimenti POST
-      try {
-        await api.put(`/device-wifi/${deviceId}/`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-      } catch {
-        await api.post('/device-wifi/', (() => {
-          fd.append('device', String(deviceId))
-          return fd
-        })(), { headers: { 'Content-Type': 'multipart/form-data' } })
+      // Il record DeviceWifi ha un id suo, diverso da quello del device (B-04):
+      // si legge dal dettaglio del device, poi PATCH se esiste o POST se manca.
+      const { data: detail } = await api.get<{ wifi_detail?: { id: number } | null }>(`/devices/${deviceId}/`)
+      const wifiId = detail.wifi_detail?.id
+      const headers = { 'Content-Type': 'multipart/form-data' }
+      if (wifiId) {
+        await api.patch(`/device-wifi/${wifiId}/`, fd, { headers })
+      } else {
+        fd.append('device', String(deviceId))
+        await api.post('/device-wifi/', fd, { headers })
       }
 
       toast.success('Configurazione WiFi salvata.')
