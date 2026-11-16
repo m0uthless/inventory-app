@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, ButtonBase, IconButton, Popover, Tooltip, Typography } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import { CampoIcon } from '../ui/campo/CampoIcon'
+import { ArchieLogo } from '../ui/ArchieLogo'
 
 import { NAV_GROUPS, entryActive, leafMatches, type CountKey, type NavEntry, type NavLeaf } from './appNav'
 
@@ -130,8 +131,8 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
       }}>
         {!mini && (
           <>
-            {/* Logo (segnaposto: sostituire /logo.svg con quello definitivo, è lo stesso della login). */}
-            <Box component="img" src="/logo.svg" alt="Archie · Biotron S.p.A." sx={{ display: 'block', height: 32, width: 'auto', maxWidth: 'calc(100% - 44px)', objectFit: 'contain', objectPosition: 'left center' }} />
+            {/* Logo inline: segue tema e modalità chiara/scura (stesso componente della login). */}
+            <ArchieLogo height={32} label="Archie · Biotron S.p.A." sx={{ maxWidth: 'calc(100% - 44px)' }} />
           </>
         )}
         {!mobile && onToggleMini ? (
