@@ -38,6 +38,7 @@ from django.utils.crypto import get_random_string
 
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -266,6 +267,16 @@ class UserAdminViewSet(
             .order_by("username")
         )
 
+    @staticmethod
+    def _ensure_can_manage(requester, target) -> None:
+        """Gerarchia degli amministratori: chi ha solo ``core.manage_users``
+        non può agire su un account superuser o staff (modifica, disattivazione,
+        reset password o permessi, eliminazione). Senza questo controllo un
+        gestore poteva resettare la password del superuser, riceverla nella
+        risposta ed entrare come superuser."""
+        if (target.is_superuser or target.is_staff) and not getattr(requester, "is_superuser", False):
+            raise PermissionDenied("Solo un superuser può modificare un account amministratore.")
+
     def _apply_write(self, user: User, data: dict, requester) -> list[str]:
         """Applica il payload di scrittura validato. Ritorna la lista dei
         campi utente modificati (per l'audit log)."""
@@ -449,6 +460,7 @@ class UserAdminViewSet(
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
+        self._ensure_can_manage(request.user, instance)
         in_serializer = UserAdminWriteSerializer(data=request.data, partial=partial)
         in_serializer.is_valid(raise_exception=True)
 
@@ -515,6 +527,7 @@ class UserAdminViewSet(
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        self._ensure_can_manage(request.user, instance)
 
         if instance.is_superuser:
             raise serializers.ValidationError(
@@ -556,6 +569,7 @@ class UserAdminViewSet(
     @action(detail=True, methods=["post"], url_path="reset-password")
     def reset_password(self, request, pk=None):
         user = self.get_object()
+        self._ensure_can_manage(request.user, user)
         new_password = get_random_string(
             length=14,
             allowed_chars="abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%",
@@ -597,6 +611,7 @@ class UserAdminViewSet(
     @action(detail=True, methods=["post"], url_path="reset-permissions-to-group")
     def reset_permissions_to_group(self, request, pk=None):
         user = self.get_object()
+        self._ensure_can_manage(request.user, user)
         user.user_permissions.clear()
 
         log_event(

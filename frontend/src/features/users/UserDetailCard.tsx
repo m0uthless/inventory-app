@@ -36,6 +36,8 @@ export type UserDetailCardProps = {
   modules: PermissionModule[]
   leaveAreas: LeaveAreaOption[]
   currentUserId?: number
+  /** L'utente corrente è superuser: solo lui può modificare account superuser o staff (B-10). */
+  currentUserIsSuperuser?: boolean
   initialTab?: 'anagrafica' | 'permessi'
   /** Sezione Portal in cima (scheda aperta da Accesso Portal). */
   portalFirst?: boolean
@@ -48,7 +50,7 @@ export type UserDetailCardProps = {
 }
 
 /** Scheda utente (anteprima up-base, variante A): Permessi, Anagrafica e ruoli, Attività. */
-export default function UserDetailCard({ user, groups, modules, leaveAreas, currentUserId, initialTab, portalFirst, position, onPrev, onNext, onClose, onSaved, onDeleted }: UserDetailCardProps) {
+export default function UserDetailCard({ user, groups, modules, leaveAreas, currentUserId, currentUserIsSuperuser, initialTab, portalFirst, position, onPrev, onNext, onClose, onSaved, onDeleted }: UserDetailCardProps) {
   const toast = useToast()
   const [tab, setTab] = React.useState<Tab>(initialTab === 'anagrafica' ? 'ana' : 'perm')
   const [busy, setBusy] = React.useState(false)
@@ -135,7 +137,10 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
   const get = (app: string) => levelSource(user, groups, app, direct)
   const setLevel = (app: string, l: RwdLevel) => setDirect((d) => ({ ...d, [app]: LEVEL_TO_RWD[l] }))
   const hasDirect = Object.values(user.direct_permissions.modules).some((v) => v.r || v.w || v.d) || user.direct_permissions.extra_permissions.length > 0
-  const canDelete = !user.is_superuser && user.id !== currentUserId
+  // B-10: un account superuser o staff lo modifica solo un superuser (il backend risponde 403).
+  const locked = (user.is_superuser || user.is_staff) && !currentUserIsSuperuser
+  const off = busy || locked
+  const canDelete = !user.is_superuser && !locked && user.id !== currentUserId
   const groupFloorPortal = rwdToLevel(user.group_permissions.modules.portal)
   const activity = useList<AuditEvent>('/audit-events/', tab === 'act' ? { actor: user.id, page_size: 15, ordering: '-created_at' } : null, user.id)
 
@@ -172,12 +177,18 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
       position={position} onPrev={onPrev} onNext={onNext}
       menu={canDelete ? [{ label: 'Elimina utente', danger: true, onClick: () => setDel(true) }] : undefined}
       footer={<>
-        <Button variant="outlined" disabled={busy} onClick={() => void resetPassword()} startIcon={<CampoIcon name="key" size={15} />}>Reimposta password</Button>
+        <Button variant="outlined" disabled={off} onClick={() => void resetPassword()} startIcon={<CampoIcon name="key" size={15} />}>Reimposta password</Button>
         <Box sx={{ flex: 1 }} />
         {user.id !== currentUserId ? (user.is_active
-          ? <Button variant="outlined" color="error" disabled={busy} onClick={() => void patch({ is_active: false }, 'Utente disattivato.')}>Disattiva</Button>
-          : <Button variant="contained" disabled={busy} onClick={() => void patch({ is_active: true }, 'Utente riattivato.')}>Riattiva</Button>) : null}
+          ? <Button variant="outlined" color="error" disabled={off} onClick={() => void patch({ is_active: false }, 'Utente disattivato.')}>Disattiva</Button>
+          : <Button variant="contained" disabled={off} onClick={() => void patch({ is_active: true }, 'Utente riattivato.')}>Riattiva</Button>) : null}
       </>}>
+      {locked ? (
+        <Box sx={{ p: '10px 12px', borderRadius: '8px', bgcolor: 'archie.neutralBg', mb: 2 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 650 }}>Account amministratore</Typography>
+          <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>Solo un superuser può modificarlo, reimpostarne la password o disattivarlo.</Typography>
+        </Box>
+      ) : null}
       {!user.is_active ? (
         <Box sx={{ p: '10px 12px', borderRadius: '8px', bgcolor: 'archie.neutralBg', mb: 2 }}>
           <Typography sx={{ fontSize: 13, fontWeight: 650 }}>Utente disattivato</Typography>
@@ -201,7 +212,7 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
             </Box>
             {String(groupIds) !== String(user.groups.map((g) => g.id)) ? <Typography sx={{ ...help, mt: 0.75 }}>I livelli qui sotto si aggiornano dopo il salvataggio.</Typography> : null}
           </DetailSection>
-          <DetailSection title="Archie" end={hasDirect ? <Button size="small" variant="text" disabled={busy} onClick={() => void resetToGroup()}>Riporta a quelli dei gruppi</Button> : undefined}>
+          <DetailSection title="Archie" end={hasDirect ? <Button size="small" variant="text" disabled={off} onClick={() => void resetToGroup()}>Riporta a quelli dei gruppi</Button> : undefined}>
             {user.is_superuser ? <Typography sx={help}>Superuser: ha accesso completo a tutto.</Typography> : <ModuleLevels modules={archieModules(modules)} get={get} onChange={setLevel} disabled={philips} />}
           </DetailSection>
           {!user.is_superuser ? (
@@ -211,7 +222,7 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
             </DetailSection>
           ) : null}
           {portalFirst ? null : portalSection}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="contained" disabled={busy} onClick={savePerms}>Salva i permessi</Button></Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="contained" disabled={off} onClick={savePerms}>Salva i permessi</Button></Box>
         </Box>
       ) : tab === 'ana' ? (
         <Box sx={{ display: 'grid', gap: 2.25 }}>
@@ -241,7 +252,7 @@ export default function UserDetailCard({ user, groups, modules, leaveAreas, curr
               <Toggle label="Account funzionale" help="Usato da integrazioni o come assegnatario automatico, non da una persona" checked={prof.is_functional_account} onChange={(v) => setFlag('is_functional_account', v)} />
             </Box>
           </DetailSection>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="contained" disabled={busy} onClick={saveAna}>Salva</Button></Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="contained" disabled={off} onClick={saveAna}>Salva</Button></Box>
         </Box>
       ) : (
         <Box sx={{ display: 'grid', gap: 1.5 }}>

@@ -178,7 +178,7 @@ export default function PortalAccess() {
         />
       </Box>
       {current ? (
-        <UserDetailCard user={current} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} initialTab="permessi" portalFirst
+        <UserDetailCard user={current} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)} initialTab="permessi" portalFirst
           position={idx >= 0 ? `${idx + 1} di ${grid.rows.length}` : undefined}
           onPrev={idx > 0 ? () => setParam('open', String(grid.rows[idx - 1].id)) : undefined}
           onNext={idx >= 0 && idx < grid.rows.length - 1 ? () => setParam('open', String(grid.rows[idx + 1].id)) : undefined}

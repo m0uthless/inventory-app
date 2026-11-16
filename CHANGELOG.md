@@ -7,6 +7,10 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Security
+
+- Utenti e gruppi: un amministratore con il solo permesso `core.manage_users` non può più modificare, disattivare, eliminare o reimpostare la password e i permessi di un account superuser o staff (403). Prima poteva resettare la password del superuser, riceverla in risposta ed entrare al suo posto. Nella scheda utente le azioni su questi account sono disabilitate per chi non è superuser.
+
 ## [0.10.0] - 2026-11-04
 
 ### Added
