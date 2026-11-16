@@ -15,6 +15,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - File caricati: le anteprime (`preview`) di allegati wiki, Drive, rapportini, contratti, PO, spese, segnalazioni e ServiceNow aprono nel browser solo PDF, immagini PNG/JPEG/GIF/WebP e testo semplice, con il tipo ricavato dall'estensione e mai da quello dichiarato dal client; ogni altro file viene scaricato. nginx aggiunge `nosniff` e una CSP `sandbox` (esclusi i PDF) ai file serviti. Gli allegati wiki `.html`, `.svg`, `.xml` e simili vengono rifiutati. Prima un allegato HTML veniva eseguito aprendone l'anteprima.
 - Audit: la password del certificato Wi-Fi (`pass_certificato`) non viene più registrata in chiaro nelle modifiche dei device, e nessun valore cifrato (`enc::…`) finisce più nell'audit. Per ripulire lo storico: `manage.py sanitize_audit_history --dry-run`, poi senza `--dry-run`.
 - Bacheca e Changelog: creare, modificare ed eliminare comunicazioni e voci di changelog richiede ora il permesso `core.change_announcement` / `core.change_changelogentry` (i superuser restano abilitati). Prima bastava l'accesso ad Archie, e qualunque utente poteva scrivere via API. I pulsanti della UI seguono lo stesso permesso.
+- API: rimossa l'autenticazione HTTP Basic, attiva di default in DRF ma non usata da nessun client. Permetteva di provare credenziali aggirando il rate limit del login.
 
 ### Fixed
 
@@ -23,6 +24,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Rimborso spese: chi non ha permessi `expenses.*` espliciti può ora compilare la propria nota (voci, tragitti, scontrini); prima creava la nota ma tutto il resto rispondeva 403. Vale la proprietà della nota, come per la nota stessa: le note altrui e quelle non più modificabili restano protette, eliminazioni comprese.
 - Portal, "Wi-Fi rapido" del device: il salvataggio usava l'id del device come id del Wi-Fi e non aggiornava nulla (404, poi 400). Ora aggiorna il Wi-Fi esistente o lo crea se manca.
 - Login di Archie in dev: il link "Portale clienti" portava al Portal di produzione, perché la build leggeva sempre `.env.production`. In dev ora apre il Portal sullo stesso host della pagina (porta 8081); in produzione non cambia nulla.
+- Sessione scaduta: l'API risponde ora 401 invece di 403 e l'app torna al login. Prima restava aperta con liste vuote e il messaggio "Non autorizzato".
 
 ## [0.10.0] - 2026-11-04
 

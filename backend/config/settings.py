@@ -230,6 +230,10 @@ SPECTACULAR_SETTINGS = {
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
+    # B-06: 401 a sessione assente. Rimossa anche la BasicAuthentication di
+    # default di DRF: non usata da nessun client, e aggirava il rate limit
+    # del login (/api/auth/login/).
+    "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SessionAuthentication401"],
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
