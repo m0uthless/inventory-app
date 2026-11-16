@@ -162,8 +162,31 @@ class ExpenseKmTripSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class ExpenseChildPermission(BasePermission):
+    """Voci, tragitti e scontrini di una nota spese (B-19, QA 2026-11-15).
+
+    Prima valevano i permessi di modello di default (`expenses.add_*` ecc.):
+    chi non li aveva creava la nota ma non poteva compilarla. Come per
+    ExpenseReportPermission conta la proprietà: la lettura è già limitata da
+    get_queryset() alle proprie note (tutte per la Segreteria); creazione e
+    modifica sono validate nei serializer; qui si blocca la scrittura,
+    eliminazione compresa, su note altrui o non più modificabili.
+    """
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        return bool(user and user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        report = obj.report if isinstance(obj, ExpenseItem) else obj.item.report
+        return report.user_id == request.user.id and report.status in EDITABLE_STATUSES
+
+
 class ExpenseKmTripViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseKmTripSerializer
+    permission_classes = [ExpenseChildPermission, IsInternalOrPortalDedicatedApp]
     pagination_class = None
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["item"]
@@ -248,6 +271,7 @@ class ExpenseReceiptSerializer(serializers.ModelSerializer):
 
 
 class ExpenseReceiptViewSet(viewsets.ModelViewSet):
+    permission_classes = [ExpenseChildPermission, IsInternalOrPortalDedicatedApp]
     serializer_class = ExpenseReceiptSerializer
     pagination_class = None
     http_method_names = ["get", "post", "delete", "head", "options"]
@@ -369,6 +393,7 @@ class ExpenseItemSerializer(serializers.ModelSerializer):
 
 
 class ExpenseItemViewSet(viewsets.ModelViewSet):
+    permission_classes = [ExpenseChildPermission, IsInternalOrPortalDedicatedApp]
     serializer_class = ExpenseItemSerializer
     pagination_class = None
     http_method_names = ["get", "patch", "head", "options"]
