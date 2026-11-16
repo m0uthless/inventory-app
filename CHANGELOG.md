@@ -14,6 +14,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Cestino: le azioni di ripristino ed eliminazione definitiva (`restore`, `bulk_restore`, `purge`) applicano ora la barriera Portal/Archie. Prima un utente con doppio profilo, collegato dal Portal, poteva ripristinare record dei moduli interni pur vedendosi negata la lista.
 - File caricati: le anteprime (`preview`) di allegati wiki, Drive, rapportini, contratti, PO, spese, segnalazioni e ServiceNow aprono nel browser solo PDF, immagini PNG/JPEG/GIF/WebP e testo semplice, con il tipo ricavato dall'estensione e mai da quello dichiarato dal client; ogni altro file viene scaricato. nginx aggiunge `nosniff` e una CSP `sandbox` (esclusi i PDF) ai file serviti. Gli allegati wiki `.html`, `.svg`, `.xml` e simili vengono rifiutati. Prima un allegato HTML veniva eseguito aprendone l'anteprima.
 - Audit: la password del certificato Wi-Fi (`pass_certificato`) non viene più registrata in chiaro nelle modifiche dei device, e nessun valore cifrato (`enc::…`) finisce più nell'audit. Per ripulire lo storico: `manage.py sanitize_audit_history --dry-run`, poi senza `--dry-run`.
+- Bacheca e Changelog: creare, modificare ed eliminare comunicazioni e voci di changelog richiede ora il permesso `core.change_announcement` / `core.change_changelogentry` (i superuser restano abilitati). Prima bastava l'accesso ad Archie, e qualunque utente poteva scrivere via API. I pulsanti della UI seguono lo stesso permesso.
 
 ### Fixed
 

@@ -169,7 +169,13 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 
 class IsStaffOrReadOnly(BasePermission):
-    """Lettura: tutti gli autenticati. Scrittura: superuser o permesso core.access_archie."""
+    """Lettura: tutti gli autenticati. Scrittura (crea, modifica, elimina):
+    superuser o permesso ``core.change_<modello>`` (es. change_announcement).
+
+    H-04 (QA 2026-11-15): prima bastava ``core.access_archie``, cioè ogni
+    utente Archie scriveva in Bacheca e Changelog. Un solo permesso per la
+    gestione, lo stesso che la UI usa per mostrare i pulsanti.
+    """
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -178,14 +184,15 @@ class IsStaffOrReadOnly(BasePermission):
             return True
         if getattr(request.user, "is_superuser", False):
             return True
-        return request.user.has_perm("core.access_archie")
+        model = view.get_queryset().model
+        return request.user.has_perm(f"{model._meta.app_label}.change_{model._meta.model_name}")
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
     """
     CRUD comunicazioni bacheca.
     Lettura: tutti gli utenti autenticati.
-    Scrittura: solo gruppo admin o superuser.
+    Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
     """
     queryset           = Announcement.objects.select_related('created_by').all()
     serializer_class   = AnnouncementSerializer
@@ -230,8 +237,8 @@ class ChangelogEntrySerializer(serializers.ModelSerializer):
 class ChangelogEntryViewSet(viewsets.ModelViewSet):
     """
     CRUD voci di changelog.
-    Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-    IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+    Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+    core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
     """
     queryset           = ChangelogEntry.objects.select_related('created_by').all()
     serializer_class   = ChangelogEntrySerializer

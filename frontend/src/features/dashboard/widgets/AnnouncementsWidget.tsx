@@ -48,8 +48,8 @@ function Form({ initial, onSave, onCancel }: { initial?: Partial<Announcement>; 
 
 /** Comunicazioni: la più recente per intero, le altre su una riga; lo staff aggiunge, modifica, elimina. */
 export default function AnnouncementsWidget() {
-  const { me } = useAuth()
-  const isStaff = Boolean(me?.is_staff || me?.is_superuser)
+  const { hasPerm } = useAuth()
+  const isStaff = hasPerm('core.change_announcement') // H-04: stesso permesso richiesto dal backend
   const toast = useToast()
   const [items, setItems] = React.useState<Announcement[] | null>(null)
   const [adding, setAdding] = React.useState(false)
