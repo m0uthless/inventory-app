@@ -589,3 +589,37 @@ class ScheduledJobRun(models.Model):
     def __str__(self):
         return f"{self.job_name} — {self.last_run_date}"
 
+
+
+class ModuleSwitch(models.Model):
+    """Stato di un modulo spegnibile (pagina «Moduli», solo superuser).
+
+    Una riga solo per i moduli toccati almeno una volta: senza riga il
+    modulo è acceso. Il registro dei moduli è in ``core/modules.py``; lo
+    storico delle accensioni e degli spegnimenti è nell'Audit.
+    """
+    key        = models.CharField(max_length=40, unique=True)
+    enabled    = models.BooleanField(default=True)
+    reason     = models.CharField(max_length=200, blank=True, default='')
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    changed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Interruttore modulo'
+        verbose_name_plural = 'Interruttori moduli'
+
+    def __str__(self):
+        return f"{self.key} — {'acceso' if self.enabled else 'spento'}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from core.modules import invalidate_cache
+        invalidate_cache()
+
+    def delete(self, *args, **kwargs):
+        result = super().delete(*args, **kwargs)
+        from core.modules import invalidate_cache
+        invalidate_cache()
+        return result

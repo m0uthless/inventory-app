@@ -8,6 +8,7 @@ import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import { useAuth } from '../../auth/AuthProvider'
+import { useModules } from '../../modules/useModules'
 import { CampoIcon } from '../../ui/campo'
 import { LOGIN_GRADIENT, hasWebGL } from '../login/loginColors'
 import { CONDITION_LABEL } from './widgets/weatherModel'
@@ -47,6 +48,14 @@ export default function DashboardHero({ paused, actions }: { paused: boolean; ac
   const w = useWeather()
   const mine = useMine(me?.id)
   const away = useAwayToday()
+  const { isHidden } = useModules()
+  // Contatori e azioni dei moduli spenti spariscono dalla fascia.
+  const stats = [
+    !isHidden('issues') && <Stat key="issues" icon={ErrorOutlineRoundedIcon} n={mine?.issues ?? null} label={mine?.issues === 1 ? 'issue tua' : 'issue tue'} to="/issues?vista=mine" />,
+    !isHidden('area_tasks') && <Stat key="tasks" icon={TaskAltRoundedIcon} n={mine?.tasks ?? null} label={mine?.tasks === 1 ? 'task tuo' : 'task tuoi'} to="/tasks?vista=mine" />,
+    !isHidden('maintenance') && <Stat key="maint" icon={BuildOutlinedIcon} n={mine?.overdue ?? null} label={mine?.overdue === 1 ? 'manutenzione scaduta' : 'manutenzioni scadute'} to="/maintenance?vista=over" alert={Boolean(mine?.overdue)} />,
+    away !== null && !isHidden('leave') && <Stat key="away" icon={GroupsOutlinedIcon} n={away} label={away === 1 ? 'collega assente oggi' : 'colleghi assenti oggi'} to="/piano-ferie" />,
+  ].filter(Boolean)
 
   const name = me?.first_name?.trim() || me?.username || ''
   const now = new Date()
@@ -78,23 +87,20 @@ export default function DashboardHero({ paused, actions }: { paused: boolean; ac
             {day} · settimana {isoWeek(now)}{weather}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mt: 2.25, flexWrap: 'wrap' }}>
-            <Button variant="contained" startIcon={<CampoIcon name="plus" size={15} />} onClick={() => navigate('/issues', { state: { openCreate: true } })}>Nuova issue</Button>
-            <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="cloud" size={15} />} onClick={() => navigate('/servicenow-cases', { state: { openCreate: true } })}
+            {!isHidden('issues') && <Button variant="contained" startIcon={<CampoIcon name="plus" size={15} />} onClick={() => navigate('/issues', { state: { openCreate: true } })}>Nuova issue</Button>}
+            {!isHidden('servicenow') && <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="cloud" size={15} />} onClick={() => navigate('/servicenow-cases', { state: { openCreate: true } })}
               sx={{ borderColor: 'transparent', bgcolor: (t) => `color-mix(in srgb, ${t.palette.background.paper} 82%, transparent)`, backdropFilter: 'blur(6px)', '&:hover': { bgcolor: 'background.paper', borderColor: 'transparent' } }}>
               Triage
-            </Button>
+            </Button>}
           </Box>
         </Box>
-        <Box component="nav" aria-label="La tua giornata" sx={{
-          display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', lg: `repeat(${away === null ? 3 : 4}, minmax(118px, 1fr))` }, gap: '1px',
+        {stats.length ? <Box component="nav" aria-label="La tua giornata" sx={{
+          display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', lg: `repeat(${stats.length}, minmax(118px, 1fr))` }, gap: '1px',
           borderRadius: '12px', overflow: 'hidden', width: { xs: '100%', lg: 'auto' },
           bgcolor: (t) => `color-mix(in srgb, ${t.palette.text.primary} 10%, transparent)`,
         }}>
-          <Stat icon={ErrorOutlineRoundedIcon} n={mine?.issues ?? null} label={mine?.issues === 1 ? 'issue tua' : 'issue tue'} to="/issues?vista=mine" />
-          <Stat icon={TaskAltRoundedIcon} n={mine?.tasks ?? null} label={mine?.tasks === 1 ? 'task tuo' : 'task tuoi'} to="/tasks?vista=mine" />
-          <Stat icon={BuildOutlinedIcon} n={mine?.overdue ?? null} label={mine?.overdue === 1 ? 'manutenzione scaduta' : 'manutenzioni scadute'} to="/maintenance?vista=over" alert={Boolean(mine?.overdue)} />
-          {away !== null ? <Stat icon={GroupsOutlinedIcon} n={away} label={away === 1 ? 'collega assente oggi' : 'colleghi assenti oggi'} to="/piano-ferie" /> : null}
-        </Box>
+          {stats}
+        </Box> : null}
       </Box>
     </Box>
   )

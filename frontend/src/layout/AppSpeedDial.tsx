@@ -20,6 +20,7 @@ import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import { useModules } from '../modules/useModules'
 import { useTheme } from '@mui/material/styles'
 
 type QuickAction = {
@@ -39,6 +40,7 @@ function pathStarts(pathname: string, base: string) {
 
 export default function AppSpeedDial() {
   const { hasPerm } = useAuth()
+  const { isPathHidden } = useModules()
   const nav = useNavigate()
   const loc = useLocation()
   const theme = useTheme()
@@ -202,8 +204,8 @@ export default function AppSpeedDial() {
       actionOrder
         .map((key) => allActions[key])
         .filter((a): a is QuickAction => Boolean(a))
-        .filter((a) => (!a.perm || hasPerm(a.perm)) && (!a.onlyWhen || a.onlyWhen())),
-    [actionOrder, allActions, hasPerm],
+        .filter((a) => !isPathHidden(a.to) && (!a.perm || hasPerm(a.perm)) && (!a.onlyWhen || a.onlyWhen())),
+    [actionOrder, allActions, hasPerm, isPathHidden],
   )
 
   if (!actions.length) return null

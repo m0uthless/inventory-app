@@ -4,6 +4,7 @@ import { Box, CircularProgress } from '@mui/material'
 import { AppLayout } from './layout/AppLayout'
 import { RequirePerm } from './auth/RequirePerm'
 import { RequireAnyPerm } from './auth/RequireAnyPerm'
+import { RequireSuperuser } from './modules/RequireSuperuser'
 
 // Route-level code splitting (reduces the large Vite chunk warning)
 const Login = lazy(() => import('./pages/Login'))
@@ -26,6 +27,7 @@ const Search = lazy(() => import('./pages/Search'))
 const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
 const Profile = lazy(() => import('./pages/Profile'))
+const Modules = lazy(() => import('./pages/Modules'))
 const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
 const ServiceNowDashboard = lazy(() => import('./pages/ServiceNowDashboard'))
@@ -240,6 +242,7 @@ const router = createBrowserRouter([
         path: 'accesso-portal',
         element: <RequirePerm perm="core.manage_users">{lazyEl(<PortalAccess />)}</RequirePerm>,
       },
+      { path: 'moduli', element: <RequireSuperuser>{lazyEl(<Modules />)}</RequireSuperuser> },
       { path: '*', element: lazyEl(<NotFound />) },
     ],
   },

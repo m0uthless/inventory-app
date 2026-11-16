@@ -56,6 +56,7 @@ const P = {
   funnel: 'M3 5h18l-7 8.5V19l-4 2v-7.5z',
   key: 'M15.5 7.5a3.5 3.5 0 1 1-7 0a3.5 3.5 0 0 1 7 0z M12 11v10 M12 15h3 M12 18h2',
   upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v12',
+  check: 'M20 6L9 17l-5-5',
 } as const
 
 export type CampoIconName = keyof typeof P

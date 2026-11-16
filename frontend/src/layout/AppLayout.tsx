@@ -35,6 +35,9 @@ import DashboardCustomizeOutlinedIcon from '@mui/icons-material/DashboardCustomi
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 
 import { getPageTitle, type NavLeaf } from './appNav'
+import { useModules } from '../modules/useModules'
+import { ModuleGate } from '../modules/ModuleGate'
+import ToggleOnOutlinedIcon from '@mui/icons-material/ToggleOnOutlined'
 import { AppSidebar } from './AppSidebar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
 import { UndoToastProvider } from '../ui/campo'
@@ -187,15 +190,21 @@ export function AppLayout() {
     nav('/login', { replace: true })
   }
 
+  const { isHidden, isPathHidden, isPathOff } = useModules()
   const canAccess = React.useCallback((it: NavLeaf) => {
+    if (isPathHidden(it.path)) return false
     if (it.perm) return hasPerm(it.perm)
     if (it.permAny?.length) return it.permAny.some((perm) => hasPerm(perm))
     return true
-  }, [hasPerm])
+  }, [hasPerm, isPathHidden])
+  const feedbackHidden = isHidden('feedback')
+  const issuesHidden = isHidden('issues')
+  const tasksHidden = isHidden('area_tasks')
 
   // Contatori della sidebar
   const [feedbackSummary, setFeedbackSummary] = React.useState<FeedbackSummary | null>(null)
   React.useEffect(() => {
+    if (feedbackHidden) { setFeedbackSummary(null); return }
     let active = true
     ;(async () => {
       try {
@@ -206,11 +215,11 @@ export function AppLayout() {
       }
     })()
     return () => { active = false }
-  }, [loc.pathname])
+  }, [loc.pathname, feedbackHidden])
 
   const [issueSummary, setIssueSummary] = React.useState<IssueSummary | null>(null)
   React.useEffect(() => {
-    if (!hasPerm('issues.view_issue')) return
+    if (!hasPerm('issues.view_issue') || issuesHidden) { setIssueSummary(null); return }
     let active = true
     const fetchSummary = async () => {
       try {
@@ -223,10 +232,11 @@ export function AppLayout() {
     void fetchSummary()
     const interval = setInterval(fetchSummary, 60_000)
     return () => { active = false; clearInterval(interval) }
-  }, [loc.pathname, hasPerm])
+  }, [loc.pathname, hasPerm, issuesHidden])
 
   const [taskSummary, setTaskSummary] = React.useState<TaskSummary | null>(null)
   React.useEffect(() => {
+    if (tasksHidden) { setTaskSummary(null); return }
     let active = true
     const fetchSummary = async () => {
       try {
@@ -239,7 +249,7 @@ export function AppLayout() {
     void fetchSummary()
     const interval = setInterval(fetchSummary, 60_000)
     return () => { active = false; clearInterval(interval) }
-  }, [loc.pathname])
+  }, [loc.pathname, tasksHidden])
 
   const counts = {
     issues: issueSummary?.active_count,
@@ -259,7 +269,7 @@ export function AppLayout() {
 
       {/* Sidebar desktop */}
       <Box sx={{ display: { xs: 'none', md: 'block' }, flexShrink: 0, height: '100%' }}>
-        <AppSidebar mini={mini} onToggleMini={() => setDesktopOpen((v) => !v)} canAccess={canAccess} counts={counts} />
+        <AppSidebar mini={mini} onToggleMini={() => setDesktopOpen((v) => !v)} canAccess={canAccess} isOff={isPathOff} counts={counts} />
       </Box>
 
       {/* Sidebar mobile */}
@@ -270,7 +280,7 @@ export function AppLayout() {
         ModalProps={{ keepMounted: true }}
         sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { border: 0, boxShadow: (t) => t.palette.archie.shadowFloat } }}
       >
-        <AppSidebar mini={false} mobile canAccess={canAccess} counts={counts} onNavigate={() => setMobileOpen(false)} />
+        <AppSidebar mini={false} mobile canAccess={canAccess} isOff={isPathOff} counts={counts} onNavigate={() => setMobileOpen(false)} />
       </Drawer>
 
       {/* Area principale: topbar sulla cornice + foglio di lavoro */}
@@ -323,7 +333,7 @@ export function AppLayout() {
             <Box sx={{ flex: 1, px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: { xs: 3, md: 3 } }}>
               <DashboardEditModeRouteGuard isDashboardRoute={loc.pathname === '/'} />
               <ShellPageTitle pathname={loc.pathname} />
-              <Outlet />
+              <ModuleGate><Outlet /></ModuleGate>
             </Box>
           </Box>
           {/* Il footer resta sempre visibile: fuori dall'area che scorre (richiesta di Fede). */}
@@ -355,6 +365,11 @@ export function AppLayout() {
         {hasPerm('core.manage_users') && (
           <MenuItem onClick={() => { setUserAnchorEl(null); nav('/accesso-portal') }} sx={menuItemSx}>
             <BusinessOutlinedIcon />Accesso Portal
+          </MenuItem>
+        )}
+        {me?.is_superuser && (
+          <MenuItem onClick={() => { setUserAnchorEl(null); nav('/moduli') }} sx={menuItemSx}>
+            <ToggleOnOutlinedIcon />Moduli
           </MenuItem>
         )}
         <MenuItem onClick={async () => { setUserAnchorEl(null); await handleLogout() }} sx={menuItemSx}>

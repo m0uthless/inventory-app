@@ -104,6 +104,7 @@ MIDDLEWARE = [
     CSRF_MIDDLEWARE,
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.SessionIdleTimeoutMiddleware",
+    "core.middleware.ModuleSwitchMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

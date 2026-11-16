@@ -15,6 +15,7 @@ from rest_framework.throttling import UserRateThrottle
 
 from audit.utils import log_event
 from core.models import UserProfile
+from core.modules import disabled_modules
 from crm.models import Customer
 from portal.permissions import IsInternalOrPortalDedicatedApp
 
@@ -87,6 +88,7 @@ def _validate_avatar_upload(uploaded_file):
 
     return None
 
+
 User = get_user_model()
 
 
@@ -147,6 +149,9 @@ class MeAPIView(APIView):
             "date_joined": user.date_joined.isoformat() if getattr(user, "date_joined", None) else None,
             "groups": list(user.groups.values_list("name", flat=True)),
             "permissions": sorted(list(user.get_all_permissions())),
+            # Moduli spenti dalla pagina «Moduli»: il frontend li nasconde, o per
+            # i superuser li mostra con l'etichetta «Spento» (core/modules.py).
+            "disabled_modules": sorted(disabled_modules()),
             "profile": {
                 "avatar": avatar_url,
                 "preferred_customer": preferred_customer_id,

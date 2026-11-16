@@ -16,6 +16,8 @@ type Props = {
   onToggleMini?: () => void
   onNavigate?: () => void
   canAccess: (leaf: NavLeaf) => boolean
+  /** Modulo spento (lo vede solo il superuser, con l'etichetta «spento»). */
+  isOff?: (path: string) => boolean
   counts: Partial<Record<CountKey, number | null | undefined>>
 }
 
@@ -24,7 +26,7 @@ type Props = {
  * topbar, logo ARCHIE + Biotron, voci raggruppate per lavoro, comprimibile a
  * sole icone. Voce attiva = fondo paper + filo del primario.
  */
-export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, canAccess, counts }: Props) {
+export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, canAccess, isOff, counts }: Props) {
   const theme = useTheme()
   const a = theme.palette.archie
   const loc = useLocation()
@@ -52,6 +54,15 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
     }}>{n > 99 ? '99+' : n}</Box>
   )
 
+  // Modulo spento visto dal superuser: etichetta (pallino con la sidebar compressa).
+  const offChip = (
+    <Box component="span" aria-label="spento" sx={{
+      ml: 'auto', px: 0.75, lineHeight: '17px', borderRadius: '5px', fontSize: 10.5, fontWeight: 600,
+      bgcolor: alpha(theme.palette.warning.main, 0.14), color: 'warning.main',
+      ...(mini && { position: 'absolute', top: 3, right: 5, width: 7, height: 7, p: 0, fontSize: 0, borderRadius: '50%', bgcolor: 'warning.main' }),
+    }}>spento</Box>
+  )
+
   const itemSx = (selected: boolean, sectionActive: boolean) => ({
     position: 'relative' as const, width: '100%', height: 32, borderRadius: '6px', gap: 1.25, px: mini ? 0 : 1,
     justifyContent: mini ? 'center' : 'flex-start', border: '1px solid transparent',
@@ -68,6 +79,7 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
     const active = entryActive(it, loc.pathname)
     const count = it.count ? counts[it.count] : null
     const hasKids = it.children.length > 0
+    const off = Boolean(isOff?.(it.path))
     const btn = (
       <ButtonBase
         onClick={() => go(it.path)}
@@ -77,9 +89,9 @@ export function AppSidebar({ mini, mobile = false, onToggleMini, onNavigate, can
         onMouseLeave={mini && hasKids ? scheduleClose : undefined}
         sx={itemSx(selected, active && !selected)}
       >
-        <Box component="span" className="nav-ic">{it.icon}</Box>
-        {!mini && <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.label}</Box>}
-        {countChip(count, selected)}
+        <Box component="span" className="nav-ic" sx={off ? { color: 'text.disabled' } : undefined}>{it.icon}</Box>
+        {!mini && <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', ...(off && { color: 'text.disabled', textDecoration: 'line-through' }) }}>{it.label}</Box>}
+        {off ? offChip : countChip(count, selected)}
       </ButtonBase>
     )
     return (

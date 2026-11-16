@@ -9,6 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.modules import hidden_search_kinds
 from crm.models import Contact, Customer, Site
 from drive.access import filter_accessible_files, filter_accessible_folders
 from drive.models import DriveFile, DriveFolder
@@ -77,6 +78,7 @@ class SearchAPIView(APIView):
 
         user = request.user
         results: List[Dict[str, Any]] = []
+        hidden_kinds = hidden_search_kinds(user)
 
         def add(
             kind: str,
@@ -87,6 +89,8 @@ class SearchAPIView(APIView):
             path: str,
             meta: Optional[Dict[str, Any]] = None,
         ):
+            if kind in hidden_kinds:
+                return
             results.append(
                 {
                     "kind": kind,

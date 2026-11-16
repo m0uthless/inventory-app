@@ -7,6 +7,10 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Added
+
+- Moduli (menu utente, solo superuser): accendere e spegnere i moduli di Archie per tutti. Si possono spegnere Issue, Task di area, Manutenzione, ServiceNow, Monitor, Wiki, Drive, Contratti, Purchase Order, Rimborso spese, Piano ferie e Bug e feature. Un modulo spento sparisce per chi non è superuser: le sue API rispondono 404, la pagina porta alla 404, spariscono voce di menu, widget e contatori della Dashboard, risultati della ricerca, notifiche e pulsanti che lo raggiungono da altre pagine, e i job del cron (notifiche di scadenza, riepilogo giornaliero, chiusura automatica delle issue) lo saltano. I dati restano. Il superuser continua a vederlo, con l'etichetta «spento» nel menu e un banner nella pagina, per provarlo prima del rilascio. Con il Piano ferie spento restano attive le assenze dei tecnici ServiceNow e le aree degli utenti. Ogni accensione e spegnimento, con il motivo, finisce nell'Audit. Migrazione `core 0046`.
+
 ### Security
 
 - Utenti e gruppi: un amministratore con il solo permesso `core.manage_users` non può più modificare, disattivare, eliminare o reimpostare la password e i permessi di un account superuser o staff (403). Prima poteva resettare la password del superuser, riceverla in risposta ed entrare al suo posto. Nella scheda utente le azioni su questi account sono disabilitate per chi non è superuser.

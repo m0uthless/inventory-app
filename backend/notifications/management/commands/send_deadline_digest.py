@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from core.emails import send_templated_email
 from core.models import AreaTask, ScheduledJobRun
+from core.modules import is_module_enabled
 from issues.models import Issue, IssueStatus
 
 User = get_user_model()
@@ -50,21 +51,27 @@ class Command(BaseCommand):
         in_3 = today + timedelta(days=DEADLINE_WINDOW_DAYS)
         recipients = list(User.objects.filter(is_active=True, portal_profile__isnull=True))
 
-        area_tasks_by_area: dict = {}
-        for task in (
+        # Moduli spenti dalla pagina «Moduli»: niente scadenze nel digest.
+        area_on = is_module_enabled("area_tasks")
+        issues_on = is_module_enabled("issues")
+
+        tasks = (
             AreaTask.objects
             .filter(due_date__isnull=False, due_date__gte=today, due_date__lte=in_3, deleted_at__isnull=True)
             .exclude(status=AreaTask.STATUS_COMPLETATO)
-        ):
+        )
+        area_tasks_by_area: dict = {}
+        for task in tasks if area_on else tasks.none():
             area_tasks_by_area.setdefault(task.area_id, []).append(task)
 
-        issues_by_assignee: dict = {}
-        for issue in (
+        issues = (
             Issue.objects
             .filter(due_date__isnull=False, due_date__gte=today, due_date__lte=in_3, deleted_at__isnull=True)
             .exclude(status=IssueStatus.CLOSED)
             .exclude(assigned_to__isnull=True)
-        ):
+        )
+        issues_by_assignee: dict = {}
+        for issue in issues if issues_on else issues.none():
             issues_by_assignee.setdefault(issue.assigned_to_id, []).append(issue)
 
         sent = 0

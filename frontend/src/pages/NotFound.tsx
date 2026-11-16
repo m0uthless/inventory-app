@@ -3,6 +3,7 @@ import { Box, Button, ButtonBase, InputBase, Typography } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CampoIcon, type CampoIconName } from '../ui/campo'
 import { useOwnPageHeader } from '../layout/PageHeaderContext'
+import { useModules } from '../modules/useModules'
 
 const LINKS: { label: string; to: string; icon: CampoIconName }[] = [
   { label: 'Dashboard', to: '/', icon: 'dashboard' },
@@ -18,6 +19,7 @@ export default function NotFound() {
   const nav = useNavigate()
   const loc = useLocation()
   const [q, setQ] = React.useState('')
+  const { isPathHidden } = useModules()
   const search = () => { const t = q.trim(); nav(t ? `/search?search=${encodeURIComponent(t)}` : '/search') }
   const digit = (ch: string, tone: 'mint' | 'sky', rotate = 0) => (
     <Box component="span" sx={{
@@ -52,7 +54,7 @@ export default function NotFound() {
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, justifyContent: 'center', alignItems: 'center', fontSize: 12.5, color: 'text.secondary' }}>
         <Box component="span" sx={{ mr: 0.5 }}>Oppure vai a</Box>
-        {LINKS.map((l) => (
+        {LINKS.filter((l) => !isPathHidden(l.to)).map((l) => (
           <ButtonBase key={l.to} onClick={() => nav(l.to)} sx={{
             display: 'inline-flex', alignItems: 'center', gap: 0.6, height: 28, px: 1.25, borderRadius: '14px', border: '1px solid', borderColor: 'divider',
             bgcolor: 'background.paper', color: 'text.primary', fontSize: 12.5, fontWeight: 550, '&:hover': { borderColor: 'text.disabled' },

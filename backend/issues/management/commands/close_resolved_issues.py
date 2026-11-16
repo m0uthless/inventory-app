@@ -17,6 +17,7 @@ import datetime
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from core.modules import is_module_enabled
 from issues.models import Issue, IssueStatus
 
 
@@ -33,6 +34,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        if not is_module_enabled("issues"):
+            self.stdout.write("Modulo Issue spento: nessuna azione.")
+            return
         cutoff = timezone.localdate() - datetime.timedelta(hours=48)
 
         candidates = Issue.objects.filter(

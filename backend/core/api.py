@@ -22,6 +22,7 @@ from drive.access import filter_accessible_files, has_file_access
 from drive.models import DriveFile
 from core.emails import send_templated_email
 from core.mixins import RestoreActionMixin, SoftDeleteAuditMixin
+from core.modules import hidden_modules_for
 from core.soft_delete import TRUTHY, apply_soft_delete_filters
 from portal.permissions import IsInternalOrPortalDedicatedApp
 
@@ -878,6 +879,9 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
     def convert_to_issue(self, request, pk=None):
         task = self.get_object()
         self._check_own_area(task.area_id)
+
+        if 'issues' in hidden_modules_for(request.user):
+            return Response({'detail': 'Il modulo Issue non è disponibile.'}, status=status.HTTP_404_NOT_FOUND)
 
         if not request.user.has_perm('issues.add_issue'):
             return Response(

@@ -12,6 +12,8 @@ import DashboardGrid from '../features/dashboard/DashboardGrid'
 import { useDashboardLayout } from '../features/dashboard/useDashboardLayout'
 import { useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
 import { WIDGET_REGISTRY, findFreeSlot } from '../features/dashboard/dashboardTypes'
+import { WIDGET_MODULE } from '../modules/moduleRegistry'
+import { useModules } from '../modules/useModules'
 import DashboardHero from '../features/dashboard/DashboardHero'
 import { ANIM_CLASS } from '../features/dashboard/widgets/tints'
 
@@ -23,9 +25,10 @@ const STACK: [string, number][] = [
 
 /** Widget uno sotto l'altro (telefono e ripiego). */
 function StackedWidgets({ columns = 1 }: { columns?: number }) {
+  const { isHidden } = useModules()
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: '12px' }}>
-      {STACK.map(([k, h]) => {
+      {STACK.filter(([k]) => !isHidden(WIDGET_MODULE[k])).map(([k, h]) => {
         const W = WIDGET_REGISTRY[k]
         return W ? <Box key={k} sx={{ minHeight: h || undefined, display: 'flex' }}><W /></Box> : null
       })}

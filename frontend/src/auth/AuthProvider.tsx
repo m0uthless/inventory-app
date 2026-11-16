@@ -2,6 +2,7 @@ import * as React from 'react'
 import { api } from '@shared/api/client'
 import { setUnauthorizedHandler, setIdleLockHandler, type IdleLockUserInfo } from '@shared/api/runtime'
 import { createAuthBroadcast, type AuthBroadcast } from '@shared/auth/authBroadcast'
+import { moduleForPerm } from '../modules/moduleRegistry'
 
 export type Me = {
   id: number
@@ -15,6 +16,8 @@ export type Me = {
   date_joined?: string | null
   groups: string[]
   permissions: string[]
+  /** Moduli spenti dalla pagina «Moduli» (vedi modules/moduleRegistry.ts). */
+  disabled_modules?: string[]
   profile?: {
     avatar: string | null
     preferred_customer: number | null
@@ -149,8 +152,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Un modulo spento dalla pagina «Moduli» toglie i suoi permessi a chi non è
+  // superuser (il backend risponde comunque 404 alle sue API).
   const hasPerm = React.useCallback(
-    (perm: string) => Boolean(me?.is_superuser || (me?.permissions || []).includes(perm)),
+    (perm: string) => {
+      if (me?.is_superuser) return true
+      const mod = moduleForPerm(perm)
+      if (mod && (me?.disabled_modules ?? []).includes(mod)) return false
+      return (me?.permissions || []).includes(perm)
+    },
     [me],
   )
 

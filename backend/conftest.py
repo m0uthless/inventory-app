@@ -9,6 +9,17 @@ def _isolated_media_root(settings, tmp_path_factory):
     settings.MEDIA_ROOT = str(tmp_path_factory.mktemp("media"))
 
 
+@pytest.fixture(autouse=True)
+def _fresh_module_switches():
+    """Lo stato dei moduli spenti sta in cache (core/modules.py) e il rollback
+    del DB tra un test e l'altro non la invalida."""
+    from core.modules import invalidate_cache
+
+    invalidate_cache()
+    yield
+    invalidate_cache()
+
+
 @pytest.fixture
 def api_client():
     from rest_framework.test import APIClient
