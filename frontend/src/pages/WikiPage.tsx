@@ -10,55 +10,43 @@ import * as React from 'react'
 import {
   Box,
   Button,
-  Card,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
-  FormControlLabel,
   IconButton,
   InputLabel,
   LinearProgress,
   MenuItem,
-  Rating,
   Select,
   Stack,
-  Switch,
-  Tab,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined'
-import CloseIcon from '@mui/icons-material/Close'
-import HistoryIcon from '@mui/icons-material/History'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
-import { Can } from '../auth/Can'
+import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import RichEditor, { type QuillInstance } from '../ui/RichEditor'
-import WikiLinkedCustomersTab, { type WikiLink } from '../features/wiki/WikiLinkedCustomersTab'
-import WikiAttachmentsTab, { type WikiAttachment } from '../features/wiki/WikiAttachmentsTab'
-import WikiRevisionsTab, { type WikiRevision, getProseSx } from '../features/wiki/WikiRevisionsTab'
+import { type WikiLink } from '../features/wiki/WikiLinkedCustomersTab'
+import { type WikiAttachment } from '../features/wiki/WikiAttachmentsTab'
+import WikiRevisionsTab, { type WikiRevision } from '../features/wiki/WikiRevisionsTab'
 import { useWidgetAccents } from '../theme/AppThemeProvider'
 import { useTheme, alpha } from '@mui/material/styles'
+import { CampoIcon } from '../ui/campo'
+import { ArchiveRoot, FolderTabs, OpenFolder, StarIcon } from '../features/wiki/archive/archiveUi'
+import { AttachmentsCard, LinksCard, ProseContent, TocList, type TocItem } from '../features/wiki/archive/ArticleParts'
+import { NO_CAT, catColor, dshort, r1, rel, type WikiCategory } from '../features/wiki/archive/archiveModel'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Category = { id: number; name: string; emoji?: string; color?: string }
+type Category = WikiCategory
 
 type Customer = { id: number; name: string }
 
@@ -77,6 +65,7 @@ type PageDetail = {
   average_rating?: number | null
   rating_count?: number
   current_user_rating?: number | null
+  is_favorite?: boolean
   pdf_template_key?: string
   created_by_username?: string | null
   updated_by_username?: string | null
@@ -88,25 +77,8 @@ type ApiPage<T> = { count: number; results: T[] }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(iso?: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('it-IT', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
 
-function fmtAverageRating(value?: number | null): string {
-  if (typeof value !== 'number') return '—'
-  return value.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-}
 
-// Stile condiviso dai due componenti Rating (voto medio + voto utente)
-const ratingIconSx = {
-  '& .MuiRating-iconFilled': { color: 'warning.main' },
-  '& .MuiRating-iconEmpty': { color: 'warning.light' },
-} as const
 
 function escapeHtml(value: string): string {
   return value
@@ -359,13 +331,11 @@ const DEFAULT_TEMPLATE = `<h1>Titolo della pagina</h1>
 type Mode = 'view' | 'edit'
 
 export default function WikiPage() {
+  const catDark = useTheme().palette.mode === 'dark'
   const { id } = useParams<{ id: string }>()
   const isNew = !id || id === 'new'
   const navigate = useNavigate()
   const toast = useToast()
-  const widgetAccents = useWidgetAccents()
-  const theme = useTheme()
-  const proseSx = getProseSx(widgetAccents)
 
   const [mode, setMode] = React.useState<Mode>('view')
   const [detail, setDetail] = React.useState<PageDetail | null>(null)
@@ -389,14 +359,17 @@ export default function WikiPage() {
   const [attachUploading, setAttachUploading] = React.useState(false)
   const [ratingBusy, setRatingBusy] = React.useState(false)
 
-  const [tab, setTab] = React.useState(0)
+  const [revsOpen, setRevsOpen] = React.useState(false)
+  const [toc, setToc] = React.useState<TocItem[]>([])
+  const { hasPerm } = useAuth()
+  const [searchParams] = useSearchParams()
   const attachInputRef = React.useRef<HTMLInputElement>(null)
 
   // form state
   const [form, setForm] = React.useState({
     title: '',
     slug: '',
-    category: '' as number | '',
+    category: (isNew && Number(searchParams.get('cartella')) > 0 ? Number(searchParams.get('cartella')) : '') as number | '',
     summary: '',
     content_html: DEFAULT_TEMPLATE,
     is_published: true,
@@ -731,6 +704,7 @@ export default function WikiPage() {
         }
         setMode('view')
         loadDetail(parseInt(id!, 10))
+        loadRevisions(parseInt(id!, 10))
       }
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -834,6 +808,26 @@ export default function WikiPage() {
     }
   }
 
+  // ── Preferiti ──────────────────────────────────────────────────────────
+
+  const handleToggleFavorite = async () => {
+    if (!id || isNew || !detail) return
+    const on = !detail.is_favorite
+    try {
+      if (on) await api.post(`/wiki-pages/${id}/favorite/`)
+      else await api.delete(`/wiki-pages/${id}/favorite/`)
+      setDetail({ ...detail, is_favorite: on })
+      toast.success(on ? 'Aggiunta ai preferiti' : 'Tolta dai preferiti')
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }
+
+  const copyKb = () => {
+    if (!detail?.kb_code) return
+    navigator.clipboard?.writeText(detail.kb_code).then(() => toast.success(`Copiato · ${detail.kb_code}`), () => {})
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -844,556 +838,21 @@ export default function WikiPage() {
     )
   }
 
-  const pageTitle = isNew ? 'Nuova pagina' : (detail?.title ?? `Pagina #${id}`)
   const numericId = id && id !== 'new' ? parseInt(id, 10) : null
+  const folders: WikiCategory[] = [...categories, NO_CAT]
+  const viewCat = folders.find((c) => c.id === (detail?.category ?? 0)) ?? NO_CAT
+  const editCat = folders.find((c) => c.id === (form.category === '' ? 0 : form.category)) ?? NO_CAT
+  const canChange = hasPerm(PERMS.wiki.page.change)
+  const canDelete = hasPerm(PERMS.wiki.page.delete)
+  const linksCard = <LinksCard links={links} canEdit={canChange} onAdd={() => setAddCustomerOpen(true)} onRemove={(lid) => void handleRemoveLink(lid)} />
+  const attachCard = (
+    <AttachmentsCard items={attachments} canEdit={canChange} uploading={attachUploading} inputRef={attachInputRef}
+      onUpload={(e) => void handleAttachmentUpload(e)} onDelete={(aid) => void handleDeleteAttachment(aid)} />
+  )
 
-  return (
-    <Stack spacing={2}>
-      {/* ── Topbar ── */}
-      <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-        <Tooltip title="Torna alla Wiki">
-          <IconButton aria-label="Torna alla Wiki" size="small" onClick={() => navigate('/wiki')}>
-            <ArrowBackIcon />
-          </IconButton>
-        </Tooltip>
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-            <Typography variant="body2" color="text.secondary">
-              Wiki
-            </Typography>
-            <Typography variant="body2" color="text.disabled">
-              ›
-            </Typography>
-            <Typography variant="subtitle1" fontWeight={700} noWrap>
-              {pageTitle}
-            </Typography>
-            {detail?.kb_code && (
-              <Chip
-                size="small"
-                label={detail.kb_code}
-                sx={{
-                  height: 20,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  bgcolor: widgetAccents.softTealBg,
-                  color: (theme) => theme.palette.primary.main,
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
-                  fontFamily: 'monospace',
-                }}
-              />
-            )}
-            {detail && (
-              <Chip
-                size="small"
-                label={detail.is_published ? 'Pubblicato' : 'Bozza'}
-                sx={{
-                  height: 20,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  bgcolor: detail.is_published ? (theme) => theme.palette.success.light : (theme) => theme.palette.warning.light,
-                  color: detail.is_published ? (theme) => theme.palette.success.dark : (theme) => theme.palette.warning.dark,
-                }}
-              />
-            )}
-            {detail?.view_count !== undefined && detail.view_count > 0 && (
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.25}
-                sx={{ color: 'text.disabled' }}
-              >
-                <VisibilityIcon sx={{ fontSize: 12 }} />
-                <Typography variant="caption" fontSize={11}>
-                  {detail.view_count}
-                </Typography>
-              </Stack>
-            )}
-            {detail && (
-              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: 'text.disabled' }}>
-                <Typography component="span" variant="caption" fontSize={11} sx={{ color: 'warning.main' }}>
-                  ★
-                </Typography>
-                <Typography variant="caption" fontSize={11}>
-                  {detail.rating_count ? `${fmtAverageRating(detail.average_rating)} · ${detail.rating_count}` : 'Nessun voto'}
-                </Typography>
-              </Stack>
-            )}
-          </Stack>
-          {detail?.category_name && (
-            <Typography variant="caption" color="text.disabled">
-              {detail.category_name}
-              {detail.updated_at && ` · Aggiornato ${fmtDate(detail.updated_at)}`}
-              {detail.updated_by_username && ` da ${detail.updated_by_username}`}
-            </Typography>
-          )}
-        </Box>
-
-        <Stack direction="row" spacing={1}>
-          {mode === 'view' && (
-            <>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<PictureAsPdfOutlinedIcon />}
-                onClick={handleExportPdf}
-              >
-                Export PDF
-              </Button>
-              <Can perm={PERMS.wiki.page.change}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<EditOutlinedIcon />}
-                  onClick={() => setMode('edit')}
-                >
-                  Modifica
-                </Button>
-              </Can>
-              <Can perm={PERMS.wiki.page.delete}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  startIcon={<DeleteOutlineIcon />}
-                  onClick={() => setDelDlgOpen(true)}
-                >
-                  Elimina
-                </Button>
-              </Can>
-            </>
-          )}
-          {mode === 'edit' && (
-            <>
-              {!isNew && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<CloseIcon />}
-                  onClick={() => setMode('view')}
-                >
-                  Annulla
-                </Button>
-              )}
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={
-                  saving ? <CircularProgress size={14} color="inherit" /> : <SaveOutlinedIcon />
-                }
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {isNew ? 'Crea pagina' : 'Salva'}
-              </Button>
-            </>
-          )}
-        </Stack>
-      </Stack>
-
-      {saving && <LinearProgress sx={{ borderRadius: 1 }} />}
-
-      {/* ── Tabs (solo pagina esistente) ── */}
-      {!isNew && (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-            <Tab label="Contenuto" sx={{ fontSize: 13 }} />
-            <Tab
-              label={`Clienti collegati${links.length ? ` (${links.length})` : ''}`}
-              sx={{ fontSize: 13 }}
-            />
-            <Tab
-              label={`Allegati${attachments.length ? ` (${attachments.length})` : ''}`}
-              sx={{ fontSize: 13 }}
-            />
-            <Tab
-              label={
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <HistoryIcon sx={{ fontSize: 14 }} />
-                  <span>Revisioni{revisions.length ? ` (${revisions.length})` : ''}</span>
-                </Stack>
-              }
-              sx={{ fontSize: 13 }}
-            />
-          </Tabs>
-        </Box>
-      )}
-
-      {/* ══════════════════════════════
-          TAB 0 — CONTENUTO
-      ══════════════════════════════ */}
-      {(isNew || tab === 0) && (
-        <Stack spacing={2}>
-          {/* Metadati view */}
-          {mode === 'view' && detail && (
-            <Card variant="outlined" sx={{ borderRadius: 1, p: 2 }}>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap">
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Categoria
-                  </Typography>
-                  <Typography variant="body2" fontWeight={500}>
-                    {detail.category_name ?? '—'}
-                  </Typography>
-                </Box>
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Codice
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    fontWeight={800}
-                    fontFamily="monospace"
-                    color="primary.main"
-                  >
-                    {detail.kb_code || '—'}
-                  </Typography>
-                </Box>
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Slug
-                  </Typography>
-                  <Typography variant="body2" fontWeight={500} fontFamily="monospace" fontSize={12}>
-                    {detail.slug}
-                  </Typography>
-                </Box>
-                <Box sx={{ minWidth: 100 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Visualizzazioni
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={0.5} mt={0.25}>
-                    <VisibilityIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                    <Typography variant="body2" fontWeight={600}>
-                      {detail.view_count ?? 0}
-                    </Typography>
-                  </Stack>
-                </Box>
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Creato
-                  </Typography>
-                  <Typography variant="body2" fontWeight={500}>
-                    {fmtDate(detail.created_at)}
-                  </Typography>
-                  {detail.created_by_username && (
-                    <Typography variant="caption" color="text.secondary">
-                      da {detail.created_by_username}
-                    </Typography>
-                  )}
-                </Box>
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Ultima modifica
-                  </Typography>
-                  <Typography variant="body2" fontWeight={500}>
-                    {fmtDate(detail.updated_at)}
-                  </Typography>
-                  {detail.updated_by_username && (
-                    <Typography variant="caption" color="text.secondary">
-                      da {detail.updated_by_username}
-                    </Typography>
-                  )}
-                </Box>
-                <Box sx={{ minWidth: 220 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    fontWeight={600}
-                    sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                  >
-                    Valutazione
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={1} mt={0.25} flexWrap="wrap">
-                    <Rating
-                      value={detail.average_rating ?? 0}
-                      precision={0.1}
-                      readOnly
-                      size="small"
-                      sx={ratingIconSx}
-                    />
-                    <Typography variant="body2" fontWeight={600}>
-                      {detail.rating_count ? fmtAverageRating(detail.average_rating) : '—'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {detail.rating_count ? `${detail.rating_count} vot${detail.rating_count === 1 ? 'o' : 'i'}` : 'Nessun voto'}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1} mt={0.75} flexWrap="wrap">
-                    <Typography variant="caption" color="text.secondary">
-                      Il tuo voto
-                    </Typography>
-                    <Rating
-                      value={detail.current_user_rating ?? null}
-                      onChange={(_, value) => {
-                        void handleRatePage(value)
-                      }}
-                      readOnly={Boolean(detail.current_user_rating) || ratingBusy}
-                      size="small"
-                      sx={ratingIconSx}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {detail.current_user_rating
-                        ? `Hai votato ${detail.current_user_rating}/5`
-                        : ratingBusy
-                          ? 'Salvataggio voto…'
-                          : 'Puoi votare una sola volta'}
-                    </Typography>
-                  </Stack>
-                </Box>
-                {(detail.tags ?? []).length > 0 && (
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      color="text.disabled"
-                      fontWeight={600}
-                      sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                    >
-                      Tag
-                    </Typography>
-                    <Stack direction="row" flexWrap="wrap" spacing={0.5} mt={0.5}>
-                      {(detail.tags ?? []).map((t) => (
-                        <Chip
-                          key={t}
-                          label={t}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 20, fontSize: 11 }}
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-                {detail.summary && (
-                  <Box sx={{ width: '100%' }}>
-                    <Typography
-                      variant="caption"
-                      color="text.disabled"
-                      fontWeight={600}
-                      sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}
-                    >
-                      Sommario
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.25, fontStyle: 'italic' }}
-                    >
-                      {detail.summary}
-                    </Typography>
-                  </Box>
-                )}
-              </Stack>
-            </Card>
-          )}
-
-          {/* Form edit / new */}
-          {mode === 'edit' && (
-            <Card variant="outlined" sx={{ borderRadius: 1, p: 2 }}>
-              <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-                  <TextField
-                    size="small"
-                    label="Titolo *"
-                    required
-                    fullWidth
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  />
-                  <TextField
-                    size="small"
-                    label="Slug"
-                    value={form.slug}
-                    onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                    sx={{ width: { xs: '100%', md: 240 } }}
-                    InputProps={{ sx: { fontFamily: 'monospace', fontSize: 13 } }}
-                  />
-                </Stack>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center">
-                  <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel>Categoria</InputLabel>
-                    <Select
-                      label="Categoria"
-                      value={form.category === '' ? '' : String(form.category)}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          category: e.target.value === '' ? '' : Number(e.target.value),
-                        }))
-                      }
-                    >
-                      <MenuItem value="">Nessuna</MenuItem>
-                      {categories.map((c) => (
-                        <MenuItem key={c.id} value={String(c.id)}>
-                          {c.emoji ? `${c.emoji} ` : ''}
-                          {c.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    size="small"
-                    label="Tag (separati da virgola)"
-                    fullWidth
-                    value={form.tags}
-                    onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={form.is_published}
-                        onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))}
-                        size="small"
-                        color="success"
-                      />
-                    }
-                    label={
-                      <Typography variant="body2">
-                        {form.is_published ? 'Pubblicato' : 'Bozza'}
-                      </Typography>
-                    }
-                    sx={{ ml: 0, flexShrink: 0 }}
-                  />
-                </Stack>
-                <TextField
-                  size="small"
-                  label="Sommario"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={form.summary}
-                  onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
-                />
-              </Stack>
-            </Card>
-          )}
-
-          {/* Editor / Reader */}
-          {mode === 'edit' ? (
-            <Box>
-              {isNew && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mb: 1, display: 'block' }}
-                >
-                  💡 Salva prima la pagina per abilitare l'upload di immagini tramite editor.
-                </Typography>
-              )}
-              <RichEditor
-                value={form.content_html}
-                onChange={(html) => {
-                  setForm((f) => ({ ...f, content_html: html }))
-                  // Autocomplete [[: se l'ultimo testo contiene [[ apri il dialog
-                  const plain = html.replace(/<[^>]+>/g, '')
-                  if (plain.endsWith('[[')) {
-                    setWikiLinkOpen(true)
-                    // Rimuovi [[ dal contenuto
-                    setForm((f) => ({
-                      ...f,
-                      content_html: html.replace(/\[\[$/, '').replace(/\[\[<\/[^>]+>$/, ''),
-                    }))
-                  }
-                }}
-                onImageUpload={!isNew ? handleImageUpload : undefined}
-                onWikiLink={() => setWikiLinkOpen(true)}
-                quillRef={quillInstanceRef}
-                minHeight={440}
-                placeholder="Scrivi il contenuto della pagina…"
-              />
-            </Box>
-          ) : (
-            <Card variant="outlined" sx={{ borderRadius: 1, p: 3 }}>
-              {renderHtml ? (
-                <Box dangerouslySetInnerHTML={{ __html: renderHtml }} sx={proseSx} />
-              ) : (
-                <Typography color="text.disabled" fontSize={13} fontStyle="italic">
-                  Nessun contenuto.
-                </Typography>
-              )}
-            </Card>
-          )}
-        </Stack>
-      )}
-
-      {/* ══════════════════════════════
-          TAB 1 — CLIENTI COLLEGATI
-      ══════════════════════════════ */}
-      {!isNew && tab === 1 && (
-        <WikiLinkedCustomersTab
-          links={links}
-          onRemoveLink={handleRemoveLink}
-          onAddCustomer={() => setAddCustomerOpen(true)}
-        />
-      )}
-
-      {/* ══════════════════════════════
-          TAB 2 — ALLEGATI
-      ══════════════════════════════ */}
-      {!isNew && tab === 2 && (
-        <WikiAttachmentsTab
-          attachments={attachments}
-          attachUploading={attachUploading}
-          attachInputRef={attachInputRef}
-          onUpload={handleAttachmentUpload}
-          onDelete={handleDeleteAttachment}
-        />
-      )}
-
-      {/* ══════════════════════════════
-          TAB 3 — REVISIONI
-      ══════════════════════════════ */}
-      {!isNew && tab === 3 && (
-        <WikiRevisionsTab
-          revisions={revisions}
-          restoring={restoring}
-          onPreview={(rev) => void handleOpenRevisionPreview(rev)}
-          onRestore={(rev) => void handleRestore(rev)}
-          previewRev={previewRev}
-          previewRevHtml={previewRevHtml}
-          previewRevLoading={previewRevLoading}
-          onClosePreview={() => {
-            setPreviewRev(null)
-            setPreviewRevHtml('')
-          }}
-        />
-      )}
-
-      {/* ── Dialogs ── */}
-      <WikiLinkDialog
-        open={wikiLinkOpen}
-        onClose={() => setWikiLinkOpen(false)}
-        onSelect={handleInsertWikiLink}
-      />
+  const dialogs = (
+    <>
+      <WikiLinkDialog open={wikiLinkOpen} onClose={() => setWikiLinkOpen(false)} onSelect={handleInsertWikiLink} />
       <ConfirmDeleteDialog
         open={delDlgOpen}
         title="Elimina pagina wiki?"
@@ -1402,7 +861,6 @@ export default function WikiPage() {
         onClose={() => setDelDlgOpen(false)}
         onConfirm={handleDelete}
       />
-
       {numericId !== null && (
         <AddCustomerDialog
           open={addCustomerOpen}
@@ -1412,8 +870,206 @@ export default function WikiPage() {
           onAdded={() => loadLinks(numericId)}
         />
       )}
-    </Stack>
+      <Dialog open={revsOpen} onClose={() => setRevsOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Cronologia{detail ? ` · ${detail.title}` : ''}</DialogTitle>
+        <DialogContent>
+          <WikiRevisionsTab
+            revisions={revisions}
+            restoring={restoring}
+            onPreview={(rev) => void handleOpenRevisionPreview(rev)}
+            onRestore={(rev) => void handleRestore(rev)}
+            previewRev={previewRev}
+            previewRevHtml={previewRevHtml}
+            previewRevLoading={previewRevLoading}
+            onClosePreview={() => { setPreviewRev(null); setPreviewRevHtml('') }}
+          />
+        </DialogContent>
+        <DialogActions><Button onClick={() => setRevsOpen(false)}>Chiudi</Button></DialogActions>
+      </Dialog>
+    </>
+  )
+
+  // ── Modifica: il foglio su cui si scrive, dentro la cartella ──
+  if (mode === 'edit') {
+    const tagList = form.tags.split(',').map((t) => t.trim()).filter(Boolean)
+    return (
+      <ArchiveRoot>
+        <div className="w-ed-head">
+          <nav className="w-crumbs" aria-label="Percorso">
+            <a href={isNew ? '/wiki' : `/wiki/${id}`} onClick={(e) => { e.preventDefault(); if (isNew) navigate('/wiki'); else setMode('view') }}>
+              <CampoIcon name="chevL" size={14} />{isNew ? 'Archivio' : detail?.title}
+            </a>
+          </nav>
+          <span className="w-ed-st">{isNew ? 'Nuova pagina' : <>Modifica{detail?.kb_code ? <> · <span className="w-mono-s">{detail.kb_code}</span></> : null}</>}</span>
+          <div className="actions">
+            <Button color="inherit" onClick={() => (isNew ? navigate('/wiki') : setMode('view'))} disabled={saving}>Annulla</Button>
+            <Button variant="contained" onClick={() => void handleSave()} disabled={saving}
+              startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <CampoIcon name="task" size={16} />}>
+              {isNew ? 'Crea pagina' : 'Salva'}
+            </Button>
+          </div>
+        </div>
+        <OpenFolder className="w-ed-fold" color={catColor(editCat, catDark)} label="Pagina in modifica"
+          tabs={<FolderTabs cats={folders} active={editCat.id} mode="edit" onPick={(cid) => setForm((f) => ({ ...f, category: cid === 0 ? '' : cid }))} />}>
+          <div className="w-ed-b">
+            <div className="w-ed-main">
+              <textarea className="w-ed-title" rows={1} placeholder="Titolo della pagina" aria-label="Titolo" value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value.replace(/\n/g, ' ') }))} />
+              <textarea className="w-ed-lead" rows={2} placeholder="Riepilogo in una o due frasi: compare nelle schede e nella ricerca" aria-label="Riepilogo"
+                value={form.summary} onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))} />
+              {isNew ? <p className="w-ed-hint-p">Le immagini si possono caricare dopo aver creato la pagina.</p> : null}
+              <div className="w-ed-editor">
+                <RichEditor
+                  value={form.content_html}
+                  onChange={(html) => {
+                    setForm((f) => ({ ...f, content_html: html }))
+                    // [[ apre la scelta di una pagina della Wiki da collegare
+                    const plainText = html.replace(/<[^>]+>/g, '')
+                    if (plainText.endsWith('[[')) {
+                      setWikiLinkOpen(true)
+                      setForm((f) => ({ ...f, content_html: html.replace(/\[\[$/, '').replace(/\[\[<\/[^>]+>$/, '') }))
+                    }
+                  }}
+                  onImageUpload={!isNew ? handleImageUpload : undefined}
+                  onWikiLink={() => setWikiLinkOpen(true)}
+                  quillRef={quillInstanceRef}
+                  minHeight={440}
+                  placeholder="Scrivi il contenuto della pagina…"
+                />
+              </div>
+            </div>
+            <aside className="w-ed-side" aria-label="Proprietà della pagina">
+              <section className="w-rail-s">
+                <h4>Pubblicazione</h4>
+                <label className="w-switch">
+                  <input type="checkbox" checked={form.is_published} onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))} />
+                  <span />Visibile a tutti
+                </label>
+                <p className="w-rail-none">{form.is_published ? 'Pubblicata: compare nell\'archivio e nella ricerca.' : 'Bozza: resta nelle tue bozze finché non la pubblichi.'}</p>
+              </section>
+              <section className="w-rail-s">
+                <h4>Posizione</h4>
+                <div className="w-f">
+                  <label htmlFor="w-cat">Cartella</label>
+                  <select id="w-cat" value={form.category === '' ? '' : String(form.category)}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value === '' ? '' : Number(e.target.value) }))}>
+                    <option value="">Senza cartella</option>
+                    {categories.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="w-f">
+                  <label htmlFor="w-slug">Indirizzo</label>
+                  <input id="w-slug" className="w-mono-in" value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} />
+                </div>
+              </section>
+              <section className="w-rail-s">
+                <h4>Tag</h4>
+                <div className="w-tags">
+                  {tagList.map((t) => (
+                    <span key={t} className="w-tag">{t}
+                      <button type="button" aria-label={`Togli ${t}`} onClick={() => setForm((f) => ({ ...f, tags: tagList.filter((x) => x !== t).join(', ') }))}><CampoIcon name="x" size={12} /></button>
+                    </span>
+                  ))}
+                  <input placeholder="Aggiungi e premi Invio" aria-label="Aggiungi tag" onKeyDown={(e) => {
+                    const v = e.currentTarget.value.trim().replace(/,$/, '')
+                    if ((e.key === 'Enter' || e.key === ',') && v) {
+                      e.preventDefault()
+                      if (!tagList.includes(v)) setForm((f) => ({ ...f, tags: [...tagList, v].join(', ') }))
+                      e.currentTarget.value = ''
+                    } else if (e.key === 'Backspace' && !e.currentTarget.value && tagList.length) {
+                      setForm((f) => ({ ...f, tags: tagList.slice(0, -1).join(', ') }))
+                    }
+                  }} />
+                </div>
+              </section>
+              {!isNew ? linksCard : null}
+              {!isNew ? attachCard : null}
+              <p className="w-ed-note">{isNew ? 'Il codice KB viene assegnato alla creazione.' : `Salvando si crea la revisione ${revisions.length + 1}: la versione attuale resta nella cronologia.`}</p>
+            </aside>
+          </div>
+        </OpenFolder>
+        {dialogs}
+      </ArchiveRoot>
+    )
+  }
+
+  // ── Lettura: il foglio nella cartella ──
+  if (!detail) {
+    return (
+      <ArchiveRoot>
+        <div className="w-d-none"><CampoIcon name="alert" size={18} /><div><b>Pagina non trovata</b><p><button type="button" className="link-btn" onClick={() => navigate('/wiki')}>Torna all'archivio</button></p></div></div>
+      </ArchiveRoot>
+    )
+  }
+  const myVote = detail.current_user_rating ?? null
+  return (
+    <ArchiveRoot>
+      <div className="w-page-e">
+      <nav className="w-crumbs" aria-label="Percorso">
+        <a href="/wiki" onClick={(e) => { e.preventDefault(); navigate('/wiki') }}><CampoIcon name="chevL" size={14} />Archivio</a>
+        <span>/</span>
+        <a href={`/wiki?cartella=${viewCat.id}`} onClick={(e) => { e.preventDefault(); navigate(`/wiki?cartella=${viewCat.id}`) }}>{viewCat.name}</a>
+      </nav>
+      <OpenFolder color={catColor(viewCat, catDark)} label={viewCat.name}
+        tabs={<FolderTabs cats={folders.filter((c) => c.id !== 0 || viewCat.id === 0)} active={viewCat.id} mode="art" onPick={(cid) => navigate(`/wiki?cartella=${cid}`)} />}>
+        <article className="w-art is-sheet">
+          <header className="w-art-h">
+            <div className="w-art-top">
+              <div className="w-art-tt">
+                <h1>{detail.title}{!detail.is_published ? <span className="w-draft">Bozza</span> : null}</h1>
+                <div className="w-meta">
+                  {detail.kb_code ? <button type="button" className="w-kbcode" onClick={copyKb} title="Copia il codice">{detail.kb_code}<CampoIcon name="copy" size={12} /></button> : null}
+                  <span>Aggiornata {rel(detail.updated_at)}{detail.updated_by_username ? <> da <b>{detail.updated_by_username}</b></> : null}</span>
+                  <span>{detail.view_count ?? 0} letture</span>
+                  {detail.rating_count ? <span className="w-rate"><StarIcon />{r1(detail.average_rating)}<small>{detail.rating_count} vot{detail.rating_count === 1 ? 'o' : 'i'}</small></span> : null}
+                  {(detail.tags ?? []).map((t) => <span key={t} className="w-tag">{t}</span>)}
+                </div>
+              </div>
+              <div className="w-art-act">
+                <Tooltip title="Esporta PDF"><IconButton aria-label="Esporta PDF" onClick={() => void handleExportPdf()}><CampoIcon name="download" size={18} /></IconButton></Tooltip>
+                <Tooltip title={detail.is_favorite ? 'Togli dai preferiti' : 'Aggiungi ai preferiti'}>
+                  <IconButton aria-label={detail.is_favorite ? 'Togli dai preferiti' : 'Aggiungi ai preferiti'} aria-pressed={Boolean(detail.is_favorite)} onClick={() => void handleToggleFavorite()}
+                    sx={{ color: detail.is_favorite ? 'warning.main' : undefined }}>
+                    <StarIcon on={Boolean(detail.is_favorite)} size={18} />
+                  </IconButton>
+                </Tooltip>
+                {canDelete ? <Tooltip title="Elimina"><IconButton aria-label="Elimina la pagina" onClick={() => setDelDlgOpen(true)}><CampoIcon name="trash" size={18} /></IconButton></Tooltip> : null}
+                {canChange ? <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="wrench" size={16} />} onClick={() => setMode('edit')}>Modifica</Button> : null}
+              </div>
+            </div>
+            {detail.summary ? <p className="w-lead">{detail.summary}</p> : null}
+          </header>
+          <div className="w-art-b">
+            <div className="w-prose" data-prose>
+              {renderHtml ? <ProseContent html={renderHtml} onToc={setToc} /> : <p className="w-rail-none">Nessun contenuto.</p>}
+              <div className="w-useful">
+                <span>{myVote ? `Hai dato ${myVote} ${myVote === 1 ? 'stella' : 'stelle'} a questa pagina.` : ratingBusy ? 'Salvataggio del voto…' : 'Ti è stata utile?'}</span>
+                <span className="w-stars" role="radiogroup" aria-label="Voto">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} type="button" role="radio" aria-checked={myVote === n} aria-label={`${n} su 5`} disabled={Boolean(myVote) || ratingBusy}
+                      onClick={() => void handleRatePage(n)}>
+                      <StarIcon on={Boolean(myVote && n <= myVote)} size={18} />
+                    </button>
+                  ))}
+                </span>
+                {myVote ? <small>Si vota una sola volta.</small> : null}
+              </div>
+            </div>
+            <aside className="w-rail" aria-label="Informazioni sulla pagina">
+              {toc.length ? <section className="w-rail-s w-toc"><h4>In questa pagina</h4><TocList items={toc} /></section> : null}
+              {linksCard}
+              {attachCard}
+              <section className="w-rail-s">
+                <h4>Revisioni <span>{revisions.length}</span></h4>
+                <p className="w-rail-none">Creata {dshort(detail.created_at)}{detail.created_by_username ? ` da ${detail.created_by_username}` : ''}.</p>
+                <button type="button" className="link-btn" onClick={() => setRevsOpen(true)}><CampoIcon name="history" size={14} />Cronologia</button>
+              </section>
+            </aside>
+          </div>
+        </article>
+      </OpenFolder>
+      </div>
+      {dialogs}
+    </ArchiveRoot>
   )
 }
-
-

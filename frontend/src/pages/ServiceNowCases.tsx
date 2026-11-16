@@ -1,997 +1,271 @@
 import * as React from 'react'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
-import {
-  Box,
-  Button,
-  Checkbox,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  IconButton,
-  MenuItem,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import EditIcon from '@mui/icons-material/Edit'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Box, Button, IconButton, Stack, Tooltip, Typography, useTheme } from '@mui/material'
+import type { GridColDef } from '@mui/x-data-grid'
+import { api } from '@shared/api/client'
+import { buildDrfListParams } from '@shared/api/drf'
+import { itemActionPath, itemPath } from '@shared/api/apiPaths'
+import { apiErrorToMessage } from '@shared/api/error'
+import { useDrfList } from '@shared/hooks/useDrfList'
+import { useServerGrid } from '@shared/hooks/useServerGrid'
+import { useUrlStringParam } from '@shared/hooks/useUrlParam'
+import EntityListCard from '@shared/ui/EntityListCard'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import { useToast } from '@shared/ui/toast'
+import { isRecord } from '@shared/utils/guards'
+import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
+import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
-import CloseIcon from '@mui/icons-material/Close'
-
 import { useAuth } from '../auth/AuthProvider'
-import { useTheme, alpha } from '@mui/material/styles'
-import { useStatusTokens } from '../theme/AppThemeProvider'
-import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
-import { SHARED } from '../theme/constants'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { isRecord } from '@shared/utils/guards'
-import type { GridColDef } from '@mui/x-data-grid'
-import { useServerGrid } from '@shared/hooks/useServerGrid'
-import { api } from '@shared/api/client'
-import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import { itemPath, itemActionPath, type CollectionPath } from '@shared/api/apiPaths'
-import { useDrfList } from '@shared/hooks/useDrfList'
-import { useToast } from '@shared/ui/toast'
-import { apiErrorToMessage } from '@shared/api/error'
-import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
-import EntityListCard from '@shared/ui/EntityListCard'
-import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import { type AbsenceRow, type DayPart, ABSENCE_REASONS, DAY_PART_OPTIONS, todayISO, formatItDate, formatItTime } from '../features/servicenow/absenceShared'
-
-// "Aperto il" per card mobile / dettaglio: combina data e ora se entrambe presenti.
-export function formatOpenedAt(row: { opened_date: string | null; opened_time: string | null }): string | null {
-  if (!row.opened_date) return null
-  const time = row.opened_time ? ` · ${formatItTime(row.opened_time)}` : ''
-  return `${formatItDate(row.opened_date)}${time}`
-}
-import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import ServiceNowCaseDrawer from '../features/servicenow/ServiceNowCaseDrawer'
-import ServiceNowCaseFormDrawer, { type ServiceNowCaseForm } from '../features/servicenow/ServiceNowCaseFormDrawer'
+import { CampoIcon, PageHead, TableBar, ViewTabs, type DetailMenuItem } from '../ui/campo'
+import { formatOpenedAt, initialsOf, taskPrefillFromCase, typeColor, type CaseTypeOption, type ServiceNowCaseRow } from '../features/servicenow/snModel'
+import TodayPanel from '../features/servicenow/TodayPanel'
+import CaseDetailCard from '../features/servicenow/CaseDetailCard'
+import CaseDialog, { type ServiceNowCaseForm } from '../features/servicenow/CaseDialog'
 import PhilipsAssignmentCopyDialog, { buildPhilipsAssignmentCopyText } from '../features/servicenow/PhilipsAssignmentCopyDialog'
 import ImportHistoricalDialog from '../features/servicenow/ImportHistoricalDialog'
-import { isServiceNowCategoryVisible } from '../features/servicenow/visibleCategories'
+import { todayISO } from '../features/servicenow/absenceShared'
 
-// ─── Tipi ────────────────────────────────────────────────────────────────────
+const PATH = '/servicenow-cases/' as const
+type View = 'all' | 'today' | 'mine' | 'unassigned'
+const VIEWS: { key: View; label: string; alert?: boolean }[] = [
+  { key: 'all', label: 'Tutti' }, { key: 'today', label: 'Oggi' }, { key: 'mine', label: 'Miei' }, { key: 'unassigned', label: 'Da assegnare', alert: true },
+]
+const MONO = { fontFamily: '"Geist Mono", ui-monospace, monospace' } as const
+const cell = { display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 } as const
 
-export type ServiceNowCaseRow = {
-  id: number
-  number: string
-  account: string
-  short_description: string
-  priority: string
-  priority_label: string
-  category: string
-  category_label: string
-  case_type: number
-  case_type_label: string
-  opened_date: string | null
-  opened_time: string | null
-  screenshot_url: string | null
-  status: string
-  status_label: string
-  assigned_to: number | null
-  assigned_to_username: string | null
-  assigned_to_full_name: string | null
-  assigned_to_avatar: string | null
-  external_url: string
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
-}
-
-const SERVICENOW_CASES_PATH = '/servicenow-cases/' as const satisfies CollectionPath
-
-// ─── Chip stato ─────────────────────────────────────────────────────────────
-// Priority rimosso dalla UI (0.9.0, non più rilevante per l'uso corrente):
-// il campo resta in modello/API lato backend (default 'Moderate', nessuna
-// migration), ma non è più mostrato né richiesto nel form. Il chip "Type"
-// che compariva senza colore ora usa lo stesso pattern hash-deterministico
-// di committenteColor() (PurchaseOrders.tsx / clientChipPalette), al posto
-// di PRIORITY_SEMANTIC/SemanticChip rimossi.
-
-// ─── Pannello Triage (casi di oggi per categoria/tecnico) ────────────────────
-
-type TriageTechnician = { id: number | null; name: string; count: number; absent?: boolean; absence_reason?: string | null }
-type TriageCategoryData = { total: number; technicians: TriageTechnician[] }
-type TriageResponse = { date: string; categories: Record<string, TriageCategoryData> }
-
-// I due "accent" delle categorie triage (philips/biotron) sono calcolati
-// dentro TriagePanel via useTheme(): prima erano un const a livello di
-// modulo con `theme.palette.primary/secondary.main` importati staticamente
-// da '../theme' — bug noto (mostra sempre i colori del tema default,
-// ignora). Vedi TriagePanel più sotto.
-const TRIAGE_CATEGORY_DEFS = [
-  { value: 'philips', label: 'Philips' },
-  { value: 'biotron', label: 'Biotron' },
-] as const
-
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
-function TriageTechnicianRow({ t, accent, canManage, onManage }: {
-  t: TriageTechnician; accent: string; canManage: boolean; onManage: (t: TriageTechnician) => void
-}) {
-  const free = t.count === 0 && !t.absent
-  return (
-    <Stack
-      direction="row" alignItems="center" spacing={1}
-      sx={{
-        px: 0.75, py: 0.5, borderRadius: 1.5,
-        bgcolor: t.absent ? (theme) => alpha(theme.palette.error.main, 0.05) : free ? 'transparent' : 'action.hover',
-        transition: 'background-color 0.15s',
-        '&:hover .triage-manage-btn': { opacity: 1 },
-      }}
-    >
-      <Box sx={{
-        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '0.6rem', fontWeight: 700,
-        bgcolor: t.absent ? (theme) => alpha(theme.palette.error.main, 0.12) : free ? 'action.selected' : `${accent}26`,
-        color: t.absent ? 'error.main' : free ? 'text.disabled' : accent,
-      }}>
-        {t.id === null ? '—' : initialsOf(t.name)}
-      </Box>
-      <Typography sx={{ fontSize: '0.8rem', color: t.absent || free ? 'text.disabled' : 'text.primary', flex: 1, minWidth: 0 }} noWrap>
-        {t.name}
-      </Typography>
-      {t.absent ? (
-        <Chip
-          size="small" label={t.absence_reason ?? 'Assente'}
-          sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: (theme) => alpha(theme.palette.error.main, 0.12), color: 'error.main' }}
-        />
-      ) : free ? (
-        <Typography variant="caption" sx={{ color: 'success.dark', fontWeight: 600, flexShrink: 0 }}>
-          Libero
-        </Typography>
-      ) : (
-        <Box sx={{
-          minWidth: 22, px: 0.6, py: 0.05, borderRadius: 10, textAlign: 'center', flexShrink: 0,
-          bgcolor: accent, color: SHARED.pureWhite, fontSize: '0.72rem', fontWeight: 700,
-        }}>
-          {t.count}
-        </Box>
-      )}
-      {canManage && t.id !== null && (
-        <IconButton
-          size="small"
-          className="triage-manage-btn"
-          onClick={() => onManage(t)}
-          sx={{ p: 0.3, opacity: { xs: 1, sm: 0.35 }, transition: 'opacity 0.15s', flexShrink: 0 }}
-          title="Gestisci assenze"
-          aria-label="Gestisci assenze"
-        >
-          <EventBusyOutlinedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-      )}
-    </Stack>
-  )
-}
-
-function TriageCategoryCard({ label, accent, tint, data, canManage, onManage }: {
-  label: string; accent: string; tint: string; data: TriageCategoryData | undefined
-  canManage: boolean; onManage: (t: TriageTechnician) => void
-}) {
-  const total = data?.total ?? 0
-  const technicians = data?.technicians ?? []
-  return (
-    <Box sx={{
-      flex: 1, minWidth: 240, borderRadius: 1.5, overflow: 'hidden',
-      border: '0.5px solid', borderColor: 'divider',
-    }}>
-      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 1.25, py: 1, bgcolor: tint, borderBottom: '0.5px solid', borderColor: 'divider' }}>
-        <Box sx={{ width: 5, height: 30, borderRadius: 4, bgcolor: accent, flexShrink: 0 }} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.2 }}>{label}</Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>casi di oggi</Typography>
-        </Box>
-        <Typography sx={{ fontSize: '1.7rem', fontWeight: 800, color: accent, lineHeight: 1 }}>{total}</Typography>
-      </Stack>
-      <Stack spacing={0.25} sx={{ p: 0.75 }}>
-        {technicians.length === 0 ? (
-          <Typography sx={{ fontSize: '0.78rem', color: 'text.disabled', fontStyle: 'italic', px: 0.75, py: 0.5 }}>
-            Nessun tecnico in questa categoria
-          </Typography>
-        ) : (
-          technicians.map((t) => (
-            <TriageTechnicianRow key={t.id ?? 'unassigned'} t={t} accent={accent} canManage={canManage} onManage={onManage} />
-          ))
-        )}
-      </Stack>
-    </Box>
-  )
-}
-
-// ─── Modal gestione assenze tecnico ──────────────────────────────────────────
-
-function TechnicianAbsenceDialog({ open, technician, onClose, onSaved }: {
-  open: boolean
-  technician: TriageTechnician | null
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const toast = useToast()
-  const [absences, setAbsences] = React.useState<AbsenceRow[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [dateVal, setDateVal] = React.useState(todayISO())
-  const [dayPart, setDayPart] = React.useState<DayPart>('mattina')
-  const [fullDay, setFullDay] = React.useState(true)
-  const [reason, setReason] = React.useState<string>('ferie')
-  const [note, setNote] = React.useState('')
-  const [saving, setSaving] = React.useState(false)
-  const [deletingId, setDeletingId] = React.useState<number | null>(null)
-
-  const reload = React.useCallback(() => {
-    if (!technician?.id) return
-    setLoading(true)
-    api.get<AbsenceRow[]>('/servicenow-technician-absences/', { params: { user: technician.id } })
-      .then((r) => setAbsences(r.data))
-      .catch((e) => toast.error(apiErrorToMessage(e)))
-      .finally(() => setLoading(false))
-  }, [technician?.id, toast])
-
-  React.useEffect(() => {
-    if (open) {
-      setDateVal(todayISO()); setDayPart('mattina'); setFullDay(true); setReason('ferie'); setNote('')
-      reload()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, technician?.id])
-
-  const handleAdd = async () => {
-    if (!technician?.id) return
-    setSaving(true)
-    try {
-      if (fullDay) {
-        // Endpoint atomico dedicato: crea mattina+pomeriggio in un'unica
-        // transazione, tutto o niente.
-        await api.post('/servicenow-technician-absences/full-day/', { user: technician.id, date: dateVal, reason, note })
-      } else {
-        await api.post('/servicenow-technician-absences/', { user: technician.id, date: dateVal, day_part: dayPart, reason, note })
-      }
-      toast.success('Assenza registrata')
-      setDateVal(todayISO()); setDayPart('mattina'); setFullDay(true); setReason('ferie'); setNote('')
-      reload()
-      onSaved()
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async (id: number) => {
-    setDeletingId(id)
-    try {
-      await api.delete(`/servicenow-technician-absences/${id}/`)
-      toast.success('Assenza rimossa')
-      reload()
-      onSaved()
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
-        Assenze — {technician?.name}
-        <IconButton size="small" onClick={onClose} aria-label="Chiudi"><CloseIcon fontSize="small" /></IconButton>
-      </DialogTitle>
-      <DialogContent dividers sx={{ pt: 2 }}>
-        <Stack spacing={2}>
-          <Stack spacing={1}>
-            <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>Nuova assenza</Typography>
-            <TextField
-              label="Giorno" type="date" size="small" fullWidth
-              value={dateVal} onChange={(e) => setDateVal(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <FormControlLabel
-              control={<Checkbox size="small" checked={fullDay} onChange={(e) => setFullDay(e.target.checked)} />}
-              label={<Typography variant="body2">Giornata intera</Typography>}
-            />
-            {!fullDay && (
-              <TextField
-                select label="Fascia" size="small" value={dayPart}
-                onChange={(e) => setDayPart(e.target.value as DayPart)}
-                InputLabelProps={{ shrink: true }}
-              >
-                {DAY_PART_OPTIONS.map((d) => <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>)}
-              </TextField>
-            )}
-            <TextField
-              select label="Motivo" size="small" value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            >
-              {ABSENCE_REASONS.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
-            </TextField>
-            <TextField
-              label="Nota (opzionale)" size="small" value={note}
-              onChange={(e) => setNote(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Button variant="contained" size="small" onClick={handleAdd} disabled={saving}>
-              {saving ? <CircularProgress size={16} color="inherit" /> : 'Aggiungi assenza'}
-            </Button>
-          </Stack>
-
-          <Stack spacing={0.75}>
-            <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>Assenze programmate</Typography>
-            {loading ? (
-              <Stack alignItems="center" py={2}><CircularProgress size={18} /></Stack>
-            ) : absences.length === 0 ? (
-              <Typography sx={{ fontSize: '0.8rem', color: 'text.disabled', fontStyle: 'italic' }}>Nessuna assenza registrata</Typography>
-            ) : (
-              absences.map((a) => (
-                <Stack key={a.id} direction="row" alignItems="center" spacing={1} sx={{
-                  px: 1, py: 0.6, borderRadius: 1, bgcolor: 'action.hover',
-                }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>
-                      {formatItDate(a.date)} — {a.day_part_label}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled' }}>
-                      {a.reason_label}
-                      {a.is_hourly ? ` · ${formatItTime(a.time_from)}-${formatItTime(a.time_to)}` : ''}
-                      {a.note ? ` · ${a.note}` : ''}
-                    </Typography>
-                  </Box>
-                  <IconButton size="small" disabled={deletingId === a.id} onClick={() => handleDelete(a.id)} aria-label="Elimina assenza">
-                    {deletingId === a.id ? <CircularProgress size={14} /> : <DeleteOutlineIcon sx={{ fontSize: 16 }} />}
-                  </IconButton>
-                </Stack>
-              ))
-            )}
-          </Stack>
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Chiudi</Button>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-function TriagePanel({ refreshKey, canManage }: { refreshKey: number; canManage: boolean }) {
-  const theme = useTheme()
-  const [data, setData] = React.useState<TriageResponse | null>(null)
-  const [loading, setLoading] = React.useState(true)
-  const [absenceTarget, setAbsenceTarget] = React.useState<TriageTechnician | null>(null)
-
-  const TRIAGE_CATEGORIES = React.useMemo(() => TRIAGE_CATEGORY_DEFS.filter((d) => isServiceNowCategoryVisible(d.value)).map((d) => {
-    const accent = d.value === 'philips' ? theme.palette.primary.main : theme.palette.secondary.main
-    return { ...d, accent, tint: alpha(accent, 0.08) }
-  }), [theme])
-
-  const reload = React.useCallback(() => {
-    setLoading(true)
-    api.get<TriageResponse>('/servicenow-cases/triage/')
-      .then((r) => setData(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
-
-  React.useEffect(() => { reload() }, [refreshKey, reload])
-
-  const todayLabel = React.useMemo(() => {
-    const d = data?.date ? new Date(`${data.date}T00:00:00`) : new Date()
-    const label = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
-    return label.charAt(0).toUpperCase() + label.slice(1)
-  }, [data])
-
-  return (
-    <Box sx={{
-      bgcolor: 'background.paper', border: '0.5px solid', borderColor: 'divider', borderRadius: 1.5, p: 1.5,
-      backgroundImage: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)}, ${alpha(theme.palette.secondary.main, 0.03)})`,
-    }}>
-      <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 1.25 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Triage</Typography>
-        <Typography variant="caption" sx={{ color: 'text.disabled' }}>{todayLabel}</Typography>
-      </Stack>
-      {loading ? (
-        <Stack alignItems="center" justifyContent="center" minHeight={64}>
-          <CircularProgress size={20} />
-        </Stack>
-      ) : (
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-          {TRIAGE_CATEGORIES.map((c) => (
-            <TriageCategoryCard
-              key={c.value} label={c.label} accent={c.accent} tint={c.tint} data={data?.categories[c.value]}
-              canManage={canManage} onManage={setAbsenceTarget}
-            />
-          ))}
-        </Stack>
-      )}
-
-      <TechnicianAbsenceDialog
-        open={absenceTarget !== null}
-        technician={absenceTarget}
-        onClose={() => setAbsenceTarget(null)}
-        onSaved={reload}
-      />
-    </Box>
-  )
-}
-
-// ─── Mobile card ──────────────────────────────────────────────────────────────
-
-function makeRenderServiceNowCaseCard(clientChipPalette: DomainStatusTokens['clientChipPalette']): MobileCardRenderFn<ServiceNowCaseRow> {
-  return ({ row, onOpen }) => {
-  const tc = committenteColor(row.case_type_label, clientChipPalette)
-  return (
-    <Box
-      onClick={() => onOpen(row.id)}
-      sx={{
-        bgcolor: 'background.paper',
-        border: '0.5px solid', borderColor: 'divider', borderRadius: 1,
-        p: 1.25, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 0.75,
-        '&:active': { bgcolor: 'action.hover' },
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, fontFamily: 'monospace' }}>
-            {row.number}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.account}
-          </Typography>
-        </Box>
-        {row.external_url && (
-          <IconButton
-            size="small"
-            component="a"
-            href={row.external_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            sx={{ flexShrink: 0 }}
-            aria-label="Apri in ServiceNow"
-          >
-            <OpenInNewIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        )}
-      </Box>
-      <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-        {row.short_description || '—'}
-      </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {[
-          { label: 'Categoria', value: row.category_label },
-          { label: 'Aperto il', value: formatOpenedAt(row) },
-          { label: 'Assegnato a', value: row.assigned_to_full_name },
-        ].map(({ label, value }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.3 }}>
-              {value || '—'}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-      {row.case_type_label && (
-        <Box sx={{ alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: tc.bg, color: tc.color, border: `0.5px solid ${tc.border}` }}>
-          {row.case_type_label}
-        </Box>
-      )}
-    </Box>
-  )
-  }
-}
-
-// ─── Colonne DataGrid ─────────────────────────────────────────────────────────
-
-// `COLUMNS` era una costante a livello di modulo; ora è una factory chiamata
-// dentro il componente (useMemo su statusTokens = useStatusTokens()) perché
-// il chip "Type" usa committenteColor(), theme-aware, sullo stesso pattern
-// di PurchaseOrders.tsx (colonna "Committente").
-function buildColumns(clientChipPalette: DomainStatusTokens['clientChipPalette']): GridColDef<ServiceNowCaseRow>[] {
-  return [
-  { field: 'number',  headerName: 'Numero', width: 130, renderCell: ({ value }) => (
-    <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{value as string}</Box>
-  ) },
-  { field: 'account', headerName: 'Account', flex: 1, minWidth: 180 },
-  { field: 'category_label', headerName: 'Categoria', width: 100 },
-  {
-    field: 'case_type_label',
-    headerName: 'Type',
-    width: 130,
-    renderCell: ({ row }) => {
-      if (!row.case_type_label) return null
-      const c = committenteColor(row.case_type_label, clientChipPalette)
-      return (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip size="small" label={row.case_type_label} sx={{ bgcolor: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontWeight: 600 }} />
-        </Box>
-      )
-    },
-  },
-  {
-    field: 'opened_date', headerName: 'Aperto il', width: 150,
-    renderCell: ({ row }) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>{formatOpenedAt(row) ?? '—'}</Box>
-    ),
-  },
-  {
-    field: 'external_url',
-    headerName: 'Link',
-    width: 70,
-    sortable: false,
-    filterable: false,
-    renderCell: ({ row }) => row.external_url ? (
-      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-        <IconButton
-          size="small"
-          component="a"
-          href={row.external_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Apri in ServiceNow"
-        >
-          <OpenInNewIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-      </Box>
-    ) : null,
-  },
-  { field: 'assigned_to_full_name', headerName: 'Assegnato a', width: 160 },
-  { field: 'short_description', headerName: 'Descrizione', flex: 1.4, minWidth: 200 },
-  ]
-}
-
-const ALLOWED_ORDERING = ['number', 'account', 'category', 'case_type__name', 'opened_date', 'created_at', 'updated_at', 'deleted_at'] as const
-
-// ─── Pagina ServiceNow Case ───────────────────────────────────────────────────
-
+/** Casi ServiceNow (anteprima sn-base, variante A): riquadro "Oggi" e tabella con le colonne di sempre. Registrazione, non gestione. */
 export default function ServiceNowCases() {
-  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const loc = useLocation()
-
+  const dark = useTheme().palette.mode === 'dark'
   const canChange = hasPerm(PERMS.servicenow.case.change)
-  const canDelete  = hasPerm(PERMS.servicenow.case.delete)
-  const canCreate  = hasPerm(PERMS.servicenow.case.add)
-  const canCreateIssue = hasPerm(PERMS.issues.issue.add)
-  const statusTokens = useStatusTokens()
-  const renderServiceNowCaseCard = React.useMemo(
-    () => makeRenderServiceNowCaseCard(statusTokens.clientChipPalette),
-    [statusTokens],
-  )
-  const columns = React.useMemo(
-    () => buildColumns(statusTokens.clientChipPalette),
-    [statusTokens],
-  )
+  const canDelete = hasPerm(PERMS.servicenow.case.delete)
+  const canCreate = hasPerm(PERMS.servicenow.case.add)
+  const canIssue = hasPerm(PERMS.issues.issue.add)
 
-  // Dialog "Import storico" (CSV → creazione bulk di case, vedi
-  // ImportHistoricalDialog.tsx). Stessa permission 'add' della creazione
-  // singola: il backend richiede servicenow.add_servicenowcase per entrambi
-  // gli endpoint di import.
-  const [importHistoricalOpen, setImportHistoricalOpen] = React.useState(false)
+  const grid = useServerGrid({ defaultOrdering: '-created_at', allowedOrderingFields: ['number', 'account', 'category', 'case_type__name', 'opened_date', 'assigned_to__last_name', 'created_at', 'updated_at', 'deleted_at'] })
+  const [vista, setVista] = useUrlStringParam('vista')
+  const view: View = VIEWS.find((v) => v.key === vista)?.key ?? 'all'
+  const viewParams = React.useCallback((v: View): Record<string, string | number> => (
+    v === 'today' ? { opened_date: todayISO() } : v === 'mine' ? (me ? { assigned_to: me.id } : {}) : v === 'unassigned' ? { unassigned: 'true' } : {}
+  ), [me])
+  const [tick, setTick] = React.useState(0)
+  const bump = () => setTick((x) => x + 1)
 
-  // Switch TEMPORANEO in prova: modalità di notifica per i case Philips
-  // ("teams" storico o "modal" — vedi GET /servicenow-cases/notification-settings/
-  // e servicenow/notifications.py lato backend). Default prudente su "teams"
-  // finché la risposta non arriva, per non aprire il modal per errore.
-  const [philipsNotifyMode, setPhilipsNotifyMode] = React.useState<'teams' | 'modal'>('teams')
-  React.useEffect(() => {
-    api
-      .get<{ philips_notify_mode: 'teams' | 'modal' }>('/servicenow-cases/notification-settings/')
-      .then((r) => setPhilipsNotifyMode(r.data.philips_notify_mode))
-      .catch(() => {})
-  }, [])
-
-  // Modal di copia mostrato al posto della notifica Teams per i case
-  // Philips quando philipsNotifyMode === 'modal'.
-  const [philipsCopyOpen, setPhilipsCopyOpen] = React.useState(false)
-  const [philipsCopyText, setPhilipsCopyText] = React.useState('')
-
-  const grid = useServerGrid({
-    defaultOrdering: '-created_at',
-    allowedOrderingFields: ALLOWED_ORDERING,
-  })
-
-  // ── Triage (pannello riepilogo casi di oggi) ────────────────────────────────
-  const [triageRefreshKey, setTriageRefreshKey] = React.useState(0)
-
-  // ── Lista ─────────────────────────────────────────────────────────────────
   const listParams = React.useMemo(() => buildDrfListParams({
-    search:         grid.search,
-    ordering:       grid.ordering,
-    page0:          grid.paginationModel.page,
-    pageSize:       grid.paginationModel.pageSize,
-    includeDeleted: grid.includeDeleted,
-    onlyDeleted:    grid.onlyDeleted,
-  }), [grid.search, grid.ordering, grid.paginationModel, grid.includeDeleted, grid.onlyDeleted])
+    search: grid.search, ordering: grid.ordering, page0: grid.paginationModel.page, pageSize: grid.paginationModel.pageSize,
+    includeDeleted: grid.includeDeleted, onlyDeleted: grid.onlyDeleted, extra: viewParams(view),
+  }), [grid.search, grid.ordering, grid.paginationModel, grid.includeDeleted, grid.onlyDeleted, view, viewParams])
+  const { rows, rowCount, loading, reload } = useDrfList<ServiceNowCaseRow>(PATH, listParams, (e) => toast.error(apiErrorToMessage(e)))
+  const reloadAll = React.useCallback(() => { reload(); bump() }, [reload])
 
-  const { rows, rowCount, loading, reload: reloadList } = useDrfList<ServiceNowCaseRow>(
-    SERVICENOW_CASES_PATH,
-    listParams,
-    (e) => toast.error(apiErrorToMessage(e)),
-  )
-
-  // ── Detail drawer ─────────────────────────────────────────────────────────
-  const [drawerOpen, setDrawerOpen]       = React.useState(false)
-  const [drawerTab, setDrawerTab]         = React.useState(0)
-  const [selectedId, setSelectedId]       = React.useState<number | null>(null)
-  const [detail, setDetail]               = React.useState<ServiceNowCaseRow | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-
-  const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean) => {
-    setDetailLoading(true)
-    setDetail(null)
-    try {
-      const inc = forceIncludeDeleted ?? grid.includeDeleted
-      const incParams = includeDeletedParams(inc)
-      const res = await api.get<ServiceNowCaseRow>(
-        itemPath(SERVICENOW_CASES_PATH, id),
-        incParams ? { params: incParams } : undefined,
-      )
-      setDetail(res.data)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDetailLoading(false)
-    }
-  }, [toast, grid.includeDeleted])
-
-  // Apertura drawer da URL (?open=ID)
-  const lastOpenRef = React.useRef<number | null>(null)
+  // Conteggi delle viste.
+  const [counts, setCounts] = React.useState<Partial<Record<View, number>>>({})
   React.useEffect(() => {
-    if (!grid.openId) { lastOpenRef.current = null; return }
-    const id = grid.openId
-    if (lastOpenRef.current === id) return
-    lastOpenRef.current = id
-    setSelectedId(id); setDrawerOpen(true); setDrawerTab(0)
-    void loadDetail(id)
-  }, [grid.openId, loadDetail])
+    let alive = true
+    Promise.all(VIEWS.map((v) => api.get<{ count?: number }>(PATH, { params: { ...viewParams(v.key), page_size: 1 } }).then((r) => [v.key, r.data.count ?? 0] as const).catch(() => [v.key, 0] as const)))
+      .then((l) => { if (alive) setCounts(Object.fromEntries(l)) })
+    return () => { alive = false }
+  }, [viewParams, tick])
 
-  const openDrawer = React.useCallback((id: number) => {
-    lastOpenRef.current = id
-    setSelectedId(id); setDrawerOpen(true); setDrawerTab(0)
-    void loadDetail(id)
-    grid.setOpenId(id)
-  }, [grid, loadDetail])
-
-  const closeDrawer = () => {
-    lastOpenRef.current = null
-    setDrawerOpen(false)
-    grid.setOpenId(null)
+  // Type: il colore segue l'ordine configurato nella categoria.
+  const [types, setTypes] = React.useState<CaseTypeOption[]>([])
+  React.useEffect(() => { api.get<CaseTypeOption[]>('/servicenow-case-types/').then((r) => setTypes(r.data)).catch(() => {}) }, [])
+  const typeTag = (row: ServiceNowCaseRow) => {
+    if (!row.case_type_label) return null
+    const names = types.filter((t) => t.category === row.category).map((t) => t.name)
+    return (
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.6, height: 20, pl: 0.75, pr: 0.9, borderRadius: '5px', fontSize: 11.5, fontWeight: 650, bgcolor: 'archie.neutralBg', whiteSpace: 'nowrap' }}>
+        <Box component="i" sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: typeColor(names, row.case_type_label, dark) }} />{row.case_type_label}
+      </Box>
+    )
   }
 
-  // ── Form drawer create/edit ───────────────────────────────────────────────
-  const [formOpen, setFormOpen]     = React.useState(false)
+  // ── Notifica Philips (testo da copiare) ──
+  const [philipsMode, setPhilipsMode] = React.useState<'teams' | 'modal'>('teams')
+  React.useEffect(() => { api.get<{ philips_notify_mode: 'teams' | 'modal' }>(`${PATH}notification-settings/`).then((r) => setPhilipsMode(r.data.philips_notify_mode)).catch(() => {}) }, [])
+  const [copyText, setCopyText] = React.useState<string | null>(null)
+  const philipsText = (r: ServiceNowCaseRow) => buildPhilipsAssignmentCopyText({ assignedToLabel: r.assigned_to_full_name || r.assigned_to_username, number: r.number, account: r.account, shortDescription: r.short_description, caseTypeLabel: r.case_type_label })
+
+  // ── Dettaglio ──
+  const [detail, setDetail] = React.useState<ServiceNowCaseRow | null>(null)
+  const [busy, setBusy] = React.useState(false)
+  const openId = grid.openId
+  React.useEffect(() => {
+    if (!openId) { setDetail(null); return }
+    let alive = true
+    const fromList = rows.find((r) => r.id === openId)
+    if (fromList) setDetail(fromList)
+    api.get<ServiceNowCaseRow>(itemPath(PATH, openId), { params: { include_deleted: 1 } }).then((r) => { if (alive) setDetail(r.data) }).catch((e) => { if (alive) toast.error(apiErrorToMessage(e)) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, tick])
+  const idx = detail ? rows.findIndex((r) => r.id === detail.id) : -1
+
+  // ── Nuovo / modifica ──
+  const [formOpen, setFormOpen] = React.useState(false)
   const [formTarget, setFormTarget] = React.useState<ServiceNowCaseRow | null>(null)
-  const [formSaving, setFormSaving] = React.useState(false)
-
-  const openEdit     = () => { if (detail) { setFormTarget(detail); setFormOpen(true) } }
-  const openCreate   = React.useCallback(() => { setFormTarget(null); setFormOpen(true) }, [])
-
-  // Apri form create se navigato con state { openCreate: true } (da SpeedDial / mobile nav)
-  const openCreateOnceRef = React.useRef(false)
+  const [saving, setSaving] = React.useState(false)
+  const openForm = React.useCallback((r: ServiceNowCaseRow | null) => { setFormTarget(r); setFormOpen(true) }, [])
   React.useEffect(() => {
     const st = loc.state as unknown
-    if (!isRecord(st) || st['openCreate'] !== true) { openCreateOnceRef.current = false; return }
-    if (openCreateOnceRef.current) return
-    openCreateOnceRef.current = true
-    navigate(loc.pathname, { replace: true, state: {} })
-    openCreate()
-  }, [loc, navigate, openCreate])
-
-  const handleSave = async (form: ServiceNowCaseForm, screenshotFile: File | null) => {
-    setFormSaving(true)
+    if (isRecord(st) && st['openCreate'] === true) { navigate(loc.pathname + loc.search, { replace: true, state: {} }); openForm(null) }
+  }, [loc, navigate, openForm])
+  const save = async (form: ServiceNowCaseForm, file: File | null) => {
+    setSaving(true)
     try {
       const fd = new FormData()
-      fd.append('number', form.number)
-      fd.append('account', form.account)
-      fd.append('category', form.category)
+      fd.append('number', form.number); fd.append('account', form.account); fd.append('category', form.category)
       if (form.case_type !== '') fd.append('case_type', String(form.case_type))
       if (form.opened_date) fd.append('opened_date', form.opened_date)
       if (form.opened_time) fd.append('opened_time', form.opened_time)
       fd.append('short_description', form.short_description)
       if (form.assigned_to !== null) fd.append('assigned_to', String(form.assigned_to))
       fd.append('external_url', form.external_url)
-      if (screenshotFile) fd.append('screenshot', screenshotFile)
-
+      if (file) fd.append('screenshot', file)
+      const cfg = { headers: { 'Content-Type': 'multipart/form-data' } }
       if (formTarget) {
-        await api.patch(itemPath(SERVICENOW_CASES_PATH, formTarget.id), fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        toast.success('ServiceNow Case aggiornato')
-        if (selectedId === formTarget.id) await loadDetail(formTarget.id)
-        reloadList()
-        setTriageRefreshKey((k) => k + 1)
+        await api.patch(itemPath(PATH, formTarget.id), fd, cfg)
+        toast.success('Caso aggiornato.')
       } else {
-        const res = await api.post<ServiceNowCaseRow>(SERVICENOW_CASES_PATH, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        toast.success('ServiceNow Case creato')
-        reloadList()
-        setTriageRefreshKey((k) => k + 1)
-        openDrawer(res.data.id)
-        // Switch TEMPORANEO in prova: per i case Philips con modalità
-        // "modal" il backend non ha inviato alcuna notifica Teams (vedi
-        // perform_create) — mostriamo qui il testo pronto da copiare.
-        if (res.data.category === 'philips' && philipsNotifyMode === 'modal') {
-          setPhilipsCopyText(buildPhilipsAssignmentCopyText({
-            assignedToLabel: res.data.assigned_to_full_name || res.data.assigned_to_username,
-            number: res.data.number,
-            account: res.data.account,
-            shortDescription: res.data.short_description,
-            caseTypeLabel: res.data.case_type_label,
-          }))
-          setPhilipsCopyOpen(true)
-        }
+        const { data } = await api.post<ServiceNowCaseRow>(PATH, fd, cfg)
+        toast.success('Caso registrato.')
+        grid.setOpenId(data.id)
+        if (data.category === 'philips' && philipsMode === 'modal') setCopyText(philipsText(data))
       }
       setFormOpen(false)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setFormSaving(false)
-    }
+      reloadAll()
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setSaving(false) }
   }
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-  const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
-  const [deleteBusy, setDeleteBusy]       = React.useState(false)
-
-  const openDelete = (id: number) => {
-    if (selectedId !== id) {
-      void loadDetail(id)
-      setSelectedId(id); setDrawerOpen(true)
-    }
-    setDeleteDlgOpen(true)
-  }
-
+  // ── Elimina / ripristina ──
+  const [toDelete, setToDelete] = React.useState<ServiceNowCaseRow | null>(null)
   const doDelete = async () => {
-    if (!detail) return
-    setDeleteBusy(true)
-    try {
-      await api.delete(itemPath(SERVICENOW_CASES_PATH, detail.id))
-      toast.success('ServiceNow Case eliminato')
-      grid.setViewMode('all', { keepOpen: true })
-      reloadList()
-      await loadDetail(detail.id, true)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleteBusy(false)
-      setDeleteDlgOpen(false)
-    }
+    if (!toDelete) return
+    setBusy(true)
+    try { await api.delete(itemPath(PATH, toDelete.id)); toast.success('Caso spostato nel cestino.'); setToDelete(null); reloadAll() } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+  }
+  const restore = async (r: ServiceNowCaseRow) => {
+    setBusy(true)
+    try { await api.post(itemActionPath(PATH, r.id, 'restore')); toast.success('Caso ripristinato.'); reloadAll() } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
   }
 
-  // ── Restore ───────────────────────────────────────────────────────────────
-  const [restoreBusy, setRestoreBusy] = React.useState(false)
+  // ── Crea issue / task dal caso ──
+  const createIssue = (r: ServiceNowCaseRow) => navigate('/issues', { state: { openCreate: true, createFromServiceNowCase: { number: r.number, account: r.account, shortDescription: r.short_description } } })
+  const createTask = (r: ServiceNowCaseRow) => navigate('/tasks', { state: { createTaskPrefill: taskPrefillFromCase(r) } })
 
-  const doRestore = async () => {
-    if (!detail) return
-    setRestoreBusy(true)
-    try {
-      await api.post(itemActionPath(SERVICENOW_CASES_PATH, detail.id, 'restore'))
-      toast.success('ServiceNow Case ripristinato')
-      reloadList()
-      await loadDetail(detail.id)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setRestoreBusy(false)
-    }
-  }
+  const [ctx, setCtx] = React.useState<{ row: ServiceNowCaseRow; x: number; y: number } | null>(null)
+  const ctxItems: RowContextMenuItem[] = !ctx ? [] : ctx.row.deleted_at ? [
+    { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => { grid.setOpenId(ctx.row.id); setCtx(null) } },
+    { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, hidden: !canChange, onClick: () => { void restore(ctx.row); setCtx(null) } },
+  ] : [
+    { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => { grid.setOpenId(ctx.row.id); setCtx(null) } },
+    { key: 'issue', label: 'Crea issue', icon: <BugReportOutlinedIcon fontSize="small" />, hidden: !canIssue, onClick: () => { setCtx(null); createIssue(ctx.row) } },
+    { key: 'task', label: 'Crea task', icon: <TaskAltOutlinedIcon fontSize="small" />, onClick: () => { setCtx(null); createTask(ctx.row) } },
+    { key: 'msg', label: 'Messaggio', icon: <ChatBubbleOutlineIcon fontSize="small" />, hidden: ctx.row.category !== 'philips', onClick: () => { setCopyText(philipsText(ctx.row)); setCtx(null) } },
+    { key: 'edit', label: 'Modifica', icon: <EditOutlinedIcon fontSize="small" />, hidden: !canChange, onClick: () => { openForm(ctx.row); setCtx(null) } },
+    { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, hidden: !canDelete, tone: 'danger' as const, onClick: () => { setToDelete(ctx.row); setCtx(null) } },
+  ]
+  const detailMenu = (r: ServiceNowCaseRow): DetailMenuItem[] => [
+    ...(canIssue ? [{ label: 'Crea issue', onClick: () => createIssue(r) }] : []),
+    { label: 'Crea task', onClick: () => createTask(r) },
+    ...(r.category === 'philips' ? [{ label: 'Messaggio per il tecnico', onClick: () => setCopyText(philipsText(r)) }] : []),
+  ]
 
-  // ── Context menu ──────────────────────────────────────────────────────────
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: ServiceNowCaseRow; mouseX: number; mouseY: number
-  } | null>(null)
+  // ── Colonne (le stesse di prima) ──
+  const columns: GridColDef<ServiceNowCaseRow>[] = [
+    { field: 'number', headerName: 'Numero', width: 120, renderCell: (p) => <Box sx={{ ...cell, ...MONO, fontSize: 12.5, fontWeight: 500 }}>{p.row.number}</Box> },
+    { field: 'account', headerName: 'Account', flex: 1, minWidth: 180, renderCell: (p) => <Box sx={cell}><Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{p.row.account}</Typography></Box> },
+    { field: 'category', headerName: 'Categoria', width: 100, renderCell: (p) => <Box sx={{ ...cell, fontSize: 13, color: 'text.secondary' }}>{p.row.category_label}</Box> },
+    { field: 'case_type__name', headerName: 'Type', width: 110, renderCell: (p) => <Box sx={cell}>{typeTag(p.row)}</Box> },
+    { field: 'opened_date', headerName: 'Aperto il', width: 150, renderCell: (p) => <Box sx={{ ...cell, fontSize: 12.5, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{formatOpenedAt(p.row) ?? '—'}</Box> },
+    { field: 'external_url', headerName: 'Link', width: 60, sortable: false, renderCell: (p) => p.row.external_url ? (
+      <Box sx={cell}><Tooltip title="Apri in ServiceNow"><IconButton size="small" component="a" href={p.row.external_url} target="_blank" rel="noopener noreferrer" onClick={(e: React.MouseEvent) => e.stopPropagation()} aria-label="Apri in ServiceNow" sx={{ width: 26, height: 26 }}><CampoIcon name="arrowR" size={13} /></IconButton></Tooltip></Box>
+    ) : null },
+    { field: 'assigned_to__last_name', headerName: 'Assegnato a', width: 160, renderCell: (p) => (
+      <Box sx={{ ...cell, gap: 1 }}>
+        {p.row.assigned_to_full_name ? (<>
+          <Box component="span" aria-hidden sx={{ display: 'inline-grid', placeItems: 'center', flex: 'none', width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700, lineHeight: 1, bgcolor: (t) => t.palette.archie.tints.mint.bg, color: (t) => t.palette.archie.tints.mint.ink }}>{initialsOf(p.row.assigned_to_full_name)}</Box>
+          <Typography noWrap sx={{ fontSize: 13 }}>{p.row.assigned_to_full_name}</Typography>
+        </>) : <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: 'warning.main' }}>Da assegnare</Typography>}
+      </Box>
+    ) },
+    { field: 'short_description', headerName: 'Descrizione', flex: 1.4, minWidth: 200, sortable: false, renderCell: (p) => <Box sx={cell}><Typography noWrap sx={{ fontSize: 12.5, color: 'text.secondary' }}>{p.row.short_description || '—'}</Typography></Box> },
+  ]
 
-  const handleRowContextMenu = React.useCallback(
-    (row: ServiceNowCaseRow, event: React.MouseEvent<HTMLElement>) => {
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
-    }, [],
+  const mobileCard: MobileCardRenderFn<ServiceNowCaseRow> = ({ row, onOpen }) => (
+    <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, display: 'grid', gap: 0.5, cursor: 'pointer' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box component="span" sx={{ ...MONO, fontSize: 12.5 }}>{row.number}</Box>{typeTag(row)}
+        <Typography sx={{ ml: 'auto', fontSize: 11.5, color: 'text.secondary' }}>{formatOpenedAt(row) ?? ''}</Typography>
+      </Box>
+      <Typography noWrap sx={{ fontSize: 13, fontWeight: 600 }}>{row.account}</Typography>
+      <Typography sx={{ fontSize: 12, color: 'text.secondary', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{row.short_description || '—'}</Typography>
+      <Typography sx={{ fontSize: 12, color: row.assigned_to_full_name ? 'text.primary' : 'warning.main', fontWeight: row.assigned_to_full_name ? 400 : 600 }}>{row.assigned_to_full_name || 'Da assegnare'}</Typography>
+    </Box>
   )
 
-  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
-    const row = contextMenu?.row
-    if (!row) return []
-    if (row.deleted_at) {
-      return [
-        {
-          key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />,
-          onClick: () => { openDrawer(row.id); setContextMenu(null) },
-        },
-        {
-          key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />,
-          disabled: restoreBusy,
-          onClick: async () => {
-            setContextMenu(null)
-            setRestoreBusy(true)
-            try {
-              await api.post(itemActionPath(SERVICENOW_CASES_PATH, row.id, 'restore'))
-              toast.success('ServiceNow Case ripristinato')
-              reloadList()
-            } catch (e) { toast.error(apiErrorToMessage(e)) }
-            finally { setRestoreBusy(false) }
-          },
-        },
-      ]
-    }
-    return [
-      { key: 'open',   label: 'Apri',     icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => { openDrawer(row.id); setContextMenu(null) } },
-      {
-        key: 'philipsMessage', label: 'Messaggio', icon: <ChatBubbleOutlineIcon fontSize="small" />,
-        hidden: row.category !== 'philips',
-        onClick: () => {
-          setContextMenu(null)
-          setPhilipsCopyText(buildPhilipsAssignmentCopyText({
-            assignedToLabel: row.assigned_to_full_name || row.assigned_to_username,
-            number: row.number,
-            account: row.account,
-            shortDescription: row.short_description,
-            caseTypeLabel: row.case_type_label,
-          }))
-          setPhilipsCopyOpen(true)
-        },
-      },
-      {
-        key: 'createIssue', label: 'Crea Issue', icon: <BugReportOutlinedIcon fontSize="small" />,
-        hidden: !canCreateIssue,
-        onClick: () => {
-          setContextMenu(null)
-          navigate('/issues', {
-            state: {
-              openCreate: true,
-              createFromServiceNowCase: {
-                number: row.number,
-                account: row.account,
-                shortDescription: row.short_description,
-              },
-            },
-          })
-        },
-      },
-      { key: 'edit',   label: 'Modifica', icon: <EditIcon fontSize="small" />,               hidden: !canChange, onClick: () => { setFormTarget(row); setFormOpen(true); setContextMenu(null) } },
-      { key: 'delete', label: 'Elimina',  icon: <DeleteOutlineIcon fontSize="small" />,      hidden: !canDelete, tone: 'danger' as const, onClick: () => { openDelete(row.id); setContextMenu(null) } },
-    ]
-  }, [contextMenu, canChange, canDelete, canCreateIssue, restoreBusy, openDrawer, reloadList, toast, navigate])
-
-  // ── Empty state ───────────────────────────────────────────────────────────
-  const emptyState = React.useMemo(() => {
-    if (grid.view === 'deleted' && !grid.search.trim())
-      return { title: 'Cestino vuoto', subtitle: 'Non ci sono ServiceNow Case eliminati.' }
-    if (!grid.search.trim())
-      return { title: 'Nessun ServiceNow Case', subtitle: 'Crea un nuovo case da uno screenshot.' }
-    return { title: 'Nessun risultato', subtitle: 'Prova a cambiare i termini di ricerca.' }
-  }, [grid.view, grid.search])
-
-  // ─────────────────────────────────────────────────────────────────────────
+  const [importOpen, setImportOpen] = React.useState(false)
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead title="ServiceNow" actions={<>
+        {canCreate ? <Tooltip title="Importa lo storico da CSV"><IconButton aria-label="Importa lo storico da CSV" onClick={() => setImportOpen(true)} sx={{ width: 36, height: 36 }}><CampoIcon name="upload" /></IconButton></Tooltip> : null}
+        {canCreate ? <Button variant="contained" startIcon={<CampoIcon name="plus" size={15} />} onClick={() => openForm(null)}>Nuovo caso</Button> : null}
+      </>} />
+      <TodayPanel refreshKey={tick} canManage={canChange} onUnassigned={() => setVista('unassigned', { patch: { page: 1 }, keepOpen: true })} />
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs value={view} onChange={(k) => setVista(k === 'all' ? '' : k, { patch: { page: 1 }, keepOpen: true })}
+          tabs={VIEWS.map((v) => ({ key: v.key, label: v.label, count: counts[v.key] ?? null, tone: v.alert ? 'alert' : 'default' }))} />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={mobileCard}
+          header={<TableBar filters={[]} onRemoveFilter={() => {}} onClearFilters={() => {}} q={grid.q} onQChange={grid.setQ} searchPlaceholder="Cerca numero, account, descrizione…" />}
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca casi…' }}
+          grid={{
+            pageKey: 'servicenow-cases',
+            autoHeight: true,
+            username: me?.username,
+            emptyState: grid.search.trim() ? { title: 'Nessun risultato', subtitle: 'Prova con un altro numero o account.' } : { title: view === 'all' ? 'Nessun caso' : 'Nessun caso in questa vista', subtitle: view === 'all' ? 'Registra un caso incollando lo screenshot.' : '' },
+            rows,
+            columns,
+            loading,
+            rowCount,
+            rowHeight: 48,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: (id) => grid.setOpenId(id),
+            onRowContextMenu: (row, e) => setCtx({ row, x: e.clientX + 2, y: e.clientY - 6 }),
+            getRowClassName: (row) => (detail?.id === row.id ? 'Mui-selected' : undefined),
+            sx: { cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
-      <TriagePanel refreshKey={triageRefreshKey} canManage={canChange} />
-
-      <EntityListCard
-        mobileCard={renderServiceNowCaseCard}
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-          rightActions: canCreate ? (
-            <Tooltip title="Import storico da CSV" arrow>
-              <span>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<HistoryOutlinedIcon sx={{ fontSize: 16 }} />}
-                  onClick={() => setImportHistoricalOpen(true)}
-                >
-                  Import storico
-                </Button>
-              </span>
-            </Tooltip>
-          ) : undefined,
-        }}
-        grid={{
-          pageKey: 'servicenow-cases',
-          username: me?.username,
-          emptyState,
-          rows,
-          columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          onRowContextMenu: handleRowContextMenu,
-          sx: {
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-      />
-
-      {/* ── Drawer dettaglio ── */}
-      <ServiceNowCaseDrawer
-        open={drawerOpen}
-        onClose={closeDrawer}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        drawerTab={drawerTab}
-        onTabChange={setDrawerTab}
-        canChange={canChange}
-        canDelete={canDelete}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        onEdit={openEdit}
-        onDelete={() => setDeleteDlgOpen(true)}
-        onRestore={doRestore}
-      />
-
-      {/* ── Form drawer create/edit ── */}
-      <ServiceNowCaseFormDrawer
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSave={handleSave}
-        initial={formTarget}
-        saving={formSaving}
-      />
-
-      {/* ── Conferma eliminazione ── */}
-      <ConfirmDeleteDialog
-        open={deleteDlgOpen}
-        busy={deleteBusy}
-        title="Confermi eliminazione?"
-        description="Il ServiceNow Case verrà spostato nel cestino e potrà essere ripristinato."
-        onClose={() => setDeleteDlgOpen(false)}
-        onConfirm={doDelete}
-      />
-
-      {/* ── Modal copia testo Philips (switch TEMPORANEO al posto di Teams) ── */}
-      <PhilipsAssignmentCopyDialog
-        open={philipsCopyOpen}
-        onClose={() => setPhilipsCopyOpen(false)}
-        text={philipsCopyText}
-      />
-
-      {/* ── Import storico da CSV ── */}
-      <ImportHistoricalDialog
-        open={importHistoricalOpen}
-        onClose={() => setImportHistoricalOpen(false)}
-        onImported={() => { reloadList(); setTriageRefreshKey((k) => k + 1) }}
-      />
-
-      {/* ── Context menu ── */}
-      <RowContextMenu
-        open={Boolean(contextMenu)}
-        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
-        onClose={() => setContextMenu(null)}
-        items={contextMenuItems}
-      />
-
+      {detail && openId === detail.id ? (
+        <CaseDetailCard c={detail} busy={busy} canChange={canChange} canDelete={canDelete} menu={detailMenu(detail)}
+          position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
+          onPrev={idx > 0 ? () => grid.setOpenId(rows[idx - 1].id) : undefined}
+          onNext={idx >= 0 && idx < rows.length - 1 ? () => grid.setOpenId(rows[idx + 1].id) : undefined}
+          onClose={() => grid.setOpenId(null)} onEdit={() => openForm(detail)} onDelete={() => setToDelete(detail)} onRestore={() => void restore(detail)} />
+      ) : null}
+      <CaseDialog open={formOpen} onClose={() => setFormOpen(false)} onSave={save} initial={formTarget} saving={saving} />
+      <ConfirmDeleteDialog open={toDelete !== null} busy={busy} title={toDelete ? `Eliminare il caso ${toDelete.number}?` : ''} description="Finisce nel Cestino e si può ripristinare." onClose={() => setToDelete(null)} onConfirm={() => void doDelete()} />
+      <PhilipsAssignmentCopyDialog open={copyText !== null} onClose={() => setCopyText(null)} text={copyText ?? ''} />
+      <ImportHistoricalDialog open={importOpen} onClose={() => setImportOpen(false)} onImported={reloadAll} />
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
     </Stack>
   )
 }

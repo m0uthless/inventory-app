@@ -130,12 +130,11 @@ export default function NotificationsBell({ enabled }: Props) {
   return (
     <>
       <Tooltip title={tooltipTitle}>
-        <IconButton onClick={(e) => setAnchor(e.currentTarget)} size="small">
-          <Badge badgeContent={unreadCount || null} color="warning" max={99}>
-            <NotificationsOutlinedIcon
-              fontSize="small"
-              sx={{ color: unreadCount ? 'warning.main' : 'inherit' }}
-            />
+        <IconButton onClick={(e) => setAnchor(e.currentTarget)} aria-label={tooltipTitle}
+          sx={{ '&:hover': { bgcolor: 'background.paper' } }}>
+          <Badge variant="dot" invisible={!unreadCount} color="error"
+            sx={{ '& .MuiBadge-dot': { boxShadow: (t) => `0 0 0 1.5px ${t.palette.archie.frame}` } }}>
+            <NotificationsOutlinedIcon sx={{ fontSize: 20 }} />
           </Badge>
         </IconButton>
       </Tooltip>

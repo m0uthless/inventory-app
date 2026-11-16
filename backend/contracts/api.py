@@ -7,7 +7,9 @@ Entrambi i ViewSet sono riservati agli utenti interni: lettura con
 """
 from __future__ import annotations
 
-from django.db.models import Prefetch
+from datetime import timedelta
+
+from django.db.models import Count, DateField, ExpressionWrapper, F, Prefetch, Q, Sum, Value
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -25,7 +27,7 @@ from core.uploads import validate_upload
 from device.models import Device
 from portal.permissions import IsInternalOrPortalDedicatedApp, PortalModelPermissions
 
-from .models import Contract, Seller
+from .models import EXPIRING_DAYS, Contract, ContractStatus, Seller
 
 DOCUMENT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB
 DOCUMENT_ALLOWED_EXTENSIONS = ["pdf"]
@@ -211,6 +213,25 @@ class ContractSerializer(serializers.ModelSerializer):
         return attrs
 
 
+
+def expiry_q(state: str, today) -> Q:
+    """Q equivalente a `Contract.expiry_state_on(today) == state` (solo contratti attivi)."""
+    expiring_until = today + timedelta(days=EXPIRING_DAYS)
+    # Termine di disdetta raggiunto: end_date - notice_days <= today  ⇔  end_date <= today + notice_days
+    notice_reached = Q(end_date__lte=ExpressionWrapper(Value(today) + F("notice_days") * timedelta(days=1), output_field=DateField()))
+    active = Q(status=ContractStatus.ATTIVO)
+    not_expiring = Q(end_date__gt=expiring_until)
+    by_state = {
+        "expired": Q(end_date__lt=today),
+        "expiring": Q(end_date__gte=today, end_date__lte=expiring_until),
+        "notice": not_expiring & notice_reached,
+        "ok": not_expiring & ~notice_reached,
+    }
+    if state == "attention":
+        return active & (by_state["expiring"] | by_state["notice"])
+    return active & by_state[state]
+
+
 class ContractFilter(filters.FilterSet):
     customer = filters.NumberFilter(field_name="customer_id")
     seller   = filters.NumberFilter(field_name="seller_id")
@@ -218,10 +239,19 @@ class ContractFilter(filters.FilterSet):
     # Contratti attivi nell'anno indicato: start_date.year <= y <= end_date.year.
     # Limitato a 1..9999 (range di datetime.date): fuori range → 400, non 500.
     year = filters.NumberFilter(method="filter_year", min_value=1, max_value=9999)
+    # Stato di scadenza come Contract.expiry_state_on, tradotto in query:
+    # ok | notice | expiring | expired, più "attention" = notice + expiring.
+    expiry = filters.ChoiceFilter(
+        method="filter_expiry",
+        choices=[(k, k) for k in ("ok", "notice", "expiring", "expired", "attention")],
+    )
 
     class Meta:
         model  = Contract
         fields = ["customer", "seller", "company", "status", "contract_type", "auto_renew", "year"]
+
+    def filter_expiry(self, queryset, name, value):
+        return queryset.filter(expiry_q(value, timezone.localdate()))
 
     def filter_year(self, queryset, name, value):
         if value is None:
@@ -274,6 +304,46 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
             Prefetch("devices", queryset=Device.objects.filter(deleted_at__isnull=True).select_related("type")),
         )
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    # ── Indicatori della pagina ───────────────────────────────────────────────
+
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        """Conteggi per stato e per scadenza, prossime scadenze e (con il permesso
+        dedicato) il valore dei contratti attivi non scaduti. Accetta gli stessi
+        filtri cliente/venditore/società della lista."""
+        today = timezone.localdate()
+        base = self.get_queryset()
+        for key in ("customer", "seller", "company"):
+            v = request.query_params.get(key)
+            if v and v.isdigit():
+                base = base.filter(**{f"{key}_id": int(v)})
+        counts = base.aggregate(
+            **{f"st_{s}": Count("id", filter=Q(status=s)) for s in ContractStatus.values},
+            **{f"ex_{s}": Count("id", filter=expiry_q(s, today)) for s in ("ok", "notice", "expiring", "expired")},
+        )
+        upcoming = (
+            base.filter(status=ContractStatus.ATTIVO, end_date__gte=today)
+            .order_by("end_date", "id")[:6]
+        )
+        data = {
+            "active": counts["st_attivo"],
+            "by_status": {s: counts[f"st_{s}"] for s in ContractStatus.values},
+            "by_expiry": {s: counts[f"ex_{s}"] for s in ("ok", "notice", "expiring", "expired")},
+            "next_deadlines": [
+                {
+                    "id": c.id, "code": c.code, "title": c.title,
+                    "customer_name": c.customer.display_name or c.customer.name,
+                    "end_date": c.end_date.isoformat(), "notice_deadline": c.notice_deadline.isoformat(),
+                    "expiry_state": c.expiry_state_on(today),
+                }
+                for c in upcoming
+            ],
+        }
+        if request.user.has_perm(VALUE_PERM):
+            total = base.filter(status=ContractStatus.ATTIVO, end_date__gte=today).aggregate(v=Sum("total_value"))["v"]
+            data["active_value"] = f"{(total or 0):.2f}"
+        return Response(data)
 
     # ── Documento PDF ─────────────────────────────────────────────────────────
 

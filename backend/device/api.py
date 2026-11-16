@@ -295,6 +295,8 @@ class DeviceWifiViewSet(PortalTenantWriteMixin, PortalScopedMixin, SoftDeleteAud
     della password."""
 
     serializer_class = DeviceWifiSerializer
+    # H-11 (QA 2026-11-15): la password del certificato non va mai nell'audit.
+    audit_masked_fields = ("pass_certificato",)
     # Fix 2.5: sostituisce IsPortalEditor con la matrice reale
     # view/add/change/delete_devicewifi.
     permission_classes = [IsPortalUserOrInternal, PortalModelPermissions]

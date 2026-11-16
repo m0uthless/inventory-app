@@ -4,6 +4,7 @@ import { Box, CircularProgress } from '@mui/material'
 import { AppLayout } from './layout/AppLayout'
 import { RequirePerm } from './auth/RequirePerm'
 import { RequireAnyPerm } from './auth/RequireAnyPerm'
+import { RequireSuperuser } from './modules/RequireSuperuser'
 
 // Route-level code splitting (reduces the large Vite chunk warning)
 const Login = lazy(() => import('./pages/Login'))
@@ -26,10 +27,10 @@ const Search = lazy(() => import('./pages/Search'))
 const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
 const Profile = lazy(() => import('./pages/Profile'))
+const Modules = lazy(() => import('./pages/Modules'))
 const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
-const ServiceNowStats = lazy(() => import('./pages/ServiceNowStats'))
-const ServiceNowAbsences = lazy(() => import('./pages/ServiceNowAbsences'))
+const ServiceNowDashboard = lazy(() => import('./pages/ServiceNowDashboard'))
 const PianoFerie = lazy(() => import('./pages/PianoFerie'))
 const AreaTasks = lazy(() => import('./pages/AreaTasks'))
 const RimborsoSpese = lazy(() => import('./pages/RimborsoSpese'))
@@ -201,13 +202,12 @@ const router = createBrowserRouter([
         element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowCases />)}</RequirePerm>,
       },
       {
-        path: 'servicenow-stats',
-        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowStats />)}</RequirePerm>,
+        path: 'servicenow-dashboard',
+        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowDashboard />)}</RequirePerm>,
       },
-      {
-        path: 'servicenow-absences',
-        element: <RequirePerm perm="servicenow.view_servicenowcase">{lazyEl(<ServiceNowAbsences />)}</RequirePerm>,
-      },
+      // Statistiche e Assenze tecnici sono confluite nella Dashboard casi.
+      { path: 'servicenow-stats', element: <Navigate to="/servicenow-dashboard" replace /> },
+      { path: 'servicenow-absences', element: <Navigate to="/servicenow-dashboard" replace /> },
       {
         path: 'piano-ferie',
         element: <RequireAuth>{lazyEl(<PianoFerie />)}</RequireAuth>,
@@ -242,6 +242,7 @@ const router = createBrowserRouter([
         path: 'accesso-portal',
         element: <RequirePerm perm="core.manage_users">{lazyEl(<PortalAccess />)}</RequirePerm>,
       },
+      { path: 'moduli', element: <RequireSuperuser>{lazyEl(<Modules />)}</RequireSuperuser> },
       { path: '*', element: lazyEl(<NotFound />) },
     ],
   },

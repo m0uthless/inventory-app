@@ -1,706 +1,312 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react'
-import {
-  Box,
-  Checkbox,
-  Button,
-  Chip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
-
-import AddIcon from '@mui/icons-material/Add'
-import AttachFileIcon from '@mui/icons-material/AttachFile'
-import BlockIcon from '@mui/icons-material/Block'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import RotateLeftIcon from '@mui/icons-material/RotateLeft'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import { Box, Button, Checkbox, Stack, Typography } from '@mui/material'
+import type { GridColDef } from '@mui/x-data-grid'
 
 import { api } from '@shared/api/client'
-import { apiErrorToMessage } from '@shared/api/error'
 import { buildDrfListParams } from '@shared/api/drf'
-import { useAuth } from '../auth/AuthProvider'
-import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import { Can } from '../auth/Can'
-import { PERMS } from '../auth/perms'
-import type { EventRow } from './maintenanceTypes'
+import { apiErrorToMessage } from '@shared/api/error'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import EntityListCard from '@shared/ui/EntityListCard'
-import FilterChip from '@shared/ui/FilterChip'
-import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { compactCreateButtonSx, compactExportButtonSx, compactResetButtonSx } from '@shared/ui/toolbarStyles'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 
-import { RapportinoDialog } from './Maintenance'
-import { RESULT_COLOR, RESULT_LABEL, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
-import { YearFilterField } from './maintenance/YearFilterField'
+import { useAuth } from '../auth/AuthProvider'
+import { PERMS } from '../auth/perms'
+import { CampoIcon, FilterOptionList, KpiStrip, KpiTile, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
+import { daysLabel, dShort } from '../features/contracts/contractModel'
+import SectionNav from '../features/maintenance/MaintenanceNav'
+import EventDetailCard from '../features/maintenance/EventDetailCard'
+import RapportinoDialog from '../features/maintenance/RapportinoDialog'
+import { RESULT_LABEL, type Result } from '../features/maintenance/mtModel'
+import { ResultBadge } from '../features/maintenance/mtUi'
+import type { EventRow } from './maintenanceTypes'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type View = 'all' | 'follow' | 'nopdf' | 'np'
+const VIEWS: View[] = ['all', 'follow', 'nopdf', 'np']
+const VIEW_PARAMS: Record<View, Record<string, string>> = { all: {}, follow: { results: 'ko,partial' }, nopdf: { has_pdf: 'false' }, np: { result: 'not_planned' } }
+type EvStats = { total: number; month: number; month_ok: number; follow_up: number; no_pdf: number; not_planned: number; by_tech: { id: number; name: string; count: number }[] }
+type Lookup = { id: number; name: string }
+const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
+const MONTH = () => new Date().toLocaleDateString('it-IT', { month: 'long' })
 
-type CustomerItem = { id: number; code: string; name: string; display_name?: string }
-type TechItem = { id: number; full_name: string }
+function useEvStats(reloadKey: unknown, customer: number | '') {
+  const [data, setData] = React.useState<EvStats | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    api.get<EvStats>('/maintenance-events/stats/', { params: customer !== '' ? { customer } : {} })
+      .then((r) => { if (alive) setData(r.data) }).catch(() => { if (alive) setData(null) })
+    return () => { alive = false }
+  }, [reloadKey, customer])
+  return data
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const GRID_SX_BASE = {
-  ...MAINTENANCE_GRID_SX_BASE,
-  '& .row-actions': { opacity: 0, pointerEvents: 'none', transition: 'opacity 140ms ease' },
-  '& .MuiDataGrid-row:hover .row-actions': { opacity: 1, pointerEvents: 'auto' },
-  '@media (hover: none), (pointer: coarse)': { '& .row-actions': { opacity: 1, pointerEvents: 'auto' } },
-} as const
-
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-
+/** Manutenzione › Rapportini (restyle "Campo sterile", anteprima design-previews/mt-base.html). */
 export default function Rapportini() {
-  const zebraSx = useDataGridZebraSx()
   const toast = useToast()
   const { me, hasPerm } = useAuth()
+  const canAdd = hasPerm(PERMS.maintenance.event.add)
+  const canChange = hasPerm(PERMS.maintenance.event.change)
+  const canReset = hasPerm(PERMS.maintenance.event.delete)
+  const canAddIssue = hasPerm(PERMS.issues.issue.add)
   const { exporting, exportCsv } = useExportCsv()
+  const { rows: techs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
+  const { rows: customers } = useDrfList<{ id: number; name: string; display_name?: string | null }>('/customers/', { ordering: 'display_name', page_size: 500 })
+  const { rows: plans } = useDrfList<{ id: number; title: string }>('/maintenance-plans/', { ordering: 'title', page_size: 500 })
 
-  // useServerGrid senza view mode (niente Attivi/Tutti/Cestino)
-  const grid = useServerGrid({
-    defaultOrdering: '-performed_at',
-    allowedOrderingFields: ['performed_at', 'updated_at'],
-  })
-
-  // Lookup data
-  const { rows: customers } = useDrfList<CustomerItem>('/customers/', { ordering: 'name', page_size: 500 })
-  const { rows: allTechs } = useDrfList<TechItem>('/techs/', { ordering: 'last_name', page_size: 500 })
-  const [filterPlans, setFilterPlans] = React.useState<{ id: number; title: string }[]>([])
-
-  // URL filters
+  const [viewRaw, setViewRaw] = useUrlStringParam('vista')
+  const view: View = VIEWS.includes(viewRaw as View) ? (viewRaw as View) : 'all'
   const [customerF, setCustomerF] = useUrlNumberParam('ev_customer')
-  const [resultF, setResultF] = useUrlStringParam('ev_result')
   const [planF, setPlanF] = useUrlNumberParam('ev_plan')
   const [techF, setTechF] = useUrlNumberParam('ev_tech')
-  const [yearF, setYearF] = useUrlStringParam('ev_year')
+  const [resultF, setResultF] = useUrlStringParam('ev_result')
+  const opts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const setView = (v: string) => setViewRaw(v === 'all' ? '' : v, opts)
 
-  // Load plans when customer changes
+  const grid = useServerGrid({ defaultOrdering: '-performed_at', allowedOrderingFields: ['performed_at', 'updated_at'], defaultPageSize: 25 })
+  const listParams = React.useMemo(() => buildDrfListParams({
+    search: grid.search, ordering: grid.ordering, page0: grid.paginationModel.page, pageSize: grid.paginationModel.pageSize,
+    includeDeleted: grid.includeDeleted, onlyDeleted: grid.onlyDeleted,
+    extra: {
+      ...(customerF !== '' ? { customer: customerF } : {}), ...(planF !== '' ? { plan: planF } : {}), ...(techF !== '' ? { tech: techF } : {}),
+      ...(resultF ? { result: resultF } : {}), ...VIEW_PARAMS[view],
+    },
+  }), [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, grid.includeDeleted, grid.onlyDeleted, customerF, planF, techF, resultF, view])
+  const { rows, rowCount, loading, reload } = useDrfList<EventRow>('/maintenance-events/', listParams, (e) => toast.error(apiErrorToMessage(e)))
+  const [statsKey, setStatsKey] = React.useState(0)
+  const stats = useEvStats(statsKey, customerF)
+  const reloadAll = React.useCallback(() => { reload(); setStatsKey((n) => n + 1) }, [reload])
+
+  // ── Selezione, scheda, dialoghi ──
+  const [selected, setSelected] = React.useState<Set<number>>(new Set())
+  const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const [openId, setOpenId] = React.useState<number | null>(null)
+  // La scheda resta aperta anche se il rapportino esce dalla vista (es. dopo il caricamento del PDF).
+  const [open, setOpen] = React.useState<EventRow | null>(null)
   React.useEffect(() => {
-    if (!customerF) { setFilterPlans([]); setPlanF(''); return }
-    api.get<{ results: { id: number; title: string }[] }>('/maintenance-plans/', {
-      params: { customer: customerF, ordering: 'title', page_size: 500, is_active: 'true' },
-    }).then(r => setFilterPlans(r.data.results ?? [])).catch(() => {})
-  }, [customerF]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (openId == null) { setOpen(null); return }
+    const row = rows.find((r) => r.id === openId)
+    if (row) { setOpen(row); return }
+    api.get<EventRow>(`/maintenance-events/${openId}/`).then((r) => setOpen(r.data)).catch(() => setOpen(null))
+  }, [openId, rows, statsKey])
+  const [rpOpen, setRpOpen] = React.useState(false)
+  const [resetIds, setResetIds] = React.useState<number[] | null>(null)
+  const [busy, setBusy] = React.useState(false)
+  const bulkPdfRef = React.useRef<HTMLInputElement | null>(null)
 
-  // Build server params — no includeDeleted/onlyDeleted (no cestino)
-  const listParams = React.useMemo(() => {
-    const extra: Record<string, any> = {}
-    if (customerF) extra['plan__customer'] = customerF
-    if (resultF)   extra['result'] = resultF
-    if (planF)     extra['plan'] = planF
-    if (techF)     extra['tech'] = techF
-    if (yearF.trim().length === 4 && /^\d{4}$/.test(yearF.trim())) {
-      extra['performed_at__year'] = yearF.trim()
-    }
-    return buildDrfListParams({
-      search: grid.search,
-      ordering: grid.ordering,
-      page0: grid.paginationModel.page,
-      pageSize: grid.paginationModel.pageSize,
-      includeDeleted: false,
-      onlyDeleted: false,
-      extra,
+  const uploadPdf = async (ids: number[], file: File) => {
+    setBusy(true)
+    const res = await Promise.allSettled(ids.map((id) => { const fd = new FormData(); fd.append('pdf_file', file); return api.post(`/maintenance-events/${id}/upload-pdf/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }) }))
+    setBusy(false)
+    const fail = res.filter((x) => x.status === 'rejected')
+    if (!fail.length) toast.success(ids.length === 1 ? 'PDF caricato' : `PDF caricato su ${ids.length} rapportini`)
+    else toast.error(`${ids.length - fail.length} riusciti, ${fail.length} non caricati: ${apiErrorToMessage((fail[0] as PromiseRejectedResult).reason)}`)
+    reloadAll()
+  }
+  const deletePdf = async (id: number) => {
+    setBusy(true)
+    try { await api.delete(`/maintenance-events/${id}/delete-pdf/`); toast.success('PDF rimosso'); reloadAll() } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+  }
+  const notPlanned = async (id: number) => {
+    try { await api.patch(`/maintenance-events/${id}/set-not-planned/`); toast.success('Segnato come non previsto'); reloadAll() } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }
+  const doReset = async () => {
+    if (!resetIds) return
+    setBusy(true)
+    const res = await Promise.allSettled(resetIds.map((id) => api.post(`/maintenance-events/${id}/reset/`)))
+    setBusy(false)
+    const ok = res.filter((x) => x.status === 'fulfilled').length
+    if (ok === resetIds.length) toast.success(ok === 1 ? 'Rapportino eliminato: la manutenzione torna nelle scadenze' : `${ok} rapportini eliminati`)
+    else toast.warning(`${ok} eliminati, ${resetIds.length - ok} non eliminati`)
+    setResetIds(null); setSelected(new Set()); setOpenId(null); reloadAll()
+  }
+  const openIssue = async (ev: EventRow) => {
+    try {
+      await api.post('/issues/', { title: `${ev.result === 'ko' ? 'KO' : 'Parziale'} manutenzione: ${ev.plan_title} — ${ev.inventory_name}`, description: ev.notes ?? '', customer: ev.customer_id, site: ev.site_id ?? null, inventory: ev.inventory })
+      toast.success('Issue aperta')
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }
+
+  // ── Colonne, filtri, esportazione ──
+  const columns = React.useMemo<GridColDef<EventRow>[]>(() => [
+    {
+      field: '__sel', headerName: '', width: 52, sortable: false, disableColumnMenu: true,
+      renderHeader: () => { const all = rows.length > 0 && rows.every((r) => selected.has(r.id)); return <Checkbox size="small" checked={all} indeterminate={!all && rows.some((r) => selected.has(r.id))} onChange={() => setSelected(all ? new Set() : new Set(rows.map((r) => r.id)))} slotProps={{ input: { 'aria-label': 'Seleziona la pagina' } }} /> },
+      renderCell: (p) => <Checkbox size="small" checked={selected.has(p.row.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(p.row.id)} slotProps={{ input: { 'aria-label': `Seleziona il rapportino di ${p.row.inventory_name}` } }} />,
+    },
+    { field: 'performed_at', headerName: 'Data', width: 128, renderCell: (p) => <Box sx={{ lineHeight: 1.25, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{dShort(p.row.performed_at)}<Box sx={{ fontSize: 12, color: 'text.secondary' }}>{daysLabel(p.row.performed_at)}</Box></Box> },
+    { field: 'result', headerName: 'Esito', width: 132, sortable: false, renderCell: (p) => <ResultBadge result={p.row.result as Result} /> },
+    { field: 'customer_name', headerName: 'Cliente · sito', width: 200, sortable: false, renderCell: (p) => <Box sx={{ minWidth: 0, lineHeight: 1.25 }}><Box sx={{ fontWeight: 550, ...ellipsis }}>{p.row.customer_name}</Box><Box sx={{ fontSize: 12, color: 'text.secondary', ...ellipsis }}>{p.row.site_name || '—'}</Box></Box> },
+    { field: 'inventory_name', headerName: 'Inventario', flex: 1, minWidth: 190, sortable: false, renderCell: (p) => <Box sx={{ minWidth: 0, lineHeight: 1.25 }}><Box sx={{ fontWeight: 550, ...ellipsis }}>{p.row.inventory_name}</Box><Box sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 11, color: 'text.secondary', ...ellipsis }}>{p.row.inventory_knumber || p.row.inventory_hostname || '—'}</Box></Box> },
+    { field: 'plan_title', headerName: 'Piano', flex: 1, minWidth: 180, sortable: false, renderCell: (p) => <Box component="span" sx={{ fontSize: 13, ...ellipsis }}>{p.row.plan_title}</Box> },
+    { field: 'tech_name', headerName: 'Tecnico', width: 160, sortable: false, renderCell: (p) => (p.row.result === 'not_planned' || !p.row.tech_name ? <Box component="span" sx={{ color: 'text.disabled' }}>—</Box> : <Box component="span" sx={ellipsis}>{p.row.tech_name}</Box>) },
+    {
+      field: 'pdf_url', headerName: 'PDF', width: 76, sortable: false,
+      renderCell: (p) => (p.row.result === 'not_planned' ? null : p.row.pdf_url
+        ? <Box component="span" sx={{ fontSize: 11, fontWeight: 700, color: '#d93a2e' }}>PDF</Box>
+        : <Box component="span" sx={{ fontSize: 11.5, color: 'text.disabled' }}>manca</Box>),
+    },
+  ], [rows, selected])
+
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    customer_name: {
+      value: customerF === '' ? '' : String(customerF), label: 'Filtra cliente', onSet: (v) => setCustomerF(v === '' ? '' : Number(v), opts), onReset: () => setCustomerF('', opts),
+      children: <FilterOptionList label="Cliente" single searchable options={customers.map((c) => ({ value: String(c.id), label: c.display_name || c.name }))} selected={customerF === '' ? [] : [String(customerF)]} onChange={(v) => setCustomerF(v[0] ? Number(v[0]) : '', opts)} />,
+    },
+    plan_title: {
+      value: planF === '' ? '' : String(planF), label: 'Filtra piano', onSet: (v) => setPlanF(v === '' ? '' : Number(v), opts), onReset: () => setPlanF('', opts),
+      children: <FilterOptionList label="Piano" single searchable options={plans.map((p) => ({ value: String(p.id), label: p.title }))} selected={planF === '' ? [] : [String(planF)]} onChange={(v) => setPlanF(v[0] ? Number(v[0]) : '', opts)} />,
+    },
+    tech_name: {
+      value: techF === '' ? '' : String(techF), label: 'Filtra tecnico', onSet: (v) => setTechF(v === '' ? '' : Number(v), opts), onReset: () => setTechF('', opts),
+      children: <FilterOptionList label="Tecnico" single options={techs.map((t) => ({ value: String(t.id), label: t.full_name }))} selected={techF === '' ? [] : [String(techF)]} onChange={(v) => setTechF(v[0] ? Number(v[0]) : '', opts)} />,
+    },
+    result: {
+      value: resultF, label: 'Filtra esito', onSet: (v) => setResultF(String(v), opts), onReset: () => setResultF('', opts),
+      children: <FilterOptionList label="Esito" single options={(Object.keys(RESULT_LABEL) as Result[]).map((k) => ({ value: k, label: RESULT_LABEL[k] }))} selected={resultF ? [resultF] : []} onChange={(v) => setResultF(v[0] ?? '', opts)} />,
+    },
+  }), [customerF, setCustomerF, customers, planF, setPlanF, plans, techF, setTechF, techs, resultF, setResultF, opts])
+  const nameOf = (list: Lookup[], id: number | '') => list.find((x) => x.id === id)?.name ?? `#${id}`
+  const activeFilters: ActiveFilter[] = [
+    customerF !== '' ? { key: 'customer', label: 'Cliente', values: nameOf(customers.map((c) => ({ id: c.id, name: c.display_name || c.name })), customerF) } : null,
+    planF !== '' ? { key: 'plan', label: 'Piano', values: nameOf(plans.map((p) => ({ id: p.id, name: p.title })), planF) } : null,
+    techF !== '' ? { key: 'tech', label: 'Tecnico', values: nameOf(techs.map((t) => ({ id: t.id, name: t.full_name })), techF) } : null,
+    resultF ? { key: 'result', label: 'Esito', values: RESULT_LABEL[resultF as Result] ?? resultF } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (k: string) => { if (k === 'customer') setCustomerF('', opts); if (k === 'plan') setPlanF('', opts); if (k === 'tech') setTechF('', opts); if (k === 'result') setResultF('', opts) }
+  const resetFilters = () => setCustomerF('', { patch: { page: 1, ev_plan: '', ev_tech: '', ev_result: '' }, keepOpen: true })
+
+  const exportVisible = () => {
+    const { page: _p, page_size: _s, ...params } = listParams as Record<string, unknown>
+    void _p; void _s
+    void exportCsv<EventRow>({
+      url: '/maintenance-events/', params, filename: 'rapportini',
+      columns: [
+        { label: 'Data', getValue: (r) => r.performed_at },
+        { label: 'Esito', getValue: (r) => RESULT_LABEL[r.result as Result] ?? r.result },
+        { label: 'Cliente', getValue: (r) => r.customer_name ?? '' },
+        { label: 'Sito', getValue: (r) => r.site_name ?? '' },
+        { label: 'Inventario', getValue: (r) => r.inventory_name ?? '' },
+        { label: 'KNumber', getValue: (r) => r.inventory_knumber ?? '' },
+        { label: 'Piano', getValue: (r) => r.plan_title ?? '' },
+        { label: 'Tecnico', getValue: (r) => r.tech_name ?? '' },
+        { label: 'PDF', getValue: (r) => (r.pdf_url ? 'sì' : 'no') },
+        { label: 'Note', getValue: (r) => r.notes ?? '' },
+      ],
     })
-  }, [grid.search, grid.ordering, grid.paginationModel, customerF, resultF, planF, techF, yearF])
+  }
 
-  const { rows, rowCount, loading, reload } = useDrfList<EventRow>(
-    '/maintenance-events/', listParams, e => toast.error(apiErrorToMessage(e))
-  )
+  const mobileCard = React.useMemo<MobileCardRenderFn<EventRow>>(() => ({ row, onOpen }) => (
+    <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5, display: 'grid', gap: 0.75, cursor: 'pointer' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{row.inventory_name}</Typography>
+        <ResultBadge result={row.result as Result} />
+      </Box>
+      <Typography noWrap sx={{ fontSize: 12.5, color: 'text.secondary' }}>{dShort(row.performed_at)} · {row.customer_name} · {row.plan_title}</Typography>
+    </Box>
+  ), [])
 
-  // ── Multi-selection (manual Set — independent of MUI selectionModel) ───────
-  const [selectedIds, setSelectedIds] = React.useState<Set<number>>(new Set())
-  const selectedCount = selectedIds.size
-  const allPageSelected = rows.length > 0 && rows.every(r => selectedIds.has(r.id))
-  const toggleRow = React.useCallback((id: number) =>
-    setSelectedIds(prev => {
-      const s = new Set(prev)
-      if (s.has(id)) s.delete(id)
-      else s.add(id)
-      return s
-    }), [])
-  const togglePage = React.useCallback(() =>
-    setSelectedIds(prev => {
-      const s = new Set(prev)
-      if (allPageSelected) rows.forEach(r => s.delete(r.id))
-      else rows.forEach(r => s.add(r.id))
-      return s
-    }), [rows, allPageSelected])
-  const clearSelection = React.useCallback(() => setSelectedIds(new Set()), [])
-  // Ref always up-to-date for use inside async callbacks
-  const selectedIdsRef = React.useRef<Set<number>>(new Set())
-  React.useEffect(() => { selectedIdsRef.current = selectedIds })
-
-  // Clear selection on filter/page change
-  React.useEffect(() => { clearSelection() }, [listParams]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Context menu ────────────────────────────────────────────────────────────
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: EventRow; mouseX: number; mouseY: number
-    snapshot: EventRow[]   // rows selected at right-click time
-  } | null>(null)
-
-  const handleRowContextMenu = React.useCallback(
-    (row: EventRow, event: React.MouseEvent<HTMLElement>) => {
-      // Snapshot selection at right-click time — avoids stale closure issues
-      const curIds = selectedIdsRef.current
-      const inSel = curIds.has(row.id) && curIds.size > 1
-      const snapshot = inSel
-        ? rows.filter(r => curIds.has(r.id))
-        : [row]
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6, snapshot })
-    }, [rows]
-  )
-
-  // Upload PDF — opens file picker, then PATCHes the event
-  const pdfInputRef = React.useRef<HTMLInputElement>(null)
-  const pendingPdfEventRef = React.useRef<EventRow | null>(null)
-  const pendingMultiRef = React.useRef<EventRow[]>([])
-
-  const handlePdfFileChange = React.useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    const ev = pendingPdfEventRef.current
-    if (!file || !ev) return
-    e.target.value = ''
-    const fd = new FormData()
-    fd.append('pdf_file', file)
-    try {
-      await api.post(`/maintenance-events/${ev.id}/upload-pdf/`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      toast.success('PDF caricato')
-      reload()
-    } catch (err) { toast.error(apiErrorToMessage(err)) }
-    pendingPdfEventRef.current = null
-  }, [reload, toast])
-
-  const deletePdf = React.useCallback(async (ev: EventRow) => {
-    try {
-      await api.delete(`/maintenance-events/${ev.id}/delete-pdf/`)
-      toast.success('PDF eliminato')
-      reload()
-    } catch (err) { toast.error(apiErrorToMessage(err)) }
-  }, [reload, toast])
-
-  const setNotPlanned = React.useCallback(async (ev: EventRow) => {
-    try {
-      await api.patch(`/maintenance-events/${ev.id}/set-not-planned/`)
-      toast.success('Segnato come "Non prevista"')
-      reload()
-    } catch (err) { toast.error(apiErrorToMessage(err)) }
-  }, [reload, toast])
-
-  const [resetDlg, setResetDlg] = React.useState<EventRow | null>(null)
-  const [resetMulti, setResetMulti] = React.useState<EventRow[] | null>(null)
-  const [resetBusy, setResetBusy] = React.useState(false)
-
-  const doReset = React.useCallback(async () => {
-    const targets = resetMulti ?? (resetDlg ? [resetDlg] : [])
-    if (targets.length === 0) return
-    setResetBusy(true)
-    try {
-      const results = await Promise.allSettled(targets.map(ev => api.post(`/maintenance-events/${ev.id}/reset/`)))
-      const ok = results.filter(r => r.status === 'fulfilled').length
-      const fail = results.filter(r => r.status === 'rejected').length
-      if (fail === 0) toast.success(ok === 1 ? 'Manutenzione resettata' : `${ok} manutenzioni resettate`)
-      else toast.warning(`${ok} riuscite, ${fail} fallite`)
-      setResetDlg(null)
-      setResetMulti(null)
-      if (targets.length > 1) clearSelection()
-      reload()
-    } catch (err) { toast.error(apiErrorToMessage(err)) }
-    finally { setResetBusy(false) }
-  }, [resetDlg, resetMulti, clearSelection, reload, toast])
-
-  const canDeletePdf = React.useCallback((ev: EventRow) => {
-    if (!ev.pdf_url) return false
-    return me?.is_superuser || ev.created_by_username === me?.username
-  }, [me])
-
-  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
-    const row = contextMenu?.row
-    if (!row) return []
-    const targets = contextMenu.snapshot   // snapshot taken at right-click time
-    const isMulti = targets.length > 1
-    const n = targets.length
-    const items: RowContextMenuItem[] = [
-      {
-        key: 'upload-pdf',
-        label: isMulti ? `Carica PDF (${n})` : 'Carica rapportino PDF',
-        icon: <AttachFileIcon fontSize="small" />,
-        onClick: () => {
-          if (isMulti) {
-            // store targets in ref, trigger bulk input
-            pendingMultiRef.current = targets
-            bulkPdfInputRef.current?.click()
-          } else {
-            pendingPdfEventRef.current = row
-            pdfInputRef.current?.click()
-          }
-        },
-      },
-    ]
-    const deletablePdf = isMulti
-      ? targets.filter(r => r.pdf_url && canDeletePdf(r))
-      : (row.pdf_url ? [row] : [])
-    if (deletablePdf.length > 0 || (!isMulti && row.pdf_url)) {
-      items.push({
-        key: 'delete-pdf',
-        label: isMulti ? `Cancella PDF caricati (${deletablePdf.length})` : 'Cancella PDF caricato',
-        icon: <DeleteOutlineIcon fontSize="small" />,
-        onClick: async () => {
-          if (isMulti) {
-            await Promise.allSettled(deletablePdf.map(r => deletePdf(r)))
-          } else {
-            deletePdf(row)
-          }
-        },
-        disabled: isMulti ? deletablePdf.length === 0 : !canDeletePdf(row),
-        tone: 'danger',
-      })
-    }
-    if (targets.some(r => r.result !== 'not_planned')) {
-      items.push({
-        key: 'not-planned',
-        label: isMulti ? `Non prevista (${n})` : 'Non prevista',
-        icon: <BlockIcon fontSize="small" />,
-        onClick: async () => {
-          await Promise.allSettled(targets.filter(r => r.result !== 'not_planned').map(r => setNotPlanned(r)))
-          if (isMulti) clearSelection()
-        },
-        tone: 'danger',
-      })
-    }
-    if (hasPerm(PERMS.maintenance.event.delete)) {
-      items.push({
-        key: 'reset',
-        label: isMulti ? `Reset Manutenzione (${n})` : 'Reset Manutenzione',
-        icon: <RotateLeftIcon fontSize="small" />,
-        onClick: () => {
-          if (isMulti) { setResetDlg(null); setResetMulti(targets) }
-          else { setResetMulti(null); setResetDlg(row) }
-        },
-        tone: 'danger',
-      })
-    }
-    return items
-  }, [contextMenu, canDeletePdf, deletePdf, setNotPlanned, hasPerm, clearSelection])
-
-  // ── Columns ─────────────────────────────────────────────────────────────────
-
-  const columns: GridColDef<EventRow>[] = React.useMemo(() => [
-    {
-      field: '__select',
-      headerName: '',
-      width: 48,
-      sortable: false,
-      renderHeader: () => (
-        <Checkbox
-          size="small"
-          checked={allPageSelected}
-          indeterminate={selectedCount > 0 && !allPageSelected}
-          onChange={togglePage}
-          sx={{ p: 0.5 }}
-        />
-      ),
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <Checkbox
-            size="small"
-            checked={selectedIds.has(p.row.id)}
-            onChange={() => toggleRow(p.row.id)}
-            onClick={e => e.stopPropagation()}
-            sx={{ p: 0.5 }}
-          />
-        </Box>
-      ),
-    },
-    {
-      field: 'performed_at',
-      headerName: 'Data',
-      width: 120,
-      renderCell: (p: GridRenderCellParams<EventRow>) => {
-        const raw = p.value as string | null
-        if (!raw) return <Box />
-        const [y, m, d] = raw.split('-')
-        const label = `${d}/${m}/${y}`
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Chip
-              size="small"
-              label={label}
-              variant="outlined"
-              sx={{ height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5 }}
-            />
-          </Box>
-        )
-      },
-    },
-    {
-      field: 'result',
-      headerName: 'Risultato',
-      width: 110,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip
-            size="small"
-            label={RESULT_LABEL[p.value as string] ?? p.value}
-            color={RESULT_COLOR[p.value as string] ?? 'default'}
-            sx={{ height: 22, fontSize: '0.72rem' }}
-          />
-        </Box>
-      ),
-    },
-    {
-      field: 'pdf_url',
-      headerName: '',
-      width: 40,
-      sortable: false,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          {p.value ? (
-            <Tooltip title="Apri PDF">
-              <PictureAsPdfOutlinedIcon sx={{ fontSize: 18, color: 'error.main' }} />
-            </Tooltip>
-          ) : null}
-        </Box>
-      ),
-    },
-    {
-      field: 'customer_name',
-      headerName: 'Cliente',
-      width: 180,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{p.value as string}</Typography>
-          {p.row.site_name && (
-            <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>{p.row.site_name}</Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      field: 'plan_title',
-      headerName: 'Piano',
-      flex: 1,
-      minWidth: 180,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>{(p.value as string) ?? '—'}</Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'inventory_hostname',
-      headerName: 'Inventory',
-      width: 180,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>
-            {(p.value as string) || p.row.inventory_name || '—'}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'inventory_knumber',
-      headerName: 'KNumber',
-      width: 130,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2" sx={{ color: p.value ? 'text.primary' : 'text.disabled' }} noWrap>
-            {(p.value as string) || '—'}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'tech_name',
-      headerName: 'Tecnico',
-      width: 170,
-      renderCell: (p: GridRenderCellParams<EventRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2" sx={{ color: p.value ? 'text.primary' : 'text.disabled' }} noWrap>
-            {(p.value as string) || '—'}
-          </Typography>
-        </Box>
-      ),
-    },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [selectedIds, allPageSelected, toggleRow, togglePage])
-
-  // ── Filters ─────────────────────────────────────────────────────────────────
-  const fcnt = [customerF, resultF, planF, techF, yearF].filter(Boolean).length
-
-  const resetAll = React.useCallback(() => {
-    setCustomerF('')
-    setResultF('')
-    setPlanF('')
-    setTechF('')
-    setYearF('')
-    grid.reset(['ev_customer', 'ev_result', 'ev_plan', 'ev_tech', 'ev_year'])
-  }, [setCustomerF, setResultF, setPlanF, setTechF, setYearF, grid])
-
-  // ── Rapportino dialog ───────────────────────────────────────────────────────
-  const [rapportinoOpen, setRapportinoOpen] = React.useState(false)
-
-
-  // Hidden file input for bulk PDF upload
-  const bulkPdfInputRef = React.useRef<HTMLInputElement>(null)
-
-  const handleBulkPdfChange = React.useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    // pendingMultiRef is set when triggered from context menu multi-action
-    // otherwise fall back to selectedIdsRef (banner button)
-    const fromCtx = pendingMultiRef.current.length > 0
-    const ids = fromCtx
-      ? pendingMultiRef.current.map(r => r.id)
-      : Array.from(selectedIdsRef.current)
-    pendingMultiRef.current = []
-    if (!file || ids.length === 0) return
-    e.target.value = ''
-    try {
-      const results = await Promise.allSettled(
-        ids.map(id => {
-          const fd = new FormData()
-          fd.append('pdf_file', file)
-          return api.post(`/maintenance-events/${id}/upload-pdf/`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-        })
-      )
-      const ok = results.filter(r => r.status === 'fulfilled').length
-      const fail = results.filter(r => r.status === 'rejected').length
-      if (fail === 0) toast.success(`PDF caricato su ${ok} rapportini`)
-      else toast.warning(`${ok} riusciti, ${fail} falliti`)
-      if (!fromCtx) clearSelection()
-      reload()
-    } catch (err) { toast.error(apiErrorToMessage(err)) }
-  }, [clearSelection, reload, toast])
-  const [pdfViewer, setPdfViewer] = React.useState<{ url: string; knumber: string } | null>(null)
+  const maxTech = Math.max(1, ...(stats?.by_tech ?? []).map((t) => t.count))
+  const idx = openId != null ? rows.findIndex((r) => r.id === openId) : -1
+  const sel = [...selected]
 
   return (
-    <>
-      {/* Hidden file inputs */}
-      <input
-        ref={bulkPdfInputRef}
-        type="file"
-        accept="application/pdf"
-        style={{ display: 'none' }}
-        onChange={handleBulkPdfChange}
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Manutenzione"
+        inline={<SectionNav current="events" />}
+        actions={canAdd ? <Button variant="contained" startIcon={<CampoIcon name="plus" size={16} />} onClick={() => setRpOpen(true)}>Registra rapportino</Button> : null}
       />
-      <input
-        ref={pdfInputRef}
-        type="file"
-        accept="application/pdf"
-        style={{ display: 'none' }}
-        onChange={handlePdfFileChange}
-      />
+      <KpiStrip label="Indicatori rapportini">
+        <KpiTile label={`Rapportini a ${MONTH()}`} value={stats ? stats.month : '—'} sub={stats ? <><b>{stats.month_ok}</b>&nbsp;OK · <b>{stats.month - stats.month_ok}</b>&nbsp;con esito diverso</> : null} />
+        <KpiTile label="KO e parziali" active={view === 'follow'} onClick={() => setView(view === 'follow' ? 'all' : 'follow')} value={stats ? stats.follow_up : '—'} sub="interventi da completare o ripassare" />
+        <KpiTile label="Senza PDF" active={view === 'nopdf'} onClick={() => setView(view === 'nopdf' ? 'all' : 'nopdf')} value={stats ? stats.no_pdf : '—'} sub="rapportino firmato da allegare" />
+        <KpiTile label="Per tecnico · ultimi 90 giorni" wide>
+          <Box sx={{ display: 'grid', gap: 0.5, mt: 0.5 }}>
+            {(stats?.by_tech ?? []).slice(0, 4).map((t) => (
+              <Box key={t.id} component="button" type="button" onClick={() => setTechF(techF === t.id ? '' : t.id, opts)} sx={{
+                display: 'grid', gridTemplateColumns: 'minmax(0,140px) 1fr 28px', gap: 1, alignItems: 'center', fontSize: 12, color: 'text.secondary', border: 0, bgcolor: 'transparent', p: '1px 4px', mx: -0.5, borderRadius: '4px', cursor: 'pointer', font: 'inherit', textAlign: 'left',
+                '&:hover': { bgcolor: 'action.hover' }, '&:focus-visible': { outline: 'none', boxShadow: (th) => th.palette.archie.focusRing },
+              }}>
+                <Box component="span" sx={ellipsis}>{t.name}</Box>
+                <Box component="span" sx={{ height: 6, borderRadius: 3, bgcolor: 'archie.neutralBg', overflow: 'hidden' }}><Box component="span" sx={{ display: 'block', height: '100%', width: `${(t.count / maxTech) * 100}%`, borderRadius: 3, bgcolor: (th) => th.palette.archie.seq[2] }} /></Box>
+                <Box component="b" sx={{ color: 'text.primary', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.count}</Box>
+              </Box>
+            ))}
+            {stats && !stats.by_tech.length ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Nessun rapportino negli ultimi 90 giorni.</Typography> : null}
+          </Box>
+        </KpiTile>
+      </KpiStrip>
 
-      <EntityListCard
-        toolbar={{
-          q: grid.q,
-          onQChange: grid.setQ,
-          compact: true,
-          rightActions: (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FilterChip
-                compact
-                activeCount={fcnt}
-                onReset={fcnt > 0 ? resetAll : undefined}
-              >
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Cliente</InputLabel>
-                  <Select
-                    label="Cliente"
-                    value={customerF === '' ? '' : String(customerF)}
-                    onChange={e => setCustomerF(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <MenuItem value="">Tutti</MenuItem>
-                    {customers.map(c => (
-                      <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs value={view} onChange={setView} tabs={[
+          { key: 'all', label: 'Tutti', count: stats?.total },
+          { key: 'follow', label: 'KO e parziali', count: stats?.follow_up },
+          { key: 'nopdf', label: 'Senza PDF', count: stats?.no_pdf },
+          { key: 'np', label: 'Non previste', count: stats?.not_planned },
+        ]} />
+        {selected.size ? (
+          <Box role="toolbar" aria-label="Rapportini selezionati" sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', p: '8px 14px', bgcolor: 'archie.field', borderBottom: '1px solid', borderColor: 'archie.fieldLine' }}>
+            <Typography component="b" sx={{ fontWeight: 600, mr: 0.5 }}>{selected.size} selezionat{selected.size === 1 ? 'o' : 'i'}</Typography>
+            {canChange ? <Button size="small" variant="contained" disabled={busy} startIcon={<CampoIcon name="upload" size={14} />} onClick={() => bulkPdfRef.current?.click()}>Carica un PDF per tutti</Button> : null}
+            {canReset ? <Button size="small" variant="outlined" color="inherit" sx={{ bgcolor: 'background.paper' }} startIcon={<CampoIcon name="trash" size={14} />} onClick={() => setResetIds(sel)}>Elimina</Button> : null}
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" color="inherit" onClick={() => setSelected(new Set())}>Annulla selezione</Button>
+            <input ref={bulkPdfRef} type="file" accept="application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadPdf(sel, f).then(() => setSelected(new Set())) }} />
+          </Box>
+        ) : null}
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={mobileCard}
+          header={<TableBar filters={activeFilters} onRemoveFilter={removeFilter} onClearFilters={resetFilters} q={grid.q} onQChange={grid.setQ} searchPlaceholder="Cerca inventario, KNumber, piano, tecnico, note…" onExport={exportVisible} exporting={exporting} />}
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca rapportini…' }}
+          grid={{
+            pageKey: 'maintenance-events-v2',
+            autoHeight: true,
+            rowHeight: 54,
+            username: me?.username,
+            filterConfig,
+            emptyState: view === 'follow' ? { title: 'Nessun KO o parziale', subtitle: 'Tutti gli interventi sono andati a buon fine.' } : view === 'nopdf' ? { title: 'Tutti i PDF sono allegati', subtitle: 'Nessun rapportino in attesa del firmato.' } : { title: 'Nessun rapportino', subtitle: 'I rapportini compaiono qui quando registri una manutenzione.' },
+            rows, columns, loading, rowCount,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: (id) => setOpenId(id),
+            getRowClassName: (r) => [openId === r.id ? 'Mui-selected' : '', selected.has(r.id) ? 'is-checked' : ''].join(' '),
+            sx: { ...headerFilterGridSx, cursor: 'pointer', '& .is-checked': { bgcolor: (t) => `${t.palette.archie.field} !important` } },
+          }}
+        />
+      </Box>
 
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Risultato</InputLabel>
-                  <Select label="Risultato" value={resultF} onChange={e => setResultF(e.target.value)}>
-                    <MenuItem value="">Tutti</MenuItem>
-                    <MenuItem value="ok">OK</MenuItem>
-                    <MenuItem value="ko">KO</MenuItem>
-                    <MenuItem value="partial">Parziale</MenuItem>
-                    <MenuItem value="not_planned">Non prevista</MenuItem>
-                  </Select>
-                </FormControl>
+      {open ? (
+        <EventDetailCard
+          ev={open}
+          position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
+          onPrev={idx > 0 ? () => setOpenId(rows[idx - 1].id) : undefined}
+          onNext={idx >= 0 && idx < rows.length - 1 ? () => setOpenId(rows[idx + 1].id) : undefined}
+          onClose={() => setOpenId(null)}
+          canChange={canChange}
+          canReset={canReset}
+          canAddIssue={canAddIssue}
+          pdfBusy={busy}
+          onUploadPdf={(f) => void uploadPdf([open.id], f)}
+          onDeletePdf={() => void deletePdf(open.id)}
+          onNotPlanned={() => void notPlanned(open.id)}
+          onReset={() => setResetIds([open.id])}
+          onOpenIssue={() => void openIssue(open)}
+        />
+      ) : null}
 
-                <FormControl size="small" fullWidth disabled={!customerF}>
-                  <InputLabel>Piano</InputLabel>
-                  <Select
-                    label="Piano"
-                    value={planF === '' ? '' : String(planF)}
-                    onChange={e => setPlanF(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <MenuItem value="">Tutti</MenuItem>
-                    {filterPlans.map(p => <MenuItem key={p.id} value={String(p.id)}>{p.title}</MenuItem>)}
-                  </Select>
-                </FormControl>
-
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Tecnico</InputLabel>
-                  <Select
-                    label="Tecnico"
-                    value={techF === '' ? '' : String(techF)}
-                    onChange={e => setTechF(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <MenuItem value="">Tutti</MenuItem>
-                    {allTechs.map(t => <MenuItem key={t.id} value={String(t.id)}>{t.full_name}</MenuItem>)}
-                  </Select>
-                </FormControl>
-
-                <YearFilterField value={yearF} onChange={setYearF} />
-              </FilterChip>
-
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={resetAll} sx={compactResetButtonSx}>
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={exporting}
-                    onClick={() => exportCsv({
-                      url: '/maintenance-events/',
-                      params: {
-                        search: grid.search,
-                        ordering: grid.ordering,
-                        ...(customerF ? { plan__customer: customerF } : {}),
-                        ...(resultF ? { result: resultF } : {}),
-                        ...(planF ? { plan: planF } : {}),
-                        ...(techF ? { tech: techF } : {}),
-                        ...(yearF.trim().length === 4 ? { performed_at__year: yearF.trim() } : {}),
-                      },
-                      filename: 'rapportini_manutenzione',
-                      columns: [
-                        { label: 'Data', getValue: (r: any) => r.performed_at },
-                        { label: 'Risultato', getValue: (r: any) => RESULT_LABEL[r.result] ?? r.result },
-                        { label: 'Cliente', getValue: (r: any) => r.customer_name },
-                        { label: 'Piano', getValue: (r: any) => r.plan_title },
-                        { label: 'Inventory', getValue: (r: any) => r.inventory_hostname || r.inventory_name },
-                        { label: 'KNumber', getValue: (r: any) => r.inventory_knumber },
-                        { label: 'Tecnico', getValue: (r: any) => r.tech_name },
-                      ],
-                    })}
-                    sx={compactExportButtonSx}
-                  >
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-          ),
-        }}
-        grid={{
-          pageKey: 'maintenance-events',
-          username: me?.username,
-          rows,
-          columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowContextMenu: handleRowContextMenu,
-          onRowClick: (id) => {
-            const row = rows.find(r => r.id === id)
-            if (row?.pdf_url) setPdfViewer({ url: row.pdf_url, knumber: row.inventory_knumber ?? row.inventory_hostname ?? String(row.id) })
-          },
-          sx: { ...GRID_SX_BASE, ...zebraSx },
-        }}
-      >
-        <Can perm={PERMS.maintenance.event.add}>
-          <Tooltip title="Nuovo rapportino" arrow>
-            <span>
-              <Button size="small" variant="contained" onClick={() => setRapportinoOpen(true)} sx={compactCreateButtonSx}>
-                <AddIcon />
-              </Button>
-            </span>
-          </Tooltip>
-        </Can>
-      </EntityListCard>
-
-      <RowContextMenu
-        open={Boolean(contextMenu)}
-        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
-        onClose={() => setContextMenu(null)}
-        items={contextMenuItems}
-      />
-
-      <RapportinoDialog
-        open={rapportinoOpen}
-        techs={allTechs}
-        onClose={() => setRapportinoOpen(false)}
-        onSaved={reload}
-      />
-
-      <ConfirmDeleteDialog
-        open={Boolean(resetDlg) || Boolean(resetMulti)}
-        title="Reset Manutenzione"
-        description={resetMulti
-          ? `Eliminare definitivamente ${resetMulti.length} rapportini (inclusi i PDF)? Gli inventory torneranno in lista scadenze.`
-          : `Il rapportino del ${resetDlg?.performed_at ?? ''} per "${resetDlg?.inventory_hostname || resetDlg?.inventory_name || ''}" verrà eliminato definitivamente (incluso il PDF). L'inventory tornerà nella lista scadenze.`
-        }
-        busy={resetBusy}
-        onConfirm={doReset}
-        onClose={() => { setResetDlg(null); setResetMulti(null) }}
-      />
-
-      {/* PDF viewer dialog */}
-      <Dialog
-        open={Boolean(pdfViewer)}
-        onClose={() => setPdfViewer(null)}
-        maxWidth="lg"
-        fullWidth
-        PaperProps={{ sx: { height: '90vh' } }}
-      >
-        <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {pdfViewer ? `${pdfViewer.knumber} - Rapportino PDF` : 'Rapportino PDF'}
-          <Button size="small" href={pdfViewer?.url ?? ''} target="_blank" rel="noopener noreferrer" component="a">
-            Apri in nuova scheda
-          </Button>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
-          {pdfViewer && (
-            <Box
-              component="iframe"
-              src={pdfViewer.url}
-              sx={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
-              title="Rapportino PDF"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+      <RapportinoDialog open={rpOpen} rows={[]} techs={techs} customers={customers.map((c) => ({ id: c.id, name: c.display_name || c.name }))} canAddIssue={canAddIssue} onClose={() => setRpOpen(false)} onSaved={reloadAll} />
+      <ConfirmDeleteDialog open={Boolean(resetIds)} busy={busy} title={resetIds && resetIds.length > 1 ? `Eliminare ${resetIds.length} rapportini?` : 'Eliminare il rapportino?'}
+        description="L'eliminazione è definitiva, PDF compreso: la manutenzione torna nelle scadenze da fare." confirmText="Elimina"
+        onClose={() => setResetIds(null)} onConfirm={() => void doReset()} />
+    </Stack>
   )
 }

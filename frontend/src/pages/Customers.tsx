@@ -1,34 +1,16 @@
 import * as React from 'react'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
-import { alpha } from '@mui/material/styles'
 import {
   Box,
   Button,
   ButtonBase,
-  Chip,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
-  TextField,
   Tooltip,
   Typography,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
-import MailOutlineIcon from '@mui/icons-material/MailOutline'
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import { Can } from '../auth/Can'
@@ -50,19 +32,19 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import AuditEventsTab from '../ui/AuditEventsTab'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { useThemeTokens } from '../theme/AppThemeProvider'
 import { useUrlStringParam } from '@shared/hooks/useUrlParam'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
-import CustomerDrawer from '../features/customers/CustomerDrawer'
-import CustomerDevicesTab from '../features/devices/CustomerDevicesTab'
-import CustomerContractsTab from '../features/contracts/CustomerContractsTab'
+import CustomerDetailCard, { type CustomerPatch, type CustomerTab } from '../features/customers/CustomerDetailCard'
+import CustomerKpis, { useCustomerSummary } from '../features/customers/CustomerKpis'
+import { CustomerActivityPanel, CustomerDocumentsPanel, CustomerInventoriesPanel, CustomerSitesPanel } from '../features/customers/CustomerTabs'
+import { daysTo, dIt, EXPIRING_DAYS, ExpiryMark, VendorMark, vendorColorOf } from '../features/customers/customerUi'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
-import { RelatedListHeader, RelatedListBody } from '../features/entityRelations/RelatedListSection'
-import { stripOpenParam } from '../features/entityRelations/relatedListUtils'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -87,6 +69,12 @@ type CustomerRow = {
 
   notes?: string | null
   has_vpn?: boolean | null
+  sites_count?: number
+  assets_count?: number
+  open_issues_count?: number
+  active_contracts_count?: number
+  next_contract_end?: string | null
+  next_contract_title?: string | null
   created_at?: string | null
   updated_at?: string | null
   deleted_at?: string | null
@@ -109,422 +97,27 @@ type CustomerForm = {
   notes: string
 }
 
-type SiteMini = {
-  id: number
-  name?: string | null
-  display_name?: string | null
-  city?: string | null
-  status?: number | null
-  status_label?: string | null
-  deleted_at?: string | null
-}
 
-type InventoryMini = {
-  id: number
-  customer: number
-  site?: number | null
-  hostname?: string | null
-  knumber?: string | null
-  serial_number?: string | null
-  site_name?: string | null
-  site_display_name?: string | null
-  type_label?: string | null
-  status_label?: string | null
-  deleted_at?: string | null
-}
 
-function viewQuery(includeDeleted: boolean, onlyDeleted: boolean) {
-  if (onlyDeleted) return { view: 'deleted' }
-  if (includeDeleted) return { view: 'all' }
-  return {}
-}
-
-function CustomerSitesTab(props: {
-  customerId: number
-  includeDeleted: boolean
-  onlyDeleted: boolean
-  onCount?: (n: number) => void
-}) {
-  const { customerId, includeDeleted, onlyDeleted, onCount } = props
-  const toast = useToast()
-  const navigate = useNavigate()
-  const loc = useLocation()
-  const { gridZebraBase } = useThemeTokens()
-
-  const params = React.useMemo(
-    () =>
-      buildDrfListParams({
-        page0: 0,
-        pageSize: 25,
-        ordering: 'name',
-        includeDeleted,
-        onlyDeleted,
-        extra: { customer: customerId },
-      }),
-    [customerId, includeDeleted, onlyDeleted],
-  )
-
-  const { rows, rowCount, loading } = useDrfList<SiteMini>('/sites/', params, (e: unknown) =>
-    toast.error(apiErrorToMessage(e)),
-  )
-
-  React.useEffect(() => {
-    onCount?.(rowCount)
-  }, [rowCount, onCount])
-
-  return (
-    <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <RelatedListHeader
-        title="Siti"
-        count={rowCount}
-        buttonLabel="Apri lista"
-        onOpenList={() =>
-          navigate(
-            `/sites${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + stripOpenParam(loc.search) })}`,
-          )
-        }
-      />
-
-      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
-        <List
-          dense
-          disablePadding
-          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
-        >
-          {rows.map((s, idx) => {
-            const label = s.display_name || s.name || `Sito #${s.id}`
-            const q = {
-              open: s.id,
-              customer: customerId,
-              ...(s.deleted_at ? { view: 'all' } : viewQuery(includeDeleted, onlyDeleted)),
-            }
-            return (
-              <ListItem
-                key={s.id}
-                disablePadding
-                sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
-              >
-                <ListItemButton
-                  onClick={() => navigate(`/sites${buildQuery({ ...q, return: loc.pathname + stripOpenParam(loc.search) })}`)}
-                  sx={{
-                    py: 0.75,
-                    opacity: s.deleted_at ? 0.55 : 1,
-                    textDecoration: s.deleted_at ? 'line-through' : 'none',
-                  }}
-                >
-                  <ListItemText
-                    primary={label}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      variant: 'body2',
-                      sx: { fontWeight: 600 },
-                    }}
-                  />
-                  {s.deleted_at ? (
-                    <Chip size="small" color="error" label="Eliminato" sx={{ ml: 1 }} />
-                  ) : null}
-                </ListItemButton>
-              </ListItem>
-            )
-          })}
-        </List>
-      </RelatedListBody>
-    </Stack>
-  )
-}
-
-function CustomerInventoriesTab(props: {
-  customerId: number
-  includeDeleted: boolean
-  onlyDeleted: boolean
-  onCount?: (n: number) => void
-}) {
-  const { customerId, includeDeleted, onlyDeleted, onCount } = props
-  const toast = useToast()
-  const navigate = useNavigate()
-  const loc = useLocation()
-  const { gridZebraBase } = useThemeTokens()
-
-  const params = React.useMemo(
-    () =>
-      buildDrfListParams({
-        page0: 0,
-        pageSize: 25,
-        ordering: 'hostname',
-        includeDeleted,
-        onlyDeleted,
-        extra: { customer: customerId },
-      }),
-    [customerId, includeDeleted, onlyDeleted],
-  )
-
-  const { rows, rowCount, loading } = useDrfList<InventoryMini>(
-    '/inventories/',
-    params,
-    (e: unknown) => toast.error(apiErrorToMessage(e)),
-  )
-
-  React.useEffect(() => {
-    onCount?.(rowCount)
-  }, [rowCount, onCount])
-
-  return (
-    <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <RelatedListHeader
-        title="Inventari"
-        count={rowCount}
-        buttonLabel="Apri lista"
-        onOpenList={() =>
-          navigate(
-            `/inventory${buildQuery({ customer: customerId, ...viewQuery(includeDeleted, onlyDeleted), return: loc.pathname + stripOpenParam(loc.search) })}`,
-          )
-        }
-      />
-
-      <RelatedListBody loading={loading} isEmpty={rows.length === 0}>
-        <List
-          dense
-          disablePadding
-          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
-        >
-          {rows.map((inv, idx) => {
-            const name = inv.hostname || inv.knumber || inv.serial_number || `#${inv.id}`
-            const label = [inv.type_label, name].filter(Boolean).join(' · ')
-            const q = {
-              open: inv.id,
-              customer: customerId,
-              site: inv.site ?? '',
-              ...(inv.deleted_at ? { view: 'all' } : viewQuery(includeDeleted, onlyDeleted)),
-            }
-            return (
-              <ListItem
-                key={inv.id}
-                disablePadding
-                sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
-              >
-                <ListItemButton
-                  onClick={() => navigate(`/inventory${buildQuery({ ...q, return: loc.pathname + stripOpenParam(loc.search) })}`)}
-                  sx={{
-                    py: 0.75,
-                    opacity: inv.deleted_at ? 0.55 : 1,
-                    textDecoration: inv.deleted_at ? 'line-through' : 'none',
-                  }}
-                >
-                  <ListItemText
-                    primary={label}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      variant: 'body2',
-                      sx: { fontWeight: 600 },
-                    }}
-                  />
-                  {inv.deleted_at ? (
-                    <Chip size="small" color="error" label="Eliminato" sx={{ ml: 1 }} />
-                  ) : null}
-                </ListItemButton>
-              </ListItem>
-            )
-          })}
-        </List>
-      </RelatedListBody>
-    </Stack>
-  )
-}
-
-// ─── CustomerDriveTab ─────────────────────────────────────────────────────────
-
-type DriveMini = {
-  id: number
-  name: string
-  mime_type?: string
-  size_human?: string
-  updated_at: string
-  kind: 'file' | 'folder'
-}
-
-function CustomerDriveTab({ customerId }: { customerId: number }) {
-  const toast = useToast()
-  const navigate = useNavigate()
-  const { gridZebraBase } = useThemeTokens()
-  const [items, setItems] = React.useState<DriveMini[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [total, setTotal] = React.useState(0)
-
-  React.useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    const coerce = (v: unknown, kind: DriveMini['kind']): DriveMini | null => {
-      if (!isRecord(v)) return null
-      const id = Number(v['id'])
-      if (!Number.isFinite(id)) return null
-      const name = typeof v['name'] === 'string' ? v['name'] : `#${id}`
-      const updated_at = typeof v['updated_at'] === 'string' ? v['updated_at'] : ''
-      const mime_type = typeof v['mime_type'] === 'string' ? v['mime_type'] : undefined
-      const size_human = typeof v['size_human'] === 'string' ? v['size_human'] : undefined
-      return { id, name, updated_at, mime_type, size_human, kind }
-    }
-
-    Promise.allSettled([
-      api.get('/drive-folders/', {
-        params: { customer: customerId, page_size: 15, ordering: 'name' },
-      }),
-      api.get('/drive-files/', {
-        params: { customer: customerId, page_size: 15, ordering: 'name' },
-      }),
-    ])
-      .then(([fSettled, fiSettled]) => {
-        if (cancelled) return
-
-        const foldersU: unknown =
-          fSettled.status === 'fulfilled' ? (fSettled.value as { data: unknown }).data : null
-        const filesU: unknown =
-          fiSettled.status === 'fulfilled' ? (fiSettled.value as { data: unknown }).data : null
-
-        const folderList: unknown[] =
-          isRecord(foldersU) && Array.isArray(foldersU['results'])
-            ? (foldersU['results'] as unknown[])
-            : Array.isArray(foldersU)
-              ? foldersU
-              : []
-        const fileList: unknown[] =
-          isRecord(filesU) && Array.isArray(filesU['results'])
-            ? (filesU['results'] as unknown[])
-            : Array.isArray(filesU)
-              ? filesU
-              : []
-
-        const folders: DriveMini[] = folderList
-          .map((f: unknown) => coerce(f, 'folder'))
-          .filter((x): x is DriveMini => Boolean(x))
-        const files: DriveMini[] = fileList
-          .map((f: unknown) => coerce(f, 'file'))
-          .filter((x): x is DriveMini => Boolean(x))
-
-        const folderCount = isRecord(foldersU) ? Number(foldersU['count'] ?? 0) : 0
-        const fileCount = isRecord(filesU) ? Number(filesU['count'] ?? 0) : 0
-
-        setItems([...folders, ...files])
-        setTotal(folderCount + fileCount)
-
-        // Se almeno una delle due chiamate è fallita, mostra un toast
-        const errors = [fSettled, fiSettled].filter((r) => r.status === 'rejected')
-        if (errors.length) {
-          const first = (errors[0] as PromiseRejectedResult).reason
-          toast.error(apiErrorToMessage(first))
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [customerId, toast])
-
-  function fileIcon(mime?: string) {
-    if (!mime) return <FolderOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-    if (mime.startsWith('image/'))
-      return <ImageOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-    if (mime === 'application/pdf')
-      return <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-    return <DescriptionOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-  }
-
-  return (
-    <Stack spacing={1.25} sx={{ pt: 1 }}>
-      <RelatedListHeader
-        title="File Drive"
-        count={total}
-        buttonLabel="Apri Drive"
-        onOpenList={() => navigate('/drive')}
-      />
-
-      <RelatedListBody loading={loading} isEmpty={items.length === 0} emptyText="Nessun file collegato.">
-        <List
-          dense
-          disablePadding
-          sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}
-        >
-          {items.map((item, idx) => (
-            <ListItem
-              key={`${item.kind}-${item.id}`}
-              disablePadding
-              sx={{ bgcolor: idx % 2 === 1 ? alpha(gridZebraBase, 0.03) : 'transparent' }}
-            >
-              <ListItemText
-                sx={{ px: 1.5, py: 0.75 }}
-                primary={
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
-                    {item.kind === 'folder' ? (
-                      <FolderOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                    ) : (
-                      fileIcon(item.mime_type)
-                    )}
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1 }}>
-                      {item.name}
-                    </Typography>
-                    {item.size_human && (
-                      <Typography variant="caption" sx={{ color: 'text.disabled', flexShrink: 0 }}>
-                        {item.size_human}
-                      </Typography>
-                    )}
-                  </Stack>
-                }
-              />
-            </ListItem>
-          ))}
-          {total > items.length && (
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={() => navigate('/drive')}
-                sx={{ py: 0.75, justifyContent: 'center' }}
-              >
-                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                  + altri {total - items.length} elementi
-                </Typography>
-              </ListItemButton>
-            </ListItem>
-          )}
-        </List>
-      </RelatedListBody>
-    </Stack>
-  )
-}
-
-/** Testo leggibile solo dagli screen reader. */
 const srOnlySx = {
   border: 0, clip: 'rect(0 0 0 0)', height: '1px', margin: '-1px', overflow: 'hidden',
   padding: 0, position: 'absolute', whiteSpace: 'nowrap', width: '1px',
 } as const
 
-/** Pillola VPN: vero pulsante (tastiera + screen reader), apre le credenziali VPN. */
+/** Etichetta VPN: vero pulsante (tastiera + screen reader), apre le credenziali VPN. */
 function VpnPill({ row, onClick, size = 'grid' }: { row: CustomerRow; onClick: (row: CustomerRow) => void; size?: 'grid' | 'touch' }) {
   const name = row.display_name || row.name
   return (
     <ButtonBase
       aria-label={`Apri VPN di ${name}`}
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick(row)
-      }}
+      onClick={(e) => { e.stopPropagation(); onClick(row) }}
       onKeyDown={(e) => e.stopPropagation()}
       sx={{
-        flexShrink: 0,
-        gap: 0.5,
-        fontSize: size === 'touch' ? '0.75rem' : '0.6rem',
-        fontWeight: 700,
-        letterSpacing: '0.05em',
-        px: size === 'touch' ? 1.5 : 0.6,
-        py: size === 'touch' ? 0 : 0.15,
-        minHeight: size === 'touch' ? 44 : undefined,
-        borderRadius: size === 'touch' ? 1 : 0.75,
-        bgcolor: 'success.50',
-        color: 'success.800',
-        border: '0.5px solid',
-        borderColor: 'success.200',
-        lineHeight: 1.6,
-        '&:hover': { bgcolor: 'success.100' },
-        '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+        flexShrink: 0, fontFamily: '"Geist Mono", monospace', fontSize: size === 'touch' ? 12 : 10, fontWeight: 650, letterSpacing: '0.04em',
+        px: size === 'touch' ? 1.5 : '5px', minHeight: size === 'touch' ? 44 : 18, lineHeight: '16px', borderRadius: size === 'touch' ? '8px' : '4px',
+        border: '1px solid', borderColor: 'archie.borderStrong', color: 'text.secondary',
+        '&:hover': { borderColor: 'archie.fieldLine', bgcolor: 'archie.field', color: 'primary.main' },
+        '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
       }}
     >
       VPN
@@ -532,255 +125,190 @@ function VpnPill({ row, onClick, size = 'grid' }: { row: CustomerRow; onClick: (
   )
 }
 
-function buildColumns(onVpnClick: (row: CustomerRow) => void): GridColDef<CustomerRow>[] {
+const numCell = (v?: number | null) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>{v ?? 0}</Box>
+const missing = (t: string) => <Box component="span" sx={{ fontSize: 12, fontWeight: 550, color: 'warning.main' }}>{t}</Box>
+
+function buildColumns(onVpnClick: (row: CustomerRow) => void, vendorColor: (l: string) => string, onIssues: (row: CustomerRow) => void): GridColDef<CustomerRow>[] {
   return [
-  {
-    field: 'id',
-    headerName: 'ID',
-    width: 80,
-    align: 'right',
-    headerAlign: 'right',
-  },
-  {
-    field: 'display_name',
-    headerName: 'Cliente',
-    flex: 1,
-    minWidth: 260,
-    renderCell: (p) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-        <Box component="span" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {p.value as string}
-        </Box>
-        {p.row.has_vpn && <VpnPill row={p.row} onClick={onVpnClick} />}
-      </Box>
-    ),
-  },
-  {
-    // Il lookup "stato" del cliente contiene il vendor (Philips, Biotron, …):
-    // testo neutro, il colore resta riservato a stati veri.
-    field: 'status_label',
-    headerName: 'Vendor',
-    width: 170,
-    renderCell: (p) => (
-      <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-        {typeof p.value === 'string' && p.value ? p.value : '—'}
-      </Box>
-    ),
-  },
-  { field: 'city', headerName: 'Città', width: 170 },
-  { field: 'province', headerName: 'Provincia', width: 120 },
-  {
-    field: 'primary_contact_name',
-    headerName: 'Contatto primario',
-    width: 230,
-    renderCell: (p) => {
-      const r = p.row
-      const name = r.primary_contact_name || ''
-      const email = r.primary_contact_email || ''
-      const phone = r.primary_contact_phone || ''
-      const tooltip = [email, phone].filter(Boolean).join(' · ')
-
-      if (!name && !email && !phone) {
-        return (
-          <Box component="span" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-            Nessun contatto
-          </Box>
-        )
-      }
-
-      const label = name || email || phone
-      return tooltip ? (
-        <Tooltip title={tooltip} arrow>
-          <span>
-            {label}
-            {/* Email/telefono anche per chi naviga con screen reader (il tooltip è solo hover). */}
-            {name ? <Box component="span" sx={srOnlySx}>{`, ${tooltip}`}</Box> : null}
-          </span>
-        </Tooltip>
-      ) : (
-        <span>{label}</span>
-      )
+    { field: 'id', headerName: 'ID', width: 70, align: 'right', headerAlign: 'right' },
+    {
+      field: 'code', headerName: 'Codice', width: 78,
+      renderCell: (p) => <Box component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>{p.value as string}</Box>,
     },
-  },
-  { field: 'vat_number', headerName: 'P.IVA', width: 160 },
-  { field: 'tax_code', headerName: 'Codice fiscale', width: 170 },
+    {
+      field: 'display_name', headerName: 'Cliente', flex: 1, minWidth: 180,
+      renderCell: (p) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <Box component="span" sx={{ fontWeight: 550, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.value as string}</Box>
+          {p.row.has_vpn && <VpnPill row={p.row} onClick={onVpnClick} />}
+        </Box>
+      ),
+    },
+    {
+      // Il lookup "stato" del cliente contiene il vendor (Philips, Biotron, …):
+      // colore di riconoscimento, mai semaforico.
+      field: 'status_label', headerName: 'Vendor', width: 136,
+      renderCell: (p) => <VendorMark label={p.value as string} color={vendorColor((p.value as string) || '')} />,
+    },
+    {
+      field: 'city', headerName: 'Città · prov.', width: 132,
+      renderCell: (p) => p.row.city || p.row.province ? (
+        <Box component="span" sx={{ whiteSpace: 'nowrap' }}>{p.row.city}{p.row.province ? <Box component="span" sx={{ ml: 0.5, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>{p.row.province}</Box> : null}</Box>
+      ) : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>,
+    },
+    {
+      field: 'primary_contact_name', headerName: 'Contatto primario', width: 160,
+      renderCell: (p) => {
+        const r = p.row
+        if (!r.primary_contact_name) return missing('Nessun contatto')
+        const tip = [r.primary_contact_phone, r.primary_contact_email].filter(Boolean).join(' · ')
+        return tip ? <Tooltip title={tip}><span>{r.primary_contact_name}<Box component="span" sx={srOnlySx}>{`, ${tip}`}</Box></span></Tooltip> : <span>{r.primary_contact_name}</span>
+      },
+    },
+    { field: 'sites_count', headerName: 'Siti', width: 64, align: 'right', headerAlign: 'right', renderCell: (p) => numCell(p.row.sites_count) },
+    { field: 'assets_count', headerName: 'Inventari', width: 80, align: 'right', headerAlign: 'right', renderCell: (p) => numCell(p.row.assets_count) },
+    {
+      field: 'open_issues_count', headerName: 'Issue', width: 70, align: 'right', headerAlign: 'right',
+      renderCell: (p) => p.row.open_issues_count ? (
+        <Tooltip title={`${p.row.open_issues_count} issue aperte · apri l'elenco`}>
+          <ButtonBase onClick={(e) => { e.stopPropagation(); onIssues(p.row) }} sx={{
+            minWidth: 24, height: 22, px: '7px', borderRadius: '5px', bgcolor: 'archie.neutralBg', color: 'text.primary', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+            '&:hover': { bgcolor: 'archie.field', color: 'primary.main' },
+          }}>{p.row.open_issues_count}</ButtonBase>
+        </Tooltip>
+      ) : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>,
+    },
+    {
+      field: 'next_contract_end', headerName: 'Contratto', width: 112,
+      renderCell: (p) => {
+        const r = p.row
+        if (!r.active_contracts_count || !r.next_contract_end) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+        return daysTo(r.next_contract_end) <= EXPIRING_DAYS
+          ? <ExpiryMark date={r.next_contract_end} title={r.next_contract_title} />
+          : <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{r.active_contracts_count} {r.active_contracts_count === 1 ? 'attivo' : 'attivi'}</Box>
+      },
+    },
+    {
+      field: 'vat_number', headerName: 'P.IVA', width: 122,
+      renderCell: (p) => p.value ? <Box component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12 }}>{p.value as string}</Box> : missing('Manca'),
+    },
+    { field: 'tax_code', headerName: 'Codice fiscale', width: 160 },
   ]
 }
-
 
 // ─── Mobile card renderer ────────────────────────────────────────────────────
 
 const touchLinkSx = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 0.75,
-  minHeight: 44,
-  px: 1.25,
-  borderRadius: 1,
-  border: '0.5px solid',
-  borderColor: 'divider',
-  color: 'primary.main',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  textDecoration: 'none',
-  minWidth: 0,
-  '&:active': { bgcolor: 'action.selected' },
-  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+  display: 'inline-flex', alignItems: 'center', gap: 0.75, minHeight: 44, px: 1.25, borderRadius: '8px', border: '1px solid', borderColor: 'divider',
+  color: 'text.primary', fontSize: 13, fontWeight: 550, textDecoration: 'none', minWidth: 0,
+  '& svg': { color: 'primary.main' }, '&:active': { bgcolor: 'action.selected' },
 } as const
 
-function makeRenderCustomerCard(onVpnClick: (row: CustomerRow) => void): MobileCardRenderFn<CustomerRow> {
+function makeRenderCustomerCard(onVpnClick: (row: CustomerRow) => void, vendorColor: (l: string) => string): MobileCardRenderFn<CustomerRow> {
   return ({ row, onOpen }) => {
-  const place = [row.city, row.province ? `(${row.province})` : null].filter(Boolean).join(' ')
-  const phone = row.primary_contact_phone?.trim() || ''
-  const email = row.primary_contact_email?.trim() || ''
-  const contactName = row.primary_contact_name?.trim() || ''
-  const hasActions = Boolean(phone || email || row.has_vpn)
-
-  return (
-    <Box
-      onClick={() => onOpen(row.id)}
-      sx={{
-        bgcolor: 'background.paper',
-        border: '0.5px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
-        p: 1.5,
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        '&:active': { bgcolor: 'action.hover' },
-      }}
-    >
-      {/* Nome + vendor, poi luogo */}
-      <Box sx={{ minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-            {row.display_name || row.name}
-          </Typography>
-          {row.status_label ? (
-            <Typography variant="caption" sx={{ flexShrink: 0, color: 'text.secondary', fontWeight: 500 }}>
-              {row.status_label}
-            </Typography>
-          ) : null}
+    const phone = row.primary_contact_phone?.trim() || ''
+    const email = row.primary_contact_email?.trim() || ''
+    return (
+      <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5, cursor: 'pointer', display: 'grid', gap: 0.75, '&:active': { bgcolor: 'action.hover' } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{row.display_name || row.name}</Typography>
+          {row.open_issues_count ? <Box component="span" sx={{ fontSize: 12, fontWeight: 600, px: '7px', borderRadius: '5px', bgcolor: 'archie.neutralBg' }}>{row.open_issues_count}</Box> : null}
         </Box>
-        {place || contactName ? (
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {[place, contactName].filter(Boolean).join(' · ')}
-          </Typography>
-        ) : null}
-        {!contactName && !phone && !email ? (
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontStyle: 'italic' }}>
-            Nessun contatto
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, fontSize: 13 }}>
+          <VendorMark label={row.status_label} color={vendorColor(row.status_label || '')} />
+          <Box component="span" sx={{ color: 'text.secondary' }}>{row.city}{row.province ? ` ${row.province}` : ''}</Box>
+        </Box>
+        {phone || email || row.has_vpn ? (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }} onClick={(e) => e.stopPropagation()}>
+            {phone ? <Box component="a" href={`tel:${phone.replace(/\s+/g, '')}`} aria-label={`Chiama ${phone}`} sx={touchLinkSx}><CampoIcon name="phone" size={16} bold /><Box component="span" sx={{ fontFamily: '"Geist Mono", monospace' }}>{phone}</Box></Box> : null}
+            {email ? <Box component="a" href={`mailto:${email}`} aria-label={`Scrivi a ${email}`} sx={{ ...touchLinkSx, flex: '1 1 auto', maxWidth: '100%' }}><CampoIcon name="mail" size={16} bold /><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</Box></Box> : null}
+            {row.has_vpn ? <VpnPill row={row} onClick={onVpnClick} size="touch" /> : null}
+          </Box>
         ) : null}
       </Box>
-
-      {/* Azioni dirette: chiama, scrivi, VPN. Il tap non apre il drawer. */}
-      {hasActions ? (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }} onClick={(e) => e.stopPropagation()}>
-          {phone ? (
-            <Box component="a" href={`tel:${phone.replace(/\s+/g, '')}`} aria-label={`Chiama ${phone}`} sx={{ ...touchLinkSx, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-              <PhoneOutlinedIcon sx={{ fontSize: 18 }} />
-              {phone}
-            </Box>
-          ) : null}
-          {email ? (
-            <Box component="a" href={`mailto:${email}`} aria-label={`Scrivi a ${email}`} sx={{ ...touchLinkSx, flex: '1 1 auto', maxWidth: '100%' }}>
-              <MailOutlineIcon sx={{ fontSize: 18, flexShrink: 0 }} />
-              <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</Box>
-            </Box>
-          ) : null}
-          {row.has_vpn ? <VpnPill row={row} onClick={onVpnClick} size="touch" /> : null}
-        </Box>
-      ) : null}
-    </Box>
-  )
+    )
   }
 }
 
+type CustView = 'all' | 'iss' | 'exp' | 'inc'
+type ColQ = { code: string; name: string; vendor: string; city: string; contact: string; vat: string }
+const EMPTY_COLQ: ColQ = { code: '', name: '', vendor: '', city: '', contact: '', vat: '' }
+type ViewState = { view: CustView; status: string; vpn: string; contact: string }
 
 // prettier-ignore
 export default function Customers() {
-  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const toast = useToast()
+  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const loc = useLocation()
+  const tokens = useStatusTokens()
+  
   const canChange = hasPerm(PERMS.crm.customer.change)
   const canDelete = hasPerm(PERMS.crm.customer.delete)
+  const canEditVpn = hasPerm(PERMS.crm.vpn.change) || hasPerm(PERMS.crm.vpn.add)
+  const showDevices = hasPerm(PERMS.device.device.view)
 
   const grid = useServerGrid({
     defaultOrdering: 'display_name',
-    allowedOrderingFields: [
-      'id',
-      'display_name',
-      'status_label',
-      'city',
-      'province',
-      'primary_contact_name',
-      'vat_number',
-      'tax_code',
-    ],
+    allowedOrderingFields: ['id', 'code', 'display_name', 'status_label', 'city', 'province', 'primary_contact_name', 'vat_number', 'tax_code', 'sites_count', 'assets_count', 'open_issues_count', 'next_contract_end'],
     defaultPageSize: 25,
   })
 
-  // Filtri URL (stesso pattern di Siti): imbuto sulle colonne, chip su mobile.
+  // Vista (schede) e filtri da intestazione, nell'URL.
+  const [viewRaw, setViewRaw] = useUrlStringParam('vista')
+  const view: CustView = (['all', 'iss', 'exp', 'inc'] as const).includes(viewRaw as CustView) ? (viewRaw as CustView) : 'all'
   const [statusFilter, setStatusFilter] = useUrlStringParam('status')
-  const [provinceFilter, setProvinceFilter] = useUrlStringParam('province')
   const [vpnFilter, setVpnFilter] = useUrlStringParam('has_vpn')
   const [contactFilter, setContactFilter] = useUrlStringParam('has_contact')
   const filterOpts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
-  const hasActiveFilters = Boolean(statusFilter || provinceFilter || vpnFilter || contactFilter)
+  const setView = (v: string) => { setSavedId(null); setViewRaw(v === 'all' ? '' : v, filterOpts) }
+  const hasActiveFilters = Boolean(statusFilter || vpnFilter || contactFilter)
   const resetFilters = React.useCallback(() => {
-    setStatusFilter('', { patch: { page: 1, province: '', has_vpn: '', has_contact: '' }, keepOpen: true })
+    setStatusFilter('', { patch: { page: 1, has_vpn: '', has_contact: '' }, keepOpen: true })
   }, [setStatusFilter])
+
+  // Ricerca per colonna (lente)
+  const [colSearchOpen, setColSearchOpen] = React.useState(false)
+  const [colQ, setColQ] = React.useState<ColQ>(EMPTY_COLQ)
+  const colQActive = Object.values(colQ).some(Boolean)
+  const setCol = (k: keyof ColQ) => (v: string) => { setColQ((c) => ({ ...c, [k]: v })); grid.onPaginationModelChange({ ...grid.paginationModel, page: 0 }) }
+
+  // Viste salvate
+  const saved = useSavedViews<ViewState>('customers', me?.username)
+  const [savedId, setSavedId] = React.useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const applySaved = (id: string) => {
+    const v = saved.views.find((x) => x.id === id); if (!v) return
+    setSavedId(id)
+    setViewRaw(v.state.view === 'all' ? '' : v.state.view, { patch: { page: 1, status: v.state.status, has_vpn: v.state.vpn, has_contact: v.state.contact }, keepOpen: true })
+  }
 
   const { setQ: setGridQ } = grid
   const emptyState = React.useMemo(() => {
-    const searching = Boolean(grid.search.trim())
-    if (grid.view === 'deleted' && !searching && !hasActiveFilters) {
-      return { title: 'Cestino vuoto', subtitle: 'Non ci sono clienti eliminati.' }
-    }
-    if (searching || hasActiveFilters) {
-      const what = searching && hasActiveFilters ? 'la ricerca o i filtri' : searching ? 'la ricerca' : 'i filtri'
+    const searching = Boolean(grid.search.trim()) || colQActive
+    if (grid.view === 'deleted' && !searching && !hasActiveFilters) return { title: 'Cestino vuoto', subtitle: 'Non ci sono clienti eliminati.' }
+    if (searching || hasActiveFilters || view !== 'all') {
       return {
         title: 'Nessun risultato',
-        subtitle: `Nessun cliente corrisponde: prova a modificare ${what}.`,
+        subtitle: 'Nessun cliente corrisponde: prova a modificare la ricerca, la vista o i filtri.',
         action: (
           <Stack direction="row" spacing={1} justifyContent="center">
-            {searching ? (
-              <Button variant="outlined" onClick={() => setGridQ('')}>
-                Cancella ricerca
-              </Button>
-            ) : null}
-            {hasActiveFilters ? (
-              <Button variant="outlined" onClick={resetFilters}>
-                Azzera filtri
-              </Button>
-            ) : null}
+            {grid.search.trim() || colQActive ? <Button variant="outlined" onClick={() => { setGridQ(''); setColQ(EMPTY_COLQ) }}>Cancella ricerca</Button> : null}
+            {hasActiveFilters ? <Button variant="outlined" onClick={resetFilters}>Azzera filtri</Button> : null}
           </Stack>
         ),
       }
     }
     return {
-        title: 'Nessun cliente',
-        subtitle: 'Non ci sono ancora clienti.',
-        action: (
-          <Can perm={PERMS.crm.customer.add}>
-            <Button
-              startIcon={<AddIcon />}
-              variant="contained"
-              onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}
-            >
-              Crea cliente
-            </Button>
-          </Can>
-        ),
+      title: 'Nessun cliente', subtitle: 'Non ci sono ancora clienti.',
+      action: <Can perm={PERMS.crm.customer.add}><Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}>Crea cliente</Button></Can>,
     }
-  }, [grid.view, grid.search, setGridQ, hasActiveFilters, resetFilters, loc.pathname, loc.search, navigate])
+  }, [grid.view, grid.search, colQActive, view, setGridQ, hasActiveFilters, resetFilters, loc.pathname, loc.search, navigate])
 
   const [statuses, setStatuses] = React.useState<LookupItem[]>([])
+  const vendorOrder = React.useMemo(() => [...statuses].sort((a, b) => a.id - b.id).map((x) => x.label), [statuses])
+  const vendorColor = React.useCallback((l: string) => vendorColorOf(l, tokens.clientChipPalette, vendorOrder), [tokens.clientChipPalette, vendorOrder])
 
   const listParams = React.useMemo(
     () =>
@@ -794,47 +322,34 @@ export default function Customers() {
         onlyDeleted: grid.onlyDeleted,
         extra: {
           ...(statusFilter ? { status: statusFilter } : {}),
-          ...(provinceFilter.trim() ? { province: provinceFilter.trim() } : {}),
           ...(vpnFilter ? { has_vpn: vpnFilter } : {}),
           ...(contactFilter ? { has_contact: contactFilter } : {}),
+          ...(view === 'iss' ? { has_open_issues: 'true' } : view === 'exp' ? { contract_expiring: 'true' } : view === 'inc' ? { incomplete: 'true' } : {}),
+          ...(colQ.code ? { code_q: colQ.code } : {}),
+          ...(colQ.name ? { name_q: colQ.name } : {}),
+          ...(colQ.vendor ? { status: colQ.vendor } : {}),
+          ...(colQ.city ? { city_q: colQ.city } : {}),
+          ...(colQ.contact ? { contact_q: colQ.contact } : {}),
+          ...(colQ.vat ? { vat_q: colQ.vat } : {}),
         },
       }),
-    [
-      statusFilter,
-      provinceFilter,
-      vpnFilter,
-      contactFilter,
-      grid.search,
-      grid.ordering,
-      grid.paginationModel.page,
-      grid.paginationModel.pageSize,
-      grid.includeDeleted,
-      grid.onlyDeleted,
-    ],
+    [statusFilter, vpnFilter, contactFilter, view, colQ, grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, grid.includeDeleted, grid.onlyDeleted],
   )
 
-  const {
-    rows,
-    rowCount,
-    loading,
-    reload: reloadList,
-  } = useDrfList<CustomerRow>('/customers/', listParams, (e: unknown) =>
-    toast.error(apiErrorToMessage(e)),
-  )
+  const { rows, rowCount, loading, reload: reloadList } = useDrfList<CustomerRow>('/customers/', listParams, (e: unknown) => toast.error(apiErrorToMessage(e)))
+
+  // Indicatori e conteggi delle viste (globali, non filtrati)
+  const [kpiReload, setKpiReload] = React.useState(0)
+  const summary = useCustomerSummary(kpiReload)
+  const reloadAll = React.useCallback(() => { reloadList(); setKpiReload((n) => n + 1) }, [reloadList])
 
   const [drawerOpen, setDrawerOpen] = React.useState(false)
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<CustomerDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState(0)
-  const {
-    sitesCount,
-    invCount,
-    driveCount,
-    devicesCount,
-    contractsCount,
-    reset: resetKpis,
-  } = useCustomerKpis(detail?.id ?? null)
+  const [drawerTab, setDrawerTab] = React.useState<CustomerTab>('det')
+  const [vpnReload, setVpnReload] = React.useState(0)
+  const { sitesCount, invCount, driveCount, devicesCount, contractsCount, reset: resetKpis } = useCustomerKpis(detail?.id ?? null)
 
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
@@ -845,16 +360,7 @@ export default function Customers() {
   const [dlgMode, setDlgMode] = React.useState<'create' | 'edit'>('create')
   const [dlgSaving, setDlgSaving] = React.useState(false)
   const [dlgId, setDlgId] = React.useState<number | null>(null)
-  const [form, setForm] = React.useState<CustomerForm>({
-    status: '',
-    name: '',
-    display_name: '',
-    vat_number: '',
-    tax_code: '',
-    province: '',
-    custom_fields: {},
-    notes: '',
-  })
+  const [form, setForm] = React.useState<CustomerForm>({ status: '', name: '', display_name: '', vat_number: '', tax_code: '', province: '', custom_fields: {}, notes: '' })
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({})
 
   const address = React.useMemo(() => {
@@ -864,22 +370,18 @@ export default function Customers() {
     if (!key) return null
     const v = cf[key]
     if (typeof v !== 'string' || !v.trim()) return null
-    // Append city to improve Nominatim geocoding accuracy
-    const parts = [v.trim(), detail?.city?.trim()].filter(Boolean)
-    return parts.join(', ')
+    // La città migliora la geolocalizzazione (Nominatim)
+    return [v.trim(), detail?.city?.trim()].filter(Boolean).join(', ')
   }, [detail])
 
   const loadDetail = React.useCallback(
-    async (id: number, forceIncludeDeleted?: boolean) => {
+    async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
       setDetailLoading(true)
-      setDetail(null)
+      if (!keep) setDetail(null)
       try {
         const inc = forceIncludeDeleted ?? grid.includeDeleted
         const incParams = includeDeletedParams(inc)
-        const res = await api.get<CustomerDetail>(
-          `/customers/${id}/`,
-          incParams ? { params: incParams } : undefined,
-        )
+        const res = await api.get<CustomerDetail>(`/customers/${id}/`, incParams ? { params: incParams } : undefined)
         setDetail(res.data)
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -894,20 +396,13 @@ export default function Customers() {
     try {
       const res = await api.get('/customer-statuses/')
       const data = res.data
-
-      // supporta sia array che paginato { results: [...] }
-      const items = Array.isArray(data) ? data : (data.results ?? [])
-      setStatuses(items)
+      setStatuses(Array.isArray(data) ? data : (data.results ?? []))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     }
   }, [toast])
 
-  React.useEffect(() => {
-    loadStatuses()
-  }, [loadStatuses])
-
-  // list loading is handled by useDrfList
+  React.useEffect(() => { loadStatuses() }, [loadStatuses])
 
   // open drawer from URL (?open=ID)
   const lastOpenRef = React.useRef<number | null>(null)
@@ -918,56 +413,36 @@ export default function Customers() {
     lastOpenRef.current = id
     setSelectedId(id)
     setDrawerOpen(true)
-    setDrawerTab(0)
+    setDrawerTab('det')
     loadDetail(id)
   }, [grid.openId, loadDetail])
 
   const openDrawer = React.useCallback(
     (id: number) => {
+      lastOpenRef.current = id
       setSelectedId(id)
       setDrawerOpen(true)
-      setDrawerTab(0)
-      resetKpis()
+      setDrawerTab((t) => (selectedId === id ? t : 'det'))
+      if (selectedId !== id) resetKpis()
       loadDetail(id)
       grid.setOpenId(id)
     },
-    [grid, loadDetail, resetKpis],
+    [grid, loadDetail, resetKpis, selectedId],
   )
 
   // Azioni riga / menu contestuale
   const pendingEditIdRef = React.useRef<number | null>(null)
   const pendingDeleteIdRef = React.useRef<number | null>(null)
   const openEditRef = React.useRef<(() => void) | null>(null)
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: CustomerRow
-    mouseX: number
-    mouseY: number
-  } | null>(null)
+  const [contextMenu, setContextMenu] = React.useState<{ row: CustomerRow; mouseX: number; mouseY: number } | null>(null)
 
   // VPN modal
   const [vpnModalOpen, setVpnModalOpen] = React.useState(false)
-  const [vpnModalRow, setVpnModalRow] = React.useState<CustomerRow | null>(null)
+  const [vpnModalRow, setVpnModalRow] = React.useState<{ id: number; display_name: string; name: string } | null>(null)
+  const openVpnModal = React.useCallback((row: { id: number; display_name: string; name: string }) => { setVpnModalRow(row); setVpnModalOpen(true) }, [])
 
-  const openVpnModal = React.useCallback((row: CustomerRow) => {
-    setVpnModalRow(row)
-    setVpnModalOpen(true)
-  }, [])
-
-  const openEditFromRow = React.useCallback(
-    (id: number) => {
-      pendingEditIdRef.current = id
-      openDrawer(id)
-    },
-    [openDrawer],
-  )
-
-  const openDeleteFromRow = React.useCallback(
-    (id: number) => {
-      pendingDeleteIdRef.current = id
-      openDrawer(id)
-    },
-    [openDrawer],
-  )
+  const openEditFromRow = React.useCallback((id: number) => { pendingEditIdRef.current = id; openDrawer(id) }, [openDrawer])
+  const openDeleteFromRow = React.useCallback((id: number) => { pendingDeleteIdRef.current = id; openDrawer(id) }, [openDrawer])
 
   const restoreFromRow = React.useCallback(
     async (id: number) => {
@@ -975,202 +450,135 @@ export default function Customers() {
       try {
         await api.post(`/customers/${id}/restore/`)
         toast.success('Cliente ripristinato')
-        reloadList()
+        reloadAll()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
       } finally {
         setRestoreBusy(false)
       }
     },
-    [toast, reloadList],
+    [toast, reloadAll],
   )
 
-  // Quando il detail viene caricato a seguito di un click su un'azione di riga,
-  // apre il dialog di modifica o eliminazione appropriato.
+  // Dopo un'azione di riga, quando il dettaglio è caricato apre modifica o eliminazione.
   React.useEffect(() => {
     if (!detail) return
-
-    if (pendingEditIdRef.current === detail.id) {
-      pendingEditIdRef.current = null
-      openEditRef.current?.()
-    }
-
-    if (pendingDeleteIdRef.current === detail.id) {
-      pendingDeleteIdRef.current = null
-      setDeleteDlgOpen(true)
-    }
+    if (pendingEditIdRef.current === detail.id) { pendingEditIdRef.current = null; openEditRef.current?.() }
+    if (pendingDeleteIdRef.current === detail.id) { pendingDeleteIdRef.current = null; setDeleteDlgOpen(true) }
   }, [detail])
 
-  const handleRowContextMenu = React.useCallback(
-    (row: CustomerRow, event: React.MouseEvent<HTMLElement>) => {
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
-    },
-    [],
-  )
-
-  const closeContextMenu = React.useCallback(() => {
-    setContextMenu(null)
+  const handleRowContextMenu = React.useCallback((row: CustomerRow, event: React.MouseEvent<HTMLElement>) => {
+    setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
   }, [])
+  const closeContextMenu = React.useCallback(() => setContextMenu(null), [])
+
+  const newIssueFor = React.useCallback((c: { id: number; display_name: string; name: string }) => {
+    navigate('/issues', { state: { createForCustomer: { customerId: c.id, customerName: c.display_name || c.name } } })
+  }, [navigate])
 
   const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
     const row = contextMenu?.row
     if (!row) return []
-
     if (row.deleted_at) {
       return [
-        {
-          key: 'open',
-          label: 'Apri',
-          icon: <VisibilityOutlinedIcon fontSize="small" />,
-          onClick: () => openDrawer(row.id),
-        },
-        {
-          key: 'restore',
-          label: 'Ripristina',
-          icon: <RestoreFromTrashIcon fontSize="small" />,
-          onClick: () => void restoreFromRow(row.id),
-          disabled: restoreBusy,
-        },
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
+        { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, onClick: () => void restoreFromRow(row.id), disabled: restoreBusy },
       ]
     }
-
     return [
-      {
-        key: 'open',
-        label: 'Apri',
-        icon: <VisibilityOutlinedIcon fontSize="small" />,
-        onClick: () => openDrawer(row.id),
-      },
-      {
-        key: 'edit',
-        label: 'Modifica',
-        icon: <EditIcon fontSize="small" />,
-        onClick: () => openEditFromRow(row.id),
-      },
-      {
-        key: 'vpn',
-        label: 'VPN',
-        icon: <LanOutlinedIcon fontSize="small" sx={{ color: 'primary.main' }} />,
-        onClick: () => openVpnModal(row),
-        badge: row.has_vpn ? 'configurata' : 'non configurata',
-        badgeTone: row.has_vpn ? 'success' : 'neutral',
-      },
-      {
-        key: 'delete',
-        label: 'Elimina',
-        icon: <DeleteOutlineIcon fontSize="small" />,
-        onClick: () => openDeleteFromRow(row.id),
-        disabled: deleteBusy,
-        tone: 'danger',
-      },
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
+      { key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => openEditFromRow(row.id) },
+      { key: 'issue', label: 'Nuova issue', icon: <AddIcon fontSize="small" />, onClick: () => newIssueFor(row) },
+      { key: 'vpn', label: 'VPN', icon: <LanOutlinedIcon fontSize="small" />, onClick: () => openVpnModal(row), badge: row.has_vpn ? 'configurata' : 'non configurata', badgeTone: row.has_vpn ? 'success' : 'neutral' },
+      { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => openDeleteFromRow(row.id), disabled: deleteBusy, tone: 'danger' },
     ]
-  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openVpnModal, restoreBusy, restoreFromRow])
+  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openVpnModal, restoreBusy, restoreFromRow, newIssueFor])
 
-  const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => {
-    return buildColumns(openVpnModal)
-  }, [openVpnModal])
+  const openIssues = React.useCallback((row: CustomerRow) => {
+    navigate(`/issues${buildQuery({ cliente: row.display_name || row.name })}`)
+  }, [navigate])
 
-  const renderCustomerCard = React.useMemo(() => makeRenderCustomerCard(openVpnModal), [openVpnModal])
+  const columns = React.useMemo<GridColDef<CustomerRow>[]>(() => buildColumns(openVpnModal, vendorColor, openIssues), [openVpnModal, vendorColor, openIssues])
+  const renderCustomerCard = React.useMemo(() => makeRenderCustomerCard(openVpnModal, vendorColor), [openVpnModal, vendorColor])
 
+  const yesNo = (v: string, yes: string, no: string) => (v === 'true' ? yes : v === 'false' ? no : v)
   const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
-    const yesNoSelect = (label: string, value: string, onChange: (v: string) => void, yes: string, no: string) => (
-      <FormControl size="small" fullWidth>
-        <InputLabel>{label}</InputLabel>
-        <Select label={label} value={value} onChange={(e) => onChange(String(e.target.value))}>
-          <MenuItem value="">Tutti</MenuItem>
-          <MenuItem value="true">{yes}</MenuItem>
-          <MenuItem value="false">{no}</MenuItem>
-        </Select>
-      </FormControl>
-    )
+    const make = (label: string, value: string, set: (v: string) => void, options: { value: string; label: string }[]) => ({
+      value,
+      label: `Filtra ${label.toLowerCase()}`,
+      onSet: (v: string | number | '') => set(String(v)),
+      onReset: () => set(''),
+      children: <FilterOptionList label={label} options={options} selected={value ? [value] : []} onChange={(vals) => set(vals[0] ?? '')} single />,
+    })
     return {
-      status_label: {
-        value: statusFilter,
-        label: 'Filtra per vendor',
-        onSet: (v) => setStatusFilter(String(v), filterOpts),
-        onReset: () => setStatusFilter('', filterOpts),
-        children: (
-          <FormControl size="small" fullWidth>
-            <InputLabel>Vendor</InputLabel>
-            <Select label="Vendor" value={statusFilter} onChange={(e) => setStatusFilter(String(e.target.value), filterOpts)}>
-              <MenuItem value="">Tutti</MenuItem>
-              {statuses.map((st) => <MenuItem key={st.id} value={String(st.id)}>{st.label}</MenuItem>)}
-            </Select>
-          </FormControl>
-        ),
-      },
-      province: {
-        value: provinceFilter,
-        label: 'Filtra per provincia',
-        onSet: (v) => setProvinceFilter(String(v), filterOpts),
-        onReset: () => setProvinceFilter('', filterOpts),
-        children: (
-          <TextField
-            size="small"
-            fullWidth
-            autoFocus
-            label="Provincia"
-            placeholder="Es. BO"
-            value={provinceFilter}
-            onChange={(e) => setProvinceFilter(e.target.value.toUpperCase(), filterOpts)}
-          />
-        ),
-      },
-      display_name: {
-        value: vpnFilter,
-        label: 'Filtra per VPN',
-        onSet: (v) => setVpnFilter(String(v), filterOpts),
-        onReset: () => setVpnFilter('', filterOpts),
-        children: yesNoSelect('VPN', vpnFilter, (v) => setVpnFilter(v, filterOpts), 'Con VPN', 'Senza VPN'),
-      },
-      primary_contact_name: {
-        value: contactFilter,
-        label: 'Filtra per contatto',
-        onSet: (v) => setContactFilter(String(v), filterOpts),
-        onReset: () => setContactFilter('', filterOpts),
-        children: yesNoSelect('Contatto primario', contactFilter, (v) => setContactFilter(v, filterOpts), 'Con contatto', 'Senza contatto'),
-      },
+      status_label: make('Vendor', statusFilter, (v) => setStatusFilter(v, filterOpts), statuses.map((st) => ({ value: String(st.id), label: st.label }))),
+      display_name: make('VPN', vpnFilter, (v) => setVpnFilter(v, filterOpts), [{ value: 'true', label: 'Con VPN' }, { value: 'false', label: 'Senza VPN' }]),
+      primary_contact_name: make('Contatto primario', contactFilter, (v) => setContactFilter(v, filterOpts), [{ value: 'true', label: 'Con contatto' }, { value: 'false', label: 'Senza contatto' }]),
     }
-  }, [statusFilter, provinceFilter, vpnFilter, contactFilter, statuses, filterOpts, setStatusFilter, setProvinceFilter, setVpnFilter, setContactFilter])
+  }, [statusFilter, vpnFilter, contactFilter, statuses, filterOpts, setStatusFilter, setVpnFilter, setContactFilter])
 
-  // Configurazione filtri URL per il kebab menu delle colonne
+  const activeFilters: ActiveFilter[] = [
+    statusFilter ? { key: 'status', label: 'Vendor', values: statuses.find((s) => String(s.id) === statusFilter)?.label ?? statusFilter } : null,
+    vpnFilter ? { key: 'vpn', label: 'VPN', values: yesNo(vpnFilter, 'Con VPN', 'Senza VPN') } : null,
+    contactFilter ? { key: 'contact', label: 'Contatto primario', values: yesNo(contactFilter, 'Con contatto', 'Senza contatto') } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (key: string) => {
+    if (key === 'status') setStatusFilter('', filterOpts)
+    if (key === 'vpn') setVpnFilter('', filterOpts)
+    if (key === 'contact') setContactFilter('', filterOpts)
+  }
+
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<CustomerRow>({
+      url: '/customers/',
+      params,
+      filename: 'clienti',
+      columns: [
+        { label: 'Codice', getValue: (r) => r.code },
+        { label: 'Cliente', getValue: (r) => r.display_name },
+        { label: 'Ragione sociale', getValue: (r) => r.name },
+        { label: 'Vendor', getValue: (r) => r.status_label ?? '' },
+        { label: 'Città', getValue: (r) => r.city ?? '' },
+        { label: 'Provincia', getValue: (r) => r.province ?? '' },
+        { label: 'Contatto primario', getValue: (r) => r.primary_contact_name ?? '' },
+        { label: 'Telefono', getValue: (r) => r.primary_contact_phone ?? '' },
+        { label: 'Email', getValue: (r) => r.primary_contact_email ?? '' },
+        { label: 'Siti', getValue: (r) => String(r.sites_count ?? 0) },
+        { label: 'Inventari', getValue: (r) => String(r.assets_count ?? 0) },
+        { label: 'Issue aperte', getValue: (r) => String(r.open_issues_count ?? 0) },
+        { label: 'Prossima scadenza contratto', getValue: (r) => (r.next_contract_end ? dIt(r.next_contract_end) : '') },
+        { label: 'P.IVA', getValue: (r) => r.vat_number ?? '' },
+        { label: 'Codice fiscale', getValue: (r) => r.tax_code ?? '' },
+      ],
+    })
+  }
+
   // If opened from global Search, we can return back to the Search results on close.
-  const returnTo = React.useMemo(() => {
-    return new URLSearchParams(loc.search).get('return')
-  }, [loc.search])
+  const returnTo = React.useMemo(() => new URLSearchParams(loc.search).get('return'), [loc.search])
 
   const closeDrawer = () => {
     setDrawerOpen(false)
+    setSelectedId(null)
+    lastOpenRef.current = null
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
   }
 
-
   const openCreateOnceRef = React.useRef(false)
-
   const openCreate = React.useCallback(() => {
     setDlgMode('create')
     setDlgId(null)
-    setForm({
-      status: '',
-      name: '',
-      display_name: '',
-      vat_number: '',
-      tax_code: '',
-      province: '',
-      custom_fields: {},
-      notes: '',
-    })
+    setForm({ status: '', name: '', display_name: '', vat_number: '', tax_code: '', province: '', custom_fields: {}, notes: '' })
     setDlgOpen(true)
     setFieldErrors({})
   }, [])
 
   React.useEffect(() => {
     const stU = loc.state as unknown
-    if (!isRecord(stU) || stU['openCreate'] !== true) {
-      openCreateOnceRef.current = false
-      return
-    }
+    if (!isRecord(stU) || stU['openCreate'] !== true) { openCreateOnceRef.current = false; return }
     if (openCreateOnceRef.current) return
     openCreateOnceRef.current = true
     openCreate()
@@ -1182,31 +590,20 @@ export default function Customers() {
     setDlgMode('edit')
     setDlgId(detail.id)
     setForm({
-      status: detail.status ?? '',
-      name: detail.name ?? '',
-      display_name: detail.display_name ?? '',
-      vat_number: detail.vat_number ?? '',
-      tax_code: detail.tax_code ?? '',
-      province: detail.province ?? '',
-      custom_fields: detail.custom_fields ?? {},
-      notes: detail.notes ?? '',
+      status: detail.status ?? '', name: detail.name ?? '', display_name: detail.display_name ?? '', vat_number: detail.vat_number ?? '',
+      tax_code: detail.tax_code ?? '', province: detail.province ?? '', custom_fields: detail.custom_fields ?? {}, notes: detail.notes ?? '',
     })
     setDlgOpen(true)
     setFieldErrors({})
   }, [detail])
-
   openEditRef.current = openEdit
 
   const save = async () => {
-    // Validazione client-side: popola fieldErrors invece del toast generico
-    // così i campi si colorano di rosso esattamente come fanno gli errori backend.
+    // Validazione client-side: popola fieldErrors come gli errori del backend.
     const clientErrors: Record<string, string> = {}
     if (form.status === '') clientErrors.status = 'Seleziona un vendor.'
     if (!String(form.name).trim()) clientErrors.name = 'Il nome è obbligatorio.'
-    if (Object.keys(clientErrors).length) {
-      setFieldErrors(clientErrors)
-      return
-    }
+    if (Object.keys(clientErrors).length) { setFieldErrors(clientErrors); return }
 
     const payload: Record<string, unknown> = {
       status: Number(form.status),
@@ -1215,8 +612,7 @@ export default function Customers() {
       vat_number: (form.vat_number || '').trim() || null,
       tax_code: (form.tax_code || '').trim() || null,
       province: (form.province || '').trim() || null,
-      custom_fields:
-        form.custom_fields && Object.keys(form.custom_fields).length ? form.custom_fields : null,
+      custom_fields: form.custom_fields && Object.keys(form.custom_fields).length ? form.custom_fields : null,
       notes: (form.notes || '').trim() || null,
     }
 
@@ -1233,29 +629,48 @@ export default function Customers() {
         id = res.data.id
         toast.success('Cliente aggiornato')
       }
-
       setDlgOpen(false)
-      reloadList()
+      reloadAll()
       openDrawer(id)
     } catch (e) {
       const feedback = apiErrorToFormFeedback(e)
-      if (feedback.hasFieldErrors) {
-        setFieldErrors(feedback.fieldErrors)
-      }
+      if (feedback.hasFieldErrors) setFieldErrors(feedback.fieldErrors)
       toast.error(feedback.message)
     } finally {
       setDlgSaving(false)
     }
   }
+
+  // Modifica sul posto dalle Proprietà, con annulla.
+  const patchCustomer = React.useCallback(async (patch: CustomerPatch, label: string) => {
+    if (!detail) return
+    const id = detail.id
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
+    try {
+      await api.patch(`/customers/${id}/`, patch)
+      await loadDetail(id, undefined, true)
+      reloadAll()
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          await api.patch(`/customers/${id}/`, prev)
+          await loadDetail(id, undefined, true)
+          reloadAll()
+        } catch (e) { toast.error(apiErrorToMessage(e)) }
+      })
+    } catch (e) {
+      toast.error(apiErrorToFormFeedback(e).message)
+    }
+  }, [detail, loadDetail, reloadAll, undoToast, toast])
+
   const doDelete = async () => {
     if (!detail) return
     setDeleteBusy(true)
     try {
       await api.delete(`/customers/${detail.id}/`)
       toast.success('Cliente eliminato')
-
-      // per poterlo vedere subito nel drawer dopo il delete:
       grid.setViewMode('all', { keepOpen: true })
+      setKpiReload((n) => n + 1)
       await loadDetail(detail.id, true)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -1271,7 +686,7 @@ export default function Customers() {
     try {
       await api.post(`/customers/${detail.id}/restore/`)
       toast.success('Cliente ripristinato')
-      reloadList()
+      reloadAll()
       await loadDetail(detail.id)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -1280,55 +695,96 @@ export default function Customers() {
     }
   }
 
+  const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
+  const tabCount = (n?: number | null) => (typeof n === 'number' ? n : null)
+
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
-      <EntityListCard
-        mobileCard={renderCustomerCard}
-        toolbar={{
-          q: grid.q,
-          onQChange: grid.setQ,
-          compact: true,
-          searchLabel: 'Cerca clienti, siti, hostname…',
-          onReset: hasActiveFilters ? resetFilters : undefined,
-          resetLabel: 'Azzera filtri',
-        }}
-        grid={{
-          pageKey: 'customers',
-          username: me?.username,
-          filterConfig,
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Clienti"
+        actions={<Can perm={PERMS.crm.customer.add}><Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>Nuovo cliente</Button></Can>}
+      />
+      <CustomerKpis summary={summary} view={view} onView={setView} vendorColor={vendorColor}
+        onVendor={(key) => { const st = statuses.find((x) => x.key === key); if (st) setStatusFilter(statusFilter === String(st.id) ? '' : String(st.id), filterOpts) }} />
 
-          emptyState,
-          columnVisibilityModel: {},
-
-          rows,
-          columns: columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          onRowContextMenu: handleRowContextMenu,
-
-          sx: {
-            // compact-ish density + zebra soft (no prop changes needed)
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-      >
-
-      </EntityListCard>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs
+          value={savedId ? `saved:${savedId}` : view}
+          onChange={(k) => { if (k.startsWith('saved:')) { applySaved(k.slice(6)); return } setView(k) }}
+          tabs={[
+            { key: 'all', label: 'Tutti', count: summary?.total },
+            { key: 'iss', label: 'Con issue aperte', count: summary?.with_open_issues },
+            { key: 'exp', label: 'Contratti in scadenza', count: summary?.contracts_expiring, tone: 'alert' },
+            { key: 'inc', label: 'Da completare', count: summary?.incomplete },
+            ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
+          ]}
+          end={
+            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+              Salva vista
+            </Button>
+          }
+        />
+        <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
+          onSave={(name) => { const v = saved.add(name, { view, status: statusFilter, vpn: vpnFilter, contact: contactFilter }); setSavedId(v.id) }} />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={renderCustomerCard}
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={activeFilters}
+              onRemoveFilter={removeFilter}
+              onClearFilters={resetFilters}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca clienti, siti, hostname, IP…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
+            />
+          }
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca clienti, siti, hostname…' }}
+          grid={{
+            pageKey: 'customers',
+            autoHeight: true,
+            username: me?.username,
+            filterConfig,
+            emptyState,
+            defaultHiddenColumns: ['id', 'tax_code'],
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                code: { value: colQ.code, onChange: setCol('code'), placeholder: '#' },
+                display_name: { value: colQ.name, onChange: setCol('name'), placeholder: 'Nome o ragione sociale' },
+                status_label: { value: colQ.vendor, onChange: setCol('vendor'), options: statuses.map((st) => ({ value: String(st.id), label: st.label })) },
+                city: { value: colQ.city, onChange: setCol('city'), placeholder: 'Città o provincia' },
+                primary_contact_name: { value: colQ.contact, onChange: setCol('contact'), placeholder: 'Nome o telefono' },
+                vat_number: { value: colQ.vat, onChange: setCol('vat'), placeholder: 'P.IVA' },
+              },
+            },
+            rows,
+            columns,
+            loading,
+            rowCount,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: openDrawer,
+            onRowContextMenu: handleRowContextMenu,
+            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
       <RowContextMenu
         open={Boolean(contextMenu)}
-        anchorPosition={
-          contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined
-        }
+        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
         onClose={closeContextMenu}
         items={contextMenuItems}
       />
@@ -1336,68 +792,52 @@ export default function Customers() {
       {vpnModalRow && (
         <VpnModal
           open={vpnModalOpen}
-          onClose={() => {
-            setVpnModalOpen(false)
-            reloadList()
-          }}
+          onClose={() => { setVpnModalOpen(false); reloadAll(); setVpnReload((n) => n + 1); if (detail?.id === vpnModalRow.id) void loadDetail(detail.id, undefined, true) }}
           customerId={vpnModalRow.id}
           customerName={vpnModalRow.display_name || vpnModalRow.name}
         />
       )}
 
-      <CustomerDrawer
-        open={drawerOpen}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        drawerTab={drawerTab}
-        sitesCount={sitesCount}
-        inventoriesCount={invCount}
-        driveCount={driveCount}
-        devicesCount={devicesCount}
-        contractsCount={contractsCount}
-        address={address}
-        canChange={canChange}
-        canDelete={canDelete}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        onClose={closeDrawer}
-        onEdit={openEdit}
-        onDelete={() => setDeleteDlgOpen(true)}
-        onRestore={doRestore}
-        onTabChange={setDrawerTab}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-        sitesTabContent={detail ? (
-          <CustomerSitesTab
-            customerId={detail.id}
-            includeDeleted={grid.includeDeleted}
-            onlyDeleted={grid.onlyDeleted}
-          />
-        ) : null}
-        inventoriesTabContent={detail ? (
-          <CustomerInventoriesTab
-            customerId={detail.id}
-            includeDeleted={grid.includeDeleted}
-            onlyDeleted={grid.onlyDeleted}
-          />
-        ) : null}
-        driveTabContent={detail ? <CustomerDriveTab customerId={detail.id} /> : null}
-        devicesTabContent={detail ? <CustomerDevicesTab customerId={detail.id} /> : null}
-        contractsTabContent={detail ? <CustomerContractsTab customerId={detail.id} /> : null}
-        activityTabContent={detail ? (
-          <AuditEventsTab appLabel="crm" model="customer" objectId={detail.id} />
-        ) : null}
-      />
+      {drawerOpen ? (
+        <CustomerDetailCard
+          detail={detail}
+          loading={detailLoading}
+          statuses={statuses}
+          vendorColor={vendorColor}
+          canChange={canChange}
+          canDelete={canDelete}
+          canEditVpn={canEditVpn}
+          tab={drawerTab}
+          onTab={setDrawerTab}
+          counts={{ sites: tabCount(sitesCount), inventories: tabCount(invCount), drive: tabCount(driveCount), contracts: tabCount(contractsCount), devices: tabCount(devicesCount) }}
+          address={address}
+          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onClose={closeDrawer}
+          onEdit={openEdit}
+          onDelete={() => setDeleteDlgOpen(true)}
+          onRestore={() => void doRestore()}
+          onPatch={(patch, label) => void patchCustomer(patch, label)}
+          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+          onEditVpn={() => { if (detail) openVpnModal(detail) }}
+          onNewIssue={() => { if (detail) newIssueFor(detail) }}
+          onAllContacts={() => { if (detail) navigate(`/contacts${buildQuery({ customer: detail.id })}`) }}
+          reloadKey={vpnReload}
+          sitesTab={detail ? <CustomerSitesPanel customerId={detail.id} /> : null}
+          inventoriesTab={detail ? <CustomerInventoriesPanel customerId={detail.id} showDevices={showDevices} canEditDevices={hasPerm(PERMS.device.device.change)} /> : null}
+          documentsTab={detail ? <CustomerDocumentsPanel customerId={detail.id} showContracts={hasPerm(PERMS.contracts.contract.view)} /> : null}
+          activityTab={detail ? <CustomerActivityPanel customerId={detail.id} /> : null}
+        />
+      ) : null}
 
       <ConfirmDeleteDialog
         open={deleteDlgOpen}
         busy={deleteBusy}
         title="Confermi eliminazione?"
-        description={
-          detail?.code
-            ? `Il cliente verrà spostato nel cestino e potrà essere ripristinato.\n\n${detail.code} • ${detail.display_name}`
-            : 'Il cliente verrà spostato nel cestino e potrà essere ripristinato.'
-        }
+        description={detail?.code
+          ? `Il cliente verrà spostato nel cestino e potrà essere ripristinato.\n\n${detail.code} • ${detail.display_name}`
+          : 'Il cliente verrà spostato nel cestino e potrà essere ripristinato.'}
         onClose={() => setDeleteDlgOpen(false)}
         onConfirm={doDelete}
       />

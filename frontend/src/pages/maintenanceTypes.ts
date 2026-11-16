@@ -9,6 +9,9 @@ export type PlanRow = {
   inventory_type_labels?: string[]
   covered_count?: number | null
   completed_count?: number | null
+  /** Manutenzioni ancora da fare / scadute nel ciclo corrente (solo in elenco). */
+  todo_count?: number | null
+  overdue_count?: number | null
   title: string
   schedule_type: string
   interval_value?: number | null
@@ -35,6 +38,8 @@ export type EventRow = {
   inventory_knumber?: string | null
   customer_code?: string | null
   customer_name?: string | null
+  customer_id?: number | null
+  site_id?: number | null
   site_name?: string | null
   performed_at: string
   result: string
@@ -85,6 +90,9 @@ export type TodoRow = {
   plan_next_due_date?: string | null
   /** ID del record MaintenancePlanInventory (pivot), null se non ancora creato */
   plan_inventory_id?: number | null
+  /** Ultima esecuzione registrata per questa coppia (piano, inventory), qualunque ciclo. */
+  last_result?: 'ok' | 'ko' | 'partial' | 'not_planned' | null
+  last_date?: string | null
   schedule_type: string
   interval_value?: number | null
   interval_unit?: string | null

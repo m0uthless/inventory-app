@@ -1,0 +1,73 @@
+/* Varianti della topbar per la base h. Si scelgono con data-top sull'elemento html.
+   base    = attuale (superficie bianca, ricerca a sinistra)
+   cornice = sidebar e topbar formano un'unica cornice tinta, il contenuto è un foglio con l'angolo arrotondato
+   banda   = fascia di marca scura su tutta la larghezza, logo compreso */
+
+:root { --band: #17463c; --band-2: #1f5a4d; }
+:root[data-palette="blu"] { --band: #153e66; --band-2: #1c4f80; }
+:root[data-palette="indaco"] { --band: #2b2a6b; --band-2: #383788; }
+:root[data-theme="dark"] { --band: #123a32; --band-2: #1a5045; }
+:root[data-theme="dark"][data-palette="blu"] { --band: #132f4e; --band-2: #1b4168; }
+:root[data-theme="dark"][data-palette="indaco"] { --band: #232254; --band-2: #302f70; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --band: #123a32; --band-2: #1a5045; }
+  :root[data-palette="blu"]:not([data-theme="light"]) { --band: #132f4e; --band-2: #1b4168; }
+  :root[data-palette="indaco"]:not([data-theme="light"]) { --band: #232254; --band-2: #302f70; }
+}
+
+/* Ricerca centrata nella topbar (cornice e banda) */
+@media (min-width: 861px) {
+  :root[data-top="cornice"] .topbar, :root[data-top="banda"] .topbar { position: relative; }
+  :root[data-top="cornice"] .topbar .search-global, :root[data-top="banda"] .topbar .search-global {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(520px, 42vw); height: 34px; border-radius: 8px;
+  }
+}
+
+/* ── Cornice ───────────────────────────────────────────────────── */
+:root[data-top="cornice"] .main { background: var(--rail); }
+:root[data-top="cornice"] .sidebar { border-right: 0; }
+:root[data-top="cornice"] .brand { border-bottom: 0; }
+:root[data-top="cornice"] .topbar { background: transparent; border-bottom: 0; padding-left: 8px; }
+:root[data-top="cornice"] .workspace {
+  background: var(--bg); border-top-left-radius: 14px; border: 1px solid var(--border); border-width: 1px 0 0 1px;
+}
+:root[data-top="cornice"] .topbar .search-global { background: var(--surface); border-color: var(--border); box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+:root[data-top="cornice"] .topbar .search-global:hover { border-color: var(--border-strong); }
+:root[data-top="cornice"] .topbar .icon-btn:hover, :root[data-top="cornice"] .user-btn:hover { background: var(--surface); }
+:root[data-top="cornice"] .bell::after { border-color: var(--rail); }
+:root[data-top="cornice"] .user-btn .avatar { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+:root[data-top="cornice"] .drawer { border-top-left-radius: 0; }
+@media (max-width: 860px) {
+  :root[data-top="cornice"] .workspace { border-radius: 0; border-left: 0; }
+}
+
+/* ── Banda ─────────────────────────────────────────────────────── */
+:root[data-top="banda"] .topbar {
+  background: var(--band); border-bottom: 0; color: #fff;
+  background-image: linear-gradient(90deg, var(--band) 0%, var(--band-2) 100%);
+}
+:root[data-top="banda"] .brand { background: var(--band); border-bottom: 0; color: #fff; }
+:root[data-top="banda"] .brand-org { color: rgb(255 255 255 / .68); }
+:root[data-top="banda"] .brand .brand-mark { background: #fff; color: var(--band); }
+:root[data-top="banda"] .brand .icon-btn { color: rgb(255 255 255 / .72); }
+:root[data-top="banda"] .brand .icon-btn:hover,
+:root[data-top="banda"] .topbar .icon-btn:hover,
+:root[data-top="banda"] .topbar .user-btn:hover { background: rgb(255 255 255 / .1); border-color: rgb(255 255 255 / .14); color: #fff; }
+:root[data-top="banda"] .topbar .search-global {
+  background: rgb(255 255 255 / .1); border-color: rgb(255 255 255 / .16); color: rgb(255 255 255 / .74);
+}
+:root[data-top="banda"] .topbar .search-global:hover { background: rgb(255 255 255 / .15); border-color: rgb(255 255 255 / .26); }
+:root[data-top="banda"] .topbar kbd { background: rgb(255 255 255 / .1); border-color: rgb(255 255 255 / .2); color: rgb(255 255 255 / .8); }
+:root[data-top="banda"] .topbar .icon-btn { color: rgb(255 255 255 / .8); }
+:root[data-top="banda"] .bell::after { border-color: var(--band-2); }
+:root[data-top="banda"] .user-btn { color: rgb(255 255 255 / .72); }
+:root[data-top="banda"] .user-btn .avatar { background: rgb(255 255 255 / .16); color: #fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .24); }
+:root[data-top="banda"] .u-txt b { color: #fff; }
+:root[data-top="banda"] .u-txt span { color: rgb(255 255 255 / .68); }
+/* compressa: la fascia resta alta 52px, il logo lascia posto al pulsante per riaprire */
+:root[data-top="banda"] .is-collapsed .brand { height: 52px; padding: 0; flex-direction: row; }
+:root[data-top="banda"] .is-collapsed .brand .brand-mark { display: none; }
+
+/* Selettore nella barra di anteprima */
+.pv-top { display: inline-flex; align-items: center; gap: 2px; }
+.pv-top .pv-lbl { color: var(--muted); font-size: 12px; padding: 0 4px 0 2px; }

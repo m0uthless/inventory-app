@@ -1,52 +1,36 @@
 import * as React from 'react'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
-import { alpha } from '@mui/material/styles'
-
-import {
-  Box,
-  Button,
-  Chip,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Typography,
-} from '@mui/material'
-
+import { Box, Button, Stack, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-
-import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
-
+import type { GridColDef } from '@mui/x-data-grid'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
-import { useUrlNumberParam } from '@shared/hooks/useUrlParam'
-
+import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
+import { api } from '@shared/api/client'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
-
-import { api } from '@shared/api/client'
 import ContactDialog from '../features/contacts/ContactDialog'
-import ContactDrawer from '../features/contacts/ContactDrawer'
+import ContactDetailCard, { type ContactPatch, type ContactTab } from '../features/contacts/ContactDetailCard'
+import ContactKpis, { useContactSummary } from '../features/contacts/ContactKpis'
+import { AuditFeedPanel } from '../features/customers/CustomerTabs'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
-import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
-import { useAuth } from '../auth/AuthProvider'
-import { Can } from '../auth/Can'
-import { emptySelectionModel, selectionSize, selectionToNumberIds } from '@shared/utils/gridSelection'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
-
+import { useAuth } from '../auth/AuthProvider'
+import { Can } from '../auth/Can'
+import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
+import { buildQuery } from '@shared/utils/nav'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import ConfirmActionDialog from '@shared/ui/ConfirmActionDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 
 type CustomerItem = { id: number; code?: string; name?: string; display_name?: string | null }
 
@@ -91,162 +75,131 @@ type ContactForm = {
 
 type OpenCreateState = { openCreate?: boolean }
 
+const mono = { fontFamily: '"Geist Mono", monospace' }
+const missing = (t: string) => <Box component="span" sx={{ fontSize: 12, fontWeight: 550, color: 'warning.main' }}>{t}</Box>
+const tel = (p: string) => p.replace(/\s+/g, '')
+const primaryTag = <Box component="span" sx={{ ml: 1, display: 'inline-flex', alignItems: 'center', alignSelf: 'center', height: 18, fontSize: 10, fontWeight: 650, letterSpacing: '.02em', color: 'primary.main', bgcolor: 'archie.field', borderRadius: '4px', px: 0.75, flex: 'none' }}>Primario</Box>
+const linkCellSx = { display: 'inline-flex', alignItems: 'center', gap: 0.75, minWidth: 0, color: 'text.primary', textDecoration: 'none', '& svg': { color: 'primary.main', flex: 'none' }, '&:hover': { color: 'primary.main', '& .tx': { textDecoration: 'underline', textUnderlineOffset: '3px' } } }
 
-
-const cols: GridColDef<ContactRow>[] = [
-  { field: 'name', headerName: 'Nome', flex: 1, minWidth: 220 },
-  { field: 'email', headerName: 'Email', width: 240 },
-  { field: 'phone', headerName: 'Telefono', width: 160 },
-  {
-    field: 'customer_display_name',
-    headerName: 'Cliente',
-    width: 220,
-    valueGetter: (v, row) => {
-      void v
-      return row.customer_display_name || row.customer_name || row.customer_code || '—'
-    },
-  },
-  {
-    field: 'site_display_name',
-    headerName: 'Sito',
-    width: 220,
-    valueGetter: (v, row) => {
-      void v
-      return row.site_display_name || row.site_name || '—'
-    },
-  },
-  {
-    field: 'is_primary',
-    headerName: 'Primario',
-    width: 120,
-    renderCell: (p) =>
-      p.value ? (
-        <Chip size="small" label="Sì" />
-      ) : (
-        <Chip size="small" variant="outlined" label="No" />
-      ),
-  },
-]
-
-
-// ─── Mobile card renderer ────────────────────────────────────────────────────
-
-const renderContactCard: MobileCardRenderFn<ContactRow> = ({ row, onOpen }) => {
-  const meta: { label: string; value: string | null | undefined }[] = [
-    { label: 'Cliente',  value: row.customer_display_name || row.customer_name },
-    { label: 'Sito',     value: row.site_display_name || row.site_name },
-    { label: 'Email',    value: row.email },
-    { label: 'Telefono', value: row.phone },
-  ]
-
-  return (
-    <Box
-      onClick={() => onOpen(row.id)}
-      sx={{
-        bgcolor: 'background.paper',
-        border: '0.5px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
-        p: 1.25,
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.75,
-        '&:active': { bgcolor: 'action.hover' },
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.name}
-          </Typography>
-          {row.department && (
-            <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', mt: 0.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {row.department}
-            </Typography>
-          )}
+function buildColumns(): GridColDef<ContactRow>[] {
+  return [
+    { field: 'id', headerName: 'ID', width: 70, align: 'right', headerAlign: 'right' },
+    {
+      field: 'name', headerName: 'Nome', flex: 1, minWidth: 180,
+      renderCell: (p) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+          <Box component="span" sx={{ fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.name}</Box>
+          {p.row.is_primary ? primaryTag : null}
         </Box>
-        {row.is_primary && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: (theme) => alpha(theme.palette.success.main, 0.10), color: (theme) => theme.palette.success.dark, border: (theme) => `0.5px solid ${alpha(theme.palette.success.main, 0.28)}`, whiteSpace: 'nowrap' }}>
-            Primario
-          </Box>
-        )}
-      </Box>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {meta.map(({ label, value }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {value || '—'}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-    </Box>
-  )
+      ),
+    },
+    { field: 'department', headerName: 'Reparto', width: 140, renderCell: (p) => p.row.department || <Box component="span" sx={{ color: 'text.disabled' }}>—</Box> },
+    {
+      field: 'customer_display_name', headerName: 'Cliente', width: 150,
+      renderCell: (p) => <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.customer_display_name || p.row.customer_name || '—'}</Box>,
+    },
+    {
+      field: 'site_display_name', headerName: 'Sito', width: 150,
+      renderCell: (p) => p.row.site ? <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.site_display_name || p.row.site_name}</Box>
+        : <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>Sede del cliente</Box>,
+    },
+    {
+      field: 'phone', headerName: 'Telefono', width: 150,
+      renderCell: (p) => p.row.phone ? (
+        <Box component="a" href={`tel:${tel(p.row.phone)}`} onClick={(e: React.MouseEvent) => e.stopPropagation()} sx={linkCellSx}>
+          <CampoIcon name="phone" size={14} bold /><Box component="span" className="tx" sx={{ ...mono, fontSize: 12 }}>{p.row.phone}</Box>
+        </Box>
+      ) : missing('Manca'),
+    },
+    {
+      field: 'email', headerName: 'Email', width: 210,
+      renderCell: (p) => p.row.email ? (
+        <Box component="a" href={`mailto:${p.row.email}`} onClick={(e: React.MouseEvent) => e.stopPropagation()} sx={linkCellSx}>
+          <CampoIcon name="mail" size={14} bold /><Box component="span" className="tx" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.email}</Box>
+        </Box>
+      ) : missing('Manca'),
+    },
+  ]
 }
 
+const renderContactCard: MobileCardRenderFn<ContactRow> = ({ row, onOpen }) => (
+  <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5, cursor: 'pointer', display: 'grid', gap: 0.75, '&:active': { bgcolor: 'action.hover' } }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+      <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, minWidth: 0 }}>{row.name}</Typography>
+      {row.is_primary ? primaryTag : null}
+    </Box>
+    <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>
+      {[row.department, row.customer_display_name || row.customer_name, row.site_display_name || row.site_name].filter(Boolean).join(' · ')}
+    </Typography>
+    {row.phone || row.email ? (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }} onClick={(e) => e.stopPropagation()}>
+        {row.phone ? <Box component="a" href={`tel:${tel(row.phone)}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minHeight: 44, px: 1.25, borderRadius: '8px', border: '1px solid', borderColor: 'divider', color: 'text.primary', fontSize: 13, fontWeight: 550, textDecoration: 'none', '& svg': { color: 'primary.main' } }}><CampoIcon name="phone" size={16} bold /><Box component="span" sx={mono}>{row.phone}</Box></Box> : null}
+        {row.email ? <Box component="a" href={`mailto:${row.email}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, minHeight: 44, px: 1.25, borderRadius: '8px', border: '1px solid', borderColor: 'divider', color: 'text.primary', fontSize: 13, fontWeight: 550, textDecoration: 'none', minWidth: 0, maxWidth: '100%', '& svg': { color: 'primary.main', flex: 'none' } }}><CampoIcon name="mail" size={16} bold /><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.email}</Box></Box> : null}
+      </Box>
+    ) : null}
+  </Box>
+)
 
-// prettier-ignore
+type ContactView = 'all' | 'pri' | 'unr' | 'nosite'
+type ColQ = { name: string; department: string; customer: string; site: string; phone: string; email: string }
+const EMPTY_COLQ: ColQ = { name: '', department: '', customer: '', site: '', phone: '', email: '' }
+type ViewState = { view: ContactView; customer: number | ''; site: number | '' }
+
 export default function Contacts() {
-  const zebraSx = useDataGridZebraSx()
   const { me, hasPerm } = useAuth()
   const canChange = hasPerm(PERMS.crm.contact.change)
-  const canDelete  = hasPerm(PERMS.crm.contact.delete)
+  const canDelete = hasPerm(PERMS.crm.contact.delete)
   const toast = useToast()
+  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const loc = useLocation()
   const grid = useServerGrid({
     defaultOrdering: 'name',
-    allowedOrderingFields: [
-      'name',
-      'email',
-      'phone',
-      'customer_display_name',
-      'site_display_name',
-      'is_primary',
-    ],
+    allowedOrderingFields: ['id', 'name', 'email', 'phone', 'department', 'customer_display_name', 'site_display_name', 'is_primary'],
     defaultPageSize: 25,
   })
 
-  const [selectionModel, setSelectionModel] =
-    React.useState<GridRowSelectionModel>(emptySelectionModel())
-  const [bulkRestoreDlgOpen, setBulkRestoreDlgOpen] = React.useState(false)
-  const selectedIds = React.useMemo(() => selectionToNumberIds(selectionModel), [selectionModel])
-  const selectedCount = React.useMemo(() => selectionSize(selectionModel), [selectionModel])
+  const [viewRaw, setViewRaw] = useUrlStringParam('vista')
+  const view: ContactView = (['all', 'pri', 'unr', 'nosite'] as const).includes(viewRaw as ContactView) ? (viewRaw as ContactView) : 'all'
+  const [customerId, setCustomerId] = useUrlNumberParam('customer')
+  const [siteId, setSiteId] = useUrlNumberParam('site')
+  const filterOpts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const [colSearchOpen, setColSearchOpen] = React.useState(false)
+  const [colQ, setColQ] = React.useState<ColQ>(EMPTY_COLQ)
+  const colQActive = Object.values(colQ).some(Boolean)
+  const setCol = (k: keyof ColQ) => (v: string) => { setColQ((c) => ({ ...c, [k]: v })); grid.onPaginationModelChange({ ...grid.paginationModel, page: 0 }) }
+  const hasActiveFilters = customerId !== '' || siteId !== ''
+  const resetFilters = React.useCallback(() => { setCustomerId('', { patch: { page: 1, site: '' }, keepOpen: true }) }, [setCustomerId])
 
-  React.useEffect(() => {
-    setSelectionModel(emptySelectionModel())
-  }, [grid.view])
+  const saved = useSavedViews<ViewState>('contacts', me?.username)
+  const [savedId, setSavedId] = React.useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const setView = (v: string) => { setSavedId(null); setViewRaw(v === 'all' ? '' : v, filterOpts) }
+  const applySaved = (id: string) => {
+    const v = saved.views.find((x) => x.id === id); if (!v) return
+    setSavedId(id)
+    setViewRaw(v.state.view === 'all' ? '' : v.state.view, { patch: { page: 1, customer: v.state.customer === '' ? '' : String(v.state.customer), site: v.state.site === '' ? '' : String(v.state.site) }, keepOpen: true })
+  }
 
   const emptyState = React.useMemo(() => {
-    if (grid.view === 'deleted' && !grid.search.trim()) {
-      return { title: 'Cestino vuoto', subtitle: 'Non ci sono contatti eliminati.' }
-    }
-    if (!grid.search.trim()) {
+    const searching = Boolean(grid.search.trim()) || colQActive
+    if (grid.view === 'deleted' && !searching && !hasActiveFilters) return { title: 'Cestino vuoto', subtitle: 'Non ci sono contatti eliminati.' }
+    if (searching || hasActiveFilters || view !== 'all') {
       return {
-        title: 'Nessun contatto',
-        subtitle: 'Crea un nuovo contatto o cambia i filtri.',
+        title: 'Nessun risultato', subtitle: 'Nessun contatto corrisponde: prova a modificare la ricerca, la vista o i filtri.',
         action: (
-          <Can perm={PERMS.crm.contact.add}>
-            <Button
-              startIcon={<AddIcon />}
-              variant="contained"
-              onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}
-            >
-              Crea contatto
-            </Button>
-          </Can>
+          <Stack direction="row" spacing={1} justifyContent="center">
+            {searching ? <Button variant="outlined" onClick={() => { grid.setQ(''); setColQ(EMPTY_COLQ) }}>Cancella ricerca</Button> : null}
+            {hasActiveFilters ? <Button variant="outlined" onClick={resetFilters}>Azzera filtri</Button> : null}
+          </Stack>
         ),
       }
     }
-    return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
-  }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
-
-  // filters (URL)
-  const [customerId, setCustomerId] = useUrlNumberParam('customer')
-  const [siteId, setSiteId] = useUrlNumberParam('site')
+    return {
+      title: 'Nessun contatto', subtitle: 'Non ci sono ancora contatti.',
+      action: <Can perm={PERMS.crm.contact.add}><Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}>Crea contatto</Button></Can>,
+    }
+  }, [grid, colQActive, hasActiveFilters, view, resetFilters, loc.pathname, loc.search, navigate])
 
   const listParams = React.useMemo(
     () =>
@@ -261,41 +214,34 @@ export default function Contacts() {
         extra: {
           ...(customerId !== '' ? { customer: customerId } : {}),
           ...(siteId !== '' ? { site: siteId } : {}),
+          ...(view === 'pri' ? { is_primary: 'true' } : view === 'unr' ? { unreachable: 'true' } : view === 'nosite' ? { has_site: 'false' } : {}),
+          ...(colQ.name ? { name_q: colQ.name } : {}),
+          ...(colQ.department ? { department_q: colQ.department } : {}),
+          ...(colQ.customer ? { customer_q: colQ.customer } : {}),
+          ...(colQ.site ? { site_q: colQ.site } : {}),
+          ...(colQ.phone ? { phone_q: colQ.phone } : {}),
+          ...(colQ.email ? { email_q: colQ.email } : {}),
         },
       }),
-    [
-      grid.search,
-      grid.ordering,
-      grid.paginationModel.page,
-      grid.paginationModel.pageSize,
-      grid.includeDeleted,
-      grid.onlyDeleted,
-      customerId,
-      siteId,
-    ],
+    [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, grid.includeDeleted, grid.onlyDeleted, customerId, siteId, view, colQ],
   )
 
-  const {
-    rows,
-    rowCount,
-    loading,
-    reload: reloadList,
-  } = useDrfList<ContactRow>('/contacts/', listParams, (e: unknown) =>
-    toast.error(apiErrorToMessage(e)),
-  )
+  const { rows, rowCount, loading, reload: reloadList } = useDrfList<ContactRow>('/contacts/', listParams, (e: unknown) => toast.error(apiErrorToMessage(e)))
+  const [kpiReload, setKpiReload] = React.useState(0)
+  const summary = useContactSummary(kpiReload)
+  const reloadAll = React.useCallback(() => { reloadList(); setKpiReload((n) => n + 1) }, [reloadList])
 
   // lookups
   const [customers, setCustomers] = React.useState<CustomerItem[]>([])
-  const [sites, setSites] = React.useState<SiteItem[]>([]) // sites for selected customer (filter + dialog)
+  const [sites, setSites] = React.useState<SiteItem[]>([]) // siti del cliente scelto (filtro + dialogo)
 
-  // drawer
+  // pannello
   const [drawerOpen, setDrawerOpen] = React.useState(false)
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<ContactDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState(0)
+  const [drawerTab, setDrawerTab] = React.useState<ContactTab>('det')
 
-  // delete/restore
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
   const [restoreBusy, setRestoreBusy] = React.useState(false)
@@ -306,359 +252,218 @@ export default function Contacts() {
   const [dlgSaving, setDlgSaving] = React.useState(false)
   const [dlgId, setDlgId] = React.useState<number | null>(null)
   const [dlgErrors, setDlgErrors] = React.useState<Record<string, string>>({})
-  const [form, setForm] = React.useState<ContactForm>({
-    customer: '',
-    site: '',
-    name: '',
-    email: '',
-    phone: '',
-    department: '',
-    is_primary: false,
-    notes: '',
-  })
+  const [form, setForm] = React.useState<ContactForm>({ customer: '', site: '', name: '', email: '', phone: '', department: '', is_primary: false, notes: '' })
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', {
-        params: { ordering: 'name', page_size: 500 },
-      })
+      const res = await api.get<ApiPage<CustomerItem>>('/customers/', { params: { ordering: 'name', page_size: 500 } })
       setCustomers(res.data.results ?? [])
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
-  const loadSitesForCustomer = React.useCallback(
-    async (cust: number | '') => {
-      try {
-        if (cust === '') {
-          setSites([])
-          return
-        }
-        const res = await api.get<ApiPage<SiteItem>>('/sites/', {
-          params: { customer: cust, ordering: 'name', page_size: 500 },
-        })
-        setSites(res.data.results ?? [])
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      }
-    },
-    [toast],
-  )
+  const loadSitesForCustomer = React.useCallback(async (cust: number | '') => {
+    try {
+      if (cust === '') { setSites([]); return }
+      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { customer: cust, ordering: 'name', page_size: 500 } })
+      setSites(res.data.results ?? [])
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }, [toast])
 
-  const loadDetail = React.useCallback(
-    async (id: number, forceIncludeDeleted?: boolean) => {
-      setDetailLoading(true)
-      setDetail(null)
-      try {
-        const inc = forceIncludeDeleted ?? grid.includeDeleted
-        const incParams = includeDeletedParams(inc)
-        const res = await api.get<ContactDetail>(
-          `/contacts/${id}/`,
-          incParams ? { params: incParams } : undefined,
-        )
-        setDetail(res.data)
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        setDetailLoading(false)
-      }
-    },
-    [toast, grid.includeDeleted],
-  )
+  const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
+    setDetailLoading(true)
+    if (!keep) setDetail(null)
+    try {
+      const inc = forceIncludeDeleted ?? grid.includeDeleted
+      const incParams = includeDeletedParams(inc)
+      const res = await api.get<ContactDetail>(`/contacts/${id}/`, incParams ? { params: incParams } : undefined)
+      setDetail(res.data)
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [toast, grid.includeDeleted])
 
-  const openDrawer = React.useCallback(
-    (id: number) => {
-      setSelectedId(id)
-      setDrawerOpen(true)
-      setDrawerTab(0)
-      loadDetail(id)
-      grid.setOpenId(id)
-    },
-    [grid, loadDetail],
-  )
+  const returnTo = React.useMemo(() => new URLSearchParams(loc.search).get('return'), [loc.search])
+  const lastOpenRef = React.useRef<number | null>(null)
+  const closeDrawer = React.useCallback(() => {
+    setDrawerOpen(false)
+    setSelectedId(null)
+    lastOpenRef.current = null
+    grid.setOpenId(null)
+    if (returnTo) navigate(returnTo, { replace: true })
+  }, [grid, returnTo, navigate])
+
+  const openDrawer = React.useCallback((id: number) => {
+    lastOpenRef.current = id
+    setDrawerTab((t) => (selectedId === id ? t : 'det'))
+    setSelectedId(id)
+    setDrawerOpen(true)
+    loadDetail(id)
+    grid.setOpenId(id)
+  }, [grid, loadDetail, selectedId])
+
+  React.useEffect(() => {
+    if (!grid.openId) return
+    const id = grid.openId
+    if (lastOpenRef.current === id) return
+    lastOpenRef.current = id
+    setSelectedId(id)
+    setDrawerOpen(true)
+    setDrawerTab('det')
+    loadDetail(id)
+  }, [grid.openId, loadDetail])
 
   // ── Azioni riga / menu contestuale ──────────────────────────────────────────
   const pendingEditIdRef = React.useRef<number | null>(null)
   const pendingDeleteIdRef = React.useRef<number | null>(null)
   const openEditRef = React.useRef<(() => void | Promise<void>) | null>(null)
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: ContactRow
-    mouseX: number
-    mouseY: number
-  } | null>(null)
+  const [contextMenu, setContextMenu] = React.useState<{ row: ContactRow; mouseX: number; mouseY: number } | null>(null)
 
-  const openEditFromRow = React.useCallback(
-    (id: number) => {
-      pendingEditIdRef.current = id
-      openDrawer(id)
-    },
-    [openDrawer],
-  )
-
-  const openDeleteFromRow = React.useCallback(
-    (id: number) => {
-      pendingDeleteIdRef.current = id
-      openDrawer(id)
-    },
-    [openDrawer],
-  )
-
-  const restoreFromRow = React.useCallback(
-    async (id: number) => {
-      setRestoreBusy(true)
-      try {
-        await api.post(`/contacts/${id}/restore/`)
-        toast.success('Contatto ripristinato')
-        reloadList()
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        setRestoreBusy(false)
-      }
-    },
-    [reloadList, toast],
-  )
+  const openEditFromRow = React.useCallback((id: number) => { pendingEditIdRef.current = id; openDrawer(id) }, [openDrawer])
+  const openDeleteFromRow = React.useCallback((id: number) => { pendingDeleteIdRef.current = id; openDrawer(id) }, [openDrawer])
+  const restoreFromRow = React.useCallback(async (id: number) => {
+    setRestoreBusy(true)
+    try {
+      await api.post(`/contacts/${id}/restore/`)
+      toast.success('Contatto ripristinato')
+      reloadAll()
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setRestoreBusy(false)
+    }
+  }, [reloadAll, toast])
 
   React.useEffect(() => {
     if (!detail) return
-    if (pendingEditIdRef.current === detail.id) {
-      pendingEditIdRef.current = null
-      const fn = openEditRef.current
-      if (fn) void fn()
-    }
-    if (pendingDeleteIdRef.current === detail.id) {
-      pendingDeleteIdRef.current = null
-      setDeleteDlgOpen(true)
-    }
+    if (pendingEditIdRef.current === detail.id) { pendingEditIdRef.current = null; const fn = openEditRef.current; if (fn) void fn() }
+    if (pendingDeleteIdRef.current === detail.id) { pendingDeleteIdRef.current = null; setDeleteDlgOpen(true) }
   }, [detail])
 
-  const handleRowContextMenu = React.useCallback(
-    (row: ContactRow, event: React.MouseEvent<HTMLElement>) => {
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
-    },
-    [],
-  )
-
-  const closeContextMenu = React.useCallback(() => {
-    setContextMenu(null)
+  const handleRowContextMenu = React.useCallback((row: ContactRow, event: React.MouseEvent<HTMLElement>) => {
+    setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
   }, [])
+  const closeContextMenu = React.useCallback(() => setContextMenu(null), [])
 
   const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
     const row = contextMenu?.row
     if (!row) return []
-
     if (row.deleted_at) {
       return [
-        {
-          key: 'open',
-          label: 'Apri',
-          icon: <VisibilityOutlinedIcon fontSize="small" />,
-          onClick: () => openDrawer(row.id),
-        },
-        {
-          key: 'restore',
-          label: 'Ripristina',
-          icon: <RestoreFromTrashIcon fontSize="small" />,
-          onClick: () => void restoreFromRow(row.id),
-          disabled: restoreBusy,
-        },
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
+        { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, onClick: () => void restoreFromRow(row.id), disabled: restoreBusy },
       ]
     }
-
     return [
-      {
-        key: 'open',
-        label: 'Apri',
-        icon: <VisibilityOutlinedIcon fontSize="small" />,
-        onClick: () => openDrawer(row.id),
-      },
-      {
-        key: 'edit',
-        label: 'Modifica',
-        icon: <EditIcon fontSize="small" />,
-        onClick: () => openEditFromRow(row.id),
-      },
-      {
-        key: 'delete',
-        label: 'Elimina',
-        icon: <DeleteOutlineIcon fontSize="small" />,
-        onClick: () => openDeleteFromRow(row.id),
-        disabled: deleteBusy,
-        tone: 'danger',
-      },
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
+      { key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => openEditFromRow(row.id) },
+      ...(row.phone ? [{ key: 'tel', label: 'Copia il telefono', icon: <CampoIcon name="copy" />, onClick: async () => { await copyToClipboard(row.phone!); toast.success('Copiato') } }] : []),
+      ...(row.email ? [{ key: 'mail', label: "Copia l'email", icon: <CampoIcon name="copy" />, onClick: async () => { await copyToClipboard(row.email!); toast.success('Copiato') } }] : []),
+      { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => openDeleteFromRow(row.id), disabled: deleteBusy, tone: 'danger' as const },
     ]
-  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, restoreBusy, restoreFromRow])
+  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, restoreBusy, restoreFromRow, toast])
 
-  const columns = React.useMemo<GridColDef<ContactRow>[]>(() => {
-    return cols
-  }, [])
+  const columns = React.useMemo<GridColDef<ContactRow>[]>(() => buildColumns(), [])
 
+  const customerLabel = (id: number | '') => { const c = customers.find((x) => x.id === id); return c ? c.display_name || c.name || `#${c.id}` : String(id) }
+  const siteLabel = (id: number | '') => { const st = sites.find((x) => x.id === id); return st ? st.display_name || st.name : String(id) }
   const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
     customer_display_name: {
-      value: customerId,
-      label: 'Filtra per cliente',
-      onSet: (v) => setCustomerId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setCustomerId('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Cliente</InputLabel>
-          <Select
-            label="Cliente"
-            value={customerId === '' ? '' : String(customerId)}
-            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-      ),
+      value: customerId === '' ? '' : String(customerId),
+      label: 'Filtra cliente',
+      onSet: (v) => setCustomerId(v === '' ? '' : Number(v), filterOpts),
+      onReset: () => setCustomerId('', filterOpts),
+      children: <FilterOptionList label="Cliente" single searchable options={customers.map((c) => ({ value: String(c.id), label: c.display_name || c.name || `#${c.id}` }))}
+        selected={customerId === '' ? [] : [String(customerId)]} onChange={(vals) => setCustomerId(vals[0] ? Number(vals[0]) : '', { patch: { page: 1, site: '' }, keepOpen: true })} />,
     },
-    site_display_name: {
-      value: siteId,
-      label: 'Filtra per sito',
-      onSet: (v) => setSiteId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setSiteId('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Sito</InputLabel>
-          <Select
-            label="Sito"
-            value={siteId === '' ? '' : String(siteId)}
-            onChange={(e) => setSiteId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {sites.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-      ),
-    },
-  }), [customerId, siteId, setCustomerId, setSiteId, customers, sites])
+    ...(customerId !== '' ? {
+      site_display_name: {
+        value: siteId === '' ? '' : String(siteId),
+        label: 'Filtra sito',
+        onSet: (v: string | number | '') => setSiteId(v === '' ? '' : Number(v), filterOpts),
+        onReset: () => setSiteId('', filterOpts),
+        children: <FilterOptionList label="Sito" single options={sites.map((st) => ({ value: String(st.id), label: st.display_name || st.name }))}
+          selected={siteId === '' ? [] : [String(siteId)]} onChange={(vals) => setSiteId(vals[0] ? Number(vals[0]) : '', filterOpts)} />,
+      },
+    } : {}),
+  }), [customerId, siteId, setCustomerId, setSiteId, customers, sites, filterOpts])
 
-  // If opened from global Search, we can return back to the Search results on close.
-  const returnTo = React.useMemo(() => {
-    return new URLSearchParams(loc.search).get('return')
-  }, [loc.search])
+  const activeFilters: ActiveFilter[] = [
+    customerId !== '' ? { key: 'customer', label: 'Cliente', values: customerLabel(customerId) } : null,
+    siteId !== '' ? { key: 'site', label: 'Sito', values: siteLabel(siteId) } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (key: string) => {
+    if (key === 'customer') setCustomerId('', { patch: { page: 1, site: '' }, keepOpen: true })
+    if (key === 'site') setSiteId('', filterOpts)
+  }
 
-  const closeDrawer = React.useCallback(() => {
-    setDrawerOpen(false)
-    grid.setOpenId(null)
-    if (returnTo) navigate(returnTo, { replace: true })
-  }, [grid, returnTo, navigate])
+  React.useEffect(() => { loadCustomers() }, [loadCustomers])
+  React.useEffect(() => { loadSitesForCustomer(customerId) }, [customerId, loadSitesForCustomer])
+
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<ContactRow>({
+      url: '/contacts/', params, filename: 'contatti',
+      columns: [
+        { label: 'Nome', getValue: (r) => r.name },
+        { label: 'Primario', getValue: (r) => (r.is_primary ? 'Sì' : 'No') },
+        { label: 'Reparto', getValue: (r) => r.department ?? '' },
+        { label: 'Cliente', getValue: (r) => r.customer_display_name || r.customer_name || '' },
+        { label: 'Sito', getValue: (r) => r.site_display_name || r.site_name || '' },
+        { label: 'Telefono', getValue: (r) => r.phone ?? '' },
+        { label: 'Email', getValue: (r) => r.email ?? '' },
+      ],
+    })
+  }
 
   const doDelete = React.useCallback(async () => {
     if (!selectedId) return
     setDeleteBusy(true)
     try {
       await api.delete(`/contacts/${selectedId}/`)
-      toast.success('Contatto eliminato.')
+      toast.success('Contatto eliminato')
       setDeleteDlgOpen(false)
       closeDrawer()
-      reloadList()
+      reloadAll()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
       setDeleteBusy(false)
     }
-  }, [selectedId, toast, closeDrawer, reloadList])
-
-  const doBulkRestore = async (): Promise<boolean> => {
-    const ids = selectedIds.filter((n) => Number.isFinite(n))
-    if (!ids.length) return false
-    setRestoreBusy(true)
-    try {
-      await api.post(`/contacts/bulk_restore/`, { ids })
-      toast.success(`Ripristinati ${ids.length} elementi`)
-      setSelectionModel(emptySelectionModel())
-      reloadList()
-      return true
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-      return false
-    } finally {
-      setRestoreBusy(false)
-    }
-  }
+  }, [selectedId, toast, closeDrawer, reloadAll])
 
   const doRestore = React.useCallback(async () => {
     if (!selectedId) return
     setRestoreBusy(true)
     try {
       await api.post(`/contacts/${selectedId}/restore/`)
-      toast.success('Contatto ripristinato.')
+      toast.success('Contatto ripristinato')
       await loadDetail(selectedId)
-      reloadList()
+      reloadAll()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
       setRestoreBusy(false)
     }
-  }, [selectedId, toast, loadDetail, reloadList])
+  }, [selectedId, toast, loadDetail, reloadAll])
 
-  React.useEffect(() => {
-    loadCustomers()
-  }, [loadCustomers])
-
-  // initial sites load (based on customer from URL) - run once on mount
-  const didInitSitesRef = React.useRef(false)
-  React.useEffect(() => {
-    if (didInitSitesRef.current) return
-    didInitSitesRef.current = true
-    loadSitesForCustomer(customerId)
-  }, [customerId, loadSitesForCustomer])
-
-  // when customerId changes after init, reload sites and reset site filter
-  const prevCustomerRef = React.useRef<number | ''>(customerId)
-  React.useEffect(() => {
-    loadSitesForCustomer(customerId)
-    if (prevCustomerRef.current !== customerId) {
-      setSiteId('', { patch: { page: 1 }, keepOpen: true })
-      prevCustomerRef.current = customerId
-    }
-  }, [customerId, loadSitesForCustomer, setSiteId])
-
-  // open drawer from URL (?open=ID)
-  const lastOpenRef = React.useRef<number | null>(null)
-  React.useEffect(() => {
-    if (!grid.openId) return
-    const id = grid.openId
-    if (lastOpenRef.current === id) return
-    lastOpenRef.current = id
-
-    setSelectedId(id)
-    setDrawerOpen(true)
-    setDrawerTab(0)
-    loadDetail(id)
-  }, [grid.openId, loadDetail])
-
-  // open create from sidebar quick action
   const openCreateOnceRef = React.useRef(false)
-
   const openCreate = React.useCallback(async () => {
     const preCustomer = customerId !== '' ? customerId : ''
     setDlgMode('create')
     setDlgId(null)
     setDlgErrors({})
-    setForm({
-      customer: preCustomer,
-      site: '',
-      name: '',
-      email: '',
-      phone: '',
-      department: '',
-      is_primary: false,
-      notes: '',
-    })
+    setForm({ customer: preCustomer, site: siteId !== '' ? siteId : '', name: '', email: '', phone: '', department: '', is_primary: false, notes: '' })
     setDlgOpen(true)
     await loadSitesForCustomer(preCustomer)
-  }, [customerId, loadSitesForCustomer])
+  }, [customerId, siteId, loadSitesForCustomer])
 
   React.useEffect(() => {
     const st = (loc.state as OpenCreateState | null | undefined) ?? null
-    if (!st?.openCreate) {
-      openCreateOnceRef.current = false
-      return
-    }
+    if (!st?.openCreate) { openCreateOnceRef.current = false; return }
     if (openCreateOnceRef.current) return
     openCreateOnceRef.current = true
     void openCreate()
@@ -670,46 +475,24 @@ export default function Contacts() {
     setDlgMode('edit')
     setDlgId(detail.id)
     setDlgErrors({})
-
     const cust = detail.customer ?? ''
-    setForm({
-      customer: cust,
-      site: detail.site ?? '',
-      name: detail.name ?? '',
-      email: detail.email ?? '',
-      phone: detail.phone ?? '',
-      department: detail.department ?? '',
-      is_primary: Boolean(detail.is_primary),
-      notes: detail.notes ?? '',
-    })
-
+    setForm({ customer: cust, site: detail.site ?? '', name: detail.name ?? '', email: detail.email ?? '', phone: detail.phone ?? '', department: detail.department ?? '', is_primary: Boolean(detail.is_primary), notes: detail.notes ?? '' })
     setDlgOpen(true)
     await loadSitesForCustomer(cust)
   }, [detail, loadSitesForCustomer])
-
   openEditRef.current = openEdit
 
   const save = async () => {
     const clientErrors: Record<string, string> = {}
     if (form.customer === '') clientErrors.customer = 'Seleziona un cliente.'
     if (!String(form.name).trim()) clientErrors.name = 'Il nome è obbligatorio.'
-    if (Object.keys(clientErrors).length) {
-      setDlgErrors(clientErrors)
-      return
-    }
+    if (Object.keys(clientErrors).length) { setDlgErrors(clientErrors); return }
     setDlgErrors({})
-
     const payload: Record<string, unknown> = {
-      customer: Number(form.customer),
-      site: form.site === '' ? null : Number(form.site),
-      name: form.name.trim(),
-      email: (form.email || '').trim() || null,
-      phone: (form.phone || '').trim() || null,
-      department: (form.department || '').trim() || null,
-      is_primary: Boolean(form.is_primary),
-      notes: (form.notes || '').trim() || null,
+      customer: Number(form.customer), site: form.site === '' ? null : Number(form.site), name: form.name.trim(),
+      email: (form.email || '').trim() || null, phone: (form.phone || '').trim() || null, department: (form.department || '').trim() || null,
+      is_primary: Boolean(form.is_primary), notes: (form.notes || '').trim() || null,
     }
-
     setDlgSaving(true)
     try {
       let id: number
@@ -723,100 +506,157 @@ export default function Contacts() {
         id = res.data.id
         toast.success('Contatto aggiornato')
       }
-
       setDlgOpen(false)
-      reloadList()
+      reloadAll()
       openDrawer(id)
     } catch (e) {
       const feedback = apiErrorToFormFeedback(e)
-      if (feedback.hasFieldErrors) {
-        setDlgErrors(feedback.fieldErrors)
-        toast.warning(feedback.message)
-      } else {
-        toast.error(feedback.message)
-      }
+      if (feedback.hasFieldErrors) { setDlgErrors(feedback.fieldErrors); toast.warning(feedback.message) } else toast.error(feedback.message)
     } finally {
       setDlgSaving(false)
     }
   }
 
-  return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
-      <EntityListCard
-        mobileCard={renderContactCard}
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-        }}
-        grid={{
-          pageKey: 'contacts',
-          username: me?.username,
-          filterConfig,
+  // Modifica sul posto dalle Proprietà, con annulla.
+  const patchContact = React.useCallback(async (patch: ContactPatch, label: string) => {
+    if (!detail) return
+    const id = detail.id
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
+    try {
+      await api.patch(`/contacts/${id}/`, patch)
+      await loadDetail(id, undefined, true)
+      reloadAll()
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          await api.patch(`/contacts/${id}/`, prev)
+          await loadDetail(id, undefined, true)
+          reloadAll()
+        } catch (e) { toast.error(apiErrorToMessage(e)) }
+      })
+    } catch (e) {
+      toast.error(apiErrorToFormFeedback(e).message)
+    }
+  }, [detail, loadDetail, reloadAll, undoToast, toast])
 
-          emptyState,
-          rows,
-          columns: columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          onRowContextMenu: handleRowContextMenu,
-          slotProps: { toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } },
-          sx: {
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-      >
-      </EntityListCard>
+  const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
+
+  return (
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Contatti"
+        actions={<Can perm={PERMS.crm.contact.add}><Button startIcon={<AddIcon />} variant="contained" onClick={() => void openCreate()}>Nuovo contatto</Button></Can>}
+      />
+      <ContactKpis summary={summary} view={view} onView={setView}
+        onCustomer={(id) => setCustomerId(customerId === id ? '' : id, { patch: { page: 1, site: '' }, keepOpen: true })}
+        onCustomersWithoutPrimary={() => navigate(`/customers${buildQuery({ has_contact: 'false' })}`)} />
+
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs
+          value={savedId ? `saved:${savedId}` : view}
+          onChange={(k) => { if (k.startsWith('saved:')) { applySaved(k.slice(6)); return } setView(k) }}
+          tabs={[
+            { key: 'all', label: 'Tutti', count: summary?.total },
+            { key: 'pri', label: 'Primari', count: summary?.primaries },
+            { key: 'unr', label: 'Senza recapiti', count: summary?.unreachable },
+            { key: 'nosite', label: 'Senza sito', count: summary?.without_site },
+            ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
+          ]}
+          end={
+            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+              Salva vista
+            </Button>
+          }
+        />
+        <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
+          onSave={(name) => { const v = saved.add(name, { view, customer: customerId, site: siteId }); setSavedId(v.id) }} />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={renderContactCard}
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={activeFilters}
+              onRemoveFilter={removeFilter}
+              onClearFilters={resetFilters}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca nome, reparto, telefono, email…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
+            />
+          }
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca contatti…' }}
+          grid={{
+            pageKey: 'contacts',
+            autoHeight: true,
+            username: me?.username,
+            filterConfig,
+            emptyState,
+            defaultHiddenColumns: ['id'],
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                name: { value: colQ.name, onChange: setCol('name'), placeholder: 'Nome' },
+                department: { value: colQ.department, onChange: setCol('department'), placeholder: 'Reparto' },
+                customer_display_name: { value: colQ.customer, onChange: setCol('customer'), placeholder: 'Cliente' },
+                site_display_name: { value: colQ.site, onChange: setCol('site'), placeholder: 'Sito o città' },
+                phone: { value: colQ.phone, onChange: setCol('phone'), placeholder: 'Telefono' },
+                email: { value: colQ.email, onChange: setCol('email'), placeholder: 'Email' },
+              },
+            },
+            rows,
+            columns,
+            loading,
+            rowCount,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: openDrawer,
+            onRowContextMenu: handleRowContextMenu,
+            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
       <RowContextMenu
         open={Boolean(contextMenu)}
-        anchorPosition={
-          contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined
-        }
+        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
         onClose={closeContextMenu}
         items={contextMenuItems}
       />
 
-      <ContactDrawer
-        open={drawerOpen}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        drawerTab={drawerTab}
-        canChange={canChange}
-        canDelete={canDelete}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        onClose={closeDrawer}
-        onEdit={openEdit}
-        onDelete={() => setDeleteDlgOpen(true)}
-        onRestore={doRestore}
-        onTabChange={setDrawerTab}
-        onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-      />
-
-      <ConfirmActionDialog
-        open={bulkRestoreDlgOpen}
-        busy={restoreBusy}
-        title="Ripristinare i contatti selezionati?"
-        description={`Verranno ripristinati ${selectedCount} contatti dal cestino.`}
-        confirmText="Ripristina"
-        confirmColor="success"
-        onClose={() => setBulkRestoreDlgOpen(false)}
-        onConfirm={async () => {
-          const ok = await doBulkRestore()
-          if (ok) setBulkRestoreDlgOpen(false)
-        }}
-      />
+      {drawerOpen ? (
+        <ContactDetailCard
+          detail={detail}
+          loading={detailLoading}
+          canChange={canChange}
+          canDelete={canDelete}
+          tab={drawerTab}
+          onTab={setDrawerTab}
+          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onClose={closeDrawer}
+          onEdit={() => void openEdit()}
+          onDelete={() => setDeleteDlgOpen(true)}
+          onRestore={() => void doRestore()}
+          onPatch={(patch, label) => void patchContact(patch, label)}
+          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+          onOpenCustomer={() => { if (detail?.customer) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
+          onOpenSite={() => { if (detail?.site) navigate(`/sites${buildQuery({ open: detail.site })}`) }}
+          onOpenContact={openDrawer}
+          activityTab={detail ? <AuditFeedPanel appLabel="crm" model="contact" objectId={detail.id} noun="il contatto"
+            fields={{ name: 'il nome', email: "l'email", phone: 'il telefono', department: 'il reparto', is_primary: 'il flag primario', site: 'il sito', customer: 'il cliente', notes: 'le note' }} /> : null}
+        />
+      ) : null}
 
       <ConfirmDeleteDialog
         open={deleteDlgOpen}

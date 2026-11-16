@@ -75,7 +75,7 @@ function buildArchieOverrideCss(opts: {
 }
 .ql-container.ql-snow {
   border: none !important;
-  font-family: Inter, -apple-system, sans-serif;
+  font-family: "Geist", system-ui, -apple-system, sans-serif;
   font-size: 14px;
 }
 .ql-editor {

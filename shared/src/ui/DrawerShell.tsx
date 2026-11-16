@@ -41,6 +41,24 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import CloseIcon from '@mui/icons-material/Close'
+import { useTheme } from '@mui/material/styles'
+import { useCloseOnOutsideClick } from '@shared/hooks/useCloseOnOutsideClick'
+
+// ─── Aspetto (opt-in) ─────────────────────────────────────────────────────────
+// 'classic' = hero a gradiente (predefinito, Portal). 'campo' = restyle
+// "Campo sterile" di Archie: scheda flottante sopra la lista (non modale),
+// testata a fascia di marca, linguette, niente orb. Lo attiva solo la shell
+// di Archie con <DrawerAppearanceProvider value="campo">.
+
+export type DrawerAppearance = 'classic' | 'campo'
+const DrawerAppearanceContext = React.createContext<DrawerAppearance>('classic')
+export const DrawerAppearanceProvider = DrawerAppearanceContext.Provider
+// eslint-disable-next-line react-refresh/only-export-components
+export function useDrawerAppearance(): DrawerAppearance {
+  return React.useContext(DrawerAppearanceContext)
+}
+type CampoPalette = { band: string; band2: string; shadowFloat: string }
 
 // ─── Gradients predefiniti ────────────────────────────────────────────────────
 
@@ -111,6 +129,17 @@ function HeroBadge({
       }}
     >
       {label}
+    </Box>
+  )
+}
+
+function CampoBadge({ label }: { label: string }) {
+  return (
+    <Box component="span" sx={{
+      display: 'inline-flex', alignItems: 'center', height: 22, px: 1, borderRadius: '5px', fontSize: 12, fontWeight: 550,
+      bgcolor: 'rgba(255,255,255,0.14)', color: '#fff', boxShadow: '0 0 0 1px rgba(255,255,255,0.2)', whiteSpace: 'nowrap',
+    }}>
+      {label.replace(/^●\s*/, '')}
     </Box>
   )
 }
@@ -283,9 +312,35 @@ export function DrawerShell({
   bodyFooter,
   children,
 }: DrawerShellProps) {
+  const appearance = React.useContext(DrawerAppearanceContext)
+  const theme = useTheme()
+  const campo = appearance === 'campo' ? (theme.palette as unknown as { archie?: CampoPalette }).archie : undefined
+
+  // Clic fuori dalla scheda flottante: la chiude (comportamento globale "campo").
+  const paperRef = React.useRef<HTMLDivElement | null>(null)
+  useCloseOnOutsideClick(paperRef, Boolean(campo) && open, onClose)
+
+  // Esc chiude la scheda flottante (non è modale, quindi MUI non lo gestisce).
+  React.useEffect(() => {
+    if (!campo || !open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (document.querySelector('.MuiModal-root:not(.MuiDrawer-docked):not(.MuiModal-hidden)')) return
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return
+      onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [campo, open, onClose])
 
   // ── Status slot (freccia indietro + badge status) ────────────────────────
-  const resolvedStatusSlot = statusSlot ?? (
+  const resolvedStatusSlot = statusSlot ?? (campo ? (
+    <Stack direction="row" alignItems="center" spacing={0.75}>
+      {statusLabel ? <CampoBadge label={statusLabel} /> : null}
+      {statusLabelSecondary ? <CampoBadge label={statusLabelSecondary} /> : null}
+    </Stack>
+  ) : (
     <Stack direction="row" alignItems="center" spacing={0.75}>
       <Tooltip title="Chiudi">
         <IconButton size="small" onClick={onClose} sx={HERO_ICON_BTN_SX} aria-label="Chiudi">
@@ -295,7 +350,7 @@ export function DrawerShell({
       {statusLabel ? <HeroBadge label={statusLabel} gradient={gradient} /> : null}
       {statusLabelSecondary ? <HeroBadge label={statusLabelSecondary} gradient={gradient} secondary /> : null}
     </Stack>
-  )
+  ))
 
   // ── Azioni auto ──────────────────────────────────────────────────────────
   const resolvedActions = actions ?? (
@@ -324,7 +379,7 @@ export function DrawerShell({
   const hasTabs = visibleTabs.length > 0
 
   const heroTabBar = hasTabs ? (
-    <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mt: 1.25, position: 'relative', zIndex: 2 }}>
+    <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: campo ? 'flex-start' : 'space-between', flexDirection: campo ? 'row-reverse' : 'row', gap: 1, mt: campo ? 1.5 : 1.25, mx: campo ? -0.75 : 0, position: 'relative', zIndex: 2 }}>
       {extraChips ? (
         <Stack direction="row" spacing={0.5} alignItems="center">
           {extraChips}
@@ -338,7 +393,22 @@ export function DrawerShell({
         variant="scrollable"
         scrollButtons="auto"
         allowScrollButtonsMobile
-        sx={{
+        sx={campo ? {
+          minHeight: 0,
+          minWidth: 0,
+          flex: '0 1 auto',
+          mb: '-1px',
+          '& .MuiTabs-scrollButtons': { color: '#fff', width: 24, '&.Mui-disabled': { opacity: 0 } },
+          '& .MuiTabs-indicator': { display: 'none' },
+          '& .MuiTabs-flexContainer': { gap: '2px' },
+          '& .MuiTab-root': {
+            minHeight: 34, minWidth: 0, px: 1.5, py: 0, borderRadius: '8px 8px 0 0',
+            fontSize: 13, fontWeight: 550, letterSpacing: 0, textTransform: 'none',
+            color: 'rgba(255,255,255,0.72)',
+            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' },
+            '&.Mui-selected': { color: 'text.primary', bgcolor: 'background.paper' },
+          },
+        } : {
           minHeight: 0,
           minWidth: 0,
           flex: '0 1 auto',
@@ -364,26 +434,37 @@ export function DrawerShell({
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: { xs: '100%', sm: width }, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+      variant={campo ? 'persistent' : 'temporary'}
+      PaperProps={{ ref: paperRef, sx: campo ? {
+        width: { xs: '100%', md: `min(${Math.max(width, 440)}px, calc(100vw - 24px))` },
+        top: { xs: 0, md: 64 }, right: { xs: 0, md: 12 }, bottom: { xs: 0, md: 12 }, height: 'auto',
+        borderRadius: { xs: 0, md: '12px' }, border: { xs: 0, md: '1px solid' }, borderColor: 'divider',
+        boxShadow: `${campo.shadowFloat}, 0 24px 60px -24px rgb(0 0 0 / .3)`, zIndex: (t: Theme) => t.zIndex.drawer + 1,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      } : { width: { xs: '100%', sm: width }, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
     >
       <Stack sx={{ height: '100%', minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
         {/* ── Hero banner ─────────────────────────────────────────────────── */}
         <Box
           sx={{
-            background: resolveGradient(gradient),
-            px: 2.5,
-            pt: 2.25,
-            pb: hasTabs ? (preBody ? 3 : 1.5) : 2.25,
+            background: campo ? `linear-gradient(120deg, ${campo.band} 0%, ${campo.band2} 100%)` : resolveGradient(gradient),
+            px: campo ? 2.25 : 2.5,
+            pt: campo ? 2 : 2.25,
+            pb: campo ? (hasTabs ? 0 : 2) : hasTabs ? (preBody ? 3 : 1.5) : 2.25,
             position: 'relative',
             overflow: 'hidden',
             flexShrink: 0,
           }}
         >
-          {/* Orb decorativo alto-destra */}
-          <Box sx={{ position: 'absolute', top: -44, right: -44, width: 130, height: 130, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-          {/* Orb decorativo basso-sinistra */}
-          <Box sx={{ position: 'absolute', bottom: -26, left: 52, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+          {campo ? null : (
+            <>
+              {/* Orb decorativo alto-destra */}
+              <Box sx={{ position: 'absolute', top: -44, right: -44, width: 130, height: 130, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+              {/* Orb decorativo basso-sinistra */}
+              <Box sx={{ position: 'absolute', bottom: -26, left: 52, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+            </>
+          )}
 
           {/* Riga 1: status + azioni */}
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 2 }}>
@@ -407,6 +488,11 @@ export function DrawerShell({
             {/* Su touch Modifica ed Elimina più distanziate: un tocco impreciso non deve finire sul cestino. */}
             <Stack direction="row" spacing={{ xs: 1.5, sm: 0.75 }}>
               {resolvedActions}
+              {campo ? (
+                <HeroIconBtn label="Chiudi (Esc)" onClick={onClose}>
+                  <CloseIcon fontSize="small" />
+                </HeroIconBtn>
+              ) : null}
             </Stack>
           </Stack>
 
@@ -425,12 +511,12 @@ export function DrawerShell({
                   </Box>
                 )
               ) : null}
-              <Typography sx={{ color: '#fff', fontSize: icon ? 24 : 26, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ color: '#fff', fontSize: campo ? 18 : icon ? 24 : 26, fontWeight: campo ? 650 : 900, letterSpacing: campo ? '-0.01em' : '-0.025em', lineHeight: campo ? 1.3 : 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {title}
               </Typography>
             </Stack>
             {subtitle ? (
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mt: icon ? 0 : 0.5 }}>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mt: icon ? 0 : 0.5, ...(campo && { fontSize: 12, color: 'rgba(255,255,255,0.7)', mt: 0.25 }) }}>
                 {subtitle}
               </Typography>
             ) : null}
@@ -452,7 +538,7 @@ export function DrawerShell({
         {preBody ?? null}
 
         {/* ── Body scrollabile ────────────────────────────────────────────── */}
-        <DrawerBody sx={bodySx}>
+        <DrawerBody sx={campo ? { px: 2.25, py: 1.75, ...(bodySx as object) } : bodySx}>
           {children}
         </DrawerBody>
 

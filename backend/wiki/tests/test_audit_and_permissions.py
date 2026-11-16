@@ -18,6 +18,7 @@ from rest_framework.test import APIClient
 
 from audit.models import AuditEvent
 from wiki.models import WikiPage, WikiPageRevision
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -27,7 +28,7 @@ pytestmark = pytest.mark.django_db
 def _make_user(*, superuser: bool = False):
     User = get_user_model()
     suffix = uuid.uuid4().hex[:6]
-    u = User.objects.create_user(username=f"u_{suffix}", password="pw")
+    u = make_archie_user(username=f"u_{suffix}", password="pw")
     if superuser:
         u.is_staff = True
         u.is_superuser = True

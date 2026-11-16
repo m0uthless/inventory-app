@@ -35,8 +35,24 @@ from core.permissions import CanRestoreModelPermission, CanPurgeModelPermission
 # ViewSet mixin — soft delete + audit
 # ─────────────────────────────────────────────────────────────────────────────
 
+def make_deleted_at_read_only(serializer):
+    """B-11 (QA 2026-11-15): `deleted_at` si cambia solo con le action
+    dedicate (destroy, restore, purge), mai con POST/PUT/PATCH. Prima un
+    PATCH {"deleted_at": ...} cestinava senza `delete_*` o ripristinava
+    aggirando il blocco padre/figlio. Applicato all'istanza del serializer,
+    così vale anche per i ViewSet che sovrascrivono perform_update()."""
+    fields = getattr(serializer, "fields", None)  # ListSerializer: nessun campo
+    field = fields.get("deleted_at") if fields is not None else None
+    if field is not None:
+        field.read_only = True
+    return serializer
+
+
 class SoftDeleteAuditMixin:
     """Mixin per ViewSet con soft-delete e audit logging."""
+
+    def get_serializer(self, *args, **kwargs):
+        return make_deleted_at_read_only(super().get_serializer(*args, **kwargs))
 
     # Campi del modello i cui valori non devono mai finire nell'audit pur non
     # rientrando in SENSITIVE_FIELD_RE (es. Contract.total_value): la modifica

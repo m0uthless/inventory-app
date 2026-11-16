@@ -161,3 +161,50 @@ class SessionIdleTimeoutMiddleware:
 
         session["last_activity"] = now
         return None
+
+
+class ModuleSwitchMiddleware:
+    """Moduli spenti dalla pagina «Moduli» (``core/modules.py``): le loro API
+    rispondono 404 a chi non è superuser, come se non esistessero.
+
+    Sta nel middleware, e non nella barriera DRF, perché deve valere anche per
+    le action con ``permission_classes`` proprie e per le APIView scritte a
+    mano: decide l'indirizzo, non la classe della view.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest):
+        from core.modules import disabled_modules, module_for_path, user_sees_disabled
+
+        key = module_for_path(request.path_info)
+        if key and key in disabled_modules() and not user_sees_disabled(getattr(request, "user", None)):
+            return JsonResponse({"detail": "Modulo non disponibile.", "module": key}, status=404)
+        return self.get_response(request)
+
+
+class MaintenanceModeMiddleware:
+    """Modalità manutenzione (``core/maintenance.py``): una sessione interna
+    di chi non è superuser viene chiusa alla prima richiesta API, con 401 e
+    ``reason: maintenance``; il frontend torna al login, che mostra l'avviso.
+    Le sessioni del Portal (ambito "portal") non sono toccate.
+    """
+
+    EXEMPT_PREFIXES = ("/api/auth/", "/api/health/")
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest):
+        path = request.path_info
+        if path.startswith("/api/") and not path.startswith(self.EXEMPT_PREFIXES):
+            user = getattr(request, "user", None)
+            if user is not None and user.is_authenticated:
+                from core.maintenance import blocks, state
+
+                ambito = request.session.get("ambito")
+                if blocks(user, ambito):
+                    logout(request)
+                    return JsonResponse({"detail": state()["message"], "reason": "maintenance"}, status=401)
+        return self.get_response(request)

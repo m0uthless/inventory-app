@@ -1,8 +1,15 @@
+import * as React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/dom'
-import { render } from '@testing-library/react'
+import { render as rtlRender } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { ThemeProvider } from '@mui/material/styles'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Drive from './Drive'
 import type { DriveFolder } from './drive/types'
+import { THEME_REGISTRY } from '../theme/themeRegistry'
+
+const theme = THEME_REGISTRY.default.build('light')
+const render = (ui: React.ReactElement) => rtlRender(<ThemeProvider theme={theme}><MemoryRouter initialEntries={['/drive']}>{ui}</MemoryRouter></ThemeProvider>)
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -73,7 +80,7 @@ function makeFile(id: number, name: string) {
   }
 }
 
-describe('Drive page — fix P1', () => {
+describe('Drive page (restyle) — fix P1', () => {
   beforeEach(() => {
     apiGet.mockReset()
     apiPost.mockReset()
@@ -103,8 +110,7 @@ describe('Drive page — fix P1', () => {
 
     render(<Drive />)
 
-    const folderBtn = await screen.findByRole('button', { name: /Apri cartella Cartella A/ })
-    fireEvent.click(folderBtn)
+    fireEvent.click(await screen.findByText('Cartella A'))
 
     await waitFor(() => {
       const calls = apiGet.mock.calls.filter(([url]) => url === '/drive-folders/10/children/')
@@ -119,14 +125,11 @@ describe('Drive page — fix P1', () => {
   })
 
   it('preserva il filtro cliente dopo aver creato una cartella (fix 7.3)', async () => {
-    apiGet.mockImplementation((url: string, config?: Params) => {
+    apiGet.mockImplementation((url: string) => {
       if (url === '/customers/') {
         return Promise.resolve({ data: { results: [{ id: 1, display_name: 'Cliente Alpha' }] } })
       }
-      if (url === '/drive-folders/' && config?.params?.root) {
-        return Promise.resolve({ data: { results: [] } })
-      }
-      if (url === '/drive-files/' && config?.params?.root) {
+      if (url === '/drive-folders/' || url === '/drive-files/') {
         return Promise.resolve({ data: { results: [] } })
       }
       return Promise.resolve({ data: {} })
@@ -177,16 +180,16 @@ describe('Drive page — fix P1', () => {
       if (url === '/customers/') {
         return Promise.resolve({ data: { results: [{ id: 1, display_name: 'Cliente Alpha' }] } })
       }
+      if (url === '/drive-folders/' && config?.params?.customer === 1) {
+        return Promise.resolve({ data: { results: [makeFolder(20, 'Cartella Filtrata')] } })
+      }
       if (url === '/drive-folders/' && config?.params?.root) {
-        if (config?.params?.customer === 1) {
-          return Promise.resolve({ data: { results: [makeFolder(20, 'Cartella Filtrata')] } })
-        }
         // Richiesta iniziale (senza filtro): resta in sospeso finché non la
         // risolviamo esplicitamente più sotto, per simulare l'arrivo in
         // ritardo rispetto alla richiesta successiva (filtrata).
         return unfilteredPromise
       }
-      if (url === '/drive-files/' && config?.params?.root) {
+      if (url === '/drive-folders/' || url === '/drive-files/') {
         return Promise.resolve({ data: { results: [] } })
       }
       return Promise.resolve({ data: {} })
@@ -198,7 +201,7 @@ describe('Drive page — fix P1', () => {
     fireEvent.change(filterInput, { target: { value: 'Alpha' } })
     fireEvent.click(await screen.findByText('Cliente Alpha'))
 
-    await screen.findByText('Cartella Filtrata')
+    await screen.findByText('Cartella Filtrata', { selector: 'b' })
 
     // La richiesta iniziale (obsoleta) arriva ora, con dati diversi: non deve
     // sovrascrivere quanto già mostrato dalla richiesta più recente.
@@ -206,7 +209,7 @@ describe('Drive page — fix P1', () => {
     await new Promise((r) => setTimeout(r, 30))
 
     expect(screen.queryByText('Cartella Fantasma')).not.toBeInTheDocument()
-    expect(screen.getByText('Cartella Filtrata')).toBeInTheDocument()
+    expect(screen.getByText('Cartella Filtrata', { selector: 'b' })).toBeInTheDocument()
   })
 
   it('seleziona un file con un solo click, senza doppio toggle (fix 7.1)', async () => {
@@ -228,6 +231,6 @@ describe('Drive page — fix P1', () => {
 
     // Se il bug del setState annidato fosse ancora presente, il toggle si
     // annullerebbe da solo e la barra di selezione non apparirebbe mai.
-    await screen.findByText('1 selezionati')
+    await screen.findByText('1 selezionato')
   })
 })

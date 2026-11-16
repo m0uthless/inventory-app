@@ -12,6 +12,7 @@ from core.models import CustomerStatus, InventoryStatus, InventoryType, SiteStat
 from crm.models import Customer, Site
 from custom_fields.models import CustomFieldDefinition
 from inventory.models import Inventory
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -24,7 +25,7 @@ def _client(user):
 
 def _user():
     User = get_user_model()
-    return User.objects.create_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
+    return make_archie_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
 
 
 def test_customer_restore_allowed_with_change_permission_only():

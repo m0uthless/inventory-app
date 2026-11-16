@@ -1,12 +1,11 @@
 import * as React from 'react'
-import { Link as RouterLink } from 'react-router-dom'
 import {
-  Avatar, Box, Button, Card, Chip, Divider, IconButton, InputBase, MenuItem, Select,
-  Stack, TextField, Tooltip, Typography,
+  Avatar, Box, Chip, IconButton, InputBase, MenuItem, Select,
+  Stack, Tooltip, Typography,
 } from '@mui/material'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
-import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded'
+import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded'
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded'
 import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded'
 import PauseCircleOutlineRoundedIcon from '@mui/icons-material/PauseCircleOutlineRounded'
@@ -18,6 +17,8 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
 import AreaTaskDetail from '../features/areatasks/AreaTaskDetail'
+import WidgetShell, { CountPill, WidgetNote } from '../features/dashboard/widgets/WidgetShell'
+import { tintVeil } from '../features/dashboard/widgets/tints'
 import {
   NEXT_STATUS, PRIORITY_META, STATUS_META, STATUS_ORDER, personInitials,
   type AreaTaskRow, type TaskStatus,
@@ -146,114 +147,87 @@ export default function AreaTaskCard() {
   const grouped = STATUS_ORDER.map((status) => ({ status, items: tasks.filter((t) => t.status === status) }))
   const openTask = tasks.find((t) => t.id === openId) ?? null
 
+  const openCount = tasks.filter((t) => t.status !== 'completato').length
   return (
-    <Card
-      variant="outlined"
-      sx={{ borderRadius: 1, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}
+    <WidgetShell
+      tone="salvia"
+      look="tint"
+      icon={AssignmentTurnedInRoundedIcon}
+      title="Task di area"
+      extra={selectedArea && !loading ? <CountPill tone="salvia">{openCount} aperti</CountPill> : null}
+      link={{ label: 'Vedi tutti', to: '/tasks' }}
+      actions={areas.length > 1 || isSuperuser ? (
+        <Select
+          size="small"
+          value={selectedArea ?? ''}
+          onChange={(e) => setSelectedArea(e.target.value ? Number(e.target.value) : null)}
+          displayEmpty
+          inputProps={{ 'aria-label': 'Area' }}
+          sx={{ fontSize: 12, height: 26, maxWidth: 140, borderRadius: '7px', bgcolor: 'background.paper', '& fieldset': { border: 0 }, '& .MuiSelect-select': { py: 0.25, pl: 1 } }}
+        >
+          {areas.map((a) => (
+            <MenuItem key={a.id} value={a.id} sx={{ fontSize: 12.5 }}>
+              {a.label}{a.id === myAreaId ? ' (mia)' : ''}
+            </MenuItem>
+          ))}
+        </Select>
+      ) : null}
+      bodySx={{ px: 2, pb: 1.5, gap: 1 }}
     >
-      <Box sx={{
-        px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,
-        borderBottom: '1px solid', borderColor: 'divider',
-      }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-          <GroupsRoundedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-          <Typography variant="subtitle2" fontWeight={700} noWrap>Task di area</Typography>
-        </Stack>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Button component={RouterLink} to="/tasks" size="small" sx={{ fontSize: '0.75rem', textTransform: 'none' }}>
-            Vedi tutti
-          </Button>
-          <Select
-            size="small"
-            value={selectedArea ?? ''}
-            onChange={(e) => setSelectedArea(e.target.value ? Number(e.target.value) : null)}
-            displayEmpty
-            sx={{ fontSize: '0.78rem', minWidth: 140, '& .MuiSelect-select': { py: 0.5 } }}
-          >
-            {areas.map((a) => (
-              <MenuItem key={a.id} value={a.id} sx={{ fontSize: '0.82rem' }}>
-                {a.label}{a.id === myAreaId ? ' (mia)' : ''}
-              </MenuItem>
-            ))}
-          </Select>
-        </Stack>
-      </Box>
-
       {readOnly && (
-        <Box sx={{ px: 2, py: 0.75, bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" color="text.disabled">Sola lettura — non fai parte di quest'area</Typography>
-        </Box>
+        <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>Sola lettura: non fai parte di quest'area</Typography>
       )}
-
       {!myAreaId && !isSuperuser && (
-        <Box sx={{ px: 2, py: 0.75, bgcolor: 'warning.light', borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" sx={{ color: 'warning.dark' }}>
-            Nessuna area assegnata al tuo profilo: contatta un amministratore per poter creare task.
-          </Typography>
-        </Box>
+        <Typography sx={{ fontSize: 11.5, color: 'warning.main' }}>
+          Nessuna area assegnata al tuo profilo: contatta un amministratore per poter creare task.
+        </Typography>
       )}
-
       {!readOnly && (
-        <Box sx={{
-          px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 0.75,
-          borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'action.hover',
-        }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: 32, pl: 1.25, pr: 0.5, borderRadius: '8px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'transparent', '&:focus-within': { borderColor: 'primary.main' } }}>
           <InputBase
             inputRef={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void addTask() }}
             placeholder={`Aggiungi un task per ${isOwnArea ? (myAreaLabel ?? 'la tua area') : (areas.find((a) => a.id === selectedArea)?.label ?? 'quest\'area')}...`}
-            sx={{ flex: 1, fontSize: '0.82rem', color: 'text.primary' }}
+            sx={{ flex: 1, fontSize: 13, color: 'text.primary' }}
             inputProps={{ maxLength: 200 }}
           />
-          <TextField
-            type="date" size="small" value={dueDate}
+          <InputBase
+            type="date" value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ width: 150, '& input': { fontSize: '0.78rem', py: 0.5 } }}
+            inputProps={{ 'aria-label': 'Scadenza' }}
+            sx={{ width: 122, fontSize: 12, color: dueDate ? 'text.primary' : 'text.secondary' }}
           />
-          <IconButton size="small" onClick={() => void addTask()} disabled={!input.trim() || saving} sx={{ color: 'primary.main' }}>
-            <AddRoundedIcon sx={{ fontSize: 16 }} />
+          <IconButton size="small" aria-label="Aggiungi il task" onClick={() => void addTask()} disabled={!input.trim() || saving} sx={{ width: 26, height: 26, color: (t) => t.palette.archie.dash.salvia.ink }}>
+            <AddRoundedIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
       )}
-
-      <Box sx={{ flex: 1, overflowY: 'auto' }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', mx: -1 }}>
         {loading ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.disabled">Caricamento...</Typography>
-          </Box>
+          <WidgetNote>Caricamento…</WidgetNote>
         ) : tasks.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <GroupsRoundedIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 0.5 }} />
-            <Typography variant="caption" color="text.disabled" display="block">
-              {selectedArea ? 'Nessun task per quest\'area' : 'Seleziona un\'area'}
-            </Typography>
-          </Box>
+          <WidgetNote>{selectedArea ? 'Nessun task per quest\'area' : 'Seleziona un\'area'}</WidgetNote>
         ) : (
-          <Stack>
+          <Stack spacing={0.25}>
             {grouped.map(({ status, items }, gi) => (
               items.length === 0 ? null : (
                 <Box key={status}>
                   {gi > 0 && (
-                    <Box sx={{ px: 2, py: 0.5, bgcolor: 'action.hover', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider' }}>
-                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        {STATUS_META[status].label}
-                      </Typography>
-                    </Box>
+                    <Typography sx={{ px: 1, pt: 1, pb: 0.25, fontSize: 11.5, fontWeight: 650, color: 'text.secondary' }}>
+                      {STATUS_META[status].label}
+                    </Typography>
                   )}
-                  {items.map((task, i) => (
-                    <Box key={task.id}>
-                      <TaskRow
-                        task={task}
-                        readOnly={readOnly}
-                        onCycle={cycleStatus}
-                        onDelete={deleteTask}
-                        onOpen={(t) => setOpenId(t.id)}
-                      />
-                      {i < items.length - 1 && <Divider />}
-                    </Box>
+                  {items.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      readOnly={readOnly}
+                      onCycle={cycleStatus}
+                      onDelete={deleteTask}
+                      onOpen={(t) => setOpenId(t.id)}
+                    />
                   ))}
                 </Box>
               )
@@ -261,14 +235,13 @@ export default function AreaTaskCard() {
           </Stack>
         )}
       </Box>
-
       <AreaTaskDetail
         task={openTask}
         onClose={() => setOpenId(null)}
         onChanged={(next) => { setTasks((prev) => prev.map((t) => (t.id === next.id ? next : t))); notify() }}
         onDeleted={(id) => { setTasks((prev) => prev.filter((t) => t.id !== id)); notify() }}
       />
-    </Card>
+    </WidgetShell>
   )
 }
 
@@ -288,13 +261,13 @@ function TaskRow({
     <Stack
       direction="row"
       alignItems="center"
-      spacing={1.25}
+      spacing={1.1}
       sx={{
-        px: 2, py: 1,
+        px: 1, py: 0.6, borderRadius: '8px',
         '&:hover .task-actions': { opacity: canAct ? 1 : 0 },
         '&:focus-within .task-actions': { opacity: canAct ? 1 : 0 },
         transition: 'background 0.12s',
-        '&:hover': { bgcolor: 'action.hover' },
+        '&:hover': { bgcolor: (t) => tintVeil(t, 'salvia', 30) },
       }}
     >
       <Tooltip title={canAct ? `Segna come "${STATUS_META[NEXT_STATUS[task.status]].label}"` : ''}>
@@ -325,7 +298,7 @@ function TaskRow({
           variant="body2"
           noWrap
           sx={{
-            fontWeight: 600, fontSize: '0.82rem',
+            fontWeight: 550, fontSize: 13,
             textDecoration: task.status === 'completato' ? 'line-through' : 'none',
             color: task.status === 'completato' ? 'text.disabled' : 'text.primary',
           }}
@@ -361,7 +334,7 @@ function TaskRow({
       ) : null}
       {task.assigned_to_name ? (
         <Tooltip title={task.assigned_to_name}>
-          <Avatar sx={{ width: 20, height: 20, fontSize: '0.6rem', fontWeight: 700, bgcolor: 'primary.main' }}>
+          <Avatar sx={{ width: 24, height: 24, fontSize: 10, fontWeight: 700, color: (t) => t.palette.archie.dash.salvia.ink, bgcolor: (t) => tintVeil(t, 'salvia', 26) }}>
             {personInitials(task.assigned_to_name)}
           </Avatar>
         </Tooltip>

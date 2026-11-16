@@ -28,6 +28,7 @@ from core.soft_delete import apply_soft_delete_filters
 from audit.utils import log_event, to_change_value_for_field
 
 from wiki.models import WikiAttachment, WikiPage
+from core.uploads import sniff_mime
 from wiki.api.helpers import _attachment_accel_response
 
 # ── Upload limits ─────────────────────────────────────────────────────────────
@@ -38,6 +39,8 @@ _WIKI_BLOCKED_EXTENSIONS = {
     "exe", "bat", "cmd", "com", "msi", "sh", "bash",
     "ps1", "vbs", "js", "ts", "php", "py", "rb", "pl",
     "jar", "dll", "so",
+    # B-14: tipi che il browser esegue se aperti dall'origine dell'app.
+    "html", "htm", "xhtml", "shtml", "svg", "svgz", "xml", "xsl", "mjs",
 }
 
 try:
@@ -53,6 +56,8 @@ _WIKI_BLOCKED_MIMES = {
     "application/x-ruby", "application/x-perl",
     "application/x-msdos-program", "application/x-msdownload",
     "application/x-dosexec", "application/java-archive",
+    # B-14: contenuto HTML/SVG anche se rinominato con un'altra estensione.
+    "text/html", "image/svg+xml", "application/xhtml+xml",
 }
 
 
@@ -130,6 +135,8 @@ class WikiAttachmentSerializer(serializers.ModelSerializer):
             "updated_at",
             "deleted_at",
         ]
+        # B-14: il tipo lo determina l'upload dal contenuto, non il client.
+        read_only_fields = ["mime_type"]
 
 
 class WikiAttachmentViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -195,7 +202,8 @@ class WikiAttachmentViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             page=page,
             file=uploaded,
             filename=uploaded.name,
-            mime_type=uploaded.content_type or "",
+            # B-14: mai il Content-Type dichiarato dal client.
+            mime_type=sniff_mime(uploaded) or mimetypes.guess_type(uploaded.name)[0] or "",
             size_bytes=uploaded.size,
             storage_key="",
         )

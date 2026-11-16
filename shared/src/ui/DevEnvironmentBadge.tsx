@@ -18,7 +18,14 @@ export const isDevEnvironment = import.meta.env.VITE_APP_ENV === 'development'
  * Renderizza null in produzione: montarlo incondizionatamente in
  * AppLayout di entrambi i frontend (archie e portal).
  */
-export default function DevEnvironmentBadge() {
+/** Righe diagonali dell'ambiente di sviluppo (ambra e nero), riusabili altrove (es. footer di Archie). */
+export const DEV_STRIPES = 'repeating-linear-gradient(45deg, #f59e0b 0 10px, #1e1b16 10px 20px)'
+
+/**
+ * `frame=false`: niente cornice sui bordi (Archie segnala lo sviluppo nel footer),
+ * resta solo il prefisso "[DEV]" nel titolo della scheda.
+ */
+export default function DevEnvironmentBadge({ frame = true }: { frame?: boolean } = {}) {
   React.useEffect(() => {
     if (!isDevEnvironment) return
     const original = document.title
@@ -30,9 +37,9 @@ export default function DevEnvironmentBadge() {
     }
   }, [])
 
-  if (!isDevEnvironment) return null
+  if (!isDevEnvironment || !frame) return null
 
-  const stripe = 'repeating-linear-gradient(45deg, #f59e0b 0 10px, #1e1b16 10px 20px)'
+  const stripe = DEV_STRIPES
   const barThickness = 5
 
   const commonBarStyle: React.CSSProperties = {

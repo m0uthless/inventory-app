@@ -1,6 +1,9 @@
 from django.utils import timezone
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, F, OuterRef
+import datetime
+
+import django_filters as filters
+from django.db.models import Count, Exists, F, OuterRef, Q
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import serializers, status, viewsets
@@ -274,6 +277,68 @@ class InventoryWriteSerializer(InventoryDetailSerializer):
         }
 
 
+# Stati "non operativi": il sistema c'è ma non lavora (dismessi esclusi).
+INV_NOT_OPERATIONAL = ("to_install", "maintenance", "repair")
+# Inventario "da completare": senza sito o senza IP locale.
+INV_INCOMPLETE = Q(site__isnull=True) | Q(local_ip__isnull=True) | Q(local_ip="")
+
+
+class InventoryFilter(filters.FilterSet):
+    """Filtri della lista inventari: ricerca per colonna (restyle) e viste."""
+    name_q = filters.CharFilter(field_name="name", lookup_expr="icontains")
+    hostname_q = filters.CharFilter(field_name="hostname", lookup_expr="icontains")
+    customer_q = filters.CharFilter(method="filter_customer_q")
+    site_q = filters.CharFilter(method="filter_site_q")
+    ip_q = filters.CharFilter(method="filter_ip_q")
+    code_q = filters.CharFilter(method="filter_code_q")
+    # Ricerca del Site Repository: solo gli identificativi del sistema (niente
+    # cliente/sito, che hanno risultati propri), per non elencare tutti gli asset di un cliente.
+    asset_q = filters.CharFilter(method="filter_asset_q")
+    has_active_issue = filters.BooleanFilter(field_name="has_active_issue")
+    not_operational = filters.BooleanFilter(method="filter_not_operational")
+    incomplete = filters.BooleanFilter(method="filter_incomplete")
+
+    class Meta:
+        model = Inventory
+        fields = ["customer", "site", "status", "type"]
+
+    def filter_customer_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(customer__name__icontains=v) | Q(customer__display_name__icontains=v)) if v else queryset
+
+    def filter_site_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(site__name__icontains=v) | Q(site__display_name__icontains=v) | Q(location__icontains=v)) if v else queryset
+
+    def filter_ip_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(local_ip__icontains=v) | Q(srsa_ip__icontains=v)) if v else queryset
+
+    def filter_code_q(self, queryset, name, value):
+        v = (value or "").strip()
+        return queryset.filter(Q(knumber__icontains=v) | Q(serial_number__icontains=v)) if v else queryset
+
+    def filter_asset_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=v) | Q(hostname__icontains=v) | Q(local_ip__icontains=v)
+            | Q(srsa_ip__icontains=v) | Q(knumber__icontains=v) | Q(serial_number__icontains=v)
+        )
+
+    def filter_not_operational(self, queryset, name, value):
+        if value is None:
+            return queryset
+        cond = Q(status__key__in=INV_NOT_OPERATIONAL)
+        return queryset.filter(cond) if value else queryset.exclude(cond)
+
+    def filter_incomplete(self, queryset, name, value):
+        if value is None:
+            return queryset
+        return queryset.filter(INV_INCOMPLETE) if value else queryset.exclude(INV_INCOMPLETE)
+
+
 class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
     serializer_class = InventoryWriteSerializer
     # Fix P0 6.6: view/add/change/delete_inventory espliciti per il portale
@@ -285,7 +350,7 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
     # verifica che il site scelto appartenga allo stesso tenant.
     tenant_related_fields = ("site",)
 
-    filterset_fields = ["customer", "site", "status", "type"]
+    filterset_class = InventoryFilter
 
     search_fields = [
         "name",
@@ -410,6 +475,93 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
 
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """Indicatori della pagina Inventari (non cestinati, stesso perimetro della lista)."""
+        qs = self.get_queryset().filter(deleted_at__isnull=True).order_by()
+        agg = qs.aggregate(
+            total=Count("id"),
+            customers=Count("customer_id", distinct=True),
+            in_use=Count("id", filter=Q(status__key="in_use")),
+            retired=Count("id", filter=Q(status__key="retired")),
+            to_install=Count("id", filter=Q(status__key="to_install")),
+            maintenance=Count("id", filter=Q(status__key="maintenance")),
+            repair=Count("id", filter=Q(status__key="repair")),
+            not_operational=Count("id", filter=Q(status__key__in=INV_NOT_OPERATIONAL)),
+            with_issue=Count("id", filter=Q(has_active_issue=True)),
+            incomplete=Count("id", filter=INV_INCOMPLETE),
+            missing_site=Count("id", filter=Q(site__isnull=True)),
+            missing_ip=Count("id", filter=Q(local_ip__isnull=True) | Q(local_ip="")),
+        )
+        by_priority = {p["active_issue_priority"]: p["n"] for p in qs.filter(has_active_issue=True).values("active_issue_priority").annotate(n=Count("id"))}
+        by_type = list(qs.values("type_id", "type__key", "type__label").annotate(n=Count("id")).order_by("-n", "type__label"))
+        today = timezone.localdate()
+        months = []
+        y, m = today.year, today.month
+        for _ in range(12):
+            months.append((y, m))
+            y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+        months.reverse()
+        created = list(qs.values_list("created_at", flat=True))
+        growth = []
+        for (yy, mm) in months:
+            end = datetime.date(yy + (mm // 12), (mm % 12) + 1, 1)
+            growth.append({"month": f"{yy}-{mm:02d}", "count": sum(1 for c in created if c and timezone.localtime(c).date() < end)})
+        return Response({
+            **{k: (v or 0) for k, v in agg.items()},
+            "issue_priority": {k: by_priority.get(k, 0) for k in ("critical", "high", "medium", "low")},
+            "by_type": [{"id": t["type_id"], "key": t["type__key"], "label": t["type__label"], "count": t["n"]} for t in by_type],
+            "growth": growth,
+        })
+
+    @action(detail=True, methods=["get"], url_path="maintenance")
+    def maintenance(self, request, pk=None):
+        """Piani di manutenzione che coprono il sistema e interventi registrati (con rapportino).
+
+        Un piano copre il sistema se è dello stesso cliente e include il suo tipo; la
+        scadenza è quella del piano, salvo override per il singolo sistema.
+        """
+        if not request.user.has_perm("maintenance.view_maintenanceevent"):
+            raise PermissionDenied("Serve il permesso di vedere le manutenzioni.")
+        inv = self.get_object()
+        from maintenance.models import MaintenanceEvent, MaintenancePlan, MaintenancePlanInventory
+        from maintenance.api.events import MaintenanceEventSerializer
+
+        plans: list[dict] = []
+        if inv.type_id:
+            overrides = dict(
+                MaintenancePlanInventory.objects.filter(inventory=inv, deleted_at__isnull=True)
+                .values_list("plan_id", "due_date_override")
+            )
+            qs = (
+                MaintenancePlan.objects.filter(
+                    customer_id=inv.customer_id, inventory_types=inv.type_id,
+                    is_active=True, deleted_at__isnull=True,
+                )
+                .distinct()
+                .order_by("next_due_date", "title")
+            )
+            for p in qs:
+                due = overrides.get(p.id) or p.next_due_date
+                plans.append({
+                    "id": p.id, "title": p.title, "schedule_type": p.schedule_type,
+                    "interval_value": p.interval_value, "interval_unit": p.interval_unit,
+                    "fixed_month": p.fixed_month, "fixed_day": p.fixed_day,
+                    "due_date": due.isoformat() if due else None,
+                    "alert_days_before": p.alert_days_before,
+                })
+            plans.sort(key=lambda x: x["due_date"] or "9999")
+
+        events = (
+            MaintenanceEvent.objects.filter(inventory=inv, deleted_at__isnull=True)
+            .select_related("plan", "tech", "created_by", "inventory", "inventory__site", "inventory__customer")
+            .order_by("-performed_at", "-id")[:50]
+        )
+        return Response({
+            "plans": plans,
+            "events": MaintenanceEventSerializer(events, many=True, context={"request": request}).data,
+        })
+
 
 # ─── Monitor ──────────────────────────────────────────────────────────────────
 
@@ -420,6 +572,7 @@ class MonitorSerializer(serializers.ModelSerializer):
     # Campi leggibili in sola lettura per il frontend
     inventory_name = serializers.CharField(source="inventory.name", read_only=True, default=None)
     site_name      = serializers.SerializerMethodField()
+    customer_name  = serializers.SerializerMethodField()
     stato_label    = serializers.CharField(source="get_stato_display", read_only=True)
     tipo_label     = serializers.CharField(source="get_tipo_display", read_only=True)
 
@@ -430,6 +583,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "inventory",
             "inventory_name",
             "site_name",
+            "customer_name",
             "produttore",
             "modello",
             "seriale",
@@ -442,13 +596,20 @@ class MonitorSerializer(serializers.ModelSerializer):
             "updated_at",
             "deleted_at",
         ]
-        read_only_fields = ["id", "inventory_name", "site_name", "stato_label", "tipo_label", "created_at", "updated_at", "deleted_at"]
+        read_only_fields = ["id", "inventory_name", "site_name", "customer_name", "stato_label", "tipo_label", "created_at", "updated_at", "deleted_at"]
 
     def get_site_name(self, obj) -> str | None:
         try:
             return obj.inventory.site.name if obj.inventory.site else None
         except Exception:
             return None
+
+    def get_customer_name(self, obj) -> str | None:
+        inv = obj.inventory
+        if inv is None or inv.customer_id is None:
+            return None
+        c = inv.customer
+        return c.display_name or c.name
 
     def validate(self, attrs):
         # Ricostruisce l'istanza parziale per eseguire il clean() del modello
@@ -468,17 +629,29 @@ class MonitorViewSet(PurgeActionMixin, RestoreActionMixin, SoftDeleteAuditMixin,
 
     serializer_class   = MonitorSerializer
     filter_backends    = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields   = ["inventory", "stato", "tipo", "radinet"]
-    search_fields      = ["produttore", "modello", "seriale"]
-    ordering_fields    = ["produttore", "modello", "stato", "tipo", "created_at", "updated_at"]
+    # inventory__isnull=true → monitor senza workstation (vista "Senza workstation").
+    filterset_fields   = {"inventory": ["exact", "isnull"], "stato": ["exact"], "tipo": ["exact"], "radinet": ["exact"]}
+    search_fields      = ["produttore", "modello", "seriale", "inventory__name", "inventory__site__name", "inventory__customer__name"]
+    ordering_fields    = ["produttore", "modello", "seriale", "stato", "tipo", "inventory__name", "created_at", "updated_at", "deleted_at"]
     ordering           = ["produttore", "modello"]
+
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        """Conteggi per le schede della pagina Monitor (solo monitor attivi)."""
+        qs = Monitor.objects.filter(deleted_at__isnull=True)
+        by_stato = dict(qs.values_list("stato").annotate(n=Count("id")).values_list("stato", "n"))
+        return Response({
+            "total": qs.count(),
+            "by_stato": {k: by_stato.get(k, 0) for k in Monitor.Stato.values},
+            "unassigned": qs.filter(inventory__isnull=True).count(),
+        })
 
     # Monitor non ha updated_by
     restore_has_updated_by = False
     purge_permission = "inventory.delete_monitor"
 
     def get_queryset(self):
-        qs = Monitor.objects.select_related("inventory", "inventory__site")
+        qs = Monitor.objects.select_related("inventory", "inventory__site", "inventory__customer")
         return apply_soft_delete_filters(
             qs,
             request=self.request,

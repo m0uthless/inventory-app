@@ -265,10 +265,11 @@ class IsInternalOrPortalDedicatedApp(BasePermission):
     (oggi: portal, device, vlan).
 
     Comportamento:
-    - utente interno (ambito di sessione != "portal", incl. sessioni senza
-      SESSION_AMBITO_KEY) o superuser → sempre consentito, ESATTAMENTE il
-      comportamento storico di IsAuthenticatedDjangoModelPermissions da
-      solo. Nessuna regressione per lo staff.
+    - superuser → sempre consentito.
+    - sessione interna (ambito != "portal", incl. sessioni senza
+      SESSION_AMBITO_KEY) → consentito solo con `core.access_archie`
+      (H-01, QA 2026-11-15: prima bastava non essere in sessione Portal,
+      così un utente senza permessi leggeva i moduli interni via API).
     - sessione con ambito == "portal" → negato su qualunque ViewSet che
       finisce per usare il default globale (cioè non dichiara proprie
       permission_classes). I ViewSet CRM/Inventory/Device/VLAN che il
@@ -293,7 +294,10 @@ class IsInternalOrPortalDedicatedApp(BasePermission):
         session = getattr(request, "session", None)
         ambito = session.get(SESSION_AMBITO_KEY) if session is not None else None
         if ambito != "portal":
-            return True
+            # H-01 (QA 2026-11-15): una sessione interna vale solo per chi ha
+            # davvero accesso ad Archie. Chiude anche sessioni aperte prima del
+            # controllo al login e qualunque altro percorso di autenticazione.
+            return _can_access_archie(user)
 
         from core.permission_modules import PORTAL_DEDICATED_APPS
 

@@ -1,24 +1,19 @@
 import * as React from 'react'
-import {
-  Alert,
-  Autocomplete,
-  Button,
-  Checkbox,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormControlLabel,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Avatar, Box } from '@mui/material'
+import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded'
+import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined'
+import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded'
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
+import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
+import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined'
+import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined'
+import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
+import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded'
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded'
 
+import { DatePill, Pill, QuickForm, SelectPill, StaticPill, TextPill } from '../../ui/campo'
+import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
 import {
   PRIORITY_META,
   STATUS_META,
@@ -54,333 +49,94 @@ type IssueDialogProps = {
   onFormChange: React.Dispatch<React.SetStateAction<IssueFormData>>
 }
 
+const FIELD_LABEL: Record<string, string> = {
+  title: 'Titolo', customer: 'Cliente', customer_placeholder: 'Cliente', site: 'Sito', priority: 'Priorità', status: 'Stato', waiting_reason: 'In attesa di',
+  category: 'Categoria', assigned_to: 'Assegnata a', opened_at: 'Data di apertura', due_date: 'Scadenza', servicenow_id: 'Caso ServiceNow', description: 'Descrizione', inventory: 'Inventario',
+}
+const initials = (s: string) => s.replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase()
+const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low']
+
+/**
+ * Nuova issue / modifica: inserimento rapido (anteprima fm-base, variante C). Titolo, descrizione e le
+ * proprietà in pillole; il cliente si cerca in anagrafica o, se manca, si scrive il nome (testo libero).
+ * Una issue chiusa si apre in sola lettura.
+ */
 export default function IssueDialog({
-  open,
-  editIssue,
-  form,
-  saving,
-  errors,
-  customerInput,
-  customerOptions,
-  customerLoading,
-  siteOptions,
-  categories,
-  users,
-  pendingInventory,
-  onClose,
-  onSave,
-  onOpenLinkInventory,
-  onCustomerInputChange,
-  onFormChange,
+  open, editIssue, form, saving, errors, customerOptions, customerLoading, siteOptions, categories, users, pendingInventory,
+  onClose, onSave, onOpenLinkInventory, onCustomerInputChange, onFormChange,
 }: IssueDialogProps) {
   const isClosed = editIssue?.status === 'closed'
+  const set = <K extends keyof IssueFormData>(k: K, v: IssueFormData[K]) => onFormChange((f) => ({ ...f, [k]: v }))
+  const errs = Object.entries(errors).filter(([, m]) => m).map(([k, m]) => (FIELD_LABEL[k] ? `${FIELD_LABEL[k]}: ${m}` : m))
+  const setFreeCustomer = (on: boolean) => onFormChange((f) => ({
+    ...f, useCustomerPlaceholder: on,
+    // Passando al testo libero si azzerano cliente e sito; tornando all'anagrafica il testo libero.
+    customer: on ? null : f.customer, site_id: on ? '' : f.site_id, customerPlaceholder: on ? f.customerPlaceholder : '',
+  }))
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ pb: 1 }}>
-        {editIssue ? `Modifica issue #${editIssue.id}` : 'Nuova issue'}
-        {editIssue ? (
-          <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-            · {editIssue.customer_name}
-          </Typography>
-        ) : null}
-      </DialogTitle>
-      <DialogContent dividers>
-        {isClosed && (
-          <Alert severity="warning" icon={false} sx={{ mb: 2 }}>
-            Questa issue è <strong>chiusa</strong> e non può essere modificata. Lo stato
-            «Chiusa» viene impostato automaticamente 48 ore dopo la risoluzione.
-          </Alert>
-        )}
-        <Stack
-          spacing={2}
-          sx={{
-            pt: 0.5,
-            ...(isClosed ? { opacity: 0.55, pointerEvents: 'none', userSelect: 'none' } : {}),
-          }}
-        >
-          <TextField
-            label="Titolo *"
-            size="small"
-            fullWidth
-            value={form.title}
-            onChange={(e) => onFormChange((f) => ({ ...f, title: e.target.value }))}
-            error={Boolean(errors.title)}
-            helperText={errors.title}
-          />
-
+    <QuickForm
+      dialogLabel={editIssue ? `Modifica issue #${editIssue.id}` : 'Nuova issue'}
+      open={open} onClose={onClose} mode={editIssue ? 'edit' : 'create'} saving={saving} onSubmit={onSave} readOnly={isClosed}
+      crumb={{ icon: <ErrorOutlineRoundedIcon />, label: 'Issue', extra: editIssue ? `#${editIssue.id}` : undefined }}
+      submitLabel={editIssue ? 'Salva modifiche' : 'Crea issue'}
+      notice={isClosed ? <>Questa issue è <b>chiusa</b> e non si può modificare. Lo stato «Chiusa» si imposta da solo 48 ore dopo la risoluzione.</> : undefined}
+      title={{ value: form.title, onChange: (v) => set('title', v), placeholder: 'Titolo della issue', label: 'Titolo', error: errors.title }}
+      description={{ value: form.description, onChange: (v) => set('description', v), placeholder: 'Cosa succede, da quando, cosa è già stato provato…', label: 'Descrizione' }}
+      errors={errs}
+      pills={
+        <>
           {form.useCustomerPlaceholder ? (
-            <TextField
-              label="Cliente (testo libero) *"
-              size="small"
-              fullWidth
-              value={form.customerPlaceholder}
-              onChange={(e) => onFormChange((f) => ({ ...f, customerPlaceholder: e.target.value }))}
-              error={Boolean(errors.customer_placeholder || errors.customer)}
-              helperText={
-                errors.customer_placeholder || errors.customer ||
-                'Cliente non ancora presente in anagrafica: verrà collegato in un secondo momento.'
-              }
-              placeholder="Nome del cliente"
-            />
+            <>
+              <TextPill icon={<ApartmentOutlinedIcon />} placeholder="Cliente non in anagrafica" value={form.customerPlaceholder}
+                onChange={(v) => set('customerPlaceholder', v)} error={Boolean(errors.customer_placeholder || errors.customer)}
+                title="Cliente non ancora in anagrafica: si collega in un secondo momento." />
+              <Pill icon={<UndoRoundedIcon />} placeholder="Cerca in anagrafica" onClick={() => setFreeCustomer(false)} />
+            </>
           ) : (
-            <Autocomplete
-              size="small"
-              value={form.customer}
-              inputValue={customerInput}
-              onInputChange={(_, value) => onCustomerInputChange(value)}
-              onChange={(_, value) => onFormChange((f) => ({ ...f, customer: value, site_id: '' }))}
-              options={customerOptions}
-              loading={customerLoading}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Cliente *"
-                  size="small"
-                  error={Boolean(errors.customer)}
-                  helperText={errors.customer}
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <>
-                        {customerLoading ? <CircularProgress size={16} /> : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
-                />
-              )}
-            />
+            <SelectPill icon={<ApartmentOutlinedIcon />} placeholder="Cliente" required value={form.customer?.id ?? ''} error={Boolean(errors.customer)}
+              options={customerOptions.map((c) => ({ value: c.id, label: c.label }))} current={form.customer ? { value: form.customer.id, label: form.customer.label } : null}
+              onSearch={onCustomerInputChange} loading={customerLoading}
+              action={{ label: 'Non è in anagrafica? Scrivi il nome', onClick: () => setFreeCustomer(true) }}
+              onChange={(v) => {
+                const c = customerOptions.find((x) => x.id === v) ?? null
+                onFormChange((f) => ({ ...f, customer: c, site_id: '' }))
+              }} />
           )}
-
-          <FormControlLabel
-            sx={{ mt: -1, ml: 0 }}
-            control={
-              <Checkbox
-                size="small"
-                checked={form.useCustomerPlaceholder}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  onFormChange((f) => ({
-                    ...f,
-                    useCustomerPlaceholder: checked,
-                    // Passando al testo libero azzeriamo cliente/sito (non applicabili);
-                    // tornando all'anagrafica azzeriamo il testo libero.
-                    customer: checked ? null : f.customer,
-                    site_id: checked ? '' : f.site_id,
-                    customerPlaceholder: checked ? f.customerPlaceholder : '',
-                  }))
-                }}
-              />
-            }
-            label={
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Cliente non presente in DB
-              </Typography>
-            }
-          />
-
           {!form.useCustomerPlaceholder && siteOptions.length > 0 ? (
-            <FormControl size="small" fullWidth>
-              <InputLabel>Sito</InputLabel>
-              <Select
-                value={form.site_id}
-                label="Sito"
-                onChange={(e) => onFormChange((f) => ({ ...f, site_id: e.target.value as number | '' }))}
-              >
-                <MenuItem value="">
-                  <em>Nessuno</em>
-                </MenuItem>
-                {siteOptions.map((site) => (
-                  <MenuItem key={site.id} value={site.id}>
-                    {site.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <SelectPill icon={<PlaceOutlinedIcon />} placeholder="Sito" value={form.site_id} emptyLabel="Nessun sito"
+              options={siteOptions.map((s) => ({ value: s.id, label: s.label }))} onChange={(v) => set('site_id', v === '' ? '' : Number(v))} />
           ) : null}
-
-          <Stack direction="row" spacing={2}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Priorità</InputLabel>
-              <Select
-                value={form.priority}
-                label="Priorità"
-                onChange={(e) => onFormChange((f) => ({ ...f, priority: e.target.value }))}
-              >
-                {Object.entries(PRIORITY_META).map(([key, value]) => (
-                  <MenuItem key={key} value={key}>
-                    {value.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Stato</InputLabel>
-              <Select
-                value={form.status}
-                label="Stato"
-                onChange={(e) =>
-                  onFormChange((f) => ({
-                    ...f,
-                    status: e.target.value,
-                    // La causale ha senso solo con stato "In attesa": la
-                    // azzeriamo cambiando stato per evitare valori stantii
-                    // che poi il backend rifiuterebbe/ignorerebbe comunque.
-                    waiting_reason: e.target.value === 'waiting' ? f.waiting_reason : '',
-                  }))
-                }
-              >
-                {Object.entries(STATUS_META)
-                  .filter(([key]) => key !== 'closed')
-                  .map(([key, value]) => (
-                    <MenuItem key={key} value={key}>
-                      {value.label}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </Stack>
-
+          {editIssue && !editIssue.is_customer_placeholder ? (
+            <Pill icon={<DnsOutlinedIcon />} placeholder="Collega un inventario" label={editIssue.inventory ? issueInventoryLabel(editIssue) : undefined}
+              onClick={onOpenLinkInventory} error={Boolean(errors.inventory)} />
+          ) : !editIssue && pendingInventory ? (
+            <StaticPill icon={<DnsOutlinedIcon />} title="Inventario collegato"
+              label={[pendingInventory.name, pendingInventory.knumber, pendingInventory.hostname].filter(Boolean).join(' · ')} />
+          ) : null}
+          <SelectPill placeholder="Priorità" value={form.priority} onChange={(v) => v && set('priority', String(v))}
+            options={PRIORITY_ORDER.filter((k) => PRIORITY_META[k]).map((k) => ({ value: k, label: PRIORITY_META[k].label, node: <IssuePriorityMark priority={k} /> }))}
+            render={(o) => <IssuePriorityMark priority={String(o.value)} />} />
+          <SelectPill placeholder="Stato" value={form.status}
+            options={Object.keys(STATUS_META).filter((k) => k !== 'closed').map((k) => ({ value: k, label: STATUS_META[k].label, node: <IssueStatusBadge status={k} /> }))}
+            render={(o) => <IssueStatusBadge status={String(o.value)} />}
+            onChange={(v) => v && onFormChange((f) => ({ ...f, status: String(v), waiting_reason: v === 'waiting' ? f.waiting_reason : '' }))} />
           {form.status === 'waiting' ? (
-            <FormControl size="small" fullWidth error={Boolean(errors.waiting_reason)}>
-              <InputLabel>In attesa di *</InputLabel>
-              <Select
-                value={form.waiting_reason}
-                label="In attesa di *"
-                onChange={(e) => onFormChange((f) => ({ ...f, waiting_reason: e.target.value }))}
-              >
-                <MenuItem value="">
-                  <em>Seleziona</em>
-                </MenuItem>
-                {Object.entries(WAITING_REASON_META).map(([key, value]) => (
-                  <MenuItem key={key} value={key}>
-                    {value.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.waiting_reason ? (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
-                  {errors.waiting_reason}
-                </Typography>
-              ) : null}
-            </FormControl>
+            <SelectPill icon={<HourglassEmptyRoundedIcon />} placeholder="In attesa di" required value={form.waiting_reason} error={Boolean(errors.waiting_reason)}
+              options={Object.entries(WAITING_REASON_META).map(([k, v]) => ({ value: k, label: v.label }))} onChange={(v) => set('waiting_reason', String(v))} />
           ) : null}
-
-          <Stack direction="row" spacing={2}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Categoria</InputLabel>
-              <Select
-                value={form.category_id}
-                label="Categoria"
-                onChange={(e) => onFormChange((f) => ({ ...f, category_id: e.target.value as number | '' }))}
-              >
-                <MenuItem value="">
-                  <em>Nessuna</em>
-                </MenuItem>
-                {categories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Assegnato a</InputLabel>
-              <Select
-                value={form.assigned_to_id}
-                label="Assegnato a"
-                onChange={(e) => onFormChange((f) => ({ ...f, assigned_to_id: e.target.value as number | '' }))}
-              >
-                <MenuItem value="">
-                  <em>Nessuno</em>
-                </MenuItem>
-                {users.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-
-          <Stack direction="row" spacing={2}>
-            <TextField
-              label="Data apertura"
-              size="small"
-              fullWidth
-              type="date"
-              value={form.opened_at}
-              onChange={(e) => onFormChange((f) => ({ ...f, opened_at: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-              helperText="Precompilata con la data odierna, modificabile se necessario"
-            />
-            <TextField
-              label="Scadenza"
-              size="small"
-              fullWidth
-              type="date"
-              value={form.due_date}
-              onChange={(e) => onFormChange((f) => ({ ...f, due_date: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Stack>
-
-          <TextField
-            label="Caso ServiceNow"
-            size="small"
-            fullWidth
-            value={form.servicenow_id}
-            onChange={(e) => onFormChange((f) => ({ ...f, servicenow_id: e.target.value }))}
-            placeholder="INC0012345"
-          />
-
-          <TextField
-            label="Descrizione"
-            size="small"
-            fullWidth
-            multiline
-            rows={3}
-            value={form.description}
-            onChange={(e) => onFormChange((f) => ({ ...f, description: e.target.value }))}
-          />
-
-          {editIssue ? (
-            <Alert severity={editIssue.inventory ? 'info' : 'warning'}>
-              {editIssue.inventory
-                ? `Inventory collegato: ${issueInventoryLabel(editIssue)}`
-                : 'Questa issue non è ancora collegata a un inventory.'}
-            </Alert>
-          ) : pendingInventory ? (
-            <Alert severity="info" icon={false} sx={{ py: 0.5 }}>
-              <strong>Inventory:</strong>{' '}
-              {[pendingInventory.name, pendingInventory.knumber, pendingInventory.hostname]
-                .filter(Boolean)
-                .join(' · ')}
-            </Alert>
-          ) : null}
-
-          {errors.non_field_errors ? <Alert severity="error">{errors.non_field_errors}</Alert> : null}
-          {errors.inventory ? <Alert severity="error">{errors.inventory}</Alert> : null}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        {editIssue && !isClosed && !editIssue.is_customer_placeholder ? (
-          <Button variant="outlined" onClick={onOpenLinkInventory} disabled={saving}>
-            Collega a inventory
-          </Button>
-        ) : null}
-        <Button variant="text" onClick={onClose} disabled={saving}>
-          {editIssue ? 'Chiudi' : 'Annulla'}
-        </Button>
-        {!isClosed ? (
-          <Button variant="contained" onClick={onSave} disabled={saving} sx={{ minWidth: 140 }}>
-            {saving ? <CircularProgress size={16} sx={{ mr: 1, color: 'inherit' }} /> : null}
-            {editIssue ? 'Salva modifiche' : 'Crea issue'}
-          </Button>
-        ) : null}
-      </DialogActions>
-    </Dialog>
+          <SelectPill icon={<PersonOutlineRoundedIcon />} placeholder="Assegna" title="Assegnata a" value={form.assigned_to_id} emptyLabel="Nessuno"
+            onChange={(v) => set('assigned_to_id', v === '' ? '' : Number(v))}
+            options={users.map((u) => ({ value: u.id, label: u.label, node: <><Avatar sx={{ width: 20, height: 20, fontSize: 9, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{initials(u.label)}</Avatar>{u.label}</> }))}
+            render={(o) => <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>{o.node}</Box>} />
+          <SelectPill icon={<FolderOutlinedIcon />} placeholder="Categoria" value={form.category_id} emptyLabel="Nessuna"
+            options={categories.map((c) => ({ value: c.id, label: c.label }))} onChange={(v) => set('category_id', v === '' ? '' : Number(v))} />
+          <DatePill icon={<EventAvailableOutlinedIcon />} placeholder="Aperta il" value={form.opened_at} onChange={(v) => set('opened_at', v)} clearable={false}
+            quick={[[0, 'Oggi'], [-1, 'Ieri']]} error={Boolean(errors.opened_at)} />
+          <DatePill icon={<EventOutlinedIcon />} placeholder="Scadenza" value={form.due_date} onChange={(v) => set('due_date', v)} error={Boolean(errors.due_date)} />
+          <TextPill icon={<CloudOutlinedIcon />} placeholder="Caso ServiceNow" mono value={form.servicenow_id} onChange={(v) => set('servicenow_id', v)} error={Boolean(errors.servicenow_id)} />
+        </>
+      }
+    />
   )
 }

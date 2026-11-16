@@ -23,3 +23,6 @@ class ResizeObserverMock {
 globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver
 window.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver
 Object.assign(navigator, { clipboard: { writeText: async () => {} } })
+
+// jsdom non implementa scrollTo sugli elementi (usato dai pannelli flottanti).
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = function scrollTo() {}

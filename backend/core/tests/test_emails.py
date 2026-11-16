@@ -51,7 +51,7 @@ def test_send_templated_email_from_non_portal_module_uses_archie_brand():
 
     html_body = msg.alternatives[0][0]
     assert msg.alternatives[0][1] == "text/html"
-    assert "ARCHIE" in html_body
+    assert "cid:archie-logo@biotron.email" in html_body  # layout Archie (logo nell'header)
     assert "Ciao Mario, questo è un contenuto di prova." in html_body
 
     # Fallback plain-text auto-generato da strip_tags(): niente tag HTML,
@@ -100,7 +100,8 @@ def test_send_templated_email_attaches_inline_image_referenced_by_cid():
 
     msg = mail.outbox[-1]
     assert msg.mixed_subtype == "related"
-    assert "<archie-issue_assigned@biotron.email>" in _image_cids(msg)
+    # Il logo dell'header (base_archie.html) parte come immagine inline.
+    assert _image_cids(msg) == ["<archie-logo@biotron.email>"]
 
 
 @override_settings(DEFAULT_FROM_EMAIL="noreply@biotron.it")

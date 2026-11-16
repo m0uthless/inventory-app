@@ -1,9 +1,15 @@
 import { fireEvent, screen, waitFor } from '@testing-library/dom'
-import { render } from '@testing-library/react'
+import { render as rtlRender } from '@testing-library/react'
+import { ThemeProvider } from '@mui/material/styles'
+import type { ReactElement } from 'react'
+import { THEME_REGISTRY } from '../theme/themeRegistry'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AreaTaskCard from './AreaTaskCard'
 import type { AreaTaskRow } from '../features/areatasks/types'
+
+const theme = THEME_REGISTRY.default.build('light')
+const render = (ui: ReactElement) => rtlRender(<ThemeProvider theme={theme}>{ui}</ThemeProvider>)
 
 const apiGet = vi.fn()
 const apiPost = vi.fn()

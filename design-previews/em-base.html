@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Email · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c; --bg: #eef2f1; --surface: #ffffff; --surface-2: #f5f8f7; --rail: #e3eae8;
+  --border: #d5dedb; --border-strong: #b9c7c3; --text: #15201e; --muted: #5b6b67; --faint: #66766f;
+  --field: #e2f0eb; --focus: 0 0 0 3px rgb(31 107 92 / .28);
+  --shadow-float: 0 12px 32px -12px rgb(16 40 34 / .22), 0 2px 6px rgb(16 40 34 / .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --primary: #5fb8a3; --bg: #0f1615; --surface: #151e1c; --surface-2: #1a2523; --rail: #121a19;
+    --border: #2a3734; --border-strong: #3b4c48; --text: #e4ecea; --muted: #93a4a0; --faint: #849591;
+    --field: #183a33; --focus: 0 0 0 3px rgb(95 184 163 / .35); --shadow-float: 0 16px 40px -12px rgb(0 0 0 / .6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --bg: #0f1615; --surface: #151e1c; --surface-2: #1a2523; --rail: #121a19;
+  --border: #2a3734; --border-strong: #3b4c48; --text: #e4ecea; --muted: #93a4a0; --faint: #849591;
+  --field: #183a33; --focus: 0 0 0 3px rgb(95 184 163 / .35); --shadow-float: 0 16px 40px -12px rgb(0 0 0 / .6);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 400 13px/1.5 "Geist", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--field); color: var(--text); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* Casella di posta finta */
+.mail { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+.inbox { background: var(--rail); border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 10px 90px; }
+.inbox h1 { font-size: 13px; font-weight: 650; margin: 4px 8px 12px; color: var(--muted); }
+.msg { display: grid; gap: 2px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
+.msg:hover { background: var(--surface); }
+.msg[aria-pressed="true"] { background: var(--surface); border-color: var(--primary); }
+.msg .from { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+.msg .from time { font-weight: 500; color: var(--faint); font-size: 12px; }
+.msg .subj { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg .why { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.reader { display: flex; flex-direction: column; min-width: 0; }
+.reader-head { padding: 18px 28px 14px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.reader-head h2 { margin: 0 0 8px; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; }
+.sender { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.sender .ava { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.sender b { color: var(--text); font-weight: 600; }
+.stage { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 0 0 90px; }
+.stage iframe { border: 0; width: 100%; max-width: 760px; display: block; background: #eef2f1; transition: max-width .25s cubic-bezier(.2,.8,.2,1); }
+.stage.phone iframe { max-width: 390px; margin-top: 18px; border-radius: 22px; box-shadow: var(--shadow-float); outline: 8px solid #1d2826; }
+
+.note { margin: 0; padding: 10px 28px; background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+.note b { color: var(--text); font-weight: 600; }
+
+/* Barra anteprima */
+.pv-bar { position: fixed; z-index: 50; left: 50%; transform: translateX(-50%); bottom: 16px; display: flex; gap: 4px; padding: 4px; align-items: center; max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: none; white-space: nowrap; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-float); }
+.pv-bar .pv-name { padding: 0 8px; font-weight: 600; color: var(--muted); font-size: 12px; }
+.pv-bar a { color: var(--muted); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; text-decoration: none; font-size: 16px; }
+.pv-bar button { border: 0; background: transparent; height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; }
+.pv-bar button[aria-pressed="true"] { background: var(--field); color: var(--text); }
+.pv-bar button:hover, .pv-bar a:hover { background: var(--surface-2); color: var(--text); }
+.pv-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex: none; }
+
+@media (max-width: 860px) {
+  .mail { grid-template-columns: 1fr; }
+  .inbox { display: none; }
+  .reader-head, .note { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="mail">
+  <nav class="inbox" aria-label="Posta in arrivo">
+    <h1>Posta in arrivo</h1>
+    <div data-list></div>
+  </nav>
+  <main class="reader">
+    <header class="reader-head">
+      <h2 data-subject></h2>
+      <div class="sender"><span class="ava" aria-hidden="true">A</span><span><b>ARCHIE</b> &lt;noreply@biotron.it&gt; · a Federico Mutuale</span></div>
+    </header>
+    <p class="note" data-note></p>
+    <div class="stage" data-stage><iframe title="Email" data-frame></iframe></div>
+  </main>
+</div>
+
+<div class="pv-bar" role="toolbar" aria-label="Controlli anteprima">
+  <a href="index.html" aria-label="Torna all'indice" title="Indice">‹</a>
+  <span class="pv-name">Direzione</span>
+  <span role="group" aria-label="Direzione" style="display:inline-flex;gap:2px">
+    <button data-dir="a">A · Bollettino</button><button data-dir="c">C · Ricevuta</button></span>
+  <span class="pv-sep" aria-hidden="true"></span>
+  <span role="group" aria-label="Larghezza" style="display:inline-flex;gap:2px">
+    <button data-w="desk">Computer</button><button data-w="phone">Telefono</button></span>
+  <span class="pv-sep" aria-hidden="true"></span>
+  <button data-theme-toggle aria-label="Tema della casella chiaro o scuro">Tema</button>
+</div>
+
+<script src="shared/em.js?v=10"></script>
+<script>
+(() => {
+  const E = window.ArchieEmails
+  const $ = (s) => document.querySelector(s)
+  const qs = new URLSearchParams(location.search)
+  const ls = (k, d) => { try { return localStorage.getItem(k) || d } catch { return d } }
+  const save = (k, v) => { try { localStorage.setItem(k, v) } catch { /* niente */ } }
+  const st = {
+    dir: ['a', 'c'].includes(qs.get('dir') || ls('archie-preview-em-dir', 'a')) ? (qs.get('dir') || ls('archie-preview-em-dir', 'a')) : 'a',
+    kind: qs.get('email') || 'issue',
+    owl: false,
+    cat: 'h',
+    w: qs.get('w') || 'desk',
+  }
+  const LIST = [
+    ['issue', '09:14', 'Nuova issue #1042 · PACS non raggiungibile dalla Radiologia PS'],
+    ['leave', '11:02', 'Nicole Spazzoli ha chiesto 2,5 giorni di ferie'],
+    ['digest', '08:00', 'Le tue scadenze dei prossimi 3 giorni'],
+  ]
+  const NOTES = {
+    a: '<b>A · Bollettino.</b> Ogni email è un orario: testata con il giorno, una riga per data con il riquadro del giorno a sinistra e lo stato a destra. Le ferie mostrano mattina e pomeriggio come nella griglia del Piano ferie.',
+    b: "<b>B · Scheda.</b> L'email è la scheda flottante dell'app: testata scura con il riferimento e lo stato, proprietà in griglia, descrizione, azioni in fondo. Chi usa Archie la riconosce subito.",
+    c: '<b>C · Ricevuta.</b> Una cosa sola da fare: il numero in grande, i fatti come voci di una ricevuta tra righe tratteggiate, il pulsante al centro. La più veloce da leggere sul telefono.',
+  }
+  const frame = $('[data-frame]')
+  const fit = () => { try { frame.style.height = frame.contentDocument.documentElement.scrollHeight + 'px' } catch { /* niente */ } }
+  frame.addEventListener('load', fit)
+  const render = () => {
+    $('[data-list]').innerHTML = LIST.map(([k, time, subj]) => `<button class="msg" data-kind="${k}" aria-pressed="${k === st.kind}">
+      <span class="from"><span>ARCHIE</span><time>${time}</time></span><span class="subj">${subj}</span><span class="why">${E.EMAILS[k].why}</span></button>`).join('')
+    $('[data-subject]').textContent = E.EMAILS[st.kind].subject
+    const owlMissing = st.owl && !E.EMAILS[st.kind].owl
+    $('[data-note]').innerHTML = NOTES[st.dir] + (owlMissing ? ' Per questa email il gufo non esiste ancora: il cerchio tratteggiato segna dove andrebbe il disegno da Canva.' : '') + ' I pulsanti portano alla scheda giusta in Archie'
+    frame.srcdoc = E.render(st.dir, st.kind, st.owl, st.cat === 'v')
+    document.querySelectorAll('[data-cat]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cat === st.cat)))
+    $('[data-stage]').classList.toggle('phone', st.w === 'phone')
+    document.querySelectorAll('[data-dir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === st.dir)))
+    document.querySelectorAll('[data-owl]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.owl === '1') === st.owl)))
+    document.querySelectorAll('[data-w]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.w === st.w)))
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return
+    if (b.dataset.kind) st.kind = b.dataset.kind
+    else if (b.dataset.dir) { st.dir = b.dataset.dir; save('archie-preview-em-dir', st.dir) }
+    else if (b.dataset.owl) { st.owl = b.dataset.owl === '1'; save('archie-preview-em-owl2', b.dataset.owl) }
+    else if (b.dataset.w) st.w = b.dataset.w
+    else if (b.dataset.cat) { st.cat = b.dataset.cat; save('archie-preview-em-cat', st.cat) }
+    else if (b.hasAttribute('data-theme-toggle')) {
+      const html = document.documentElement
+      const dark = html.dataset.theme ? html.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+      html.dataset.theme = dark ? 'light' : 'dark'; return
+    } else return
+    render()
+  })
+  window.addEventListener('resize', fit)
+  render()
+})()
+</script>
+</body>
+</html>

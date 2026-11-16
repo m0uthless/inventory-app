@@ -5,6 +5,8 @@ import {
   type DashboardWidgetDef,
   type DashboardLayoutItem,
 } from './dashboardTypes'
+import { WIDGET_MODULE } from '../../modules/moduleRegistry'
+import { useModules } from '../../modules/useModules'
 
 // ─── Auto-placement per i widget senza layout salvato ──────────────────────────
 // Shelf-packing semplice: scandisce la griglia riga per riga, colonna per
@@ -119,5 +121,10 @@ export function useDashboardLayout() {
     }
   }, [])
 
-  return { widgets, layoutItems, setLayoutItems, loading, saving, save, reload: load }
+  // Widget dei moduli spenti: spariscono (restano nel layout salvato e
+  // tornano quando il modulo si riaccende).
+  const { isHidden } = useModules()
+  const visibleWidgets = React.useMemo(() => widgets.filter((w) => !isHidden(WIDGET_MODULE[w.key])), [widgets, isHidden])
+
+  return { widgets: visibleWidgets, layoutItems, setLayoutItems, loading, saving, save, reload: load }
 }

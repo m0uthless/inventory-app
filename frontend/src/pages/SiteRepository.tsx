@@ -1,616 +1,606 @@
 import * as React from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Box, Button, Dialog, DialogContent, DialogTitle, IconButton, Skeleton, Stack, Typography, useMediaQuery } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Box, Button, ButtonBase, CircularProgress, InputBase, Skeleton, Typography } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined'
-import VpnLockIcon from '@mui/icons-material/VpnLock'
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
-import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
-import SearchOffOutlinedIcon from '@mui/icons-material/SearchOffOutlined'
 import GridOnOutlinedIcon from '@mui/icons-material/GridOnOutlined'
-import VpnModal from '../features/customers/VpnModal'
+import VpnLockIcon from '@mui/icons-material/VpnLock'
 import { api } from '@shared/api/client'
+import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
+import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
+import { buildQuery } from '@shared/utils/nav'
+import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
-import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import { buildQuery } from '@shared/utils/nav'
-import InventoryDrawer from '../features/inventory/InventoryDrawer'
-import type { InventoryDetail } from '../features/inventory/types'
-import type { CustomerDetail } from '../features/customers/types'
-import type { SiteDetail } from '../features/sites/types'
-import { useToast } from '@shared/ui/toast'
-import { apiErrorToMessage } from '@shared/api/error'
-import { useSiteRepoV2 } from '../features/siterepov2/SiteRepoV2Context'
-import type { SiteRepoV2Handle } from '../features/siterepov2/SiteRepoV2Context'
+import { useOwnPageHeader } from '../layout/PageHeaderContext'
+import { useStatusTokens } from '../theme/AppThemeProvider'
+import { CampoIcon, useUndoToast } from '../ui/campo'
 import { resolveItalianProvince } from '../data/italianProvinces'
+import type { RegionId } from '../data/italianRegions'
+import VpnModal from '../features/customers/VpnModal'
+import { AuditFeedPanel } from '../features/customers/CustomerTabs'
+import { vendorColorOf } from '../features/customers/customerUi'
+import InventoryDetailCard, { type InventoryCardDetail, type InventoryPatch, type InventoryTab } from '../features/inventory/InventoryDetailCard'
+import { AssetTypeIcon } from '../features/inventory/inventoryUi'
+import { PROVINCE_NAME, REGION_NAME, RepoMap, regionOf } from '../features/siterepo/RepoMap'
+import { AssetHead, AssetRow, Chevron, CustomerBlock, focusInset, Highlight, NameCell, numSx, PrioMark } from '../features/siterepo/RepoTree'
+import type { RepoAsset, RepoCustomer, RepoCustomerContent, RepoSite } from '../features/siterepo/types'
 
-import type { CustomerRow, SiteRow, InventoryRow, LocationGroup } from './siteRepository/types'
-import { normalizeProvince, normalizeCity } from './siteRepository/style'
-import { ProvinceSection, type ProvinceSectionHandle } from './siteRepository/ProvinceSection'
-import { CustomerInfoDrawer, SiteInfoDrawer } from './siteRepository/InfoDrawers'
-import { ItalyRegionMap } from './siteRepository/ItalyRegionMap'
+// ─── Dati ────────────────────────────────────────────────────────────────────
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+type Page<T> = { results?: T[]; next?: string | null }
+/** Tutte le pagine di una lista (il backend ne restituisce al massimo 200 alla volta). */
+async function fetchAll<T>(url: string, params: Record<string, unknown>, cap = 2000): Promise<T[]> {
+  const out: T[] = []
+  for (let page = 1; out.length < cap; page++) {
+    const r = await api.get<Page<T>>(url, { params: { ...params, page, page_size: 200 } })
+    out.push(...(r.data.results ?? []))
+    if (!r.data.next) break
+  }
+  return out
+}
+
+const provKey = (c: RepoCustomer) => resolveItalianProvince(c.province)?.sigla ?? ''
+const PRIO_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+type Lookup = { id: number; label: string; key?: string }
+type MenuState =
+  | { kind: 'asset'; row: RepoAsset; x: number; y: number }
+  | { kind: 'site'; row: RepoSite; x: number; y: number }
+  | { kind: 'customer'; row: RepoCustomer; x: number; y: number }
+
+const panelSx = { border: '1px solid', borderColor: 'divider', borderRadius: '10px', bgcolor: 'background.paper' } as const
+const provCols = { display: 'grid', alignItems: 'center', gap: 1.5, gridTemplateColumns: '20px minmax(0,1fr) 70px 56px 60px 76px', '@media (max-width: 760px)': { gridTemplateColumns: '20px minmax(0,1fr) 50px 56px', '& > :nth-of-type(4), & > :nth-of-type(6)': { display: 'none' } } } as const
+const groupTitleSx = { fontSize: 11, fontWeight: 600, color: 'text.disabled', display: 'flex', alignItems: 'center', gap: 0.75 } as const
+const cntSx = { fontSize: 11, fontWeight: 600, color: 'text.secondary', bgcolor: 'archie.neutralBg', borderRadius: '5px', px: 0.75, lineHeight: '18px', fontVariantNumeric: 'tabular-nums' } as const
+
+// ─── Pagina ──────────────────────────────────────────────────────────────────
 
 export default function SiteRepository() {
+  useOwnPageHeader()
   const { hasPerm } = useAuth()
   const toast = useToast()
-  const theme = useTheme()
-  const isPhone = useMediaQuery(theme.breakpoints.down('sm'))
+  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const location = useLocation()
-  const { searchQuery, setSearchQuery, registerHandle, unregisterHandle, setTotals, groupBy, setGroupBy, mapOpen, setMapOpen } = useSiteRepoV2()
+  const tokens = useStatusTokens()
 
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
-  const canChange      = hasPerm(PERMS.inventory.inventory.change)
-  const canDelete      = hasPerm(PERMS.inventory.inventory.delete)
-  const canViewCustomer   = hasPerm(PERMS.crm.customer.view)
-  const canViewSite        = hasPerm(PERMS.crm.site.view)
+  const canChange = hasPerm(PERMS.inventory.inventory.change)
+  const canDelete = hasPerm(PERMS.inventory.inventory.delete)
+  const canAddIssue = hasPerm(PERMS.issues.issue.add)
+  const canViewCustomer = hasPerm(PERMS.crm.customer.view)
   const canChangeCustomer = hasPerm(PERMS.crm.customer.change)
   const canDeleteCustomer = hasPerm(PERMS.crm.customer.delete)
-  const canChangeSite      = hasPerm(PERMS.crm.site.change)
-  const canDeleteSite      = hasPerm(PERMS.crm.site.delete)
-  const canAddIssue        = hasPerm(PERMS.issues.issue.add)
+  const canViewSite = hasPerm(PERMS.crm.site.view)
+  const canChangeSite = hasPerm(PERMS.crm.site.change)
+  const canDeleteSite = hasPerm(PERMS.crm.site.delete)
+  const returnTo = location.pathname + location.search
 
-  // Quick-view Cliente/Sito: drawer di sola lettura aperto senza lasciare la
-  // pagina (i tab Siti/Inventari dei drawer "ufficiali" sarebbero ridondanti
-  // qui, dato che sono già visibili inline).
-  const [customerDrawerOpen, setCustomerDrawerOpen]       = React.useState(false)
-  const [customerDrawerId, setCustomerDrawerId]           = React.useState<number | null>(null)
-  const [customerDrawerDetail, setCustomerDrawerDetail]   = React.useState<CustomerDetail | null>(null)
-  const [customerDrawerLoading, setCustomerDrawerLoading] = React.useState(false)
+  // ── Clienti (tutti: i conteggi per provincia nascono da qui) ──
+  const [customers, setCustomers] = React.useState<RepoCustomer[] | null>(null)
+  const [reloadKey, setReloadKey] = React.useState(0)
+  React.useEffect(() => {
+    let alive = true
+    fetchAll<RepoCustomer>('/customers/', { ordering: 'name' })
+      .then((rows) => { if (alive) setCustomers(rows) })
+      .catch((e) => { if (alive) { setCustomers([]); toast.error(apiErrorToMessage(e)) } })
+    return () => { alive = false }
+  }, [reloadKey, toast])
 
-  const [siteDrawerOpen, setSiteDrawerOpen]       = React.useState(false)
-  const [siteDrawerId, setSiteDrawerId]           = React.useState<number | null>(null)
-  const [siteDrawerDetail, setSiteDrawerDetail]   = React.useState<SiteDetail | null>(null)
-  const [siteDrawerLoading, setSiteDrawerLoading] = React.useState(false)
+  const [vendors, setVendors] = React.useState<Lookup[]>([])
+  const [statuses, setStatuses] = React.useState<Lookup[]>([])
+  const [types, setTypes] = React.useState<Lookup[]>([])
+  React.useEffect(() => {
+    const list = <T,>(d: T[] | Page<T>) => (Array.isArray(d) ? d : d.results ?? [])
+    api.get('/customer-statuses/').then((r) => setVendors(list<Lookup>(r.data))).catch(() => {})
+    Promise.all([api.get('/inventory-statuses/'), api.get('/inventory-types/')])
+      .then(([s, t]) => { setStatuses(list<Lookup>(s.data)); setTypes(list<Lookup>(t.data)) }).catch(() => {})
+  }, [])
+  const vendorOrder = React.useMemo(() => [...vendors].sort((a, b) => a.id - b.id).map((v) => v.label), [vendors])
+  const vendorColor = React.useCallback((l?: string | null) => vendorColorOf(l ?? '', tokens.clientChipPalette, vendorOrder), [tokens.clientChipPalette, vendorOrder])
 
-  const openCustomerDetail = React.useCallback((id: number) => {
-    setCustomerDrawerId(id); setCustomerDrawerOpen(true)
-    setCustomerDrawerLoading(true); setCustomerDrawerDetail(null)
-    api.get(`/customers/${id}/`)
-      .then((res) => setCustomerDrawerDetail(res.data as CustomerDetail))
-      .catch((e: unknown) => toast.error(apiErrorToMessage(e)))
-      .finally(() => setCustomerDrawerLoading(false))
-  }, [toast])
+  // ── Sistemi con issue aperte (riquadro sotto la cartina) ──
+  const [hot, setHot] = React.useState<RepoAsset[] | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    fetchAll<RepoAsset>('/inventories/', { has_active_issue: true, ordering: 'name' }, 400)
+      .then((rows) => { if (alive) setHot(rows) }).catch(() => { if (alive) setHot([]) })
+    return () => { alive = false }
+  }, [reloadKey])
 
-  const openSiteDetail = React.useCallback((id: number) => {
-    setSiteDrawerId(id); setSiteDrawerOpen(true)
-    setSiteDrawerLoading(true); setSiteDrawerDetail(null)
-    api.get(`/sites/${id}/`)
-      .then((res) => setSiteDrawerDetail(res.data as SiteDetail))
-      .catch((e: unknown) => toast.error(apiErrorToMessage(e)))
-      .finally(() => setSiteDrawerLoading(false))
-  }, [toast])
-
-  const closeCustomerDrawer = React.useCallback(() => setCustomerDrawerOpen(false), [])
-  const closeSiteDrawer     = React.useCallback(() => setSiteDrawerOpen(false), [])
-
-  // Deep-link a /customers, /sites, /inventory per la modifica: il form di
-  // modifica è privato di quelle pagine (validazioni, campi custom, dropdown
-  // dipendenti) — riprodurlo qui duplicherebbe centinaia di righe. "return"
-  // riporta su Site Repository alla chiusura del drawer.
-  const editCustomerElsewhere = React.useCallback((id: number) => {
-    navigate(`/customers${buildQuery({ open: id, return: location.pathname + location.search })}`)
-  }, [navigate, location])
-  const editSiteElsewhere = React.useCallback((id: number) => {
-    navigate(`/sites${buildQuery({ open: id, return: location.pathname + location.search })}`)
-  }, [navigate, location])
-  const editInventoryElsewhere = React.useCallback((id: number) => {
-    navigate(`/inventory${buildQuery({ open: id, return: location.pathname + location.search })}`)
-  }, [navigate, location])
-
-  // Export Excel (flat, cliente → siti → inventory) scoped a un solo
-  // cliente: stesso pattern download-via-blob di ServiceNowStats.tsx
-  // (handleExportPdf), qui però innescato dal menu contestuale invece che
-  // da un bottone di pagina (export "singolo cliente", non filtro pagina).
-  const exportCustomerExcel = React.useCallback(async (row: CustomerRow) => {
+  // ── Contenuto dei clienti aperti (siti + asset), caricato al bisogno ──
+  const [content, setContent] = React.useState<Record<number, RepoCustomerContent | null>>({})
+  const loadCustomer = React.useCallback(async (id: number) => {
+    setContent((m) => ({ ...m, [id]: m[id] ?? null }))
     try {
-      const res = await api.get(`/customers/${row.id}/export-site-repository/`, { responseType: 'blob' })
-      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `site_repository_${row.code || row.id}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      const [sites, assets] = await Promise.all([
+        fetchAll<RepoSite>('/sites/', { customer: id, ordering: 'name' }),
+        fetchAll<RepoAsset>('/inventories/', { customer: id, ordering: 'name' }),
+      ])
+      const bySite = new Map<number | null, RepoAsset[]>()
+      assets.forEach((a) => { const k = a.site ?? null; bySite.set(k, [...(bySite.get(k) ?? []), a]) })
+      // Solo i siti con almeno un asset, come nel conteggio "siti" dei clienti.
+      const withAssets = sites.filter((s) => bySite.has(s.id)).map((s) => ({ ...s, assets: bySite.get(s.id)! }))
+      const orphans = bySite.get(null)
+      if (orphans?.length) withAssets.push({ id: -id, customer: id, name: 'Senza sito', assets: orphans })
+      setContent((m) => ({ ...m, [id]: { sites: withAssets } }))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
+      setContent((m) => { const n = { ...m }; delete n[id]; return n })
     }
   }, [toast])
 
-  // Bottone "Contatti" (visibile solo con più di un contatto collegato):
-  // deep-link a /contacts pre-filtrato, stesso pattern "return" delle altre
-  // deep-link di modifica sopra.
-  const openCustomerContacts = React.useCallback((customerId: number) => {
-    navigate(`/contacts${buildQuery({ customer: customerId, return: location.pathname + location.search })}`)
-  }, [navigate, location])
-  const openSiteContacts = React.useCallback((customerId: number, siteId: number) => {
-    navigate(`/contacts${buildQuery({ customer: customerId, site: siteId, return: location.pathname + location.search })}`)
-  }, [navigate, location])
+  // ── Stato della vista ──
+  const [region, setRegion] = React.useState<RegionId | null>(null)
+  const [mapProv, setMapProv] = React.useState<string | null>(null)
+  const [openProv, setOpenProv] = React.useState<Set<string>>(() => new Set())
+  const [openCust, setOpenCust] = React.useState<Set<number>>(() => new Set())
+  const [openSite, setOpenSite] = React.useState<Set<number>>(() => new Set())
+  const toggle = <T,>(set: React.Dispatch<React.SetStateAction<Set<T>>>, k: T, force?: boolean) =>
+    set((s) => { const n = new Set(s); if (force ?? !n.has(k)) n.add(k); else n.delete(k); return n })
 
-  const openIssueFromInventory = React.useCallback((row: InventoryRow, customerName: string) => {
-    navigate('/issues', {
-      state: {
-        createFromInventory: {
-          inventoryId: row.id,
-          inventoryName: row.name || row.hostname || row.knumber || `Inventory #${row.id}`,
-          inventoryKnumber: row.knumber ?? null,
-          inventorySerialNumber: row.serial_number ?? null,
-          inventoryHostname: row.hostname ?? null,
-          customerId: row.customer,
-          customerName,
-          siteId: row.site ?? null,
-        },
-      },
-    })
-  }, [navigate])
+  const toggleCustomer = (id: number) => {
+    const willOpen = !openCust.has(id)
+    toggle(setOpenCust, id)
+    if (willOpen && !(id in content)) void loadCustomer(id)
+  }
+  const toggleProvince = (p: string) => {
+    if (!openProv.has(p)) setMapProv(p || null)
+    toggle(setOpenProv, p)
+  }
 
-  // Menu contestuale (tasto destro) — stesso set di azioni della vecchia
-  // pagina Site Repository (che incorporava le griglie di Clienti/Siti/
-  // Inventari, ciascuna con il proprio menu). "Apri" e "VPN" restano inline;
-  // "Modifica" apre la pagina dedicata (vedi sopra); "Elimina" chiede conferma
-  // e aggiorna la lista qui senza ricaricare tutto.
-  type CtxMenuState =
-    | { kind: 'inventory'; row: InventoryRow; mouseX: number; mouseY: number }
-    | { kind: 'site'; row: SiteRow; mouseX: number; mouseY: number }
-    | { kind: 'customer'; row: CustomerRow; mouseX: number; mouseY: number }
-  const [ctxMenu, setCtxMenu] = React.useState<CtxMenuState | null>(null)
-
-  const handleInventoryContextMenu = React.useCallback((row: InventoryRow, e: React.MouseEvent) => {
-    setCtxMenu({ kind: 'inventory', row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 })
+  // ── Ricerca ──
+  const [q, setQ] = React.useState('')
+  const [dq, setDq] = React.useState('')
+  React.useEffect(() => { const t = window.setTimeout(() => setDq(q.trim()), 250); return () => window.clearTimeout(t) }, [q])
+  const searchRef = React.useRef<HTMLInputElement>(null)
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (e.key !== '/' || t?.closest('input, textarea, select, [contenteditable="true"]')) return
+      e.preventDefault(); searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
-  const handleSiteContextMenu = React.useCallback((row: SiteRow, e: React.MouseEvent) => {
-    setCtxMenu({ kind: 'site', row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 })
-  }, [])
-  const handleCustomerContextMenu = React.useCallback((row: CustomerRow, e: React.MouseEvent) => {
-    setCtxMenu({ kind: 'customer', row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 })
-  }, [])
-  const closeCtxMenu = React.useCallback(() => setCtxMenu(null), [])
-
-  const [customers, setCustomers]               = React.useState<CustomerRow[]>([])
-  const [customersLoading, setCustomersLoading] = React.useState(true)
-
-  // Bump per forzare il refetch dei figli espansi (siti/asset) dopo un delete,
-  // ora che i loro dati non sono più derivati da liste globali in memoria.
-  const [refreshToken, setRefreshToken] = React.useState(0)
-
-  // La ricerca ora gira sul server (?search=), quindi va sfasata rispetto alla
-  // digitazione per non emettere una richiesta per ogni tasto premuto.
-  const [debouncedSearch, setDebouncedSearch] = React.useState(searchQuery)
+  const [found, setFound] = React.useState<{ q: string; assets: RepoAsset[]; sites: (RepoSite & { customer_name?: string })[] } | null>(null)
   React.useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 300)
-    return () => window.clearTimeout(t)
-  }, [searchQuery])
+    if (dq.length < 2) { setFound(null); return }
+    let alive = true
+    Promise.all([
+      api.get<Page<RepoAsset>>('/inventories/', { params: { asset_q: dq, page_size: 50, ordering: 'name' } }),
+      api.get<Page<RepoSite & { customer_name?: string }>>('/sites/', { params: { search: dq, page_size: 30, ordering: 'name' } }),
+    ]).then(([a, s]) => { if (alive) setFound({ q: dq, assets: a.data.results ?? [], sites: s.data.results ?? [] }) })
+      .catch((e) => { if (alive) toast.error(apiErrorToMessage(e)) })
+    return () => { alive = false }
+  }, [dq, toast])
 
-  // Un'unica chiamata: i clienti. I contatori (assets_count, sites_count,
-  // active_issue_count) sono annotati dal backend.
-  //
-  // Prima questa pagina scaricava in parallelo TUTTI gli inventory e TUTTI i
-  // siti (page_size 2000/1000) per contarli e cercarci dentro lato client. Due
-  // problemi: il conteggio era sbagliato non appena i record superavano la
-  // pagina, e la ricerca vedeva solo la porzione scaricata. Ora conteggio e
-  // ricerca li fa il DB, che è l'unico che vede tutti i dati.
-  const loadCustomers = React.useCallback(() => {
-    let cancelled = false
-    setCustomersLoading(true)
-
-    api.get('/customers/', {
-      params: {
-        page_size: 200,
-        ordering: 'name',
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
-      },
-    })
-      .then((custRes) => {
-        if (cancelled) return
-        setCustomers(custRes.data?.results ?? [])
-      })
-      .catch((e: unknown) => { if (!cancelled) toast.error(apiErrorToMessage(e)) })
-      .finally(() => { if (!cancelled) setCustomersLoading(false) })
-
-    return () => { cancelled = true }
-  }, [debouncedSearch, toast])
-
-  React.useEffect(() => loadCustomers(), [loadCustomers])
-
-  const [deleteTarget, setDeleteTarget] = React.useState<CtxMenuState | null>(null)
-  const [deleteRowBusy, setDeleteRowBusy] = React.useState(false)
-
-  const confirmDeleteRow = React.useCallback(async () => {
-    if (!deleteTarget) return
-    setDeleteRowBusy(true)
-    try {
-      if (deleteTarget.kind === 'inventory') {
-        await api.delete(`/inventories/${deleteTarget.row.id}/`)
-        toast.success('Asset eliminato.')
-        // Refetch clienti (aggiorna assets_count) + forza il refetch delle tab
-        // espanse, che non condividono più una lista globale.
-        loadCustomers()
-        setRefreshToken((t) => t + 1)
-      } else if (deleteTarget.kind === 'site') {
-        await api.delete(`/sites/${deleteTarget.row.id}/`)
-        toast.success('Sito eliminato.')
-        loadCustomers()
-        setRefreshToken((t) => t + 1)
-      } else {
-        await api.delete(`/customers/${deleteTarget.row.id}/`)
-        setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.row.id))
-        toast.success('Cliente eliminato.')
-      }
-      setDeleteTarget(null)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleteRowBusy(false)
-    }
-  }, [deleteTarget, toast, loadCustomers])
-
-  // Nessun controllo UI espone ancora un filtro di stato: il valore è fisso
-  // su 'all' e passato così com'è ai componenti figli che lo richiedono.
-  const statusFilter = 'all' as const
-
-  // Contatori letti dalle annotazioni del backend (niente più derivazione da
-  // liste in memoria).
-  const counts = React.useMemo(() => {
-    const map: Record<number, { assets: number | null; sites: number | null }> = {}
-    customers.forEach((c) => {
-      // "sites" alimenta il badge "siti": deve contare solo i siti con asset
-      // collegati, coerentemente con i siti effettivamente visibili nella tab
-      // (SitesWithInventoryTab nasconde i siti senza asset).
-      map[c.id] = { assets: c.assets_count ?? 0, sites: c.sites_with_assets_count ?? 0 }
-    })
-    return map
+  // ── Aggregati ──
+  const byId = React.useMemo(() => new Map((customers ?? []).map((c) => [c.id, c])), [customers])
+  const provinces = React.useMemo(() => {
+    const m = new Map<string, RepoCustomer[]>()
+    ;(customers ?? []).forEach((c) => { const k = provKey(c); m.set(k, [...(m.get(k) ?? []), c]) })
+    return m
   }, [customers])
-
-  // Badge "segnale": numero di asset del cliente con almeno una issue attiva.
-  const issueCountsByCustomer = React.useMemo(() => {
-    const map: Record<number, number> = {}
-    customers.forEach((c) => {
-      if (c.active_issue_count) map[c.id] = c.active_issue_count
-    })
-    return map
-  }, [customers])
-
-  const locationGroups = React.useMemo<LocationGroup[]>(() => {
-    const noValueLabel = groupBy === 'province' ? 'Senza provincia' : 'Senza città'
-    const map = new Map<string, CustomerRow[]>()
-    customers.forEach((c) => {
-      const label = groupBy === 'province' ? normalizeProvince(c.province) : normalizeCity(c.city)
-      if (!map.has(label)) map.set(label, [])
-      map.get(label)!.push(c)
-    })
-    return Array.from(map.entries())
-      .map(([label, custs]) => ({
-        label,
-        customers: custs,
-        // Somma delle issue attive di tutti i clienti del gruppo
-        issueCount: custs.reduce((sum, c) => sum + (issueCountsByCustomer[c.id] ?? 0), 0),
-      }))
-      .sort((a, b) => {
-        if (a.label === noValueLabel) return 1
-        if (b.label === noValueLabel) return -1
-        return a.label.localeCompare(b.label, 'it')
-      })
-  }, [customers, issueCountsByCustomer, groupBy])
-
-  // Refs per Comprimi / Espandi tutto
-  const sectionRefs = React.useRef<Map<string, ProvinceSectionHandle>>(new Map())
-
-  // Cartina Italia (ItalyRegionMap): dopo la selezione di una provincia si
-  // aspetta che locationGroups (ri)includa quella provincia — serve quando si
-  // passa da groupBy 'città' a 'provincia' nello stesso click — prima di
-  // aprire/scrollare la sezione corrispondente.
-  const [pendingProvinceScroll, setPendingProvinceScroll] = React.useState<string | null>(null)
-
-  const provinceCounts = React.useMemo(() => {
-    const map: Record<string, number> = {}
-    customers.forEach((c) => {
-      const resolved = resolveItalianProvince(c.province)
-      if (!resolved) return
-      map[resolved.sigla] = (map[resolved.sigla] ?? 0) + 1
-    })
-    return map
-  }, [customers])
-
-  const handleSelectProvinceFromMap = React.useCallback((sigla: string) => {
-    setMapOpen(false)
-    if (groupBy !== 'province') setGroupBy('province')
-    setPendingProvinceScroll(normalizeProvince(sigla))
-  }, [groupBy, setGroupBy, setMapOpen])
-
-  React.useEffect(() => {
-    if (!pendingProvinceScroll) return
-    const handle = sectionRefs.current.get(pendingProvinceScroll)
-    if (handle) {
-      handle.open()
-      handle.scrollIntoView()
-      setPendingProvinceScroll(null)
-    }
-  }, [pendingProvinceScroll, locationGroups])
-
-  // Registra handle nel context (per toolbar in AppLayout)
-  React.useEffect(() => {
-    const h: SiteRepoV2Handle = {
-      collapseAll: () => sectionRefs.current.forEach((ref) => ref.close()),
-      expandAll:   () => sectionRefs.current.forEach((ref) => ref.open()),
-    }
-    registerHandle(h)
-    return () => unregisterHandle()
-  }, [registerHandle, unregisterHandle])
-
-  // Aggiorna contatori nella toolbar
-  React.useEffect(() => {
-    setTotals(customers.length, locationGroups.length)
-  }, [customers.length, locationGroups.length, setTotals])
-
-  // VPN modal
-  const [vpnModalOpen, setVpnModalOpen] = React.useState(false)
-  const [vpnModalCustomer, setVpnModalCustomer] = React.useState<CustomerRow | null>(null)
-  const openVpnModal = React.useCallback((c: CustomerRow) => { setVpnModalCustomer(c); setVpnModalOpen(true) }, [])
-
-  const [drawerOpen, setDrawerOpen]       = React.useState(false)
-  const [selectedId, setSelectedId]       = React.useState<number | null>(null)
-  const [detail, setDetail]               = React.useState<InventoryDetail | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTypeKeyHint, setDrawerTypeKeyHint] = React.useState<string | null>(null)
-  const [drawerTab, setDrawerTab]         = React.useState(0)
-  const [deleteBusy, setDeleteBusy]       = React.useState(false)
-  const [restoreBusy, setRestoreBusy]     = React.useState(false)
-
-  const openDrawer = React.useCallback(async (id: number, typeKeyHint?: string | null) => {
-    setSelectedId(id); setDrawerTab(0); setDrawerOpen(true)
-    setDrawerTypeKeyHint(typeKeyHint ?? null)
-    setDetailLoading(true); setDetail(null)
-    try {
-      const res = await api.get(`/inventories/${id}/`)
-      setDetail(res.data as InventoryDetail)
-    } catch (e) { toast.error(apiErrorToMessage(e)) }
-    finally    { setDetailLoading(false) }
-  }, [toast])
-
-  const closeDrawer   = React.useCallback(() => setDrawerOpen(false), [])
-  const handleEdit    = React.useCallback(() => {
-    if (selectedId) editInventoryElsewhere(selectedId)
-  }, [selectedId, editInventoryElsewhere])
-
-  const handleDelete = React.useCallback(async () => {
-    if (!selectedId) return
-    setDeleteBusy(true)
-    try { await api.delete(`/inventories/${selectedId}/`); toast.success('Asset eliminato.'); closeDrawer() }
-    catch (e) { toast.error(apiErrorToMessage(e)) }
-    finally   { setDeleteBusy(false) }
-  }, [selectedId, closeDrawer, toast])
-
-  const handleRestore = React.useCallback(async () => {
-    if (!selectedId) return
-    setRestoreBusy(true)
-    try { await api.post(`/inventories/${selectedId}/restore/`); toast.success('Asset ripristinato.'); closeDrawer() }
-    catch (e) { toast.error(apiErrorToMessage(e)) }
-    finally   { setRestoreBusy(false) }
-  }, [selectedId, closeDrawer, toast])
-
-  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
-    if (!ctxMenu) return []
-
-    if (ctxMenu.kind === 'inventory') {
-      const row = ctxMenu.row
-      const items: RowContextMenuItem[] = [
-        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
-      ]
-      if (canChange) items.push({ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => editInventoryElsewhere(row.id) })
-      if (canAddIssue) items.push({
-        key: 'open-issue', label: 'Apri issue', icon: <ConfirmationNumberOutlinedIcon fontSize="small" />,
-        onClick: () => {
-          const cust = customers.find((c) => c.id === row.customer)
-          openIssueFromInventory(row, cust?.display_name || cust?.name || `Cliente #${row.customer}`)
-        },
-      })
-      if (canDelete) items.push({ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(ctxMenu), tone: 'danger' })
-      return items
-    }
-
-    if (ctxMenu.kind === 'site') {
-      const row = ctxMenu.row
-      const items: RowContextMenuItem[] = []
-      if (canViewSite) items.push({ key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openSiteDetail(row.id) })
-      if (canChangeSite) items.push({ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => editSiteElsewhere(row.id) })
-      if (canDeleteSite) items.push({ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(ctxMenu), tone: 'danger' })
-      return items
-    }
-
-    // customer
-    const row = ctxMenu.row
-    const items: RowContextMenuItem[] = []
-    if (canViewCustomer) items.push({ key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openCustomerDetail(row.id) })
-    if (canChangeCustomer) items.push({ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => editCustomerElsewhere(row.id) })
-    // Stesso permesso di "Apri": l'export espone gli stessi dati visibili in-app.
-    if (canViewCustomer) items.push({ key: 'export-excel', label: 'Esporta Excel', icon: <GridOnOutlinedIcon fontSize="small" />, onClick: () => exportCustomerExcel(row) })
-    if (row.has_vpn) items.push({ key: 'vpn', label: 'VPN', icon: <VpnLockIcon fontSize="small" sx={{ color: 'primary.main' }} />, onClick: () => openVpnModal(row), badge: 'configurata', badgeTone: 'success' })
-    if (canDeleteCustomer) items.push({ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(ctxMenu), tone: 'danger' })
-    return items
-  }, [
-    ctxMenu, canChange, canDelete, canAddIssue, canViewSite, canChangeSite, canDeleteSite,
-    canViewCustomer, canChangeCustomer, canDeleteCustomer, customers,
-    openDrawer, editInventoryElsewhere, openIssueFromInventory,
-    openSiteDetail, editSiteElsewhere, openCustomerDetail, editCustomerElsewhere, openVpnModal, exportCustomerExcel,
-  ])
-
-  const deleteDialogCopy = React.useMemo(() => {
-    if (!deleteTarget) return { title: 'Confermi eliminazione?', description: undefined as string | undefined }
-    if (deleteTarget.kind === 'inventory') return {
-      title: 'Confermi eliminazione?',
-      description: 'L’asset verrà spostato nel cestino e potrà essere ripristinato dalla pagina Inventari.',
-    }
-    if (deleteTarget.kind === 'site') return {
-      title: 'Confermi eliminazione del sito?',
-      description: 'Il sito verrà spostato nel cestino e potrà essere ripristinato dalla pagina Siti.',
-    }
+  const assetCounts = React.useMemo(() => {
+    const m: Record<string, number> = {}
+    provinces.forEach((cs, k) => { if (k) m[k] = cs.reduce((n, c) => n + (c.assets_count ?? 0), 0) })
+    return m
+  }, [provinces])
+  const totals = React.useMemo(() => {
+    const cs = customers ?? []
     return {
-      title: 'Confermi eliminazione del cliente?',
-      description: 'Il cliente verrà spostato nel cestino e potrà essere ripristinato dalla pagina Clienti.',
+      customers: cs.length,
+      sites: cs.reduce((n, c) => n + (c.sites_with_assets_count ?? 0), 0),
+      assets: cs.reduce((n, c) => n + (c.assets_count ?? 0), 0),
+      provinces: [...provinces.keys()].filter(Boolean).length,
     }
-  }, [deleteTarget])
+  }, [customers, provinces])
+  const list = React.useMemo(() => {
+    const ks = [...provinces.keys()].filter((k) => k && (!region || regionOf(k) === region))
+      .sort((a, b) => (PROVINCE_NAME[a] ?? a).localeCompare(PROVINCE_NAME[b] ?? b, 'it'))
+    if (!region && provinces.has('')) ks.push('')
+    return ks
+  }, [provinces, region])
+  const provStats = (k: string) => {
+    const cs = provinces.get(k) ?? []
+    return {
+      cs, sites: cs.reduce((n, c) => n + (c.sites_with_assets_count ?? 0), 0),
+      assets: cs.reduce((n, c) => n + (c.assets_count ?? 0), 0),
+      issues: cs.reduce((n, c) => n + (c.active_issue_count ?? 0), 0),
+    }
+  }
+  const hotHere = React.useMemo(() => (hot ?? [])
+    .filter((a) => !region || regionOf(provKey(byId.get(a.customer) ?? ({} as RepoCustomer))) === region)
+    .sort((x, y) => (PRIO_ORDER[y.active_issue_priority ?? ''] ?? 0) - (PRIO_ORDER[x.active_issue_priority ?? ''] ?? 0) || x.name.localeCompare(y.name, 'it')),
+  [hot, region, byId])
+  const [hotAll, setHotAll] = React.useState(false)
+
+  // ── Navigazione dalla cartina e dai risultati ──
+  const listRef = React.useRef<HTMLDivElement>(null)
+  const scrollToProv = (p: string) => window.setTimeout(() => listRef.current?.querySelector(`[data-prov="${p}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50)
+  const pickProvince = (p: string) => { setMapProv(p); setRegion(regionOf(p) ?? region); toggle(setOpenProv, p, true); scrollToProv(p) }
+  const reveal = (customerId: number, siteId?: number | null) => {
+    const c = byId.get(customerId)
+    if (!c) return
+    const p = provKey(c)
+    setQ(''); setDq('')
+    setRegion(p ? regionOf(p) : null); setMapProv(p || null)
+    toggle(setOpenProv, p, true); toggle(setOpenCust, customerId, true)
+    if (siteId) toggle(setOpenSite, siteId, true)
+    if (!(customerId in content)) void loadCustomer(customerId)
+    scrollToProv(p)
+  }
+
+  // ── Pannello dell'asset ──
+  const [selectedId, setSelectedId] = React.useState<number | null>(null)
+  const [detail, setDetail] = React.useState<InventoryCardDetail | null>(null)
+  const [detailLoading, setDetailLoading] = React.useState(false)
+  const [tab, setTab] = React.useState<InventoryTab>('det')
+  const loadDetail = React.useCallback(async (id: number) => {
+    setDetailLoading(true)
+    try { const r = await api.get<InventoryCardDetail>(`/inventories/${id}/`); setDetail(r.data) }
+    catch (e) { toast.error(apiErrorToMessage(e)); setDetail(null) }
+    finally { setDetailLoading(false) }
+  }, [toast])
+  const openAsset = (a: RepoAsset | number) => {
+    const id = typeof a === 'number' ? a : a.id
+    if (id !== selectedId) { setTab('det'); setDetail(null) }
+    setSelectedId(id)
+    void loadDetail(id)
+  }
+  const closeAsset = React.useCallback(() => { setSelectedId(null); setDetail(null) }, [])
+  const refreshCustomer = (cid: number) => { if (cid in content) void loadCustomer(cid); setReloadKey((k) => k + 1) }
+
+  const patchAsset = async (patch: InventoryPatch, label: string) => {
+    if (!detail) return
+    const { id, customer } = detail
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
+    try {
+      await api.patch(`/inventories/${id}/`, patch)
+      await loadDetail(id)
+      refreshCustomer(customer)
+      undoToast.show(`${label} · salvato`, async () => {
+        try { await api.patch(`/inventories/${id}/`, prev); await loadDetail(id); refreshCustomer(customer) }
+        catch (e) { toast.error(apiErrorToMessage(e)) }
+      })
+    } catch (e) { toast.error(apiErrorToFormFeedback(e).message) }
+  }
+
+  const openIssueFor = (a: { id: number; name: string; hostname?: string | null; knumber?: string | null; serial_number?: string | null; customer: number; customer_name?: string; site?: number | null }) => {
+    navigate('/issues', { state: { createFromInventory: {
+      inventoryId: a.id, inventoryName: a.name || a.hostname || a.knumber || `Inventario #${a.id}`,
+      inventoryKnumber: a.knumber ?? null, inventorySerialNumber: a.serial_number ?? null, inventoryHostname: a.hostname ?? null,
+      customerId: a.customer, customerName: a.customer_name || byId.get(a.customer)?.display_name || `Cliente #${a.customer}`, siteId: a.site ?? null,
+    } } })
+  }
+
+  // ── Azioni su cliente, sito e asset ──
+  const [vpn, setVpn] = React.useState<RepoCustomer | null>(null)
+  const exportCustomer = async (c: RepoCustomer) => {
+    try {
+      const res = await api.get(`/customers/${c.id}/export-site-repository/`, { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+      const a = document.createElement('a'); a.href = url; a.download = `site_repository_${c.code || c.id}.xlsx`
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }
+  const goCustomer = (id: number) => navigate(`/customers${buildQuery({ open: id, return: returnTo })}`)
+  const goSite = (id: number) => navigate(`/sites${buildQuery({ open: id, return: returnTo })}`)
+  const goInventory = (id: number) => navigate(`/inventory${buildQuery({ open: id, return: returnTo })}`)
+
+  const [menu, setMenu] = React.useState<MenuState | null>(null)
+  const [del, setDel] = React.useState<MenuState | null>(null)
+  const [delBusy, setDelBusy] = React.useState(false)
+  const menuItems = React.useMemo<RowContextMenuItem[]>(() => {
+    if (!menu) return []
+    if (menu.kind === 'asset') {
+      const a = menu.row
+      return [
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openAsset(a) },
+        ...(canChange ? [{ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => goInventory(a.id) }] : []),
+        ...(canAddIssue ? [{ key: 'issue', label: 'Nuova issue', icon: <ConfirmationNumberOutlinedIcon fontSize="small" />, onClick: () => openIssueFor(a) }] : []),
+        ...(a.hostname ? [{ key: 'host', label: "Copia l'hostname", icon: <CampoIcon name="copy" />, onClick: async () => { await copyToClipboard(a.hostname!); toast.success('Copiato') } }] : []),
+        ...(a.local_ip ? [{ key: 'ip', label: "Copia l'IP locale", icon: <CampoIcon name="copy" />, onClick: async () => { await copyToClipboard(a.local_ip!); toast.success('Copiato') } }] : []),
+        ...(canDelete ? [{ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDel(menu), tone: 'danger' as const }] : []),
+      ]
+    }
+    if (menu.kind === 'site') {
+      const s = menu.row
+      return [
+        ...(canViewSite ? [{ key: 'open', label: 'Apri la scheda', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => goSite(s.id) }] : []),
+        ...(canChangeSite ? [{ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => goSite(s.id) }] : []),
+        ...(canDeleteSite ? [{ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDel(menu), tone: 'danger' as const }] : []),
+      ]
+    }
+    const c = menu.row
+    return [
+      ...(canViewCustomer ? [{ key: 'open', label: 'Apri la scheda', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => goCustomer(c.id) }] : []),
+      ...(canChangeCustomer ? [{ key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => goCustomer(c.id) }] : []),
+      ...(canViewCustomer ? [{ key: 'xls', label: 'Esporta Excel', icon: <GridOnOutlinedIcon fontSize="small" />, onClick: () => void exportCustomer(c) }] : []),
+      ...(c.has_vpn ? [{ key: 'vpn', label: 'VPN', icon: <VpnLockIcon fontSize="small" sx={{ color: 'primary.main' }} />, onClick: () => setVpn(c), badge: 'configurata', badgeTone: 'success' as const }] : []),
+      ...(canDeleteCustomer ? [{ key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDel(menu), tone: 'danger' as const }] : []),
+    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu, canChange, canDelete, canAddIssue, canViewSite, canChangeSite, canDeleteSite, canViewCustomer, canChangeCustomer, canDeleteCustomer])
+
+  const confirmDelete = async () => {
+    if (!del) return
+    setDelBusy(true)
+    try {
+      if (del.kind === 'asset') { await api.delete(`/inventories/${del.row.id}/`); toast.success('Asset spostato nel cestino'); if (selectedId === del.row.id) closeAsset(); refreshCustomer(del.row.customer) }
+      else if (del.kind === 'site') { await api.delete(`/sites/${del.row.id}/`); toast.success('Sito spostato nel cestino'); refreshCustomer(del.row.customer) }
+      else { await api.delete(`/customers/${del.row.id}/`); toast.success('Cliente spostato nel cestino'); setReloadKey((k) => k + 1) }
+      setDel(null)
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+    finally { setDelBusy(false) }
+  }
+  const deleteCopy = !del ? { title: '', description: '' }
+    : del.kind === 'asset' ? { title: "Eliminare l'asset?", description: "L'asset va nel cestino e si può ripristinare dalla pagina Inventari." }
+    : del.kind === 'site' ? { title: 'Eliminare il sito?', description: 'Il sito va nel cestino e si può ripristinare dalla pagina Siti.' }
+    : { title: 'Eliminare il cliente?', description: 'Il cliente va nel cestino e si può ripristinare dalla pagina Clienti.' }
+
+  const openMenu = (kind: MenuState['kind']) => (row: RepoAsset | RepoSite | RepoCustomer, e: React.MouseEvent) =>
+    setMenu({ kind, row, x: e.clientX + 2, y: e.clientY - 6 } as MenuState)
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  const searching = q.trim().length >= 2
+  const meta = customers ? (
+    <><b>{totals.customers}</b> clienti · <b>{totals.sites}</b> siti · <b>{totals.assets}</b> asset in <b>{totals.provinces}</b> province</>
+  ) : null
 
   return (
-    <Stack spacing={2}>
-      {customersLoading? (
-        <Stack spacing={2}>
-          {[1, 2, 3].map((i) => (
-            <Box key={i} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 2 }}>
-              <Skeleton width={200} height={28} />
-              <Stack spacing={1} sx={{ mt: 1.5 }}>
-                {[1, 2].map((j) => <Skeleton key={j} height={52} />)}
-              </Stack>
-            </Box>
-          ))}
-        </Stack>
-      ) : locationGroups.length === 0 ? (
-        <Box sx={{
-          border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper',
-          px: 3, py: 4, textAlign: 'center',
-        }}>
-          <SearchOffOutlinedIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 1 }} />
-          {searchQuery.trim() ? (
-            <>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                Nessun risultato per “{searchQuery.trim()}”
-              </Typography>
-              <Typography sx={{ fontSize: '0.8125rem', color: 'grey.700', mt: 0.5, maxWidth: '60ch', mx: 'auto' }}>
-                La ricerca guarda nome e codice del cliente, siti, hostname, IP, K# e seriale degli asset.
-                Prova con una parte del nome o dell'indirizzo IP.
-              </Typography>
-              <Button variant="outlined" size="small" sx={{ mt: 2 }} onClick={() => setSearchQuery('')}>
-                Cancella ricerca
-              </Button>
-            </>
-          ) : (
-            <>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>Nessun cliente</Typography>
-              <Typography sx={{ fontSize: '0.8125rem', color: 'grey.700', mt: 0.5 }}>
-                Quando ci saranno clienti, qui li troverai raggruppati per provincia con siti e asset.
-              </Typography>
-            </>
-          )}
+    <Box sx={{ pb: 2 }}>
+      {/* Testata: titolo e conteggi, ricerca sulla stessa riga */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'grid', gap: '2px', flex: 'none' }}>
+          <Typography variant="h4" component="h1">Site Repository</Typography>
+          <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary', minHeight: 18, '& b': { color: 'text.primary', fontWeight: 600, fontVariantNumeric: 'tabular-nums' } }}>{meta}</Typography>
         </Box>
+        <Box component="label" sx={{
+          flex: '1 1 360px', maxWidth: 560, ml: { md: 1 }, display: 'flex', alignItems: 'center', gap: 1, height: 38, px: 1.25,
+          border: '1px solid', borderColor: 'archie.borderStrong', borderRadius: '8px', bgcolor: 'background.paper', color: 'text.secondary',
+          '&:focus-within': { borderColor: 'primary.main', boxShadow: (t) => t.palette.archie.focusRing },
+        }}>
+          <CampoIcon name="search" size={16} />
+          <InputBase inputRef={searchRef} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca hostname, IP, K-Number, seriale, cliente o sito"
+            inputProps={{ 'aria-label': 'Cerca nel repository' }} sx={{ flex: 1, fontSize: 13, '& input::placeholder': { color: 'text.disabled', opacity: 1 } }}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); (e.target as HTMLInputElement).blur() } }} />
+          <Box component="kbd" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 11, px: 0.625, borderRadius: '4px', border: '1px solid', borderColor: 'divider', color: 'text.disabled' }}>/</Box>
+        </Box>
+      </Box>
+
+      {searching ? (
+        <SearchResults q={q.trim()} found={found} customers={customers ?? []} selectedId={selectedId} vendorColor={vendorColor}
+          onOpenAsset={openAsset} onReveal={reveal} onClear={() => setQ('')} onAssetMenu={openMenu('asset')} />
       ) : (
-        <Stack spacing={0} sx={{ gap: 0 }}>
-          {locationGroups.map((group) => (
-            <ProvinceSection
-              key={group.label}
-              group={group}
-              searchQuery={searchQuery}
-              statusFilter={statusFilter}
-              counts={counts}
-              issueCounts={issueCountsByCustomer}
-              onOpenDrawer={openDrawer}
-              onOpenVpn={openVpnModal}
-              onOpenCustomer={openCustomerDetail}
-              onOpenSite={openSiteDetail}
-              onOpenCustomerContacts={openCustomerContacts}
-              onOpenSiteContacts={openSiteContacts}
-              canViewCustomer={canViewCustomer}
-              canViewSite={canViewSite}
-              canChangeSite={canChangeSite}
-              onEditSite={editSiteElsewhere}
-              onCustomerContextMenu={handleCustomerContextMenu}
-              onSiteContextMenu={handleSiteContextMenu}
-              onInventoryContextMenu={handleInventoryContextMenu}
-              refreshToken={refreshToken}
-              ref={(el) => {
-                if (el) sectionRefs.current.set(group.label, el)
-                else sectionRefs.current.delete(group.label)
-              }}
-            />
-          ))}
-        </Stack>
-      )}
-
-      {/* VPN Modal */}
-      {vpnModalCustomer && (
-        <VpnModal
-          open={vpnModalOpen}
-          onClose={() => setVpnModalOpen(false)}
-          customerId={vpnModalCustomer.id}
-          customerName={vpnModalCustomer.display_name || vpnModalCustomer.name}
-        />
-      )}
-
-      {/* Cartina Italia per regione — naviga regione → provincia → apre/scrolla
-          la sezione provincia corrispondente (passando a groupBy 'provincia'
-          se necessario). */}
-      <Dialog open={mapOpen} onClose={() => setMapOpen(false)} maxWidth="sm" fullWidth fullScreen={isPhone}>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <MapOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-            <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>Naviga per regione</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '320px minmax(0,1fr)' }, gap: 1.5, alignItems: 'start' }}>
+          {/* Sinistra: cartina e sistemi con issue aperte */}
+          <Box component="aside" sx={{ ...panelSx, p: 1.5, display: 'grid', gap: 1.25, position: { lg: 'sticky' }, top: { lg: 0 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 28, fontSize: 13 }}>
+              {region ? (
+                <>
+                  <ButtonBase onClick={() => { setRegion(null); setMapProv(null) }} sx={[{ height: 26, pl: 0.5, pr: 1, gap: '2px', borderRadius: '6px', border: '1px solid', borderColor: 'divider', fontSize: 12, color: 'text.secondary', '&:hover': { bgcolor: 'archie.surface2' } }, focusInset]}>
+                    <CampoIcon name="chevL" size={14} />Italia
+                  </ButtonBase>
+                  <b>{REGION_NAME[region]}</b>
+                </>
+              ) : <><b>Italia</b><Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>scegli una regione</Typography></>}
+            </Box>
+            <Box sx={{ px: 1, py: 0.5, borderRadius: '8px', bgcolor: 'archie.surface2' }}>
+              {customers ? <RepoMap counts={assetCounts} region={region} selectedProvince={mapProv} onRegion={(r) => { setRegion(r); setMapProv(null) }} onProvince={pickProvince} />
+                : <Skeleton variant="rounded" height={300} />}
+            </Box>
+            <Box aria-hidden sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 11, color: 'text.secondary', px: '2px' }}>
+              <span>meno asset</span>
+              <Box sx={(t) => ({ flex: 1, height: 6, borderRadius: '3px', background: `linear-gradient(90deg, color-mix(in oklab, ${t.palette.primary.main} 18%, ${t.palette.archie.surface2}), ${t.palette.primary.main})` })} />
+              <span>più asset</span>
+            </Box>
+            <Box sx={{ display: 'grid', gap: '1px', borderTop: '1px solid', borderColor: 'divider', pt: 0.5 }}>
+              <Typography component="h2" sx={{ ...groupTitleSx, p: '8px 4px 2px' }}>
+                Sistemi con issue aperte · {region ? REGION_NAME[region] : 'Italia'} <Box component="span" sx={cntSx}>{hot ? hotHere.length : '…'}</Box>
+              </Typography>
+              {!hot ? <Box sx={{ py: 2, display: 'grid', placeItems: 'center' }}><CircularProgress size={16} /></Box>
+                : hotHere.length ? (
+                  <>
+                    {(hotAll ? hotHere : hotHere.slice(0, 6)).map((a) => {
+                      const c = byId.get(a.customer)
+                      return (
+                        <ButtonBase key={a.id} onClick={() => openAsset(a)} sx={[{
+                          display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto', gap: 1, alignItems: 'center', minHeight: 42, px: 1, py: 0.5,
+                          borderRadius: '6px', border: '1px solid transparent', textAlign: 'left', '&:hover': { bgcolor: 'archie.surface2' },
+                          ...(a.id === selectedId && { bgcolor: 'archie.field', borderColor: 'archie.fieldLine' }),
+                        }, focusInset]}>
+                          <AssetTypeIcon typeKey={a.type_key} label={a.type_label} />
+                          <NameCell title={<><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</Box><PrioMark priority={a.active_issue_priority} /></>}
+                            sub={[a.customer_name || c?.display_name, a.site_display_name || a.site_name].filter(Boolean).join(' › ')} />
+                          <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>{c ? provKey(c) : ''}</Box>
+                        </ButtonBase>
+                      )
+                    })}
+                    {hotHere.length > 6 ? (
+                      <ButtonBase onClick={() => setHotAll((v) => !v)} sx={[{ justifyContent: 'flex-start', px: 1, py: 0.75, borderRadius: '6px', fontSize: 12, fontWeight: 550, color: 'primary.main', '&:hover': { textDecoration: 'underline' } }, focusInset]}>
+                        {hotAll ? 'Mostra meno' : `Mostra tutti (${hotHere.length})`}
+                      </ButtonBase>
+                    ) : null}
+                  </>
+                ) : <Typography sx={{ m: 0.5, fontSize: 12, color: 'text.secondary' }}>Nessuna issue aperta sui sistemi di questo territorio.</Typography>}
+            </Box>
           </Box>
-          <IconButton size="small" onClick={() => setMapOpen(false)} aria-label="Chiudi">
-            <CloseRoundedIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <ItalyRegionMap provinceCounts={provinceCounts} onSelectProvince={handleSelectProvinceFromMap} />
-        </DialogContent>
-      </Dialog>
 
-      <InventoryDrawer
-        open={drawerOpen}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        typeKeyHint={drawerTypeKeyHint}
-        canViewSecrets={canViewSecrets}
-        canChange={canChange}
-        canDelete={canDelete}
-        drawerTab={drawerTab}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        onClose={closeDrawer}
-        onTabChange={setDrawerTab}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onRestore={handleRestore}
-      />
+          {/* Destra: province in ordine alfabetico, si aprono sul posto */}
+          <Box sx={{ display: 'grid', gap: 1.25, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, px: '2px', pt: 0.5, flexWrap: 'wrap' }}>
+              <Box>
+                <Typography component="h2" sx={{ fontSize: 18, fontWeight: 650, letterSpacing: '-.01em' }}>{region ? `Province · ${REGION_NAME[region]}` : 'Tutte le province'}</Typography>
+                <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{list.filter(Boolean).length} province con clienti, in ordine alfabetico · clic per vedere i clienti</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                {openProv.size ? <Button size="small" variant="text" onClick={() => { setOpenProv(new Set()); setOpenCust(new Set()); setOpenSite(new Set()) }}>Chiudi tutte</Button> : null}
+                {region ? <Button size="small" variant="text" onClick={() => { setRegion(null); setMapProv(null) }}>Mostra tutte</Button> : null}
+              </Box>
+            </Box>
 
-      <CustomerInfoDrawer
-        open={customerDrawerOpen}
-        detail={customerDrawerDetail}
-        detailLoading={customerDrawerLoading}
-        selectedId={customerDrawerId}
-        onClose={closeCustomerDrawer}
-      />
+            <Box ref={listRef} sx={{ ...panelSx, overflow: 'hidden' }}>
+              <Box aria-hidden sx={{ ...provCols, minHeight: 34, px: 1.75, bgcolor: 'archie.surface2', borderBottom: '1px solid', borderColor: 'divider', fontSize: 12, fontWeight: 550, color: 'text.secondary', '& > :nth-of-type(n+3)': { textAlign: 'right' } }}>
+                <span /><span>Provincia</span><span>Clienti</span><span>Siti</span><span>Asset</span><span>Con issue</span>
+              </Box>
+              {!customers ? [0, 1, 2, 3].map((i) => <Box key={i} sx={{ px: 1.75, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Skeleton width="40%" /><Skeleton width="20%" /></Box>)
+                : !list.length ? <Typography sx={{ p: 3, fontSize: 13, color: 'text.secondary' }}>Nessun cliente in questo territorio.</Typography>
+                : list.map((p) => {
+                  const st = provStats(p)
+                  const open = openProv.has(p)
+                  return (
+                    <Box key={p || '-'} data-prov={p} sx={{ borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 0 }, scrollMarginTop: 12 }}>
+                      <ButtonBase onClick={() => toggleProvince(p)} aria-expanded={open} sx={[provCols, {
+                        width: '100%', minHeight: 52, px: 1.75, py: 0.75, textAlign: 'left', '&:hover': { bgcolor: 'archie.surface2' }, ...(open && { bgcolor: 'archie.surface2' }),
+                      }, focusInset]}>
+                        <Chevron open={open} />
+                        <NameCell titleSx={open ? { color: 'primary.main' } : undefined}
+                          title={p ? <>{PROVINCE_NAME[p] ?? p} <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>{p}</Box></> : <i>Senza provincia</i>}
+                          sub={p ? REGION_NAME[regionOf(p) ?? ''] ?? '' : 'clienti senza provincia in anagrafica'} />
+                        <Box component="span" sx={numSx}>{st.cs.length}</Box>
+                        <Box component="span" sx={numSx}>{st.sites}</Box>
+                        <Box component="span" sx={numSx}>{st.assets}</Box>
+                        <Box component="span" sx={numSx}>{st.issues ? <Box component="span" sx={{ color: 'info.main', fontWeight: 600 }}>{st.issues}</Box> : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>}</Box>
+                      </ButtonBase>
+                      {open ? (
+                        <Box sx={{ display: 'grid', gap: 1, pt: 0.5, pr: 1.5, pb: 1.5, pl: { xs: 1, sm: 4.25 }, bgcolor: 'archie.surface2' }}>
+                          {st.cs.map((c) => (
+                            <CustomerBlock key={c.id} c={c} vendorColor={vendorColor(c.status_label)} open={openCust.has(c.id)} onToggle={() => toggleCustomer(c.id)}
+                              content={content[c.id]} openSites={openSite} onToggleSite={(id) => toggle(setOpenSite, id)} selectedId={selectedId} onOpenAsset={openAsset}
+                              actions={{ onVpn: setVpn, onOpenCustomer: (x) => goCustomer(x.id), onExport: (x) => void exportCustomer(x) }}
+                              onCustomerMenu={openMenu('customer')} onSiteMenu={openMenu('site')} onAssetMenu={openMenu('asset')} />
+                          ))}
+                        </Box>
+                      ) : null}
+                    </Box>
+                  )
+                })}
+            </Box>
+          </Box>
+        </Box>
+      )}
 
-      <SiteInfoDrawer
-        open={siteDrawerOpen}
-        detail={siteDrawerDetail}
-        detailLoading={siteDrawerLoading}
-        selectedId={siteDrawerId}
-        onClose={closeSiteDrawer}
-      />
+      {selectedId != null ? (
+        <InventoryDetailCard
+          detail={detail}
+          loading={detailLoading}
+          statuses={statuses}
+          types={types}
+          canChange={canChange}
+          canDelete={canDelete}
+          canViewSecrets={canViewSecrets}
+          canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
+          canUploadReports={hasPerm(PERMS.maintenance.event.change)}
+          tab={tab}
+          onTab={setTab}
+          onClose={closeAsset}
+          onEdit={() => goInventory(selectedId)}
+          onDelete={() => { if (detail) setDel({ kind: 'asset', row: detail as RepoAsset, x: 0, y: 0 }) }}
+          onRestore={async () => { try { await api.post(`/inventories/${selectedId}/restore/`); toast.success('Asset ripristinato'); await loadDetail(selectedId); if (detail) refreshCustomer(detail.customer) } catch (e) { toast.error(apiErrorToMessage(e)) } }}
+          onPatch={(patch, label) => void patchAsset(patch, label)}
+          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+          onNewIssue={() => { if (detail) openIssueFor(detail) }}
+          onOpenCustomer={() => { if (detail) goCustomer(detail.customer) }}
+          onOpenSite={() => { if (detail?.site) goSite(detail.site) }}
+          activityTab={detail ? <AuditFeedPanel appLabel="inventory" model="inventory" objectId={detail.id} noun="l'inventario"
+            fields={{ name: 'il nome', hostname: "l'hostname", local_ip: "l'IP locale", srsa_ip: "l'IP SRSA", knumber: 'il K-Number', serial_number: 'il seriale', status: 'lo stato', type: 'il tipo', site: 'il sito', location: 'la posizione', telefono: 'il telefono', manufacturer: 'il produttore', model: 'il modello', warranty_end_date: 'la fine garanzia', notes: 'le note', os_user: "l'utente OS", app_usr: "l'utente app", os_pwd: 'la password OS', app_pwd: 'la password app', vnc_pwd: 'la password VNC', tags: 'i tag', custom_fields: 'i campi personalizzati' }} /> : null}
+        />
+      ) : null}
 
-      {/* Menu contestuale (tasto destro) — Cliente/Sito/Asset */}
-      <RowContextMenu
-        open={Boolean(ctxMenu)}
-        anchorPosition={ctxMenu ? { top: ctxMenu.mouseY, left: ctxMenu.mouseX } : undefined}
-        onClose={closeCtxMenu}
-        items={contextMenuItems}
-      />
+      {vpn ? <VpnModal open onClose={() => setVpn(null)} customerId={vpn.id} customerName={vpn.display_name || vpn.name} /> : null}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deleteTarget)}
-        busy={deleteRowBusy}
-        title={deleteDialogCopy.title}
-        description={deleteDialogCopy.description}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={confirmDeleteRow}
-      />
-    </Stack>
+      <RowContextMenu open={Boolean(menu)} anchorPosition={menu ? { top: menu.y, left: menu.x } : undefined} onClose={() => setMenu(null)} items={menuItems} />
+      <ConfirmDeleteDialog open={Boolean(del)} busy={delBusy} title={deleteCopy.title} description={deleteCopy.description} onClose={() => setDel(null)} onConfirm={confirmDelete} />
+    </Box>
+  )
+}
+
+// ─── Risultati di ricerca ────────────────────────────────────────────────────
+
+function SearchResults({ q, found, customers, selectedId, vendorColor, onOpenAsset, onReveal, onClear, onAssetMenu }: {
+  q: string
+  found: { q: string; assets: RepoAsset[]; sites: (RepoSite & { customer_name?: string })[] } | null
+  customers: RepoCustomer[]
+  selectedId: number | null
+  vendorColor: (l?: string | null) => string
+  onOpenAsset: (a: RepoAsset) => void
+  onReveal: (customerId: number, siteId?: number | null) => void
+  onClear: () => void
+  onAssetMenu: (a: RepoAsset, e: React.MouseEvent) => void
+}) {
+  const t = q.toLowerCase()
+  const cs = customers.filter((c) => [c.name, c.display_name, c.code, c.city].some((v) => v && v.toLowerCase().includes(t)))
+  const byId = new Map(customers.map((c) => [c.id, c]))
+  const provOf = (cid: number) => { const c = byId.get(cid); const p = c ? provKey(c) : ''; return p ? PROVINCE_NAME[p] ?? p : '' }
+  const path = (parts: (string | null | undefined)[]) => (
+    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: 11, color: 'text.disabled', whiteSpace: 'nowrap', overflow: 'hidden', minWidth: 0 }}>
+      {parts.filter(Boolean).map((x, i) => <React.Fragment key={i}>{i ? <CampoIcon name="chevR" size={11} /> : null}<span>{x}</span></React.Fragment>)}
+    </Box>
+  )
+  const head = (label: string, n: number) => <Typography component="h3" sx={{ p: '14px 14px 6px', fontSize: 12, fontWeight: 600, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.75 }}>{label}<Box component="span" sx={cntSx}>{n}</Box></Typography>
+  const rowSx = [{ width: '100%', display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto 14px', gap: 1.5, alignItems: 'center', minHeight: 48, px: 1.5, py: 0.75, borderBottom: '1px solid', borderColor: 'divider', textAlign: 'left', '&:hover': { bgcolor: 'archie.surface2' } }, focusInset]
+  const stale = !found || found.q !== q
+  const total = found ? found.assets.length + found.sites.length + cs.length : 0
+  return (
+    <Box component="section" aria-label="Risultati della ricerca" sx={{ ...panelSx, overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', fontSize: 13, color: 'text.secondary' }}>
+        {stale ? <><CircularProgress size={14} /> Cerco «{q}»…</> : <><Box component="b" sx={{ color: 'text.primary' }}>{total}</Box> risultati per «{q}»</>}
+        <Button size="small" variant="text" onClick={onClear} sx={{ ml: 'auto' }}>Cancella ricerca</Button>
+      </Box>
+      {found ? (
+        <Box sx={{ opacity: stale ? 0.55 : 1, transition: 'opacity .15s' }}>
+          {found.assets.length ? (
+            <>
+              {head('Sistemi', found.assets.length)}
+              <AssetHead />
+              {found.assets.map((a) => (
+                <Box key={a.id} sx={{ borderBottom: '1px solid', borderColor: 'divider', '& > button': { borderBottom: 0 } }}>
+                  <Box sx={{ pt: 1, pl: 6.5, pr: 1.5 }}>{path([provOf(a.customer), a.customer_name, a.site_display_name || a.site_name])}</Box>
+                  <AssetRow a={a} q={q} selected={a.id === selectedId} onOpen={onOpenAsset} onContextMenu={onAssetMenu} />
+                </Box>
+              ))}
+            </>
+          ) : null}
+          {found.sites.length ? (
+            <>
+              {head('Siti', found.sites.length)}
+              {found.sites.map((s) => (
+                <ButtonBase key={s.id} onClick={() => onReveal(s.customer, s.id)} sx={rowSx}>
+                  <Box component="span" sx={{ color: 'primary.main', display: 'grid', placeItems: 'center' }}><CampoIcon name="pin" size={17} /></Box>
+                  <NameCell title={<Highlight text={s.display_name || s.name} q={q} />} sub={[s.address_line1, s.city].filter(Boolean).join(', ') || 'Nessun indirizzo'} />
+                  {path([provOf(s.customer), s.customer_name])}
+                  <span />
+                  <Box component="span" sx={{ color: 'text.disabled', display: 'inline-flex' }}><CampoIcon name="chevR" size={14} /></Box>
+                </ButtonBase>
+              ))}
+            </>
+          ) : null}
+          {cs.length ? (
+            <>
+              {head('Clienti', cs.length)}
+              {cs.map((c) => (
+                <ButtonBase key={c.id} onClick={() => onReveal(c.id)} sx={rowSx}>
+                  <Box component="span" sx={{ color: 'primary.main', display: 'grid', placeItems: 'center' }}><CampoIcon name="building" size={17} /></Box>
+                  <NameCell title={<Highlight text={c.display_name || c.name} q={q} />}
+                    sub={c.status_label ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.625 }}><Box component="span" sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: vendorColor(c.status_label) }} />{c.status_label}</Box> : undefined} />
+                  <Box component="span" sx={{ fontSize: 11, color: 'text.disabled' }}>{provOf(c.id) || 'Senza provincia'}</Box>
+                  <Box component="span" sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap' }}>{c.sites_with_assets_count ?? 0} siti · {c.assets_count ?? 0} asset</Box>
+                  <Box component="span" sx={{ color: 'text.disabled', display: 'inline-flex' }}><CampoIcon name="chevR" size={14} /></Box>
+                </ButtonBase>
+              ))}
+            </>
+          ) : null}
+          {!total && !stale ? <Typography sx={{ px: 1.75, py: 3, fontSize: 13, color: 'text.secondary' }}>Nessun sistema, sito o cliente corrisponde a «{q}». Prova con parte dell'hostname o dell'IP.</Typography> : null}
+        </Box>
+      ) : null}
+    </Box>
   )
 }

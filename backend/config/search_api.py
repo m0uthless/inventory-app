@@ -9,17 +9,20 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.modules import hidden_search_kinds
 from crm.models import Contact, Customer, Site
 from drive.access import filter_accessible_files, filter_accessible_folders
 from drive.models import DriveFile, DriveFolder
 from inventory.models import Inventory
 from maintenance.models import MaintenancePlan
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from wiki.models import WikiPage
 
 from .ui_paths import (
     contact_path,
     customer_path,
-    drive_root_path,
+    drive_file_path,
+    drive_folder_path,
     inventory_path,
     maintenance_plan_path,
     site_path,
@@ -59,7 +62,8 @@ def _or_icontains(model, q: str, fields: list[str]) -> Q:
 
 
 class SearchAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    # Esplicite: la ricerca globale è solo di Archie (barriera Portal/Archie).
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request: Request):
         q = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
@@ -74,6 +78,7 @@ class SearchAPIView(APIView):
 
         user = request.user
         results: List[Dict[str, Any]] = []
+        hidden_kinds = hidden_search_kinds(user)
 
         def add(
             kind: str,
@@ -84,6 +89,8 @@ class SearchAPIView(APIView):
             path: str,
             meta: Optional[Dict[str, Any]] = None,
         ):
+            if kind in hidden_kinds:
+                return
             results.append(
                 {
                     "kind": kind,
@@ -117,7 +124,7 @@ class SearchAPIView(APIView):
                     "customer",
                     c.id,
                     f"{c.code} — {c.display_name}",
-                    subtitle or "Customer",
+                    subtitle or "Cliente",
                     c.updated_at,
                     customer_path(c.id),
                     {"code": c.code},
@@ -143,7 +150,7 @@ class SearchAPIView(APIView):
                     subtitle = f"{s.customer.code} — {s.customer.name}"
                 if s.city:
                     subtitle = (subtitle + " • " if subtitle else "") + s.city
-                add("site", s.id, s.display_name or s.name, subtitle or "Site", s.updated_at, site_path(s.id))
+                add("site", s.id, s.display_name or s.name, subtitle or "Sito", s.updated_at, site_path(s.id))
 
         if user.has_perm("crm.view_contact"):
             for ct in (
@@ -166,7 +173,7 @@ class SearchAPIView(APIView):
                 extra = " / ".join([s for s in [_safe_str(ct.email), _safe_str(ct.phone)] if s])
                 if extra:
                     subtitle = (subtitle + " • " if subtitle else "") + extra
-                add("contact", ct.id, ct.name, subtitle or "Contact", ct.updated_at, contact_path(ct.id))
+                add("contact", ct.id, ct.name, subtitle or "Contatto", ct.updated_at, contact_path(ct.id))
 
         if user.has_perm("inventory.view_inventory"):
             for inv in (
@@ -233,7 +240,7 @@ class SearchAPIView(APIView):
                 subtitle = "Cartella"
                 if f.parent_id and f.parent:
                     subtitle = f"In {f.parent.name}"
-                add("drive_folder", f.id, f.name, subtitle, f.updated_at, drive_root_path())
+                add("drive_folder", f.id, f.name, subtitle, f.updated_at, drive_folder_path(f.id))
 
         if user.has_perm("drive.view_drivefile"):
             for df in (
@@ -247,7 +254,7 @@ class SearchAPIView(APIView):
                 subtitle = "File"
                 if df.folder_id and df.folder:
                     subtitle = f"In {df.folder.name}"
-                add("drive_file", df.id, df.name, subtitle, df.updated_at, drive_root_path())
+                add("drive_file", df.id, df.name, subtitle, df.updated_at, drive_file_path(df.id))
 
         wiki_qs = (
             WikiPage.objects.select_related("category").filter(deleted_at__isnull=True, is_published=True)

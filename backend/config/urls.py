@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.routers import DefaultRouter
 
 from audit.api import AuditEventViewSet
-from core.me_api import ChangePasswordView, MeAPIView
+from core.me_api import ChangePasswordView, MeAPIView, MeLoginsView
 from core.admin_users_api import (
     GroupAdminViewSet,
     PermissionModulesView,
@@ -40,7 +40,9 @@ from core.api import (
     StickyNoteView,
     BirthdaysView,
 )
+from core.modules_api import MaintenanceView, ModuleDetailView, ModuleListView
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
+from core.trash_api import TrashInfoView
 from notifications.api import NotificationViewSet
 from crm.api import ContactViewSet, CustomerViewSet, SiteViewSet, CustomerVpnAccessViewSet
 from custom_fields.api import CustomFieldDefinitionViewSet
@@ -193,8 +195,10 @@ urlpatterns = [
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
+    path("api/me/logins/", MeLoginsView.as_view()),
     path("api/sticky-note/", StickyNoteView.as_view()),
     path("api/birthdays/", BirthdaysView.as_view()),
+    path("api/trash/info/", TrashInfoView.as_view()),
 
     # Changelog (modal al login + voce menu utente)
     path("api/changelog/unseen/", ChangelogUnseenView.as_view()),
@@ -202,6 +206,9 @@ urlpatterns = [
 
     # Pannello "Utenti e Gruppi"
     path("api/admin/permission-modules/", PermissionModulesView.as_view()),
+    path("api/admin/maintenance/", MaintenanceView.as_view()),
+    path("api/admin/modules/", ModuleListView.as_view()),
+    path("api/admin/modules/<str:key>/", ModuleDetailView.as_view()),
 
     # Portal
     path("api/portal/me/", PortalMeView.as_view(), name="portal-me"),

@@ -1,619 +1,279 @@
+/**
+ * Audit — /audit
+ *
+ * Registro di modifiche e accessi (restyle "Campo sterile", anteprima
+ * design-previews/au-base.html, variante A · Registro con le colonne Data e Ora).
+ */
 import * as React from 'react'
-import {
-  Autocomplete,
-  Box,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
-
+import { useNavigate } from 'react-router-dom'
+import { Box, ButtonBase, Stack } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 
 import { api } from '@shared/api/client'
 import { buildDrfListParams } from '@shared/api/drf'
 import { apiErrorToMessage } from '@shared/api/error'
+import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
-import { useDrfList } from '@shared/hooks/useDrfList'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
-import AuditActionChip, { type AuditAction } from '../ui/AuditActionChip'
-import AuditEventDrawer from '../features/audit/AuditEventDrawer'
-import FilterChip from '@shared/ui/FilterChip'
-import { isString } from '@shared/utils/guards'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 
-type AuditEvent = {
-  id: number
-  created_at: string
-  action: AuditAction
-  actor: number | null
-  actor_username?: string | null
-  actor_email?: string | null
-  content_type_app?: string
-  content_type_model?: string
-  object_id?: string
-  object_repr?: string
-  subject?: string
-  changes?: unknown
-  entity_path?: string | null
-  path?: string | null
-  method?: string | null
-  ip_address?: string | null
-  user_agent?: string | null
-  metadata_summary?: Record<string, unknown> | null
-}
+import { useAuth } from '../auth/AuthProvider'
+import { CampoIcon, FilterOptionList, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
+import AuditKpis from '../features/audit/AuditKpis'
+import { useAuditStats } from '../features/audit/useAuditStats'
+import AuditDetailCard, { type AuditTab } from '../features/audit/AuditDetailCard'
+import { ActorCell, AuditActionBadge, ChangeSummary, ObjectCell } from '../features/audit/auditUi'
+import {
+  ACTION_META, ENTITY, PERIODS, VIEWS, actorLabel, changeEntries, dateCell, entityKey, entityLabel, fieldLabel, fmtValue, objectTitle, periodStart, timeCell, whenLabel,
+  type AuditAction, type AuditEvent, type AuditView, type Period,
+} from '../features/audit/auditModel'
 
+type AuditActor = { id: number; label: string; first_name?: string; last_name?: string; username?: string }
 type AuditEntity = { app_label: string; model: string }
 
-type AuditActor = {
-  id: number
-  username?: string
-  email?: string
-  first_name?: string
-  last_name?: string
-  label: string
-}
+const actorShort = (a: AuditActor) => [a.first_name, a.last_name].filter(Boolean).join(' ').trim() || a.username || a.label
 
-const ENTITY_LABELS: Record<string, string> = {
-  'crm.customer': 'Clienti',
-  'crm.site': 'Siti',
-  'crm.contact': 'Contatti',
-  'crm.customervpnaccess': 'VPN cliente',
-  'inventory.inventory': 'Inventari',
-  'issues.issue': 'Issue',
-  'maintenance.tech': 'Tecnici',
-  'maintenance.maintenanceplan': 'Piani di manutenzione',
-  'maintenance.maintenanceplaninventory': 'Piani di manutenzione',
-  'maintenance.maintenancetemplate': 'Template di manutenzione',
-  'maintenance.maintenanceevent': 'Eventi di manutenzione',
-  'maintenance.maintenancenotification': 'Notifiche di manutenzione',
-  'wiki.wikipage': 'Pagine wiki',
-  'wiki.wikicategory': 'Categorie wiki',
-  'wiki.wikiattachment': 'Allegati wiki',
-  'wiki.wikilink': 'Link wiki',
-  'wiki.wikiquery': 'Query',
-  'feedback.reportrequest': 'Feedback',
-  'drive.drivefolder': 'Cartelle drive',
-  'drive.drivefile': 'File drive',
-  'custom_fields.customfielddefinition': 'Definizioni campi custom',
-  'auth.user': 'Utenti',
-}
-
-function fmt(ts?: string | null) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return ts
-  return d.toLocaleString()
-}
-
-
-function entityKey(app?: string, model?: string): string {
-  const a = (app || '').toLowerCase()
-  const m = (model || '').toLowerCase()
-  if (!a || !m) return ''
-  return `${a}.${m}`
-}
-
-function entityLabel(key: string): string {
-  return ENTITY_LABELS[key] || key || '—'
-}
-
-function entityLabelForEvent(ev: Pick<AuditEvent, 'content_type_app' | 'content_type_model' | 'action'>): string {
-  const key = entityKey(ev.content_type_app, ev.content_type_model)
-  if (key) return entityLabel(key)
-
-  const action = String(ev.action || '').toLowerCase()
-  if (action === 'login' || action === 'login_failed' || action === 'logout') {
-    return 'Autenticazione'
-  }
-
-  return 'Sistema'
-}
-
-const cols: GridColDef<AuditEvent>[] = [
-  {
-    field: 'created_at',
-    headerName: 'Quando',
-    width: 190,
-    sortable: true,
-    valueGetter: (v) => v,
-    renderCell: (p) => <span>{fmt(isString(p.value) ? p.value : null)}</span>,
-  },
-  {
-    field: 'action',
-    headerName: 'Azione',
-    width: 140,
-    sortable: true,
-    renderCell: (p) => <AuditActionChip action={String(p.value || '')} />,
-  },
-  {
-    field: 'subject',
-    headerName: 'Oggetto',
-    flex: 1,
-    minWidth: 280,
-    sortable: false,
-    valueGetter: (_v, row) => row.subject || row.object_repr || row.object_id || '—',
-  },
-  {
-    field: 'actor_username',
-    headerName: 'Utente',
-    width: 180,
-    sortable: false,
-    valueGetter: (_v, row) => row.actor_username || '—',
-  },
-  {
-    field: 'content_type_model',
-    headerName: 'Tipo',
-    width: 200,
-    sortable: false,
-    valueGetter: (_v, row) => entityLabelForEvent(row),
-  },
+const columns: GridColDef<AuditEvent>[] = [
+  { field: 'created_at', headerName: 'Data', width: 112, renderCell: (p) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>{dateCell(p.row.created_at)}</Box> },
+  { field: 'time', headerName: 'Ora', width: 64, sortable: false, renderCell: (p) => <Box component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{timeCell(p.row.created_at)}</Box> },
+  { field: 'actor', headerName: 'Utente', width: 190, sortable: false, renderCell: (p) => <ActorCell ev={p.row} /> },
+  { field: 'action', headerName: 'Azione', width: 138, renderCell: (p) => <AuditActionBadge action={p.row.action} /> },
+  { field: 'object', headerName: 'Oggetto', flex: 1, minWidth: 240, sortable: false, renderCell: (p) => <ObjectCell ev={p.row} /> },
+  { field: 'changes', headerName: 'Cosa è cambiato', flex: 0.8, minWidth: 200, sortable: false, renderCell: (p) => <ChangeSummary ev={p.row} /> },
 ]
 
-// ─── Mobile card ──────────────────────────────────────────────────────────────
-
-const renderAuditCard: MobileCardRenderFn<AuditEvent> = ({ row, onOpen }) => (
-  <Box
-    onClick={() => onOpen(row.id)}
-    sx={{
-      bgcolor: 'background.paper',
-      border: '0.5px solid', borderColor: 'divider', borderRadius: 1,
-      p: 1.25, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 0.75,
-      '&:active': { bgcolor: 'action.hover' },
-    }}
-  >
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {row.subject || row.object_repr || row.object_id || '—'}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {entityLabelForEvent(row)}{row.actor_username ? ` · ${row.actor_username}` : ''}
-        </Typography>
-      </Box>
-      <AuditActionChip action={String(row.action || '')} />
+const auditCard: MobileCardRenderFn<AuditEvent> = ({ row, onOpen }) => (
+  <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, cursor: 'pointer', display: 'grid', gap: 0.75 }}>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}><ObjectCell ev={row} /></Box>
+      <AuditActionBadge action={row.action} />
     </Box>
-    <Typography variant="caption" color="text.disabled">{fmt(row.created_at)}</Typography>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 12, color: 'text.secondary' }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}><ActorCell ev={row} /></Box>
+      <span>{whenLabel(row.created_at)}</span>
+    </Box>
+    {changeEntries(row.changes).length ? <ChangeSummary ev={row} /> : null}
   </Box>
 )
 
-// prettier-ignore
 export default function Audit() {
-  const zebraSx = useDataGridZebraSx()
   const toast = useToast()
+  const navigate = useNavigate()
+  const { me } = useAuth()
+  const grid = useServerGrid({ defaultOrdering: '-created_at', allowedOrderingFields: ['created_at', 'action'], defaultPageSize: 25 })
+  const opts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
 
-  const grid = useServerGrid({
-    defaultOrdering: '-created_at',
-    allowedOrderingFields: ['created_at', 'action'],
-    defaultPageSize: 25,
-  })
-
-  // filters
-  const [action, setAction] = useUrlStringParam('action')
-  const [appLabel, setAppLabel] = useUrlStringParam('app_label')
-  const [model, setModel] = useUrlStringParam('model')
-  const [objectId, setObjectId] = useUrlStringParam('object_id')
+  const [vista, setVista] = useUrlStringParam('vista')
+  const [periodo, setPeriodo] = useUrlStringParam('periodo')
   const [actor, setActor] = useUrlNumberParam('actor')
-  const [createdAfter, setCreatedAfter] = useUrlStringParam('created_after')
-  const [createdBefore, setCreatedBefore] = useUrlStringParam('created_before')
+  const [sistema, setSistema] = useUrlStringParam('sistema')
+  const [action, setAction] = useUrlStringParam('action')
+  const [tipo, setTipo] = useUrlStringParam('tipo')
+  const [objectId, setObjectId] = useUrlStringParam('object_id')
+  const view: AuditView = (VIEWS.find((v) => v.key === vista)?.key ?? 'all')
+  // Arrivando da un link con un utente o un oggetto (Profilo, "Solo questo oggetto") il periodo parte da "Sempre".
+  const period: Period = (PERIODS.find((p) => p.key === periodo)?.key ?? (actor !== '' || objectId ? 'all' : '7'))
+  const [appLabel, model] = tipo.includes('.') ? tipo.split('.') : ['', '']
 
-  // entities (for dropdown)
+  // ── Opzioni dei filtri ──
+  const [actors, setActors] = React.useState<AuditActor[]>([])
   const [entities, setEntities] = React.useState<AuditEntity[]>([])
-  const [entitiesLoading, setEntitiesLoading] = React.useState(false)
-
   React.useEffect(() => {
-    let alive = true
-    ;(async () => {
-      setEntitiesLoading(true)
-      try {
-        const res = await api.get<AuditEntity[]>('/audit-events/entities/')
-        if (!alive) return
-        const raw = Array.isArray(res.data) ? res.data : []
-        // stable sorting: known entities first (by label), then by key
-        const sorted = [...raw].sort((a, b) => {
-          const ka = entityKey(a.app_label, a.model)
-          const kb = entityKey(b.app_label, b.model)
-          const la = ENTITY_LABELS[ka] ? 0 : 1
-          const lb = ENTITY_LABELS[kb] ? 0 : 1
-          if (la !== lb) return la - lb
-          const na = entityLabel(ka).toLowerCase()
-          const nb = entityLabel(kb).toLowerCase()
-          if (na !== nb) return na.localeCompare(nb)
-          return ka.localeCompare(kb)
-        })
-        setEntities(sorted)
-      } catch {
-        // non-blocking
-      } finally {
-        if (alive) setEntitiesLoading(false)
-      }
-    })()
-    return () => {
-      alive = false
-    }
+    api.get<AuditActor[]>('/audit-events/actors/').then((r) => setActors(Array.isArray(r.data) ? r.data : [])).catch(() => {})
+    api.get<AuditEntity[]>('/audit-events/entities/').then((r) => setEntities(Array.isArray(r.data) ? r.data : [])).catch(() => {})
   }, [])
+  React.useEffect(() => {
+    if (actor === '' || actors.some((a) => a.id === actor)) return
+    api.get<AuditActor[]>('/audit-events/actors/', { params: { id: actor } }).then((r) => { if (r.data?.length) setActors((p) => [...r.data, ...p]) }).catch(() => {})
+  }, [actor, actors])
 
-  // actors autocomplete
-  const [actorOptions, setActorOptions] = React.useState<AuditActor[]>([])
-  const [actorInput, setActorInput] = React.useState('')
-  const [actorsLoading, setActorsLoading] = React.useState(false)
+  // ── Parametri ──
+  const scopeParams = React.useMemo(() => {
+    const after = periodStart(period)
+    return {
+      ...(after ? { created_after: after } : {}),
+      ...(actor !== '' ? { actor } : {}),
+      ...(sistema ? { actor_null: 'true' } : {}),
+      ...(action ? { action } : {}),
+      ...(appLabel ? { app_label: appLabel, model } : {}),
+      ...(objectId ? { object_id: objectId } : {}),
+    }
+  }, [period, actor, sistema, action, appLabel, model, objectId])
+  const listParams = React.useMemo(() => buildDrfListParams({
+    search: grid.search, ordering: grid.ordering, page0: grid.paginationModel.page, pageSize: grid.paginationModel.pageSize,
+    extra: { ...VIEWS.find((v) => v.key === view)!.params, ...scopeParams },
+  }), [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, view, scopeParams])
+  const { rows, rowCount, loading } = useDrfList<AuditEvent>('/audit-events/', listParams, (e: unknown) => toast.error(apiErrorToMessage(e)))
+  const stats = useAuditStats()
 
+  // Conteggi delle viste (stessi filtri e periodo).
+  const [counts, setCounts] = React.useState<Partial<Record<AuditView, number>>>({})
   React.useEffect(() => {
     let alive = true
-    const t = window.setTimeout(async () => {
-      setActorsLoading(true)
-      try {
-        const res = await api.get<AuditActor[]>('/audit-events/actors/', {
-          params: actorInput.trim() ? { q: actorInput.trim() } : {},
-        })
-        if (!alive) return
-        setActorOptions(Array.isArray(res.data) ? res.data : [])
-      } catch {
-        if (alive) setActorOptions([])
-      } finally {
-        if (alive) setActorsLoading(false)
-      }
-    }, 250)
-    return () => {
-      alive = false
-      window.clearTimeout(t)
-    }
-  }, [actorInput])
+    Promise.all(VIEWS.map((v) => api.get<{ count?: number }>('/audit-events/', { params: { ...v.params, ...scopeParams, ...(grid.search ? { search: grid.search } : {}), page_size: 1 } })
+      .then((r) => [v.key, r.data?.count ?? 0] as const).catch(() => [v.key, undefined] as const)))
+      .then((all) => { if (alive) setCounts(Object.fromEntries(all.filter(([, n]) => n != null))) })
+    return () => { alive = false }
+  }, [scopeParams, grid.search])
 
-  // ensure the selected actor is present in options (so the label is nice)
-  React.useEffect(() => {
-    let alive = true
-    ;(async () => {
-      if (actor === '') return
-      if (actorOptions.some((o) => o.id === actor)) return
-      try {
-        const res = await api.get<AuditActor[]>('/audit-events/actors/', { params: { id: actor } })
-        if (!alive) return
-        const arr = Array.isArray(res.data) ? res.data : []
-        if (arr.length) setActorOptions((prev) => [...arr, ...prev])
-      } catch {
-        // ignore
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [actor, actorOptions])
-
-  const selectedActor = React.useMemo(() => {
-    if (actor === '') return null
-    return actorOptions.find((o) => o.id === actor) || { id: actor, label: `#${actor}` }
-  }, [actor, actorOptions])
-
-  const selectedEntityKey = React.useMemo(() => entityKey(appLabel, model), [appLabel, model])
-
-  const listParams = React.useMemo(
-    () =>
-      buildDrfListParams({
-        search: grid.search,
-        ordering: grid.ordering,
-        page0: grid.paginationModel.page,
-        pageSize: grid.paginationModel.pageSize,
-        extra: {
-          ...(action.trim() ? { action: action.trim() } : {}),
-          ...(appLabel.trim() ? { app_label: appLabel.trim() } : {}),
-          ...(model.trim() ? { model: model.trim() } : {}),
-          ...(objectId.trim() ? { object_id: objectId.trim() } : {}),
-          ...(actor !== '' ? { actor } : {}),
-          ...(createdAfter.trim() ? { created_after: createdAfter.trim() } : {}),
-          ...(createdBefore.trim() ? { created_before: createdBefore.trim() } : {}),
-        },
-      }),
-    [
-      grid.search,
-      grid.ordering,
-      grid.paginationModel.page,
-      grid.paginationModel.pageSize,
-      action,
-      appLabel,
-      model,
-      objectId,
-      actor,
-      createdAfter,
-      createdBefore,
-    ],
-  )
-
-  const { rows, rowCount, loading } = useDrfList<AuditEvent>(
-    '/audit-events/',
-    listParams,
-    (e: unknown) => toast.error(apiErrorToMessage(e)),
-  )
-
-  // drawer
-  const [drawerOpen, setDrawerOpen] = React.useState(false)
-  const [selectedId, setSelectedId] = React.useState<number | null>(null)
+  // ── Dettaglio ──
   const [detail, setDetail] = React.useState<AuditEvent | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-
-  const loadDetail = React.useCallback(
-    async (id: number) => {
-      setDetailLoading(true)
-      setDetail(null)
-      try {
-        const res = await api.get<AuditEvent>(`/audit-events/${id}/`)
-        setDetail(res.data)
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        setDetailLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  // open drawer from URL (?open=ID)
-  const lastOpenRef = React.useRef<number | null>(null)
+  const [tab, setTab] = React.useState<AuditTab>('det')
+  const selectedId = grid.openId ?? null
   React.useEffect(() => {
-    if (!grid.openId) return
-    const id = grid.openId
-    if (lastOpenRef.current === id) return
-    lastOpenRef.current = id
-    setSelectedId(id)
-    setDrawerOpen(true)
-    loadDetail(id)
-  }, [grid.openId, loadDetail])
+    if (!selectedId) { setDetail(null); return }
+    const row = rows.find((r) => r.id === selectedId)
+    if (row) { setDetail(row); return }
+    let alive = true
+    api.get<AuditEvent>(`/audit-events/${selectedId}/`).then((r) => { if (alive) setDetail(r.data) }).catch((e) => { if (alive) toast.error(apiErrorToMessage(e)) })
+    return () => { alive = false }
+  }, [selectedId, rows, toast])
+  const open = (id: number) => { setTab('det'); grid.setOpenId(id) }
+  const close = () => grid.setOpenId(null)
+  const idx = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
 
-  const openDrawer = (id: number) => {
-    setSelectedId(id)
-    setDrawerOpen(true)
-    loadDetail(id)
-    grid.setOpenId(id)
+  // ── Filtri ──
+  const setView = (v: AuditView) => setVista(v === 'all' ? '' : v, opts)
+  const clearAll = () => setActor('', { ...opts, patch: { page: 1, sistema: '', action: '', tipo: '', object_id: '' } })
+  const actorName = (id: number) => { const a = actors.find((x) => x.id === id); return a ? actorShort(a) : `#${id}` }
+  const activeFilters: ActiveFilter[] = [
+    ...(actor !== '' ? [{ key: 'actor', label: 'Utente', values: actorName(actor) }] : []),
+    ...(sistema ? [{ key: 'sistema', label: 'Utente', values: 'Sistema' }] : []),
+    ...(action ? [{ key: 'action', label: 'Azione', values: ACTION_META[action as AuditAction]?.label ?? action }] : []),
+    ...(tipo && !objectId ? [{ key: 'tipo', label: 'Tipo', values: ENTITY[tipo]?.label ?? tipo }] : []),
+    ...(objectId ? [{ key: 'object', label: 'Oggetto', values: detail && String(detail.object_id) === objectId ? objectTitle(detail) : `${ENTITY[tipo]?.label ?? tipo} #${objectId}` }] : []),
+  ]
+  const removeFilter = (k: string) => {
+    if (k === 'actor') setActor('', opts)
+    else if (k === 'sistema') setSistema('', opts)
+    else if (k === 'action') setAction('', opts)
+    else if (k === 'tipo') setTipo('', opts)
+    else if (k === 'object') setObjectId('', { ...opts, patch: { page: 1, tipo: '' } })
+  }
+  const userValue = sistema ? 'sys' : actor === '' ? '' : String(actor)
+  const filterConfig: Record<string, ColumnFilterConfig> = {
+    actor: {
+      value: userValue, label: 'Filtra utente',
+      onSet: () => {}, onReset: () => setActor('', { ...opts, patch: { page: 1, sistema: '' } }),
+      children: <FilterOptionList label="Utente" single searchable selected={userValue ? [userValue] : []}
+        options={[{ value: 'sys', label: 'Sistema (operazioni automatiche)' }, ...actors.map((a) => ({ value: String(a.id), label: actorShort(a) }))]}
+        onChange={(v) => { const x = v[0]; if (!x) setActor('', { ...opts, patch: { page: 1, sistema: '' } }); else if (x === 'sys') setSistema('1', { ...opts, patch: { page: 1, actor: '' } }); else setActor(Number(x), { ...opts, patch: { page: 1, sistema: '' } }) }} />,
+    },
+    action: {
+      value: action, label: 'Filtra azione', onSet: (v) => setAction(String(v), opts), onReset: () => setAction('', opts),
+      children: <FilterOptionList label="Azione" single selected={action ? [action] : []} options={Object.entries(ACTION_META).map(([k, m]) => ({ value: k, label: m.label }))} onChange={(v) => setAction(v[0] ?? '', opts)} />,
+    },
+    object: {
+      value: tipo, label: 'Filtra tipo', onSet: (v) => setTipo(String(v), opts), onReset: () => setTipo('', { ...opts, patch: { page: 1, object_id: '' } }),
+      children: <FilterOptionList label="Tipo" single searchable selected={tipo ? [tipo] : []}
+        options={entities.map((x) => { const k = entityKey(x.app_label, x.model); return { value: k, label: ENTITY[k]?.label ?? `${x.app_label}.${x.model}` } }).sort((a, b) => a.label.localeCompare(b.label))}
+        onChange={(v) => setTipo(v[0] ?? '', { ...opts, patch: { page: 1, object_id: '' } })} />,
+    },
+  }
+  const filterObject = (ev: AuditEvent) => {
+    setTipo(entityKey(ev.content_type_app, ev.content_type_model), { ...opts, patch: { page: 1, object_id: ev.object_id ?? '', vista: '', periodo: 'all', actor: '', sistema: '', action: '' } })
   }
 
-  const closeDrawer = () => {
-    setDrawerOpen(false)
-    grid.setOpenId(null)
+  // ── Esportazione ──
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<AuditEvent>({
+      url: '/audit-events/', params, filename: 'audit',
+      columns: [
+        { label: 'Data', getValue: (r) => dateCell(r.created_at) },
+        { label: 'Ora', getValue: (r) => timeCell(r.created_at) },
+        { label: 'Utente', getValue: (r) => actorLabel(r).name },
+        { label: 'Azione', getValue: (r) => ACTION_META[r.action]?.label ?? r.action },
+        { label: 'Tipo', getValue: (r) => entityLabel(r) },
+        { label: 'Oggetto', getValue: (r) => objectTitle(r) },
+        { label: 'Modifiche', getValue: (r) => changeEntries(r.changes).map((c) => `${fieldLabel(c.field)}: ${fmtValue(c.from) ?? ''} → ${fmtValue(c.to) ?? ''}`).join('; ') },
+        { label: 'IP', getValue: (r) => r.ip_address ?? '' },
+      ],
+    })
   }
 
-  const resetFilters = () => {
-    // Clear URL-managed filters + reset grid state (search/page/ordering).
-    grid.reset([
-      'action',
-      'app_label',
-      'model',
-      'object_id',
-      'actor',
-      'created_after',
-      'created_before',
-    ])
-  }
-
-  // quanti filtri nel chip sono attivi
-  const chipActiveCount =
-    (action.trim() ? 1 : 0) +
-    (selectedEntityKey ? 1 : 0) +
-    (actor !== '' ? 1 : 0) +
-    (objectId.trim() ? 1 : 0)
-
-  // sx riutilizzabile per i TextField piccoli della toolbar
-  const inputSx = {
-    '& .MuiInputLabel-root': { fontSize: 12 },
-    '& .MuiInputBase-input': { fontSize: 12, py: 0 },
-    '& .MuiOutlinedInput-root': {
-      fontSize: 12,
-      height: 40,
-      borderRadius: 1,
-    },
-  } as const
-
-  const selectSx = {
-    '& .MuiInputLabel-root': { fontSize: 12 },
-    '& .MuiSelect-select': {
-      fontSize: 12,
-      display: 'flex',
-      alignItems: 'center',
-    },
-    '& .MuiOutlinedInput-root': {
-      fontSize: 12,
-      height: 40,
-      borderRadius: 1,
-    },
-  } as const
+  const emptyState = React.useMemo(() => ({
+    title: 'Nessun evento',
+    subtitle: view === 'failed' ? 'Nessun accesso fallito in questo periodo.' : 'Nessun evento con questi filtri in questo periodo.',
+  }), [view])
 
   return (
-    <Stack spacing={2}>
-      <EntityListCard<AuditEvent>
-        toolbar={{
-          q: grid.q,
-          onQChange: grid.setQ,
-          compact: true,
-          onReset: resetFilters,
-        }}
-        grid={{
-          rows,
-          columns: cols,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          height: 680,
-          pageSizeOptions: [25],
-          deletedField: '__never__',
-          footerLabel: 'Eventi',
-          emptyState:
-            grid.search.trim() || action || appLabel || model || actor || createdAfter || createdBefore
-              ? { title: 'Nessun risultato', subtitle: 'Nessun evento corrisponde ai filtri selezionati.' }
-              : { title: 'Nessun evento audit', subtitle: 'Gli eventi vengono registrati automaticamente al primo utilizzo.' },
-          sx: {
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-        mobileCard={renderAuditCard}
-      >
-        {/* Da */}
-        <TextField
-          size="small"
-          label="Da"
-          type="datetime-local"
-          value={createdAfter}
-          onChange={(e) =>
-            setCreatedAfter(e.target.value, { patch: { page: 1 }, keepOpen: true })
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead title="Audit" meta="registro di modifiche e accessi" />
+      <AuditKpis stats={stats} view={view} onView={setView} onActor={(id) => setActor(id, { ...opts, patch: { page: 1, sistema: '', vista: 'changes', periodo: '7' } })} />
+      {/* Il periodo su telefono: le stesse scelte sopra la tabella. */}
+      <Box role="group" aria-label="Periodo" sx={{ display: { xs: 'flex', md: 'none' }, gap: 0.5, mb: 1.25, flexWrap: 'wrap' }}>
+        {PERIODS.map((p) => (
+          <ButtonBase key={p.key} aria-pressed={period === p.key} onClick={() => setPeriodo(p.key, opts)} sx={{
+            height: 30, px: 1.5, borderRadius: '15px', border: '1px solid', borderColor: period === p.key ? 'archie.fieldLine' : 'divider', fontSize: 12.5, fontWeight: 550,
+            color: period === p.key ? 'primary.main' : 'text.secondary', bgcolor: period === p.key ? 'archie.field' : 'background.paper',
+          }}><CampoIcon name="clock" size={13} />&nbsp;{p.label}</ButtonBase>
+        ))}
+      </Box>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs value={view} onChange={(k) => setView(k as AuditView)}
+          tabs={VIEWS.map((v) => ({ key: v.key, label: v.label, count: counts[v.key] ?? null, tone: v.alert ? 'alert' : 'default' }))}
+          end={
+            <Box role="group" aria-label="Periodo" sx={{ display: { xs: 'none', md: 'inline-flex' }, gap: '2px', p: '3px', border: '1px solid', borderColor: 'divider', borderRadius: '8px', mr: 0.5 }}>
+              {PERIODS.map((p) => (
+                <ButtonBase key={p.key} aria-pressed={period === p.key} onClick={() => setPeriodo(p.key, opts)} sx={{
+                  height: 26, px: 1.25, borderRadius: '5px', fontSize: 12, fontWeight: 550, color: period === p.key ? 'primary.main' : 'text.secondary', bgcolor: period === p.key ? 'archie.field' : 'transparent',
+                  '&:hover': { color: 'text.primary' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+                }}>{p.label}</ButtonBase>
+              ))}
+            </Box>
+          } />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={auditCard}
+          header={
+            <TableBar filters={activeFilters} onRemoveFilter={removeFilter} onClearFilters={clearAll} q={grid.q} onQChange={grid.setQ}
+              searchPlaceholder="Cerca oggetto, ID, percorso…" onExport={exportVisible} exporting={exporting} />
           }
-          InputLabelProps={{ shrink: true }}
-          sx={{ width: { xs: '100%', md: 200 }, flexShrink: 0, ...inputSx }}
-        />
-
-        {/* A */}
-        <TextField
-          size="small"
-          label="A"
-          type="datetime-local"
-          value={createdBefore}
-          onChange={(e) =>
-            setCreatedBefore(e.target.value, { patch: { page: 1 }, keepOpen: true })
-          }
-          InputLabelProps={{ shrink: true }}
-          sx={{ width: { xs: '100%', md: 200 }, flexShrink: 0, ...inputSx }}
-        />
-
-        {/* FilterChip — tutti gli altri filtri */}
-        <FilterChip
-          compact
-          activeCount={chipActiveCount}
-          onReset={() => {
-            setAction('', { patch: { page: 1 }, keepOpen: true })
-            setAppLabel('', { patch: { page: 1 }, keepOpen: true })
-            setModel('', { patch: { page: 1 }, keepOpen: true })
-            setObjectId('', { patch: { page: 1 }, keepOpen: true })
-            setActor('', { patch: { page: 1 }, keepOpen: true })
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca nel registro…' }}
+          grid={{
+            pageKey: 'audit',
+            autoHeight: true,
+            username: me?.username,
+            filterConfig,
+            emptyState,
+            rows,
+            columns,
+            loading,
+            rowCount,
+            rowHeight: 52,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: open,
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
-        >
-          {/* Azione */}
-          <FormControl size="small" fullWidth sx={selectSx}>
-            <InputLabel>Azione</InputLabel>
-            <Select
-              label="Azione"
-              value={action}
-              onChange={(e) =>
-                setAction(String(e.target.value), { patch: { page: 1 }, keepOpen: true })
-              }
-            >
-              <MenuItem value="">Tutte</MenuItem>
-              <MenuItem value="create">Creato</MenuItem>
-              <MenuItem value="update">Modificato</MenuItem>
-              <MenuItem value="delete">Eliminato</MenuItem>
-              <MenuItem value="restore">Ripristinato</MenuItem>
-              <MenuItem value="login">Login</MenuItem>
-              <MenuItem value="login_failed">Login fallito</MenuItem>
-              <MenuItem value="logout">Logout</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Entità */}
-          <FormControl size="small" fullWidth sx={selectSx}>
-            <InputLabel>Entità</InputLabel>
-            <Select
-              label="Entità"
-              value={selectedEntityKey}
-              onChange={(e) => {
-                const v = String(e.target.value)
-                if (!v) {
-                  setAppLabel('', { patch: { page: 1 }, keepOpen: true })
-                  setModel('', { patch: { page: 1 }, keepOpen: true })
-                  return
-                }
-                const [a, m] = v.split('.')
-                setAppLabel(a || '', { patch: { page: 1 }, keepOpen: true })
-                setModel(m || '', { patch: { page: 1 }, keepOpen: true })
-              }}
-            >
-              <MenuItem value="">Tutte</MenuItem>
-              {entitiesLoading ? (
-                <MenuItem value="" disabled>
-                  Caricamento…
-                </MenuItem>
-              ) : (
-                entities.map((e) => {
-                  const k = entityKey(e.app_label, e.model)
-                  return (
-                    <MenuItem key={k} value={k}>
-                      {entityLabel(k)}
-                    </MenuItem>
-                  )
-                })
-              )}
-            </Select>
-          </FormControl>
-
-          {/* Utente */}
-          <Autocomplete<AuditActor>
-            options={actorOptions}
-            loading={actorsLoading}
-            value={selectedActor}
-            onChange={(_e, v) =>
-              setActor(v ? v.id : '', { patch: { page: 1 }, keepOpen: true })
-            }
-            inputValue={actorInput}
-            onInputChange={(_e, v) => setActorInput(v)}
-            getOptionLabel={(o) => o.label}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-            renderOption={(props, option) => (
-              <Box component="li" {...props} sx={{ fontSize: 12, minHeight: 36 }}>
-                {option.label}
-              </Box>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                size="small"
-                label="Utente"
-                placeholder="Cerca…"
-                sx={inputSx}
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {actorsLoading ? <CircularProgress size={14} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-              />
-            )}
-            fullWidth
-          />
-
-          {/* Object ID */}
-          <TextField
-            size="small"
-            label="Object ID"
-            value={objectId}
-            onChange={(e) =>
-              setObjectId(e.target.value, { patch: { page: 1 }, keepOpen: true })
-            }
-            sx={inputSx}
-            fullWidth
-          />
-        </FilterChip>
-      </EntityListCard>
-
-      <AuditEventDrawer
-        open={drawerOpen}
-        onClose={closeDrawer}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-      />
+        />
+      </Box>
+      {detail && selectedId === detail.id ? (
+        <AuditDetailCard
+          ev={detail}
+          tab={tab}
+          onTab={setTab}
+          position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
+          onPrev={idx > 0 ? () => open(rows[idx - 1].id) : undefined}
+          onNext={idx >= 0 && idx < rows.length - 1 ? () => open(rows[idx + 1].id) : undefined}
+          onClose={close}
+          onSelect={(id) => grid.setOpenId(id)}
+          onFilterObject={filterObject}
+          onFailedView={() => setVista('failed', { ...opts, patch: { page: 1, periodo: '30', actor: '', sistema: '', action: '', tipo: '', object_id: '' } })}
+          onNavigate={(path) => navigate(path)}
+        />
+      ) : null}
     </Stack>
   )
 }

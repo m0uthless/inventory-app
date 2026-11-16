@@ -28,6 +28,27 @@ def _display_name(user) -> str:
     return user.first_name or user.get_full_name() or user.username
 
 
+def _days_summary(rows) -> tuple[list[dict], str]:
+    """Righe a mezza giornata → una voce per giorno (mattina/pomeriggio) e il
+    totale leggibile ("2,5 giorni"), per il riquadro dei giorni nelle email."""
+    by_date: dict = {}
+    for a in rows:
+        day = by_date.setdefault(a.date, {"date": a.date, "mattina": False, "pomeriggio": False})
+        day[a.day_part] = True
+    days = []
+    for day in sorted(by_date.values(), key=lambda d: d["date"]):
+        day["label"] = (
+            "Giornata intera" if day["mattina"] and day["pomeriggio"]
+            else "Mattina" if day["mattina"] else "Pomeriggio"
+        )
+        days.append(day)
+    halves = sum(int(d["mattina"]) + int(d["pomeriggio"]) for d in days)
+    whole, half = divmod(halves, 2)
+    number = f"{whole},5" if half else str(whole)
+    totale = f"{number} {'giorno' if halves == 2 else 'giorni'}" if halves != 1 else "mezza giornata"
+    return days, totale
+
+
 def _groups_by_request(absences):
     """{request_group: [righe ordinate per data/fascia]}. Una riga senza
     request_group finisce nel proprio gruppo (chiave = pk)."""
@@ -56,6 +77,7 @@ def notify_leave_request_submitted(absences) -> int:
     sent = 0
     for rows in _groups_by_request(proposte).values():
         richiedente = rows[0].user
+        days, totale = _days_summary(rows)
         for coord in recipients:
             if coord.id == rows[0].user_id:
                 continue
@@ -63,9 +85,12 @@ def notify_leave_request_submitted(absences) -> int:
                 template_name="emails/leave_request_submitted.html",
                 context={
                     "nome_utente": _display_name(coord),
-                    "richiedente": _display_name(richiedente),
+                    "richiedente": richiedente.get_full_name() or _display_name(richiedente),
                     "giorni": rows,
+                    "giorni_raggruppati": days,
+                    "totale": totale,
                     "motivo": rows[0].get_reason_display(),
+                    "nota": next((a.note for a in rows if a.note), ""),
                 },
                 subject=f"ARCHIE — Nuova richiesta ferie: {_display_name(richiedente)}",
                 recipient_list=[coord.email],
@@ -96,6 +121,7 @@ def notify_leave_request_resolved(absences, actor) -> int:
                 "nome_utente": _display_name(richiedente),
                 "esito": esito,
                 "giorni": rows,
+                "giorni_raggruppati": _days_summary(rows)[0],
             },
             subject=f"ARCHIE — Richiesta ferie {esito}",
             recipient_list=[richiedente.email],

@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.modules import hidden_notification_types
 from portal.permissions import IsInternalOrPortalDedicatedApp
 from notifications.models import Notification
 
@@ -42,7 +43,9 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user)
+        qs = Notification.objects.filter(recipient=self.request.user)
+        hidden = hidden_notification_types(self.request.user)
+        return qs.exclude(notification_type__in=hidden) if hidden else qs
 
     @action(detail=False, methods=["get"])
     def unread_count(self, request):

@@ -192,7 +192,29 @@ def login_view(request: HttpRequest) -> JsonResponse:
                 {"detail": "Non sei autorizzato ad accedere al gestionale interno."},
                 status=403,
             )
+    elif not can_archie and not is_portal:
+        # H-01 (QA 2026-11-15): senza ambito il controllo veniva saltato e un
+        # utente senza alcun accesso otteneva una sessione "site-repo" valida.
+        _record_failed_attempt(username=username, ip_address=ip_address)
+        _audit_failed_login(request, username=username, user_obj=user, reason="ambito_not_allowed")
+        return JsonResponse(
+            {"detail": "Non sei autorizzato ad accedere al gestionale interno."},
+            status=403,
+        )
     # ── Fine verifica ambito ───────────────────────────────────────────────
+
+    # Modalità manutenzione (pagina «Moduli»): Archie è chiuso a chi non è
+    # superuser. Il Portal resta aperto. Non conta come tentativo fallito per
+    # il rate limit: le credenziali sono giuste.
+    from core.maintenance import blocks as maintenance_blocks, state as maintenance_state
+
+    login_ambito = "portal" if (is_portal and not can_archie and not ambito) else (ambito or "site-repo")
+    if maintenance_blocks(user, login_ambito):
+        _audit_failed_login(request, username=username, user_obj=user, reason="maintenance")
+        return JsonResponse(
+            {"detail": maintenance_state()["message"], "reason": "maintenance"},
+            status=503,
+        )
 
     login(request, user)
     _clear_failed_attempts(username=username, ip_address=ip_address)
@@ -229,6 +251,14 @@ def login_view(request: HttpRequest) -> JsonResponse:
     request.session["last_activity"] = time.time()
 
     return JsonResponse({"detail": "ok", "ambito": effective_ambito})
+
+
+@require_GET
+def maintenance_status(request: HttpRequest) -> JsonResponse:
+    """Stato pubblico della manutenzione, per l'avviso nella pagina di login."""
+    from core.maintenance import state as maintenance_state
+
+    return JsonResponse(maintenance_state())
 
 
 @require_POST

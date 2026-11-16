@@ -1,80 +1,41 @@
 import * as React from 'react'
-import { alpha, useTheme } from '@mui/material/styles'
-import {
-  Box,
-  Button,
-  Chip,
-  Stack,
-  Tooltip,
-  Typography,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-} from '@mui/material'
+import { Box, Button, Stack, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined'
-
 import { Can } from '../auth/Can'
 import { useAuth } from '../auth/AuthProvider'
-import { useStatusTokens, useDataGridZebraSx } from '../theme/AppThemeProvider'
-import type { DomainStatusTokens, InventoryStatusKey } from '../theme/statusTokens'
-
 import type { GridColDef } from '@mui/x-data-grid'
-
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
-import { useUrlNumberParam } from '@shared/hooks/useUrlParam'
+import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { api } from '@shared/api/client'
 import { itemActionPath, itemPath, type CollectionPath } from '@shared/api/apiPaths'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import InventoryDialog from '../features/inventory/InventoryDialog'
-import InventoryDrawer from '../features/inventory/InventoryDrawer'
+import InventoryDetailCard, { type InventoryPatch, type InventoryTab } from '../features/inventory/InventoryDetailCard'
+import InventoryKpis, { useInventorySummary } from '../features/inventory/InventoryKpis'
+import { disabledFieldsFor, InventoryStatusBadge, invTypeIcon, OpenIssueMark, type InventoryFieldName } from '../features/inventory/inventoryUi'
+import { AuditFeedPanel } from '../features/customers/CustomerTabs'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
-
+import { buildQuery } from '@shared/utils/nav'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
-import { getInventoryTypeIcon, INVENTORY_TYPE_ICON_COLOR } from '@shared/ui/inventoryTypeIcon'
 import { isRecord } from '@shared/utils/guards'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { useExportCsv } from '@shared/ui/useExportCsv'
 
 type LookupItem = { id: number; label: string; key?: string }
-
-// FIX (refactoring colori 0.9.x): ISSUE_PRIORITY_COLOR leggeva `import { theme }
-// from '../theme'` statico — bug reale, non solo cosmetico: il tema `temp` ha
-// error.main diverso dal default (#dc2626 vs #ef4444), quindi 'critical' mostrava
-// il rosso sbagliato sotto quel tema. Ora calcolato dentro il componente via
-// useTheme().
-function ActiveIssueWarningIcon({ priority }: { priority?: string | null }) {
-  const theme = useTheme()
-  const priorityColor: Record<string, string> = {
-    critical: theme.palette.error.main,
-    high:     '#f97316',
-    medium:   '#f59e0b',
-    low:      theme.palette.text.secondary,
-  }
-  const color = priorityColor[priority ?? ''] ?? priorityColor.medium
-  const label = priority === 'critical' ? 'Issue critica aperta'
-    : priority === 'high' ? 'Issue alta priorità aperta'
-    : priority === 'low' ? 'Issue a bassa priorità aperta'
-    : "C'è almeno una issue collegata aperta o in lavorazione."
-  return (
-    <Tooltip title={label}>
-      <WarningAmberRoundedIcon sx={{ color, fontSize: 18, flexShrink: 0 }} />
-    </Tooltip>
-  )
-}
 
 const INVENTORIES_PATH = '/inventories/' as const satisfies CollectionPath
 
@@ -135,6 +96,7 @@ type InventoryDetail = {
   type_label?: string | null
 
   status: number
+  status_key?: string | null
   status_label?: string | null
 
   os_user?: string | null
@@ -157,6 +119,7 @@ type InventoryDetail = {
   deleted_at?: string | null
   has_active_issue?: boolean
   active_issue_priority?: string | null
+  monitors?: { id: number; produttore?: string | null; modello?: string | null; seriale?: string | null; tipo_label?: string | null; stato_label?: string | null }[]
 }
 
 type InventoryForm = {
@@ -190,284 +153,136 @@ type InventoryForm = {
   tags: string[]
 }
 
-// ── REGOLE CAMPI PER TIPO INVENTARIO ─────────────────────────────────────────
-// Per ogni tipo, elenca i campi DISABILITATI nel form di creazione/modifica.
-// Campo non elencato = sempre abilitato.
-// Aggiungi nuovi tipi o modifica i profili senza toccare il codice del form.
-// ─────────────────────────────────────────────────────────────────────────────
 
-type InventoryFieldName =
-  | 'hostname'
-  | 'local_ip'
-  | 'srsa_ip' // rete
-  | 'location'
-  | 'telefono' // logistica
-  | 'os_user'
-  | 'os_pwd' // credenziali OS
-  | 'app_usr'
-  | 'app_pwd' // credenziali app
-  | 'vnc_pwd' // VNC
-  | 'manufacturer'
-  | 'model'
-  | 'warranty_end_date' // hardware
+const mono = { fontFamily: '"Geist Mono", monospace' }
+const dash = <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+const missing = (t: string) => <Box component="span" sx={{ fontSize: 12, fontWeight: 550, color: 'warning.main' }}>{t}</Box>
+const monoCell = (v?: string | null) => (v ? <Box component="span" sx={{ ...mono, fontSize: 12 }}>{v}</Box> : dash)
 
-// ── Profili riusabili ─────────────────────────────────────────────────────────
-const PROFILE_MANAGEMENT: InventoryFieldName[] = ['vnc_pwd', 'app_usr', 'app_pwd']
-const PROFILE_LOAD_BALANCER: InventoryFieldName[] = [
-  'vnc_pwd',
-  'os_user',
-  'os_pwd',
-  'app_usr',
-  'app_pwd',
-]
-const PROFILE_STORAGE: InventoryFieldName[] = ['vnc_pwd', 'os_user', 'os_pwd']
-
-// ── Mappa tipo → campi disabilitati ──────────────────────────────────────────
-const TYPE_DISABLED_FIELDS: Partial<Record<string, InventoryFieldName[]>> = {
-  management: PROFILE_MANAGEMENT,
-  management1: PROFILE_MANAGEMENT,
-  management2: PROFILE_MANAGEMENT,
-  management3: PROFILE_MANAGEMENT,
-  management4: PROFILE_MANAGEMENT,
-  load_balancer1: PROFILE_LOAD_BALANCER,
-  load_balancer2: PROFILE_LOAD_BALANCER,
-  storage: PROFILE_STORAGE,
-  // Aggiungi altri tipi qui, es:
-  // robot:       ["vnc_pwd", "app_usr", "app_pwd"],
-}
-
-
-
-
-
-
-// `cols` era una costante di modulo: STATUS_COLOR leggeva una palette fissa
-// (via `theme` statico, stesso bug di ISSUE_PRIORITY_COLOR sopra). Ora è una
-// factory chiamata dentro il componente (useMemo su statusTokens = useStatusTokens()).
-function buildColumns(statusTokens: DomainStatusTokens): GridColDef<InventoryRow>[] {
+function buildColumns(): GridColDef<InventoryRow>[] {
   return [
-  {
-    field: 'type_label',
-    headerName: 'Tipo',
-    width: 180,
-    sortable: true,
-    renderCell: (p) => {
-      const Icon = getInventoryTypeIcon(p.row?.type_key)
-      const label = p.value == null ? '—' : typeof p.value === 'string' ? p.value : String(p.value)
-      return (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, height: '100%' }}>
-          {label && label !== '—' ? (
-            <Chip
-              size="small"
-              icon={<Icon sx={{ color: `${INVENTORY_TYPE_ICON_COLOR} !important`, fontSize: '14px !important' }} />}
-              label={label}
-              sx={{
-                height: 22,
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
-                color: 'text.primary',
-                border: (t) => `1px solid ${alpha(t.palette.primary.main, 0.18)}`,
-                '& .MuiChip-label': { px: 0.75 },
-                maxWidth: '100%',
-              }}
-            />
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
-          )}
-          {p.row?.has_active_issue ? <ActiveIssueWarningIcon priority={p.row.active_issue_priority} /> : null}
+    { field: 'id', headerName: 'ID', width: 70, align: 'right', headerAlign: 'right' },
+    {
+      field: 'name', headerName: 'Nome', flex: 1, minWidth: 190,
+      renderCell: (p) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+          <Box component="span" sx={{ display: 'inline-flex', color: 'text.secondary', mr: 1, flex: 'none' }}><CampoIcon name={invTypeIcon(p.row.type_key)} size={15} /></Box>
+          <Box component="span" sx={{ fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.name}</Box>
+          {p.row.has_active_issue ? <OpenIssueMark priority={p.row.active_issue_priority} /> : null}
         </Box>
-      )
+      ),
     },
-  },
-  { field: 'name', headerName: 'Nome', width: 200 },
-  { field: 'customer_name', headerName: 'Cliente', width: 220 },
-  { field: 'site_name', headerName: 'Sito', width: 180 },
-
-  { field: 'hostname', headerName: 'Hostname', flex: 1, minWidth: 180 },
-  { field: 'knumber', headerName: 'K#', width: 140 },
-  { field: 'serial_number', headerName: 'Seriale', width: 180 },
-
-  {
-    field: 'status_label',
-    headerName: 'Stato',
-    width: 140,
-    renderCell: (p) => {
-      const label  = p.value as string | null
-      const key    = (p.row?.status_key ?? '') as InventoryStatusKey
-      if (!label) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
-      const c = statusTokens.inventory[key] ?? { bg: 'rgba(100,116,139,0.08)', color: '#475569', border: 'rgba(100,116,139,0.20)' }
-      return (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Chip
-            size="small"
-            label={label}
-            sx={{
-              height: 22,
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              bgcolor: c.bg,
-              color: c.color,
-              border: `1px solid ${c.border}`,
-              '& .MuiChip-label': { px: 0.75 },
-            }}
-          />
-        </Box>
-      )
+    { field: 'type_label', headerName: 'Tipo', width: 120, renderCell: (p) => p.row.type_label || dash },
+    { field: 'hostname', headerName: 'Hostname', width: 140, renderCell: (p) => monoCell(p.row.hostname) },
+    {
+      field: 'customer_name', headerName: 'Cliente', width: 140,
+      renderCell: (p) => <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.customer_name || '—'}</Box>,
     },
-  },
-  { field: 'local_ip', headerName: 'IP locale', width: 160 },
-  { field: 'srsa_ip', headerName: 'IP SRSA', width: 160 },
+    {
+      field: 'site_name', headerName: 'Sito', width: 140,
+      renderCell: (p) => p.row.site ? <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.row.site_display_name || p.row.site_name}</Box> : missing('Nessun sito'),
+    },
+    { field: 'status_label', headerName: 'Stato', width: 150, renderCell: (p) => <InventoryStatusBadge statusKey={p.row.status_key} label={p.row.status_label} /> },
+    { field: 'local_ip', headerName: 'IP locale', width: 120, renderCell: (p) => (p.row.local_ip ? monoCell(p.row.local_ip) : missing('Manca')) },
+    { field: 'knumber', headerName: 'K-Number', width: 120, renderCell: (p) => monoCell(p.row.knumber) },
+    { field: 'serial_number', headerName: 'Seriale', width: 140, renderCell: (p) => monoCell(p.row.serial_number) },
+    { field: 'srsa_ip', headerName: 'IP SRSA', width: 120, renderCell: (p) => monoCell(p.row.srsa_ip) },
+    { field: 'location', headerName: 'Posizione', width: 140 },
   ]
 }
 
-
-// ─── Mobile card renderer ────────────────────────────────────────────────────
-// Stesso motivo di buildColumns sopra: factory chiamata dentro il componente.
-
-function makeRenderInventoryCard(statusTokens: DomainStatusTokens): MobileCardRenderFn<InventoryRow> {
-  return ({ row, onOpen }) => {
-  const TypeIcon = getInventoryTypeIcon(row.type_key)
-  const sc = statusTokens.inventory[(row.status_key ?? '') as InventoryStatusKey] ?? { bg: 'rgba(100,116,139,0.08)', color: '#475569', border: 'rgba(100,116,139,0.20)' }
-
-  const meta: { label: string; value: string | null | undefined; mono?: boolean }[] = [
-    { label: 'Cliente',  value: row.customer_name },
-    { label: 'IP',       value: row.local_ip,  mono: true },
-    { label: 'K-Number', value: row.knumber },
-    { label: 'IP SRSA',  value: row.srsa_ip,   mono: true },
-  ]
-
-  return (
-    <Box
-      onClick={() => onOpen(row.id)}
-      sx={{
-        bgcolor: 'background.paper',
-        border: '0.5px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
-        p: 1.25,
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.75,
-        '&:active': { bgcolor: 'action.hover' },
-      }}
-    >
-      {/* Header: nome + badge stato */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.name}
-          </Typography>
-          {row.type_label && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-              {TypeIcon && <TypeIcon sx={{ fontSize: 11, color: 'text.disabled' }} />}
-              <Typography variant="caption" color="text.secondary">{row.type_label}</Typography>
-            </Box>
-          )}
-        </Box>
-        {row.status_label && (
-          <Box sx={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, px: 0.75, py: 0.2, borderRadius: 20, bgcolor: sc.bg, color: sc.color, border: `0.5px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
-            {row.status_label}
-          </Box>
-        )}
-      </Box>
-
-      {/* Grid 2×2 campi */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
-        {meta.map(({ label, value, mono }) => (
-          <Box key={label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1 }}>{label}</Typography>
-            <Typography sx={{ fontSize: '0.72rem', color: value ? 'text.secondary' : 'text.disabled', fontStyle: value ? 'normal' : 'italic', fontFamily: mono && value ? 'monospace' : 'inherit', lineHeight: 1.3 }}>
-              {value || '—'}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-
-      {/* Footer: sito */}
-      {row.site_display_name && (
-        <Box sx={{ borderTop: '0.5px solid', borderColor: 'divider', pt: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', opacity: 0.5, flexShrink: 0 }} />
-          <Typography variant="caption" color="text.secondary">{row.site_display_name}</Typography>
-        </Box>
-      )}
+const renderInventoryCard: MobileCardRenderFn<InventoryRow> = ({ row, onOpen }) => (
+  <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5, cursor: 'pointer', display: 'grid', gap: 0.75, '&:active': { bgcolor: 'action.hover' } }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, gap: 1 }}>
+      <Box component="span" sx={{ display: 'inline-flex', color: 'text.secondary' }}><CampoIcon name={invTypeIcon(row.type_key)} size={16} /></Box>
+      <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, minWidth: 0, flex: 1 }}>{row.name}</Typography>
+      {row.has_active_issue ? <OpenIssueMark priority={row.active_issue_priority} /> : null}
     </Box>
-  )
-  }
-}
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, minWidth: 0 }}>
+      <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary', minWidth: 0 }}>{[row.type_label, row.customer_name, row.site_display_name || row.site_name].filter(Boolean).join(' · ')}</Typography>
+      <InventoryStatusBadge statusKey={row.status_key} label={row.status_label} />
+    </Box>
+    {row.hostname || row.local_ip ? <Typography noWrap sx={{ fontSize: 12, ...mono }}>{[row.hostname, row.local_ip].filter(Boolean).join(' · ')}</Typography> : null}
+  </Box>
+)
 
+type InvView = 'all' | 'iss' | 'nop' | 'inc'
+type ColQ = { name: string; hostname: string; customer: string; site: string; status: string; type: string; ip: string; code: string }
+const EMPTY_COLQ: ColQ = { name: '', hostname: '', customer: '', site: '', status: '', type: '', ip: '', code: '' }
+type ViewState = { view: InvView; customer: number | ''; site: number | ''; type: number | '' }
 
-// prettier-ignore
+const emptyForm = (customer: number | '' = ''): InventoryForm => ({
+  customer, site: '', status: '', type: '', name: '', knumber: '', serial_number: '', hostname: '', local_ip: '', srsa_ip: '',
+  location: '', telefono: '', os_user: '', os_pwd: '', app_usr: '', app_pwd: '', vnc_pwd: '', manufacturer: '', model: '',
+  warranty_end_date: '', custom_fields: {}, notes: '', tags: [],
+})
+
 export default function Inventory() {
-  const statusTokens = useStatusTokens()
-  const zebraSx = useDataGridZebraSx()
   const toast = useToast()
+  const undoToast = useUndoToast()
   const { hasPerm, me } = useAuth()
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
   const canChange = hasPerm(PERMS.inventory.inventory.change)
   const canDelete = hasPerm(PERMS.inventory.inventory.delete)
-
   const navigate = useNavigate()
   const loc = useLocation()
-  const defaultPageSizeRef = React.useRef(25)
 
   const grid = useServerGrid({
-    defaultOrdering: 'hostname',
-    allowedOrderingFields: [
-      'customer_name',
-      'site_name',
-      'hostname',
-      'knumber',
-      'serial_number',
-      'type_label',
-      'status_label',
-      'local_ip',
-      'srsa_ip',
-    ],
-    defaultPageSize: defaultPageSizeRef.current,
+    defaultOrdering: 'name',
+    allowedOrderingFields: ['id', 'name', 'customer_name', 'site_name', 'hostname', 'knumber', 'serial_number', 'type_label', 'status_label', 'local_ip', 'srsa_ip'],
+    defaultPageSize: 25,
   })
 
-
-  const emptyState = React.useMemo(() => {
-    if (grid.view === 'deleted' && !grid.search.trim()) {
-      return { title: 'Cestino vuoto', subtitle: 'Non ci sono inventari eliminati.' }
-    }
-    if (!grid.search.trim()) {
-      return {
-        title: 'Nessun inventario',
-        subtitle: 'Crea un nuovo inventario o cambia i filtri.',
-        action: (
-          <Can perm={PERMS.inventory.inventory.add}>
-            <Button
-              startIcon={<AddIcon />}
-              variant="contained"
-              onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}
-            >
-              Crea inventario
-            </Button>
-          </Can>
-        ),
-      }
-    }
-    return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
-  }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
-
+  const [viewRaw, setViewRaw] = useUrlStringParam('vista')
+  const view: InvView = (['all', 'iss', 'nop', 'inc'] as const).includes(viewRaw as InvView) ? (viewRaw as InvView) : 'all'
   const [customerId, setCustomerId] = useUrlNumberParam('customer')
   const [siteId, setSiteId] = useUrlNumberParam('site')
   const [typeId, setTypeId] = useUrlNumberParam('type')
+  const filterOpts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const [colSearchOpen, setColSearchOpen] = React.useState(false)
+  const [colQ, setColQ] = React.useState<ColQ>(EMPTY_COLQ)
+  const colQActive = Object.values(colQ).some(Boolean)
+  const setCol = (k: keyof ColQ) => (v: string) => { setColQ((c) => ({ ...c, [k]: v })); grid.onPaginationModelChange({ ...grid.paginationModel, page: 0 }) }
+  const hasActiveFilters = customerId !== '' || siteId !== '' || typeId !== ''
+  const resetFilters = React.useCallback(() => { setCustomerId('', { patch: { page: 1, site: '', type: '' }, keepOpen: true }) }, [setCustomerId])
+
+  const saved = useSavedViews<ViewState>('inventory', me?.username)
+  const [savedId, setSavedId] = React.useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const setView = (v: string) => { setSavedId(null); setViewRaw(v === 'all' ? '' : v, filterOpts) }
+  const applySaved = (id: string) => {
+    const v = saved.views.find((x) => x.id === id); if (!v) return
+    setSavedId(id)
+    const str = (n: number | '') => (n === '' ? '' : String(n))
+    setViewRaw(v.state.view === 'all' ? '' : v.state.view, { patch: { page: 1, customer: str(v.state.customer), site: str(v.state.site), type: str(v.state.type) }, keepOpen: true })
+  }
+
+  const emptyState = React.useMemo(() => {
+    const searching = Boolean(grid.search.trim()) || colQActive
+    if (grid.view === 'deleted' && !searching && !hasActiveFilters) return { title: 'Cestino vuoto', subtitle: 'Non ci sono inventari eliminati.' }
+    if (searching || hasActiveFilters || view !== 'all') {
+      return {
+        title: 'Nessun risultato', subtitle: 'Nessun inventario corrisponde: prova a modificare la ricerca, la vista o i filtri.',
+        action: (
+          <Stack direction="row" spacing={1} justifyContent="center">
+            {searching ? <Button variant="outlined" onClick={() => { grid.setQ(''); setColQ(EMPTY_COLQ) }}>Cancella ricerca</Button> : null}
+            {hasActiveFilters ? <Button variant="outlined" onClick={resetFilters}>Azzera filtri</Button> : null}
+          </Stack>
+        ),
+      }
+    }
+    return {
+      title: 'Nessun inventario', subtitle: 'Non ci sono ancora inventari.',
+      action: <Can perm={PERMS.inventory.inventory.add}><Button startIcon={<AddIcon />} variant="contained" onClick={() => navigate(loc.pathname + loc.search, { state: { openCreate: true } })}>Crea inventario</Button></Can>,
+    }
+  }, [grid, colQActive, hasActiveFilters, view, resetFilters, loc.pathname, loc.search, navigate])
 
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
         search: grid.search,
         ordering: grid.ordering,
-        orderingMap: {
-          customer_name: 'customer__name',
-          site_name: 'site__name',
-          type_label: 'type__label',
-          status_label: 'status__label',
-        },
+        orderingMap: { customer_name: 'customer__name', site_name: 'site__name', type_label: 'type__label', status_label: 'status__label' },
         page0: grid.paginationModel.page,
         pageSize: grid.paginationModel.pageSize,
         includeDeleted: grid.includeDeleted,
@@ -476,29 +291,24 @@ export default function Inventory() {
           ...(customerId !== '' ? { customer: customerId } : {}),
           ...(siteId !== '' ? { site: siteId } : {}),
           ...(typeId !== '' ? { type: typeId } : {}),
+          ...(view === 'iss' ? { has_active_issue: 'true' } : view === 'nop' ? { not_operational: 'true' } : view === 'inc' ? { incomplete: 'true' } : {}),
+          ...(colQ.name ? { name_q: colQ.name } : {}),
+          ...(colQ.hostname ? { hostname_q: colQ.hostname } : {}),
+          ...(colQ.customer ? { customer_q: colQ.customer } : {}),
+          ...(colQ.site ? { site_q: colQ.site } : {}),
+          ...(colQ.status ? { status: colQ.status } : {}),
+          ...(colQ.type ? { type: colQ.type } : {}),
+          ...(colQ.ip ? { ip_q: colQ.ip } : {}),
+          ...(colQ.code ? { code_q: colQ.code } : {}),
         },
       }),
-    [
-      grid.search,
-      grid.ordering,
-      grid.paginationModel.page,
-      grid.paginationModel.pageSize,
-      grid.includeDeleted,
-      grid.onlyDeleted,
-      customerId,
-      siteId,
-      typeId,
-    ],
+    [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, grid.includeDeleted, grid.onlyDeleted, customerId, siteId, typeId, view, colQ],
   )
 
-  const {
-    rows,
-    rowCount,
-    loading,
-    reload: reloadList,
-  } = useDrfList<InventoryRow>(INVENTORIES_PATH, listParams, (e: unknown) =>
-    toast.error(apiErrorToMessage(e)),
-  )
+  const { rows, rowCount, loading, reload: reloadList } = useDrfList<InventoryRow>(INVENTORIES_PATH, listParams, (e: unknown) => toast.error(apiErrorToMessage(e)))
+  const [kpiReload, setKpiReload] = React.useState(0)
+  const summary = useInventorySummary(kpiReload)
+  const reloadAll = React.useCallback(() => { reloadList(); setKpiReload((n) => n + 1) }, [reloadList])
 
   const [customers, setCustomers] = React.useState<CustomerItem[]>([])
   const [filterSites, setFilterSites] = React.useState<SiteItem[]>([])
@@ -506,452 +316,258 @@ export default function Inventory() {
   const [types, setTypes] = React.useState<LookupItem[]>([])
 
   const [drawerOpen, setDrawerOpen] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState(0)
+  const [drawerTab, setDrawerTab] = React.useState<InventoryTab>('det')
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<InventoryDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
 
-  // delete/restore
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
   const [restoreBusy, setRestoreBusy] = React.useState(false)
 
-  // CRUD dialog
+  // dialog CRUD
   const [dlgOpen, setDlgOpen] = React.useState(false)
   const [dlgMode, setDlgMode] = React.useState<'create' | 'edit'>('create')
   const [dlgSaving, setDlgSaving] = React.useState(false)
   const [dlgId, setDlgId] = React.useState<number | null>(null)
   const [dlgSites, setDlgSites] = React.useState<SiteItem[]>([])
-  const [form, setForm] = React.useState<InventoryForm>({
-    customer: '',
-    site: '',
-    status: '',
-    type: '',
-    name: '',
-    knumber: '',
-    serial_number: '',
-    hostname: '',
-    local_ip: '',
-    srsa_ip: '',
-    location: '',
-    telefono: '',
-    os_user: '',
-    os_pwd: '',
-    app_usr: '',
-    app_pwd: '',
-    vnc_pwd: '',
-    manufacturer: '',
-    model: '',
-    warranty_end_date: '',
-    custom_fields: {},
-    notes: '',
-    tags: [],
-  })
-
+  const [form, setForm] = React.useState<InventoryForm>(emptyForm())
   const [formErrors, setFormErrors] = React.useState<Record<string, string | undefined>>({})
   const [tagInput, setTagInput] = React.useState('')
 
-  // Campi disabilitati in base al tipo selezionato
-  const selectedTypeKey = React.useMemo(
-    () => (form.type !== '' ? (types.find((t) => t.id === form.type)?.key ?? null) : null),
-    [form.type, types],
-  )
-  const disabledFields = React.useMemo((): Set<InventoryFieldName> => {
-    const fields = TYPE_DISABLED_FIELDS[selectedTypeKey ?? ''] ?? []
-    return new Set(fields)
-  }, [selectedTypeKey])
+  // Campi non applicabili al tipo scelto nel modulo
+  const selectedTypeKey = React.useMemo(() => (form.type !== '' ? (types.find((t) => t.id === form.type)?.key ?? null) : null), [form.type, types])
+  const disabledFields = React.useMemo(() => disabledFieldsFor(selectedTypeKey), [selectedTypeKey])
   const df = (f: InventoryFieldName) => disabledFields.has(f)
   const dfHelp = (f: InventoryFieldName) => (df(f) ? 'Non applicabile per questo tipo' : undefined)
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', {
-        params: { ordering: 'name', page_size: 500 },
-      })
+      const res = await api.get<ApiPage<CustomerItem>>('/customers/', { params: { ordering: 'name', page_size: 500 } })
       setCustomers(res.data.results ?? [])
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
   const loadLookups = React.useCallback(async () => {
     try {
-      const [st, ty] = await Promise.all([
-        api.get<LookupItem[]>('/inventory-statuses/'),
-        api.get<LookupItem[]>('/inventory-types/'),
-      ])
+      const [st, ty] = await Promise.all([api.get<LookupItem[]>('/inventory-statuses/'), api.get<LookupItem[]>('/inventory-types/')])
       setStatuses(st.data ?? [])
       setTypes(ty.data ?? [])
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
   const loadFilterSites = React.useCallback(async () => {
     try {
-      const params: Record<string, unknown> = { ordering: 'name', page_size: 500 }
-      if (customerId !== '') params.customer = customerId
-      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params })
+      if (customerId === '') { setFilterSites([]); return }
+      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { ordering: 'name', page_size: 500, customer: customerId } })
       setFilterSites(res.data.results ?? [])
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    }
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [customerId, toast])
 
-  const loadSitesForDialogCustomer = React.useCallback(
-    async (cust: number | '') => {
-      try {
-        if (cust === '') {
-          setDlgSites([])
-          return
-        }
-        const res = await api.get<ApiPage<SiteItem>>('/sites/', {
-          params: { ordering: 'name', page_size: 500, customer: cust },
-        })
-        setDlgSites(res.data.results ?? [])
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      }
-    },
-    [toast],
-  )
+  const loadSitesForDialogCustomer = React.useCallback(async (cust: number | '') => {
+    try {
+      if (cust === '') { setDlgSites([]); return }
+      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { ordering: 'name', page_size: 500, customer: cust } })
+      setDlgSites(res.data.results ?? [])
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }, [toast])
 
-  const loadDetail = React.useCallback(
-    async (id: number, forceIncludeDeleted?: boolean) => {
-      setDetailLoading(true)
-      setDetail(null)
-      try {
-        const inc = forceIncludeDeleted ?? grid.includeDeleted
-        const incParams = includeDeletedParams(inc)
-        const res = await api.get<InventoryDetail>(
-          itemPath(INVENTORIES_PATH, id),
-          incParams ? { params: incParams } : undefined,
-        )
-        setDetail(res.data)
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        setDetailLoading(false)
-      }
-    },
-    [toast, grid.includeDeleted],
-  )
-
-  React.useEffect(() => {
-    loadCustomers()
-    loadLookups()
-  }, [loadCustomers, loadLookups])
-
-  // Keep siteId when initial URL has both customer+site; reset only when customer changes later
-  const prevCustomerRef = React.useRef(customerId)
-  React.useEffect(() => {
-    loadFilterSites()
-    if (prevCustomerRef.current !== customerId) {
-      setSiteId('', { patch: { page: 1 }, keepOpen: true })
-      prevCustomerRef.current = customerId
+  const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
+    setDetailLoading(true)
+    if (!keep) setDetail(null)
+    try {
+      const inc = forceIncludeDeleted ?? grid.includeDeleted
+      const incParams = includeDeletedParams(inc)
+      const res = await api.get<InventoryDetail>(itemPath(INVENTORIES_PATH, id), incParams ? { params: incParams } : undefined)
+      setDetail(res.data)
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setDetailLoading(false)
     }
-  }, [customerId, loadFilterSites, setSiteId])
+  }, [toast, grid.includeDeleted])
 
-  // list loading is handled by useDrfList
+  React.useEffect(() => { loadCustomers(); loadLookups() }, [loadCustomers, loadLookups])
+  React.useEffect(() => { loadFilterSites() }, [loadFilterSites])
 
   // open drawer from URL (?open=ID)
   const lastOpenRef = React.useRef<number | null>(null)
   React.useEffect(() => {
-    if (!grid.openId) {
-      lastOpenRef.current = null
-      return
-    }
+    if (!grid.openId) { lastOpenRef.current = null; return }
     const id = grid.openId
     if (lastOpenRef.current === id) return
     lastOpenRef.current = id
-
     setSelectedId(id)
     setDrawerOpen(true)
-    setDrawerTab(0)
+    setDrawerTab('det')
     void loadDetail(id)
   }, [grid.openId, loadDetail])
 
-  const openDrawer = React.useCallback(
-    (id: number) => {
-      lastOpenRef.current = id
-      setSelectedId(id)
-      setDrawerOpen(true)
-      setDrawerTab(0)
-      void loadDetail(id)
-      grid.setOpenId(id)
-    },
-    [grid, loadDetail],
-  )
+  const openDrawer = React.useCallback((id: number) => {
+    lastOpenRef.current = id
+    setDrawerTab((t) => (selectedId === id ? t : 'det'))
+    setSelectedId(id)
+    setDrawerOpen(true)
+    void loadDetail(id)
+    grid.setOpenId(id)
+  }, [grid, loadDetail, selectedId])
 
   // ── Azioni riga / menu contestuale ──────────────────────────────────────────
   const pendingEditIdRef = React.useRef<number | null>(null)
   const pendingDeleteIdRef = React.useRef<number | null>(null)
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: InventoryRow
-    mouseX: number
-    mouseY: number
-  } | null>(null)
+  const openEditRef = React.useRef<(() => void | Promise<void>) | null>(null)
+  const [contextMenu, setContextMenu] = React.useState<{ row: InventoryRow; mouseX: number; mouseY: number } | null>(null)
 
-  const openEditFromRow = React.useCallback(
-    (id: number) => {
-      pendingEditIdRef.current = id
-      openDrawer(id)
-    },
-    [openDrawer],
-  )
+  const openEditFromRow = React.useCallback((id: number) => { pendingEditIdRef.current = id; openDrawer(id) }, [openDrawer])
+  const openDeleteFromRow = React.useCallback((id: number) => { pendingDeleteIdRef.current = id; openDrawer(id) }, [openDrawer])
+  const restoreFromRow = React.useCallback(async (id: number) => {
+    setRestoreBusy(true)
+    try {
+      await api.post(itemActionPath(INVENTORIES_PATH, id, 'restore'))
+      toast.success('Inventario ripristinato')
+      reloadAll()
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    } finally {
+      setRestoreBusy(false)
+    }
+  }, [toast, reloadAll])
 
-  const openDeleteFromRow = React.useCallback(
-    (id: number) => {
-      pendingDeleteIdRef.current = id
-      openDrawer(id)
-    },
-    [openDrawer],
-  )
-
-  const restoreFromRow = React.useCallback(
-    async (id: number) => {
-      setRestoreBusy(true)
-      try {
-        await api.post(itemActionPath(INVENTORIES_PATH, id, 'restore'))
-        toast.success('Inventario ripristinato')
-        reloadList()
-      } catch (e) {
-        toast.error(apiErrorToMessage(e))
-      } finally {
-        setRestoreBusy(false)
-      }
-    },
-    [toast, reloadList],
-  )
-
-  const openIssueFromRow = React.useCallback(
-    (row: InventoryRow) => {
-      navigate('/issues', {
-        state: {
-          createFromInventory: {
-            inventoryId: row.id,
-            inventoryName: row.name || row.hostname || row.knumber || `Inventory #${row.id}`,
-            inventoryKnumber: row.knumber ?? null,
-            inventorySerialNumber: row.serial_number ?? null,
-            inventoryHostname: row.hostname ?? null,
-            customerId: row.customer,
-            customerName: row.customer_name || row.customer_code || `Customer #${row.customer}`,
-            siteId: row.site ?? null,
-          },
+  const openIssueFor = React.useCallback((row: { id: number; name: string; hostname?: string | null; knumber?: string | null; serial_number?: string | null; customer: number; customer_name?: string; customer_code?: string; site?: number | null }) => {
+    navigate('/issues', {
+      state: {
+        createFromInventory: {
+          inventoryId: row.id,
+          inventoryName: row.name || row.hostname || row.knumber || `Inventario #${row.id}`,
+          inventoryKnumber: row.knumber ?? null,
+          inventorySerialNumber: row.serial_number ?? null,
+          inventoryHostname: row.hostname ?? null,
+          customerId: row.customer,
+          customerName: row.customer_name || row.customer_code || `Cliente #${row.customer}`,
+          siteId: row.site ?? null,
         },
-      })
-    },
-    [navigate],
-  )
+      },
+    })
+  }, [navigate])
 
   React.useEffect(() => {
     if (!detail) return
-    if (pendingEditIdRef.current === detail.id) {
-      pendingEditIdRef.current = null
-      openEdit()
-    }
-    if (pendingDeleteIdRef.current === detail.id) {
-      pendingDeleteIdRef.current = null
-      setDeleteDlgOpen(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (pendingEditIdRef.current === detail.id) { pendingEditIdRef.current = null; const fn = openEditRef.current; if (fn) void fn() }
+    if (pendingDeleteIdRef.current === detail.id) { pendingDeleteIdRef.current = null; setDeleteDlgOpen(true) }
   }, [detail])
 
-  const handleRowContextMenu = React.useCallback(
-    (row: InventoryRow, event: React.MouseEvent<HTMLElement>) => {
-      setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
-    },
-    [],
-  )
-
-  const closeContextMenu = React.useCallback(() => {
-    setContextMenu(null)
+  const handleRowContextMenu = React.useCallback((row: InventoryRow, event: React.MouseEvent<HTMLElement>) => {
+    setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6 })
   }, [])
+  const closeContextMenu = React.useCallback(() => setContextMenu(null), [])
 
   const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
     const row = contextMenu?.row
     if (!row) return []
-
     if (row.deleted_at) {
       return [
-        {
-          key: 'open',
-          label: 'Apri',
-          icon: <VisibilityOutlinedIcon fontSize="small" />,
-          onClick: () => openDrawer(row.id),
-        },
-        {
-          key: 'restore',
-          label: 'Ripristina',
-          icon: <RestoreFromTrashIcon fontSize="small" />,
-          onClick: () => void restoreFromRow(row.id),
-          disabled: restoreBusy,
-        },
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
+        { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, onClick: () => void restoreFromRow(row.id), disabled: restoreBusy },
       ]
     }
-
     return [
-      {
-        key: 'open',
-        label: 'Apri',
-        icon: <VisibilityOutlinedIcon fontSize="small" />,
-        onClick: () => openDrawer(row.id),
-      },
-      {
-        key: 'edit',
-        label: 'Modifica',
-        icon: <EditIcon fontSize="small" />,
-        onClick: () => openEditFromRow(row.id),
-      },
-      {
-        key: 'delete',
-        label: 'Elimina',
-        icon: <DeleteOutlineIcon fontSize="small" />,
-        onClick: () => openDeleteFromRow(row.id),
-        disabled: deleteBusy,
-        tone: 'danger',
-      },
-      {
-        key: 'open-issue',
-        label: 'Apri issue',
-        icon: <ConfirmationNumberOutlinedIcon fontSize="small" />,
-        onClick: () => openIssueFromRow(row),
-      },
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(row.id) },
+      { key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, onClick: () => openEditFromRow(row.id) },
+      { key: 'issue', label: 'Nuova issue', icon: <AddIcon fontSize="small" />, onClick: () => openIssueFor(row) },
+      ...(row.hostname ? [{ key: 'host', label: "Copia l'hostname", icon: <CampoIcon name="copy" />, onClick: async () => { await copyToClipboard(row.hostname!); toast.success('Copiato') } }] : []),
+      ...(row.local_ip ? [{ key: 'ip', label: "Copia l'IP locale", icon: <CampoIcon name="copy" />, onClick: async () => { await copyToClipboard(row.local_ip!); toast.success('Copiato') } }] : []),
+      { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => openDeleteFromRow(row.id), disabled: deleteBusy, tone: 'danger' as const },
     ]
-  }, [
-    contextMenu,
-    deleteBusy,
-    openDeleteFromRow,
-    openDrawer,
-    openEditFromRow,
-    openIssueFromRow,
-    restoreBusy,
-    restoreFromRow,
-  ])
+  }, [contextMenu, deleteBusy, openDeleteFromRow, openDrawer, openEditFromRow, openIssueFor, restoreBusy, restoreFromRow, toast])
 
-  const columns = React.useMemo<GridColDef<InventoryRow>[]>(() => {
-    return buildColumns(statusTokens)
-  }, [statusTokens])
+  const columns = React.useMemo<GridColDef<InventoryRow>[]>(() => buildColumns(), [])
 
-  const renderInventoryCard = React.useMemo(
-    () => makeRenderInventoryCard(statusTokens),
-    [statusTokens],
-  )
-
-  // Configurazione filtri URL per il kebab/imbuto delle colonne
+  const customerLabel = (id: number | '') => { const c = customers.find((x) => x.id === id); return c ? c.name : String(id) }
   const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
-    customer_display_name: {
-      value: customerId,
-      label: 'Filtra per cliente',
-      onSet: (v) => setCustomerId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setCustomerId('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Cliente</InputLabel>
-          <Select
-            label="Cliente"
-            value={customerId === '' ? '' : String(customerId)}
-            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {customers.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-      ),
+    customer_name: {
+      value: customerId === '' ? '' : String(customerId),
+      label: 'Filtra cliente',
+      onSet: (v) => setCustomerId(v === '' ? '' : Number(v), { patch: { page: 1, site: '' }, keepOpen: true }),
+      onReset: () => setCustomerId('', { patch: { page: 1, site: '' }, keepOpen: true }),
+      children: <FilterOptionList label="Cliente" single searchable options={customers.map((c) => ({ value: String(c.id), label: c.name }))}
+        selected={customerId === '' ? [] : [String(customerId)]} onChange={(vals) => setCustomerId(vals[0] ? Number(vals[0]) : '', { patch: { page: 1, site: '' }, keepOpen: true })} />,
     },
-    site_display_name: {
-      value: siteId,
-      label: 'Filtra per sito',
-      onSet: (v) => setSiteId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setSiteId('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Sito</InputLabel>
-          <Select
-            label="Sito"
-            value={siteId === '' ? '' : String(siteId)}
-            onChange={(e) => setSiteId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {filterSites.map((s) => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-      ),
-    },
+    ...(customerId !== '' ? {
+      site_name: {
+        value: siteId === '' ? '' : String(siteId),
+        label: 'Filtra sito',
+        onSet: (v: string | number | '') => setSiteId(v === '' ? '' : Number(v), filterOpts),
+        onReset: () => setSiteId('', filterOpts),
+        children: <FilterOptionList label="Sito" single options={filterSites.map((st) => ({ value: String(st.id), label: st.display_name || st.name }))}
+          selected={siteId === '' ? [] : [String(siteId)]} onChange={(vals) => setSiteId(vals[0] ? Number(vals[0]) : '', filterOpts)} />,
+      },
+    } : {}),
     type_label: {
-      value: typeId,
-      label: 'Filtra per tipo',
-      onSet: (v) => setTypeId(v as number | '', { patch: { page: 1 }, keepOpen: true }),
-      onReset: () => setTypeId('', { patch: { page: 1 }, keepOpen: true }),
-      children: (
-        <FormControl size="small" fullWidth>
-          <InputLabel>Tipo</InputLabel>
-          <Select
-            label="Tipo"
-            value={typeId === '' ? '' : String(typeId)}
-            onChange={(e) => setTypeId(e.target.value === '' ? '' : Number(e.target.value), { patch: { page: 1 }, keepOpen: true })}
-          >
-            <MenuItem value="">Tutti</MenuItem>
-            {types.map((t) => <MenuItem key={t.id} value={String(t.id)}>{t.label}</MenuItem>)}
-          </Select>
-        </FormControl>
-      ),
+      value: typeId === '' ? '' : String(typeId),
+      label: 'Filtra tipo',
+      onSet: (v) => setTypeId(v === '' ? '' : Number(v), filterOpts),
+      onReset: () => setTypeId('', filterOpts),
+      children: <FilterOptionList label="Tipo" single searchable options={types.map((t) => ({ value: String(t.id), label: t.label }))}
+        selected={typeId === '' ? [] : [String(typeId)]} onChange={(vals) => setTypeId(vals[0] ? Number(vals[0]) : '', filterOpts)} />,
     },
-  }), [customerId, siteId, typeId, setCustomerId, setSiteId, setTypeId, customers, filterSites, types])
+  }), [customerId, siteId, typeId, setCustomerId, setSiteId, setTypeId, customers, filterSites, types, filterOpts])
 
-  // If opened from global Search, we can return back to the Search results on close.
-  const returnTo = React.useMemo(() => {
-    return new URLSearchParams(loc.search).get('return')
-  }, [loc.search])
+  const activeFilters: ActiveFilter[] = [
+    customerId !== '' ? { key: 'customer', label: 'Cliente', values: customerLabel(customerId) } : null,
+    siteId !== '' ? { key: 'site', label: 'Sito', values: (() => { const st = filterSites.find((x) => x.id === siteId); return st ? st.display_name || st.name : String(siteId) })() } : null,
+    typeId !== '' ? { key: 'type', label: 'Tipo', values: types.find((t) => t.id === typeId)?.label ?? String(typeId) } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (key: string) => {
+    if (key === 'customer') setCustomerId('', { patch: { page: 1, site: '' }, keepOpen: true })
+    if (key === 'site') setSiteId('', filterOpts)
+    if (key === 'type') setTypeId('', filterOpts)
+  }
 
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<InventoryRow>({
+      url: INVENTORIES_PATH, params, filename: 'inventari',
+      columns: [
+        { label: 'Nome', getValue: (r) => r.name },
+        { label: 'Tipo', getValue: (r) => r.type_label ?? '' },
+        { label: 'Stato', getValue: (r) => r.status_label ?? '' },
+        { label: 'Cliente', getValue: (r) => r.customer_name ?? '' },
+        { label: 'Sito', getValue: (r) => r.site_display_name || r.site_name || '' },
+        { label: 'Hostname', getValue: (r) => r.hostname ?? '' },
+        { label: 'IP locale', getValue: (r) => r.local_ip ?? '' },
+        { label: 'IP SRSA', getValue: (r) => r.srsa_ip ?? '' },
+        { label: 'K-Number', getValue: (r) => r.knumber ?? '' },
+        { label: 'Seriale', getValue: (r) => r.serial_number ?? '' },
+        { label: 'Posizione', getValue: (r) => r.location ?? '' },
+      ],
+    })
+  }
+
+  const returnTo = React.useMemo(() => new URLSearchParams(loc.search).get('return'), [loc.search])
   const closeDrawer = () => {
     lastOpenRef.current = null
     setDrawerOpen(false)
+    setSelectedId(null)
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
   }
 
   const openCreateOnceRef = React.useRef(false)
-
   const openCreate = React.useCallback(async () => {
     const preCustomer = customerId !== '' ? customerId : ''
     setDlgMode('create')
     setDlgId(null)
-    setForm({
-      customer: preCustomer,
-      site: '',
-      status: '',
-      type: '',
-      name: '',
-      knumber: '',
-      serial_number: '',
-      hostname: '',
-      local_ip: '',
-      srsa_ip: '',
-      location: '',
-      telefono: '',
-      os_user: '',
-      os_pwd: '',
-      app_usr: '',
-      app_pwd: '',
-      vnc_pwd: '',
-      manufacturer: '',
-      model: '',
-      warranty_end_date: '',
-      custom_fields: {},
-      notes: '',
-      tags: [],
-    })
+    setForm({ ...emptyForm(preCustomer), site: siteId !== '' ? siteId : '' })
+    setFormErrors({})
     setDlgOpen(true)
     await loadSitesForDialogCustomer(preCustomer)
-  }, [customerId, loadSitesForDialogCustomer])
+  }, [customerId, siteId, loadSitesForDialogCustomer])
 
   React.useEffect(() => {
     const stU = loc.state as unknown
-    if (!isRecord(stU) || stU['openCreate'] !== true) {
-      openCreateOnceRef.current = false
-      return
-    }
+    if (!isRecord(stU) || stU['openCreate'] !== true) { openCreateOnceRef.current = false; return }
     if (openCreateOnceRef.current) return
     openCreateOnceRef.current = true
     void openCreate()
@@ -962,38 +578,20 @@ export default function Inventory() {
     if (!detail) return
     setDlgMode('edit')
     setDlgId(detail.id)
-
     const cust = detail.customer
     setForm({
-      customer: cust,
-      site: detail.site ?? '',
-      status: detail.status ?? '',
-      type: detail.type ?? '',
-      name: detail.name ?? '',
-      knumber: detail.knumber ?? '',
-      serial_number: detail.serial_number ?? '',
-      hostname: detail.hostname ?? '',
-      local_ip: detail.local_ip ?? '',
-      srsa_ip: detail.srsa_ip ?? '',
-      location: detail.location ?? '',
-      telefono: detail.telefono ?? '',
-      os_user: detail.os_user ?? '',
-      os_pwd: detail.os_pwd ?? '',
-      app_usr: detail.app_usr ?? '',
-      app_pwd: detail.app_pwd ?? '',
-      vnc_pwd: detail.vnc_pwd ?? '',
-      manufacturer: detail.manufacturer ?? '',
-      model: detail.model ?? '',
-      warranty_end_date: detail.warranty_end_date ?? '',
-      custom_fields: detail.custom_fields ?? {},
-      notes: detail.notes ?? '',
-      tags: detail.tags ?? [],
+      customer: cust, site: detail.site ?? '', status: detail.status ?? '', type: detail.type ?? '', name: detail.name ?? '',
+      knumber: detail.knumber ?? '', serial_number: detail.serial_number ?? '', hostname: detail.hostname ?? '', local_ip: detail.local_ip ?? '',
+      srsa_ip: detail.srsa_ip ?? '', location: detail.location ?? '', telefono: detail.telefono ?? '', os_user: detail.os_user ?? '',
+      os_pwd: detail.os_pwd ?? '', app_usr: detail.app_usr ?? '', app_pwd: detail.app_pwd ?? '', vnc_pwd: detail.vnc_pwd ?? '',
+      manufacturer: detail.manufacturer ?? '', model: detail.model ?? '', warranty_end_date: detail.warranty_end_date ?? '',
+      custom_fields: detail.custom_fields ?? {}, notes: detail.notes ?? '', tags: detail.tags ?? [],
     })
-
     setDlgOpen(true)
     setFormErrors({})
     await loadSitesForDialogCustomer(cust)
   }, [detail, loadSitesForDialogCustomer])
+  openEditRef.current = openEdit
 
   const save = async () => {
     const errs: { customer?: string; status?: string; name?: string } = {}
@@ -1003,36 +601,16 @@ export default function Inventory() {
     setFormErrors(errs)
     if (Object.keys(errs).length) return
 
+    const t = (v: string) => (v || '').trim() || null
     const payload: Record<string, unknown> = {
-      customer: Number(form.customer),
-      site: form.site === '' ? null : Number(form.site),
-      status: Number(form.status),
-      type: form.type === '' ? null : Number(form.type),
-
-      name: form.name.trim(),
-      knumber: (form.knumber || '').trim() || null,
-      serial_number: (form.serial_number || '').trim() || null,
-
-      hostname: (form.hostname || '').trim() || null,
-      local_ip: (form.local_ip || '').trim() || null,
-      srsa_ip: (form.srsa_ip || '').trim() || null,
-      location: (form.location || '').trim() || null,
-      telefono: (form.telefono || '').trim() || null,
-
-      os_user: (form.os_user || '').trim() || null,
-      os_pwd: (form.os_pwd || '').trim() || null,
-      app_usr: (form.app_usr || '').trim() || null,
-      app_pwd: (form.app_pwd || '').trim() || null,
-      vnc_pwd: (form.vnc_pwd || '').trim() || null,
-
-      manufacturer: (form.manufacturer || '').trim() || null,
-      model: (form.model || '').trim() || null,
-      warranty_end_date: (form.warranty_end_date || '').trim() || null,
-
-      custom_fields:
-        form.custom_fields && Object.keys(form.custom_fields).length ? form.custom_fields : null,
-      notes: (form.notes || '').trim() || null,
-      tags: form.tags.length ? form.tags : null,
+      customer: Number(form.customer), site: form.site === '' ? null : Number(form.site), status: Number(form.status), type: form.type === '' ? null : Number(form.type),
+      name: form.name.trim(), knumber: t(form.knumber), serial_number: t(form.serial_number),
+      hostname: t(form.hostname), local_ip: t(form.local_ip), srsa_ip: t(form.srsa_ip), location: t(form.location), telefono: t(form.telefono),
+      manufacturer: t(form.manufacturer), model: t(form.model), warranty_end_date: t(form.warranty_end_date),
+      custom_fields: form.custom_fields && Object.keys(form.custom_fields).length ? form.custom_fields : null,
+      notes: t(form.notes), tags: form.tags.length ? form.tags : null,
+      // Le credenziali si inviano solo con il permesso (il backend le rifiuta altrimenti).
+      ...(canViewSecrets ? { os_user: t(form.os_user), os_pwd: t(form.os_pwd), app_usr: t(form.app_usr), app_pwd: t(form.app_pwd), vnc_pwd: t(form.vnc_pwd) } : { os_user: t(form.os_user), app_usr: t(form.app_usr) }),
     }
 
     setDlgSaving(true)
@@ -1048,20 +626,39 @@ export default function Inventory() {
         id = res.data.id
         toast.success('Inventario aggiornato')
       }
-
       setDlgOpen(false)
-      reloadList()
+      reloadAll()
       openDrawer(id)
     } catch (e) {
       const feedback = apiErrorToFormFeedback(e)
-      if (feedback.hasFieldErrors) {
-        setFormErrors((prev) => ({ ...prev, ...feedback.fieldErrors }))
-      }
+      if (feedback.hasFieldErrors) setFormErrors((prev) => ({ ...prev, ...feedback.fieldErrors }))
       toast.error(feedback.message)
     } finally {
       setDlgSaving(false)
     }
   }
+
+  // Modifica sul posto dalle Proprietà, con annulla.
+  const patchInventory = React.useCallback(async (patch: InventoryPatch, label: string) => {
+    if (!detail) return
+    const id = detail.id
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
+    try {
+      await api.patch(itemPath(INVENTORIES_PATH, id), patch)
+      await loadDetail(id, undefined, true)
+      reloadAll()
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          await api.patch(itemPath(INVENTORIES_PATH, id), prev)
+          await loadDetail(id, undefined, true)
+          reloadAll()
+        } catch (e) { toast.error(apiErrorToMessage(e)) }
+      })
+    } catch (e) {
+      toast.error(apiErrorToFormFeedback(e).message)
+    }
+  }, [detail, loadDetail, reloadAll, undoToast, toast])
 
   const doDelete = async () => {
     if (!detail) return
@@ -1069,10 +666,8 @@ export default function Inventory() {
     try {
       await api.delete(itemPath(INVENTORIES_PATH, detail.id))
       toast.success('Inventario eliminato')
-
-      // per poterlo vedere subito nel drawer dopo il delete:
       grid.setViewMode('all', { keepOpen: true })
-      reloadList()
+      reloadAll()
       await loadDetail(detail.id, true)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -1088,7 +683,7 @@ export default function Inventory() {
     try {
       await api.post(itemActionPath(INVENTORIES_PATH, detail.id, 'restore'))
       toast.success('Inventario ripristinato')
-      reloadList()
+      reloadAll()
       await loadDetail(detail.id)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
@@ -1097,69 +692,131 @@ export default function Inventory() {
     }
   }
 
+  const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
+
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Inventari"
+        actions={<Can perm={PERMS.inventory.inventory.add}><Button startIcon={<AddIcon />} variant="contained" onClick={() => void openCreate()}>Nuovo inventario</Button></Can>}
+      />
+      <InventoryKpis summary={summary} view={view} onView={setView} onType={(id) => setTypeId(typeId === id ? '' : id, filterOpts)} />
 
-      <EntityListCard
-        mobileCard={renderInventoryCard}
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-        }}
-        grid={{
-          pageKey: 'inventory',
-          username: me?.username,
-          filterConfig,
-
-          emptyState,
-          rows,
-          columns: columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowClick: openDrawer,
-          onRowContextMenu: handleRowContextMenu,
-          sx: {
-            '--DataGrid-rowHeight': '24px',
-            '--DataGrid-headerHeight': '35px',
-            '& .MuiDataGrid-cell': { py: 0.25 },
-            '& .MuiDataGrid-columnHeader': { py: 0.75 },
-            ...zebraSx,
-          },
-        }}
-      >
-      </EntityListCard>
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs
+          value={savedId ? `saved:${savedId}` : view}
+          onChange={(k) => { if (k.startsWith('saved:')) { applySaved(k.slice(6)); return } setView(k) }}
+          tabs={[
+            { key: 'all', label: 'Tutti', count: summary?.total },
+            { key: 'iss', label: 'Con issue aperte', count: summary?.with_issue },
+            { key: 'nop', label: 'Non operativi', count: summary?.not_operational, tone: 'alert' },
+            { key: 'inc', label: 'Da completare', count: summary?.incomplete },
+            ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
+          ]}
+          end={
+            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+              Salva vista
+            </Button>
+          }
+        />
+        <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
+          onSave={(name) => { const v = saved.add(name, { view, customer: customerId, site: siteId, type: typeId }); setSavedId(v.id) }} />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={renderInventoryCard}
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={activeFilters}
+              onRemoveFilter={removeFilter}
+              onClearFilters={resetFilters}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca nome, hostname, IP, K-Number, seriale…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
+            />
+          }
+          toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca inventari…' }}
+          grid={{
+            pageKey: 'inventory',
+            autoHeight: true,
+            username: me?.username,
+            filterConfig,
+            emptyState,
+            defaultHiddenColumns: ['id', 'knumber', 'serial_number', 'srsa_ip', 'location'],
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                name: { value: colQ.name, onChange: setCol('name'), placeholder: 'Nome' },
+                type_label: { value: colQ.type, onChange: setCol('type'), options: types.map((t) => ({ value: String(t.id), label: t.label })) },
+                hostname: { value: colQ.hostname, onChange: setCol('hostname'), placeholder: 'Hostname' },
+                customer_name: { value: colQ.customer, onChange: setCol('customer'), placeholder: 'Cliente' },
+                site_name: { value: colQ.site, onChange: setCol('site'), placeholder: 'Sito o posizione' },
+                status_label: { value: colQ.status, onChange: setCol('status'), options: statuses.map((s) => ({ value: String(s.id), label: s.label })) },
+                local_ip: { value: colQ.ip, onChange: setCol('ip'), placeholder: 'IP' },
+                knumber: { value: colQ.code, onChange: setCol('code'), placeholder: 'K# o seriale' },
+                serial_number: { value: colQ.code, onChange: setCol('code'), placeholder: 'K# o seriale' },
+                srsa_ip: { value: colQ.ip, onChange: setCol('ip'), placeholder: 'IP' },
+              },
+            },
+            rows,
+            columns,
+            loading,
+            rowCount,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: grid.sortModel,
+            onSortModelChange: grid.onSortModelChange,
+            onRowClick: openDrawer,
+            onRowContextMenu: handleRowContextMenu,
+            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            sx: { ...headerFilterGridSx, cursor: 'pointer' },
+          }}
+        />
+      </Box>
 
       <RowContextMenu
         open={Boolean(contextMenu)}
-        anchorPosition={
-          contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined
-        }
+        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
         onClose={closeContextMenu}
         items={contextMenuItems}
       />
 
-      <InventoryDrawer
-        open={drawerOpen}
-        detail={detail}
-        detailLoading={detailLoading}
-        selectedId={selectedId}
-        canViewSecrets={canViewSecrets}
-        canChange={canChange}
-        canDelete={canDelete}
-        drawerTab={drawerTab}
-        deleteBusy={deleteBusy}
-        restoreBusy={restoreBusy}
-        onClose={closeDrawer}
-        onTabChange={setDrawerTab}
-        onEdit={openEdit}
-        onDelete={() => setDeleteDlgOpen(true)}
-        onRestore={doRestore}
-      />
+      {drawerOpen ? (
+        <InventoryDetailCard
+          detail={detail}
+          loading={detailLoading}
+          statuses={statuses}
+          types={types}
+          canChange={canChange}
+          canDelete={canDelete}
+          canViewSecrets={canViewSecrets}
+          canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
+          canUploadReports={hasPerm(PERMS.maintenance.event.change)}
+          tab={drawerTab}
+          onTab={setDrawerTab}
+          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onClose={closeDrawer}
+          onEdit={() => void openEdit()}
+          onDelete={() => setDeleteDlgOpen(true)}
+          onRestore={() => void doRestore()}
+          onPatch={(patch, label) => void patchInventory(patch, label)}
+          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+          onNewIssue={() => { if (detail) openIssueFor(detail) }}
+          onOpenCustomer={() => { if (detail) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
+          onOpenSite={() => { if (detail?.site) navigate(`/sites${buildQuery({ open: detail.site })}`) }}
+          activityTab={detail ? <AuditFeedPanel appLabel="inventory" model="inventory" objectId={detail.id} noun="l'inventario"
+            fields={{ name: 'il nome', hostname: "l'hostname", local_ip: "l'IP locale", srsa_ip: "l'IP SRSA", knumber: 'il K-Number', serial_number: 'il seriale', status: 'lo stato', type: 'il tipo', site: 'il sito', location: 'la posizione', telefono: 'il telefono', manufacturer: 'il produttore', model: 'il modello', warranty_end_date: 'la fine garanzia', notes: 'le note', os_user: "l'utente OS", app_usr: "l'utente app", os_pwd: 'la password OS', app_pwd: 'la password app', vnc_pwd: 'la password VNC', tags: 'i tag', custom_fields: 'i campi personalizzati' }} /> : null}
+        />
+      ) : null}
 
       <InventoryDialog
         open={dlgOpen}

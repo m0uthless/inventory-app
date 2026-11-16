@@ -2,7 +2,7 @@ import * as React from 'react'
 import { ThemeProvider, CssBaseline } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useAuth } from '../auth/AuthProvider'
-import { THEME_REGISTRY, DEFAULT_THEME_KEY, resolveThemeKey } from './themeRegistry'
+import { THEME_REGISTRY, DEFAULT_THEME_KEY, resolveThemeKey, resolveColorModePref } from './themeRegistry'
 import { SIDEBAR, KPI_ACCENTS, WIDGET_ACCENTS, GRID_ZEBRA_BASE } from './tokens'
 import { STATUS_TOKENS } from './statusTokens'
 import { SHARED } from './constants'
@@ -98,7 +98,8 @@ export function useDataGridZebraSx() {
 }
 
 /**
- * Sceglie il tema MUI in base a `me.profile.theme` (persistito lato server,
+ * Sceglie il tema MUI in base a `me.profile.theme` (palette) e `me.profile.color_mode`
+ * (chiaro / scuro / segue il sistema), entrambi persistiti lato server,
  * quindi cross-device — punto 1 della roadmap). Finché `me` non è ancora
  * caricato (primo mount, schermata di login) usa il tema default: non c'è
  * un utente autenticato da cui leggere la preferenza.
@@ -110,6 +111,10 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const { me } = useAuth()
   const themeKey = resolveThemeKey(me?.profile?.theme ?? DEFAULT_THEME_KEY)
   const entry = THEME_REGISTRY[themeKey]
+  const pref = resolveColorModePref(me?.profile?.color_mode)
+  const systemDark = useSystemDark()
+  const mode = pref === 'system' ? (systemDark ? 'dark' : 'light') : pref
+  const muiTheme = React.useMemo(() => entry.build(mode), [entry, mode])
 
   const tokens = React.useMemo<ThemeTokens>(() => ({
     sidebar: entry.sidebar,
@@ -121,11 +126,26 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   }), [entry])
 
   return (
-    <ThemeProvider theme={entry.theme}>
+    <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <ThemeTokensContext.Provider value={tokens}>
         {children}
       </ThemeTokensContext.Provider>
     </ThemeProvider>
   )
+}
+
+/** Segue `prefers-color-scheme` del sistema, aggiornandosi se cambia. */
+function useSystemDark(): boolean {
+  const query = '(prefers-color-scheme: dark)'
+  const get = () => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches
+  const [dark, setDark] = React.useState(get)
+  React.useEffect(() => {
+    const mq = window.matchMedia?.(query)
+    if (!mq) return
+    const on = () => setDark(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return dark
 }

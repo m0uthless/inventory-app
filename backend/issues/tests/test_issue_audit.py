@@ -18,6 +18,7 @@ from audit.utils import to_change_value_for_field
 from core.models import CustomerStatus
 from crm.models import Customer
 from issues.models import Issue
+from core.testing import make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -25,7 +26,7 @@ User = get_user_model()
 
 
 def _user(*, superuser=False):
-    u = User.objects.create_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
+    u = make_technician(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
     if superuser:
         u.is_staff = u.is_superuser = True
         u.save(update_fields=["is_staff", "is_superuser"])

@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 
 from attendance.models import Absence, AbsenceReason, AbsenceStatus, DayPart
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -23,7 +24,7 @@ URL = "/api/absences/"
 
 
 def _make_user(*, coordinator=False, email="user@example.com"):
-    u = User.objects.create_user(
+    u = make_archie_user(
         username=f"u-{uuid.uuid4().hex[:8]}", password="pw",
         first_name="Nome", last_name="Cognome", email=email,
     )

@@ -2,7 +2,7 @@ import type { WidgetAccents } from '../../theme/tokens'
 
 // Tipi e helper condivisi per la gestione delle assenze tecnici ServiceNow.
 // Usati sia dal dialog per-tecnico nel pannello Triage (ServiceNowCases.tsx)
-// sia dalla pagina calendario "Assenze tecnici" (ServiceNowAbsences.tsx).
+// sia dalla settimana delle assenze nella Dashboard casi (SnAbsences.tsx).
 //
 // Backend: /api/servicenow-technician-absences/ (servicenow.api.SnTechnicianAbsenceViewSet),
 // basato sulla tabella condivisa `attendance.Absence` a mezza giornata

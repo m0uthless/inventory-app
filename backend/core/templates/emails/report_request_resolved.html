@@ -1,9 +1,11 @@
 {% extends base_template %}
 {% block content %}
-<p style="margin:0 0 10px;color:#60736d;font-size:10px;line-height:16px;font-weight:bold;letter-spacing:1.7px;">SEGNALAZIONI</p>
-<h1 class="headline" style="margin:0 0 26px;font-size:29px;line-height:36px;letter-spacing:-0.6px;color:#203734;font-weight:bold;">Aggiornamento segnalazione</h1>
-<p style="margin:0 0 18px;font-size:15px;line-height:24px;">Ciao {{ nome_utente }},</p>
-<p style="margin:0 0 18px;font-size:15px;line-height:24px;">La tua segnalazione ({{ tipo }} · {{ sezione }}) è ora: <strong>{{ stato }}</strong>.</p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;margin:8px 0 24px;"><tr><td style="padding:22px;background-color:#f3f7f5;border:1px solid #dce6e1;border-left:3px solid #93aaa0;word-wrap:break-word;overflow-wrap:anywhere;"><p style="margin:0;font-size:15px;line-height:24px;color:#203734;">{{ descrizione }}</p>{% if motivo_rifiuto %}<p style="margin:16px 0 0;font-size:14px;line-height:23px;color:#526760;"><strong>Motivazione:</strong> {{ motivo_rifiuto }}</p>{% endif %}</td></tr></table>
-<p style="margin:0 0 18px;font-size:15px;line-height:24px;">Accedi ad ARCHIE per i dettagli.</p>
+<h1 class="h1" style="margin:0 0 6px;font-size:22px;line-height:28px;font-weight:650;letter-spacing:-0.3px;color:#15201e;">La tua segnalazione è {{ stato|lower }}</h1>
+<p style="margin:0;font-size:14px;line-height:22px;color:#5b6b67;">{{ tipo }} · {{ sezione }}</p>
+<div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr>{% include "emails/_day.html" with giorno=oggi %}
+<td valign="top" style="padding:14px 0;border-bottom:1px solid #d5dedb;word-wrap:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:#5b6b67;">Stato: <strong style="color:#15201e;">{{ stato }}</strong></p>
+<p style="margin:0;font-size:14px;line-height:22px;color:#15201e;">{{ descrizione|linebreaksbr }}</p>{% if motivo_rifiuto %}
+<p style="margin:10px 0 0;font-size:14px;line-height:22px;color:#15201e;"><span style="color:#5b6b67;">Motivazione:</span> {{ motivo_rifiuto }}</p>{% endif %}</td></tr></table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;"><tr><td>{% include "emails/_button.html" with label="Apri la segnalazione" url="/bug-feature?open=" id=report_id %}</td></tr></table>
 {% endblock %}

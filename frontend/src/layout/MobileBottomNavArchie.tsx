@@ -21,6 +21,7 @@ import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
 import { useTheme } from '@mui/material/styles'
 import { MobileBottomNav, type MobileNavAction, type MobileNavItem } from '@shared/ui/MobileBottomNav'
 import { useAuth } from '../auth/AuthProvider'
+import { useModules } from '../modules/useModules'
 
 const NAV_ITEMS: [MobileNavItem, MobileNavItem, MobileNavItem, MobileNavItem] = [
   { key: 'home',        label: 'Home',       icon: <DashboardIcon />, path: '/' },
@@ -29,11 +30,14 @@ const NAV_ITEMS: [MobileNavItem, MobileNavItem, MobileNavItem, MobileNavItem] = 
   { key: 'manut',      label: 'Manut.',      icon: <HandymanIcon />,  path: '/maintenance' },
 ]
 
+const FALLBACK_ITEM: MobileNavItem = { key: 'customers', label: 'Clienti', icon: <BusinessIcon />, path: '/customers' }
+
 function getActiveKey(pathname: string): string {
   if (pathname === '/')                          return 'home'
   if (pathname.startsWith('/site-repository'))  return 'repository'
   if (pathname.startsWith('/issues'))           return 'issues'
   if (pathname.startsWith('/maintenance'))      return 'manut'
+  if (pathname.startsWith('/customers'))        return 'customers'
   return 'home'
 }
 
@@ -44,8 +48,15 @@ function pathStarts(p: string, base: string) {
 export default function MobileBottomNavArchie() {
   const theme = useTheme()
   const { hasPerm } = useAuth()
+  const { isPathHidden } = useModules()
   const nav = useNavigate()
   const loc = useLocation()
+
+  // Moduli spenti: la voce lascia il posto ai Clienti (la barra ha sempre 4 voci).
+  const items = React.useMemo(
+    () => NAV_ITEMS.map((it) => (isPathHidden(it.path) ? FALLBACK_ITEM : it)) as typeof NAV_ITEMS,
+    [isPathHidden],
+  )
 
   const activeKey = getActiveKey(loc.pathname)
 
@@ -130,6 +141,7 @@ export default function MobileBottomNavArchie() {
       keys = ['newIssue', 'newInventory', 'newReport']
     }
 
+    const PATHS: Record<string, string> = { newIssue: '/issues', newMonitor: '/monitors', newReport: '/bug-feature' }
     const PERMS: Record<string, string> = {
       newInventory: 'inventory.add_inventory',
       newMonitor:   'inventory.add_monitor',
@@ -142,15 +154,16 @@ export default function MobileBottomNavArchie() {
     return keys
       .map((k) => all[k])
       .filter((a) => {
+        if (PATHS[a.key] && isPathHidden(PATHS[a.key])) return false
         const perm = PERMS[a.key]
         return perm ? hasPerm(perm) : true
       })
-  }, [loc.pathname, hasPerm, nav])
+  }, [loc.pathname, hasPerm, nav, isPathHidden])
 
   return (
     <MobileBottomNav
-      color={theme.palette.primary.main}
-      items={NAV_ITEMS}
+      color={theme.palette.archie.band}
+      items={items}
       activeKey={activeKey}
       onNavigate={handleNavigate}
       actions={actions}

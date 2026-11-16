@@ -1,20 +1,17 @@
 import * as React from 'react'
-import { alpha, useTheme } from '@mui/material/styles'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 
 import {
   Alert,
   Autocomplete,
-  Badge,
   Box,
   Button,
-  Chip,
   CircularProgress,
   IconButton,
   Stack,
   TextField,
   Tooltip,
   Typography,
+  ButtonBase,
 } from '@mui/material'
 
 import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material'
@@ -24,7 +21,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import LinkIcon from '@mui/icons-material/Link'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
@@ -35,7 +31,6 @@ import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMe
 import type { GridColDef, GridSortModel } from '@mui/x-data-grid'
 
 import { useAuth } from '../auth/AuthProvider'
-import { useKpiAccents } from '../theme/AppThemeProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -54,22 +49,18 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
-import IssueDrawer from '../features/issues/IssueDrawer'
+import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
+import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
+import { useExportCsv } from '@shared/ui/useExportCsv'
+import { IssuePriorityMark, IssueStatusBadge } from '../features/issues/IssueBadges'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useToast } from '@shared/ui/toast'
 import EntityListCard from '@shared/ui/EntityListCard'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { isRecord } from '@shared/utils/guards'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-} from 'recharts'
 
 type CreateFromInventoryState = {
   inventoryId: number
@@ -90,6 +81,8 @@ type CreateFromServiceNowCaseState = {
 
 type OpenCreateState = {
   openCreate?: boolean
+  /** Dalla scheda cliente: nuova issue con il cliente già scelto. */
+  createForCustomer?: { customerId: number; customerName: string; siteId?: number }
   createFromInventory?: CreateFromInventoryState
   createFromServiceNowCase?: CreateFromServiceNowCaseState
 }
@@ -160,13 +153,6 @@ function isIssueInventoryLabelSource(
   return 'inventory_name' in item
 }
 
-function UnlinkedInventoryWarningIcon() {
-  return (
-    <Tooltip title="Questa issue non è ancora collegata a un inventory.">
-      <WarningAmberRoundedIcon sx={{ color: 'warning.main', fontSize: 18, flexShrink: 0 }} />
-    </Tooltip>
-  )
-}
 
 function inventoryLabel(item: InventoryLabelSource) {
   if (!item) return '—'
@@ -194,28 +180,6 @@ function inventoryLabel(item: InventoryLabelSource) {
   return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
-function IssuePriorityChip({ priority }: { priority: string }) {
-  const m = PRIORITY_META[priority] ?? { label: priority, color: 'default' as const }
-  const dotColor = m.color === 'default' ? 'text.disabled' : `${m.color}.main`
-  return (
-    <Tooltip title={m.label}>
-      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
-    </Tooltip>
-  )
-}
-
-function IssueStatusChip({ status }: { status: string }) {
-  const m = STATUS_META[status] ?? { label: status, color: 'default' as const }
-  return (
-    <Chip
-      size="small"
-      label={m.label}
-      color={m.color}
-      variant={m.color === 'default' ? 'outlined' : 'filled'}
-    />
-  )
-}
-
 // Raggruppamento "Aperte"/"Chiuse" già usato in /issues/summary/ e nel grafico
 // andamento: risolta + chiusa contano entrambe come "chiuse" agli occhi
 // dell'utente (solo "chiusa" è lo stato terminale/immutabile).
@@ -223,447 +187,10 @@ function isClosedIssueRow(row: Pick<IssueRow, 'status'>) {
   return row.status === 'resolved' || row.status === 'closed'
 }
 
-function StatusViewChipBar({
-  value,
-  onChange,
-}: {
-  value: 'all' | 'open' | 'closed'
-  onChange: (v: 'all' | 'open' | 'closed') => void
-}) {
-  const options: { key: 'all' | 'open' | 'closed'; label: string }[] = [
-    { key: 'open', label: 'Aperte' },
-    { key: 'closed', label: 'Chiuse' },
-    { key: 'all', label: 'Tutte' },
-  ]
-  return (
-    <Stack direction="row" spacing={1}>
-      {options.map((o) => {
-        const selected = value === o.key
-        return (
-          <Chip
-            key={o.key}
-            size="small"
-            label={o.label}
-            clickable
-            onClick={() => onChange(o.key)}
-            color={
-              selected
-                ? o.key === 'open'
-                  ? 'error'
-                  : o.key === 'closed'
-                    ? 'default'
-                    : 'primary'
-                : 'default'
-            }
-            variant={selected ? 'filled' : 'outlined'}
-          />
-        )
-      })}
-    </Stack>
-  )
-}
-
-// ─── Widget riepilogo ────────────────────────────────────────────────────────
-
-type Granularity = 'day' | 'week' | 'month'
-
-// Riempie i buchi del calendario e fonde due serie (aperte + risolte/chiuse)
-function fillChartBuckets(
-  openedBuckets: { date: string; count: number }[],
-  closedBuckets: { date: string; count: number }[],
-  granularity: Granularity,
-): { label: string; opened: number; closed: number }[] {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  // Usa date locali (evita lo sfasamento UTC di toISOString con fuso +X)
-  const localISO = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-  const slots: { key: string; label: string; opened: number; closed: number }[] = []
-
-  if (granularity === 'day') {
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      slots.push({
-        key: localISO(d),
-        label: d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }),
-        opened: 0,
-        closed: 0,
-      })
-    }
-  } else if (granularity === 'week') {
-    const monday = new Date(today)
-    const dow = today.getDay()
-    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
-    for (let i = 11; i >= 0; i--) {
-      const ws = new Date(monday)
-      ws.setDate(monday.getDate() - i * 7)
-      slots.push({
-        key: localISO(ws),
-        label: ws.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }),
-        opened: 0,
-        closed: 0,
-      })
-    }
-  } else {
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      slots.push({
-        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`,
-        label: d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }),
-        opened: 0,
-        closed: 0,
-      })
-    }
-  }
-
-  const byKey = Object.fromEntries(slots.map((s) => [s.key, s]))
-  for (const b of openedBuckets) {
-    const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
-    if (byKey[k]) byKey[k].opened = b.count
-  }
-  for (const b of closedBuckets) {
-    const k = granularity === 'month' ? b.date.slice(0, 7) + '-01' : b.date.slice(0, 10)
-    if (byKey[k]) byKey[k].closed = b.count
-  }
-  return slots
-}
-
-function IssuesSummaryWidget({ rows, loading }: { rows: IssueRow[]; loading: boolean }) {
-  const theme = useTheme()
-  const kpiAccents = useKpiAccents()
-  const toast = useToast()
-  const [granularity, setGranularity] = React.useState<Granularity>('day')
-  const [avgDaysGlobal, setAvgDaysGlobal] = React.useState<number | null>(null)
-  const [chartData, setChartData] = React.useState<
-    { label: string; opened: number; closed: number }[]
-  >([])
-
-  // Carica dati globali (avg + grafico) ad ogni cambio di granularità
-  React.useEffect(() => {
-    api
-      .get<{
-        avg_days_to_close: number | null
-        chart_buckets: { date: string; count: number }[]
-        closed_buckets: { date: string; count: number }[]
-      }>('/issues/summary/', { params: { granularity } })
-      .then((r) => {
-        setAvgDaysGlobal(r.data.avg_days_to_close ?? null)
-        setChartData(
-          fillChartBuckets(r.data.chart_buckets ?? [], r.data.closed_buckets ?? [], granularity),
-        )
-      })
-      .catch((e) => toast.error(apiErrorToMessage(e)))
-  }, [granularity, toast])
-
-  const open = rows.filter((r) => r.status === 'open').length
-  const inProg = rows.filter((r) => r.status === 'in_progress').length
-  const critical = rows.filter(
-    (r) => r.priority === 'critical' && (r.status === 'open' || r.status === 'in_progress'),
-  ).length
-
-  const cardSx = {
-    bgcolor: 'background.paper',
-    border: '0.5px solid',
-    borderColor: 'divider',
-    borderRadius: 2,
-    p: '1rem 1.25rem',
-    opacity: loading ? 0.6 : 1,
-    transition: 'opacity .2s',
-  }
-
-  const avgLabel = avgDaysGlobal != null ? `${avgDaysGlobal.toFixed(1)} gg` : '—'
-
-  const kpis = [
-    {
-      label: 'Aperte',
-      value: open,
-      sub: `su ${rows.length} totali`,
-      accent: theme.palette.error.main,
-    },
-    { label: 'In lavorazione', value: inProg, sub: 'in corso', accent: theme.palette.warning.main },
-    {
-      label: 'Critiche aperte',
-      value: critical,
-      sub: critical > 0 ? 'richiedono attenzione' : 'nessuna criticità',
-      accent: critical > 0 ? theme.palette.error.dark : theme.palette.success.main,
-    },
-    {
-      label: 'Tempo medio',
-      value: avgLabel,
-      sub: 'su tutte le issue chiuse',
-      accent: kpiAccents.teal1,
-    },
-  ]
-
-  const granularityOptions: { key: Granularity; label: string }[] = [
-    { key: 'day', label: 'Giornaliero' },
-    { key: 'week', label: 'Settimanale' },
-    { key: 'month', label: 'Mensile' },
-  ]
-
-  return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-      {/* ── Sinistra: KPI gradient cards ── */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '10px',
-          opacity: loading ? 0.6 : 1,
-          transition: 'opacity .2s',
-        }}
-      >
-        {kpis.map((m) => (
-          <Box
-            key={m.label}
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: '8px',
-              p: { xs: '12px', sm: '14px 16px' },
-              backgroundImage: `linear-gradient(135deg, ${alpha(m.accent, 0.62)} 0%, ${alpha(m.accent, 0.86)} 100%)`,
-              border: `1px solid ${alpha(m.accent, 0.18)}`,
-              boxShadow: `0 10px 28px ${alpha(m.accent, 0.18)}`,
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                right: -20,
-                top: -16,
-                backgroundColor: alpha(theme.palette.common.white, 0.14),
-              },
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                width: 100,
-                height: 100,
-                borderRadius: '50%',
-                right: 16,
-                bottom: -52,
-                backgroundColor: alpha(theme.palette.common.white, 0.1),
-              },
-            }}
-          >
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: alpha(theme.palette.common.white, 0.85),
-                  mb: '6px',
-                  lineHeight: 1.2,
-                }}
-              >
-                {m.label}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '1.75rem',
-                  fontWeight: 800,
-                  color: theme.palette.common.white,
-                  lineHeight: 1,
-                  letterSpacing: -0.5,
-                  textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}`,
-                }}
-              >
-                {m.value}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.68rem',
-                  fontWeight: 600,
-                  color: alpha(theme.palette.common.white, 0.75),
-                  mt: '4px',
-                }}
-              >
-                {m.sub}
-              </Typography>
-            </Box>
-          </Box>
-        ))}
-      </Box>
-
-      <Box sx={cardSx}>
-        <Box
-          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '8px' }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography
-              sx={{
-                fontSize: '11px',
-                fontWeight: 500,
-                letterSpacing: '.06em',
-                textTransform: 'uppercase',
-                color: 'text.disabled',
-              }}
-            >
-              Andamento issue
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.error.main,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>Aperte</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.success.main,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography sx={{ fontSize: '10px', color: 'text.secondary' }}>
-                  Risolte/Chiuse
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-          <Box
-            sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: 1, p: '2px', gap: '2px' }}
-          >
-            {granularityOptions.map((o) => (
-              <Box
-                key={o.key}
-                onClick={() => setGranularity(o.key)}
-                sx={{
-                  px: 1,
-                  py: '3px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  userSelect: 'none',
-                  transition: 'all .15s',
-                  color: granularity === o.key ? 'text.primary' : 'text.secondary',
-                  bgcolor: granularity === o.key ? 'background.paper' : 'transparent',
-                  border: '0.5px solid',
-                  borderColor: granularity === o.key ? 'divider' : 'transparent',
-                }}
-              >
-                {o.label}
-              </Box>
-            ))}
-          </Box>
-        </Box>
-        <IssueAreaChart data={chartData} granularity={granularity} />
-      </Box>
-    </Box>
-  )
-}
-
-// NOTA (color refactor 0.9.x): stile del grafico Recharts — eccezione
-// tecnica deliberata (non theme-aware, non duplicata altrove nell'app).
-// I colori "di significato" (aperte/chiuse) restano su theme.palette
-// (error/success), qui restano solo i grigi neutri di assi/griglia/tooltip,
-// centralizzati in un'unica costante per evitare 7 letterali sparsi nel file.
-const CHART_NEUTRAL = {
-  grid: 'rgba(0,0,0,0.06)',
-  axisLabel: '#888',
-  tooltipBg: '#fff',
-  tooltipBorder: 'rgba(0,0,0,0.12)',
-  tooltipShadow: 'rgba(0,0,0,0.08)',
-} as const
-
-function IssueAreaChart({
-  data,
-  granularity,
-}: {
-  data: { label: string; opened: number; closed: number }[]
-  granularity: Granularity
-}) {
-  const theme = useTheme()
-  const openedColor = theme.palette.error.main
-  const closedColor = theme.palette.success.main
-  const interval = granularity === 'day' ? 6 : 2
-  return (
-    <ResponsiveContainer width="100%" height={148}>
-      <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-        <defs>
-          <linearGradient id="issueAreaGradOpened" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={openedColor} stopOpacity={0.25} />
-            <stop offset="95%" stopColor={openedColor} stopOpacity={0.03} />
-          </linearGradient>
-          <linearGradient id="issueAreaGradClosed" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={closedColor} stopOpacity={0.22} />
-            <stop offset="95%" stopColor={closedColor} stopOpacity={0.03} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL.grid} vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 10, fill: CHART_NEUTRAL.axisLabel }}
-          tickLine={false}
-          axisLine={false}
-          interval={interval}
-        />
-        <YAxis
-          tick={{ fontSize: 10, fill: CHART_NEUTRAL.axisLabel }}
-          tickLine={false}
-          axisLine={false}
-          allowDecimals={false}
-          width={28}
-        />
-        <RechartsTooltip
-          wrapperStyle={{ outline: 'none' }}
-          contentStyle={{
-            background: CHART_NEUTRAL.tooltipBg,
-            border: `0.5px solid ${CHART_NEUTRAL.tooltipBorder}`,
-            borderRadius: 8,
-            fontSize: 12,
-            padding: '6px 10px',
-            boxShadow: `0 2px 8px ${CHART_NEUTRAL.tooltipShadow}`,
-          }}
-          formatter={(value: number, name: string) =>
-            [value, name === 'opened' ? 'Aperte' : 'Risolte/Chiuse'] as [number, string]
-          }
-          labelStyle={{ color: CHART_NEUTRAL.axisLabel, marginBottom: 2 }}
-        />
-        <Area
-          type="monotone"
-          dataKey="opened"
-          stroke={openedColor}
-          strokeWidth={2}
-          fill="url(#issueAreaGradOpened)"
-          dot={false}
-          activeDot={{ r: 4, fill: openedColor, strokeWidth: 0 }}
-        />
-        <Area
-          type="monotone"
-          dataKey="closed"
-          stroke={closedColor}
-          strokeWidth={2}
-          fill="url(#issueAreaGradClosed)"
-          dot={false}
-          activeDot={{ r: 4, fill: closedColor, strokeWidth: 0 }}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  )
-}
-
-// ─── Componente principale ────────────────────────────────────────────────────
-
 export default function Issues() {
-  const zebraSx = useDataGridZebraSx()
   const loc = useLocation()
   const navigate = useNavigate()
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
   const toast = useToast()
 
   // ── Grid ──────────────────────────────────────────────────────────────────
@@ -723,21 +250,54 @@ export default function Issues() {
     ? [{ field: 'days_open', sort: daysOpenSortDir }]
     : grid.sortModel
 
-  // ── Filtri extra ──────────────────────────────────────────────────────────
-  const [statusView, setStatusView] = React.useState<'all' | 'open' | 'closed'>('open')
-  const activeFilterCount = [statusView !== 'open' ? statusView : ''].filter(Boolean).length
+  // ── Viste e filtri (dalle intestazioni di colonna) ──────────────────────
+  type IssueView = 'active' | 'mine' | 'overdue' | 'closed' | 'all'
+  // `?vista=mine|overdue|closed|all` dalla Dashboard; poi la vista vive nello stato della pagina.
+  const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
+  const [fStatus, setFStatus] = React.useState<string[]>([])
+  const [fPriority, setFPriority] = React.useState<string[]>([])
+  const [fCategory, setFCategory] = React.useState<string[]>([])
+  const [fAssigned, setFAssigned] = React.useState<string[]>([])
+  type ColQ = { id: string; title: string; customer: string; servicenow: string; assigned: string; priority: string; status: string; due: string }
+  const EMPTY_COLQ: ColQ = { id: '', title: '', customer: '', servicenow: '', assigned: '', priority: '', status: '', due: '' }
+  // ?cliente=<nome> (dalla pagina Clienti): ricerca per colonna già compilata.
+  const clienteParam = new URLSearchParams(loc.search).get('cliente') ?? ''
+  const [colSearchOpen, setColSearchOpen] = React.useState(Boolean(clienteParam))
+  const [colQ, setColQ] = React.useState<ColQ>(() => ({ ...EMPTY_COLQ, customer: clienteParam }))
+  const colQActive = Object.values(colQ).some(Boolean)
+  const activeFilterCount = [fStatus, fPriority, fCategory, fAssigned].filter((f) => f.length).length + (view !== 'active' ? 1 : 0)
 
   const resetFilters = () => {
-    setStatusView('open')
+    setView('active'); setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([])
   }
 
   const allExtraParams = React.useMemo(() => {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
-    if (statusView === 'open') p.hide_closed = true
-    if (statusView === 'closed') p.only_closed = true
+    if (view === 'active' || view === 'mine' || view === 'overdue') p.hide_closed = true
+    if (view === 'overdue') p.due_before = overdueBefore()
+    if (view === 'closed') p.only_closed = true
+    if (view === 'mine' && me?.id) p.assigned_to = me.id
+    else if (fAssigned.length) p.assigned_to = fAssigned[0]
+    if (fStatus.length) p.status = fStatus
+    if (fPriority.length) p.priority = fPriority
+    if (fCategory.length) p.category = fCategory[0]
+    // Ricerca per colonna
+    const iso = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+    if (colQ.id) p.id_q = colQ.id
+    if (colQ.title) p.title_q = colQ.title
+    if (colQ.customer) p.customer_q = colQ.customer
+    if (colQ.servicenow) p.servicenow_q = colQ.servicenow
+    if (colQ.assigned) p.assigned_q = colQ.assigned
+    if (colQ.priority) p.priority = [colQ.priority]
+    if (colQ.status) p.status = [colQ.status]
+    if (colQ.due === 'overdue') p.due_before = iso(-1)
+    if (colQ.due === 'today') { p.due_after = iso(0); p.due_before = iso(0) }
+    if (colQ.due === 'week') { p.due_after = iso(1); p.due_before = iso(7) }
+    if (colQ.due === 'later') p.due_after = iso(8)
+    if (colQ.due === 'none') p.has_due = false
     return p
-  }, [grid.view, statusView])
+  }, [grid.view, view, me?.id, fStatus, fPriority, fCategory, fAssigned, colQ])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -926,7 +486,7 @@ export default function Issues() {
 
   React.useEffect(() => {
     const st = loc.state as OpenCreateState | null
-    const hasOpenCreate = st?.openCreate || st?.createFromInventory || st?.createFromServiceNowCase
+    const hasOpenCreate = st?.openCreate || st?.createFromInventory || st?.createFromServiceNowCase || st?.createForCustomer
     if (!hasOpenCreate) {
       openCreateOnceRef.current = false
       return
@@ -974,6 +534,17 @@ export default function Issues() {
         customerPlaceholder: cfsn.account || '',
       })
       setCustFormInput(cfsn.account || '')
+      setFormErrors({})
+      setInventoryOptions([])
+      setSelectedInventory(null)
+      setPendingInventory(null)
+      setLinkInventoryOpen(false)
+      setFormOpen(true)
+    } else if (st?.createForCustomer) {
+      const cfc = st.createForCustomer
+      setEditIssue(null)
+      setForm({ ...createEmptyForm(me?.id), customer: { id: cfc.customerId, label: cfc.customerName }, site_id: cfc.siteId ?? '' })
+      setCustFormInput(cfc.customerName)
       setFormErrors({})
       setInventoryOptions([])
       setSelectedInventory(null)
@@ -1246,6 +817,159 @@ export default function Issues() {
     }
   }
 
+  // ── Modifica sul posto dal pannello: salva subito, con Annulla ──────────
+  const undoToast = useUndoToast()
+  const [kpiReload, setKpiReload] = React.useState(0)
+  const patchIssue = React.useCallback(async (patch: IssuePatch, label: string) => {
+    if (!detailIssue) return
+    const id = detailIssue.id
+    const prev: Record<string, unknown> = {}
+    for (const k of Object.keys(patch)) prev[k] = (detailIssue as Record<string, unknown>)[k]
+    try {
+      const r = await api.patch<IssueRow>(`/issues/${id}/`, patch)
+      syncIssueState(r.data)
+      reload()
+      setKpiReload((n) => n + 1)
+      undoToast.show(`${label} · salvato`, async () => {
+        try {
+          const back = await api.patch<IssueRow>(`/issues/${id}/`, prev)
+          syncIssueState(back.data)
+          reload()
+          setKpiReload((n) => n + 1)
+        } catch (e) {
+          toast.error(apiErrorToMessage(e))
+        }
+      })
+    } catch (e) {
+      toast.error(apiErrorToMessage(e))
+    }
+  }, [detailIssue, syncIssueState, reload, undoToast, toast])
+
+  const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
+
+  const issueCounts = useIssueCounts(kpiReload, me?.id)
+  // Viste salvate (scheda + filtri + ordinamento + ricerca)
+  type ViewState = { view: IssueView; fStatus: string[]; fPriority: string[]; fCategory: string[]; fAssigned: string[]; q: string; sort: GridSortModel }
+  const saved = useSavedViews<ViewState>('issues', me?.username)
+  const [savedId, setSavedId] = React.useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
+  const currentViewState = (): ViewState => ({ view, fStatus, fPriority, fCategory, fAssigned, q: grid.q, sort: displaySortModel })
+  const applySaved = (id: string) => {
+    const v = saved.views.find((x) => x.id === id); if (!v) return
+    setSavedId(id)
+    setView(v.state.view); setFStatus(v.state.fStatus); setFPriority(v.state.fPriority); setFCategory(v.state.fCategory); setFAssigned(v.state.fAssigned)
+    grid.setQ(v.state.q ?? '')
+    if (v.state.sort) handleSortModelChange(v.state.sort)
+  }
+  // Eventi di audit per Attività e timeline (solo con il permesso di vedere l'audit).
+  const canAudit = hasPerm('audit.view_auditevent')
+  const [events, setEvents] = React.useState<IssueEvent[] | null>(null)
+  React.useEffect(() => {
+    if (!detailIssue || !canAudit) { setEvents(null); return }
+    let alive = true
+    api.get('/audit-events/', { params: { app_label: 'issues', model: 'issue', object_id: String(detailIssue.id), ordering: 'created_at', page_size: 200 } })
+      .then((r) => { const d = r.data as { results?: IssueEvent[] } | IssueEvent[]; if (alive) setEvents(Array.isArray(d) ? d : d.results ?? []) })
+      .catch(() => { if (alive) setEvents(null) })
+    return () => { alive = false }
+  }, [detailIssue, canAudit])
+  const { exporting, exportCsv } = useExportCsv()
+  const exportVisible = () => {
+    const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
+    void _p; void _ps
+    void exportCsv<IssueRow>({
+      url: '/issues/',
+      params,
+      filename: 'issue',
+      columns: [
+        { label: 'ID', getValue: (r) => r.id },
+        { label: 'Priorità', getValue: (r) => r.priority_label || r.priority },
+        { label: 'Stato', getValue: (r) => r.status_label || r.status },
+        { label: 'Titolo', getValue: (r) => r.title },
+        { label: 'Cliente', getValue: (r) => r.customer_name || r.customer_placeholder },
+        { label: 'Sito', getValue: (r) => r.site_name },
+        { label: 'ServiceNow', getValue: (r) => r.servicenow_id },
+        { label: 'Assegnata a', getValue: (r) => r.assigned_to_full_name },
+        { label: 'Scadenza', getValue: (r) => r.due_date },
+        { label: 'Apertura', getValue: (r) => r.opened_at },
+      ],
+    })
+  }
+
+  // Conteggi delle viste (globali, da /issues/summary/)
+  const [kpiCounts, setKpiCounts] = React.useState<{ active: number; closed: number; all: number } | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    api.get('/issues/summary/').then((r) => {
+      const d = r.data as Record<string, number>
+      if (alive) setKpiCounts({
+        active: d.active_count ?? 0,
+        closed: (d.resolved_count ?? 0) + (d.closed_count ?? 0),
+        all: (d.active_count ?? 0) + (d.resolved_count ?? 0) + (d.closed_count ?? 0),
+      })
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [kpiReload])
+
+  const userLabel = (id: string) => users.find((u) => String(u.id) === id)?.label ?? id
+  const catLabel = (id: string) => categories.find((c) => String(c.id) === id)?.label ?? id
+  const activeFilters: ActiveFilter[] = [
+    fStatus.length ? { key: 'status', label: 'Stato', values: fStatus.map((x) => STATUS_META[x]?.label ?? x).join(', ') } : null,
+    fPriority.length ? { key: 'priority', label: 'Priorità', values: fPriority.map((x) => PRIORITY_META[x]?.label ?? x).join(', ') } : null,
+    fCategory.length ? { key: 'category', label: 'Categoria', values: fCategory.map(catLabel).join(', ') } : null,
+    fAssigned.length && view !== 'mine' ? { key: 'assigned', label: 'Assegnata a', values: fAssigned.map(userLabel).join(', ') } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (key: string) => {
+    if (key === 'status') setFStatus([])
+    if (key === 'priority') setFPriority([])
+    if (key === 'category') setFCategory([])
+    if (key === 'assigned') setFAssigned([])
+  }
+  // Card su telefono: stato e scadenza in alto, titolo, cliente.
+  const renderIssueCard = React.useCallback(({ row, onOpen, onContextMenu }: { row: IssueRow; onOpen: (id: number) => void; onContextMenu: (r: IssueRow, e: React.MouseEvent<HTMLElement>) => void }) => {
+    const overdue = !!row.due_date && new Date(row.due_date) < new Date() && !isClosedIssueRow(row)
+    return (
+      <Box role="button" tabIndex={0} onClick={() => onOpen(row.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(row.id) }}
+        onContextMenu={(e) => { e.preventDefault(); onContextMenu(row, e) }}
+        sx={{ display: 'grid', gap: 0.5, p: 1.5, bgcolor: 'background.paper', border: '1px solid', borderColor: detailIssue?.id === row.id ? 'archie.fieldLine' : 'divider', borderRadius: '8px', cursor: 'pointer' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>
+          <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
+          <IssuePriorityMark priority={row.priority} compact />
+          {row.comments_count ? (
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: 20, px: '6px', borderRadius: '5px', fontSize: 11, fontWeight: 600, bgcolor: 'archie.field', color: 'primary.main' }}>
+              <CampoIcon name="chat" size={12} />{row.comments_count}
+            </Box>
+          ) : null}
+          <Typography component="span" sx={{ ml: 'auto', fontSize: 12, fontWeight: overdue ? 600 : 500, color: overdue ? 'error.main' : 'text.secondary' }}>
+            {row.due_date ? fmtDate(row.due_date) : ''}
+          </Typography>
+        </Box>
+        <Typography sx={{ fontWeight: 600, fontSize: 13, lineHeight: 1.35 }}>{row.title}</Typography>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+          {[row.customer_name, row.site_name].filter(Boolean).join(' · ')}{row.assigned_to_full_name ? ` · ${row.assigned_to_full_name}` : ''}
+        </Typography>
+      </Box>
+    )
+  }, [detailIssue?.id])
+
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => {
+    const make = (label: string, sel: string[], set: (v: string[]) => void, options: { value: string; label: string }[], opts?: { single?: boolean; searchable?: boolean }) => ({
+      value: sel.join(','),
+      label: `Filtra ${label.toLowerCase()}`,
+      onSet: (v: string | number | '') => set(v === '' ? [] : String(v).split(',')),
+      onReset: () => set([]),
+      children: <FilterOptionList label={label} options={options} selected={sel} onChange={set} single={opts?.single} searchable={opts?.searchable} />,
+    })
+    const cfg: Record<string, ColumnFilterConfig> = {
+      priority: make('Priorità', fPriority, setFPriority, ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k].label }))),
+      status: make('Stato', fStatus, setFStatus, Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))),
+      category_label: make('Categoria', fCategory, setFCategory, categories.map((c) => ({ value: String(c.id), label: c.label })), { single: true }),
+    }
+    if (view !== 'mine') cfg.assigned_to_full_name = make('Assegnata a', fAssigned, setFAssigned, assignableUsers.map((u) => ({ value: String(u.id), label: u.label })), { single: true, searchable: true })
+    return cfg
+  }, [fPriority, fStatus, fCategory, fAssigned, categories, assignableUsers, view])
+
   // ── Delete / restore ──────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = React.useState<IssueRow | null>(null)
 
@@ -1387,42 +1111,32 @@ export default function Issues() {
 
   const columns: GridColDef<IssueRow>[] = [
     {
-      field: 'opened_at',
-      headerName: 'Data apertura',
-      width: 130,
-      renderCell: ({ row }) => {
-        const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            <Typography variant="body2">{d}</Typography>
-          </Box>
-        )
-      },
+      field: 'id',
+      headerName: 'ID',
+      width: 62,
+      sortable: false,
+      renderCell: ({ row }) => <Typography component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary' }}>#{row.id}</Typography>,
     },
     {
       field: 'priority',
       headerName: 'Priorità',
-      width: 64,
+      width: 91,
       sortable: true,
-      align: 'center',
-      headerAlign: 'center',
       renderCell: ({ row }) => (
-        <Box
-          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}
-        >
-          <IssuePriorityChip priority={row.priority} />
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <IssuePriorityMark priority={row.priority} />
         </Box>
       ),
     },
     {
       field: 'status',
       headerName: 'Stato',
-      width: 220,
+      width: 161,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%' }}>
-          <IssueStatusChip status={row.status} />
+          <IssueStatusBadge status={row.status} label={row.status_label || undefined} />
           {row.status === 'waiting' && row.waiting_reason_label ? (
-            <Chip size="small" label={row.waiting_reason_label} variant="outlined" />
+            <Typography component="span" sx={{ fontSize: 11, color: 'text.secondary' }}>{row.waiting_reason_label}</Typography>
           ) : null}
         </Box>
       ),
@@ -1431,20 +1145,35 @@ export default function Issues() {
       field: 'title',
       headerName: 'Titolo',
       flex: 1,
-      minWidth: 200,
+      minWidth: 220,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>
-            {row.title}
-          </Typography>
-          {!row.inventory && <UnlinkedInventoryWarningIcon />}
+          <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{row.title}</Typography>
+        </Box>
+      ),
+    },
+    {
+      field: 'customer_name',
+      headerName: 'Cliente · sito',
+      width: 173,
+      renderCell: ({ row }) => (
+        <Box sx={{ minWidth: 0, lineHeight: 1.3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: 13 }}>{row.customer_name || row.customer_placeholder}</Typography>
+            {row.is_customer_placeholder ? (
+              <Tooltip title="Cliente non in Site Repository">
+                <InfoOutlinedIcon sx={{ color: 'text.disabled', fontSize: 14, flexShrink: 0 }} />
+              </Tooltip>
+            ) : null}
+          </Box>
+          {row.site_name ? <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>{row.site_name}</Typography> : null}
         </Box>
       ),
     },
     {
       field: 'servicenow_id',
       headerName: 'ServiceNow',
-      width: 150,
+      width: 111,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%' }}>
           {row.servicenow_id ? (
@@ -1455,11 +1184,11 @@ export default function Issues() {
                   void openServiceNowCaseDrawer(row.servicenow_id as string)
                 }}
                 sx={{
-                  fontFamily: 'monospace',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
+                  fontFamily: '"Geist Mono", monospace',
+                  fontWeight: 500,
+                  fontSize: 12,
                   cursor: resolvingServiceNowId === row.servicenow_id ? 'wait' : 'pointer',
-                  color: 'primary.main',
+                  color: 'text.primary',
                   opacity: resolvingServiceNowId === row.servicenow_id ? 0.5 : 1,
                   '&:hover': { textDecoration: 'underline' },
                 }}
@@ -1484,61 +1213,21 @@ export default function Issues() {
               ) : null}
             </>
           ) : (
-            <Chip
-              size="small"
-              variant="outlined"
-              label="Non collegato"
-              sx={{ color: 'text.disabled', borderColor: 'divider' }}
-            />
-          )}
-        </Box>
-      ),
-    },
-    {
-      field: 'customer_name',
-      headerName: 'Cliente',
-      width: 160,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>
-            {row.customer_name}
-          </Typography>
-          {row.is_customer_placeholder ? (
-            <Tooltip title="Cliente non in Site Repository">
-              <InfoOutlinedIcon sx={{ color: 'text.disabled', fontSize: 16, flexShrink: 0 }} />
-            </Tooltip>
-          ) : null}
-        </Box>
-      ),
-    },
-    {
-      field: 'category_label',
-      headerName: 'Categoria',
-      width: 140,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          {row.category_label ? (
-            <Chip size="small" label={row.category_label} variant="outlined" />
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-              —
-            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
           )}
         </Box>
       ),
     },
     {
       field: 'assigned_to_full_name',
-      headerName: 'Assegnato a',
-      width: 190,
+      headerName: 'Assegnata a',
+      width: 113,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
           {row.assigned_to_full_name ? (
-            <Typography variant="body2" noWrap>
-              {row.assigned_to_full_name}
-            </Typography>
+            <Typography noWrap sx={{ fontSize: 13 }}>{row.assigned_to_full_name}</Typography>
           ) : (
-            <Chip size="small" variant="outlined" label="Non assegnata" sx={{ height: 24 }} />
+            <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>Non assegnata</Typography>
           )}
         </Box>
       ),
@@ -1546,88 +1235,73 @@ export default function Issues() {
     {
       field: 'due_date',
       headerName: 'Scadenza',
-      width: 110,
+      width: 123,
       renderCell: ({ row }) => {
-        const d = fmtDate(row.due_date)
-        const overdue =
-          !!d &&
-          new Date(row.due_date!) < new Date() &&
-          !['resolved', 'closed'].includes(row.status)
+        if (!row.due_date) return <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+        const today = new Date(); today.setHours(0, 0, 0, 0)
+        const due = new Date(row.due_date + 'T00:00:00')
+        const open = !isClosedIssueRow(row)
+        const overdue = open && due < today
+        const isToday = open && due.getTime() === today.getTime()
+        return (
+          <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: overdue || isToday ? 600 : 400, color: overdue ? 'error.main' : isToday ? 'warning.main' : 'inherit' }}>
+            {fmtDate(row.due_date)?.slice(0, 5)}{overdue ? ' · scaduta' : isToday ? ' · oggi' : ''}
+          </Typography>
+        )
+      },
+    },
+    {
+      field: 'opened_at',
+      headerName: 'Apertura',
+      width: 130,
+      renderCell: ({ row }) => {
+        const d = fmtDate(row.opened_at) || fmtDate(row.created_at.split('T')[0])
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-            {d ? (
-              <Typography
-                variant="body2"
-                sx={{
-                  color: overdue ? 'error.main' : 'inherit',
-                  fontWeight: overdue ? 700 : 400,
-                }}
-              >
-                {d}
-              </Typography>
-            ) : (
-              <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                —
-              </Typography>
-            )}
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>{d}</Typography>
           </Box>
         )
       },
     },
     {
+      field: 'category_label',
+      headerName: 'Categoria',
+      width: 150,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
+          {row.category_label ? (
+            <Typography variant="body2" noWrap>{row.category_label}</Typography>
+          ) : (
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
       field: 'comments_count',
       headerName: 'Commenti',
-      width: 90,
-      align: 'center',
-      headerAlign: 'center',
+      width: 104,
       renderCell: ({ row }) => {
         const count = row.comments_count ?? 0
+        const label = count ? `${count} ${count === 1 ? 'commento' : 'commenti'} · apri` : 'Nessun commento · scrivi il primo'
         return (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              width: '100%',
-            }}
-          >
-            <Tooltip
-              title={
-                count ? `${count} ${count === 1 ? 'commento' : 'commenti'}` : 'Nessun commento'
-              }
+          <Tooltip title={label}>
+            <ButtonBase
+              aria-label={label}
+              onClick={(e) => { e.stopPropagation(); openDetail(row, 1) }}
+              sx={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px', height: 22, px: '7px', borderRadius: '5px',
+                fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', border: '1px solid',
+                ...(count
+                  ? { bgcolor: 'archie.field', color: 'primary.main', borderColor: 'transparent', '&:hover': { borderColor: 'archie.fieldLine' } }
+                  : { bgcolor: 'transparent', color: 'text.disabled', borderColor: 'transparent', '&:hover': { color: 'text.secondary', bgcolor: 'archie.surface2', borderColor: 'divider' } }),
+                '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+              }}
             >
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  openDetail(row, 1)
-                }}
-                sx={{
-                  color: count ? 'primary.main' : 'text.disabled',
-                  bgcolor: (theme) => alpha(theme.palette.primary.main, count ? 0.08 : 0),
-                  '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.16) },
-                }}
-              >
-                <Badge
-                  badgeContent={count || null}
-                  color="primary"
-                  max={99}
-                  sx={{
-                    '& .MuiBadge-badge': {
-                      fontSize: '0.6rem',
-                      height: 15,
-                      minWidth: 15,
-                      top: 1,
-                      right: 1,
-                    },
-                  }}
-                >
-                  <ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-          </Box>
+              <CampoIcon name="chat" size={14} />
+              {count ? (count > 99 ? '99+' : count) : null}
+            </ButtonBase>
+          </Tooltip>
         )
       },
     },
@@ -1666,50 +1340,116 @@ export default function Issues() {
     },
   ]
 
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Stack spacing={2} sx={{ height: '100%' }}>
-      <IssuesSummaryWidget rows={rows} loading={loading} />
-      <EntityListCard
-        toolbar={{
-          compact: true,
-          q: grid.q,
-          onQChange: grid.setQ,
-          alignRightActions: true,
-          rightActions: (
-            <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
-              Nuova issue
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Issue"
+        actions={<Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>Nuova issue</Button>}
+      />
+      <IssuesKpis
+        reloadKey={kpiReload}
+        counts={issueCounts}
+        view={view}
+        priority={fPriority}
+        onView={(k) => { setView(k as IssueView); setFPriority([]) }}
+        onPriorityPick={(pr) => { setView('active'); setFPriority((cur) => (cur.length === 1 && cur[0] === pr ? [] : [pr])) }}
+      />
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        <ViewTabs
+          value={savedId ? `saved:${savedId}` : view}
+          onChange={(k) => {
+            if (k.startsWith('saved:')) { applySaved(k.slice(6)); return }
+            setSavedId(null); setView(k as IssueView)
+          }}
+          tabs={[
+            { key: 'active', label: 'Attive', count: kpiCounts?.active },
+            { key: 'mine', label: 'Le mie', count: issueCounts?.mine },
+            { key: 'overdue', label: 'Scadute', count: issueCounts?.overdue, tone: 'alert' },
+            { key: 'closed', label: 'Risolte e chiuse', count: kpiCounts?.closed },
+            { key: 'all', label: 'Tutte', count: kpiCounts?.all },
+            ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
+          ]}
+          end={
+            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+              Salva vista
             </Button>
-          ),
-        }}
-        grid={{
-          pageKey: 'issues',
-          username: me?.username,
-          rows,
-          emptyState,
-          rowCount,
-          loading,
-          columns,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: displaySortModel,
-          onSortModelChange: handleSortModelChange,
-          onRowClick: (id) => {
-            const row = rows.find((r) => r.id === id)
-            if (row) openDetail(row, 0)
-          },
-          onRowContextMenu: handleRowContextMenu,
-          getRowClassName: (row) => (isClosedIssueRow(row) ? 'row-closed-issue' : undefined),
-          sx: {
-            cursor: 'pointer',
-            ...zebraSx,
-            '& .row-closed-issue': { opacity: 0.5 },
-            '& .row-closed-issue:hover': { opacity: 0.8 },
-          },
-        }}
-      >
-        <StatusViewChipBar value={statusView} onChange={setStatusView} />
-      </EntityListCard>
+          }
+        />
+        <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
+          onSave={(name) => { const v = saved.add(name, currentViewState()); setSavedId(v.id) }} />
+        <EntityListCard
+          sx={{ border: 0, borderRadius: 0 }}
+          flush
+          mobileCard={renderIssueCard}
+          openColumnsRef={openColumnsRef}
+          header={
+            <TableBar
+              filters={activeFilters}
+              onRemoveFilter={removeFilter}
+              onClearFilters={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }}
+              q={grid.q}
+              onQChange={grid.setQ}
+              searchPlaceholder="Cerca titolo, cliente, ServiceNow, inventario…"
+              onExport={exportVisible}
+              exporting={exporting}
+              onColumns={(el) => openColumnsRef.current?.(el)}
+              columnSearch={{ open: colSearchOpen, active: colQActive, onToggle: () => { if (colSearchOpen) setColQ(EMPTY_COLQ); setColSearchOpen((v) => !v) } }}
+            />
+          }
+          toolbar={{
+            compact: true,
+            q: grid.q,
+            onQChange: grid.setQ,
+            alignRightActions: true,
+          }}
+          grid={{
+            pageKey: 'issues',
+            autoHeight: true,
+            defaultHiddenColumns: ['opened_at', 'category_label', 'comments_count', 'closed_at', 'days_open'],
+            filterConfig,
+            columnSearch: {
+              open: colSearchOpen,
+              fields: {
+                id: { value: colQ.id, onChange: (v) => setColQ((c) => ({ ...c, id: v })), placeholder: '#' },
+                priority: { value: colQ.priority, allLabel: 'Tutte', onChange: (v) => setColQ((c) => ({ ...c, priority: v })), options: ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: PRIORITY_META[k].label })) },
+                status: { value: colQ.status, onChange: (v) => setColQ((c) => ({ ...c, status: v })), options: Object.entries(STATUS_META).map(([k, m]) => ({ value: k, label: m.label })) },
+                title: { value: colQ.title, onChange: (v) => setColQ((c) => ({ ...c, title: v })), placeholder: 'Cerca nel titolo' },
+                customer_name: { value: colQ.customer, onChange: (v) => setColQ((c) => ({ ...c, customer: v })), placeholder: 'Cliente o sito' },
+                servicenow_id: { value: colQ.servicenow, onChange: (v) => setColQ((c) => ({ ...c, servicenow: v })), placeholder: 'CS…' },
+                assigned_to_full_name: { value: colQ.assigned, onChange: (v) => setColQ((c) => ({ ...c, assigned: v })), placeholder: 'Nome' },
+                due_date: { value: colQ.due, allLabel: 'Tutte', onChange: (v) => setColQ((c) => ({ ...c, due: v })), options: [
+                  { value: 'overdue', label: 'Scadute' }, { value: 'today', label: 'Oggi' }, { value: 'week', label: 'Entro 7 giorni' },
+                  { value: 'later', label: 'Oltre 7 giorni' }, { value: 'none', label: 'Senza scadenza' },
+                ] },
+              },
+            },
+            username: me?.username,
+            rows,
+            emptyState,
+            rowCount,
+            loading,
+            columns,
+            paginationModel: grid.paginationModel,
+            onPaginationModelChange: grid.onPaginationModelChange,
+            sortModel: displaySortModel,
+            onSortModelChange: handleSortModelChange,
+            onRowClick: (id) => {
+              const row = rows.find((r) => r.id === id)
+              if (row) openDetail(row, 0)
+            },
+            onRowContextMenu: handleRowContextMenu,
+            getRowClassName: (row) => [isClosedIssueRow(row) ? 'row-closed-issue' : '', detailIssue?.id === row.id ? 'Mui-selected' : ''].filter(Boolean).join(' ') || undefined,
+            sx: {
+              cursor: 'pointer',
+              ...headerFilterGridSx,
+              '& .row-closed-issue': { color: 'text.secondary' },
+            },
+          }}
+        />
+      </Box>
       <IssueDialog
         open={formOpen}
         editIssue={editIssue}
@@ -1827,18 +1567,27 @@ export default function Issues() {
           </Button>
         </DialogActions>
       </Dialog>
-      <IssueDrawer
-        open={!!detailIssue}
+      <IssueDetail
         issue={detailIssue}
-        detailTab={detailTab}
+        tab={detailTab === 1 ? 'att' : 'det'}
+        onTab={(t) => setDetailTab(t === 'att' ? 1 : 0)}
+        position={detailIndex >= 0 ? `${detailIndex + 1} di ${rows.length}` : undefined}
+        onPrev={detailIndex > 0 ? () => openDetail(rows[detailIndex - 1], detailTab) : undefined}
+        onNext={detailIndex >= 0 && detailIndex < rows.length - 1 ? () => openDetail(rows[detailIndex + 1], detailTab) : undefined}
+        onClose={() => setDetailIssue(null)}
         comments={comments}
         commentsLoading={commentsLoading}
+        events={events}
         newComment={newComment}
         sendingComment={sendingComment}
-        onClose={() => setDetailIssue(null)}
+        onNewCommentChange={setNewComment}
+        onSendComment={handleSendComment}
+        users={assignableUsers}
+        categories={categories}
+        meId={me?.id}
+        onPatch={patchIssue}
         onEdit={() => {
           if (!detailIssue) return
-          setDetailIssue(null)
           openEdit(detailIssue)
         }}
         onDelete={() => {
@@ -1846,9 +1595,12 @@ export default function Issues() {
           setDeleteTarget(detailIssue)
           setDetailIssue(null)
         }}
-        onDetailTabChange={setDetailTab}
-        onNewCommentChange={setNewComment}
-        onSendComment={handleSendComment}
+        onLinkInventory={() => {
+          if (!detailIssue) return
+          openEdit(detailIssue)
+          window.setTimeout(() => openLinkInventoryPicker(), 120)
+        }}
+        onOpenServiceNow={(n) => void openServiceNowCaseDrawer(n)}
       />
 
       {/* ── Context menu ── */}

@@ -17,6 +17,7 @@ from django.contrib.auth.models import Group, Permission
 from rest_framework.test import APIClient
 
 from core.models import UserProfile
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -24,7 +25,7 @@ User = get_user_model()
 
 
 def _make_user(*, superuser: bool = False, with_manage_users: bool = False):
-    u = User.objects.create_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw", email="test@example.com")
+    u = make_archie_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw", email="test@example.com")
     if superuser:
         u.is_staff = True
         u.is_superuser = True

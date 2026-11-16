@@ -15,7 +15,10 @@ from rest_framework.throttling import UserRateThrottle
 
 from audit.utils import log_event
 from core.models import UserProfile
+from core.maintenance import state as maintenance_state
+from core.modules import disabled_modules
 from crm.models import Customer
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 
 class ChangePasswordThrottle(UserRateThrottle):
@@ -86,6 +89,7 @@ def _validate_avatar_upload(uploaded_file):
 
     return None
 
+
 User = get_user_model()
 
 
@@ -142,8 +146,15 @@ class MeAPIView(APIView):
             "last_name": user.last_name or "",
             "is_staff": bool(user.is_staff),
             "is_superuser": bool(user.is_superuser),
+            "last_login": user.last_login.isoformat() if user.last_login else None,
+            "date_joined": user.date_joined.isoformat() if getattr(user, "date_joined", None) else None,
             "groups": list(user.groups.values_list("name", flat=True)),
             "permissions": sorted(list(user.get_all_permissions())),
+            # Moduli spenti dalla pagina «Moduli»: il frontend li nasconde, o per
+            # i superuser li mostra con l'etichetta «Spento» (core/modules.py).
+            "disabled_modules": sorted(disabled_modules()),
+            # Modalità manutenzione attiva: il superuser vede la fascia in alto.
+            "maintenance_active": maintenance_state()["active"],
             "profile": {
                 "avatar": avatar_url,
                 "preferred_customer": preferred_customer_id,
@@ -152,6 +163,7 @@ class MeAPIView(APIView):
                 "leave_area_label": leave_area_label,
                 "gender": profile.gender if profile is not None else None,
                 "theme": profile.theme if profile is not None else UserProfile.Theme.DEFAULT,
+                "color_mode": profile.color_mode if profile is not None else UserProfile.ColorMode.LIGHT,
             },
         }
         return data
@@ -223,6 +235,17 @@ class MeAPIView(APIView):
                 )
             new_theme = raw_theme
 
+        new_color_mode = _UNSET
+        if "color_mode" in data:
+            raw_mode = data.get("color_mode")
+            valid_modes = {choice for choice, _ in UserProfile.ColorMode.choices}
+            if raw_mode not in valid_modes:
+                return Response(
+                    {"color_mode": f"Valore non valido. Ammessi: {', '.join(sorted(valid_modes))}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            new_color_mode = raw_mode
+
         # ── Fase 2: tutte le validazioni passate → salvataggio atomico ──────
 
         if new_email is not None:
@@ -243,6 +266,9 @@ class MeAPIView(APIView):
 
         if new_theme is not _UNSET:
             profile.theme = new_theme
+
+        if new_color_mode is not _UNSET:
+            profile.color_mode = new_color_mode
 
         profile.save()
 
@@ -327,3 +353,22 @@ class ChangePasswordView(APIView):
             pass  # non bloccare la risposta per un errore di audit
 
         return Response({"detail": "Password aggiornata con successo."}, status=status.HTTP_200_OK)
+
+
+class MeLoginsView(APIView):
+    """Ultimi accessi riusciti dell'utente (scheda Sicurezza del Profilo)."""
+
+    # Esplicite: solo Archie (il Portal non mostra questa scheda).
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
+
+    def get(self, request):
+        from audit.models import AuthAttempt
+
+        rows = (
+            AuthAttempt.objects.filter(username__iexact=request.user.get_username(), success=True)
+            .order_by("-created_at")[:5]
+        )
+        return Response([
+            {"created_at": r.created_at.isoformat(), "ip": r.ip, "user_agent": r.user_agent or ""}
+            for r in rows
+        ])

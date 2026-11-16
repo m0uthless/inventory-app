@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from core.models import CustomerStatus
 from crm.models import Contact, Customer
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -30,7 +31,7 @@ URL = "/api/contacts/bulk_restore/"
 
 def _make_user(*, superuser: bool = False):
     User = get_user_model()
-    u = User.objects.create_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
+    u = make_archie_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
     if superuser:
         u.is_staff = True
         u.is_superuser = True

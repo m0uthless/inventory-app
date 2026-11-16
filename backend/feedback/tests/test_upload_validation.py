@@ -10,6 +10,7 @@ from PIL import Image
 from rest_framework.test import APIClient
 
 from feedback.models import ReportRequest
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -17,7 +18,7 @@ pytestmark = pytest.mark.django_db
 def _make_user():
     User = get_user_model()
     suffix = uuid.uuid4().hex[:6]
-    return User.objects.create_user(username=f"fb_val_{suffix}", password="pw")
+    return make_archie_user(username=f"fb_val_{suffix}", password="pw")
 
 
 def _auth_client(user) -> APIClient:

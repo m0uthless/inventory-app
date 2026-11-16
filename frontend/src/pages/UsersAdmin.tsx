@@ -1,1625 +1,224 @@
 import * as React from 'react'
-import { alpha } from '@mui/material/styles'
-import { useDataGridZebraSx, useStatusTokens } from '../theme/AppThemeProvider'
-import { SHARED } from '../theme/constants'
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Checkbox,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  FormControl,
-  FormControlLabel,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Switch,
-  Tabs,
-  Tab,
-  TextField,
-  Tooltip,
-  Typography,
-  Autocomplete,
-} from '@mui/material'
-import type { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid'
-
-import AddIcon from '@mui/icons-material/Add'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
-import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import LockResetIcon from '@mui/icons-material/LockReset'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-
+import { useSearchParams } from 'react-router-dom'
+import { Box, Button, ButtonBase, Stack, Typography } from '@mui/material'
+import type { GridColDef } from '@mui/x-data-grid'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
-import { useToast } from '@shared/ui/toast'
 import EntityListCard from '@shared/ui/EntityListCard'
-import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
-import { DrawerShell } from '@shared/ui/DrawerShell'
-import { DrawerSection } from '@shared/ui/DrawerParts'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
-import {
-  RWD_LEVEL_OPTIONS,
-  LEVEL_TO_RWD,
-  rwdToLevel,
-  rwdLevelIndex,
-  type AdminUserRow,
-  type AdminGroupRow,
-  type PermissionModule,
-  type ModuleRwd,
-  type RwdLevel,
-  type ResetPasswordResponse,
-  type AdminUserCreateResponse,
-} from '../types/adminUsers'
+import { CampoIcon, PageHead, TableBar, ViewTabs } from '../ui/campo'
+import type { AdminGroupRow, AdminUserRow, PermissionModule, RwdLevel } from '../types/adminUsers'
+import { rwdToLevel } from '../types/adminUsers'
+import { agoLabel } from '../utils/agoLabel'
+import { USER_VIEWS, archieModules, fullName, openModules, roleTags, type LeaveAreaOption, type UserView } from '../features/users/usersModel'
+import { CreateGroupDialog, CreateUserDialog, GroupTag, RoleChip, UserAvatar } from '../features/users/usersUi'
+import { useLocalGrid } from '../features/users/useLocalGrid'
+import UserDetailCard from '../features/users/UserDetailCard'
+import GroupDetailCard from '../features/users/GroupDetailCard'
 
-export type LeaveAreaOption = { id: number; label: string }
-type CustomerOption = { id: number; label: string }
-export type UserTabId = 'anagrafica' | 'permessi'
-const USER_TAB_IDS: UserTabId[] = ['anagrafica', 'permessi']
-
-function fmtDateTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+type Section = 'users' | 'groups'
+const HEAT: Record<RwdLevel, (t: import('@mui/material').Theme) => string> = {
+  none: (t) => t.palette.archie.neutralBg,
+  read: (t) => t.palette.archie.tints.sky.bg,
+  read_write: (t) => t.palette.archie.tints.mint.mid,
+  full: (t) => t.palette.archie.tints.mint.ink,
 }
 
-function fullName(u: { first_name?: string; last_name?: string; username: string }) {
-  return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username
-}
-
-function initials(u: { first_name?: string; last_name?: string; username: string }) {
-  const fi = (u.first_name?.[0] || '') + (u.last_name?.[0] || '')
-  return (fi || u.username?.[0] || 'U').toUpperCase()
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null
-}
-
-function toIdLabel(v: unknown, labelKeys: string[]): { id: number; label: string } | null {
-  if (!isRecord(v)) return null
-  const id = Number(v['id'])
-  if (!Number.isFinite(id)) return null
-  for (const k of labelKeys) {
-    const val = v[k]
-    if (typeof val === 'string' && val.trim()) return { id, label: val }
-  }
-  return { id, label: String(id) }
-}
-
-// Stesso criterio del backend (portal/permissions.py::_can_access_archie):
-// superuser, oppure permesso core.access_archie da gruppo o diretto.
-function hasArchieAccess(u: AdminUserRow): boolean {
-  if (u.is_superuser) return true
-  const codename = 'core.access_archie'
-  return (
-    u.group_permissions.extra_permissions.includes(codename) ||
-    u.direct_permissions.extra_permissions.includes(codename)
-  )
-}
-
-// ─── Griglia locale (ricerca + ordinamento + paginazione lato client) ──────
-// Gli endpoint /admin-users/ e /admin-groups/ non sono paginati lato server
-// (dataset piccolo): la UI resta identica alle liste server-side esistenti,
-// ma la paginazione/ordinamento/ricerca vengono fatti qui in locale.
-function useLocalGrid<T extends Record<string, unknown>>(rows: T[], searchableFields: (keyof T)[]) {
-  const [q, setQ] = React.useState('')
-  const [paginationModel, setPaginationModel] = React.useState<GridPaginationModel>({ page: 0, pageSize: 25 })
-  const [sortModel, setSortModel] = React.useState<GridSortModel>([])
-
-  React.useEffect(() => {
-    setPaginationModel((p) => ({ ...p, page: 0 }))
-  }, [q])
-
-  const filtered = React.useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) return rows
-    return rows.filter((r) =>
-      searchableFields.some((f) => String(r[f] ?? '').toLowerCase().includes(needle)),
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, q])
-
-  const sorted = React.useMemo(() => {
-    const s = sortModel[0]
-    if (!s?.field) return filtered
-    const dir = s.sort === 'desc' ? -1 : 1
-    return [...filtered].sort((a, b) => {
-      const av = a[s.field]
-      const bv = b[s.field]
-      if (av == null && bv == null) return 0
-      if (av == null) return 1
-      if (bv == null) return -1
-      if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv) * dir
-      return av < bv ? -1 * dir : av > bv ? 1 * dir : 0
-    })
-  }, [filtered, sortModel])
-
-  const paged = React.useMemo(() => {
-    const start = paginationModel.page * paginationModel.pageSize
-    return sorted.slice(start, start + paginationModel.pageSize)
-  }, [sorted, paginationModel])
-
-  return {
-    q, setQ,
-    paginationModel, onPaginationModelChange: setPaginationModel,
-    sortModel, onSortModelChange: setSortModel,
-    rows: paged,
-    rowCount: sorted.length,
-  }
-}
-
-// ─── Riga modulo: menu a tendina a 4 livelli (None/R/RW/RWD) ───────────────
-// I livelli sono cumulativi (RW include R, RWD include RW). Se il gruppo
-// garantisce già un livello, non è possibile scendere sotto quella soglia
-// (i permessi diretti sono additivi rispetto al gruppo in Django).
-const RWD_LEVEL_SHORT_LABEL: Record<RwdLevel, string> = {
-  none: 'Nessuno',
-  read: 'Lettura',
-  read_write: 'Lettura+Scrittura',
-  full: 'Completo (R/W/D)',
-}
-
-function ModuleRwdSelect(props: {
-  label: string
-  value: RwdLevel
-  floorLevel?: RwdLevel
-  onChange: (level: RwdLevel) => void
-  disabled?: boolean
-}) {
-  const { label, value, floorLevel, onChange, disabled } = props
-  const floorIdx = floorLevel ? rwdLevelIndex(floorLevel) : 0
-  const displayValue = floorLevel && floorIdx > rwdLevelIndex(value) ? floorLevel : value
-
-  return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ py: 0.6 }}>
-      <Typography sx={{ fontSize: 12.5, flex: 1, minWidth: 0, color: disabled ? 'text.disabled' : 'text.primary' }}>{label}</Typography>
-      <FormControl size="small" sx={{ minWidth: 172, flexShrink: 0 }} disabled={disabled}>
-        <Select<RwdLevel>
-          value={displayValue}
-          onChange={(e) => onChange(e.target.value as RwdLevel)}
-          renderValue={(v) => RWD_LEVEL_SHORT_LABEL[v]}
-          sx={{ fontSize: 12.5 }}
-        >
-          {RWD_LEVEL_OPTIONS.map((opt) => {
-            const optDisabled = rwdLevelIndex(opt.key) < floorIdx
-            return (
-              <MenuItem key={opt.key} value={opt.key} disabled={optDisabled} sx={{ fontSize: 12.5 }}>
-                {opt.label}
-                {optDisabled ? ' (dal gruppo)' : ''}
-              </MenuItem>
-            )
-          })}
-        </Select>
-      </FormControl>
-    </Stack>
-  )
-}
-
-// ─── Matrice permessi per modulo ────────────────────────────────────────────
-// Usata sia per l'utente (2 livelli: gruppo/diretto, con floor dal gruppo)
-// sia per il gruppo (1 livello, nessun floor).
-function PermissionMatrix(props: {
-  modules: PermissionModule[]
-  groupState?: Record<string, ModuleRwd>
-  value: Record<string, ModuleRwd>
-  onChange: (appLabel: string, level: RwdLevel) => void
-  extraGroupSet?: Set<string>
-  extraValueSet: Set<string>
-  onToggleExtra: (codename: string, checked: boolean) => void
-  sectionTitle?: string
-  disabled?: boolean
-}) {
-  const { modules, groupState, value, onChange, extraGroupSet, extraValueSet, onToggleExtra, sectionTitle, disabled } = props
-  const modulesWithExtras = modules.filter((m) => m.extra_permissions.length > 0)
-
-  return (
-    <Stack spacing={2}>
-      <DrawerSection title={sectionTitle || 'Permessi per modulo'}>
-        <Stack divider={<Divider sx={{ borderColor: 'grey.100' }} />}>
-          {modules.map((m) => (
-            <ModuleRwdSelect
-              key={m.app_label}
-              label={m.label}
-              value={rwdToLevel(value[m.app_label])}
-              floorLevel={groupState ? rwdToLevel(groupState[m.app_label]) : undefined}
-              onChange={(level) => onChange(m.app_label, level)}
-              disabled={disabled}
-            />
-          ))}
-        </Stack>
-      </DrawerSection>
-
-      {modulesWithExtras.length > 0 && (
-        <DrawerSection title="Permessi extra" variant="muted">
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1 }}>
-            Permessi speciali che non rientrano nello schema standard: vanno assegnati singolarmente.
-          </Typography>
-          <Stack spacing={0.5}>
-            {modulesWithExtras.map((m) => (
-              <Box key={m.app_label}>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.disabled', mt: 1 }}>{m.label}</Typography>
-                {m.extra_permissions.map((p) => {
-                  const fromGroup = Boolean(extraGroupSet?.has(p.codename))
-                  const direct = extraValueSet.has(p.codename)
-                  const locked = fromGroup || disabled
-                  return (
-                    <FormControlLabel
-                      key={p.codename}
-                      sx={{ display: 'flex', ml: 0 }}
-                      control={
-                        <Tooltip title={fromGroup ? 'Concesso dal gruppo' : ''}>
-                          <span>
-                            <Checkbox
-                              size="small"
-                              color="primary"
-                              checked={fromGroup || direct}
-                              disabled={locked}
-                              onChange={(e) => onToggleExtra(p.codename, e.target.checked)}
-                              sx={{ p: 0.25, mr: 1 }}
-                            />
-                          </span>
-                        </Tooltip>
-                      }
-                      label={<Typography sx={{ fontSize: 12.5, color: disabled ? 'text.disabled' : 'text.primary' }}>{p.name}</Typography>}
-                    />
-                  )
-                })}
-              </Box>
-            ))}
-          </Stack>
-        </DrawerSection>
-      )}
-    </Stack>
-  )
-}
-
-// ─── Dialog risultato reset password (one-shot) ────────────────────────────
-function ResetPasswordResultDialog({ result, onClose }: { result: ResetPasswordResponse; onClose: () => void }) {
-  const toast = useToast()
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(result.password)
-      toast.success('Password copiata negli appunti.')
-    } catch {
-      /* silenzioso */
-    }
-  }
-  return (
-    <Box
-      sx={{ position: 'fixed', inset: 0, zIndex: 2000, bgcolor: SHARED.overlay.blackScrim, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
-      onClick={onClose}
-    >
-      <Box onClick={(e) => e.stopPropagation()} sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 3, maxWidth: 420, width: '100%', boxShadow: 8 }}>
-        <Typography sx={{ fontWeight: 800, mb: 1 }}>Password reimpostata</Typography>
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 2 }}>
-          Questa password viene mostrata una sola volta: comunicala all'utente e chiedigli di cambiarla al primo accesso.
-        </Typography>
-        <TextField
-          value={result.password}
-          fullWidth
-          size="small"
-          InputProps={{
-            readOnly: true,
-            sx: { fontFamily: 'monospace', fontSize: 14 },
-            endAdornment: (
-              <IconButton size="small" onClick={copy}>
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            ),
-          }}
-        />
-        {!result.email_sent && (
-          <Alert severity="warning" sx={{ mt: 2, fontSize: 12 }}>
-            Email non inviata (SMTP non ancora configurato). Comunica la password manualmente.
-          </Alert>
-        )}
-        {result.email_sent && (
-          <Alert severity="success" sx={{ mt: 2, fontSize: 12 }}>
-            Email inviata all'utente.
-          </Alert>
-        )}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-          <Button onClick={onClose} variant="contained" size="small">
-            Chiuso
-          </Button>
-        </Box>
-      </Box>
-    </Box>
-  )
-}
-
-// ─── Dialog creazione utente ────────────────────────────────────────────────
-// Form minimale (anagrafica + gruppi): permessi/profilo dettagliato si
-// configurano dopo, riaprendo il drawer già esistente (nessuna duplicazione
-// della matrice permessi). Se la password è lasciata vuota viene generata
-// automaticamente e mostrata una sola volta, come per "Reimposta password".
-function CreateUserDialog(props: {
-  open: boolean
-  groups: AdminGroupRow[]
-  onClose: () => void
-  onCreated: (user: AdminUserRow) => void
-}) {
-  const { open, groups, onClose, onCreated } = props
-  const toast = useToast()
-  const [saving, setSaving] = React.useState(false)
-  const [username, setUsername] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [firstName, setFirstName] = React.useState('')
-  const [lastName, setLastName] = React.useState('')
-  const [email, setEmail] = React.useState('')
-  const [isActive, setIsActive] = React.useState(true)
-  const [groupIds, setGroupIds] = React.useState<number[]>([])
-  const [created, setCreated] = React.useState<AdminUserCreateResponse | null>(null)
-
-  const reset = () => {
-    setUsername('')
-    setPassword('')
-    setFirstName('')
-    setLastName('')
-    setEmail('')
-    setIsActive(true)
-    setGroupIds([])
-    setCreated(null)
-  }
-
-  const handleClose = () => {
-    if (saving) return
-    reset()
-    onClose()
-  }
-
-  const submit = async () => {
-    if (!username.trim()) {
-      toast.error('Lo username è obbligatorio.')
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await api.post('/admin-users/', {
-        username: username.trim(),
-        password: password || undefined,
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        is_active: isActive,
-        group_ids: groupIds,
-      })
-      setCreated(res.data as AdminUserCreateResponse)
-      toast.success('Utente creato.')
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const copyPassword = async () => {
-    if (!created?.generated_password) return
-    try {
-      await navigator.clipboard.writeText(created.generated_password)
-      toast.success('Password copiata negli appunti.')
-    } catch {
-      /* silenzioso */
-    }
-  }
-
-  const finish = () => {
-    if (created) onCreated(created)
-    reset()
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ fontWeight: 800 }}>Nuovo utente</DialogTitle>
-      <DialogContent>
-        {created ? (
-          <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-            <Alert severity="success" sx={{ fontSize: 12.5 }}>
-              Utente <strong>{created.username}</strong> creato. Configura gruppo/permessi dettagliati dal pannello
-              dopo aver chiuso questa finestra.
-            </Alert>
-            {created.generated_password && (
-              <>
-                <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-                  Password generata automaticamente (mostrata una sola volta):
-                </Typography>
-                <TextField
-                  value={created.generated_password}
-                  fullWidth
-                  size="small"
-                  InputProps={{
-                    readOnly: true,
-                    sx: { fontFamily: 'monospace', fontSize: 14 },
-                    endAdornment: (
-                      <IconButton size="small" onClick={copyPassword}>
-                        <ContentCopyIcon fontSize="small" />
-                      </IconButton>
-                    ),
-                  }}
-                />
-              </>
-            )}
-          </Stack>
-        ) : (
-          <Stack spacing={1.75} sx={{ pt: 0.5 }}>
-            <TextField
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              fullWidth
-              size="small"
-              autoFocus
-              required
-            />
-            <TextField
-              label="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              fullWidth
-              size="small"
-              helperText="Lascia vuoto per generarla automaticamente."
-            />
-            <Stack direction="row" spacing={1.5}>
-              <TextField label="Nome" value={firstName} onChange={(e) => setFirstName(e.target.value)} fullWidth size="small" />
-              <TextField label="Cognome" value={lastName} onChange={(e) => setLastName(e.target.value)} fullWidth size="small" />
-            </Stack>
-            <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth size="small" />
-            <Autocomplete
-              multiple
-              size="small"
-              options={groups}
-              getOptionLabel={(g) => g.name}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              value={groups.filter((g) => groupIds.includes(g.id))}
-              onChange={(_, v) => setGroupIds(v.map((g) => g.id))}
-              renderInput={(params) => <TextField {...params} label="Gruppi" placeholder="Seleziona gruppo/i" />}
-            />
-            <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Utente attivo" />
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions>
-        {created ? (
-          <Button onClick={finish} variant="contained" size="small">
-            Configura permessi
-          </Button>
-        ) : (
-          <>
-            <Button onClick={handleClose} disabled={saving} size="small">
-              Annulla
-            </Button>
-            <Button onClick={submit} variant="contained" disabled={saving} size="small">
-              Crea utente
-            </Button>
-          </>
-        )}
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-// ─── Dialog creazione gruppo ────────────────────────────────────────────────
-function CreateGroupDialog(props: {
-  open: boolean
-  onClose: () => void
-  onCreated: (group: AdminGroupRow) => void
-}) {
-  const { open, onClose, onCreated } = props
-  const toast = useToast()
-  const [saving, setSaving] = React.useState(false)
-  const [name, setName] = React.useState('')
-
-  const handleClose = () => {
-    if (saving) return
-    setName('')
-    onClose()
-  }
-
-  const submit = async () => {
-    if (!name.trim()) {
-      toast.error('Il nome del gruppo è obbligatorio.')
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await api.post('/admin-groups/', { name: name.trim() })
-      toast.success('Gruppo creato.')
-      onCreated(res.data as AdminGroupRow)
-      setName('')
-      onClose()
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ fontWeight: 800 }}>Nuovo gruppo</DialogTitle>
-      <DialogContent>
-        <TextField
-          label="Nome gruppo"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          fullWidth
-          size="small"
-          autoFocus
-          required
-          sx={{ mt: 0.5 }}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose} disabled={saving} size="small">
-          Annulla
-        </Button>
-        <Button onClick={submit} variant="contained" disabled={saving} size="small">
-          Crea gruppo
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-// ─── Drawer utente ──────────────────────────────────────────────────────────
-export function UserDrawer(props: {
-  open: boolean
-  user: AdminUserRow | null
-  groups: AdminGroupRow[]
-  modules: PermissionModule[]
-  leaveAreas: LeaveAreaOption[]
-  currentUserId?: number
-  onClose: () => void
-  onSaved: (updated: AdminUserRow) => void
-  onDeleted: (id: number) => void
-  /** Tab su cui aprire il drawer (default 'anagrafica'). Usato dalla
-   * schermata "Gestione accesso Portal" per aprire direttamente sul tab
-   * Permessi/Accesso Portal invece dell'anagrafica. */
-  initialTab?: UserTabId
-}) {
-  const { open, user, groups, modules, leaveAreas, currentUserId, onClose, onSaved, onDeleted, initialTab } = props
-  const toast = useToast()
-  const [tab, setTab] = React.useState<UserTabId>('anagrafica')
-  const [saving, setSaving] = React.useState(false)
-  const [resetting, setResetting] = React.useState(false)
-  const [resettingPw, setResettingPw] = React.useState(false)
-  const [pwResult, setPwResult] = React.useState<ResetPasswordResponse | null>(null)
-  const [deleteOpen, setDeleteOpen] = React.useState(false)
-  const [deleting, setDeleting] = React.useState(false)
-
-  const [firstName, setFirstName] = React.useState('')
-  const [lastName, setLastName] = React.useState('')
-  const [email, setEmail] = React.useState('')
-  const [isActive, setIsActive] = React.useState(true)
-  const [groupIds, setGroupIds] = React.useState<number[]>([])
-
-  const [isPhilips, setIsPhilips] = React.useState(false)
-  const [isTechnician, setIsTechnician] = React.useState(true)
-  const [isFunctionalAccount, setIsFunctionalAccount] = React.useState(false)
-  const [isLeaveCoordinator, setIsLeaveCoordinator] = React.useState(false)
-  const [isExpenseSecretary, setIsExpenseSecretary] = React.useState(false)
-  const [leaveArea, setLeaveArea] = React.useState<number | ''>('')
-  const [birthDate, setBirthDate] = React.useState('')
-  const [gender, setGender] = React.useState<'M' | 'F' | ''>('')
-
-  const [moduleDirect, setModuleDirect] = React.useState<Record<string, ModuleRwd>>({})
-  const [extraDirect, setExtraDirect] = React.useState<Set<string>>(new Set())
-
-  const [portalLevel, setPortalLevel] = React.useState<RwdLevel>('none')
-  // 0.9.0 punto 6: multi-select. portalCustomers = TUTTI i clienti assegnati,
-  // portalDefaultId = quale di questi è il default (mostrato al login).
-  const [portalCustomers, setPortalCustomers] = React.useState<CustomerOption[]>([])
-  const [portalDefaultId, setPortalDefaultId] = React.useState<number | null>(null)
-  const [customerInput, setCustomerInput] = React.useState('')
-  const [customerOptions, setCustomerOptions] = React.useState<CustomerOption[]>([])
-  const [customerLoading, setCustomerLoading] = React.useState(false)
-
-  React.useEffect(() => {
-    if (!user) return
-    setTab(initialTab ?? 'anagrafica')
-    setFirstName(user.first_name || '')
-    setLastName(user.last_name || '')
-    setEmail(user.email || '')
-    setIsActive(user.is_active)
-    setGroupIds(user.groups.map((g) => g.id))
-    setModuleDirect(user.direct_permissions.modules)
-    setExtraDirect(new Set(user.direct_permissions.extra_permissions))
-    setIsPhilips(user.profile.is_philips)
-    setIsTechnician(user.profile.is_servicenow_technician)
-    setIsFunctionalAccount(user.profile.is_functional_account)
-    setIsLeaveCoordinator(user.profile.is_leave_coordinator)
-    setIsExpenseSecretary(user.profile.is_expense_secretary)
-    setLeaveArea(user.profile.leave_area ?? '')
-    setBirthDate(user.profile.birth_date ?? '')
-    setGender(user.profile.gender ?? '')
-    setPortalLevel(rwdToLevel(user.direct_permissions.modules['portal']))
-    if (user.portal_profile) {
-      const assigned: CustomerOption[] =
-        user.portal_profile.customers.length > 0
-          ? user.portal_profile.customers.map((c) => ({ id: c.id, label: c.name }))
-          : [{ id: user.portal_profile.customer_id, label: user.portal_profile.customer_name }] // fallback profili pre-0.9.0
-      setPortalCustomers(assigned)
-      setPortalDefaultId(user.portal_profile.customer_id)
-    } else {
-      setPortalCustomers([])
-      setPortalDefaultId(null)
-    }
-    setCustomerInput('')
-  }, [user, initialTab])
-
-  // Ricerca cliente per l'Autocomplete "Cliente collegato" (debounce 300ms).
-  React.useEffect(() => {
-    let alive = true
-    const t = setTimeout(async () => {
-      setCustomerLoading(true)
-      try {
-        const res = await api.get('/customers/', { params: { search: customerInput || undefined, page_size: 25 } })
-        const payload: unknown = res.data
-        const list: unknown[] = Array.isArray(payload)
-          ? payload
-          : isRecord(payload) && Array.isArray(payload['results'])
-            ? (payload['results'] as unknown[])
-            : []
-        if (alive) {
-          setCustomerOptions(
-            list
-              .map((c) => toIdLabel(c, ['display_name', 'name']))
-              .filter((x): x is CustomerOption => Boolean(x)),
-          )
-        }
-      } catch {
-        /* silenzioso */
-      } finally {
-        if (alive) setCustomerLoading(false)
-      }
-    }, 300)
-    return () => {
-      alive = false
-      clearTimeout(t)
-    }
-  }, [customerInput])
-
-  const extraIdByCodename = React.useMemo(() => {
-    const map = new Map<string, number>()
-    for (const m of modules) for (const p of m.extra_permissions) map.set(p.codename, p.id)
-    return map
-  }, [modules])
-
-  const extraGroupSet = React.useMemo(
-    () => (user ? new Set(user.group_permissions.extra_permissions) : new Set<string>()),
-    [user],
-  )
-
-  const archieModules = React.useMemo(() => modules.filter((m) => !m.is_portal_dedicated), [modules])
-  // "portal" non è mostrato come riga separata: è rappresentato dal controllo "Accesso Portal".
-  const portalModules = React.useMemo(
-    () => modules.filter((m) => m.is_portal_dedicated && m.app_label !== 'portal'),
-    [modules],
-  )
-
-  if (!user) return null
-
-  const portalGroupFloor = rwdToLevel(user.group_permissions.modules['portal'])
-
-  // Un utente Philips è un profilo circoscritto esclusivamente all'app
-  // ServiceNow: diventa automaticamente tecnico, e gruppo/permessi Archie/
-  // Portal vengono azzerati e bloccati (enforced anche lato backend).
-  const handlePhilipsChange = (checked: boolean) => {
-    setIsPhilips(checked)
-    if (checked) {
-      setIsTechnician(true)
-      setIsLeaveCoordinator(false)
-      setIsExpenseSecretary(false)
-      setLeaveArea('')
-      setGroupIds([])
-      setModuleDirect({})
-      setExtraDirect(new Set())
-      setPortalLevel('none')
-      setPortalCustomers([])
-      setPortalDefaultId(null)
-    }
-  }
-
-  const saveAnagrafica = async () => {
-    setSaving(true)
-    try {
-      const res = await api.patch(`/admin-users/${user.id}/`, {
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        is_active: isActive,
-        group_ids: groupIds,
-        profile: {
-          is_philips: isPhilips,
-          is_servicenow_technician: isTechnician,
-          is_functional_account: isFunctionalAccount,
-          is_leave_coordinator: isLeaveCoordinator,
-          is_expense_secretary: isExpenseSecretary,
-          leave_area: leaveArea === '' ? null : leaveArea,
-          birth_date: birthDate === '' ? null : birthDate,
-          gender: gender === '' ? null : gender,
-        },
-      })
-      onSaved(res.data as AdminUserRow)
-      toast.success('Anagrafica aggiornata.')
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const savePermessi = async () => {
-    if (portalLevel !== 'none' && (portalCustomers.length === 0 || !portalDefaultId)) {
-      toast.error("Seleziona almeno un cliente (e il cliente di default) per abilitare l'accesso Portal.")
-      return
-    }
-    setSaving(true)
-    try {
-      const extra_permission_ids = Array.from(extraDirect)
-        .map((cn) => extraIdByCodename.get(cn))
-        .filter((id): id is number => typeof id === 'number')
-      const res = await api.patch(`/admin-users/${user.id}/`, {
-        module_permissions: moduleDirect,
-        extra_permission_ids,
-        portal_access: {
-          level: portalLevel,
-          customer_id: portalDefaultId,
-          customer_ids: portalCustomers.map((c) => c.id),
-        },
-      })
-      onSaved(res.data as AdminUserRow)
-      toast.success('Permessi aggiornati.')
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const doResetPassword = async () => {
-    setResettingPw(true)
-    try {
-      const res = await api.post(`/admin-users/${user.id}/reset-password/`)
-      setPwResult(res.data as ResetPasswordResponse)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setResettingPw(false)
-    }
-  }
-
-  const doResetToGroup = async () => {
-    setResetting(true)
-    try {
-      const res = await api.post(`/admin-users/${user.id}/reset-permissions-to-group/`)
-      onSaved(res.data as AdminUserRow)
-      toast.success("Permessi diretti azzerati: l'utente eredita ora solo dal gruppo.")
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setResetting(false)
-    }
-  }
-
-  const doDelete = async () => {
-    setDeleting(true)
-    try {
-      await api.delete(`/admin-users/${user.id}/`)
-      toast.success('Utente eliminato.')
-      setDeleteOpen(false)
-      onDeleted(user.id)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const canDelete = !user.is_superuser && user.id !== currentUserId
-
-  const hasDirectGrants = Object.values(moduleDirect).some((v) => v.r || v.w || v.d) || extraDirect.size > 0
-
-  return (
-    <DrawerShell
-      open={open}
-      onClose={onClose}
-      gradient="teal"
-      width={420}
-      icon={
-        <Avatar src={user.profile.avatar || undefined} sx={{ width: 38, height: 38, fontSize: 14, fontWeight: 800, bgcolor: alpha(SHARED.pureWhite, 0.22), color: SHARED.pureWhite }}>
-          {!user.profile.avatar && initials(user)}
-        </Avatar>
-      }
-      iconBare
-      title={fullName(user)}
-      tabs={['Anagrafica', 'Permessi']}
-      tabValue={USER_TAB_IDS.indexOf(tab)}
-      onTabChange={(v) => setTab(USER_TAB_IDS[v])}
-    >
-      {pwResult && <ResetPasswordResultDialog result={pwResult} onClose={() => setPwResult(null)} />}
-
-      {tab === 'anagrafica' && (
-        <Stack spacing={2}>
-          <DrawerSection title="Dati utente">
-            <Stack spacing={1.75}>
-              <Stack direction="row" spacing={1.5}>
-                <TextField label="Nome" value={firstName} onChange={(e) => setFirstName(e.target.value)} fullWidth size="small" />
-                <TextField label="Cognome" value={lastName} onChange={(e) => setLastName(e.target.value)} fullWidth size="small" />
-              </Stack>
-              <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth size="small" />
-              <TextField
-                type="date"
-                label="Data di nascita"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-                size="small"
-                helperText="Usata dal widget dashboard 'Compleanni'."
-              />
-              <FormControl fullWidth size="small">
-                <InputLabel id="user-gender-label">Genere</InputLabel>
-                <Select
-                  labelId="user-gender-label"
-                  label="Genere"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as 'M' | 'F' | '')}
-                >
-                  <MenuItem value="">
-                    <em>Non specificato</em>
-                  </MenuItem>
-                  <MenuItem value="M">Uomo</MenuItem>
-                  <MenuItem value="F">Donna</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Utente attivo" />
-            </Stack>
-          </DrawerSection>
-
-          <DrawerSection title="Configurazioni">
-            <Stack spacing={1}>
-              <FormControlLabel
-                control={<Switch checked={isTechnician} disabled={isPhilips} onChange={(e) => setIsTechnician(e.target.checked)} />}
-                label="Tecnico ServiceNow (assegnabile ai case)"
-              />
-              <FormControlLabel
-                control={<Switch checked={isFunctionalAccount} onChange={(e) => setIsFunctionalAccount(e.target.checked)} />}
-                label="Account funzionale (es. ac.philips, cdd.biotron)"
-              />
-              {isFunctionalAccount && (
-                <Typography sx={{ fontSize: 11.5, color: 'text.secondary', ml: 5.5, mt: -0.5 }}>
-                  Utente di servizio usato solo come assegnatario automatico di fallback: resta assegnabile
-                  normalmente ai case ServiceNow, ma non compare nel pannello Triage né nella vista settimanale
-                  assenze.
-                </Typography>
-              )}
-              <FormControlLabel control={<Switch checked={isPhilips} onChange={(e) => handlePhilipsChange(e.target.checked)} />} label="Philips (altrimenti: Biotron)" />
-              {isPhilips && (
-                <Typography sx={{ fontSize: 11.5, color: 'text.secondary', ml: 5.5, mt: -0.5 }}>
-                  Profilo circoscritto a ServiceNow: tecnico attivato in automatico; coordinatore ferie, segreteria
-                  rimborsi, area ferie, gruppo e permessi Archie/Portal bloccati a "Nessuno".
-                </Typography>
-              )}
-              <FormControlLabel
-                control={<Switch checked={isLeaveCoordinator} disabled={isPhilips} onChange={(e) => setIsLeaveCoordinator(e.target.checked)} />}
-                label="Coordinatore piano ferie"
-              />
-              <FormControlLabel
-                control={<Switch checked={isExpenseSecretary} disabled={isPhilips} onChange={(e) => setIsExpenseSecretary(e.target.checked)} />}
-                label="Segreteria rimborsi spese"
-              />
-              <FormControl size="small" fullWidth sx={{ mt: 1 }} disabled={isPhilips}>
-                <InputLabel id="leave-area-label">Area piano ferie</InputLabel>
-                <Select<number | ''>
-                  labelId="leave-area-label"
-                  label="Area piano ferie"
-                  value={leaveArea}
-                  onChange={(e) => setLeaveArea(e.target.value === '' ? '' : Number(e.target.value))}
-                >
-                  <MenuItem value="">— Nessuna —</MenuItem>
-                  {leaveAreas.map((la) => (
-                    <MenuItem key={la.id} value={la.id}>
-                      {la.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-          </DrawerSection>
-
-          <DrawerSection title="Gruppo">
-            <Autocomplete
-              multiple
-              size="small"
-              disabled={isPhilips}
-              options={groups}
-              getOptionLabel={(g) => g.name}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              value={groups.filter((g) => groupIds.includes(g.id))}
-              onChange={(_, v) => setGroupIds(v.map((g) => g.id))}
-              renderInput={(params) => <TextField {...params} label="Gruppi" placeholder="Seleziona gruppo/i" />}
-            />
-          </DrawerSection>
-
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" onClick={saveAnagrafica} disabled={saving} size="small">
-              Salva anagrafica
-            </Button>
-          </Box>
-
-          <DrawerSection title="Password" variant="muted">
-            <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1.25 }}>
-              Genera una nuova password casuale, mostrata una sola volta. Se l'utente ha un'email verrà anche
-              inviata via posta (se la posta non è configurata, comunicala manualmente).
-            </Typography>
-            <Button variant="outlined" startIcon={<LockResetIcon />} onClick={doResetPassword} disabled={resettingPw} size="small">
-              Reimposta password
-            </Button>
-          </DrawerSection>
-
-          {canDelete && (
-            <DrawerSection title="Zona pericolosa" variant="muted">
-              <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1.25 }}>
-                Eliminazione definitiva: l'utente non può essere ripristinato.
-              </Typography>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteOutlineIcon />}
-                onClick={() => setDeleteOpen(true)}
-                size="small"
-              >
-                Elimina utente
-              </Button>
-            </DrawerSection>
-          )}
-        </Stack>
-      )}
-
-      <ConfirmDeleteDialog
-        open={deleteOpen}
-        busy={deleting}
-        title={`Eliminare l'utente ${user.username}?`}
-        description="L'utente verrà eliminato definitivamente (non è un'operazione reversibile e non finisce nel cestino)."
-        confirmText="Elimina"
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={doDelete}
-      />
-
-      {tab === 'permessi' && (
-        <Stack spacing={2}>
-          {isPhilips && (
-            <Alert severity="info" sx={{ fontSize: 12 }}>
-              Profilo Philips: circoscritto a ServiceNow. Permessi Archie e accesso Portal bloccati a "Nessuno".
-            </Alert>
-          )}
-
-          <PermissionMatrix
-            modules={archieModules}
-            groupState={user.group_permissions.modules}
-            value={moduleDirect}
-            onChange={(app, level) => setModuleDirect((prev) => ({ ...prev, [app]: LEVEL_TO_RWD[level] }))}
-            extraGroupSet={extraGroupSet}
-            extraValueSet={extraDirect}
-            onToggleExtra={(codename, checked) =>
-              setExtraDirect((prev) => {
-                const next = new Set(prev)
-                if (checked) next.add(codename)
-                else next.delete(codename)
-                return next
-              })
-            }
-            sectionTitle="Permessi ARCHIE"
-            disabled={isPhilips}
-          />
-
-          <DrawerSection title="Accesso Portal">
-            <ModuleRwdSelect
-              label="Livello di accesso"
-              value={portalLevel}
-              floorLevel={portalGroupFloor}
-              onChange={setPortalLevel}
-              disabled={isPhilips}
-            />
-            {portalLevel !== 'none' && (
-              <Alert severity="info" sx={{ mt: 1.5, fontSize: 12 }}>
-                Questo controllo abilita solo l'accesso al portale e i clienti
-                selezionabili. Per far vedere Device/Inventario/VLAN all'utente,
-                assegna i permessi anche su quei moduli nella sezione "Permessi
-                ARCHIE" qui sopra — non è automatico.
-              </Alert>
-            )}
-            {portalLevel !== 'none' && (
-              <>
-                <Autocomplete
-                  multiple
-                  sx={{ mt: 1.5 }}
-                  size="small"
-                  options={customerOptions}
-                  loading={customerLoading}
-                  inputValue={customerInput}
-                  onInputChange={(_, v) => setCustomerInput(v)}
-                  value={portalCustomers}
-                  onChange={(_, list) => {
-                    setPortalCustomers(list)
-                    // Se il default non è più tra i selezionati, ricade sul
-                    // primo rimasto (o si azzera se la lista è vuota) — mai
-                    // lasciare un default "orfano" fuori dalla selezione.
-                    if (!list.some((c) => c.id === portalDefaultId)) {
-                      setPortalDefaultId(list.length > 0 ? list[0].id : null)
-                    }
-                  }}
-                  getOptionLabel={(o) => o.label}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
-                  filterOptions={(x) => x}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Clienti assegnati"
-                      placeholder="Cerca cliente…"
-                      required
-                      error={portalCustomers.length === 0}
-                    />
-                  )}
-                />
-                {portalCustomers.length > 0 && (
-                  <TextField
-                    select
-                    sx={{ mt: 1.5 }}
-                    size="small"
-                    fullWidth
-                    label="Cliente di default"
-                    helperText="Mostrato al login e usato come fallback per lo scope Portal."
-                    value={portalDefaultId ?? ''}
-                    onChange={(e) => setPortalDefaultId(Number(e.target.value))}
-                    error={!portalDefaultId}
-                  >
-                    {portalCustomers.map((c) => (
-                      <MenuItem key={c.id} value={c.id}>
-                        {c.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              </>
-            )}
-          </DrawerSection>
-
-          {portalLevel !== 'none' && portalModules.length > 0 && (
-            <PermissionMatrix
-              modules={portalModules}
-              groupState={user.group_permissions.modules}
-              value={moduleDirect}
-              onChange={(app, level) => setModuleDirect((prev) => ({ ...prev, [app]: LEVEL_TO_RWD[level] }))}
-              extraGroupSet={extraGroupSet}
-              extraValueSet={extraDirect}
-              onToggleExtra={(codename, checked) =>
-                setExtraDirect((prev) => {
-                  const next = new Set(prev)
-                  if (checked) next.add(codename)
-                  else next.delete(codename)
-                  return next
-                })
-              }
-              sectionTitle="Portal — moduli dedicati"
-            />
-          )}
-
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Tooltip title="Azzera i permessi assegnati direttamente a questo utente: tornerà a ereditare solo quelli del/dei gruppo/i.">
-              <span>
-                <Button variant="text" color="warning" startIcon={<RestartAltIcon />} onClick={doResetToGroup} disabled={resetting || !hasDirectGrants} size="small">
-                  Reset su gruppo
-                </Button>
-              </span>
-            </Tooltip>
-            <Button variant="contained" onClick={savePermessi} disabled={saving} size="small">
-              Salva permessi
-            </Button>
-          </Stack>
-        </Stack>
-      )}
-    </DrawerShell>
-  )
-}
-
-// ─── Drawer gruppo ──────────────────────────────────────────────────────────
-function GroupDrawer(props: {
-  open: boolean
-  group: AdminGroupRow | null
-  modules: PermissionModule[]
-  onClose: () => void
-  onSaved: (updated: AdminGroupRow) => void
-  onDeleted: (id: number) => void
-}) {
-  const { open, group, modules, onClose, onSaved, onDeleted } = props
-  const toast = useToast()
-  const [saving, setSaving] = React.useState(false)
-  const [name, setName] = React.useState('')
-  const [moduleValue, setModuleValue] = React.useState<Record<string, ModuleRwd>>({})
-  const [extraValue, setExtraValue] = React.useState<Set<string>>(new Set())
-  const [deleteOpen, setDeleteOpen] = React.useState(false)
-  const [deleting, setDeleting] = React.useState(false)
-
-  React.useEffect(() => {
-    if (!group) return
-    setName(group.name)
-    setModuleValue(group.permissions_state.modules)
-    setExtraValue(new Set(group.permissions_state.extra_permissions))
-  }, [group])
-
-  const extraIdByCodename = React.useMemo(() => {
-    const map = new Map<string, number>()
-    for (const m of modules) for (const p of m.extra_permissions) map.set(p.codename, p.id)
-    return map
-  }, [modules])
-
-  if (!group) return null
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      const extra_permission_ids = Array.from(extraValue)
-        .map((cn) => extraIdByCodename.get(cn))
-        .filter((id): id is number => typeof id === 'number')
-      const res = await api.patch(`/admin-groups/${group.id}/`, { name, module_permissions: moduleValue, extra_permission_ids })
-      onSaved(res.data as AdminGroupRow)
-      toast.success('Gruppo aggiornato.')
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const doDelete = async () => {
-    setDeleting(true)
-    try {
-      await api.delete(`/admin-groups/${group.id}/`)
-      toast.success('Gruppo eliminato.')
-      setDeleteOpen(false)
-      onDeleted(group.id)
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  return (
-    <DrawerShell
-      open={open}
-      onClose={onClose}
-      gradient="teal"
-      width={420}
-      icon={<GroupOutlinedIcon />}
-      title={group.name}
-      subtitle={`${group.user_count} utente/i`}
-    >
-      <Stack spacing={2}>
-        <DrawerSection title="Nome gruppo">
-          <TextField value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" />
-        </DrawerSection>
-
-        <PermissionMatrix
-          modules={modules}
-          value={moduleValue}
-          onChange={(app, level) => setModuleValue((prev) => ({ ...prev, [app]: LEVEL_TO_RWD[level] }))}
-          extraValueSet={extraValue}
-          onToggleExtra={(codename, checked) =>
-            setExtraValue((prev) => {
-              const next = new Set(prev)
-              if (checked) next.add(codename)
-              else next.delete(codename)
-              return next
-            })
-          }
-        />
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="contained" onClick={save} disabled={saving} size="small">
-            Salva gruppo
-          </Button>
-        </Box>
-
-        <DrawerSection title="Zona pericolosa" variant="muted">
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1.25 }}>
-            {group.user_count > 0
-              ? `Eliminazione definitiva: verrà rimosso da ${group.user_count} utente/i, che perderanno i permessi concessi da questo gruppo.`
-              : 'Eliminazione definitiva: non è un\'operazione reversibile.'}
-          </Typography>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteOutlineIcon />}
-            onClick={() => setDeleteOpen(true)}
-            size="small"
-          >
-            Elimina gruppo
-          </Button>
-        </DrawerSection>
-      </Stack>
-
-      <ConfirmDeleteDialog
-        open={deleteOpen}
-        busy={deleting}
-        title={`Eliminare il gruppo "${group.name}"?`}
-        description="Il gruppo verrà eliminato definitivamente (non è un'operazione reversibile e non finisce nel cestino)."
-        confirmText="Elimina"
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={doDelete}
-      />
-    </DrawerShell>
-  )
-}
-
-// ─── Pagina principale ──────────────────────────────────────────────────────
-const GRID_ZEBRA_SX_BASE = {
-  '--DataGrid-rowHeight': '32px',
-  '--DataGrid-headerHeight': '35px',
-  '& .MuiDataGrid-cell': { py: 0.25 },
-  '& .MuiDataGrid-columnHeader': { py: 0.75 },
-} as const
-
+/** Utenti e gruppi (anteprima up-base, variante A): tabella con viste e scheda flottante; gruppi come schede. */
 export default function UsersAdmin() {
-  const zebraSx = useDataGridZebraSx()
   const { me } = useAuth()
   const toast = useToast()
-  const [mainTab, setMainTab] = React.useState<'utenti' | 'gruppi'>('utenti')
+  const [sp, setSp] = useSearchParams()
+  const section: Section = sp.get('sezione') === 'gruppi' ? 'groups' : 'users'
+  const view: UserView = (USER_VIEWS.find((v) => v.key === sp.get('vista'))?.key ?? 'active')
+  const openUserId = Number(sp.get('open')) || null
+  const openGroupId = Number(sp.get('gruppo')) || null
+  const setParams = (patch: Record<string, string | null>) => setSp((p) => { const n = new URLSearchParams(p); Object.entries(patch).forEach(([k, v]) => (v ? n.set(k, v) : n.delete(k))); return n }, { replace: true })
+
   const [loading, setLoading] = React.useState(true)
   const [users, setUsers] = React.useState<AdminUserRow[]>([])
   const [groups, setGroups] = React.useState<AdminGroupRow[]>([])
   const [modules, setModules] = React.useState<PermissionModule[]>([])
   const [leaveAreas, setLeaveAreas] = React.useState<LeaveAreaOption[]>([])
-  const [selectedUser, setSelectedUser] = React.useState<AdminUserRow | null>(null)
-  const [selectedGroup, setSelectedGroup] = React.useState<AdminGroupRow | null>(null)
-  const [createUserOpen, setCreateUserOpen] = React.useState(false)
-  const [createGroupOpen, setCreateGroupOpen] = React.useState(false)
+  const [newUser, setNewUser] = React.useState(false)
+  const [newGroup, setNewGroup] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const [usersRes, groupsRes, modulesRes, leaveAreasRes] = await Promise.all([
-        api.get('/admin-users/'),
-        api.get('/admin-groups/'),
-        api.get('/admin/permission-modules/'),
-        api.get('/leave-areas/'),
-      ])
-      setUsers(usersRes.data as AdminUserRow[])
-      setGroups(groupsRes.data as AdminGroupRow[])
-      setModules(modulesRes.data as PermissionModule[])
-      const leaveAreasData = leaveAreasRes.data as { id: number; label: string }[]
-      setLeaveAreas(leaveAreasData.map((la) => ({ id: la.id, label: la.label })))
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setLoading(false)
-    }
+      const [u, g, m, la] = await Promise.all([api.get<AdminUserRow[]>('/admin-users/'), api.get<AdminGroupRow[]>('/admin-groups/'), api.get<PermissionModule[]>('/admin/permission-modules/'), api.get<{ id: number; label: string }[]>('/leave-areas/')])
+      setUsers(u.data); setGroups(g.data); setModules(m.data); setLeaveAreas(la.data.map((x) => ({ id: x.id, label: x.label })))
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setLoading(false) }
   }, [toast])
+  React.useEffect(() => { void load() }, [load])
 
-  React.useEffect(() => {
-    load()
-  }, [load])
+  const reloadGroups = () => api.get<AdminGroupRow[]>('/admin-groups/').then((r) => setGroups(r.data)).catch(() => {})
+  const onUserSaved = (u: AdminUserRow) => { setUsers((list) => list.map((x) => (x.id === u.id ? u : x))); void reloadGroups() }
 
-  const usersGrid = useLocalGrid<AdminUserRow>(users, ['username', 'first_name', 'last_name', 'email'])
-  const groupsGrid = useLocalGrid<AdminGroupRow>(groups, ['name'])
-  const statusTokens = useStatusTokens()
+  const viewRows = React.useMemo(() => users.filter(USER_VIEWS.find((v) => v.key === view)!.match), [users, view])
+  const grid = useLocalGrid<AdminUserRow>(viewRows, ['username', 'first_name', 'last_name', 'email'])
+  const current = openUserId ? users.find((u) => u.id === openUserId) ?? null : null
+  const idx = current ? grid.rows.findIndex((r) => r.id === current.id) : -1
+  const currentGroup = openGroupId ? groups.find((g) => g.id === openGroupId) ?? null : null
 
-  const userColumns: GridColDef<AdminUserRow>[] = [
-    {
-      field: 'login',
-      headerName: 'Login',
-      width: 140,
-      valueGetter: (_v, row) => row.username,
-      renderCell: (p) => (
-        <Box component="span" sx={{ fontSize: 13, fontFamily: 'monospace', color: 'text.secondary' }}>
-          {p.row.username}
+  const columns: GridColDef<AdminUserRow>[] = [
+    { field: 'last_name', headerName: 'Utente', flex: 1.2, minWidth: 240, renderCell: (p) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, height: '100%', minWidth: 0 }}>
+        <UserAvatar u={p.row} />
+        <Box sx={{ display: 'grid', minWidth: 0, lineHeight: 1.3 }}>
+          <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{fullName(p.row)}</Typography>
+          <Typography noWrap component="span" sx={{ fontSize: 11.5, color: 'text.secondary' }}>{p.row.email || `@${p.row.username}`}</Typography>
         </Box>
-      ),
-    },
-    {
-      field: 'username',
-      headerName: 'Utente',
-      flex: 1.3,
-      minWidth: 200,
-      renderCell: (p) => (
-        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-          <Tooltip title={`@${p.row.username}`}>
-            <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {fullName(p.row)}
-            </span>
-          </Tooltip>
-          {(p.row.is_staff || p.row.is_superuser) && (
-            <Tooltip title={p.row.is_superuser ? 'Superuser' : 'Staff (accesso Django Admin)'}>
-              <span style={{ fontSize: 12, lineHeight: 1 }}>👑</span>
-            </Tooltip>
-          )}
-          {p.row.profile.is_functional_account && (
-            <Tooltip title="Account funzionale: non compare in Triage / vista assenze">
-              <Chip label="FUNZ." size="small" sx={{ fontSize: 9.5, height: 18, fontWeight: 700, bgcolor: (theme) => theme.palette.background.default, color: 'text.secondary' }} />
-            </Tooltip>
-          )}
-        </Stack>
-      ),
-    },
-    { field: 'email', headerName: 'Email', flex: 1.1, minWidth: 180 },
-    {
-      field: 'is_philips',
-      headerName: 'Azienda',
-      width: 100,
-      sortable: false,
-      valueGetter: (_v, row) => row.profile.is_philips,
-      renderCell: (p) => {
-        const badge = p.row.profile.is_philips ? statusTokens.companyBadge.philips : statusTokens.companyBadge.biotron
-        return (
-        <Chip
-          label={p.row.profile.is_philips ? 'PHILIPS' : 'BIOTRON'}
-          size="small"
-          sx={{
-            fontSize: 10.5, height: 22, fontWeight: 700,
-            bgcolor: badge.bg,
-            color: badge.color,
-          }}
-        />
-        )
-      },
-    },
-    {
-      field: 'leave_area',
-      headerName: 'Area',
-      width: 140,
-      sortable: false,
-      valueGetter: (_v, row) => row.profile.leave_area_name,
-      renderCell: (p) => {
-        if (p.row.profile.is_philips || !p.row.profile.leave_area_name) {
-          return <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>—</Box>
-        }
-        return <Chip label={p.row.profile.leave_area_name} size="small" sx={{ fontSize: 11, height: 20 }} />
-      },
-    },
-    {
-      field: 'groups',
-      headerName: 'Gruppi',
-      flex: 1,
-      minWidth: 160,
-      sortable: false,
-      renderCell: (p) => (
-        <Stack direction="row" spacing={0.5} flexWrap="wrap">
-          {p.row.groups.length === 0 ? (
-            <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>—</Box>
-          ) : (
-            p.row.groups.map((g) => <Chip key={g.id} label={g.name} size="small" sx={{ fontSize: 11, height: 20 }} />)
-          )}
-        </Stack>
-      ),
-    },
-    {
-      field: 'is_servicenow_technician',
-      headerName: 'Tecnico SN',
-      width: 100,
-      align: 'center',
-      headerAlign: 'center',
-      sortable: false,
-      valueGetter: (_v, row) => row.profile.is_servicenow_technician,
-      renderCell: (p) =>
-        p.row.profile.is_servicenow_technician ? (
-          <Tooltip title="Tecnico ServiceNow">
-            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
-          </Tooltip>
-        ) : null,
-    },
-    {
-      field: 'has_archie_access',
-      headerName: 'ARCHIE',
-      width: 90,
-      align: 'center',
-      headerAlign: 'center',
-      sortable: false,
-      valueGetter: (_v, row) => hasArchieAccess(row),
-      renderCell: (p) =>
-        hasArchieAccess(p.row) ? (
-          <Tooltip title="Ha accesso al frontend Archie">
-            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
-          </Tooltip>
-        ) : null,
-    },
-    {
-      field: 'has_portal_access',
-      headerName: 'Portal',
-      width: 90,
-      align: 'center',
-      headerAlign: 'center',
-      sortable: false,
-      renderCell: (p) =>
-        p.row.has_portal_access ? (
-          <Tooltip title="Ha accesso al Portal">
-            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
-          </Tooltip>
-        ) : null,
-    },
-    {
-      field: 'is_active',
-      headerName: 'Stato',
-      width: 110,
-      renderCell: (p) => (
-        <Chip
-          label={p.row.is_active ? 'Attivo' : 'Disattivo'}
-          size="small"
-          sx={{
-            fontSize: 11, height: 22,
-            bgcolor: (theme) => p.row.is_active ? theme.palette.success.light : theme.palette.error.light,
-            color: (theme) => p.row.is_active ? theme.palette.success.dark : theme.palette.error.dark,
-            border: '1px solid transparent',
-          }}
-        />
-      ),
-    },
-    { field: 'last_login', headerName: 'Ultimo accesso', width: 160, valueGetter: (_v, row) => fmtDateTime(row.last_login) },
+      </Box>
+    ) },
+    { field: 'groups', headerName: 'Gruppi', flex: 1, minWidth: 180, sortable: false, renderCell: (p) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', overflow: 'hidden' }}>
+        {p.row.groups.length ? p.row.groups.map((g) => <GroupTag key={g.id} name={g.name} />)
+          : p.row.portal_profile ? <Typography noWrap sx={{ fontSize: 12, color: (t) => t.palette.archie.tints.sky.ink }}>Portal · {p.row.portal_profile.customer_name}</Typography>
+            : <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>—</Typography>}
+      </Box>
+    ) },
+    { field: 'roles', headerName: 'Ruoli', flex: 1.1, minWidth: 200, sortable: false, renderCell: (p) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', overflow: 'hidden' }}>{roleTags(p.row).map((t) => <RoleChip key={t.label} tag={t} />)}</Box>
+    ) },
+    { field: 'last_login', headerName: 'Ultimo accesso', width: 140, renderCell: (p) => <Typography sx={{ fontSize: 12.5, color: 'text.secondary', lineHeight: '54px' }}>{p.row.last_login ? agoLabel(p.row.last_login) : 'mai'}</Typography> },
+    { field: 'is_active', headerName: 'Stato', width: 110, renderCell: (p) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', height: 22, px: 1, borderRadius: '5px', fontSize: 12, fontWeight: 550, ...(p.row.is_active ? { bgcolor: 'success.light', color: 'success.main' } : { bgcolor: 'archie.neutralBg', color: 'text.secondary' }) }}>{p.row.is_active ? 'Attivo' : 'Disattivato'}</Box>
+      </Box>
+    ) },
   ]
 
-  const groupColumns: GridColDef<AdminGroupRow>[] = [
-    { field: 'name', headerName: 'Gruppo', flex: 1, minWidth: 200 },
-    { field: 'user_count', headerName: 'Utenti', width: 90 },
-    {
-      field: 'modules',
-      headerName: 'Moduli con accesso',
-      flex: 2,
-      minWidth: 260,
-      sortable: false,
-      renderCell: (p) => {
-        const active = Object.entries(p.row.permissions_state.modules)
-          .filter(([, v]) => v.r || v.w || v.d)
-          .map(([app]) => modules.find((m) => m.app_label === app)?.label || app)
+  const mobileCard: MobileCardRenderFn<AdminUserRow> = ({ row, onOpen }) => (
+    <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, display: 'grid', gap: 0.75, cursor: 'pointer' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <UserAvatar u={row} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: 13.5, fontWeight: 600 }}>{fullName(row)}</Typography>
+          <Typography noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>{row.groups.map((g) => g.name).join(', ') || row.email}</Typography>
+        </Box>
+        {!row.is_active ? <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>Disattivato</Typography> : null}
+      </Box>
+      {roleTags(row).length ? <Box>{roleTags(row).map((t) => <RoleChip key={t.label} tag={t} />)}</Box> : null}
+    </Box>
+  )
+
+  const switcher = (
+    <Box role="tablist" aria-label="Utenti o gruppi" sx={{ display: 'inline-flex', gap: '2px', p: '3px', border: '1px solid', borderColor: 'divider', borderRadius: '9px', bgcolor: 'background.paper' }}>
+      {([['users', 'Utenti', users.length], ['groups', 'Gruppi', groups.length]] as [Section, string, number][]).map(([k, l, n]) => {
+        const on = k === section
         return (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap">
-            {active.length === 0 ? (
-              <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>Nessuno</Box>
-            ) : (
-              <>
-                {active.slice(0, 4).map((label) => (
-                  <Chip key={label} label={label} size="small" sx={{ fontSize: 11, height: 20 }} />
-                ))}
-                {active.length > 4 && <Chip label={`+${active.length - 4}`} size="small" sx={{ fontSize: 11, height: 20 }} />}
-              </>
-            )}
-          </Stack>
+          <ButtonBase key={k} role="tab" aria-selected={on} onClick={() => setParams({ sezione: k === 'groups' ? 'gruppi' : null, open: null, gruppo: null })} sx={{
+            height: 28, px: 1.5, borderRadius: '6px', fontSize: 13, fontWeight: 550, gap: 0.5, color: on ? 'primary.main' : 'text.secondary', bgcolor: on ? 'archie.field' : 'transparent',
+            '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+          }}>{l}<Box component="span" sx={{ fontSize: 11, fontWeight: 600 }}>{n}</Box></ButtonBase>
         )
-      },
-    },
-  ]
+      })}
+    </Box>
+  )
 
   return (
-    <Stack spacing={1.5} sx={{ height: '100%' }}>
-      <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)} sx={{ minHeight: 0, flexShrink: 0 }}>
-        <Tab value="utenti" label="Utenti" icon={<PersonOutlineIcon fontSize="small" />} iconPosition="start" sx={{ minHeight: 0, py: 1, fontSize: 12.5 }} />
-        <Tab value="gruppi" label="Gruppi" icon={<GroupOutlinedIcon fontSize="small" />} iconPosition="start" sx={{ minHeight: 0, py: 1, fontSize: 12.5 }} />
-      </Tabs>
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead title="Utenti e gruppi" inline={switcher} actions={
+        <Button variant="contained" startIcon={<CampoIcon name="plus" size={15} />} onClick={() => (section === 'users' ? setNewUser(true) : setNewGroup(true))}>
+          {section === 'users' ? 'Nuovo utente' : 'Nuovo gruppo'}
+        </Button>
+      } />
 
-      {mainTab === 'utenti' ? (
-        <EntityListCard
-          toolbar={{
-            q: usersGrid.q,
-            onQChange: usersGrid.setQ,
-            compact: true,
-            searchLabel: 'Cerca utente',
-            rightActions: (
-              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setCreateUserOpen(true)}>
-                Nuovo utente
-              </Button>
-            ),
-          }}
-          grid={{
-            pageKey: 'admin-users',
-            username: me?.username,
-            rows: usersGrid.rows,
-            columns: userColumns,
-            loading,
-            rowCount: usersGrid.rowCount,
-            paginationModel: usersGrid.paginationModel,
-            onPaginationModelChange: usersGrid.onPaginationModelChange,
-            sortModel: usersGrid.sortModel,
-            onSortModelChange: usersGrid.onSortModelChange,
-            onRowClick: (id) => setSelectedUser(users.find((u) => u.id === id) || null),
-            sx: { ...GRID_ZEBRA_SX_BASE, ...zebraSx },
-          }}
-        />
+      {section === 'users' ? (
+        <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+          <ViewTabs value={view} onChange={(k) => setParams({ vista: k === 'active' ? null : k })}
+            tabs={USER_VIEWS.map((v) => ({ key: v.key, label: v.label, count: loading ? null : users.filter(v.match).length }))} />
+          <EntityListCard
+            sx={{ border: 0, borderRadius: 0 }}
+            flush
+            mobileCard={mobileCard}
+            header={<TableBar filters={[]} onRemoveFilter={() => {}} onClearFilters={() => {}} q={grid.q} onQChange={grid.setQ} searchPlaceholder="Cerca nome, nome utente, email…" />}
+            toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca utenti…' }}
+            grid={{
+              autoHeight: true,
+              rows: grid.rows,
+              columns,
+              loading,
+              rowCount: grid.rowCount,
+              rowHeight: 54,
+              paginationModel: grid.paginationModel,
+              onPaginationModelChange: grid.onPaginationModelChange,
+              sortModel: grid.sortModel,
+              onSortModelChange: grid.onSortModelChange,
+              emptyState: grid.q.trim() ? { title: 'Nessun risultato', subtitle: 'Prova con un altro nome.' } : { title: 'Nessun utente in questa vista', subtitle: '' },
+              onRowClick: (id) => setParams({ open: String(id) }),
+              getRowClassName: (row) => (row.id === openUserId ? 'Mui-selected' : undefined),
+              sx: { cursor: 'pointer' },
+            }}
+          />
+        </Box>
       ) : (
-        <EntityListCard
-          toolbar={{
-            q: groupsGrid.q,
-            onQChange: groupsGrid.setQ,
-            compact: true,
-            searchLabel: 'Cerca gruppo',
-            rightActions: (
-              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => setCreateGroupOpen(true)}>
-                Nuovo gruppo
-              </Button>
-            ),
-          }}
-          grid={{
-            pageKey: 'admin-groups',
-            username: me?.username,
-            rows: groupsGrid.rows,
-            columns: groupColumns,
-            loading,
-            rowCount: groupsGrid.rowCount,
-            paginationModel: groupsGrid.paginationModel,
-            onPaginationModelChange: groupsGrid.onPaginationModelChange,
-            sortModel: groupsGrid.sortModel,
-            onSortModelChange: groupsGrid.onSortModelChange,
-            onRowClick: (id) => setSelectedGroup(groups.find((g) => g.id === id) || null),
-            sx: { ...GRID_ZEBRA_SX_BASE, ...zebraSx },
-          }}
-        />
+        <>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 1.5 }}>
+            {groups.map((g) => {
+              const members = users.filter((u) => u.groups.some((x) => x.id === g.id))
+              const mods = archieModules(modules)
+              return (
+                <ButtonBase key={g.id} onClick={() => setParams({ gruppo: String(g.id) })} sx={{
+                  display: 'grid', gap: 1, justifyContent: 'stretch', justifyItems: 'stretch', alignItems: 'start', textAlign: 'left', p: 1.75, border: '1px solid', borderRadius: '10px', bgcolor: 'background.paper',
+                  borderColor: g.id === openGroupId ? 'archie.fieldLine' : 'divider', boxShadow: g.id === openGroupId ? (t) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none',
+                  '&:hover': { borderColor: g.id === openGroupId ? 'archie.fieldLine' : 'text.disabled' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography sx={{ flex: 1, fontSize: 14, fontWeight: 650 }}>{g.name}</Typography>
+                    <Box sx={{ display: 'flex', '& > *:not(:first-of-type)': { ml: '-6px' } }}>
+                      {members.slice(0, 4).map((u) => <Box key={u.id} sx={{ borderRadius: '50%', border: '2px solid', borderColor: 'background.paper', display: 'inline-flex' }}><UserAvatar u={u} size={22} /></Box>)}
+                    </Box>
+                    {members.length > 4 ? <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>+{members.length - 4}</Typography> : null}
+                  </Box>
+                  <Box aria-hidden sx={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, mods.length)}, 1fr)`, gap: '3px' }}>
+                    {mods.map((m) => {
+                      const lv = rwdToLevel(g.permissions_state.modules[m.app_label])
+                      return <Box key={m.app_label} title={`${m.label}`} sx={{ height: 12, borderRadius: '3px', bgcolor: HEAT[lv], boxShadow: lv === 'read' ? (t) => `inset 0 0 0 1px ${t.palette.archie.tints.sky.mid}` : 'none' }} />
+                    })}
+                  </Box>
+                  <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>{members.length} {members.length === 1 ? 'utente' : 'utenti'} · {openModules(g, modules)} moduli</Typography>
+                </ButtonBase>
+              )
+            })}
+          </Box>
+          {groups.length ? (
+            <Box sx={{ display: 'flex', gap: 2, mt: 1.5, flexWrap: 'wrap' }}>
+              {(['none', 'read', 'read_write', 'full'] as RwdLevel[]).map((l) => (
+                <Box key={l} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 11.5, color: 'text.secondary' }}>
+                  <Box sx={{ width: 14, height: 12, borderRadius: '3px', bgcolor: HEAT[l], boxShadow: (t) => (l === 'read' ? `inset 0 0 0 1px ${t.palette.archie.tints.sky.mid}` : l === 'none' ? `inset 0 0 0 1px ${t.palette.divider}` : 'none') }} />
+                  {{ none: 'Nessuno', read: 'Lettura', read_write: 'Scrittura', full: 'Completo' }[l]}
+                </Box>
+              ))}
+            </Box>
+          ) : !loading ? <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Nessun gruppo: creane uno per assegnare i permessi in blocco.</Typography> : null}
+        </>
       )}
 
-      <UserDrawer
-        open={Boolean(selectedUser)}
-        user={selectedUser}
-        groups={groups}
-        modules={modules}
-        leaveAreas={leaveAreas}
-        currentUserId={me?.id}
-        onClose={() => setSelectedUser(null)}
-        onSaved={(updated) => {
-          setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
-          setSelectedUser(updated)
-        }}
-        onDeleted={(id) => {
-          setUsers((prev) => prev.filter((u) => u.id !== id))
-          setSelectedUser(null)
-        }}
-      />
+      {section === 'users' && current ? (
+        <UserDetailCard user={current} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)}
+          position={idx >= 0 ? `${idx + 1} di ${grid.rows.length}` : undefined}
+          onPrev={idx > 0 ? () => setParams({ open: String(grid.rows[idx - 1].id) }) : undefined}
+          onNext={idx >= 0 && idx < grid.rows.length - 1 ? () => setParams({ open: String(grid.rows[idx + 1].id) }) : undefined}
+          onClose={() => setParams({ open: null })}
+          onSaved={onUserSaved}
+          onDeleted={(id) => { setUsers((l) => l.filter((u) => u.id !== id)); setParams({ open: null }); void reloadGroups() }} />
+      ) : null}
+      {section === 'groups' && currentGroup ? (
+        <GroupDetailCard group={currentGroup} modules={modules} users={users}
+          onClose={() => setParams({ gruppo: null })}
+          onSaved={(g) => { setGroups((l) => l.map((x) => (x.id === g.id ? g : x))); void load() }}
+          onDeleted={(id) => { setGroups((l) => l.filter((g) => g.id !== id)); setParams({ gruppo: null }); void load() }}
+          onOpenUser={(id) => setParams({ sezione: null, gruppo: null, open: String(id) })} />
+      ) : null}
 
-      <GroupDrawer
-        open={Boolean(selectedGroup)}
-        group={selectedGroup}
-        modules={modules}
-        onClose={() => setSelectedGroup(null)}
-        onSaved={(updated) => {
-          setGroups((prev) => prev.map((g) => (g.id === updated.id ? updated : g)))
-          setSelectedGroup(updated)
-        }}
-        onDeleted={(id) => {
-          setGroups((prev) => prev.filter((g) => g.id !== id))
-          setUsers((prev) => prev.map((u) => ({ ...u, groups: u.groups.filter((g) => g.id !== id) })))
-          setSelectedGroup(null)
-        }}
-      />
-
-      <CreateUserDialog
-        open={createUserOpen}
-        groups={groups}
-        onClose={() => setCreateUserOpen(false)}
-        onCreated={(user) => {
-          setUsers((prev) => [...prev, user].sort((a, b) => a.username.localeCompare(b.username)))
-          setSelectedUser(user)
-        }}
-      />
-
-      <CreateGroupDialog
-        open={createGroupOpen}
-        onClose={() => setCreateGroupOpen(false)}
-        onCreated={(group) => {
-          setGroups((prev) => [...prev, group].sort((a, b) => a.name.localeCompare(b.name)))
-          setSelectedGroup(group)
-        }}
-      />
+      <CreateUserDialog open={newUser} groups={groups} onClose={() => setNewUser(false)}
+        onCreated={(u) => { setNewUser(false); setUsers((l) => [...l, u]); setParams({ vista: null, open: String(u.id) }) }} />
+      <CreateGroupDialog open={newGroup} onClose={() => setNewGroup(false)}
+        onCreated={(g) => { setNewGroup(false); setGroups((l) => [...l, g]); setParams({ gruppo: String(g.id) }) }} />
     </Stack>
   )
 }

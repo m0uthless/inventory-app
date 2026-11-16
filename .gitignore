@@ -69,7 +69,6 @@ graphify-out/
 .github/agents/impeccable-*.agent.md
 .github/hooks/impeccable.json
 /PRODUCT.md
-/frontend/DESIGN.md
 /frontend-portal/DESIGN.md
 /frontend-portal/PRODUCT.md
 # Playwright CLI output (may contain credentials)

@@ -1,6 +1,9 @@
 """maintenance/api/events.py — MaintenanceEvent serializer + ViewSet."""
 from __future__ import annotations
 
+from datetime import timedelta
+
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
@@ -44,6 +47,8 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
     # Da piano → customer
     customer_code = serializers.CharField(source="plan.customer.code", read_only=True)
     customer_name = serializers.CharField(source="plan.customer.name", read_only=True)
+    customer_id = serializers.IntegerField(source="plan.customer_id", read_only=True)
+    site_id = serializers.IntegerField(source="inventory.site_id", read_only=True, allow_null=True)
 
     # Da inventory (nullable site)
     site_name          = serializers.SerializerMethodField()
@@ -102,7 +107,7 @@ class MaintenanceEventSerializer(serializers.ModelSerializer):
             "inventory_name",
             "inventory_hostname",
             "inventory_knumber",
-            "customer_code",
+            "customer_code", "customer_id", "site_id",
             "customer_name",
             "site_name",
             "performed_at",
@@ -156,6 +161,16 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         customer = self.request.query_params.get("customer")
         if customer:
             qs = qs.filter(plan__customer_id=customer)
+
+        # ?results=ko,partial (più esiti) · ?has_pdf=true|false
+        results = [r for r in (self.request.query_params.get("results") or "").split(",") if r]
+        if results:
+            qs = qs.filter(result__in=results)
+        has_pdf = (self.request.query_params.get("has_pdf") or "").lower()
+        if has_pdf in ("true", "1"):
+            qs = qs.exclude(pdf_file="").exclude(pdf_file__isnull=True)
+        elif has_pdf in ("false", "0"):
+            qs = qs.filter(Q(pdf_file="") | Q(pdf_file__isnull=True)).exclude(result="not_planned")
 
         year = self.request.query_params.get("performed_at__year")
         if year and year.isdigit() and len(year) == 4:
@@ -310,4 +325,28 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         )
         return Response({"restored": restored_ids, "count": len(restored_ids)}, status=200)
 
-
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        """Indicatori della pagina Rapportini: mese corrente, conteggi delle viste
+        (KO e parziali, senza PDF, non previste) e carico per tecnico negli ultimi 90 giorni."""
+        today = timezone.localdate()
+        qs = MaintenanceEvent.objects.filter(deleted_at__isnull=True)
+        customer = request.query_params.get("customer")
+        if customer:
+            qs = qs.filter(plan__customer_id=customer)
+        month = qs.filter(performed_at__gte=today.replace(day=1))
+        no_pdf = Q(pdf_file="") | Q(pdf_file__isnull=True)
+        by_tech = (
+            qs.filter(performed_at__gte=today - timedelta(days=90), tech__isnull=False)
+            .values("tech_id", "tech__first_name", "tech__last_name")
+            .annotate(n=Count("id")).order_by("-n")
+        )
+        return Response({
+            "total": qs.count(),
+            "month": month.count(),
+            "month_ok": month.filter(result="ok").count(),
+            "follow_up": qs.filter(result__in=("ko", "partial")).count(),
+            "no_pdf": qs.filter(no_pdf).exclude(result="not_planned").count(),
+            "not_planned": qs.filter(result="not_planned").count(),
+            "by_tech": [{"id": r["tech_id"], "name": f"{r['tech__first_name']} {r['tech__last_name']}".strip(), "count": r["n"]} for r in by_tech],
+        })

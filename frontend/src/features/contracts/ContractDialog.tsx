@@ -1,98 +1,28 @@
 import * as React from 'react'
-import {
-  Autocomplete,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  InputAdornment,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Box, Button, ButtonBase, Dialog, IconButton, Typography, useMediaQuery } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
+import CheckIcon from '@mui/icons-material/Check'
 
 import { api } from '@shared/api/client'
 import { apiErrorToFormFeedback } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
+import { CampoIcon } from '../../ui/campo'
 import DevicePicker from '../devices/DevicePicker'
+import { ContractStatusBadge } from './contractUi'
+import { dShort } from './contractModel'
 import {
-  BILLING_FREQ_OPTIONS,
-  CONTRACT_STATUS_OPTIONS,
-  CONTRACT_TYPE_OPTIONS,
-  type BillingFrequency,
-  type ContractDetail,
-  type ContractStatus,
-  type ContractType,
-  type CompanyOption,
-  type CustomerOption,
-  type Seller,
-} from './types'
-
-type ContractForm = {
-  code: string
-  title: string
-  customer: number | null
-  contract_type: ContractType
-  seller: number | null
-  company: number | null
-  start_date: string
-  end_date: string
-  notice_days: string
-  auto_renew: boolean
-  total_value: string
-  billing_freq: BillingFrequency
-  status: ContractStatus
-  devices: number[]
-  notes: string
-}
-
-function emptyForm(customer: number | null): ContractForm {
-  return {
-    code: '',
-    title: '',
-    customer,
-    contract_type: 'assistenza',
-    seller: null,
-    company: null,
-    start_date: '',
-    end_date: '',
-    notice_days: '90',
-    auto_renew: false,
-    total_value: '',
-    billing_freq: 'annuale',
-    status: 'bozza',
-    devices: [],
-    notes: '',
-  }
-}
-
-function formFromContract(c: ContractDetail): ContractForm {
-  return {
-    code: c.code,
-    title: c.title,
-    customer: c.customer,
-    contract_type: c.contract_type,
-    seller: c.seller,
-    company: c.company,
-    start_date: c.start_date,
-    end_date: c.end_date,
-    notice_days: String(c.notice_days ?? ''),
-    auto_renew: c.auto_renew,
-    total_value: c.total_value ?? '',
-    billing_freq: c.billing_freq,
-    status: c.status,
-    devices: c.devices ?? [],
-    notes: c.notes ?? '',
-  }
-}
+  TYPE_CARDS, emptyForm, endOf, formFromContract, nextCode, toPayload, validate,
+  type ContractForm, type FormErrors,
+} from './contractForm'
+import {
+  AmountPreview, CodeTitle, CustomerField, Group, NotesField, PdfField, PeriodFields, PeriodPreview,
+  SellerCompany, StatusChips, TypeCards, TypeChips, ValueBilling,
+} from './ContractFormParts'
+import { CONTRACT_STATUS_OPTIONS, type CompanyOption, type ContractDetail, type CustomerOption, type Seller } from './types'
 
 export type ContractDialogProps = {
   open: boolean
-  /** Contratto da modificare; `null` = creazione. */
+  /** Contratto da modificare («Scheda unica»); `null` = creazione («Passi»). */
   contract: ContractDetail | null
   /** Cliente preimpostato in creazione (es. filtro cliente attivo). */
   initialCustomer?: number | null
@@ -100,359 +30,240 @@ export type ContractDialogProps = {
   sellers: Seller[]
   /** Scelte per la Società (`/customer-statuses/`). */
   companies: CompanyOption[]
-  /** `contracts.view_contract_value`: senza, il valore non è né mostrato né inviato. */
+  /** `contracts.view_contract_value`: senza, valore e PDF non sono né mostrati né inviati. */
   canViewValue: boolean
   onClose: () => void
   onSaved: (c: ContractDetail) => void
 }
 
-export default function ContractDialog({
-  open,
-  contract,
-  initialCustomer = null,
-  customers,
-  sellers,
-  companies,
-  canViewValue,
-  onClose,
-  onSaved,
-}: ContractDialogProps) {
+const STEPS = ['Cliente e tipo', 'Periodo', 'Valore e documenti'] as const
+const STEP_FIELDS: (keyof FormErrors)[][] = [
+  ['customer', 'contract_type', 'seller', 'company'],
+  ['start_date', 'end_date', 'notice_days'],
+  ['code', 'title', 'total_value', 'billing_freq', 'devices', 'notes', 'status'],
+]
+const stepOf = (errs: FormErrors) => Math.max(0, STEP_FIELDS.findIndex((fs) => fs.some((k) => errs[k])))
+
+/**
+ * Dialogo del contratto (anteprima design-previews/ct-base.html):
+ * creazione a tre passi, modifica come scheda unica con riepilogo che si aggiorna.
+ */
+export default function ContractDialog({ open, contract, initialCustomer = null, customers, sellers, companies, canViewValue, onClose, onSaved }: ContractDialogProps) {
   const toast = useToast()
-  const mode = contract ? 'edit' : 'create'
-  const [form, setForm] = React.useState<ContractForm>(() => emptyForm(initialCustomer))
-  const [errors, setErrors] = React.useState<Record<string, string>>({})
+  const theme = useTheme()
+  const narrow = useMediaQuery(theme.breakpoints.down('sm'))
+  const edit = Boolean(contract)
+  const [f, setF] = React.useState<ContractForm>(() => emptyForm(initialCustomer))
+  const [errors, setErrors] = React.useState<FormErrors>({})
+  const [step, setStep] = React.useState(0)
+  const [pdf, setPdf] = React.useState<File | null>(null)
   const [saving, setSaving] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) return
-    setForm(
-      contract
-        ? formFromContract(contract)
-        : {
-            ...emptyForm(initialCustomer),
-            company: customers.find((c) => c.id === initialCustomer)?.status ?? null,
-          },
-    )
-    setErrors({})
+    setErrors({}); setStep(0); setPdf(null)
+    if (contract) { setF(formFromContract(contract)); return }
+    setF(emptyForm(initialCustomer))
+    // Codice proposto: il successivo dell'ultimo dell'anno.
+    const year = new Date().getFullYear()
+    api.get<{ results?: { code: string }[] }>('/contracts/', { params: { search: String(year), ordering: '-code', page_size: 1 } })
+      .then((r) => setF((x) => (x.code ? x : { ...x, code: nextCode(r.data.results?.[0]?.code, year) })))
+      .catch(() => setF((x) => (x.code ? x : { ...x, code: nextCode(null, year) })))
     // Reinizializza solo all'apertura.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const set = <K extends keyof ContractForm>(key: K, value: ContractForm[K]) =>
-    setForm((f) => ({ ...f, [key]: value }))
+  const set = React.useCallback(<K extends keyof ContractForm>(k: K, v: ContractForm[K]) => {
+    setF((x) => ({ ...x, [k]: v }))
+    setErrors((e) => (e[k as keyof FormErrors] ? { ...e, [k]: undefined } : e))
+  }, [])
 
-  const customerOptions = React.useMemo(() => {
-    if (form.customer == null || customers.some((c) => c.id === form.customer)) return customers
-    // Cliente del contratto non presente nella lista caricata: lo si mostra comunque.
-    return [...customers, { id: form.customer, name: contract?.customer_name ?? `Cliente #${form.customer}` }]
-  }, [customers, form.customer, contract])
+  const custName = (id: number | null) => { const c = customers.find((x) => x.id === id); return c ? c.display_name || c.name || `#${c.id}` : contract?.customer_name ?? '' }
+  const typeLabel = TYPE_CARDS.find((t) => t.value === f.contract_type)?.label ?? ''
+  const autoTitle = typeLabel && f.customer != null ? `${typeLabel} — ${custName(f.customer)}` : ''
+  const title = f.titleTouched ? f.title : autoTitle
+  const parts = { f, set, errors }
 
-  // Venditori attivi, più quello già assegnato anche se disattivato.
-  const sellerOptions = React.useMemo(
-    () => sellers.filter((s) => s.is_active || s.id === form.seller),
-    [sellers, form.seller],
-  )
-
-  const customerLabel = (c: CustomerOption) => c.display_name || c.name || c.code || `#${c.id}`
-  const selectedCustomer = customerOptions.find((c) => c.id === form.customer) ?? null
-  const selectedSeller = sellerOptions.find((s) => s.id === form.seller) ?? null
-
-  const save = async () => {
-    const clientErrors: Record<string, string> = {}
-    if (!form.code.trim()) clientErrors.code = 'Il codice è obbligatorio.'
-    if (!form.title.trim()) clientErrors.title = 'Il titolo è obbligatorio.'
-    if (form.customer == null) clientErrors.customer = 'Seleziona un cliente.'
-    if (!form.start_date) clientErrors.start_date = 'La data di inizio è obbligatoria.'
-    if (!form.end_date) clientErrors.end_date = 'La data di fine è obbligatoria.'
-    if (form.start_date && form.end_date && form.end_date < form.start_date)
-      clientErrors.end_date = 'La data di fine non può precedere la data di inizio.'
-    const notice = form.notice_days.trim() === '' ? 0 : Number(form.notice_days)
-    if (!Number.isInteger(notice) || notice < 0) clientErrors.notice_days = 'Giorni di preavviso non validi.'
-    if (canViewValue && form.total_value.trim() !== '' && !Number.isFinite(Number(form.total_value)))
-      clientErrors.total_value = 'Valore non valido.'
-    if (Object.keys(clientErrors).length) {
-      setErrors(clientErrors)
-      return
-    }
-    setErrors({})
-
-    const payload: Record<string, unknown> = {
-      code: form.code.trim(),
-      title: form.title.trim(),
-      customer: form.customer,
-      contract_type: form.contract_type,
-      seller: form.seller,
-      // null in creazione → il backend usa la società del cliente.
-      company: form.company,
-      start_date: form.start_date,
-      end_date: form.end_date,
-      notice_days: notice,
-      auto_renew: form.auto_renew,
-      billing_freq: form.billing_freq,
-      status: form.status,
-      // Opzionale: lista vuota = nessun device collegato.
-      devices: form.devices,
-      notes: form.notes.trim(),
-    }
-    if (canViewValue) payload.total_value = form.total_value.trim() === '' ? '0' : form.total_value.trim()
-
+  const save = async (status?: ContractForm['status']) => {
+    const form = status ? { ...f, status } : f
+    const errs = validate(form, title, canViewValue)
+    if (Object.keys(errs).length) { setErrors(errs); if (!edit) setStep(stepOf(errs)); return }
     setSaving(true)
     try {
+      const payload = toPayload(form, title, canViewValue)
       const res = contract
         ? await api.patch<ContractDetail>(`/contracts/${contract.id}/`, payload)
         : await api.post<ContractDetail>('/contracts/', payload)
-      toast.success(contract ? 'Contratto aggiornato' : 'Contratto creato')
-      onSaved(res.data)
-    } catch (e) {
-      const feedback = apiErrorToFormFeedback(e)
-      if (feedback.hasFieldErrors) {
-        setErrors(feedback.fieldErrors)
-        toast.warning(feedback.message)
-      } else {
-        toast.error(feedback.message)
+      let saved = res.data
+      if (!contract && pdf && canViewValue) {
+        try {
+          const fd = new FormData(); fd.append('file', pdf)
+          saved = (await api.post<ContractDetail>(`/contracts/${saved.id}/document/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })).data
+        } catch { toast.warning('Contratto creato, ma il PDF non è stato caricato: riprova dalla scheda.') }
       }
-    } finally {
-      setSaving(false)
-    }
+      toast.success(contract ? 'Contratto aggiornato' : form.status === 'bozza' ? 'Bozza salvata' : 'Contratto creato')
+      onSaved(saved)
+    } catch (e) {
+      const fb = apiErrorToFormFeedback(e)
+      if (fb.hasFieldErrors) { setErrors(fb.fieldErrors as FormErrors); if (!edit) setStep(stepOf(fb.fieldErrors as FormErrors)); toast.warning(fb.message) } else toast.error(fb.message)
+    } finally { setSaving(false) }
   }
 
-  return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="md">
-      <DialogTitle>{mode === 'create' ? 'Nuovo contratto' : 'Modifica contratto'}</DialogTitle>
-      <DialogContent>
-        {errors._error || errors.non_field_errors ? (
-          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-            {errors._error || errors.non_field_errors}
-          </Typography>
-        ) : null}
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              size="small"
-              label="Codice"
-              required
-              value={form.code}
-              onChange={(e) => set('code', e.target.value)}
-              error={!!errors.code}
-              helperText={errors.code}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              size="small"
-              label="Titolo"
-              required
-              value={form.title}
-              onChange={(e) => set('title', e.target.value)}
-              error={!!errors.title}
-              helperText={errors.title}
-              sx={{ flex: 2 }}
-            />
-          </Stack>
+  const next = () => {
+    const errs = validate(f, title, canViewValue, STEP_FIELDS[step])
+    if (Object.keys(errs).length) { setErrors(errs); return }
+    setStep((s) => s + 1)
+  }
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <Autocomplete
-              size="small"
-              sx={{ flex: 1 }}
-              options={customerOptions}
-              value={selectedCustomer}
-              getOptionLabel={customerLabel}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              onChange={(_, v) => {
-                const next = v?.id ?? null
-                // I device appartengono al cliente: al cambio cliente si svuotano.
-                // La Società segue il cliente finché l'utente non l'ha cambiata a mano.
-                setForm((f) => {
-                  const prevStatus = customers.find((c) => c.id === f.customer)?.status ?? null
-                  const keepCompany = f.company != null && f.company !== prevStatus
-                  return {
-                    ...f,
-                    customer: next,
-                    devices: next === f.customer ? f.devices : [],
-                    company: keepCompany ? f.company : (v?.status ?? f.company),
-                  }
-                })
-              }}
-              renderInput={(p) => (
-                <TextField {...p} label="Cliente" required error={!!errors.customer} helperText={errors.customer} />
-              )}
-            />
-            <Autocomplete
-              size="small"
-              sx={{ flex: 1 }}
-              options={sellerOptions}
-              value={selectedSeller}
-              getOptionLabel={(s) => (s.is_active ? s.name : `${s.name} (non attivo)`)}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              onChange={(_, v) => set('seller', v?.id ?? null)}
-              renderInput={(p) => (
-                <TextField {...p} label="Venditore" error={!!errors.seller} helperText={errors.seller} />
-              )}
-            />
-            <TextField
-              select
-              size="small"
-              sx={{ flex: 1 }}
-              label="Società"
-              value={form.company == null ? '' : String(form.company)}
-              onChange={(e) => set('company', e.target.value === '' ? null : Number(e.target.value))}
-              error={!!errors.company}
-              helperText={errors.company}
-            >
-              <MenuItem value="">—</MenuItem>
-              {companies
-                .filter((co) => co.is_active !== false || co.id === form.company)
-                .map((co) => (
-                  <MenuItem key={co.id} value={String(co.id)}>
-                    {co.label}
-                  </MenuItem>
-                ))}
-            </TextField>
-          </Stack>
+  const head = (sub: string) => (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: '16px 18px 12px', borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography component="h2" id="ct-dlg-title" sx={{ fontSize: 16, fontWeight: 650 }}>{edit ? 'Modifica contratto' : 'Nuovo contratto'}</Typography>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.25 }}>{sub}</Typography>
+      </Box>
+      <IconButton size="small" aria-label="Chiudi" onClick={onClose} disabled={saving} sx={{ mt: -0.5, mr: -0.75 }}><CampoIcon name="x" size={16} /></IconButton>
+    </Box>
+  )
+  const foot = (children: React.ReactNode) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' }, p: '12px 18px', borderTop: '1px solid', borderColor: 'divider', bgcolor: 'archie.surface2' }}>{children}</Box>
+  )
+  const devices = (
+    <DevicePicker customerId={f.customer} value={f.devices} onChange={(ids) => set('devices', ids)} allowCreate
+      initialOptions={contract?.devices_detail} label="Device collegati (facoltativo)" error={Boolean(errors.devices)} helperText={errors.devices} />
+  )
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              select
-              size="small"
-              label="Tipo"
-              value={form.contract_type}
-              onChange={(e) => set('contract_type', e.target.value as ContractType)}
-              error={!!errors.contract_type}
-              helperText={errors.contract_type}
-              sx={{ flex: 1 }}
-            >
-              {CONTRACT_TYPE_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="Stato"
-              value={form.status}
-              onChange={(e) => set('status', e.target.value as ContractStatus)}
-              error={!!errors.status}
-              helperText={errors.status}
-              sx={{ flex: 1 }}
-            >
-              {CONTRACT_STATUS_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="Fatturazione"
-              value={form.billing_freq}
-              onChange={(e) => set('billing_freq', e.target.value as BillingFrequency)}
-              error={!!errors.billing_freq}
-              helperText={errors.billing_freq}
-              sx={{ flex: 1 }}
-            >
-              {BILLING_FREQ_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
+  // ── Creazione: tre passi ──────────────────────────────────────────
+  const steps = (
+    <>
+      {head(`${STEPS[step]} · passo ${step + 1} di 3`)}
+      <Box component="nav" aria-label="Passi" sx={{ display: 'flex', p: '12px 18px', borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'archie.surface2' }}>
+        {STEPS.map((s, i) => {
+          const done = i < step; const cur = i === step
+          return (
+            <ButtonBase key={s} disabled={i > step} onClick={() => setStep(i)} aria-current={cur ? 'step' : undefined} sx={{
+              flex: 1, justifyContent: 'flex-start', gap: 1, minWidth: 0, color: cur ? 'text.primary' : 'text.secondary', borderRadius: '6px',
+              '&::before': i ? { content: '""', width: 18, height: 2, borderRadius: 1, mr: 0.25, flex: 'none', bgcolor: done || cur ? 'primary.main' : 'archie.borderStrong' } : undefined,
+              '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+            }}>
+              <Box component="span" sx={{
+                width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', flex: 'none', fontSize: 11, fontWeight: 700,
+                bgcolor: done ? 'primary.main' : 'transparent', color: done ? 'primary.contrastText' : cur ? 'primary.main' : 'text.secondary',
+                boxShadow: (t) => (done ? 'none' : cur ? `inset 0 0 0 2px ${t.palette.primary.main}, 0 0 0 4px ${t.palette.archie.field}` : `inset 0 0 0 2px ${t.palette.archie.borderStrong}`),
+              }}>{done ? <CheckIcon sx={{ fontSize: 13 }} /> : i + 1}</Box>
+              {narrow ? null : <Box component="b" sx={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s}</Box>}
+            </ButtonBase>
+          )
+        })}
+      </Box>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: '18px', display: 'grid', gap: 1.75, alignContent: 'start' }}>
+        {step === 0 ? (
+          <>
+            <CustomerField {...parts} customers={customers} autoFocus />
+            <TypeCards {...parts} />
+            <SellerCompany {...parts} sellers={sellers} companies={companies} customers={customers} />
+          </>
+        ) : step === 1 ? (
+          <>
+            <PeriodFields {...parts} />
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: '10px', bgcolor: 'archie.surface2', display: 'grid', gap: 0.75 }}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+                <Typography component="b" sx={{ fontSize: 15, fontWeight: 650 }}>{dShort(f.start_date)} → {dShort(endOf(f))}</Typography>
+              </Box>
+              <PeriodPreview f={f} />
+            </Box>
+          </>
+        ) : (
+          <>
+            <CodeTitle {...parts} title={title} autoTitle={autoTitle} />
+            <ValueBilling {...parts} canViewValue={canViewValue} />
+            {canViewValue ? <AmountPreview f={f} compact /> : null}
+            {devices}
+            {canViewValue ? <PdfField file={pdf} onFile={setPdf} /> : null}
+            <NotesField {...parts} />
+          </>
+        )}
+      </Box>
+      {foot(
+        <>
+          {step ? (
+            <Box title={[custName(f.customer), typeLabel, step > 1 ? `${dShort(f.start_date)} → ${dShort(endOf(f))}` : ''].filter(Boolean).join(' · ')}
+              sx={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'text.secondary', '& b': { color: 'text.primary', fontWeight: 600 } }}>
+              <b>{custName(f.customer)}</b> · {typeLabel}{step > 1 ? <> · {dShort(f.start_date)} → {dShort(endOf(f))}</> : null}
+            </Box>
+          ) : <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Il resto si completa nei passi successivi</Typography>}
+          {step ? null : <Box sx={{ flex: 1 }} />}
+          {step ? <Button color="inherit" onClick={() => setStep((s) => s - 1)} disabled={saving} startIcon={<CampoIcon name="chevL" size={15} />}>Indietro</Button>
+            : <Button color="inherit" onClick={onClose}>Annulla</Button>}
+          {step < 2 ? <Button variant="contained" onClick={next} endIcon={<CampoIcon name="chevR" size={15} />}>Avanti</Button> : (
+            <>
+              <Button variant="outlined" color="inherit" disabled={saving} onClick={() => void save('bozza')} sx={{ flex: 'none', whiteSpace: 'nowrap' }}>Salva come bozza</Button>
+              <Button variant="contained" disabled={saving} startIcon={<CheckIcon />} onClick={() => void save('attivo')} sx={{ flex: 'none', whiteSpace: 'nowrap' }}>{saving ? 'Salvataggio…' : 'Crea contratto'}</Button>
+            </>
+          )}
+        </>,
+      )}
+    </>
+  )
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-start' }}>
-            <TextField
-              size="small"
-              type="date"
-              label="Inizio"
-              required
-              value={form.start_date}
-              onChange={(e) => set('start_date', e.target.value)}
-              error={!!errors.start_date}
-              helperText={errors.start_date}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              size="small"
-              type="date"
-              label="Fine"
-              required
-              value={form.end_date}
-              onChange={(e) => set('end_date', e.target.value)}
-              error={!!errors.end_date}
-              helperText={errors.end_date}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              size="small"
-              type="number"
-              label="Preavviso (giorni)"
-              value={form.notice_days}
-              onChange={(e) => set('notice_days', e.target.value)}
-              error={!!errors.notice_days}
-              helperText={errors.notice_days}
-              slotProps={{ htmlInput: { min: 0, max: 3650 } }}
-              sx={{ flex: 1 }}
-            />
-          </Stack>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+  // ── Modifica: scheda unica con riepilogo ──────────────────────────
+  const sheet = (
+    <>
+      {head('Modifica a sinistra: a destra vedi subito periodo, disdetta e rate.')}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <Box sx={(t) => ({
+          display: 'grid', gridTemplateColumns: '1fr', minHeight: '100%',
+          [t.breakpoints.up('md')]: {
+            gridTemplateColumns: 'minmax(0,1fr) 300px',
+            background: `linear-gradient(to left, ${t.palette.archie.surface2} 299px, ${t.palette.divider} 299px 300px, transparent 300px)`,
+          },
+        })}>
+          <Box sx={{ p: '16px 18px 20px' }}>
+            <Group first n={1} title="Cliente e contratto">
+              <CustomerField {...parts} customers={customers} fallbackName={contract?.customer_name} />
+              <TypeChips {...parts} />
+              <StatusChips {...parts} />
+              <SellerCompany {...parts} sellers={sellers} companies={companies} customers={customers} />
+              <CodeTitle {...parts} title={title} autoTitle={autoTitle} />
+            </Group>
+            <Group n={2} title="Periodo"><PeriodFields {...parts} /></Group>
+            <Group n={3} title={canViewValue ? 'Valore' : 'Fatturazione'}><ValueBilling {...parts} canViewValue={canViewValue} /></Group>
+            <Group n={4} title="Collegamenti" aside="tutto facoltativo">{devices}<NotesField {...parts} /></Group>
+          </Box>
+          <Box component="aside" aria-live="polite" sx={{ p: 2, display: 'grid', gap: 1.25, alignContent: 'start', position: { md: 'sticky' }, top: 0, alignSelf: 'start', bgcolor: { xs: 'archie.surface2', md: 'transparent' }, borderTop: { xs: '1px solid', md: 0 }, borderColor: 'divider' }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 650, color: 'text.secondary' }}>Come apparirà</Typography>
+            <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '10px', p: 1.5, display: 'grid', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                <Box component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.code || '—'}</Box>
+                <ContractStatusBadge status={f.status} label={CONTRACT_STATUS_OPTIONS.find((o) => o.value === f.status)?.label ?? ''} />
+              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 650, lineHeight: 1.3, color: title ? 'text.primary' : 'text.disabled' }}>{title || 'Titolo del contratto'}</Typography>
+              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{[custName(f.customer) || 'Cliente da scegliere', typeLabel || null, sellers.find((s) => s.id === f.seller)?.name ?? null].filter(Boolean).join(' · ')}</Typography>
+              <PeriodPreview f={f} narrow />
+            </Box>
             {canViewValue ? (
-              <TextField
-                size="small"
-                type="number"
-                label="Valore totale"
-                value={form.total_value}
-                onChange={(e) => set('total_value', e.target.value)}
-                error={!!errors.total_value}
-                helperText={errors.total_value}
-                slotProps={{
-                  htmlInput: { min: 0, step: '0.01' },
-                  input: { endAdornment: <InputAdornment position="end">€</InputAdornment> },
-                }}
-                sx={{ flex: 1 }}
-              />
+              <>
+                <Typography sx={{ fontSize: 11, fontWeight: 650, color: 'text.secondary', mt: 0.5 }}>Importo</Typography>
+                <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '10px', p: 1.5 }}><AmountPreview f={f} /></Box>
+              </>
             ) : null}
-            <FormControlLabel
-              sx={{ flex: 1 }}
-              control={<Checkbox checked={form.auto_renew} onChange={(e) => set('auto_renew', e.target.checked)} />}
-              label="Rinnovo automatico (solo informativo)"
-            />
-          </Stack>
+          </Box>
+        </Box>
+      </Box>
+      {foot(
+        <>
+          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}><Box component="span" sx={{ color: 'error.main' }}>*</Box> obbligatori</Typography>
+          <Box sx={{ flex: 1 }} />
+          <Button color="inherit" onClick={onClose} disabled={saving}>Annulla</Button>
+          <Button variant="contained" disabled={saving} startIcon={<CheckIcon />} onClick={() => void save()}>{saving ? 'Salvataggio…' : 'Salva modifiche'}</Button>
+        </>,
+      )}
+    </>
+  )
 
-          <DevicePicker
-            customerId={form.customer}
-            value={form.devices}
-            onChange={(ids) => set('devices', ids)}
-            allowCreate
-            initialOptions={contract?.devices_detail}
-            label="Device collegati (opzionale)"
-            error={!!errors.devices}
-            helperText={errors.devices}
-          />
-
-          <TextField
-            size="small"
-            label="Note"
-            multiline
-            minRows={3}
-            value={form.notes}
-            onChange={(e) => set('notes', e.target.value)}
-            error={!!errors.notes}
-            helperText={errors.notes}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={saving}>
-          Annulla
-        </Button>
-        <Button variant="contained" onClick={() => void save()} disabled={saving}>
-          {saving ? 'Salvataggio…' : 'Salva'}
-        </Button>
-      </DialogActions>
+  return (
+    <Dialog open={open} onClose={saving ? undefined : onClose} fullScreen={narrow} aria-labelledby="ct-dlg-title"
+      slotProps={{ paper: { sx: { width: edit ? 900 : 680, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: narrow ? 0 : '12px', ...(narrow ? { maxWidth: '100vw', maxHeight: '100vh' } : {}) } } }}>
+      {edit ? sheet : steps}
     </Dialog>
   )
 }

@@ -1,13 +1,11 @@
 {% extends base_template %}
 {% block content %}
-<p style="margin:0 0 10px;color:#60736d;font-size:10px;line-height:16px;font-weight:bold;letter-spacing:1.7px;">PIANO FERIE</p>
-<h1 class="headline" style="margin:0 0 26px;font-size:29px;line-height:36px;letter-spacing:-0.6px;color:#203734;font-weight:bold;">Nuova richiesta da validare</h1>
-<p style="margin:0 0 18px;font-size:15px;line-height:24px;">Ciao {{ nome_utente }},</p>
-<p style="margin:0 0 18px;font-size:15px;line-height:24px;"><strong>{{ richiedente }}</strong> ha inviato una richiesta ({{ motivo }}):</p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;margin:8px 0 24px;">
-{% for g in giorni %}
-<tr><td style="padding:12px 18px;background-color:#f3f7f5;border-bottom:4px solid #ffffff;font-size:14px;line-height:22px;color:#203734;">{{ g.date|date:"D d/m/Y" }} — {{ g.get_day_part_display }}</td></tr>
-{% endfor %}
-</table>
-<p style="margin:0 0 18px;font-size:15px;line-height:24px;">Accedi ad ARCHIE, sezione Piano Ferie, per validare o rifiutare.</p>
+<h1 class="h1" style="margin:0 0 6px;font-size:22px;line-height:28px;font-weight:650;letter-spacing:-0.3px;color:#15201e;">{{ richiedente }} chiede {{ totale }} di {{ motivo|lower }}</h1>
+<p style="margin:0;font-size:14px;line-height:22px;color:#5b6b67;">In attesa della tua validazione.</p>
+<div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>
+{% for g in giorni_raggruppati %}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr>{% include "emails/_day.html" with giorno=g.date %}
+<td valign="middle" style="padding:14px 0;border-bottom:1px solid #d5dedb;"><p style="margin:0;font-size:15px;line-height:22px;font-weight:600;color:#15201e;">{{ g.label }}</p><p style="margin:0;font-size:13px;line-height:20px;color:#5b6b67;">{{ motivo }}</p></td>
+<td width="80" valign="middle" align="right" style="width:80px;padding:14px 0 14px 12px;border-bottom:1px solid #d5dedb;"><span style="display:inline-block;width:30px;height:12px;border-radius:3px;background-color:{% if g.mattina %}#7cc4a4{% else %}#edf1f0{% endif %};"></span><span style="display:inline-block;width:30px;height:12px;border-radius:3px;margin-left:3px;background-color:{% if g.pomeriggio %}#7cc4a4{% else %}#edf1f0{% endif %};"></span><div style="font-size:10px;line-height:14px;color:#66766f;padding-top:3px;">MAT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POM</div></td></tr></table>
+{% endfor %}{% if nota %}<p style="margin:16px 0 0;padding:12px 14px;border-radius:8px;background-color:#f5f8f7;font-size:14px;line-height:22px;color:#15201e;"><span style="color:#5b6b67;">Nota:</span> {{ nota }}</p>{% endif %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;"><tr><td>{% include "emails/_button.html" with label="Valida o rifiuta" url="/piano-ferie" %}</td></tr></table>
 {% endblock %}

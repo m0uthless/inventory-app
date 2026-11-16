@@ -232,6 +232,10 @@ export default function ConvertToIssueDialog({ open, task, onClose, onConverted 
             </FormControl>
           ) : null}
 
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 12 }}>
+            La issue eredita priorità, commenti e, se possibile, l'assegnatario. Il task viene completato e resta collegato alla issue.
+          </Typography>
+
           {errors.detail || errors.non_field_errors ? (
             <Alert severity="error">{errors.detail || errors.non_field_errors}</Alert>
           ) : null}
@@ -246,7 +250,7 @@ export default function ConvertToIssueDialog({ open, task, onClose, onConverted 
           sx={{ minWidth: 140 }}
         >
           {saving ? <CircularProgress size={16} sx={{ mr: 1, color: 'inherit' }} /> : null}
-          Conferma
+          Crea la issue
         </Button>
       </DialogActions>
     </Dialog>

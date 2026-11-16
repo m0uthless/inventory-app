@@ -1,7 +1,10 @@
 import django_filters as filters
 
+from datetime import datetime, time, timedelta
+
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
@@ -15,6 +18,7 @@ from portal.permissions import IsInternalUserStrictAmbito, PortalModelPermission
 
 class AuditEventSerializer(serializers.ModelSerializer):
     actor_username = serializers.CharField(source="actor.username", read_only=True)
+    actor_name = serializers.SerializerMethodField()
     actor_email = serializers.CharField(source="actor.email", read_only=True)
     content_type_app = serializers.CharField(source="content_type.app_label", read_only=True)
     content_type_model = serializers.CharField(source="content_type.model", read_only=True)
@@ -30,6 +34,7 @@ class AuditEventSerializer(serializers.ModelSerializer):
             "action",
             "actor",
             "actor_username",
+            "actor_name",
             "actor_email",
             "content_type",
             "content_type_app",
@@ -45,6 +50,12 @@ class AuditEventSerializer(serializers.ModelSerializer):
             "ip_address",
             "user_agent",
         ]
+
+    def get_actor_name(self, obj):
+        u = obj.actor
+        if u is None:
+            return None
+        return f"{u.first_name} {u.last_name}".strip() or u.username
 
     def get_changes(self, obj):
         raw = obj.changes or {}
@@ -91,6 +102,11 @@ class AuditEventSerializer(serializers.ModelSerializer):
 class AuditEventFilter(filters.FilterSet):
     actor = filters.NumberFilter(field_name="actor_id")
     action = filters.CharFilter(field_name="action")
+    # Più azioni insieme (viste "Modifiche", "Accessi"): ?actions=create,update,delete
+    actions = filters.CharFilter(method="filter_actions")
+    # Eventi senza utente (sincronizzazioni e operazioni automatiche): ?actor_null=true
+    actor_null = filters.BooleanFilter(field_name="actor", lookup_expr="isnull")
+    ip = filters.CharFilter(field_name="ip_address")
     # Nota: content_type è nullable (migration 0007). DjangoFilterBackend genera INNER JOIN
     # su content_type__app_label / content_type__model, escludendo silenziosamente gli eventi
     # con content_type=NULL (login, bulk restore, ecc.).
@@ -100,6 +116,10 @@ class AuditEventFilter(filters.FilterSet):
     object_id = filters.CharFilter(field_name="object_id")
     created_after = filters.IsoDateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_before = filters.IsoDateTimeFilter(field_name="created_at", lookup_expr="lte")
+
+    def filter_actions(self, queryset, name, value):
+        vals = [v.strip() for v in (value or "").split(",") if v.strip()]
+        return queryset.filter(action__in=vals) if vals else queryset
 
     def filter_app_label(self, queryset, name, value):
         if not value:
@@ -113,7 +133,7 @@ class AuditEventFilter(filters.FilterSet):
 
     class Meta:
         model = AuditEvent
-        fields = ["actor", "action", "app_label", "model", "object_id", "created_after", "created_before"]
+        fields = ["actor", "action", "actions", "actor_null", "ip", "app_label", "model", "object_id", "created_after", "created_before"]
 
 
 class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
@@ -133,6 +153,74 @@ class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["subject", "object_repr", "path", "object_id"]
     ordering_fields = ["created_at", "action"]
     ordering = ["-created_at"]
+
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        """Indicatori della pagina Audit (giorni nel fuso locale).
+
+        - today: eventi di oggi, di cui modifiche (create/update/delete/restore);
+        - days: eventi per giorno negli ultimi 14 giorni (dal più vecchio a oggi);
+        - failed_24h: accessi falliti nelle ultime 24 ore e la coppia nome utente/IP più frequente;
+        - deleted_7d: eliminazioni negli ultimi 7 giorni;
+        - top_modifiers_7d: chi ha fatto più modifiche negli ultimi 7 giorni (massimo 3);
+        - system_7d: eventi senza utente (sincronizzazioni) negli ultimi 7 giorni.
+        """
+        qs = AuditEvent.objects.all()
+        now = timezone.now()
+        today = timezone.localdate()
+        tz = timezone.get_current_timezone()
+
+        def day_start(d):
+            return timezone.make_aware(datetime.combine(d, time.min), tz)
+
+        start_today = day_start(today)
+        changes = ["create", "update", "delete", "restore"]
+        auth = ["login", "logout", "login_failed"]
+
+        today_qs = qs.filter(created_at__gte=start_today)
+        first = today - timedelta(days=13)
+        per_day = {d: 0 for d in (first + timedelta(days=i) for i in range(14))}
+        for ts in qs.filter(created_at__gte=day_start(first)).values_list("created_at", flat=True).iterator():
+            d = timezone.localtime(ts, tz).date()
+            if d in per_day:
+                per_day[d] += 1
+
+        failed = list(
+            qs.filter(action="login_failed", created_at__gte=now - timedelta(hours=24))
+            .values_list("object_repr", "metadata", "ip_address")
+        )
+        pairs: dict[tuple[str, str], int] = {}
+        for repr_, meta, ip in failed:
+            username = (meta or {}).get("username") if isinstance(meta, dict) else None
+            key = (username or repr_ or "", ip or "")
+            pairs[key] = pairs.get(key, 0) + 1
+        top_pair = max(pairs.items(), key=lambda kv: kv[1]) if pairs else None
+
+        week = now - timedelta(days=7)
+        top = (
+            qs.filter(created_at__gte=week, action__in=changes, actor__isnull=False)
+            .values("actor", "actor__username", "actor__first_name", "actor__last_name")
+            .annotate(n=Count("id"))
+            .order_by("-n", "actor__username")[:3]
+        )
+        return Response({
+            "today": {"total": today_qs.count(), "changes": today_qs.filter(action__in=changes).count()},
+            "days": [{"date": d.isoformat(), "count": n} for d, n in per_day.items()],
+            "failed_24h": {
+                "count": len(failed),
+                "top": {"username": top_pair[0][0], "ip": top_pair[0][1] or None, "count": top_pair[1]} if top_pair else None,
+            },
+            "deleted_7d": qs.filter(created_at__gte=week, action="delete").count(),
+            "top_modifiers_7d": [
+                {
+                    "id": r["actor"],
+                    "name": f"{r['actor__first_name']} {r['actor__last_name']}".strip() or r["actor__username"],
+                    "count": r["n"],
+                }
+                for r in top
+            ],
+            "system_7d": qs.filter(created_at__gte=week, actor__isnull=True).exclude(action__in=auth).count(),
+        })
 
     @action(detail=False, methods=["get"], url_path="actors")
     def actors(self, request):

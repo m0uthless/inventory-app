@@ -104,6 +104,8 @@ MIDDLEWARE = [
     CSRF_MIDDLEWARE,
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.SessionIdleTimeoutMiddleware",
+    "core.middleware.ModuleSwitchMiddleware",
+    "core.middleware.MaintenanceModeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -224,11 +226,16 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "0.10.0",
+    "VERSION": "1.0.0",
 }
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "core.exceptions.exception_handler",
+    # B-06: 401 a sessione assente. Rimossa anche la BasicAuthentication di
+    # default di DRF: non usata da nessun client, e aggirava il rate limit
+    # del login (/api/auth/login/).
+    "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SessionAuthentication401"],
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
@@ -402,6 +409,10 @@ if not DEBUG and not FIELD_ENCRYPTION_KEY:
 # Va generato da Teams: canale → Workflows → template "Post to a channel when
 # a webhook request is received".
 SERVICENOW_TEAMS_WEBHOOK_URL = os.getenv("SERVICENOW_TEAMS_WEBHOOK_URL", "")
+
+# Indirizzo pubblico di Archie: i pulsanti delle email portano qui
+# (es. {ARCHIE_PUBLIC_URL}/issues?open=42). In dev va impostato all'host dello stack.
+ARCHIE_PUBLIC_URL = os.getenv("ARCHIE_PUBLIC_URL", "https://archie.biotron.it")
 
 # Modalità di notifica per i case ServiceNow di categoria Philips (switch
 # TEMPORANEO in prova, vedi servicenow/notifications.py):

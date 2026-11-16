@@ -96,9 +96,12 @@ export type ExpenseReportRow = {
   status: ExpenseReportStatus
   status_label: string
   rejection_reason: string
+  submitted_at: string | null
   validated_by: number | null
   validated_by_name: string | null
   validated_at: string | null
+  /** Tariffa €/km del proprietario della nota (null se non impostata). */
+  km_rate: string | null
   total_expenses: string
   total_due: string
   items: ExpenseItemRow[]

@@ -1,45 +1,16 @@
 import * as React from 'react'
 import {
-  Box,
-  Button,
-  Card,
-  Chip,
-  CircularProgress,
-  Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  FormControl,
-  IconButton,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
+  Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  FormControl, InputLabel, MenuItem, Select, Stack, TextField,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
-import { alpha } from '@mui/material/styles'
-import SearchIcon from '@mui/icons-material/Search'
-import AddIcon from '@mui/icons-material/Add'
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import TerminalOutlinedIcon from '@mui/icons-material/TerminalOutlined'
-
 import { api } from '@shared/api/client'
 import { useToast } from '@shared/ui/toast'
 import { apiErrorToMessage } from '@shared/api/error'
-import { useAuth } from '../auth/AuthProvider'
-import { compactResetButtonSx } from '@shared/ui/toolbarStyles'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import { useAuth } from '../auth/AuthProvider'
+import { CampoIcon } from '../ui/campo'
+import { ArchiveRoot, HeadAction, Mark, OpenFolder, WikiHead } from '../features/wiki/archive/archiveUi'
+import { cVars, rel } from '../features/wiki/archive/archiveModel'
 
 type Language = {
   id: number
@@ -70,36 +41,6 @@ type QueryRow = {
 
 type ApiPage<T> = { count: number; results: T[] }
 
-function fmtDate(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })
-}
-
-function LangChip({ label, color, textColor }: { label: string | null; color: string | null; textColor: string | null }) {
-  const theme = useTheme()
-  if (!label) return null
-  const bg = color ?? theme.palette.background.default
-  const text = textColor ?? theme.palette.text.secondary
-  return (
-    <Chip
-      label={label}
-      size="small"
-      sx={{
-        height: 20,
-        fontSize: '0.72rem',
-        fontWeight: 700,
-        borderRadius: 1,
-        bgcolor: bg,
-        color: text,
-        border: `1px solid ${text}40`,
-        letterSpacing: '0.03em',
-        '& .MuiChip-label': { px: 0.85 },
-      }}
-    />
-  )
-}
 
 type FormState = { title: string; language: number | ''; body: string; description: string; tags: string }
 const EMPTY_FORM: FormState = { title: '', language: '', body: '', description: '', tags: '' }
@@ -196,136 +137,106 @@ function QueryFormDialog({ open, initial, languages, onClose, onSaved }: {
   )
 }
 
-function QueryItem({ query, canEdit, onEdit, onDelete }: { query: QueryRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
-  const toast = useToast()
-  const [expanded, setExpanded] = React.useState(false)
-  const [copied, setCopied] = React.useState(false)
 
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const text = query.body
-    let ok = false
-
-    // Metodo 1: Clipboard API (HTTPS / localhost)
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(text)
-        ok = true
-      } catch { /* fallback sotto */ }
-    }
-
-    // Metodo 2: execCommand (HTTP, browser vecchi, iframe)
-    if (!ok) {
-      try {
-        const ta = document.createElement('textarea')
-        ta.value = text
-        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0'
-        document.body.appendChild(ta)
-        ta.focus()
-        ta.select()
-        ok = document.execCommand('copy')
-        document.body.removeChild(ta)
-      } catch { /* niente */ }
-    }
-
-    if (ok) {
-      api.post(`/wiki-queries/${query.id}/use/`).catch(() => {})
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    } else {
-      toast.error('Impossibile copiare negli appunti')
-    }
+// Copia negli appunti: Clipboard API (HTTPS/localhost) con ripiego su execCommand (HTTP, iframe).
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true } catch { /* ripiego sotto */ }
   }
-
-  const tags = (query.tags ?? []).slice(0, 5)
-
-  return (
-    <Card variant="outlined" sx={{ borderRadius: 1.5, overflow: 'hidden', transition: 'border-color 0.15s, box-shadow 0.15s', borderColor: expanded ? 'primary.main' : 'divider', boxShadow: expanded ? (t) => `0 0 0 1px ${alpha(t.palette.primary.main, 0.15)}` : 'none' }}>
-      <Box onClick={() => setExpanded((v) => !v)} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1.1, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}>
-        <LangChip label={query.language_label} color={query.language_color} textColor={query.language_text_color} />
-        <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', flex: 1, minWidth: 0, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{query.title}</Typography>
-        {!!tags.length && (
-          <Stack direction="row" spacing={0.5} sx={{ display: { xs: 'none', sm: 'flex' }, flexShrink: 0 }}>
-            {tags.map((t) => <Typography key={t} variant="caption" sx={{ fontSize: 10.5, fontWeight: 600, color: 'text.disabled', bgcolor: 'grey.50', px: 0.75, py: 0.25, borderRadius: 0.75, border: '1px solid', borderColor: 'divider' }}>{t}</Typography>)}
-          </Stack>
-        )}
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 11, flexShrink: 0 }}>{query.use_count > 0 ? `${query.use_count}×` : ''}</Typography>
-        <Tooltip title={copied ? 'Copiato!' : 'Copia query'} arrow>
-          <IconButton size="small" onClick={handleCopy} sx={{ color: copied ? 'success.main' : 'text.secondary', '&:hover': { color: 'primary.main' }, flexShrink: 0 }}>
-            <ContentCopyIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        </Tooltip>
-        {canEdit && <>
-          <Tooltip title="Modifica" arrow><IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit() }} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' }, flexShrink: 0 }}><EditOutlinedIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-          <Tooltip title="Elimina" arrow><IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete() }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' }, flexShrink: 0 }}><DeleteOutlineIcon sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-        </>}
-        <IconButton size="small" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v) }} sx={{ color: 'text.secondary', flexShrink: 0 }} aria-label={expanded ? 'Chiudi' : 'Espandi'}>
-          {expanded ? <ExpandLessIcon sx={{ fontSize: 18 }} /> : <ExpandMoreIcon sx={{ fontSize: 18 }} />}
-        </IconButton>
-      </Box>
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
-        <Divider />
-        {query.description && <Box sx={{ px: 1.75, pt: 1.25, pb: 0.5 }}><Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 12.5, lineHeight: 1.6 }}>{query.description}</Typography></Box>}
-        <Box component="pre" sx={{ m: 0, mx: 1.5, mt: query.description ? 0.75 : 1.25, mb: 1.5, p: 1.5, bgcolor: 'grey.50', borderRadius: 1.25, border: '1px solid', borderColor: 'divider', fontFamily: 'ui-monospace,"Cascadia Code","Fira Code","Courier New",monospace', fontSize: '0.8125rem', lineHeight: 1.7, color: 'text.primary', overflowX: 'auto', whiteSpace: 'pre' }}>{query.body}</Box>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.75, pb: 1, pt: 0.25, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 11 }}>
-            {query.updated_by_username ? `Aggiornato da @${query.updated_by_username}` : query.created_by_username ? `Creato da @${query.created_by_username}` : ''}
-            {query.updated_at ? `  ·  ${fmtDate(query.updated_at)}` : ''}
-          </Typography>
-          <Button size="small" startIcon={<ContentCopyIcon sx={{ fontSize: '14px !important' }} />} onClick={handleCopy} sx={{ fontSize: '0.75rem', color: copied ? 'success.main' : 'text.secondary', '&:hover': { color: 'primary.main' }, textTransform: 'none', py: 0.25 }}>
-            {copied ? 'Copiato!' : 'Copia'}
-          </Button>
-        </Stack>
-      </Collapse>
-    </Card>
-  )
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0'
+    document.body.appendChild(ta); ta.focus(); ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch { return false }
 }
 
+// Evidenziazione leggera: commenti, testi tra apici, parole chiave più comuni.
+const KW = /\b(SELECT|FROM|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|WHERE|GROUP|BY|ORDER|HAVING|AS|IS|NULL|IN|LIKE|BETWEEN|COUNT|MIN|MAX|SUM|AVG|DISTINCT|DESC|ASC|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CASE|WHEN|THEN|ELSE|END|UNION|ALL|LIMIT|TOP|WITH|import|from|def|return|for|in|if|else|function|param|foreach)\b/g
+function CodeLine({ line }: { line: string }) {
+  if (/^\s*(--|#|\/\/|REM\b)/i.test(line)) return <span className="w-cm">{line}</span>
+  const parts: React.ReactNode[] = []
+  const re = /('[^']*'|"[^"]*")/g
+  let last = 0; let m: RegExpExecArray | null; let k = 0
+  const pushCode = (txt: string) => {
+    let l2 = 0; let m2: RegExpExecArray | null
+    KW.lastIndex = 0
+    while ((m2 = KW.exec(txt))) { parts.push(txt.slice(l2, m2.index)); parts.push(<b key={`k${k++}`}>{m2[0]}</b>); l2 = m2.index + m2[0].length }
+    parts.push(txt.slice(l2))
+  }
+  while ((m = re.exec(line))) { pushCode(line.slice(last, m.index)); parts.push(<span key={`s${k++}`} className="w-str">{m[0]}</span>); last = m.index + m[0].length }
+  pushCode(line.slice(last))
+  return <>{parts}</>
+}
+
+type Sort = 'uses' | 'upd' | 'title'
+const SORTS: [Sort, string][] = [['uses', 'Più usate'], ['upd', 'Aggiornate'], ['title', 'A–Z']]
+const NEUTRAL = '#5b6b67'
+const TILT = [-0.5, 0.4, -0.2, 0.6]
+const okHex = (c?: string | null) => (c && /^#[0-9a-f]{6}$/i.test(c) ? c : NEUTRAL)
+
+/** Query della Wiki come schedario: linguette per linguaggio, schede a sinistra, la query scelta su un foglio. */
 export default function WikiQueries() {
   const toast = useToast()
   const { hasPerm } = useAuth()
-  const canAdd    = hasPerm('wiki.add_wikiquery')
+  const canAdd = hasPerm('wiki.add_wikiquery')
   const canChange = hasPerm('wiki.change_wikiquery')
   const canDelete = hasPerm('wiki.delete_wikiquery')
 
-  const [queries, setQueries]       = React.useState<QueryRow[]>([])
-  const [languages, setLanguages]   = React.useState<Language[]>([])
-  const [loading, setLoading]       = React.useState(false)
-  const [q, setQ]                   = React.useState('')
-  const [langFilter, setLangFilter] = React.useState<number | ''>('')
-  const [formOpen, setFormOpen]     = React.useState(false)
+  const [queries, setQueries] = React.useState<QueryRow[] | null>(null)
+  const [languages, setLanguages] = React.useState<Language[]>([])
+  const [lang, setLang] = React.useState<number | 'all' | 'none'>('all')
+  const [q, setQ] = React.useState('')
+  const [sort, setSort] = React.useState<Sort>('uses')
+  const [selId, setSelId] = React.useState<number | null>(null)
+  const [formOpen, setFormOpen] = React.useState(false)
   const [editTarget, setEditTarget] = React.useState<QueryRow | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<QueryRow | null>(null)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
 
-  const loadLanguages = React.useCallback(async () => {
-    try {
-      const res = await api.get<Language[] | ApiPage<Language>>('/wiki-query-languages/')
-      const data = res.data
-      setLanguages(Array.isArray(data) ? data : (data as ApiPage<Language>).results ?? [])
-    } catch { /* silenzioso */ }
-  }, [])
-
-  React.useEffect(() => { loadLanguages() }, [loadLanguages])
-
   const load = React.useCallback(async () => {
-    setLoading(true)
     try {
-      const params: Record<string, unknown> = { page_size: 500, ordering: 'title' }
-      if (q.trim()) params.search = q.trim()
-      if (langFilter !== '') params.language = langFilter
-      const res = await api.get<ApiPage<QueryRow>>('/wiki-queries/', { params })
-      setQueries(res.data.results ?? [])
+      const [l, r] = await Promise.all([
+        api.get<Language[] | ApiPage<Language>>('/wiki-query-languages/'),
+        api.get<ApiPage<QueryRow>>('/wiki-queries/', { params: { page_size: 500, ordering: 'title' } }),
+      ])
+      setLanguages(Array.isArray(l.data) ? l.data : l.data.results ?? [])
+      setQueries(r.data.results ?? [])
     } catch (e) {
       toast.error(apiErrorToMessage(e))
-    } finally {
-      setLoading(false)
+      setQueries([])
     }
-  }, [q, langFilter, toast])
+  }, [toast])
+  React.useEffect(() => { void load() }, [load])
 
-  React.useEffect(() => { load() }, [load])
+  const all = React.useMemo(() => queries ?? [], [queries])
+  const tabs = React.useMemo(() => {
+    const used = languages.filter((l) => l.is_active || all.some((x) => x.language === l.id))
+    const t: { key: number | 'all' | 'none'; label: string; color: string; n: number }[] = [
+      { key: 'all', label: 'Tutte', color: NEUTRAL, n: all.length },
+      ...used.map((l) => ({ key: l.id, label: l.label, color: okHex(l.color), n: all.filter((x) => x.language === l.id).length })),
+    ]
+    const none = all.filter((x) => x.language == null).length
+    if (none) t.push({ key: 'none', label: 'Senza linguaggio', color: NEUTRAL, n: none })
+    return t
+  }, [languages, all])
+  const term = q.trim().toLowerCase()
+  const list = all
+    .filter((x) => (lang === 'all' ? true : lang === 'none' ? x.language == null : x.language === lang))
+    .filter((x) => !term || [x.title, x.description, x.body, (x.tags ?? []).join(' ')].join(' ').toLowerCase().includes(term))
+    .sort(sort === 'uses' ? (a, b) => b.use_count - a.use_count : sort === 'upd' ? (a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) : (a, b) => a.title.localeCompare(b.title, 'it'))
+  const sel = list.find((x) => x.id === selId) ?? list[0] ?? null
+  const active = tabs.find((t) => t.key === lang) ?? tabs[0]
 
-  const reset = () => { setQ(''); setLangFilter('') }
+  const doCopy = async (x: QueryRow) => {
+    if (!(await copyText(x.body))) { toast.error('Impossibile copiare negli appunti'); return }
+    api.post(`/wiki-queries/${x.id}/use/`).catch(() => {})
+    setQueries((prev) => prev?.map((y) => (y.id === x.id ? { ...y, use_count: y.use_count + 1 } : y)) ?? prev)
+    toast.success(`Query copiata · usata ${x.use_count + 1} volte`)
+  }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -334,7 +245,7 @@ export default function WikiQueries() {
       await api.delete(`/wiki-queries/${deleteTarget.id}/`)
       toast.success('Query eliminata')
       setDeleteTarget(null)
-      load()
+      void load()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -342,87 +253,91 @@ export default function WikiQueries() {
     }
   }
 
-  const hasFilters = !!q.trim() || langFilter !== ''
-
-  const langCounts = React.useMemo(() => {
-    const counts: Record<number, number> = {}
-    for (const row of queries) {
-      if (row.language !== null) counts[row.language] = (counts[row.language] ?? 0) + 1
-    }
-    return counts
-  }, [queries])
-
-  const selectedLangLabel = React.useMemo(
-    () => languages.find((l) => l.id === langFilter)?.label ?? '',
-    [languages, langFilter],
-  )
+  const colorOf = (x: QueryRow) => okHex(x.language_color)
+  const lines = sel ? sel.body.split('\n') : []
 
   return (
-    <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 1.5, p: 1.25 }}>
-        <Stack spacing={1.15}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ xs: 'stretch', md: 'center' }}>
-            <TextField
-              size="small" placeholder="Cerca" value={q} onChange={(e) => setQ(e.target.value)}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} /></InputAdornment> } }}
-              sx={{ width: { xs: '100%', md: 320 }, flexShrink: 0, '& .MuiInputBase-root': { height: 40, fontSize: '0.95rem', borderRadius: 1.5, bgcolor: 'transparent' }, '& .MuiInputBase-input': { py: 0 } }}
-            />
-            <FormControl size="small" sx={{ minWidth: 160, '& .MuiInputBase-root': { height: 40, borderRadius: 1.5 } }}>
-              <InputLabel>Linguaggio</InputLabel>
-              <Select label="Linguaggio" value={langFilter} onChange={(e) => setLangFilter(e.target.value as number | '')}>
-                <MenuItem value="">Tutti</MenuItem>
-                {languages.map((l) => (
-                  <MenuItem key={l.id} value={l.id}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" width="100%" spacing={1}>
-                      <span>{l.label}</span>
-                      {(langCounts[l.id] ?? 0) > 0 && <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 11 }}>{langCounts[l.id]}</Typography>}
-                    </Stack>
-                  </MenuItem>
+    <Box>
+      <WikiHead section="queries" actions={canAdd ? <HeadAction label="Nuova query" onClick={() => { setEditTarget(null); setFormOpen(true) }} /> : undefined} />
+      <ArchiveRoot>
+        {!queries ? <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}><CircularProgress size={24} /></Box> : (
+          <OpenFolder className="w-qfold" color={active.color} label="Schedario delle query"
+            tabs={
+              <div className="w-open-tabs" role="tablist" aria-label="Linguaggi">
+                {tabs.map((t) => t.key === active.key ? (
+                  <div key={String(t.key)} className="w-open-tab" role="tab" aria-selected="true" style={cVars(t.color)}>
+                    <span className="w-fold-ico"><CampoIcon name={t.key === 'all' ? 'folder' : 'columns'} size={17} /></span><h2>{t.label}</h2><small>{t.n} query</small>
+                  </div>
+                ) : (
+                  <button key={String(t.key)} type="button" role="tab" aria-selected="false" className="w-side-tab" style={cVars(t.color)} onClick={() => { setLang(t.key); setSelId(null) }}>
+                    <span>{t.label}</span><small className="w-tab-n">{t.n}</small>
+                  </button>
                 ))}
-              </Select>
-            </FormControl>
-            <Box sx={{ flex: 1 }} />
-            <Stack direction="row" spacing={1} flexShrink={0}>
-              {hasFilters && (
-                <Tooltip title="Reimposta" arrow>
-                  <Button size="small" variant="contained" onClick={reset} aria-label="Reimposta" sx={compactResetButtonSx}><RestartAltIcon /></Button>
-                </Tooltip>
-              )}
-              {canAdd && (
-                <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => { setEditTarget(null); setFormOpen(true) }}
-                  sx={{ height: 40, borderRadius: 1.5, textTransform: 'none', fontWeight: 600, fontSize: '0.875rem' }}>
-                  Nuova query
-                </Button>
-              )}
-            </Stack>
-          </Stack>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 12 }}>
-            {queries.length} quer{queries.length === 1 ? 'y' : 'ies'}{selectedLangLabel ? ` · ${selectedLangLabel}` : ''}
-          </Typography>
-        </Stack>
-      </Card>
+              </div>
+            }>
+            <div className="w-open-tools">
+              <label className="search w-search"><CampoIcon name="search" size={16} />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca titolo, descrizione, testo della query…" aria-label="Cerca nelle query" />
+              </label>
+              <div className="seg" role="group" aria-label="Ordina">{SORTS.map(([k, l]) => <button key={k} type="button" aria-pressed={sort === k} onClick={() => setSort(k)}>{l}</button>)}</div>
+            </div>
+            {!list.length ? (
+              <div className="w-d-none"><CampoIcon name="search" size={18} /><div><b>{all.length ? `Nessuna query${q ? ` per «${q}»` : ''}` : 'Ancora nessuna query'}</b>
+                {canAdd ? <p><button type="button" className="link-btn" onClick={() => { setEditTarget(null); setFormOpen(true) }}>Aggiungine una</button></p> : null}</div></div>
+            ) : (
+              <div className="w-q">
+                <ul className="w-qlist">
+                  {list.map((x, i) => (
+                    <li key={x.id} style={{ ...cVars(colorOf(x)), ['--r' as string]: `${TILT[i % TILT.length]}deg` }}>
+                      <button type="button" className={`w-qcard${sel?.id === x.id ? ' is-on' : ''}`} aria-pressed={sel?.id === x.id} onClick={() => setSelId(x.id)}>
+                        <span className="w-qcard-tab">{x.language_label ?? 'Senza linguaggio'}</span>
+                        <span className="w-qcard-t"><Mark text={x.title} term={q} /></span>
+                        {x.description ? <span className="w-qcard-d">{x.description}</span> : null}
+                        <span className="w-qcard-f">
+                          <span className="w-uses" title="Volte che è stata copiata"><CampoIcon name="copy" size={13} />{x.use_count}</span>
+                          {(x.tags ?? []).slice(0, 3).map((t) => <span key={t} className="w-tag">{t}</span>)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {sel ? (
+                  <article className="w-qdoc" style={cVars(colorOf(sel))} aria-label={sel.title}>
+                    <header className="w-qdoc-h">
+                      <span className="w-lang">{sel.language_label ?? 'Senza linguaggio'}</span>
+                      <h2>{sel.title}</h2>
+                      {sel.description ? <p>{sel.description}</p> : null}
+                      <div className="w-qdoc-m">
+                        <span>{sel.updated_by_username ?? sel.created_by_username ?? ''}{sel.updated_at ? ` · aggiornata ${rel(sel.updated_at)}` : ''}</span>
+                        <span className="w-uses-big"><b>{sel.use_count}</b> volte copiata</span>
+                      </div>
+                    </header>
+                    <div className="w-qcode">
+                      <div className="w-qcode-bar"><span>{lines.length} {lines.length === 1 ? 'riga' : 'righe'}</span>
+                        <Button size="small" variant="contained" startIcon={<CampoIcon name="copy" size={14} />} onClick={() => void doCopy(sel)} sx={{ ml: 'auto' }}>Copia la query</Button>
+                      </div>
+                      <pre><code>{lines.map((ln, i) => <span key={i} className="w-ln"><i>{i + 1}</i><CodeLine line={ln} /></span>)}</code></pre>
+                    </div>
+                    <footer className="w-qdoc-f">
+                      {(sel.tags ?? []).map((t) => <span key={t} className="w-tag">{t}</span>)}
+                      <span className="g-spacer" />
+                      {canDelete ? <Button size="small" color="inherit" startIcon={<CampoIcon name="trash" size={14} />} onClick={() => setDeleteTarget(sel)}>Elimina</Button> : null}
+                      {canChange ? <Button size="small" variant="outlined" color="inherit" startIcon={<CampoIcon name="wrench" size={14} />} onClick={() => { setEditTarget(sel); setFormOpen(true) }}>Modifica</Button> : null}
+                    </footer>
+                  </article>
+                ) : null}
+              </div>
+            )}
+          </OpenFolder>
+        )}
+      </ArchiveRoot>
 
-      {loading ? (
-        <Stack alignItems="center" py={6}><CircularProgress size={28} /></Stack>
-      ) : queries.length === 0 ? (
-        <Stack alignItems="center" py={8} spacing={1.5}>
-          <TerminalOutlinedIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
-          <Typography color="text.secondary">{hasFilters ? 'Nessuna query trovata.' : 'Nessuna query salvata.'}</Typography>
-          {hasFilters && <Button size="small" onClick={reset}>Azzera filtri</Button>}
-          {!hasFilters && canAdd && <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => { setEditTarget(null); setFormOpen(true) }}>Aggiungi la prima query</Button>}
-        </Stack>
-      ) : (
-        <Stack spacing={0.75}>
-          {queries.map((row) => <QueryItem key={row.id} query={row} canEdit={canChange || canDelete} onEdit={() => { setEditTarget(row); setFormOpen(true) }} onDelete={() => setDeleteTarget(row)} />)}
-        </Stack>
-      )}
-
-      <QueryFormDialog open={formOpen} initial={editTarget} languages={languages} onClose={() => setFormOpen(false)} onSaved={load} />
+      <QueryFormDialog open={formOpen} initial={editTarget} languages={languages} onClose={() => setFormOpen(false)} onSaved={() => void load()} />
       <ConfirmDeleteDialog
         open={!!deleteTarget} busy={deleteBusy} title="Elimina query"
         description={deleteTarget ? `Stai per eliminare "${deleteTarget.title}". L'operazione non è reversibile.` : ''}
         onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
       />
-    </Stack>
+    </Box>
   )
 }

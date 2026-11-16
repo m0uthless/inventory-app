@@ -1,7 +1,7 @@
 // ─── Regioni italiane ────────────────────────────────────────────────────────
 // Le 20 regioni, con posizione (row/col) su una griglia stilizzata usata per
 // disegnare la cartina cliccabile del Site Repository (vedi
-// pages/siteRepository/ItalyRegionMap.tsx), e la mappa provincia→regione
+// features/siterepo/RepoMap.tsx), e la mappa provincia→regione
 // (sigla ITALIAN_PROVINCES → id regione), usata per navigare "regione →
 // provincia → cliente" senza dover ricordare a quale regione appartiene
 // ciascuna provincia.

@@ -2,7 +2,11 @@ import { fireEvent, screen, waitFor } from '@testing-library/dom'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ThemeProvider } from '@mui/material/styles'
 import Search from './Search'
+import { THEME_REGISTRY } from '../theme/themeRegistry'
+
+const theme = THEME_REGISTRY.default.build('light')
 
 const navigate = vi.fn()
 const errorToast = vi.fn()
@@ -32,13 +36,17 @@ describe('Search page', () => {
     })
 
     render(
-      <MemoryRouter initialEntries={['/search?search=Alpha']}>
-        <Search />
-      </MemoryRouter>,
+      <ThemeProvider theme={theme}>
+        <MemoryRouter initialEntries={['/search?search=Alpha']}>
+          <Search />
+        </MemoryRouter>
+      </ThemeProvider>,
     )
 
-    await screen.findByText('C-000042 Alpha Industries')
-    fireEvent.click(screen.getByText('C-000042 Alpha Industries'))
+    // Il titolo è spezzato dall'evidenziazione di "Alpha": cerco il pulsante del risultato.
+    const hit = await screen.findByRole('button', { name: /C-000042 Alpha Industries/ })
+    expect(screen.getByText('Alpha', { selector: 'mark' })).toBeTruthy()
+    fireEvent.click(hit)
     await waitFor(() => expect(navigate).toHaveBeenCalled())
     expect(String(navigate.mock.calls[0][0])).toContain('/customers')
     expect(String(navigate.mock.calls[0][0])).toContain('open=42')

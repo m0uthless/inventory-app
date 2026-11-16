@@ -1,1186 +1,366 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react'
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Checkbox,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  FormControl,
-  FormControlLabel,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid'
-
-import AttachFileIcon from '@mui/icons-material/AttachFile'
-import BlockIcon from '@mui/icons-material/Block'
-import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import { Box, Button, ButtonBase, Checkbox, Stack, Typography } from '@mui/material'
+import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import EditIcon from '@mui/icons-material/Edit'
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined'
+import LibraryAddCheckOutlinedIcon from '@mui/icons-material/LibraryAddCheckOutlined'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
+import type { GridColDef } from '@mui/x-data-grid'
 
-import Portal from '@mui/material/Portal'
-import { alpha, useTheme } from '@mui/material/styles'
-import { useDataGridZebraSx } from '../theme/AppThemeProvider'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
-import { Can } from '../auth/Can'
-import { useAuth } from '../auth/AuthProvider'
-import { PERMS } from '../auth/perms'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import EntityListCard from '@shared/ui/EntityListCard'
-import FilterChip from '@shared/ui/FilterChip'
-import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { compactExportButtonSx, compactResetButtonSx } from '@shared/ui/toolbarStyles'
+import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
-import { DrawerShell, HERO_ICON_BTN_SX, HERO_ICON_BTN_DELETE_SX } from '@shared/ui/DrawerShell'
-import { DrawerEmptyState } from '@shared/ui/DrawerParts'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { useExportCsv } from '@shared/ui/useExportCsv'
-import type { PlanRow, EventRow, TodoRow, RapportinoContext } from './maintenanceTypes'
-import { UNIT_IT, RESULT_COLOR, RESULT_LABEL, MAINTENANCE_GRID_SX_BASE } from './maintenanceShared'
-import { DueBadge } from './maintenance/DueBadge'
-import { YearFilterField } from './maintenance/YearFilterField'
 
-// ─── Local types ──────────────────────────────────────────────────────────────
+import { useAuth } from '../auth/AuthProvider'
+import { PERMS } from '../auth/perms'
+import { CampoIcon, FilterOptionList, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
+import { dShort } from '../features/contracts/contractModel'
+import MaintenanceKpis, { useTodoStats } from '../features/maintenance/MaintenanceKpis'
+import MaintenanceCalendar from '../features/maintenance/MaintenanceCalendar'
+import RapportinoDialog from '../features/maintenance/RapportinoDialog'
+import TodoDetailCard, { type TodoTab } from '../features/maintenance/TodoDetailCard'
+import SectionNav from '../features/maintenance/MaintenanceNav'
+import { DueDateOverrideDialog } from '../features/maintenance/MaintenanceLegacy'
+import { useNavigate } from 'react-router-dom'
+import { overrideTipOf, rowKey, todayIso, type Result } from '../features/maintenance/mtModel'
+import { DueCell, PlanCell, ResultBadge } from '../features/maintenance/mtUi'
+import type { TodoRow } from './maintenanceTypes'
 
-type CustomerItem = { id: number; code: string; name: string; display_name?: string }
-type SiteItem = { id: number; name: string; display_name?: string | null }
-type InventoryItem = { id: number; name: string; hostname?: string | null; knumber?: string | null }
+type View = 'all' | 'over' | 'soon' | 'later' | 'ovr'
+const VIEWS: View[] = ['all', 'over', 'soon', 'later', 'ovr']
+const VIEW_DUE: Record<View, string | null> = { all: null, over: 'overdue', soon: 'next30', later: 'later', ovr: 'override' }
+// Vecchio parametro ?m_due= (link esistenti) → vista
+const LEGACY_DUE: Record<string, View> = { overdue: 'over', next30: 'soon' }
+const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
 
-type EventForm = {
-  plan: number | ''
-  inventory: number | ''
-  performed_at: string
-  result: 'ok' | 'ko' | 'partial' | ''
-  tech: number | ''
-  notes: string
-  pdf_file: File | null
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatSchedule(row: Pick<PlanRow, 'schedule_type' | 'interval_value' | 'interval_unit' | 'fixed_month' | 'fixed_day'>) {
-  if (row.schedule_type === 'interval' && row.interval_value && row.interval_unit)
-    return `ogni ${row.interval_value} ${UNIT_IT[row.interval_unit] ?? row.interval_unit}`
-  if (row.schedule_type === 'fixed_date' && row.fixed_day && row.fixed_month)
-    return `${String(row.fixed_day).padStart(2, '0')}/${String(row.fixed_month).padStart(2, '0')} ogni anno`
-  return row.schedule_type
-}
-
-const DW = { xs: '100%', sm: 416 } as const
-
-// ─── Stat card ────────────────────────────────────────────────────────────────
-
-function StatCard({ value, label, sublabel, accent, icon: Icon }: {
-  value: number | null; label: string; sublabel?: string
-  accent: string
-  icon: React.ElementType
-}) {
-  const theme = useTheme()
+function ModeSwitch({ mode, onMode }: { mode: 'list' | 'cal'; onMode: (m: 'list' | 'cal') => void }) {
   return (
-    <Card
-      elevation={0}
-      sx={{
-        flex: '1 1 0', minWidth: 0,
-        position: 'relative', overflow: 'hidden',
-        borderRadius: 1,
-        color: theme.palette.common.white,
-        backgroundImage: `linear-gradient(135deg, ${alpha(accent, 0.72)} 0%, ${alpha(accent, 0.94)} 100%)`,
-        border: `1px solid ${alpha(accent, 0.22)}`,
-        boxShadow: `0 10px 28px ${alpha(accent, 0.22)}`,
-        '&::before': {
-          content: '""', position: 'absolute',
-          width: 110, height: 110, borderRadius: '50%',
-          right: -24, top: -22,
-          backgroundColor: alpha(theme.palette.common.white, 0.13),
-        },
-        '&::after': {
-          content: '""', position: 'absolute',
-          width: 130, height: 130, borderRadius: '50%',
-          right: 24, bottom: -72,
-          backgroundColor: alpha(theme.palette.common.white, 0.10),
-        },
-      }}
-    >
-      <CardContent sx={{ position: 'relative', zIndex: 1, px: 2.5, py: 2.25, '&:last-child': { pb: 2.25 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 2.5 }}>
-          <Box>
-            <Typography variant="overline" sx={{ display: 'block', color: alpha(theme.palette.common.white, 0.9), letterSpacing: 0.4, fontSize: 11, fontWeight: 700, textTransform: 'none', lineHeight: 1.2 }}>
-              Manutenzione
-            </Typography>
-            <Typography variant="h6" sx={{ mt: 0.5, fontWeight: 700, lineHeight: 1.15, color: theme.palette.common.white }}>
-              {label}
-            </Typography>
-          </Box>
-          <Box sx={{ width: 40, height: 40, borderRadius: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(theme.palette.common.white, 0.16), border: `1px solid ${alpha(theme.palette.common.white, 0.22)}` }}>
-            <Icon sx={{ fontSize: 22, color: theme.palette.common.white }} />
-          </Box>
-        </Box>
-        <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1, letterSpacing: -1.4, color: theme.palette.common.white, textShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.12)}` }}>
-          {value != null ? value.toLocaleString('it-IT') : '—'}
-        </Typography>
-        {sublabel && (
-          <Typography variant="body2" sx={{ mt: 1.25, color: alpha(theme.palette.common.white, 0.88), fontWeight: 600 }}>
-            {sublabel}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
+    <Box role="group" aria-label="Vista" sx={{ display: 'inline-flex', gap: '2px', p: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'background.paper' }}>
+      {([['list', 'Elenco', 'menu'], ['cal', 'Calendario', 'calendar']] as const).map(([k, l, i]) => (
+        <ButtonBase key={k} onClick={() => onMode(k)} aria-pressed={mode === k} sx={{
+          height: 30, px: 1.25, gap: 0.75, borderRadius: '6px', fontSize: 13, fontWeight: 550,
+          color: mode === k ? 'primary.main' : 'text.secondary', bgcolor: mode === k ? 'archie.field' : 'transparent',
+          '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+        }}><CampoIcon name={i} size={15} /><Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{l}</Box></ButtonBase>
+      ))}
+    </Box>
   )
 }
 
-
-
-// ─── DueDateOverrideDialog ────────────────────────────────────────────────────
-
-export function DueDateOverrideDialog({ open, row, onClose, onSaved }: {
-  open: boolean
-  row: TodoRow | null
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const toast = useToast()
-  const [date, setDate] = React.useState('')
-  const [saving, setSaving] = React.useState(false)
-
-  React.useEffect(() => {
-    if (!open || !row) return
-    // Pre-compila con l'override esistente o la data del piano
-    setDate(row.due_date_override ?? row.next_due_date ?? '')
-  }, [open, row])
-
-  const hasOverride = Boolean(row?.due_date_override)
-  const planDate = row?.plan_next_due_date ?? row?.next_due_date ?? ''
-
-  const save = async () => {
-    if (!row || !date) return
-    setSaving(true)
-    try {
-      if (row.plan_inventory_id) {
-        // Record pivot già esistente → PATCH
-        await api.patch(`/maintenance-plan-inventories/${row.plan_inventory_id}/`, {
-          due_date_override: date,
-        })
-      } else {
-        // Record pivot non ancora esistente → POST (crea + imposta override)
-        await api.post('/maintenance-plan-inventories/', {
-          plan: row.plan_id,
-          inventory: row.inventory_id,
-          due_date_override: date,
-        })
-      }
-      toast.success('Scadenza personalizzata salvata')
-      window.dispatchEvent(new CustomEvent('maintenance-due-date-changed'))
-      onSaved()
-      onClose()
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const resetOverride = async () => {
-    if (!row?.plan_inventory_id) return
-    setSaving(true)
-    try {
-      await api.post(`/maintenance-plan-inventories/${row.plan_inventory_id}/reset-override/`)
-      toast.success('Scadenza ripristinata alla data del piano')
-      window.dispatchEvent(new CustomEvent('maintenance-due-date-changed'))
-      onSaved()
-      onClose()
-    } catch (e) {
-      toast.error(apiErrorToMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ pb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <CalendarMonthIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-        Modifica scadenza
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          {/* Contesto */}
-          <Box sx={{ bgcolor: 'action.hover', borderRadius: 1.5, px: 1.5, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
-              Inventory
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>{row?.inventory_name}</Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Piano: {row?.plan_title} · {row?.customer_name}
-            </Typography>
-          </Box>
-
-          {/* Data del piano (reference) */}
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 110 }}>
-              Data del piano
-            </Typography>
-            {planDate ? (() => {
-              const [y, m, d] = planDate.split('-')
-              return (
-                <Chip
-                  size="small"
-                  label={`${d}/${m}/${y}`}
-                  variant="outlined"
-                  sx={{ fontFamily: 'ui-monospace,monospace', fontSize: '0.75rem', height: 22 }}
-                />
-              )
-            })() : <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>}
-            {hasOverride && (
-              <Chip size="small" label="Override attivo" color="warning" sx={{ height: 20, fontSize: '0.68rem' }} />
-            )}
-          </Stack>
-
-          {/* Input data override */}
-          <TextField
-            size="small"
-            label="Nuova scadenza *"
-            type="date"
-            fullWidth
-            value={date}
-            InputLabelProps={{ shrink: true }}
-            onChange={e => setDate(e.target.value)}
-            helperText="Lascia vuoto per usare la data del piano"
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, gap: 1, justifyContent: 'space-between' }}>
-        {/* Reset override — visibile solo se già presente */}
-        {hasOverride ? (
-          <Tooltip title={`Riporta alla data del piano (${planDate ? (() => { const [y,m,d] = planDate.split('-'); return `${d}/${m}/${y}` })() : '—'})`}>
-            <span>
-              <Button
-                size="small"
-                variant="outlined"
-                color="warning"
-                onClick={resetOverride}
-                disabled={saving}
-                startIcon={<RestartAltIcon />}
-              >
-                Ripristina piano
-              </Button>
-            </span>
-          </Tooltip>
-        ) : <Box />}
-        <Stack direction="row" spacing={1}>
-          <Button onClick={onClose} disabled={saving}>Annulla</Button>
-          <Button variant="contained" onClick={save} disabled={saving || !date}>
-            {saving ? <><CircularProgress size={14} sx={{ mr: 1, color: 'inherit' }} />Salvataggio…</> : 'Salva'}
-          </Button>
-        </Stack>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-// ─── RapportinoDialog (exported for reuse) ────────────────────────────────────
-
-const EVENT0: EventForm = { plan: '', inventory: '', performed_at: new Date().toISOString().slice(0, 10), result: '', tech: '', notes: '', pdf_file: null }
-
-export function RapportinoDialog({ open, context, techs, onClose, onSaved }: {
-  open: boolean; context?: RapportinoContext
-  techs: { id: number; full_name: string }[]
-  onClose: () => void; onSaved: () => void
-}) {
-  const toast = useToast()
-  const theme = useTheme()
-  const pdfInputRef = React.useRef<HTMLInputElement>(null)
-  const pdfFileRef = React.useRef<File | null>(null)  // File stored in ref, never in React state
-  const [pdfFileName, setPdfFileName] = React.useState<string | null>(null)
-  const isContextual = Boolean(context)
-  const [form, setForm] = React.useState<EventForm>(EVENT0)
-  const ff = (p: Partial<EventForm>) => setForm(x => ({ ...x, ...p }))
-  const [saving, setSaving] = React.useState(false)
-  const [bulkMode, setBulkMode] = React.useState(false)
-  const [freeCustomerId, setFreeCustomerId] = React.useState<number | ''>('')
-  const [freeSiteId, setFreeSiteId] = React.useState<number | ''>('')
-  const [freeSites, setFreeSites] = React.useState<SiteItem[]>([])
-  const [freePlans, setFreePlans] = React.useState<{ id: number; title: string }[]>([])
-  const [freeInventories, setFreeInventories] = React.useState<InventoryItem[]>([])
-  const { rows: customers } = useDrfList<CustomerItem>('/customers/', { ordering: 'display_name', page_size: 500 })
-
-  // Usa ref per context — evita che un cambio di referenza di context resetti il form
-  // dopo che l'utente ha già iniziato a compilare (es. selezionato un PDF)
-  const contextRef = React.useRef(context)
-  React.useEffect(() => {
-    contextRef.current = context
-  })
-  React.useEffect(() => {
-    if (!open) return
-    setBulkMode(false)
-    const ctx = contextRef.current
-    pdfFileRef.current = null; setPdfFileName(null)
-    if (ctx) setForm({ ...EVENT0, plan: ctx.plan_id, inventory: ctx.inventory_id, performed_at: new Date().toISOString().slice(0, 10) })
-    else { setForm({ ...EVENT0, performed_at: new Date().toISOString().slice(0, 10) }); setFreeCustomerId(''); setFreeSiteId('') }
-  }, [open])
-
-  React.useEffect(() => {
-    if (!freeCustomerId) { setFreeSites([]); setFreeSiteId(''); return }
-    api.get<{ results: SiteItem[] }>('/sites/', { params: { customer: freeCustomerId, ordering: 'name', page_size: 500 } }).then(r => setFreeSites(r.data.results ?? [])).catch(() => {})
-  }, [freeCustomerId])
-
-  React.useEffect(() => {
-    if (!freeCustomerId) { setFreePlans([]); return }
-    api.get<{ results: { id: number; title: string }[] }>('/maintenance-plans/', { params: { customer: freeCustomerId, ordering: 'title', page_size: 500, is_active: 'true' } }).then(r => setFreePlans(r.data.results ?? [])).catch(() => {})
-  }, [freeCustomerId])
-
-  React.useEffect(() => {
-    if (!freeCustomerId) { setFreeInventories([]); return }
-    const params: Record<string, any> = { customer: freeCustomerId, ordering: 'name', page_size: 500 }
-    if (freeSiteId) params.site = freeSiteId
-    api.get<{ results: InventoryItem[] }>('/inventories/', { params }).then(r => setFreeInventories(r.data.results ?? [])).catch(() => {})
-  }, [freeCustomerId, freeSiteId])
-
-  const validate = () => {
-    // In multi-row context, plan/inventory come from context.rows — skip field check
-    const isMulti = isContextual && Boolean(context) && (context?.rows.length ?? 0) > 1
-    if (!isMulti) {
-      if (!form.plan) { toast.warning('Piano richiesto.'); return false }
-      if (!form.inventory) { toast.warning('Inventory richiesto.'); return false }
-    }
-    if (!form.performed_at) { toast.warning('Data richiesta.'); return false }
-    if (!form.result) { toast.warning('Risultato richiesto.'); return false }
-    if (!form.tech) { toast.warning('Tecnico richiesto.'); return false }
-    return true
-  }
-
-  const buildFd = (inventoryId: number) => {
-    const fd = new FormData()
-    fd.append('plan', String(Number(form.plan)))
-    fd.append('inventory', String(inventoryId))
-    fd.append('performed_at', form.performed_at)
-    fd.append('result', form.result)
-    fd.append('tech', String(Number(form.tech)))
-    if (form.notes.trim()) fd.append('notes', form.notes.trim())
-    if (pdfFileRef.current) fd.append('pdf_file', pdfFileRef.current)
-    return fd
-  }
-
-  const save = async () => {
-    if (!validate()) return
-    setSaving(true)
-    try {
-      if (bulkMode && context && context.siblingOverdue.length > 0) {
-        const results = await Promise.allSettled(context.siblingOverdue.map(row => api.post('/maintenance-events/', buildFd(row.inventory_id))))
-        const ok = results.filter(r => r.status === 'fulfilled').length
-        const fail = results.filter(r => r.status === 'rejected').length
-        if (fail === 0) toast.success(`${ok} rapportini creati`)
-        else toast.warning(`${ok} creati, ${fail} falliti`)
-      } else if (isContextual && context && context.rows.length > 1) {
-        // Multi-selezione: stesso form per tutti gli inventory selezionati
-        const results = await Promise.allSettled(
-          context.rows.map(row => {
-            const fd = buildFd(row.inventory_id)
-            // override plan per ogni riga (potrebbero avere piani diversi)
-            fd.set('plan', String(row.plan_id))
-            return api.post('/maintenance-events/', fd)
-          })
-        )
-        const ok = results.filter(r => r.status === 'fulfilled').length
-        const fail = results.filter(r => r.status === 'rejected').length
-        if (fail === 0) toast.success(`${ok} rapportini creati`)
-        else toast.warning(`${ok} creati, ${fail} falliti`)
-      } else {
-        await api.post('/maintenance-events/', buildFd(Number(form.inventory)))
-        toast.success('Rapportino creato')
-      }
-      onSaved(); onClose()
-    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setSaving(false) }
-  }
-
-  const siblingsCount = context?.siblingOverdue.length ?? 0
-
-  return (
-    <>
-      <Portal>
-        <input
-          ref={pdfInputRef}
-          type="file"
-          accept="application/pdf"
-          style={{ display: 'none', position: 'fixed', top: -9999 }}
-          onChange={e => {
-            const file = e.target.files?.[0] ?? null
-            pdfFileRef.current = file
-            setPdfFileName(file ? file.name : null)
-            e.target.value = ''
-          }}
-        />
-      </Portal>
-      <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ pb: 1 }}>{isContextual ? 'Carica rapportino' : 'Nuovo rapportino'}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          {isContextual && context && (
-            <Box sx={{ bgcolor: 'action.hover', borderRadius: 1.5, px: 1.5, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', mb: 0.75 }}>
-                Contesto pre-compilato {context.rows.length > 1 ? `— ${context.rows.length} inventory selezionati` : ''}
-              </Typography>
-              {context.rows.length === 1 ? (
-                <Stack direction="row" spacing={3} flexWrap="wrap" rowGap={0.5}>
-                  <Box><Typography variant="caption" sx={{ color: 'text.secondary' }}>Piano</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{context.plan_title}</Typography></Box>
-                  <Box><Typography variant="caption" sx={{ color: 'text.secondary' }}>Cliente</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{context.customer_name}</Typography></Box>
-                  <Box><Typography variant="caption" sx={{ color: 'text.secondary' }}>Inventory</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{context.inventory_name}</Typography></Box>
-                </Stack>
-              ) : (
-                <Stack spacing={0.5}>
-                  {context.rows.map(row => (
-                    <Stack key={`${row.plan_id}-${row.inventory_id}`} direction="row" spacing={2} alignItems="center">
-                      <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 120 }} noWrap>{row.inventory_name}</Typography>
-                      {row.knumber && <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'ui-monospace,monospace' }}>{row.knumber}</Typography>}
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>{row.customer_name}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>{row.plan_title}</Typography>
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Box>
-          )}
-          {!isContextual && (
-            <>
-              <FormControl size="small" fullWidth required>
-                <InputLabel>Cliente *</InputLabel>
-                <Select label="Cliente *" value={freeCustomerId === '' ? '' : String(freeCustomerId)} onChange={e => { const v = e.target.value === '' ? '' : Number(e.target.value); setFreeCustomerId(v); setFreeSiteId(''); ff({ plan: '', inventory: '' }) }}>
-                  <MenuItem value="">—</MenuItem>{customers.map(c => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <FormControl size="small" fullWidth disabled={!freeCustomerId}>
-                <InputLabel>Sito (facoltativo)</InputLabel>
-                <Select label="Sito (facoltativo)" value={freeSiteId === '' ? '' : String(freeSiteId)} onChange={e => { setFreeSiteId(e.target.value === '' ? '' : Number(e.target.value)); ff({ inventory: '' }) }}>
-                  <MenuItem value="">Tutti i siti</MenuItem>{freeSites.map(s => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <FormControl size="small" fullWidth required disabled={!freeCustomerId}>
-                <InputLabel>Piano *</InputLabel>
-                <Select label="Piano *" value={form.plan === '' ? '' : String(form.plan)} onChange={e => ff({ plan: e.target.value === '' ? '' : Number(e.target.value), inventory: '' })}>
-                  <MenuItem value="">—</MenuItem>{freePlans.map(p => <MenuItem key={p.id} value={String(p.id)}>{p.title}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <FormControl size="small" fullWidth required disabled={!freeCustomerId}>
-                <InputLabel>Inventory *</InputLabel>
-                <Select label="Inventory *" value={form.inventory === '' ? '' : String(form.inventory)} onChange={e => ff({ inventory: e.target.value === '' ? '' : Number(e.target.value) })}>
-                  <MenuItem value="">—</MenuItem>{freeInventories.map(i => <MenuItem key={i.id} value={String(i.id)}>{i.name}{i.hostname ? ` · ${i.hostname}` : ''}{i.knumber ? ` · ${i.knumber}` : ''}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </>
-          )}
-          <Stack direction="row" spacing={1}>
-            <TextField size="small" label="Data esecuzione *" type="date" fullWidth value={form.performed_at} InputLabelProps={{ shrink: true }} onChange={e => ff({ performed_at: e.target.value })} />
-            <FormControl size="small" fullWidth required>
-              <InputLabel>Risultato *</InputLabel>
-              <Select label="Risultato *" value={form.result} onChange={e => ff({ result: e.target.value as any })}>
-                <MenuItem value="">—</MenuItem><MenuItem value="ok">OK</MenuItem><MenuItem value="ko">KO</MenuItem><MenuItem value="partial">Parziale</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-          <FormControl size="small" fullWidth required>
-            <InputLabel>Tecnico *</InputLabel>
-            <Select label="Tecnico *" value={form.tech === '' ? '' : String(form.tech)} onChange={e => ff({ tech: e.target.value === '' ? '' : Number(e.target.value) })}>
-              <MenuItem value="">—</MenuItem>{techs.map(t => <MenuItem key={t.id} value={String(t.id)}>{t.full_name}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <TextField size="small" label="Note" value={form.notes} fullWidth multiline minRows={2} onChange={e => ff({ notes: e.target.value })} />
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<AttachFileIcon />}
-              onClick={() => pdfInputRef.current?.click()}
-            >
-              {pdfFileName ?? 'Allega PDF'}
-            </Button>
-            {pdfFileName && (
-              <Tooltip title="Rimuovi"><IconButton aria-label="Rimuovi" size="small" onClick={() => { pdfFileRef.current = null; setPdfFileName(null); if (pdfInputRef.current) pdfInputRef.current.value = '' }}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-            )}
-          </Stack>
-          {isContextual && siblingsCount > 1 && (
-            <Box sx={{ bgcolor: bulkMode ? alpha(theme.palette.primary.main, 0.06) : 'action.hover', borderRadius: 1.5, px: 1.5, py: 1.25, border: '1px solid', borderColor: bulkMode ? 'primary.main' : 'divider', transition: 'all 140ms ease' }}>
-              <FormControlLabel
-                control={<Checkbox checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} size="small" color="primary" />}
-                label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Applica a tutti gli inventory scaduti di questo piano{' '}<Chip size="small" label={`${siblingsCount} items`} color="primary" sx={{ height: 20, fontSize: '0.72rem', ml: 0.5 }} /></Typography>}
-              />
-              {bulkMode && (
-                <Stack spacing={0.25} sx={{ mt: 1, pl: 3.5 }}>
-                  {context!.siblingOverdue.map(row => (
-                    <Typography key={row.inventory_id} variant="caption" sx={{ color: 'text.secondary' }}>· {row.inventory_name}{row.hostname ? ` (${row.hostname})` : ''}</Typography>
-                  ))}
-                </Stack>
-              )}
-            </Box>
-          )}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={saving}>Annulla</Button>
-        <Button variant="contained" onClick={save} disabled={saving}>
-          {saving ? <><CircularProgress size={14} sx={{ mr: 1, color: 'inherit' }} />Salvataggio…</> : 'Salva'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-    </>
-  )
-}
-
-// ─── PlanDrawer (exported for reuse) ─────────────────────────────────────────
-
-export function PlanDrawer({ open, planId, onClose, onEdit, onDelete, onRestore }: {
-  open: boolean; planId: number | null; onClose: () => void
-  onEdit?: (plan: PlanRow) => void; onDelete?: (plan: PlanRow) => void; onRestore?: (plan: PlanRow) => void
-}) {
-  const [detail, setDetail] = React.useState<PlanRow | null>(null)
-  const [events, setEvents] = React.useState<EventRow[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const toast = useToast()
-  const theme = useTheme()
-
-  React.useEffect(() => {
-    if (!planId) { setDetail(null); setEvents([]); return }
-    setLoading(true)
-    Promise.all([
-      api.get<PlanRow>(`/maintenance-plans/${planId}/`),
-      api.get<{ results: EventRow[] }>('/maintenance-events/', { params: { plan: planId, ordering: '-performed_at', page_size: 200 } }),
-    ]).then(([p, e]) => { setDetail(p.data); setEvents(e.data.results ?? []) })
-      .catch(e => toast.error(apiErrorToMessage(e)))
-      .finally(() => setLoading(false))
-  }, [planId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const { executedThisCycle, totalInv } = React.useMemo(() => {
-    const coveredCount = detail?.covered_count ?? 0
-    if (!detail?.next_due_date) return { executedThisCycle: 0, totalInv: coveredCount }
-    const d = new Date(detail.next_due_date)
-    const prev = new Date(d)
-    if (detail.interval_unit === 'months' && detail.interval_value) prev.setMonth(prev.getMonth() - detail.interval_value)
-    else if (detail.interval_unit === 'years' && detail.interval_value) prev.setFullYear(prev.getFullYear() - detail.interval_value)
-    else prev.setFullYear(prev.getFullYear() - 1)
-    const inCycle = events.filter(ev => { const evDate = new Date(ev.performed_at); return evDate >= prev && evDate <= d })
-    const notPlannedIds = new Set(inCycle.filter(ev => ev.result === 'not_planned').map(ev => ev.inventory))
-    const adjustedTotal = Math.max(0, coveredCount - notPlannedIds.size)
-    const executed = inCycle.filter(ev => ev.result !== 'not_planned').length
-    return { executedThisCycle: executed, totalInv: adjustedTotal }
-  }, [detail, events])
-
-  const coveragePct = totalInv > 0 ? Math.round((executedThisCycle / totalInv) * 100) : 0
-
-  const drawerActions = (
-    <>
-      {detail?.deleted_at ? (
-        onRestore ? (
-          <Can perm={PERMS.maintenance.plan.change}>
-            <Tooltip title="Ripristina"><span>
-              <IconButton aria-label="Ripristina" size="small" onClick={() => detail && onRestore(detail)} sx={HERO_ICON_BTN_SX}>
-                <RestoreFromTrashIcon fontSize="small" />
-              </IconButton>
-            </span></Tooltip>
-          </Can>
-        ) : null
-      ) : (
-        <>
-          {onEdit ? (
-            <Can perm={PERMS.maintenance.plan.change}>
-              <Tooltip title="Modifica"><span>
-                <IconButton aria-label="Modifica" size="small" onClick={() => detail && onEdit(detail)} disabled={!detail} sx={HERO_ICON_BTN_SX}>
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </span></Tooltip>
-            </Can>
-          ) : null}
-          {onDelete ? (
-            <Can perm={PERMS.maintenance.plan.delete}>
-              <Tooltip title="Elimina"><span>
-                <IconButton aria-label="Elimina" size="small" onClick={() => detail && onDelete(detail)} disabled={!detail} sx={HERO_ICON_BTN_DELETE_SX}>
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </span></Tooltip>
-            </Can>
-          ) : null}
-        </>
-      )}
-      <Tooltip title="Chiudi">
-        <IconButton aria-label="Chiudi" size="small" onClick={onClose} sx={HERO_ICON_BTN_SX}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </>
-  )
-
-  return (
-    <DrawerShell
-      open={open}
-      onClose={onClose}
-      width={typeof DW === 'number' ? DW : 420}
-      gradient="teal"
-      statusLabel={detail?.is_active ? '● Attivo' : detail?.deleted_at ? '● Eliminato' : '● Non attivo'}
-      deleted={!!detail?.deleted_at}
-      actions={drawerActions}
-      title={detail?.title ?? (planId ? `Piano #${planId}` : 'Piano')}
-      subtitle={detail ? `${detail.customer_code} — ${detail.customer_name}` : undefined}
-      loading={loading}
-    >
-      {!detail && !loading ? <DrawerEmptyState label="Nessun dettaglio disponibile." /> : null}
-      {detail ? (
-        <>
-          {/* Stats nell'hero-like area */}
-          <Box sx={{ mx: -2.5, mt: -2, mb: 0, px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha(theme.palette.primary.main, 0.04) }}>
-            <Stack direction="row" spacing={1}>
-              {[
-                { label: 'Prossima scad.', value: detail.next_due_date ?? '—' },
-                { label: 'Ultima eseguita', value: detail.last_done_date ?? '—' },
-                { label: 'Cadenza', value: formatSchedule(detail) },
-              ].map(s => (
-                <Box key={s.label} sx={{ flex: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', fontSize: '0.65rem' }}>{s.label}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.78rem' }}>{s.value}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
-
-          <Box>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
-              <BuildOutlinedIcon sx={{ fontSize: 13 }} /> Copertura inventari
-            </Typography>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>{executedThisCycle} / {totalInv} eseguiti nel ciclo corrente</Typography>
-              {totalInv > 0 && <Chip size="small" label={`${coveragePct}%`} color={coveragePct === 100 ? 'success' : coveragePct > 50 ? 'warning' : 'error'} sx={{ height: 20, fontSize: '0.7rem' }} />}
-            </Stack>
-            <Box sx={{ height: 6, bgcolor: 'action.hover', borderRadius: 3, overflow: 'hidden' }}>
-              <Box sx={{ height: '100%', width: `${coveragePct}%`, bgcolor: coveragePct === 100 ? 'success.main' : coveragePct > 50 ? 'warning.main' : 'error.main', borderRadius: 3, transition: 'width 0.4s ease' }} />
-            </Box>
-          </Box>
-
-          {(detail.inventory_type_labels ?? []).length > 0 && (
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 130 }}>Tipi inventario</Typography>
-              <Typography variant="body2">{(detail.inventory_type_labels ?? []).join(', ')}</Typography>
-            </Stack>
-          )}
-
-          {detail.notes && (
-            <>
-              <Divider />
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>{detail.notes}</Typography>
-            </>
-          )}
-
-          {events.length > 0 && (
-            <>
-              <Divider />
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.disabled', letterSpacing: '0.08em', textTransform: 'uppercase', mt: 0.5 }}>Ultimi rapportini</Typography>
-              <Stack spacing={0.75}>
-                {events.map(ev => (
-                  <Box key={ev.id} sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', mt: 0.6, flexShrink: 0, bgcolor: RESULT_COLOR[ev.result] === 'success' ? 'success.main' : RESULT_COLOR[ev.result] === 'error' ? 'error.main' : 'warning.main' }} />
-                    <Box sx={{ flex: 1 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Stack direction="row" spacing={0.75} alignItems="center">
-                          {(() => { const [ey, em, ed] = ev.performed_at.split('-'); return <Typography variant="body2" sx={{ fontWeight: 600 }}>{`${ed}/${em}/${ey}`}</Typography> })()}
-                          {(ev.inventory_knumber || ev.inventory_hostname) && (
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'ui-monospace,monospace', fontSize: '0.7rem' }}>{ev.inventory_knumber || ev.inventory_hostname}</Typography>
-                          )}
-                          <Chip size="small" label={RESULT_LABEL[ev.result] ?? ev.result} color={RESULT_COLOR[ev.result] ?? 'default'} sx={{ height: 18, fontSize: '0.68rem' }} />
-                          {ev.pdf_url && (
-                            <Chip
-                              size="small"
-                              icon={<PictureAsPdfOutlinedIcon sx={{ fontSize: '13px !important', color: 'error.main !important' }} />}
-                              label="PDF"
-                              variant="outlined"
-                              clickable
-                              onClick={e => { e.stopPropagation(); window.open(ev.pdf_url!, '_blank', 'noopener,noreferrer') }}
-                              sx={{ height: 18, fontSize: '0.68rem', borderColor: 'error.light', color: 'error.main', cursor: 'pointer' }}
-                            />
-                          )}
-                        </Stack>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{ev.tech_name ?? ''}</Typography>
-                      </Stack>
-                    </Box>
-                  </Box>
-                ))}
-              </Stack>
-            </>
-          )}
-        </>
-      ) : null}
-    </DrawerShell>
-  )
-}
-
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-
+/** Manutenzione › Scadenze (restyle "Campo sterile", anteprima design-previews/mt-base.html). */
 export default function Maintenance() {
-  const theme = useTheme()
-  const zebraSx = useDataGridZebraSx()
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
   const toast = useToast()
+  const navigate = useNavigate()
+  const canRegister = hasPerm(PERMS.maintenance.event.add)
+  const canEditDue = hasPerm(PERMS.maintenance.plan.change)
+  const canAddIssue = hasPerm(PERMS.issues.issue.add)
   const { exporting, exportCsv } = useExportCsv()
-  const { rows: allTechs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
+  const { rows: techs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
 
-  // ── URL filters ────────────────────────────────────────────────────────────
+  // ── Vista, modalità e filtri (URL) ──
+  const [modeRaw, setModeRaw] = useUrlStringParam('modo')
+  const mode: 'list' | 'cal' = modeRaw === 'calendario' ? 'cal' : 'list'
+  const [viewRaw, setViewRaw] = useUrlStringParam('vista')
+  const [legacyDue, setLegacyDue] = useUrlStringParam('m_due')
+  const view: View = VIEWS.includes(viewRaw as View) ? (viewRaw as View) : LEGACY_DUE[legacyDue] ?? 'all'
   const [customerF, setCustomerF] = useUrlNumberParam('m_customer')
-  const [dueFilter, setDueFilter] = useUrlStringParam('m_due')
-  const [siteF, setSiteF] = useUrlStringParam('m_site')
-  const [yearFilter, setYearFilter] = useUrlStringParam('m_year')
   const [planF, setPlanF] = useUrlNumberParam('m_plan')
+  const [typeF, setTypeF] = useUrlStringParam('m_type')
+  const opts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
+  const setView = (v: string) => { if (legacyDue) setLegacyDue('', opts); setViewRaw(v === 'all' ? '' : v, opts) }
+  const setMode = (m: 'list' | 'cal') => setModeRaw(m === 'cal' ? 'calendario' : '', opts)
 
-  // Label del piano filtrato — caricata una volta sola quando planF è valorizzato
-  const [planFLabel, setPlanFLabel] = React.useState<string | null>(null)
-  React.useEffect(() => {
-    if (!planF) { setPlanFLabel(null); return }
-    api.get<{ title: string; customer_name?: string }>(`/maintenance-plans/${planF}/`)
-      .then(r => setPlanFLabel(`${r.data.title}${r.data.customer_name ? ` — ${r.data.customer_name}` : ''}`))
-      .catch(() => setPlanFLabel(String(planF)))
-  }, [planF])
+  const grid = useServerGrid({ defaultOrdering: 'next_due_date', allowedOrderingFields: ['next_due_date', 'customer_name'], defaultPageSize: 25 })
 
-  const { rows: customers } = useDrfList<CustomerItem>('/customers/', { ordering: 'display_name', page_size: 500 })
-  const [filterSites, setFilterSites] = React.useState<SiteItem[]>([])
+  const scope = React.useMemo(() => ({
+    ...(customerF !== '' ? { customer: customerF } : {}),
+    ...(planF !== '' ? { plan: planF } : {}),
+    ...(typeF ? { type: typeF } : {}),
+    ...(grid.search.trim() ? { search: grid.search.trim() } : {}),
+  }), [customerF, planF, typeF, grid.search])
+  const listParams = React.useMemo(() => ({
+    ...scope,
+    page: grid.paginationModel.page + 1,
+    page_size: grid.paginationModel.pageSize,
+    ordering: grid.ordering || 'next_due_date',
+    ...(VIEW_DUE[view] ? { due: VIEW_DUE[view] } : {}),
+  }), [scope, grid.paginationModel, grid.ordering, view])
 
-  React.useEffect(() => {
-    if (!customerF) { setFilterSites([]); setSiteF(''); return }
-    api.get<{ results: SiteItem[] }>('/sites/', { params: { customer: customerF, ordering: 'name', page_size: 500 } })
-      .then(r => setFilterSites(r.data.results ?? [])).catch(() => {})
-  }, [customerF]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { rows: rawRows, rowCount, loading, reload } = useDrfList<TodoRow>('/maintenance-plans/todo/', listParams, (e) => toast.error(apiErrorToMessage(e)))
+  // La griglia vuole id numerici: piano e inventario in un solo numero; la selezione usa rowKey.
+  const rows = React.useMemo(() => rawRows.map((r) => ({ ...r, id: r.plan_id * 1_000_000 + r.inventory_id })), [rawRows])
+  const [statsKey, setStatsKey] = React.useState(0)
+  const stats = useTodoStats(statsKey, { ...(customerF !== '' ? { customer: customerF } : {}), ...(planF !== '' ? { plan: planF } : {}) })
+  const reloadAll = React.useCallback(() => { reload(); setStatsKey((n) => n + 1) }, [reload])
 
-  // ── Server grid (todo endpoint now paginated) ──────────────────────────────
-  const grid = useServerGrid({
-    defaultOrdering: 'next_due_date',
-    allowedOrderingFields: ['next_due_date', 'customer_name'],
-    defaultPageSize: 25,
-  })
+  // ── Selezione (anche tra pagine e tra elenco e calendario) ──
+  const [selected, setSelected] = React.useState<Map<string, TodoRow>>(new Map())
+  const checked = React.useMemo(() => new Set(selected.keys()), [selected])
+  const toggle = React.useCallback((r: TodoRow) => setSelected((m) => { const n = new Map(m); if (n.has(rowKey(r))) n.delete(rowKey(r)); else n.set(rowKey(r), r); return n }), [])
+  const toggleMany = React.useCallback((list: TodoRow[]) => setSelected((m) => {
+    const n = new Map(m); const all = list.every((r) => n.has(rowKey(r)))
+    list.forEach((r) => (all ? n.delete(rowKey(r)) : n.set(rowKey(r), r))); return n
+  }), [])
+  const clearSel = () => setSelected(new Map())
 
-  const today = new Date().toISOString().slice(0, 10)
-  const in30  = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
-
-  const listParams = React.useMemo(() => {
-    const p: Record<string, any> = {
-      page:      grid.paginationModel.page + 1,
-      page_size: grid.paginationModel.pageSize,
-      ordering:  grid.ordering || 'next_due_date',
-    }
-    if (grid.search.trim()) p.search = grid.search.trim()
-    if (customerF) p.customer = customerF
-    if (siteF)     p.site     = siteF
-    if (planF)     p.plan     = planF
-    if (dueFilter === 'overdue')  { p.due_before = today }
-    if (dueFilter === 'next30')   { p.due_from = today; p.due_to = in30 }
-    const yr = yearFilter.trim()
-    if (yr.length === 4 && /^\d{4}$/.test(yr)) p.year = yr
-    return p
-  }, [grid.paginationModel, grid.ordering, grid.search, customerF, siteF, dueFilter, yearFilter, planF, today, in30])
-
-  const { rows: rawRows, rowCount, loading, reload: load } = useDrfList<TodoRow & { id: string }>(
-    '/maintenance-plans/todo/', listParams, e => toast.error(apiErrorToMessage(e))
-  )
-
-  // Add stable string id for MUI DataGrid
-  const pagedRows = React.useMemo(() =>
-    rawRows.map(r => ({ ...r, id: `${r.plan_id}-${r.inventory_id}` })),
-    [rawRows]
-  )
-
-  // KPI: separate lightweight request for unfiltered counts
-  const [kpiCounts, setKpiCounts] = React.useState({ overdue: 0, next30: 0, total: 0 })
-  React.useEffect(() => {
-    // Fetch KPI counts: one lightweight request without filters, page_size=1 just to get count,
-    // then fetch a full no-filter list for overdue/next30 split.
-    // We reuse the same endpoint with no filters and page_size=500 for KPI accuracy.
-    api.get<{ count: number; results: { next_due_date: string }[] }>(
-      '/maintenance-plans/todo/', { params: { page: 1, page_size: 500 } }
-    ).then(r => {
-      const all = r.data.results ?? []
-      const total = r.data.count ?? all.length
-      setKpiCounts({
-        overdue: all.filter(x => x.next_due_date < today).length,
-        next30:  all.filter(x => x.next_due_date >= today && x.next_due_date <= in30).length,
-        total,
-      })
-    }).catch((e) => toast.error(apiErrorToMessage(e)))
-  }, [today, in30, toast])
-
-  const overdueCount = kpiCounts.overdue
-  const next30Count  = kpiCounts.next30
-
-  // ── Multi-selection (manual Set — independent of MUI selectionModel) ───────
-  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
-  const selectedCount = selectedIds.size
-  const allPageSelected = pagedRows.length > 0 && pagedRows.every(r => selectedIds.has(r.id))
-  const toggleRow = React.useCallback((id: string) =>
-    setSelectedIds(prev => {
-      const s = new Set(prev)
-      if (s.has(id)) s.delete(id)
-      else s.add(id)
-      return s
-    }), [])
-  const togglePage = React.useCallback(() =>
-    setSelectedIds(prev => {
-      const s = new Set(prev)
-      if (allPageSelected) pagedRows.forEach(r => s.delete(r.id))
-      else pagedRows.forEach(r => s.add(r.id))
-      return s
-    }), [pagedRows, allPageSelected])
-  const clearSelection = React.useCallback(() => setSelectedIds(new Set()), [])
-
-  // Clear selection on filter/page change
-  React.useEffect(() => { clearSelection() }, [listParams]) // eslint-disable-line react-hooks/exhaustive-deps
-
-
-  // ── Drawer ─────────────────────────────────────────────────────────────────
-  const [drawerPlanId, setDrawerPlanId] = React.useState<number | null>(null)
-
-  // ── Rapportino dialog ──────────────────────────────────────────────────────
-  const [rapportinoCtx, setRapportinoCtx] = React.useState<RapportinoContext | undefined>()
-  const [rapportinoOpen, setRapportinoOpen] = React.useState(false)
-
-  // ── Due date override dialog ───────────────────────────────────────────────
+  // ── Scheda, dialoghi ──
+  const [open, setOpen] = React.useState<TodoRow | null>(null)
+  const [tab, setTab] = React.useState<TodoTab>('det')
+  const [rpRows, setRpRows] = React.useState<TodoRow[] | null>(null)
   const [overrideRow, setOverrideRow] = React.useState<TodoRow | null>(null)
-  const [overrideOpen, setOverrideOpen] = React.useState(false)
+  const [cardReload, setCardReload] = React.useState(0)
+  const openRow = (r: TodoRow) => { setTab((t) => (open && rowKey(open) === rowKey(r) ? t : 'det')); setOpen(r) }
+  const afterSave = () => { reloadAll(); clearSel(); setCardReload((n) => n + 1); setOpen(null) }
 
-  const openRapportino = React.useCallback((row: TodoRow, multiRows?: TodoRow[]) => {
-    const siblingOverdue = pagedRows.filter(r => r.plan_id === row.plan_id && r.next_due_date < today)
-    const rows = multiRows && multiRows.length > 1 ? multiRows : [row]
-    setRapportinoCtx({ rows, plan_id: row.plan_id, plan_title: row.plan_title, inventory_id: row.inventory_id, inventory_name: row.inventory_name, customer_id: row.customer_id, customer_name: row.customer_name, siblingOverdue })
-    setRapportinoOpen(true)
-  }, [pagedRows, today])
+  const markNotPlanned = async (list: TodoRow[]) => {
+    const res = await Promise.allSettled(list.map((r) => api.post('/maintenance-events/', { plan: r.plan_id, inventory: r.inventory_id, performed_at: todayIso(), result: 'not_planned', tech: null })))
+    const ok = res.filter((x) => x.status === 'fulfilled').length
+    if (ok === list.length) toast.success(ok === 1 ? 'Segnata come non prevista' : `${ok} segnate come non previste`)
+    else toast.warning(`${ok} segnate, ${list.length - ok} non salvate`)
+    afterSave()
+  }
 
-  // ── Context menu ───────────────────────────────────────────────────────────
-  const [contextMenu, setContextMenu] = React.useState<{
-    row: TodoRow; mouseX: number; mouseY: number
-    snapshot: TodoRow[]
-  } | null>(null)
+  // ── Colonne e filtri da intestazione ──
+  // La colonna delle caselle compare solo con una selezione in corso (si entra dal tasto destro → Seleziona).
+  const selecting = selected.size > 0
+  const columns = React.useMemo<GridColDef<TodoRow & { id: number }>[]>(() => [
+    ...(selecting ? [{
+      field: '__sel', headerName: '', width: 52, sortable: false, disableColumnMenu: true,
+      renderHeader: () => {
+        const all = rows.length > 0 && rows.every((r) => checked.has(rowKey(r)))
+        return <Checkbox size="small" checked={all} indeterminate={!all && rows.some((r) => checked.has(rowKey(r)))} onChange={() => toggleMany(rows)} slotProps={{ input: { 'aria-label': 'Seleziona la pagina' } }} />
+      },
+      renderCell: (p) => <Checkbox size="small" checked={checked.has(rowKey(p.row))} onClick={(e) => e.stopPropagation()} onChange={() => toggle(p.row)} slotProps={{ input: { 'aria-label': `Seleziona ${p.row.inventory_name}` } }} />,
+    } satisfies GridColDef<TodoRow & { id: number }>] : []),
+    { field: 'next_due_date', headerName: 'Scadenza', width: 128, renderCell: (p) => <DueCell due={p.row.next_due_date} /> },
+    {
+      field: 'customer_name', headerName: 'Cliente · sito', width: 200,
+      renderCell: (p) => <Box sx={{ minWidth: 0, lineHeight: 1.25 }}><Box sx={{ fontWeight: 550, ...ellipsis }}>{p.row.customer_name}</Box><Box sx={{ fontSize: 12, color: 'text.secondary', ...ellipsis }}>{p.row.site_name || '—'}</Box></Box>,
+    },
+    {
+      field: 'inventory_name', headerName: 'Inventario', flex: 1, minWidth: 200, sortable: false,
+      renderCell: (p) => <Box sx={{ minWidth: 0, lineHeight: 1.25 }}><Box sx={{ fontWeight: 550, ...ellipsis }}>{p.row.inventory_name}</Box><Box sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 11, color: 'text.secondary', ...ellipsis }}>{[p.row.knumber, p.row.hostname].filter(Boolean).join(' · ') || '—'}</Box></Box>,
+    },
+    { field: 'type_label', headerName: 'Tipo', width: 120, sortable: false, renderCell: (p) => (p.row.type_label ? <Box component="span" sx={{ fontSize: 11.5, fontWeight: 550, px: 0.75, lineHeight: '20px', borderRadius: '4px', bgcolor: 'archie.neutralBg', color: 'text.secondary' }}>{p.row.type_label}</Box> : '—') },
+    { field: 'plan_title', headerName: 'Piano', flex: 1, minWidth: 200, sortable: false, renderCell: (p) => <PlanCell title={p.row.plan_title} override={p.row.due_date_override} planDue={p.row.plan_next_due_date} /> },
+    {
+      field: 'last_date', headerName: 'Ultima esecuzione', width: 180, sortable: false,
+      renderCell: (p) => (p.row.last_result ? <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap' }}><ResultBadge result={p.row.last_result as Result} />{dShort(p.row.last_date)}</Box> : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>),
+    },
+    ...(canRegister ? [{
+      field: '__act', headerName: '', width: 112, sortable: false, disableColumnMenu: true, align: 'right', headerAlign: 'right',
+      renderCell: (p) => <Button className="row-act" size="small" variant="outlined" color="inherit" startIcon={<CheckIcon sx={{ fontSize: 15 }} />} onClick={(e) => { e.stopPropagation(); setRpRows([p.row]) }}>Registra</Button>,
+    } satisfies GridColDef<TodoRow & { id: number }>] : []),
+  ], [rows, checked, toggle, toggleMany, canRegister, selecting])
 
-  const handleRowContextMenu = React.useCallback((row: TodoRow, event: React.MouseEvent<HTMLElement>) => {
-    // Snapshot selection at right-click time — avoids stale closure issues
-    const id = `${row.plan_id}-${row.inventory_id}`
-    const curSelected = Array.from(selectedIds)
-    const inSel = curSelected.includes(id) && curSelected.length > 1
-    const snapshot = inSel
-      ? pagedRows.filter(r => curSelected.includes(`${r.plan_id}-${r.inventory_id}`))
-      : [row]
-    setContextMenu({ row, mouseX: event.clientX + 2, mouseY: event.clientY - 6, snapshot })
-  }, [selectedIds, pagedRows])
+  const custName = (id: number | '') => stats?.customers.find((c) => c.id === id)?.name ?? `#${id}`
+  const planName = (id: number | '') => stats?.plans.find((p) => p.id === id)?.title ?? `Piano #${id}`
+  const filterConfig = React.useMemo<Record<string, ColumnFilterConfig>>(() => ({
+    customer_name: {
+      value: customerF === '' ? '' : String(customerF), label: 'Filtra cliente',
+      onSet: (v) => setCustomerF(v === '' ? '' : Number(v), opts), onReset: () => setCustomerF('', opts),
+      children: <FilterOptionList label="Cliente" single searchable options={(stats?.customers ?? []).map((c) => ({ value: String(c.id), label: c.name }))}
+        selected={customerF === '' ? [] : [String(customerF)]} onChange={(v) => setCustomerF(v[0] ? Number(v[0]) : '', opts)} />,
+    },
+    type_label: {
+      value: typeF, label: 'Filtra tipo', onSet: (v) => setTypeF(String(v), opts), onReset: () => setTypeF('', opts),
+      children: <FilterOptionList label="Tipo" single options={(stats?.types ?? []).map((t) => ({ value: t, label: t }))} selected={typeF ? [typeF] : []} onChange={(v) => setTypeF(v[0] ?? '', opts)} />,
+    },
+    plan_title: {
+      value: planF === '' ? '' : String(planF), label: 'Filtra piano',
+      onSet: (v) => setPlanF(v === '' ? '' : Number(v), opts), onReset: () => setPlanF('', opts),
+      children: <FilterOptionList label="Piano" single searchable options={(stats?.plans ?? []).map((p) => ({ value: String(p.id), label: p.title }))}
+        selected={planF === '' ? [] : [String(planF)]} onChange={(v) => setPlanF(v[0] ? Number(v[0]) : '', opts)} />,
+    },
+  }), [customerF, setCustomerF, typeF, setTypeF, planF, setPlanF, stats, opts])
+  const activeFilters: ActiveFilter[] = [
+    customerF !== '' ? { key: 'customer', label: 'Cliente', values: custName(customerF) } : null,
+    planF !== '' ? { key: 'plan', label: 'Piano', values: planName(planF) } : null,
+    typeF ? { key: 'type', label: 'Tipo', values: typeF } : null,
+  ].filter((x): x is ActiveFilter => Boolean(x))
+  const removeFilter = (k: string) => { if (k === 'customer') setCustomerF('', opts); if (k === 'plan') setPlanF('', opts); if (k === 'type') setTypeF('', opts) }
+  const resetFilters = () => setCustomerF('', { patch: { page: 1, m_plan: '', m_type: '' }, keepOpen: true })
 
-  const saveNonPrevista = React.useCallback(async (row: TodoRow) => {
-    try {
-      await api.post('/maintenance-events/', {
-        plan:         row.plan_id,
-        inventory:    row.inventory_id,
-        performed_at: new Date().toISOString().slice(0, 10),
-        result:       'not_planned',
-        tech:         null,
-      })
-      toast.success('Segnata come "Non prevista"')
-      load()
-    } catch (e) { toast.error(apiErrorToMessage(e)) }
-  }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
+  const exportVisible = () => {
+    const { page: _p, page_size: _s, ...params } = listParams as Record<string, unknown>
+    void _p; void _s
+    void exportCsv<TodoRow>({
+      url: '/maintenance-plans/todo/', params, filename: 'scadenze_manutenzione',
+      columns: [
+        { label: 'Scadenza', getValue: (r) => r.next_due_date },
+        { label: 'Scadenza modificata', getValue: (r) => (r.due_date_override ? 'sì' : '') },
+        { label: 'Cliente', getValue: (r) => r.customer_name },
+        { label: 'Sito', getValue: (r) => r.site_name ?? '' },
+        { label: 'Inventario', getValue: (r) => r.inventory_name },
+        { label: 'KNumber', getValue: (r) => r.knumber ?? '' },
+        { label: 'Hostname', getValue: (r) => r.hostname ?? '' },
+        { label: 'Tipo', getValue: (r) => r.type_label ?? '' },
+        { label: 'Piano', getValue: (r) => r.plan_title },
+        { label: 'Ultima esecuzione', getValue: (r) => (r.last_date ? `${r.last_date} ${r.last_result ?? ''}` : '') },
+      ],
+    })
+  }
 
-  const contextMenuItems = React.useMemo<RowContextMenuItem[]>(() => {
-    const row = contextMenu?.row
-    if (!row) return []
-    const targets = contextMenu.snapshot
-    const isMulti = targets.length > 1
+  const mobileCard = React.useMemo<MobileCardRenderFn<TodoRow>>(() => ({ row, onOpen }) => (
+    <Box onClick={() => onOpen(row.plan_id * 1_000_000 + row.inventory_id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5, display: 'grid', gap: 0.75, cursor: 'pointer' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{row.inventory_name}</Typography>
+        <DueCell due={row.next_due_date} overrideTip={overrideTipOf(row.due_date_override, row.plan_next_due_date)} />
+      </Box>
+      <Typography noWrap sx={{ fontSize: 12.5, color: 'text.secondary' }}>{row.customer_name}{row.site_name ? ` · ${row.site_name}` : ''} · {row.plan_title}</Typography>
+      {canRegister ? <Button size="small" variant="outlined" color="inherit" startIcon={<CheckIcon />} onClick={(e) => { e.stopPropagation(); setRpRows([row]) }} sx={{ justifySelf: 'start', minHeight: 36 }}>Registra rapportino</Button> : null}
+    </Box>
+  ), [canRegister])
+
+  const emptyState = view === 'over'
+    ? { title: 'Nessuna manutenzione scaduta', subtitle: 'Tutto in regola.' }
+    : activeFilters.length || grid.search.trim() || view !== 'all'
+      ? { title: 'Nessuna manutenzione', subtitle: 'Nessuna manutenzione corrisponde: prova a modificare la ricerca, la vista o i filtri.' }
+      : { title: 'Nessuna manutenzione da fare', subtitle: 'Tutte le manutenzioni programmate sono state registrate.' }
+
+  const idx = open ? rows.findIndex((r) => rowKey(r) === rowKey(open)) : -1
+  const selectedList = [...selected.values()]
+
+  // ── Tasto destro sulla riga: seleziona e azioni ──
+  const [ctx, setCtx] = React.useState<{ row: TodoRow; x: number; y: number } | null>(null)
+  const ctxItems: RowContextMenuItem[] = (() => {
+    if (!ctx) return []
+    const r = ctx.row; const on = checked.has(rowKey(r)); const many = on && selected.size > 1
     return [
-      ...(!isMulti ? [{
-        key: 'open-plan',
-        label: 'Apri Piano Manutenzioni',
-        icon: <BuildOutlinedIcon fontSize="small" />,
-        onClick: () => setDrawerPlanId(row.plan_id),
-      }] : []),
-      {
-        key: 'rapportino',
-        label: isMulti ? `Carica Rapportino (${targets.length})` : 'Carica Rapportino',
-        icon: <CheckCircleOutlineIcon fontSize="small" />,
-        onClick: () => openRapportino(row, targets),
-      },
-      {
-        key: 'non-prevista',
-        label: isMulti ? `Non prevista PM (${targets.length})` : 'Non prevista PM',
-        icon: <BlockIcon fontSize="small" />,
-        onClick: async () => {
-          await Promise.allSettled(targets.map(r => saveNonPrevista(r)))
-          if (isMulti) clearSelection()
-        },
-      },
-      ...(!isMulti ? [{
-        key: 'override-date',
-        label: row.due_date_override ? 'Modifica scadenza ⚠️' : 'Modifica scadenza',
-        icon: <CalendarMonthIcon fontSize="small" />,
-        onClick: () => { setOverrideRow(row); setOverrideOpen(true) },
-      }] : []),
+      { key: 'sel', label: on ? 'Togli dalla selezione' : selected.size ? 'Aggiungi alla selezione' : 'Seleziona', icon: <CheckBoxOutlinedIcon />, onClick: () => toggle(r) },
+      { key: 'selall', label: 'Seleziona tutte le visibili', icon: <LibraryAddCheckOutlinedIcon />, hidden: selected.size > 0, onClick: () => toggleMany(rows) },
+      { key: 'rp', label: many ? `Registra rapportino per le ${selected.size} selezionate` : 'Registra rapportino', icon: <CheckIcon />, hidden: !canRegister, dividerBefore: true, strong: many, onClick: () => setRpRows(many ? selectedList : [r]) },
+      { key: 'np', label: many ? `Non prevista per le ${selected.size} selezionate` : 'Non prevista', icon: <CloseIcon />, hidden: !canRegister, onClick: () => void markNotPlanned(many ? selectedList : [r]) },
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon />, dividerBefore: true, onClick: () => openRow(r) },
+      { key: 'plan', label: 'Apri il piano', icon: <BuildOutlinedIcon />, onClick: () => navigate(`/maintenance/plans?apri=${r.plan_id}`) },
     ]
-  }, [contextMenu, openRapportino, saveNonPrevista, clearSelection])
-
-  // ── Columns ────────────────────────────────────────────────────────────────
-  const columns: GridColDef<TodoRow>[] = React.useMemo(() => [
-    {
-      field: '__select',
-      headerName: '',
-      width: 48,
-      sortable: false,
-      renderHeader: () => (
-        <Checkbox
-          size="small"
-          checked={allPageSelected}
-          indeterminate={selectedCount > 0 && !allPageSelected}
-          onChange={togglePage}
-          sx={{ p: 0.5 }}
-        />
-      ),
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <Checkbox
-            size="small"
-            checked={selectedIds.has(`${p.row.plan_id}-${p.row.inventory_id}`)}
-            onChange={() => toggleRow(`${p.row.plan_id}-${p.row.inventory_id}`)}
-            onClick={e => e.stopPropagation()}
-            sx={{ p: 0.5 }}
-          />
-        </Box>
-      ),
-    },
-    {
-      field: 'next_due_date',
-      headerName: 'Scadenza',
-      width: 150,
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 0.5 }}>
-          <DueBadge dateStr={p.value as string} />
-          {p.row.due_date_override && (
-            <Tooltip title={`Override attivo · piano: ${p.row.plan_next_due_date ?? '—'}`}>
-              <CalendarMonthIcon sx={{ fontSize: 13, color: 'warning.main', flexShrink: 0 }} />
-            </Tooltip>
-          )}
-        </Box>
-      ),
-    },
-    {
-      field: 'customer_name',
-      headerName: 'Cliente',
-      width: 180,
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{p.value as string}</Typography>
-          {p.row.site_name && <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>{p.row.site_name}</Typography>}
-        </Box>
-      ),
-    },
-    {
-      field: 'type_label',
-      headerName: 'Tipo',
-      width: 100,
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          {p.value
-            ? <Chip size="small" label={p.value as string} sx={{ fontSize: '0.72rem', height: 22 }} />
-            : <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>}
-        </Box>
-      ),
-    },
-    {
-      field: 'inventory_name',
-      headerName: 'Inventory',
-      flex: 1,
-      minWidth: 140,
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" noWrap>{p.value as string}</Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'knumber',
-      headerName: 'KNumber',
-      width: 130,
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2" sx={{ color: p.value ? 'text.primary' : 'text.disabled' }} noWrap>
-            {(p.value as string) || '—'}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      field: 'plan_title',
-      headerName: 'Piano',
-      width: 210,
-      renderCell: (p: GridRenderCellParams<TodoRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{p.value as string}</Typography>
-        </Box>
-      ),
-    },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [selectedIds, allPageSelected, toggleRow, togglePage])
-  const fcnt = [customerF, dueFilter, siteF, yearFilter, planF].filter(Boolean).length
+  })()
+  // Esc esce dalla selezione (se non c'è una scheda o un dialogo aperto).
+  React.useEffect(() => {
+    if (!selected.size) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !open && rpRows === null && !overrideRow && !ctx && !document.querySelector('.MuiModal-root:not(.MuiModal-hidden)')) setSelected(new Map()) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected.size, open, rpRows, overrideRow, ctx])
 
   return (
-    <Stack spacing={2}>
-      {/* KPI */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
-        <StatCard value={overdueCount} label="Scaduti" sublabel={overdueCount === 1 ? 'Scadenza in ritardo' : 'Scadenze in ritardo'} accent={theme.palette.error.main} icon={WarningAmberRoundedIcon} />
-        <StatCard value={next30Count} label="Prossimi 30 gg" sublabel="In scadenza a breve" accent={theme.palette.warning.main} icon={CheckCircleOutlineIcon} />
-        <StatCard value={kpiCounts.total} label="Totale scadenze" sublabel="Da completare" accent={theme.palette.primary.main} icon={BuildOutlinedIcon} />
+    <Stack spacing={0} sx={{ height: '100%' }}>
+      <PageHead
+        title="Manutenzione"
+        inline={<SectionNav current="due" />}
+        actions={
+          <>
+            <ModeSwitch mode={mode} onMode={setMode} />
+            {canRegister ? <Button variant="contained" startIcon={<CampoIcon name="plus" size={16} />} onClick={() => setRpRows(selectedList.length ? selectedList : [])}>Registra rapportino</Button> : null}
+          </>
+        }
+      />
+      <MaintenanceKpis stats={stats} view={view} onView={(v) => { setView(v); setMode('list') }} onCustomer={(id) => setCustomerF(customerF === id ? '' : id, opts)} />
+
+      <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>
+        {selected.size ? (
+          <Box role="toolbar" aria-label="Manutenzioni selezionate" sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', p: '8px 14px', bgcolor: 'archie.field', borderBottom: '1px solid', borderColor: 'archie.fieldLine' }}>
+            <Typography component="b" sx={{ fontWeight: 600, mr: 0.5 }}>{selected.size} selezionat{selected.size === 1 ? 'a' : 'e'}</Typography>
+            {canRegister ? <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={() => setRpRows(selectedList)}>Registra rapportino</Button> : null}
+            {canRegister ? <Button size="small" variant="outlined" color="inherit" sx={{ bgcolor: 'background.paper' }} onClick={() => void markNotPlanned(selectedList)}>Non prevista</Button> : null}
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" color="inherit" onClick={clearSel}>Annulla selezione</Button>
+          </Box>
+        ) : null}
+
+        {mode === 'cal' ? (
+          <>
+            {activeFilters.length ? <TableBar filters={activeFilters} onRemoveFilter={removeFilter} onClearFilters={resetFilters} q={grid.q} onQChange={grid.setQ} searchPlaceholder="Cerca inventario, KNumber, cliente, piano…" /> : null}
+            <MaintenanceCalendar stats={stats} params={scope} reloadKey={statsKey} checked={checked} onToggle={toggle} onToggleMany={toggleMany} onRegister={(list) => setRpRows(list)} onOpen={openRow} />
+          </>
+        ) : (
+          <>
+            <ViewTabs
+              value={view}
+              onChange={setView}
+              tabs={[
+                { key: 'all', label: 'Tutte', count: stats?.total },
+                { key: 'over', label: 'Scadute', count: stats?.overdue },
+                { key: 'soon', label: 'Prossimi 30 giorni', count: stats?.next30 },
+                { key: 'later', label: 'Più avanti', count: stats?.later },
+                { key: 'ovr', label: 'Scadenza modificata', count: stats?.override },
+              ]}
+            />
+            <EntityListCard
+              sx={{ border: 0, borderRadius: 0 }}
+              flush
+              mobileCard={mobileCard}
+              header={<TableBar filters={activeFilters} onRemoveFilter={removeFilter} onClearFilters={resetFilters} q={grid.q} onQChange={grid.setQ} searchPlaceholder="Cerca inventario, KNumber, cliente, piano…" onExport={exportVisible} exporting={exporting} />}
+              toolbar={{ compact: true, q: grid.q, onQChange: grid.setQ, searchLabel: 'Cerca scadenze…' }}
+              grid={{
+                pageKey: 'maintenance-todo-v2',
+                rowHeight: 54,
+                autoHeight: true,
+                username: me?.username,
+                filterConfig,
+                emptyState,
+                rows,
+                columns,
+                loading,
+                rowCount,
+                getRowId: (r) => (r as TodoRow & { id: number }).id,
+                paginationModel: grid.paginationModel,
+                onPaginationModelChange: grid.onPaginationModelChange,
+                sortModel: grid.sortModel,
+                onSortModelChange: grid.onSortModelChange,
+                onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) openRow(r) },
+                onRowContextMenu: (r, e) => setCtx({ row: r, x: e.clientX + 2, y: e.clientY - 6 }),
+                getRowClassName: (r) => [open && rowKey(r) === rowKey(open) ? 'Mui-selected' : '', checked.has(rowKey(r)) ? 'is-checked' : ''].join(' '),
+                sx: {
+                  ...headerFilterGridSx, cursor: 'pointer',
+                  '& .is-checked': { bgcolor: (t) => `${t.palette.archie.field} !important` },
+                  '& .row-act': { opacity: 0, transition: 'opacity .12s' },
+                  '& .MuiDataGrid-row:hover .row-act, & .MuiDataGrid-row.Mui-selected .row-act, & .row-act:focus-visible': { opacity: 1 },
+                },
+              }}
+            />
+            {canRegister && !selected.size ? (
+              <Typography sx={{ display: { xs: 'none', md: 'block' }, px: 1.75, py: 0.75, fontSize: 12, color: 'text.disabled', borderTop: '1px solid', borderColor: 'divider' }}>
+                Tasto destro su una riga → <b>Seleziona</b> per registrarne più di una insieme.
+              </Typography>
+            ) : null}
+          </>
+        )}
       </Box>
 
-      {/* Grid stile Customers */}
-      <EntityListCard
-        toolbar={{
-          q: grid.q,
-          onQChange: grid.setQ,
-          compact: true,
-          rightActions: (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FilterChip
-                compact
-                activeCount={fcnt}
-                onReset={fcnt > 0 ? () => { setCustomerF(''); setDueFilter(''); setSiteF(''); setPlanF('') } : undefined}
-              >
-                {planF && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5, py: 0.25, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.200' }}>
-                    <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      📋 {planFLabel ?? `Piano #${planF}`}
-                    </Typography>
-                    <IconButton size="small" sx={{ p: 0.25 }} onClick={() => setPlanF('')}>
-                      <CloseIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-                    </IconButton>
-                  </Box>
-                )}
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Cliente</InputLabel>
-                  <Select label="Cliente" value={customerF === '' ? '' : String(customerF)} onChange={e => setCustomerF(e.target.value === '' ? '' : Number(e.target.value))}>
-                    <MenuItem value="">Tutti</MenuItem>
-                    {customers.map(c => <MenuItem key={c.id} value={String(c.id)}>{c.display_name || c.name}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" fullWidth disabled={!customerF}>
-                  <InputLabel>Sito</InputLabel>
-                  <Select label="Sito" value={siteF} onChange={e => setSiteF(e.target.value)}>
-                    <MenuItem value="">Tutti</MenuItem>
-                    {filterSites.map(s => <MenuItem key={s.id} value={String(s.id)}>{s.display_name || s.name}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Scadenza</InputLabel>
-                  <Select label="Scadenza" value={dueFilter} onChange={e => setDueFilter(e.target.value)}>
-                    <MenuItem value="">Tutte</MenuItem>
-                    <MenuItem value="overdue">Scaduti</MenuItem>
-                    <MenuItem value="next30">Prossimi 30 gg</MenuItem>
-                  </Select>
-                </FormControl>
-                <YearFilterField value={yearFilter} onChange={setYearFilter} />
-              </FilterChip>
+      {open ? (
+        <TodoDetailCard
+          row={open}
+          tab={tab}
+          onTab={setTab}
+          reloadKey={cardReload}
+          position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
+          onPrev={idx > 0 ? () => openRow(rows[idx - 1]) : undefined}
+          onNext={idx >= 0 && idx < rows.length - 1 ? () => openRow(rows[idx + 1]) : undefined}
+          onClose={() => setOpen(null)}
+          canRegister={canRegister}
+          canEditDue={canEditDue}
+          onRegister={() => setRpRows([open])}
+          onNotPlanned={() => void markNotPlanned([open])}
+          onEditDue={() => setOverrideRow(open)}
+          onOpenPlan={() => navigate(`/maintenance/plans?apri=${open.plan_id}`)}
+        />
+      ) : null}
 
-              <Tooltip title="Reimposta" arrow>
-                <span>
-                  <Button size="small" variant="contained" onClick={() => { setCustomerF(''); setDueFilter(''); setSiteF(''); setYearFilter(''); setPlanF(''); grid.reset(['m_customer', 'm_due', 'm_site', 'm_year', 'm_plan']) }} sx={compactResetButtonSx}>
-                    <RestartAltIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip title={exporting ? 'Esportazione…' : 'Esporta CSV'} arrow>
-                <span>
-                  <Button size="small" variant="contained" disabled={exporting}
-                    onClick={() => exportCsv({
-                      url: '/maintenance-plans/todo/',
-                      params: { ...(customerF ? { customer: customerF } : {}), ...(siteF ? { site: siteF } : {}) },
-                      filename: 'scadenze_manutenzione',
-                      columns: [
-                        { label: 'Scadenza', getValue: (r: any) => r.next_due_date },
-                        { label: 'Cliente', getValue: (r: any) => r.customer_name },
-                        { label: 'Tipo', getValue: (r: any) => r.type_label },
-                        { label: 'Inventory', getValue: (r: any) => r.inventory_name },
-                        { label: 'KNumber', getValue: (r: any) => r.knumber },
-                        { label: 'Piano', getValue: (r: any) => r.plan_title },
-                      ],
-                    })}
-                    sx={compactExportButtonSx}>
-                    <FileDownloadOutlinedIcon />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-          ),
-        }}
-        grid={{
-          pageKey: 'maintenance-todo',
-          username: me?.username,
-          emptyState: {
-            title: 'Hai finito tutte le manutenzioni programmate! 🎉',
-            subtitle: 'Nessuna scadenza in lista. Ottimo lavoro!',
-          },
-          rows: pagedRows,
-          columns,
-          loading,
-          rowCount,
-          paginationModel: grid.paginationModel,
-          onPaginationModelChange: grid.onPaginationModelChange,
-          sortModel: grid.sortModel,
-          onSortModelChange: grid.onSortModelChange,
-          onRowContextMenu: handleRowContextMenu,
-          getRowId: (row) => (row as any).id,
-          height: 420,
-          sx: {
-            ...MAINTENANCE_GRID_SX_BASE,
-            ...zebraSx,
-            '& .row-overdue': { bgcolor: `${alpha(theme.palette.error.main, 0.04)} !important` },
-            '& .row-overdue:hover': { bgcolor: `${alpha(theme.palette.error.main, 0.08)} !important` },
-            '& .MuiDataGrid-row.row-overdue': { bgcolor: `${alpha(theme.palette.error.main, 0.04)} !important` },
-          },
-        }}
-      />
-
-      <RowContextMenu
-        open={Boolean(contextMenu)}
-        anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
-        onClose={() => setContextMenu(null)}
-        items={contextMenuItems}
-      />
-
-      <PlanDrawer
-        open={Boolean(drawerPlanId)}
-        planId={drawerPlanId}
-        onClose={() => setDrawerPlanId(null)}
-      />
-
-      <RapportinoDialog
-        open={rapportinoOpen}
-        context={rapportinoCtx}
-        techs={allTechs}
-        onClose={() => { setRapportinoOpen(false); setRapportinoCtx(undefined) }}
-        onSaved={load}
-      />
-
-      <DueDateOverrideDialog
-        open={overrideOpen}
-        row={overrideRow}
-        onClose={() => { setOverrideOpen(false); setOverrideRow(null) }}
-        onSaved={load}
-      />
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems}
+        title={ctx?.row.inventory_name} subtitle={ctx ? [ctx.row.customer_name, ctx.row.site_name].filter(Boolean).join(' · ') : undefined} />
+      <RapportinoDialog open={rpRows !== null} rows={rpRows ?? []} techs={techs} customers={stats?.customers ?? []} canAddIssue={canAddIssue} onClose={() => setRpRows(null)} onSaved={afterSave} />
+      <DueDateOverrideDialog open={Boolean(overrideRow)} row={overrideRow} onClose={() => setOverrideRow(null)} onSaved={() => { reloadAll(); setOpen(null) }} />
     </Stack>
   )
 }

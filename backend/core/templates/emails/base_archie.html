@@ -1,24 +1,32 @@
 <!DOCTYPE html>
 <html lang="it" xmlns:o="urn:schemas-microsoft-com:office:office">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><title>ARCHIE · Biotron</title>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><title>Archie · Biotron</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <style>
 body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}
-@media screen and (max-width:620px){.outer{padding:16px 8px!important}.pad{padding-left:22px!important;padding-right:22px!important}.hero-title{font-size:29px!important;line-height:33px!important}.hero-copy{width:65%!important}.hero-art{width:35%!important}.mascot{width:104px!important;height:104px!important}.content-pad{padding:24px 18px!important}.meta-col{display:block!important;width:auto!important;padding:0 0 14px!important}.brand-note{font-size:9px!important;letter-spacing:1px!important}}
+a{color:#1f6b5c}
+@media screen and (max-width:620px){.wrap{padding:0!important}.card{width:100%!important;border-radius:0!important;border:0!important}.px{padding-left:20px!important;padding-right:20px!important}.h1{font-size:21px!important;line-height:27px!important}.tab{width:40%!important}.sq{border-radius:0!important}.hide-sm{display:none!important}}
 </style></head>
-<body style="margin:0;padding:0;background-color:#e8eeeb;font-family:Arial,Helvetica,sans-serif;color:#203b36;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8eeeb" style="width:100%;background-color:#e8eeeb;"><tr><td class="outer" align="center" style="padding:36px 12px;">
-<!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background-color:#ffffff;border-radius:18px;box-shadow:0 12px 32px #ccd8d2;">
-<tr><td class="pad" bgcolor="#0a524d" style="padding:21px 32px;background-color:#0a524d;border-radius:18px 18px 0 0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:23px;line-height:28px;font-weight:bold;letter-spacing:2px;color:#ffffff;">ARCHIE<span style="color:#c5d7a6;">.</span></td><td align="right" class="brand-note" style="font-size:10px;line-height:16px;letter-spacing:1.6px;color:#ffffff;">BIOTRON<br><span style="color:#d2e6df;font-size:9px;letter-spacing:1px;">GESTIONE ASSET</span></td></tr></table>
+{% comment %} Email "Bollettino" (anteprima design-previews/em-base.html, variante A): header con logo e data,
+   linguetta della categoria, titolo, righe con il riquadro del giorno, pulsanti, footer sottile.
+   Colori di Campo sterile; font Geist dove il client lo ha, altrimenti quelli di sistema. {% endcomment %}
+<body style="margin:0;padding:0;background-color:#eef2f1;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef2f1" style="width:100%;background-color:#eef2f1;"><tr><td class="wrap" align="center" style="padding:28px 12px;">
+<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="card" style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #e3eae8;border-radius:12px;font-family:Geist,'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;color:#15201e;">
+<tr><td class="px sq" bgcolor="#e3eae8" style="padding:14px 32px;background-color:#e3eae8;border-radius:12px 12px 0 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td valign="middle"><img src="cid:archie-logo@biotron.email" width="129" height="28" alt="Archie" style="display:block;width:129px;height:28px;border:0;"></td>
+<td align="right" valign="middle" style="font-size:12px;line-height:18px;font-weight:500;color:#5b6b67;">{% include "emails/_data.html" with d=oggi %}</td>
+</tr></table></td></tr>
+{% if categoria %}<tr><td style="padding:0;border-top:1px solid #d5dedb;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td width="75%" style="width:75%;font-size:0;line-height:0;">&nbsp;</td>
+<td width="25%" align="center" class="tab" bgcolor="{{ categoria.bg }}" style="width:25%;padding:6px 12px;background-color:{{ categoria.bg }};border-left:1px solid #d5dedb;border-bottom:1px solid #d5dedb;border-radius:0 0 0 10px;font-size:12px;line-height:18px;font-weight:600;letter-spacing:.4px;color:{{ categoria.ink }};white-space:nowrap;">{{ categoria.label }}</td>
+</tr></table></td></tr>{% endif %}
+<tr><td class="px" style="padding:26px 32px 30px;">
+{% block content %}{% endblock %}
 </td></tr>
-{% block archie_hero %}{% endblock %}
-<tr><td class="pad" bgcolor="#f0f5f2" style="padding:28px 32px 32px;background-color:#f0f5f2;">
-{% block archie_content %}{% block content %}{% endblock %}{% endblock %}
-</td></tr>
-<tr><td class="pad" style="padding:23px 32px;border-top:1px solid #dae5df;background-color:#ffffff;border-radius:0 0 18px 18px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="4" bgcolor="#0a524d" style="width:4px;background-color:#0a524d;"></td><td style="padding-left:14px;"><p style="margin:0 0 4px;font-size:11px;line-height:16px;letter-spacing:1.3px;font-weight:bold;color:#0a524d;">BIOTRON S.p.A.</p><p style="margin:0;font-size:11px;line-height:17px;color:#61736b;">ARCHIE · Piattaforma interna di gestione asset.</p></td></tr></table>
-</td></tr></table>
+<tr><td class="px sq" bgcolor="#e3eae8" style="padding:9px 32px;background-color:#e3eae8;border-top:1px solid #d5dedb;border-radius:0 0 12px 12px;font-size:12px;line-height:18px;color:#5b6b67;">Archie · Biotron S.p.A. · <a href="{{ app_url }}/" style="color:#5b6b67;text-decoration:underline;">{{ app_url|cut:"https://"|cut:"http://" }}</a></td></tr>
+</table>
 <!--[if mso]></td></tr></table><![endif]-->
 </td></tr></table></body></html>

@@ -26,6 +26,7 @@ from audit.utils import log_event, to_change_value_for_field
 from core.emails import send_templated_email
 from core.media import build_action_url, protected_media_response
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
+from core.technicians import eligible_technician_q, is_eligible_technician
 from core.soft_delete import apply_soft_delete_filters
 from portal.permissions import IsInternalOrPortalDedicatedApp
 from servicenow.models import (
@@ -84,6 +85,15 @@ class ServiceNowCaseSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        # B-22: un case si assegna solo a un tecnico idoneo (mai a un cliente
+        # del Portal). Controllato solo quando l'assegnatario cambia, così i
+        # case storici restano modificabili.
+        assignee = attrs.get("assigned_to")
+        if assignee is not None and assignee.pk != getattr(self.instance, "assigned_to_id", None):
+            if not is_eligible_technician(assignee):
+                raise serializers.ValidationError(
+                    {"assigned_to": "L'utente selezionato non è un tecnico ServiceNow."}
+                )
         # Verifichiamo solo se la richiesta tocca opened_date/opened_time: un
         # PATCH che modifica altri campi non deve rompersi su un case storico
         # che ha già opened_date senza opened_time (dato pre-esistente a questa
@@ -201,7 +211,7 @@ class SnTechnicianAbsenceSerializer(serializers.ModelSerializer):
         user = attrs.get("user", getattr(self.instance, "user", None))
         if user is not None:
             try:
-                is_sn_tech = bool(user.profile.is_servicenow_technician)
+                is_sn_tech = is_eligible_technician(user)
                 is_functional = bool(user.profile.is_functional_account)
             except Exception:
                 is_sn_tech = False
@@ -273,6 +283,8 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
             qs = qs.filter(date__gte=p["date_from"])
         if p.get("date_to"):
             qs = qs.filter(date__lte=p["date_to"])
+        if str(p.get("user", "")).isdigit():
+            qs = qs.filter(user_id=int(p["user"]))
         return qs
 
     def perform_create(self, serializer):
@@ -304,7 +316,7 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
         e non possono avere assenze da pianificare."""
         users = (
             User.objects.select_related("profile")
-            .filter(is_active=True, profile__is_servicenow_technician=True, profile__is_functional_account=False)
+            .filter(eligible_technician_q(), is_active=True, profile__is_functional_account=False)
             .order_by("first_name", "last_name", "username")
         )
         data = [
@@ -336,7 +348,7 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
 
         user_obj = get_object_or_404(User, pk=user_id)
         try:
-            is_sn_tech = bool(user_obj.profile.is_servicenow_technician)
+            is_sn_tech = is_eligible_technician(user_obj)
         except Exception:
             is_sn_tech = False
         if not is_sn_tech:
@@ -388,10 +400,13 @@ class ServiceNowCaseFilter(filters.FilterSet):
     case_type   = filters.ModelMultipleChoiceFilter(queryset=ServiceNowCaseType.objects.all())
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
     number      = filters.CharFilter(field_name="number", lookup_expr="iexact")
+    # Viste della pagina Casi: "Da assegnare" e "Oggi".
+    unassigned  = filters.BooleanFilter(field_name="assigned_to", lookup_expr="isnull")
+    opened_date = filters.DateFilter(field_name="opened_date")
 
     class Meta:
         model  = ServiceNowCase
-        fields = ["status", "priority", "category", "case_type", "assigned_to", "number"]
+        fields = ["status", "priority", "category", "case_type", "assigned_to", "number", "unassigned", "opened_date"]
 
 
 # ─── ViewSet Type (sola lettura, popolato da admin) ──────────────────────────
@@ -468,6 +483,7 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             template_name="emails/servicenow_case_assigned.html",
             context={
                 "nome_utente": assignee.first_name or assignee.username,
+                "case_id": case.id,
                 "case_number": case.number,
                 "account": case.account,
                 "type_label": type_label,
@@ -742,7 +758,7 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
 
         technicians = list(
             User.objects.select_related("profile")
-                .filter(is_active=True)
+                .filter(eligible_technician_q(), is_active=True)
                 .order_by("first_name", "last_name", "username")
         )
 

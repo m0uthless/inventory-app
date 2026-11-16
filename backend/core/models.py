@@ -117,7 +117,7 @@ class UserProfile(models.Model):
         help_text="Utente assegnabile ai case ServiceNow di categoria Philips (se falso: Biotron). Impostabile solo da admin.",
     )
     is_servicenow_technician = models.BooleanField(
-        default=True, verbose_name="Tecnico ServiceNow",
+        default=False, verbose_name="Tecnico ServiceNow",
         help_text="Se disattivato, l'utente non è assegnabile a nessun case ServiceNow "
                    "(né Philips né Biotron) e non compare nel Triage / Statistiche. "
                    "Impostabile solo da admin.",
@@ -165,7 +165,18 @@ class UserProfile(models.Model):
     )
 
     class Theme(models.TextChoices):
-        DEFAULT = "default", "Predefinito (teal)"
+        # "default" resta la chiave della palette Verde chirurgico (restyle
+        # "Campo sterile"): nessuna migrazione dati per gli utenti esistenti.
+        # Blu e Indaco sono implementate ma per ora non selezionabili dal
+        # frontend (vedi frontend/src/theme/themeRegistry.ts, `selectable`).
+        DEFAULT = "default", "Verde chirurgico"
+        BLU = "blu", "Blu clinico"
+        INDACO = "indaco", "Indaco"
+
+    class ColorMode(models.TextChoices):
+        LIGHT = "light", "Chiaro"
+        DARK = "dark", "Scuro"
+        SYSTEM = "system", "Segue il sistema"
 
     theme = models.CharField(
         max_length=16, choices=Theme.choices, default=Theme.DEFAULT,
@@ -173,6 +184,11 @@ class UserProfile(models.Model):
         help_text="Tema grafico del frontend Archie. Preferenza personale, modificabile "
                    "dall'utente stesso dal proprio profilo (a differenza degli altri campi "
                    "di questo modello). Persiste cross-device essendo salvato lato server.",
+    )
+    color_mode = models.CharField(
+        max_length=8, choices=ColorMode.choices, default=ColorMode.LIGHT,
+        verbose_name="Modalità chiaro/scuro",
+        help_text="Preferenza personale, come `theme`. Predefinita: chiaro.",
     )
 
     last_seen_changelog = models.ForeignKey(
@@ -573,3 +589,66 @@ class ScheduledJobRun(models.Model):
     def __str__(self):
         return f"{self.job_name} — {self.last_run_date}"
 
+
+
+class ModuleSwitch(models.Model):
+    """Stato di un modulo spegnibile (pagina «Moduli», solo superuser).
+
+    Una riga solo per i moduli toccati almeno una volta: senza riga il
+    modulo è acceso. Il registro dei moduli è in ``core/modules.py``; lo
+    storico delle accensioni e degli spegnimenti è nell'Audit.
+    """
+    key        = models.CharField(max_length=40, unique=True)
+    enabled    = models.BooleanField(default=True)
+    reason     = models.CharField(max_length=200, blank=True, default='')
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    changed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Interruttore modulo'
+        verbose_name_plural = 'Interruttori moduli'
+
+    def __str__(self):
+        return f"{self.key} — {'acceso' if self.enabled else 'spento'}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from core.modules import invalidate_cache
+        invalidate_cache()
+
+    def delete(self, *args, **kwargs):
+        result = super().delete(*args, **kwargs)
+        from core.modules import invalidate_cache
+        invalidate_cache()
+        return result
+
+
+class MaintenanceMode(models.Model):
+    """Modalità manutenzione di Archie (pagina «Moduli», solo superuser).
+
+    Una sola riga (pk=1). Quando è attiva, chi non è superuser non entra in
+    Archie e chi è già dentro viene disconnesso alla prima richiesta
+    (``core.middleware.MaintenanceModeMiddleware``). Il Portal clienti non è
+    coinvolto. Stato in cache: vedi ``core/maintenance.py``.
+    """
+    active     = models.BooleanField(default=False)
+    message    = models.CharField(max_length=300, blank=True, default='')
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    changed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Modalità manutenzione'
+        verbose_name_plural = 'Modalità manutenzione'
+
+    def __str__(self):
+        return 'attiva' if self.active else 'spenta'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+        from core.maintenance import invalidate_cache
+        invalidate_cache()

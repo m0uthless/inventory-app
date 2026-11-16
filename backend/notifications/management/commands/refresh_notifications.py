@@ -9,6 +9,8 @@ from rest_framework.test import APIRequestFactory
 
 from core.emails import send_templated_email
 from core.models import AreaTask
+from core.modules import is_module_enabled
+from notifications.email_items import group_by_day, notification_item
 from maintenance.api.plans import MaintenancePlanViewSet
 from notifications.models import Notification, NotificationType
 
@@ -54,18 +56,25 @@ class Command(BaseCommand):
             User.objects.filter(is_active=True, portal_profile__isnull=True)
         )
 
-        maint_keys, maint_to_email = self._sync_maintenance_due(recipients, today, in_30)
-        area_keys, area_to_email = self._sync_area_tasks_due(recipients)
+        # Un modulo spento dalla pagina «Moduli» non genera notifiche né email;
+        # le sue notifiche già create restano, nascoste dall'API.
+        maint_on = is_module_enabled("maintenance")
+        area_on = is_module_enabled("area_tasks")
+        maint_keys, maint_to_email = (
+            self._sync_maintenance_due(recipients, today, in_30) if maint_on else (set(), [])
+        )
+        area_keys, area_to_email = self._sync_area_tasks_due(recipients) if area_on else (set(), [])
 
-        stale_maint = Notification.objects.filter(
-            is_read=False, notification_type=NotificationType.MAINTENANCE_DUE,
-        ).exclude(source_key__in=maint_keys)
-        stale_area = Notification.objects.filter(
-            is_read=False, notification_type=NotificationType.AREA_TASK_DUE,
-        ).exclude(source_key__in=area_keys)
-        removed = stale_maint.count() + stale_area.count()
-        stale_maint.delete()
-        stale_area.delete()
+        removed = 0
+        for on, ntype, keys in (
+            (maint_on, NotificationType.MAINTENANCE_DUE, maint_keys),
+            (area_on, NotificationType.AREA_TASK_DUE, area_keys),
+        ):
+            if not on:
+                continue
+            stale = Notification.objects.filter(is_read=False, notification_type=ntype).exclude(source_key__in=keys)
+            removed += stale.count()
+            stale.delete()
 
         emailed = self._send_digest_emails(maint_to_email, area_to_email)
 
@@ -197,6 +206,7 @@ class Command(BaseCommand):
                     "nome_utente": user.first_name or user.username,
                     "maintenance_items": group["maintenance"],
                     "area_task_items": group["area_task"],
+                    "scadenze": group_by_day([notification_item(n) for n in group["all"]]),
                 },
                 subject="ARCHIE — Nuove scadenze",
                 recipient_list=[user.email],

@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
@@ -11,11 +12,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from audit.utils import log_event, to_change_value_for_field
 from core.emails import send_templated_email
+from core.technicians import eligible_technician_q, is_eligible_technician
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
 from servicenow.models import ServiceNowCase
+from rest_framework.permissions import IsAuthenticated
+from portal.permissions import IsInternalOrPortalDedicatedApp
 
 User = get_user_model()
 
@@ -216,7 +220,7 @@ class IssueSerializer(serializers.ModelSerializer):
             assignee = attrs["assigned_to"]
             try:
                 profile = assignee.profile
-                is_assignable = bool(profile.is_servicenow_technician) and not bool(profile.is_philips)
+                is_assignable = is_eligible_technician(assignee) and not bool(profile.is_philips)
             except Exception:
                 is_assignable = False
             if not is_assignable:
@@ -289,10 +293,41 @@ class IssueFilter(filters.FilterSet):
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
     only_closed = filters.BooleanFilter(method="filter_only_closed")
+    # Ricerca per singola colonna (riga di ricerca sotto le intestazioni).
+    id_q        = filters.CharFilter(method="filter_id_q")
+    title_q     = filters.CharFilter(field_name="title", lookup_expr="icontains")
+    customer_q  = filters.CharFilter(method="filter_customer_q")
+    servicenow_q = filters.CharFilter(field_name="servicenow_id", lookup_expr="icontains")
+    assigned_q  = filters.CharFilter(method="filter_assigned_q")
+    has_due     = filters.BooleanFilter(field_name="due_date", lookup_expr="isnull", exclude=True)
 
     class Meta:
         model  = Issue
         fields = ["status", "priority", "customer", "site", "inventory", "category", "assigned_to", "hide_closed", "only_closed"]
+
+    def filter_id_q(self, queryset, name, value):
+        digits = (value or "").strip().lstrip("#")
+        if not digits:
+            return queryset
+        if not digits.isdigit():
+            return queryset.none()
+        return queryset.filter(id=int(digits))
+
+    def filter_customer_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(customer__name__icontains=v) | Q(customer__display_name__icontains=v) | Q(customer_placeholder__icontains=v) | Q(site__name__icontains=v)
+        )
+
+    def filter_assigned_q(self, queryset, name, value):
+        v = (value or "").strip()
+        if not v:
+            return queryset
+        return queryset.filter(
+            Q(assigned_to__first_name__icontains=v) | Q(assigned_to__last_name__icontains=v) | Q(assigned_to__username__icontains=v)
+        )
 
     def filter_hide_closed(self, queryset, name, value):
         if value:
@@ -310,9 +345,10 @@ class IssueFilter(filters.FilterSet):
 
 def notify_issue_created(user, issue):
     """Broadcast a tutti i tecnici assegnabili (stessa regola di assigned_to)."""
+    # B-22: solo tecnici idonei (mai i clienti del Portal).
     technicians = User.objects.filter(
+        eligible_technician_q(),
         is_active=True,
-        profile__is_servicenow_technician=True,
         profile__is_philips=False,
     ).exclude(email="")
     for recipient in technicians:
@@ -320,10 +356,14 @@ def notify_issue_created(user, issue):
             template_name="emails/issue_created.html",
             context={
                 "nome_utente": recipient.first_name or recipient.username,
+                "issue_id": issue.id,
                 "issue_title": issue.title,
                 "customer_name": _issue_customer_display(issue),
+                "site_name": (issue.site.display_name or issue.site.name) if issue.site_id else "",
                 "priority_label": issue.get_priority_display(),
                 "description": issue.description,
+                "due_date": issue.due_date,
+                "creato_da": (user.get_full_name() or user.get_username()) if user else "Archie",
             },
             subject=f"ARCHIE — Nuova issue: {issue.title}",
             recipient_list=[recipient.email],
@@ -346,8 +386,11 @@ def notify_issue_assignment_change(user, *, old_assigned_to_id, issue):
             template_name="emails/issue_assigned.html",
             context={
                 "nome_utente": recipient.first_name or recipient.username,
+                "issue_id": issue.id,
                 "issue_title": issue.title,
                 "customer_name": _issue_customer_display(issue),
+                "priority_label": issue.get_priority_display(),
+                "due_date": issue.due_date,
                 "is_new_owner": recipient.id == new_assigned_to_id,
             },
             subject=(
@@ -582,6 +625,117 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         ]
 
         return Response(counts)
+
+    # ── Articoli Wiki collegati e procedura ──────────────────────────────────
+    # Il collegamento è un WikiLink(entity_type="issue"); le spunte dei passi
+    # stanno sul collegamento (checked_steps). Lettura: vedere la issue e la Wiki.
+    # Scrittura: modificare la issue (le spunte fanno parte del lavoro sulla issue).
+
+    def _wiki_guard(self, request, write: bool):
+        if not request.user.has_perm("wiki.view_wikipage"):
+            return Response({"detail": "Non hai i permessi per vedere la Wiki."}, status=403)
+        if write and not request.user.has_perm("issues.change_issue"):
+            return Response({"detail": "Non hai i permessi per modificare la issue."}, status=403)
+        return None
+
+    @staticmethod
+    def _wiki_link_payload(link):
+        from wiki.procedure import procedure_steps
+
+        steps = procedure_steps(link.page.content_markdown)
+        checked = set(link.checked_steps or [])
+        return {
+            "id": link.id,
+            "page": link.page_id,
+            "page_title": link.page.title,
+            "page_slug": link.page.slug,
+            "kb_code": link.page.kb_code,
+            "page_available": link.page.deleted_at is None and link.page.is_published,
+            "steps": [{"text": t, "checked": t in checked} for t in steps],
+            "created_at": link.created_at,
+        }
+
+    @action(
+        detail=True, methods=["get", "post"], url_path="wiki",
+        permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp],
+    )
+    def wiki(self, request, pk=None):
+        from wiki.models import WikiEntityType, WikiLink, WikiPage
+
+        denied = self._wiki_guard(request, write=request.method != "GET")
+        if denied:
+            return denied
+        if not request.user.has_perm("issues.view_issue"):
+            return Response({"detail": "Non autorizzato."}, status=403)
+        issue = self.get_object()
+        links = WikiLink.objects.select_related("page").filter(
+            entity_type=WikiEntityType.ISSUE, entity_id=issue.id, deleted_at__isnull=True,
+        )
+
+        if request.method == "GET":
+            return Response([self._wiki_link_payload(link) for link in links.order_by("created_at")])
+
+        try:
+            page_id = int(request.data.get("page"))
+        except (TypeError, ValueError):
+            return Response({"page": "Indica l'articolo da collegare."}, status=400)
+        page = WikiPage.objects.filter(pk=page_id, deleted_at__isnull=True, is_published=True).first()
+        if page is None:
+            return Response({"page": "Articolo non trovato o non pubblicato."}, status=400)
+        existing = links.filter(page=page).first()
+        if existing:
+            return Response(self._wiki_link_payload(existing), status=200)
+        link = WikiLink.objects.create(page=page, entity_type=WikiEntityType.ISSUE, entity_id=issue.id)
+        log_event(
+            request.user, action="update", instance=issue,
+            changes={"wiki_linked": {"from": None, "to": page.title}}, request=request,
+        )
+        return Response(self._wiki_link_payload(link), status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True, methods=["patch", "delete"], url_path=r"wiki/(?P<link_pk>\d+)",
+        permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp],
+    )
+    def wiki_detail(self, request, pk=None, link_pk=None):
+        from wiki.models import WikiEntityType, WikiLink
+        from wiki.procedure import procedure_steps
+
+        denied = self._wiki_guard(request, write=True)
+        if denied:
+            return denied
+        issue = self.get_object()
+        link = WikiLink.objects.select_related("page").filter(
+            pk=link_pk, entity_type=WikiEntityType.ISSUE, entity_id=issue.id, deleted_at__isnull=True,
+        ).first()
+        if link is None:
+            return Response({"detail": "Collegamento non trovato."}, status=404)
+
+        if request.method == "DELETE":
+            link.deleted_at = timezone.now()
+            link.save(update_fields=["deleted_at", "updated_at"])
+            log_event(
+                request.user, action="update", instance=issue,
+                changes={"wiki_unlinked": {"from": link.page.title, "to": None}}, request=request,
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        step = request.data.get("step")
+        checked = request.data.get("checked")
+        if not isinstance(step, str) or not isinstance(checked, bool):
+            return Response({"detail": "Indica il passo e se è fatto."}, status=400)
+        if step not in procedure_steps(link.page.content_markdown):
+            return Response({"step": "Questo passo non è nella procedura dell'articolo."}, status=400)
+        done = [s for s in (link.checked_steps or []) if s != step]
+        if checked:
+            done.append(step)
+        link.checked_steps = done
+        link.save(update_fields=["checked_steps", "updated_at"])
+        log_event(
+            request.user, action="update", instance=issue,
+            changes={"procedure_step": {"from": None if checked else step, "to": step if checked else None}},
+            request=request,
+        )
+        return Response(self._wiki_link_payload(link))
 
     # ── Comments nested endpoint ──────────────────────────────────────────────
 

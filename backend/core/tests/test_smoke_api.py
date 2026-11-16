@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
+from core.testing import make_archie_user
 
 class SmokeApiTests(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username="smoke", password="smoke-pass-123")
+        self.user = make_archie_user(username="smoke", password="smoke-pass-123")
         self.client = APIClient()
 
     def test_anonymous_requires_auth_for_search(self):

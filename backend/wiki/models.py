@@ -145,6 +145,36 @@ class WikiPageRating(models.Model):
         return f"{self.page.title} — {self.user} ({self.rating})"
 
 
+class WikiPageFavorite(models.Model):
+    """Pagina messa tra i preferiti da un utente (la "stella" della Wiki)."""
+
+    page = models.ForeignKey(
+        WikiPage,
+        on_delete=models.CASCADE,
+        related_name="favorites",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Preferito"
+        verbose_name_plural = "Preferiti"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page", "user"],
+                name="ux_wiki_page_favorite_page_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} ★ {self.page.title}"
+
+
 class WikiAttachment(TimeStampedModel):
     page = models.ForeignKey(WikiPage, on_delete=models.PROTECT, related_name="attachments")
     filename = models.CharField(max_length=255)
@@ -166,6 +196,7 @@ class WikiEntityType(models.TextChoices):
     CUSTOMER = "customer", "Customer"
     SITE = "site", "Site"
     INVENTORY = "inventory", "Inventory"
+    ISSUE = "issue", "Issue"
 
 
 class WikiLink(TimeStampedModel):
@@ -173,6 +204,9 @@ class WikiLink(TimeStampedModel):
     entity_type = models.CharField(max_length=16, choices=WikiEntityType.choices)
     entity_id = models.BigIntegerField()
     notes = models.TextField(null=True, blank=True)
+    # Solo per i collegamenti a una issue: i passi della procedura già spuntati
+    # (testo del passo, così una modifica all'articolo non sposta le spunte).
+    checked_steps = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name = "Link"

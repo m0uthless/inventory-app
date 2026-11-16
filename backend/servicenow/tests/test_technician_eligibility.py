@@ -1,0 +1,90 @@
+"""B-22 (QA 2026-11-15): solo i tecnici interni sono assegnabili e ricevono
+le email delle issue; i clienti del Portal mai, anche con il flag."""
+from __future__ import annotations
+
+from unittest import mock
+
+import pytest
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+
+from core.models import UserProfile
+from core.testing import make_archie_user
+
+pytestmark = pytest.mark.django_db
+
+User = get_user_model()
+
+
+def _flag(user, **profile):
+    prof, _ = UserProfile.objects.get_or_create(user=user)
+    for k, v in {"is_servicenow_technician": True, **profile}.items():
+        setattr(prof, k, v)
+    prof.save()
+    return user
+
+
+@pytest.fixture
+def portal_customer_user(customer_status):
+    """Cliente Portal a cui qualcuno ha lasciato il flag tecnico (come i dati del QA)."""
+    from crm.models import Customer
+    from portal.models import PortalUserProfile
+
+    user = User.objects.create_user(username="cliente", password="pw", email="cliente@example.com")
+    customer = Customer.objects.create(name="Cliente", status=customer_status)
+    pp = PortalUserProfile.objects.create(user=user, customer=customer)
+    pp.customers.set([customer])
+    return _flag(user)
+
+
+def test_new_profile_is_not_a_technician_by_default():
+    user = User.objects.create_user(username="nuovo", password="pw")
+    assert UserProfile.objects.get_or_create(user=user)[0].is_servicenow_technician is False
+
+
+def test_portal_user_is_not_listed_nor_assignable(superuser, portal_customer_user):
+    tech = _flag(make_archie_user(username="tecnico", password="pw"))
+    philips = _flag(User.objects.create_user(username="philips", password="pw"), is_philips=True)
+    c = APIClient()
+    c.force_authenticate(superuser)
+
+    listed = {row["id"] for row in c.get("/api/servicenow-technician-absences/technicians/").json()}
+    assert tech.pk in listed
+    assert philips.pk in listed
+    assert portal_customer_user.pk not in listed
+
+    body = c.get("/api/users/").json()
+    users = {row["id"]: row for row in (body["results"] if isinstance(body, dict) else body)}
+    assert users[tech.pk]["is_servicenow_technician"] is True
+    assert users[portal_customer_user.pk]["is_servicenow_technician"] is False
+
+
+def test_case_cannot_be_assigned_to_portal_user(superuser, portal_customer_user):
+    from servicenow.models import ServiceNowCase, ServiceNowCaseCategory
+    from servicenow.tests.test_case_api import _make_case_type
+
+    case = ServiceNowCase.objects.create(
+        number="CS0000001", account="ACME", priority="3", category=ServiceNowCaseCategory.BIOTRON,
+        case_type=_make_case_type(), opened_date="2026-01-10", opened_time="09:00",
+    )
+    c = APIClient()
+    c.force_authenticate(superuser)
+
+    resp = c.patch(f"/api/servicenow-cases/{case.pk}/", {"assigned_to": portal_customer_user.pk}, format="json")
+
+    assert resp.status_code == 400
+    assert "assigned_to" in resp.json()
+
+
+def test_issue_created_email_skips_portal_users(portal_customer_user):
+    from issues import api as issues_api
+
+    tech = _flag(make_archie_user(username="tecnico2", password="pw", email="tecnico@example.com"))
+    issue = mock.Mock(title="T", description="", get_priority_display=lambda: "Alta")
+    with mock.patch.object(issues_api, "send_templated_email", return_value=(True, None)) as send, \
+            mock.patch.object(issues_api, "_issue_customer_display", return_value="Cliente"):
+        issues_api.notify_issue_created(tech, issue)
+
+    sent_to = {addr for call in send.call_args_list for addr in call.kwargs["recipient_list"]}
+    assert "tecnico@example.com" in sent_to
+    assert "cliente@example.com" not in sent_to

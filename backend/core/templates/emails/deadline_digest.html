@@ -1,31 +1,12 @@
 {% extends base_template %}
 {% block content %}
-<p>Ciao {{ nome_utente }},</p>
-<p>Queste sono le scadenze nei prossimi 3 giorni:</p>
-
-{% if area_task_items %}
-<p style="margin:20px 0 8px;font-weight:bold;">Task di area</p>
-<ul style="margin:0 0 16px;padding-left:20px;">
-  {% for item in area_task_items %}
-  <li style="margin-bottom:8px;">
-    <strong>{{ item.title }}</strong><br>
-    <span style="color:#6b7280;">Scadenza: {{ item.due_date|date:"d/m/Y" }}</span>
-  </li>
-  {% endfor %}
-</ul>
-{% endif %}
-
-{% if issue_items %}
-<p style="margin:20px 0 8px;font-weight:bold;">Issue assegnate a te</p>
-<ul style="margin:0 0 16px;padding-left:20px;">
-  {% for item in issue_items %}
-  <li style="margin-bottom:8px;">
-    <strong>{{ item.title }}</strong><br>
-    <span style="color:#6b7280;">Scadenza: {{ item.due_date|date:"d/m/Y" }}</span>
-  </li>
-  {% endfor %}
-</ul>
-{% endif %}
-
-<p>Accedi ad ARCHIE per maggiori dettagli.</p>
+<h1 class="h1" style="margin:0 0 6px;font-size:22px;line-height:28px;font-weight:650;letter-spacing:-0.3px;color:#15201e;">{{ totale }} scadenz{{ totale|pluralize:"a,e" }} nei prossimi 3 giorni</h1>
+<p style="margin:0;font-size:14px;line-height:22px;color:#5b6b67;">Issue assegnate a te e task della tua area.</p>
+<div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>
+{% for giorno in scadenze %}{% for it in giorno.items %}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr>{% if forloop.first %}{% include "emails/_day.html" with giorno=giorno.date %}{% else %}<td width="64" style="width:64px;"></td>{% endif %}
+<td valign="top" style="padding:14px 0;border-bottom:1px solid #d5dedb;word-wrap:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:#5b6b67;">{{ it.kind }}{% if it.where %} · {{ it.where }}{% endif %}</p>
+<a href="{{ app_url }}{{ it.url }}" style="font-size:15px;line-height:22px;font-weight:600;color:#15201e;text-decoration:none;">{{ it.title }}</a></td>
+<td width="64" valign="top" align="right" style="width:64px;padding:16px 0 14px 12px;border-bottom:1px solid #d5dedb;"><a href="{{ app_url }}{{ it.url }}" style="font-size:13px;line-height:20px;font-weight:600;color:#1f6b5c;text-decoration:none;white-space:nowrap;">Apri&nbsp;&rsaquo;</a></td></tr></table>
+{% endfor %}{% endfor %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;"><tr><td>{% include "emails/_button.html" with label="Apri la Dashboard" url="/" %}</td></tr></table>
 {% endblock %}

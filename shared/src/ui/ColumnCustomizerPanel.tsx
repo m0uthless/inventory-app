@@ -29,7 +29,9 @@ import {
   Switch,
   Tooltip,
   Typography,
+  Checkbox,
 } from '@mui/material'
+import { useDrawerAppearance } from './DrawerShell'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
@@ -63,6 +65,7 @@ export default function ColumnCustomizerPanel({
   hasPrefs,
 }: Props) {
   const open = Boolean(anchorEl)
+  const campo = useDrawerAppearance() === 'campo'
 
   // ── Ordine interno al pannello ──────────────────────────────────────────
   // Inizializziamo dall'ordine salvato; le colonne non presenti nell'ordine
@@ -141,6 +144,69 @@ export default function ColumnCustomizerPanel({
   }
 
   const visibleCount = localOrder.filter((f) => isVisible(f)).length
+
+  if (campo) {
+    // Restyle "Campo sterile": stesso linguaggio del popover dei filtri.
+    return (
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={onClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{ paper: { sx: { width: 264, p: 0.75, mt: 0.5 }, role: 'dialog', 'aria-label': 'Colonne' } }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, px: 0.75, pt: 0.25, pb: 0.75 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Colonne</Typography>
+          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{visibleCount} di {localOrder.length} visibili</Typography>
+        </Box>
+        <Box sx={{ maxHeight: 340, overflowY: 'auto', display: 'grid', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider', py: 0.5 }} onDragOver={(e) => e.preventDefault()}>
+          {localOrder.map((field, idx) => {
+            const col = colByField.get(field)
+            if (!col) return null
+            const label = col.headerName || field
+            const visible = isVisible(field)
+            const isOver = dragOver === field
+            return (
+              <Box
+                key={field}
+                draggable
+                onDragStart={() => handleDragStart(field)}
+                onDragOver={(e) => handleDragOver(e, field)}
+                onDrop={() => handleDrop(field)}
+                onDragEnd={handleDragEnd}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.75, height: 32, px: 0.5, borderRadius: '5px', userSelect: 'none',
+                  boxShadow: isOver ? (t) => `inset 0 2px 0 ${t.palette.primary.main}` : 'none',
+                  '&:hover': { bgcolor: 'archie.surface2' }, '&:hover .cc-tools': { opacity: 1 },
+                }}
+              >
+                <Box component="span" aria-hidden sx={{ display: 'grid', placeItems: 'center', width: 14, color: 'text.disabled', cursor: 'grab', '&:active': { cursor: 'grabbing' } }}>
+                  <DragIndicatorIcon sx={{ fontSize: 15 }} />
+                </Box>
+                <Checkbox size="small" checked={visible} onChange={() => toggleVisibility(field)} inputProps={{ 'aria-label': `Mostra ${label}` }} sx={{ p: 0.25 }} />
+                <Box component="span" onClick={() => toggleVisibility(field)} sx={{ flex: 1, minWidth: 0, fontSize: 13, color: visible ? 'text.primary' : 'text.secondary', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {label}
+                </Box>
+                <Box className="cc-tools" sx={{ display: 'flex', opacity: 0, transition: 'opacity .12s', '&:focus-within': { opacity: 1 } }}>
+                  <IconButton size="small" disabled={idx === 0} onClick={() => moveBy(field, -1)} aria-label={`Sposta su ${label}`} sx={{ width: 22, height: 22, p: 0 }}>
+                    <ArrowUpwardIcon sx={{ fontSize: 13 }} />
+                  </IconButton>
+                  <IconButton size="small" disabled={idx === localOrder.length - 1} onClick={() => moveBy(field, 1)} aria-label={`Sposta giù ${label}`} sx={{ width: 22, height: 22, p: 0 }}>
+                    <ArrowDownwardIcon sx={{ fontSize: 13 }} />
+                  </IconButton>
+                </Box>
+              </Box>
+            )
+          })}
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 0.75 }}>
+          <Button size="small" onClick={onReset} disabled={!hasPrefs}>Ripristina</Button>
+          <Button size="small" variant="contained" onClick={onClose}>Fatto</Button>
+        </Box>
+      </Popover>
+    )
+  }
 
   return (
     <Popover

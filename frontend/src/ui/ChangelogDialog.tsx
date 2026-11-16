@@ -115,8 +115,8 @@ function InlineForm({
 }
 
 export default function ChangelogDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { me } = useAuth()
-  const isStaff = me?.is_staff || me?.is_superuser || false
+  const { hasPerm } = useAuth()
+  const isStaff = hasPerm('core.change_changelogentry') // H-04: stesso permesso richiesto dal backend
 
   const [items, setItems] = React.useState<ChangelogEntry[]>([])
   const [loading, setLoading] = React.useState(true)
