@@ -19,15 +19,17 @@ from pathlib import Path
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
 
-# I template email (rifatti graficamente, con mascotte) referenziano le
-# immagini come `<img src="cid:archie-<nome>@biotron.email">`: vanno allegate
-# all'email come parti MIME inline con quel Content-ID, altrimenti il client
-# mostra un'immagine rotta. Convenzione: cid `archie-issue_created@biotron.email`
-# → file `core/templates/assets/archie_issue_created.png`.
+# I template email referenziano le immagini come
+# `<img src="cid:archie-<nome>@biotron.email">` (oggi solo il logo nell'header di
+# base_archie.html): vanno allegate all'email come parti MIME inline con quel
+# Content-ID, altrimenti il client mostra un'immagine rotta. Inline, e non un
+# link remoto, così il logo si vede anche dove le immagini esterne sono bloccate.
+# Convenzione: cid `archie-logo@biotron.email` → file `core/templates/assets/archie_logo.png`.
 _ASSETS_DIR = Path(__file__).resolve().parent / "templates" / "assets"
 _CID_RE = re.compile(r"cid:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)")
 
@@ -45,6 +47,62 @@ def _inline_images_for(html_body: str) -> list[tuple[str, Path]]:
         else:
             logger.warning("Immagine inline non trovata per cid=%s (atteso: %s)", cid, path)
     return found
+
+# Categoria di ogni email (linguetta sotto l'header, anteprima design-previews/em-base.html):
+# il colore tenue del modulo, lo stesso della proposta «Colore per modulo».
+_CATEGORY_COLORS = {
+    "issue": ("Issue", "#e3eefa", "#1f4f86"),
+    "servicenow": ("ServiceNow", "#e8e8f7", "#3b3a8a"),
+    "area_task": ("Task di area", "#ece9f8", "#4b3f9a"),
+    "leave": ("Piano ferie", "#fbece3", "#86441f"),
+    "feedback": ("Bug e feature", "#fbe5e2", "#8f2a21"),
+    "deadlines": ("Scadenze", "#e2f2eb", "#175a4c"),
+    "account": ("Account", "#edf1f0", "#4a5956"),
+}
+_TEMPLATE_CATEGORY = {
+    "issue_created": "issue",
+    "issue_assigned": "issue",
+    "servicenow_case_assigned": "servicenow",
+    "area_task_assigned": "area_task",
+    "area_task_comment": "area_task",
+    "leave_request_submitted": "leave",
+    "leave_request_resolved": "leave",
+    "report_request_created": "feedback",
+    "report_request_resolved": "feedback",
+    "deadline_digest": "deadlines",
+    "notifications_digest": "deadlines",
+    "password_reset": "account",
+}
+
+
+_HEAD_RE = re.compile(r"<head\b.*?</head>", re.S | re.I)
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_BLANK_LINES_RE = re.compile(r"\n\s*\n+")
+_LINK_RE = re.compile(r'<a\s[^>]*href="([^"]+)"[^>]*>(.*?)</a>', re.S | re.I)
+_BLOCK_END_RE = re.compile(r"</(?:p|td|h1|h2|div)>|<br\s*/?>", re.I)
+
+
+def _plain_text(html_body: str) -> str:
+    """Versione solo testo dell'email: senza <head> (CSS) né commenti
+    condizionali di Outlook, un a capo dopo ogni blocco, l'indirizzo dei
+    pulsanti tra parentesi e le righe vuote compattate."""
+    body = _COMMENT_RE.sub("", _HEAD_RE.sub("", html_body))
+    # Pulsanti e link: nel testo semplice resta l'indirizzo, tra parentesi.
+    body = _LINK_RE.sub(lambda m: m.group(2) if m.group(2).strip() in m.group(1) else f"{m.group(2)} ({m.group(1)})", body)
+    body = _BLOCK_END_RE.sub("\n", body)
+    text = strip_tags(body)
+    lines = (line.strip() for line in html.unescape(text).replace("\xa0", " ").splitlines())
+    return _BLANK_LINES_RE.sub("\n\n", "\n".join(lines)).strip()
+
+
+def _email_category(template_name: str) -> dict | None:
+    stem = Path(template_name).stem
+    key = _TEMPLATE_CATEGORY.get(stem)
+    if key is None:
+        return None
+    label, bg, ink = _CATEGORY_COLORS[key]
+    return {"label": label, "bg": bg, "ink": ink}
+
 
 _BRAND_DISPLAY_NAME = {
     "archie": "ARCHIE",
@@ -97,11 +155,16 @@ def send_templated_email(
     render_context = {
         **context,
         "base_template": _BRAND_BASE_TEMPLATE[brand],
+        # Comuni a tutti i template: indirizzo di Archie per i pulsanti,
+        # data di oggi (header e riquadro del giorno), categoria (linguetta).
+        "app_url": settings.ARCHIE_PUBLIC_URL.rstrip("/"),
+        "oggi": timezone.localdate(),
+        "categoria": _email_category(template_name),
     }
 
     try:
         html_body = render_to_string(template_name, render_context)
-        plain_body = html.unescape(strip_tags(html_body))
+        plain_body = _plain_text(html_body)
         from_email = formataddr((_BRAND_DISPLAY_NAME[brand], settings.DEFAULT_FROM_EMAIL))
 
         message = EmailMultiAlternatives(

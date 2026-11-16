@@ -64,6 +64,83 @@ function ItemList({ items, tone }: { items: string[]; tone: 'off' | 'on' }) {
   )
 }
 
+type Maintenance = { active: boolean; message: string; default_message: string; changed_by: string | null; changed_at: string | null }
+
+/** Modalità manutenzione: Archie chiuso a chi non è superuser, Portal aperto (backend: /api/admin/maintenance/). */
+function MaintenanceSection() {
+  const toast = useToast()
+  const { refreshMe } = useAuth()
+  const [m, setM] = React.useState<Maintenance | null>(null)
+  const [confirm, setConfirm] = React.useState(false)
+  const [message, setMessage] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
+
+  React.useEffect(() => {
+    api.get<Maintenance>('/admin/maintenance/').then((r) => setM(r.data)).catch((e) => toast.error(apiErrorToMessage(e)))
+  }, [toast])
+
+  const apply = async () => {
+    if (!m) return
+    setBusy(true)
+    try {
+      const { data } = await api.patch<Maintenance>('/admin/maintenance/', { active: !m.active, message: m.active ? m.message : message.trim() })
+      setM(data)
+      setConfirm(false)
+      await refreshMe()
+      toast.success(data.active ? 'Modalità manutenzione attivata.' : 'Modalità manutenzione disattivata: Archie è di nuovo aperto a tutti.')
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+  }
+
+  const on = Boolean(m?.active)
+  return (
+    <Box component="section" sx={{
+      display: 'flex', alignItems: 'center', gap: 1.5, px: 1.75, py: 1.25, mb: 2.25, borderRadius: '10px', border: '1px solid',
+      borderColor: on ? (t) => alpha(t.palette.warning.main, 0.35) : 'divider',
+      bgcolor: on ? (t) => alpha(t.palette.warning.main, 0.1) : 'background.paper',
+    }}>
+      <Box sx={{ width: 30, height: 30, borderRadius: '8px', display: 'grid', placeItems: 'center', flex: 'none', bgcolor: on ? (t) => alpha(t.palette.warning.main, 0.16) : 'archie.neutralBg', color: on ? 'warning.main' : 'text.secondary' }}>
+        <CampoIcon name="lock" size={16} />
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography component="h2" sx={{ fontSize: 13, fontWeight: 600 }}>Modalità manutenzione</Typography>
+        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+          {on
+            ? `Attiva${m?.changed_at ? ` dal ${fmtDate(m.changed_at, true)}` : ''}: solo i superuser entrano in Archie. «${m?.message || m?.default_message}»`
+            : 'Chiude Archie a tutti tranne i superuser: il login viene rifiutato e chi è dentro viene fatto uscire. Il Portal clienti resta aperto.'}
+        </Typography>
+      </Box>
+      <Switch checked={on} disabled={!m} onChange={() => { setMessage(''); setConfirm(true) }} slotProps={{ input: { 'aria-label': on ? 'Disattiva la modalità manutenzione' : 'Attiva la modalità manutenzione' } }} />
+
+      <CampoDialog
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        busy={busy}
+        width={460}
+        labelId="maintenance-confirm-title"
+        title={on ? 'Riaprire Archie a tutti?' : 'Attivare la modalità manutenzione?'}
+        sub={on ? 'Gli utenti potranno di nuovo accedere.' : 'Chi non è superuser non potrà accedere e chi è già dentro verrà fatto uscire alla prossima azione. Il Portal clienti resta aperto.'}
+        footer={(
+          <>
+            <Box sx={{ flex: 1 }} />
+            <Button onClick={() => setConfirm(false)} disabled={busy}>Annulla</Button>
+            <Button variant="contained" color={on ? 'primary' : 'warning'} onClick={() => void apply()} disabled={busy}>
+              {on ? 'Riapri Archie' : 'Attiva la manutenzione'}
+            </Button>
+          </>
+        )}
+      >
+        {!on ? (
+          <TextField
+            label="Messaggio per gli utenti (facoltativo)" placeholder={m?.default_message} size="small" fullWidth multiline minRows={2}
+            value={message} onChange={(e) => setMessage(e.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} sx={{ mt: 0.75 }}
+            helperText="Compare nella pagina di login. Se lo lasci vuoto usiamo il messaggio predefinito."
+          />
+        ) : null}
+      </CampoDialog>
+    </Box>
+  )
+}
+
 export default function Modules() {
   const toast = useToast()
   const undo = useUndoToast()
@@ -126,6 +203,8 @@ export default function Modules() {
           prima del rilascio.
         </Typography>
       </Box>
+
+      <MaintenanceSection />
 
       {GROUPS.map((g) => {
         const mods = MODULES.filter((m) => m.group === g)

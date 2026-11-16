@@ -483,6 +483,7 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             template_name="emails/servicenow_case_assigned.html",
             context={
                 "nome_utente": assignee.first_name or assignee.username,
+                "case_id": case.id,
                 "case_number": case.number,
                 "account": case.account,
                 "type_label": type_label,

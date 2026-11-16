@@ -1,10 +1,11 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, Button, ButtonBase, CircularProgress, IconButton, InputBase, Typography, useMediaQuery } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import { api } from '@shared/api/client'
 import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon } from '../ui/campo'
+import { ArchieLogo } from '../ui/ArchieLogo'
 
 const LoginBackground = React.lazy(() => import('../features/login/LoginBackground'))
 
@@ -59,6 +60,13 @@ export default function Login() {
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
   const portal = ambito === 'portal'
+  // Modalità manutenzione: Archie è chiuso a chi non è superuser (il Portal resta aperto).
+  const [maintenance, setMaintenance] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    api.get<{ active: boolean; message: string }>('/auth/maintenance/')
+      .then((r) => setMaintenance(r.data.active ? r.data.message : null))
+      .catch(() => setMaintenance(null))
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,6 +85,7 @@ export default function Login() {
     } catch (err: unknown) {
       const resp = (err as { response?: { data?: { detail?: string }; status?: number } })?.response
       const detail = resp?.data?.detail
+      if (resp?.status === 503) { setMaintenance(detail || 'Archie è in manutenzione. Riprova più tardi.'); return }
       if (resp?.status === 401) setError('Nome utente o password non corretti.')
       else if (resp?.status === 403) setError(detail || 'Accesso non autorizzato.')
       else if (resp?.status === 429) setError('Troppi tentativi. Riprova tra qualche minuto.')
@@ -114,8 +123,7 @@ export default function Login() {
           border: '1px solid', borderColor: (t) => `color-mix(in srgb, ${t.palette.background.paper} 60%, transparent)`,
           boxShadow: '0 24px 60px -24px rgb(10 40 30 / .35), 0 2px 8px rgb(10 40 30 / .06)',
         }}>
-          {/* Logo: sostituire /logo.svg con il logo definitivo. */}
-          <Box component="img" src="/logo.svg" alt="Archie" sx={{ display: 'block', height: 48, width: 'auto', maxWidth: '100%', mb: 2.75 }} />
+          <ArchieLogo height={44} sx={{ display: 'flex', justifyContent: 'center', mb: 2.75 }} />
           <Typography component="h1" id="login-title" sx={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>Accedi</Typography>
           <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5, mb: 2.25 }}>Usa le credenziali aziendali.</Typography>
 
@@ -123,6 +131,16 @@ export default function Login() {
             <ButtonBase role="radio" aria-checked={!portal} onClick={() => setAmbito('archie')} sx={segBtn(!portal, false)}>Archie</ButtonBase>
             <ButtonBase role="radio" aria-checked={portal} onClick={() => setAmbito('portal')} sx={segBtn(portal, true)}>Portale clienti</ButtonBase>
           </Box>
+
+          {maintenance && !portal ? (
+            <Box role="status" sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', p: '10px 12px', borderRadius: '8px', mb: 1.75, bgcolor: (t) => alpha(t.palette.warning.main, 0.12), border: '1px solid', borderColor: (t) => alpha(t.palette.warning.main, 0.3) }}>
+              <Box sx={{ color: 'warning.main', display: 'inline-flex', mt: '1px' }}><CampoIcon name="lock" size={16} /></Box>
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 650, color: 'warning.main' }}>Sistema in manutenzione</Typography>
+                <Typography sx={{ fontSize: 12.5, color: 'text.primary' }}>{maintenance} Possono entrare solo gli amministratori.</Typography>
+              </Box>
+            </Box>
+          ) : null}
 
           {error ? (
             <Box role="alert" sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', p: '9px 11px', borderRadius: '8px', bgcolor: 'error.light', color: 'error.main', fontSize: 12.5, mb: 1.75 }}>

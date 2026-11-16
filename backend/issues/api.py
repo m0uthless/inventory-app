@@ -356,10 +356,14 @@ def notify_issue_created(user, issue):
             template_name="emails/issue_created.html",
             context={
                 "nome_utente": recipient.first_name or recipient.username,
+                "issue_id": issue.id,
                 "issue_title": issue.title,
                 "customer_name": _issue_customer_display(issue),
+                "site_name": (issue.site.display_name or issue.site.name) if issue.site_id else "",
                 "priority_label": issue.get_priority_display(),
                 "description": issue.description,
+                "due_date": issue.due_date,
+                "creato_da": (user.get_full_name() or user.get_username()) if user else "Archie",
             },
             subject=f"ARCHIE — Nuova issue: {issue.title}",
             recipient_list=[recipient.email],
@@ -382,8 +386,11 @@ def notify_issue_assignment_change(user, *, old_assigned_to_id, issue):
             template_name="emails/issue_assigned.html",
             context={
                 "nome_utente": recipient.first_name or recipient.username,
+                "issue_id": issue.id,
                 "issue_title": issue.title,
                 "customer_name": _issue_customer_display(issue),
+                "priority_label": issue.get_priority_display(),
+                "due_date": issue.due_date,
                 "is_new_owner": recipient.id == new_assigned_to_id,
             },
             subject=(

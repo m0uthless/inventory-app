@@ -18,6 +18,8 @@ export type Me = {
   permissions: string[]
   /** Moduli spenti dalla pagina «Moduli» (vedi modules/moduleRegistry.ts). */
   disabled_modules?: string[]
+  /** Modalità manutenzione attiva (Archie chiuso a chi non è superuser). */
+  maintenance_active?: boolean
   profile?: {
     avatar: string | null
     preferred_customer: number | null

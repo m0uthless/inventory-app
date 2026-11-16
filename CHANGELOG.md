@@ -10,6 +10,12 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Added
 
 - Moduli (menu utente, solo superuser): accendere e spegnere i moduli di Archie per tutti. Si possono spegnere Issue, Task di area, Manutenzione, ServiceNow, Monitor, Wiki, Drive, Contratti, Purchase Order, Rimborso spese, Piano ferie e Bug e feature. Un modulo spento sparisce per chi non è superuser: le sue API rispondono 404, la pagina porta alla 404, spariscono voce di menu, widget e contatori della Dashboard, risultati della ricerca, notifiche e pulsanti che lo raggiungono da altre pagine, e i job del cron (notifiche di scadenza, riepilogo giornaliero, chiusura automatica delle issue) lo saltano. I dati restano. Il superuser continua a vederlo, con l'etichetta «spento» nel menu e sui widget della Dashboard e un banner nella pagina, per provarlo prima del rilascio. Con il Piano ferie spento restano attive le assenze dei tecnici ServiceNow e le aree degli utenti. Ogni accensione e spegnimento, con il motivo, finisce nell'Audit. Migrazione `core 0046`.
+- Modalità manutenzione (pagina Moduli, solo superuser): chiude Archie a chi non è superuser. Il login viene rifiutato con il messaggio scelto (o «Archie è in manutenzione. Riprova più tardi.»), la pagina di login mostra l'avviso «Sistema in manutenzione» e chi è già collegato viene fatto uscire alla prima azione. Il Portal clienti resta aperto. Il superuser vede una fascia in alto finché la manutenzione è attiva. Attivazione e disattivazione finiscono nell'Audit. Migrazione `core 0047`.
+
+### Changed
+
+- Nuovo logo di Archie (schedario + scritta "archie" a tratto unico) al posto del segnaposto, nella barra laterale e nella login. È disegnato inline dal componente `ui/ArchieLogo.tsx` e quindi segue il tema e la modalità chiara/scura. Aggiornati anche `public/logo.svg` e il favicon.
+- Email rifatte nello stile «Bollettino» (anteprima `design-previews/em-base.html`): header con il logo e la data, linguetta con la categoria nel colore del modulo (Issue, ServiceNow, Task di area, Piano ferie, Bug e feature, Scadenze, Account), una riga per giorno con il riquadro della data, pulsanti che aprono direttamente la issue, il task, il case o la segnalazione in Archie, footer sottile. Tolta la mascotte; il logo parte come immagine inline. La versione solo testo non contiene più il CSS e riporta l'indirizzo dei pulsanti. Nuova impostazione `ARCHIE_PUBLIC_URL` (predefinita `https://archie.biotron.it`) per i link delle email.
 
 ### Security
 

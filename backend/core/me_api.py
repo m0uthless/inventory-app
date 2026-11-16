@@ -15,6 +15,7 @@ from rest_framework.throttling import UserRateThrottle
 
 from audit.utils import log_event
 from core.models import UserProfile
+from core.maintenance import state as maintenance_state
 from core.modules import disabled_modules
 from crm.models import Customer
 from portal.permissions import IsInternalOrPortalDedicatedApp
@@ -152,6 +153,8 @@ class MeAPIView(APIView):
             # Moduli spenti dalla pagina «Moduli»: il frontend li nasconde, o per
             # i superuser li mostra con l'etichetta «Spento» (core/modules.py).
             "disabled_modules": sorted(disabled_modules()),
+            # Modalità manutenzione attiva: il superuser vede la fascia in alto.
+            "maintenance_active": maintenance_state()["active"],
             "profile": {
                 "avatar": avatar_url,
                 "preferred_customer": preferred_customer_id,

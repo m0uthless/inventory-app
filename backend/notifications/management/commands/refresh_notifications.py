@@ -10,6 +10,7 @@ from rest_framework.test import APIRequestFactory
 from core.emails import send_templated_email
 from core.models import AreaTask
 from core.modules import is_module_enabled
+from notifications.email_items import group_by_day, notification_item
 from maintenance.api.plans import MaintenancePlanViewSet
 from notifications.models import Notification, NotificationType
 
@@ -205,6 +206,7 @@ class Command(BaseCommand):
                     "nome_utente": user.first_name or user.username,
                     "maintenance_items": group["maintenance"],
                     "area_task_items": group["area_task"],
+                    "scadenze": group_by_day([notification_item(n) for n in group["all"]]),
                 },
                 subject="ARCHIE — Nuove scadenze",
                 recipient_list=[user.email],

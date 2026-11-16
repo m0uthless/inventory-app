@@ -37,6 +37,7 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import { getPageTitle, type NavLeaf } from './appNav'
 import { useModules } from '../modules/useModules'
 import { ModuleGate } from '../modules/ModuleGate'
+import { MaintenanceBar } from '../modules/MaintenanceBar'
 import ToggleOnOutlinedIcon from '@mui/icons-material/ToggleOnOutlined'
 import { AppSidebar } from './AppSidebar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
@@ -332,6 +333,7 @@ export function AppLayout() {
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ flex: 1, px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: { xs: 3, md: 3 } }}>
               <DashboardEditModeRouteGuard isDashboardRoute={loc.pathname === '/'} />
+              {me?.is_superuser && me.maintenance_active ? <MaintenanceBar onManage={() => nav('/moduli')} /> : null}
               <ShellPageTitle pathname={loc.pathname} />
               <ModuleGate><Outlet /></ModuleGate>
             </Box>

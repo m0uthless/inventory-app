@@ -292,6 +292,7 @@ class ReportRequestViewSet(
     @staticmethod
     def _report_context(item):
         return {
+            "report_id": item.id,
             "tipo": item.get_kind_display(),
             "sezione": item.get_section_display(),
             "descrizione": item.description,

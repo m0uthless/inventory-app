@@ -40,7 +40,7 @@ from core.api import (
     StickyNoteView,
     BirthdaysView,
 )
-from core.modules_api import ModuleDetailView, ModuleListView
+from core.modules_api import MaintenanceView, ModuleDetailView, ModuleListView
 from core.permissions import CanRestoreModelPermission, IsStaffOrAdminGroup
 from core.trash_api import TrashInfoView
 from notifications.api import NotificationViewSet
@@ -206,6 +206,7 @@ urlpatterns = [
 
     # Pannello "Utenti e Gruppi"
     path("api/admin/permission-modules/", PermissionModulesView.as_view()),
+    path("api/admin/maintenance/", MaintenanceView.as_view()),
     path("api/admin/modules/", ModuleListView.as_view()),
     path("api/admin/modules/<str:key>/", ModuleDetailView.as_view()),
 

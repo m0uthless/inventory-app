@@ -105,6 +105,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.SessionIdleTimeoutMiddleware",
     "core.middleware.ModuleSwitchMiddleware",
+    "core.middleware.MaintenanceModeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -408,6 +409,10 @@ if not DEBUG and not FIELD_ENCRYPTION_KEY:
 # Va generato da Teams: canale → Workflows → template "Post to a channel when
 # a webhook request is received".
 SERVICENOW_TEAMS_WEBHOOK_URL = os.getenv("SERVICENOW_TEAMS_WEBHOOK_URL", "")
+
+# Indirizzo pubblico di Archie: i pulsanti delle email portano qui
+# (es. {ARCHIE_PUBLIC_URL}/issues?open=42). In dev va impostato all'host dello stack.
+ARCHIE_PUBLIC_URL = os.getenv("ARCHIE_PUBLIC_URL", "https://archie.biotron.it")
 
 # Modalità di notifica per i case ServiceNow di categoria Philips (switch
 # TEMPORANEO in prova, vedi servicenow/notifications.py):

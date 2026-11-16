@@ -623,3 +623,32 @@ class ModuleSwitch(models.Model):
         from core.modules import invalidate_cache
         invalidate_cache()
         return result
+
+
+class MaintenanceMode(models.Model):
+    """Modalità manutenzione di Archie (pagina «Moduli», solo superuser).
+
+    Una sola riga (pk=1). Quando è attiva, chi non è superuser non entra in
+    Archie e chi è già dentro viene disconnesso alla prima richiesta
+    (``core.middleware.MaintenanceModeMiddleware``). Il Portal clienti non è
+    coinvolto. Stato in cache: vedi ``core/maintenance.py``.
+    """
+    active     = models.BooleanField(default=False)
+    message    = models.CharField(max_length=300, blank=True, default='')
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    changed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Modalità manutenzione'
+        verbose_name_plural = 'Modalità manutenzione'
+
+    def __str__(self):
+        return 'attiva' if self.active else 'spenta'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+        from core.maintenance import invalidate_cache
+        invalidate_cache()

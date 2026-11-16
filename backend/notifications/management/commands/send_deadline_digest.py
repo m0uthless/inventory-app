@@ -9,6 +9,7 @@ from django.utils import timezone
 from core.emails import send_templated_email
 from core.models import AreaTask, ScheduledJobRun
 from core.modules import is_module_enabled
+from notifications.email_items import area_task_item, group_by_day, issue_item
 from issues.models import Issue, IssueStatus
 
 User = get_user_model()
@@ -91,6 +92,10 @@ class Command(BaseCommand):
                     "nome_utente": user.first_name or user.username,
                     "area_task_items": area_items,
                     "issue_items": issue_items,
+                    "scadenze": group_by_day(
+                        [area_task_item(t) for t in area_items] + [issue_item(i) for i in issue_items]
+                    ),
+                    "totale": len(area_items) + len(issue_items),
                 },
                 subject="ARCHIE — Scadenze nei prossimi 3 giorni",
                 recipient_list=[user.email],

@@ -71,8 +71,8 @@ def test_create_with_assignee_emails_the_assignee_only():
     assert msg.subject == "ARCHIE — Task assegnato a te: Ordine toner"
     html = _html(msg)
     assert "Ordine toner" in html and "Ufficio Tecnico" in html
-    assert "Alta" in html and "01/10/2026" in html
-    assert "Anna" in html
+    assert "Alta" in html and "1 ottobre" in html
+    assert f"/tasks?open={resp.data['id']}" in html  # pulsante con link diretto al task
 
 
 def test_create_assigned_to_self_sends_nothing():

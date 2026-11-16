@@ -11,13 +11,17 @@ def _isolated_media_root(settings, tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def _fresh_module_switches():
-    """Lo stato dei moduli spenti sta in cache (core/modules.py) e il rollback
-    del DB tra un test e l'altro non la invalida."""
+    """Lo stato dei moduli spenti e della manutenzione sta in cache
+    (core/modules.py, core/maintenance.py) e il rollback del DB tra un test
+    e l'altro non la invalida."""
+    from core.maintenance import invalidate_cache as invalidate_maintenance
     from core.modules import invalidate_cache
 
     invalidate_cache()
+    invalidate_maintenance()
     yield
     invalidate_cache()
+    invalidate_maintenance()
 
 
 @pytest.fixture

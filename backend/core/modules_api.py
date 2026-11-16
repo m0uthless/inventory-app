@@ -112,3 +112,58 @@ class ModuleDetailView(APIView):
                 subject=f"Modulo {MODULES_BY_KEY[key].label} {'acceso' if enabled else 'spento'}",
             )
         return Response(_serialize(key, switch), status=status.HTTP_200_OK)
+
+
+# ── Modalità manutenzione ──────────────────────────────────────────────────
+# GET   /api/admin/maintenance/   stato
+# PATCH /api/admin/maintenance/   {"active": bool, "message": "..."}
+
+def _serialize_maintenance(row) -> dict:
+    from core.maintenance import DEFAULT_MESSAGE
+
+    return {
+        "active": bool(row and row.active),
+        "message": row.message if row else "",
+        "default_message": DEFAULT_MESSAGE,
+        "changed_by": _person(row.changed_by) if row else None,
+        "changed_at": row.changed_at.isoformat() if row else None,
+    }
+
+
+class MaintenanceView(APIView):
+    permission_classes = [IsAuthenticated, IsSuperuser, IsInternalOrPortalDedicatedApp]
+
+    def get(self, request):
+        from core.models import MaintenanceMode
+
+        return Response(_serialize_maintenance(MaintenanceMode.objects.select_related("changed_by").filter(pk=1).first()))
+
+    @transaction.atomic
+    def patch(self, request):
+        from core.models import MaintenanceMode
+
+        active = request.data.get("active")
+        if not isinstance(active, bool):
+            raise ValidationError({"active": "Indica true o false."})
+        message = str(request.data.get("message") or "").strip()[:300]
+
+        row, _ = MaintenanceMode.objects.select_for_update().get_or_create(pk=1)
+        before = {"active": row.active, "message": row.message}
+        row.active = active
+        row.message = message
+        row.changed_by = request.user
+        row.save()
+
+        if before != {"active": row.active, "message": row.message}:
+            log_event(
+                actor=request.user,
+                action=AuditEvent.Action.UPDATE,
+                instance=row,
+                changes={
+                    "active": {"before": before["active"], "after": row.active},
+                    "message": {"before": before["message"], "after": row.message},
+                },
+                request=request,
+                subject=f"Modalità manutenzione {'attivata' if active else 'disattivata'}",
+            )
+        return Response(_serialize_maintenance(row), status=status.HTTP_200_OK)

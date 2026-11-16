@@ -667,6 +667,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 template_name="emails/area_task_comment.html",
                 context={
                     "nome_utente": user.first_name or user.username,
+                    "task_id": task.id,
                     "task_title": task.title,
                     "area_label": area_label,
                     "autore": autore,
@@ -699,6 +700,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 template_name="emails/area_task_assigned.html",
                 context={
                     "nome_utente": user.first_name or user.username,
+                    "task_id": task.id,
                     "task_title": task.title,
                     "area_label": area_label,
                     "priority_label": task.get_priority_display(),
