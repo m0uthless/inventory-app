@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from core.models import CustomerStatus, UserProfile
 from crm.models import Customer
+from core.testing import make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -27,7 +28,7 @@ User = get_user_model()
 
 
 def _make_user(*, email="user@example.com", is_technician=False, is_philips=False, is_author=False):
-    user = User.objects.create_user(
+    user = make_technician(
         username=f"u_{uuid.uuid4().hex[:6]}", password="pw", email=email,
     )
     if is_author:

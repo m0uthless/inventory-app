@@ -12,6 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from servicenow.models import ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory
+from core.testing import make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -99,7 +100,7 @@ def test_preview_flags_duplicate_against_existing_case(api_client, superuser):
 
 def test_preview_matches_assigned_to_by_name(api_client, superuser):
     _ensure_case_types()
-    User.objects.create_user(username="nspazzoli", first_name="Nicole", last_name="Spazzoli")
+    make_technician(username="nspazzoli", first_name="Nicole", last_name="Spazzoli")
     api_client.force_authenticate(user=superuser)
     upload = _csv_file('CS9005,ACME Hospital,03-08-2026 10:00:00,x,3 - Moderate,Radiology IIG,Nicole Spazzoli,')
     resp = api_client.post(
@@ -113,7 +114,7 @@ def test_preview_matches_assigned_to_by_name(api_client, superuser):
 
 def test_preview_requires_permission(api_client):
     # Utente autenticato ma senza permesso 'add' su ServiceNowCase.
-    user = User.objects.create_user(username=f"u{uuid.uuid4().hex[:6]}", password="x")
+    user = make_technician(username=f"u{uuid.uuid4().hex[:6]}", password="x")
     api_client.force_authenticate(user=user)
     upload = _csv_file('CS9006,ACME Hospital,03-08-2026 10:00:00,x,3 - Moderate,Radiology IIG,,')
     resp = api_client.post(
@@ -126,8 +127,8 @@ def test_preview_requires_permission(api_client):
 
 def test_commit_assigns_ac_and_ris_to_fixed_service_users(api_client, superuser):
     _ensure_case_types()
-    ac_user = User.objects.create_user(username="ac.philips", first_name="Servizio", last_name="AC")
-    ris_user = User.objects.create_user(username="ris.philips", first_name="Servizio", last_name="RIS")
+    ac_user = make_technician(username="ac.philips", first_name="Servizio", last_name="AC")
+    ris_user = make_technician(username="ris.philips", first_name="Servizio", last_name="RIS")
     api_client.force_authenticate(user=superuser)
     upload = _csv_file(
         'CS9201,ACME Hospital,03-08-2026 10:00:00,x,3 - Moderate,Radiology IIG AC,Nome Ignorato Nel Csv,',
@@ -225,7 +226,7 @@ def test_commit_partial_success_one_bad_row_does_not_block_others(api_client, su
 
 
 def test_commit_requires_permission(api_client):
-    user = User.objects.create_user(username=f"u{uuid.uuid4().hex[:6]}", password="x")
+    user = make_technician(username=f"u{uuid.uuid4().hex[:6]}", password="x")
     api_client.force_authenticate(user=user)
     upload = _csv_file('CS9105,ACME Hospital,03-08-2026 10:00:00,x,3 - Moderate,Radiology IIG,,')
     resp = api_client.post(

@@ -117,7 +117,7 @@ class UserProfile(models.Model):
         help_text="Utente assegnabile ai case ServiceNow di categoria Philips (se falso: Biotron). Impostabile solo da admin.",
     )
     is_servicenow_technician = models.BooleanField(
-        default=True, verbose_name="Tecnico ServiceNow",
+        default=False, verbose_name="Tecnico ServiceNow",
         help_text="Se disattivato, l'utente non è assegnabile a nessun case ServiceNow "
                    "(né Philips né Biotron) e non compare nel Triage / Statistiche. "
                    "Impostabile solo da admin.",

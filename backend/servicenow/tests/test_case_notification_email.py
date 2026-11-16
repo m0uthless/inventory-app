@@ -13,6 +13,7 @@ from django.core import mail
 
 from servicenow.models import ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory
 from servicenow.notifications import PHILIPS_NOTIFY_MODE_MODAL, PHILIPS_NOTIFY_MODE_TEAMS
+from core.testing import make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -41,7 +42,7 @@ def _case_payload(case_type, **overrides):
 
 
 def test_case_with_assignee_sends_email(api_client, superuser):
-    assignee = User.objects.create_user(username="tech1", password="pw", email="tech1@example.com")
+    assignee = make_technician(username="tech1", password="pw", email="tech1@example.com")
     api_client.force_authenticate(user=superuser)
     case_type = _make_case_type()
 
@@ -70,7 +71,7 @@ def test_case_without_assignee_sends_no_email(api_client, superuser):
 
 
 def test_assignee_without_email_is_silently_skipped(api_client, superuser):
-    assignee = User.objects.create_user(username="tech1", password="pw", email="")
+    assignee = make_technician(username="tech1", password="pw", email="")
     api_client.force_authenticate(user=superuser)
     case_type = _make_case_type()
 
@@ -87,7 +88,7 @@ def test_assignee_without_email_is_silently_skipped(api_client, superuser):
 
 def test_philips_modal_mode_skips_email(api_client, superuser, settings):
     settings.SERVICENOW_PHILIPS_NOTIFY_MODE = PHILIPS_NOTIFY_MODE_MODAL
-    assignee = User.objects.create_user(username="tech1", password="pw", email="tech1@example.com")
+    assignee = make_technician(username="tech1", password="pw", email="tech1@example.com")
     api_client.force_authenticate(user=superuser)
     case_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS)
 
@@ -103,7 +104,7 @@ def test_philips_modal_mode_skips_email(api_client, superuser, settings):
 
 def test_philips_teams_mode_sends_email_normally(api_client, superuser, settings):
     settings.SERVICENOW_PHILIPS_NOTIFY_MODE = PHILIPS_NOTIFY_MODE_TEAMS
-    assignee = User.objects.create_user(username="tech1", password="pw", email="tech1@example.com")
+    assignee = make_technician(username="tech1", password="pw", email="tech1@example.com")
     api_client.force_authenticate(user=superuser)
     case_type = _make_case_type(category=ServiceNowCaseCategory.PHILIPS)
 

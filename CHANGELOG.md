@@ -15,6 +15,10 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - File caricati: le anteprime (`preview`) di allegati wiki, Drive, rapportini, contratti, PO, spese, segnalazioni e ServiceNow aprono nel browser solo PDF, immagini PNG/JPEG/GIF/WebP e testo semplice, con il tipo ricavato dall'estensione e mai da quello dichiarato dal client; ogni altro file viene scaricato. nginx aggiunge `nosniff` e una CSP `sandbox` (esclusi i PDF) ai file serviti. Gli allegati wiki `.html`, `.svg`, `.xml` e simili vengono rifiutati. Prima un allegato HTML veniva eseguito aprendone l'anteprima.
 - Audit: la password del certificato Wi-Fi (`pass_certificato`) non viene più registrata in chiaro nelle modifiche dei device, e nessun valore cifrato (`enc::…`) finisce più nell'audit. Per ripulire lo storico: `manage.py sanitize_audit_history --dry-run`, poi senza `--dry-run`.
 
+### Fixed
+
+- ServiceNow: il flag "Tecnico ServiceNow" ora nasce disattivato per i nuovi utenti. La migrazione `core 0045` lo toglie a chi non ha un profilo interno (né accesso ad Archie, né tecnico Philips, né account funzionale), stampando l'elenco degli utenti modificati. Assegnazione di case e issue, elenchi dei tecnici, Triage, assenze tecnici ed email "nuova issue" considerano solo i tecnici interni: prima i clienti del Portal risultavano assegnabili e ricevevano le email delle nuove issue.
+
 ## [0.10.0] - 2026-11-04
 
 ### Added

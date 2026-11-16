@@ -12,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from audit.utils import log_event, to_change_value_for_field
 from core.emails import send_templated_email
+from core.technicians import eligible_technician_q, is_eligible_technician
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
@@ -219,7 +220,7 @@ class IssueSerializer(serializers.ModelSerializer):
             assignee = attrs["assigned_to"]
             try:
                 profile = assignee.profile
-                is_assignable = bool(profile.is_servicenow_technician) and not bool(profile.is_philips)
+                is_assignable = is_eligible_technician(assignee) and not bool(profile.is_philips)
             except Exception:
                 is_assignable = False
             if not is_assignable:
@@ -344,9 +345,10 @@ class IssueFilter(filters.FilterSet):
 
 def notify_issue_created(user, issue):
     """Broadcast a tutti i tecnici assegnabili (stessa regola di assigned_to)."""
+    # B-22: solo tecnici idonei (mai i clienti del Portal).
     technicians = User.objects.filter(
+        eligible_technician_q(),
         is_active=True,
-        profile__is_servicenow_technician=True,
         profile__is_philips=False,
     ).exclude(email="")
     for recipient in technicians:

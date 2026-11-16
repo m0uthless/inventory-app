@@ -54,10 +54,16 @@ class UserListSerializer(serializers.ModelSerializer):
             return False
 
     def get_is_servicenow_technician(self, obj):
-        try:
-            return obj.profile.is_servicenow_technician
-        except Exception:
-            return True
+        # B-22: True solo per i tecnici idonei (flag + profilo interno), così
+        # i selettori degli assegnatari non propongono i clienti del Portal.
+        root = self.root
+        ids = getattr(root, "_eligible_technician_ids", None)
+        if ids is None:
+            from core.technicians import eligible_technician_q
+
+            ids = set(User.objects.filter(eligible_technician_q()).values_list("pk", flat=True))
+            root._eligible_technician_ids = ids
+        return obj.pk in ids
 
     def get_leave_area(self, obj):
         try:
@@ -857,7 +863,9 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         profile = getattr(user, 'profile', None)
         if profile is None:
             return False
-        return bool(profile.is_servicenow_technician) and not bool(profile.is_philips)
+        from core.technicians import is_eligible_technician
+
+        return is_eligible_technician(user) and not bool(profile.is_philips)
 
     @action(detail=True, methods=['post'], url_path='convert-to-issue')
     def convert_to_issue(self, request, pk=None):

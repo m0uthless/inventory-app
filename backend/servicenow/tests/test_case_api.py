@@ -8,6 +8,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from servicenow.models import ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory
+from core.testing import make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -327,7 +328,7 @@ def test_filter_by_assigned_to(api_client, superuser):
     api_client.force_authenticate(user=superuser)
     case_type = _make_case_type()
     User = get_user_model()
-    tech = User.objects.create_user(username=f"tech_{uuid.uuid4().hex[:6]}", password="pw")
+    tech = make_technician(username=f"tech_{uuid.uuid4().hex[:6]}", password="pw")
 
     with patch("servicenow.api.notify_teams_new_case"):
         api_client.post(
@@ -357,7 +358,7 @@ def test_anonymous_user_cannot_access_cases(api_client):
 
 def _make_service_user(username, first_name="Servizio"):
     User = get_user_model()
-    return User.objects.create_user(username=username, password="pw", first_name=first_name, last_name=username)
+    return make_technician(username=username, password="pw", first_name=first_name, last_name=username)
 
 
 def test_create_philips_case_without_assignee_falls_back_to_jolly_philips(api_client, superuser):

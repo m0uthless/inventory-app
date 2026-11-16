@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 
 from servicenow.models import ServiceNowCaseType, ServiceNowCaseCategory
 from attendance.models import Absence, DayPart
+from core.testing import make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -17,7 +18,7 @@ User = get_user_model()
 
 
 def _make_tech(name="Tech"):
-    return User.objects.create_user(
+    return make_technician(
         username=f"{name.lower()}_{uuid.uuid4().hex[:6]}", password="pw",
         first_name=name, last_name="Test",
     )
