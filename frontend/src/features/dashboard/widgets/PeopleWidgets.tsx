@@ -5,7 +5,7 @@ import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded'
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded'
 import { api } from '@shared/api/client'
 import type { DashTone } from '../../../theme/palettes'
-import WidgetShell, { WidgetNote } from './WidgetShell'
+import WidgetShell, { WidgetNote, WidgetOffChip } from './WidgetShell'
 import { ANIM_CLASS } from './tints'
 
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase()
@@ -184,7 +184,7 @@ export function ContributorWidget() {
       <EmojiEventsRoundedIcon aria-hidden sx={{ position: 'absolute', right: -12, bottom: -12, fontSize: 'calc(var(--av) * 1.4)', color: (t) => t.palette.archie.dash.verde.mid, opacity: 0.12 }} />
       <Box sx={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 1.25, textAlign: 'center', minWidth: 0 }}>
         <Typography sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12, fontWeight: 700, color: (t) => t.palette.archie.dash.verde.ink }}>
-          <EmojiEventsRoundedIcon sx={{ fontSize: 15, color: (t) => t.palette.archie.dash.verde.mid }} />Contributor del mese
+          <EmojiEventsRoundedIcon sx={{ fontSize: 15, color: (t) => t.palette.archie.dash.verde.mid }} />Contributor del mese<WidgetOffChip />
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mb: 1.5 }}>{month}</Typography>
         {c === undefined ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Caricamento…</Typography> : c === null ? (

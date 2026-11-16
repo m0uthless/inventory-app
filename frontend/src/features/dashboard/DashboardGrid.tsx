@@ -11,6 +11,7 @@ import {
   WIDGET_REGISTRY, snapToNearestSize,
   type DashboardWidgetDef, type DashboardLayoutItem,
 } from './dashboardTypes'
+import { ModuleWidget } from './ModuleWidget'
 
 const DRAG_HANDLE_CLASS = 'dashboard-drag-handle'
 
@@ -178,7 +179,7 @@ export default function DashboardGrid({ widgets, layoutItems, onLayoutItemsChang
                   </Box>
                 )}
                 <Box sx={{ height: '100%', width: '100%', ...(editMode && { pointerEvents: 'none' }) }}>
-                  <Widget />
+                  <ModuleWidget widgetKey={item.i}><Widget /></ModuleWidget>
                 </Box>
               </Box>
             )

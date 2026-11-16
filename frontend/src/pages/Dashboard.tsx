@@ -13,6 +13,7 @@ import { useDashboardLayout } from '../features/dashboard/useDashboardLayout'
 import { useDashboardEditMode } from '../features/dashboard/DashboardEditModeContext'
 import { WIDGET_REGISTRY, findFreeSlot } from '../features/dashboard/dashboardTypes'
 import { WIDGET_MODULE } from '../modules/moduleRegistry'
+import { ModuleWidget } from '../features/dashboard/ModuleWidget'
 import { useModules } from '../modules/useModules'
 import DashboardHero from '../features/dashboard/DashboardHero'
 import { ANIM_CLASS } from '../features/dashboard/widgets/tints'
@@ -30,7 +31,7 @@ function StackedWidgets({ columns = 1 }: { columns?: number }) {
     <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: '12px' }}>
       {STACK.filter(([k]) => !isHidden(WIDGET_MODULE[k])).map(([k, h]) => {
         const W = WIDGET_REGISTRY[k]
-        return W ? <Box key={k} sx={{ minHeight: h || undefined, display: 'flex' }}><W /></Box> : null
+        return W ? <Box key={k} sx={{ minHeight: h || undefined, display: 'flex' }}><ModuleWidget widgetKey={k}><W /></ModuleWidget></Box> : null
       })}
     </Box>
   )

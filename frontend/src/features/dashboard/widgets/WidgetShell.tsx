@@ -5,6 +5,7 @@ import type { SvgIconComponent } from '@mui/icons-material'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import type { DashTone } from '../../../theme/palettes'
 import { DARK_INK, tintVeil } from './tints'
+import { useWidgetOff } from '../widgetOff'
 
 /** Trattamento del widget: carta (come le tabelle), tinta tenue, scuro (testata delle schede), post-it. */
 export type WidgetLook = 'paper' | 'tint' | 'dark' | 'postit'
@@ -57,6 +58,7 @@ export default function WidgetShell({ tone, look = 'paper', icon: Icon, title, e
           {Icon ? <Icon aria-hidden sx={{ fontSize: 21, flex: 'none', color: (t) => (dark ? DARK_INK.mid : look === 'postit' ? t.palette.archie.dash.postit.ink : t.palette.archie.dash[tone].mid), opacity: look === 'postit' ? 0.75 : 1 }} /> : null}
           <Typography component="h2" sx={{ fontSize: 13.5, fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'inherit' }}>{title}</Typography>
           {extra}
+          <WidgetOffChip />
           <Box sx={{ flex: 1 }} />
           {actions}
           {link ? (
@@ -96,4 +98,16 @@ export function CountPill({ tone, children }: { tone: DashTone; children: React.
 /** Stato vuoto o di caricamento dentro un widget. */
 export function WidgetNote({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
   return <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', px: 2, pb: 2, textAlign: 'center', fontSize: 12.5, color: dark ? DARK_INK.sub : 'text.secondary' }}>{children}</Box>
+}
+
+/** Etichetta «spento» per i widget di un modulo spento (li vede solo il superuser). */
+export function WidgetOffChip() {
+  const off = useWidgetOff()
+  if (!off) return null
+  return (
+    <Box component="span" title="Modulo spento: lo vedi solo tu perché sei superuser" sx={{
+      flex: 'none', px: 0.75, lineHeight: '18px', borderRadius: '5px', fontSize: 11, fontWeight: 600,
+      bgcolor: 'warning.main', color: 'background.paper',
+    }}>spento</Box>
+  )
 }
