@@ -19,9 +19,13 @@ from audit.models import AuditEvent, AuthAttempt
 
 # Broad pattern: we prefer masking too much rather than too little.
 SENSITIVE_FIELD_RE = re.compile(
-    r"(password|pwd|secret|token|api[_-]?key|passphrase|private[_-]?key)",
+    # H-11 (QA 2026-11-15): `(^|_)pass(_|$)` copre DeviceWifi.pass_certificato.
+    r"(password|pwd|secret|token|api[_-]?key|passphrase|private[_-]?key|(?:^|_)pass(?:_|$))",
     re.IGNORECASE,
 )
+
+
+ENCRYPTED_PREFIX = "enc::"
 
 
 def _mask_value(value: Any) -> Any:
@@ -89,6 +93,11 @@ def to_change_value(val: Any) -> Any:
     - mask sensitive *nested* keys (e.g. custom_fields.password)
     - also honor CustomFieldDefinition.is_sensitive
     """
+
+    # H-11: un valore cifrato a riposo (core.crypto, prefisso "enc::") non va
+    # mai nell'audit, qualunque sia il nome del campo.
+    if isinstance(val, str) and val.startswith(ENCRYPTED_PREFIX):
+        return _mask_value(val)
 
     if isinstance(val, dict):
         keys = [str(k) for k in val.keys()]

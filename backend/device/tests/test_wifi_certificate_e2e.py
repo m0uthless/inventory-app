@@ -566,3 +566,45 @@ def test_portal_user_cannot_create_wifi_for_device_of_another_customer():
     # device_b non è scopato nel queryset dell'utente portale (customer
     # diverso): il PrimaryKeyRelatedField "device" non lo trova -> 400.
     assert resp.status_code == 400
+
+
+# ─── H-11 (QA 2026-11-15): password del certificato mai nell'audit ─────────
+
+def test_wifi_password_never_reaches_audit_log():
+    import json
+
+    from audit.models import AuditEvent
+
+    user = _superuser()
+    client = _auth_client(user)
+    device = _make_device(user, suffix="h11")
+    created = client.post(
+        "/api/device-wifi/",
+        {"device": device.id, "pass_certificato": "Prima-Segreta-1"},
+        format="json",
+    )
+    assert created.status_code == 201, created.data
+
+    resp = client.patch(
+        f"/api/device-wifi/{created.data['id']}/", {"pass_certificato": "Nuova-Segreta-2"}, format="json"
+    )
+    assert resp.status_code == 200, resp.data
+
+    dump = json.dumps(list(AuditEvent.objects.values_list("changes", flat=True)))
+    assert "Prima-Segreta-1" not in dump
+    assert "Nuova-Segreta-2" not in dump
+    assert "enc::" not in dump
+
+
+def test_sanitize_changes_masks_wifi_password_and_encrypted_values():
+    from audit.utils import sanitize_changes
+
+    out = sanitize_changes(
+        {
+            "pass_certificato": {"from": "enc::gAAAAtoken", "to": "in-chiaro"},
+            "note": {"from": "enc::gAAAAaltro", "to": "testo"},
+        }
+    )
+    assert out["pass_certificato"] == {"from": "••••", "to": "••••"}
+    assert out["note"]["from"] == "••••"
+    assert out["note"]["to"] == "testo"
