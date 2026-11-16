@@ -10,7 +10,6 @@ from __future__ import annotations
 import io
 import re
 import logging
-import mimetypes
 from pathlib import PurePosixPath
 from html import escape, unescape
 from typing import ClassVar
@@ -178,12 +177,11 @@ def _attachment_accel_response(*, file_field, filename: str, mime_type: str | No
     if not rel_name or ".." in p.parts:
         return HttpResponse(status=400)
 
-    resolved_mime = mime_type or mimetypes.guess_type(rel_name)[0] or "application/octet-stream"
-    resp = HttpResponse(b"", content_type=resolved_mime)
-    resp["X-Accel-Redirect"] = f"/protected_media/{rel_name}"
-    resp["Content-Disposition"] = f'{disposition}; filename="{filename}"'
-    resp.headers.pop("Content-Length", None)
-    return resp
+    # B-14: mime_type è quello dichiarato dal client all'upload, quindi non
+    # va mai usato per decidere cosa il browser apre "inline".
+    from core.media import protected_media_response
+
+    return protected_media_response(file_field=file_field, disposition=disposition, filename=filename)
 
 
 def _label_for_wiki_link(entity_type: str, entity_id: int) -> str | None:

@@ -25,6 +25,7 @@ from rest_framework.views import APIView
 
 from core.permissions import CanRestoreModelPermission, IsAuthenticatedDjangoModelPermissions
 from portal.permissions import IsInternalOrPortalDedicatedApp
+from core.media import safe_served_type
 from core.mixins import SoftDeleteAuditMixin
 from core.soft_delete import apply_soft_delete_filters
 from audit.utils import log_event
@@ -612,9 +613,11 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             return Response({"detail": "Percorso file non valido."}, status=400)
 
         accel_path = f"/protected_media/{rel_name}"
-        mime = file.mime_type or mimetypes.guess_type(rel_name)[0] or "application/octet-stream"
+        # B-14: tipo dall'estensione, mai dal Content-Type del client.
+        mime, disposition = safe_served_type(rel_name, "attachment")
 
         resp = HttpResponse(b"", content_type=mime)
+        resp["X-Content-Type-Options"] = "nosniff"
         resp["X-Accel-Redirect"] = accel_path
         # RFC 6266: filename* con encoding UTF-8 per nomi non-ASCII o con caratteri speciali.
         # Il fallback ASCII (filename=) mantiene la compatibilità con client datati.
@@ -622,7 +625,7 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         ascii_name = file.name.encode("ascii", errors="replace").decode("ascii")
         utf8_name = quote(file.name, safe="")
         resp["Content-Disposition"] = (
-            f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+            f'{disposition}; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
         )
         # Do not send a misleading Content-Length for the empty upstream body.
         resp.headers.pop("Content-Length", None)
@@ -649,15 +652,17 @@ class DriveFileViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             return Response({"detail": "Percorso file non valido."}, status=400)
 
         accel_path = f"/protected_media/{rel_name}"
-        mime = file.mime_type or mimetypes.guess_type(rel_name)[0] or "application/octet-stream"
+        # B-14: tipo dall'estensione, mai dal Content-Type del client.
+        mime, disposition = safe_served_type(rel_name, "inline")
 
         resp = HttpResponse(b"", content_type=mime)
+        resp["X-Content-Type-Options"] = "nosniff"
         resp["X-Accel-Redirect"] = accel_path
         from urllib.parse import quote
         ascii_name = file.name.encode("ascii", errors="replace").decode("ascii")
         utf8_name = quote(file.name, safe="")
         resp["Content-Disposition"] = (
-            f'inline; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+            f'{disposition}; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
         )
         resp.headers.pop("Content-Length", None)
         return resp
