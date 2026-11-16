@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from attendance.models import Absence, AbsenceReason, AbsenceStatus, DayPart
 from audit.models import AuditEvent
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -22,7 +23,7 @@ URL = "/api/absences/"
 
 
 def _make_user(*, coordinator=False):
-    u = User.objects.create_user(
+    u = make_archie_user(
         username=f"u-{uuid.uuid4().hex[:8]}", password="pw", email=f"{uuid.uuid4().hex[:6]}@example.com",
     )
     prof = u.profile

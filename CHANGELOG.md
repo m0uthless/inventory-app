@@ -10,6 +10,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Security
 
 - Utenti e gruppi: un amministratore con il solo permesso `core.manage_users` non può più modificare, disattivare, eliminare o reimpostare la password e i permessi di un account superuser o staff (403). Prima poteva resettare la password del superuser, riceverla in risposta ed entrare al suo posto. Nella scheda utente le azioni su questi account sono disabilitate per chi non è superuser.
+- Accesso ad Archie: il permesso `core.access_archie` ora è verificato al login anche quando la pagina non indica l'ambito, e la barriera Portal/Archie lo richiede per ogni sessione interna. Prima un utente senza alcun permesso otteneva una sessione valida e leggeva via API issue, wiki, case ServiceNow, PO, manutenzione e l'elenco utenti. La pagina di login di Archie invia sempre l'ambito.
 
 ## [0.10.0] - 2026-11-04
 

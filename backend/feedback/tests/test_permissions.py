@@ -11,6 +11,7 @@ from PIL import Image
 from rest_framework.test import APIClient
 
 from feedback.models import ReportRequest, ReportStatus
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -18,7 +19,7 @@ pytestmark = pytest.mark.django_db
 def _make_user(*, superuser: bool = False):
     User = get_user_model()
     suffix = uuid.uuid4().hex[:6]
-    user = User.objects.create_user(username=f"fb_{suffix}", password="pw")
+    user = make_archie_user(username=f"fb_{suffix}", password="pw")
     if superuser:
         user.is_staff = True
         user.is_superuser = True

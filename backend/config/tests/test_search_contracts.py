@@ -107,7 +107,7 @@ class TestSearchContracts:
         superuser.is_superuser = False
         superuser.save(update_fields=["is_superuser"])
         superuser.groups.add(outsider)
-        for codename in ["view_drivefolder", "view_drivefile"]:
+        for codename in ["access_archie", "view_drivefolder", "view_drivefile"]:
             _grant(superuser, codename)
         api_client.force_authenticate(user=superuser)
 

@@ -192,6 +192,15 @@ def login_view(request: HttpRequest) -> JsonResponse:
                 {"detail": "Non sei autorizzato ad accedere al gestionale interno."},
                 status=403,
             )
+    elif not can_archie and not is_portal:
+        # H-01 (QA 2026-11-15): senza ambito il controllo veniva saltato e un
+        # utente senza alcun accesso otteneva una sessione "site-repo" valida.
+        _record_failed_attempt(username=username, ip_address=ip_address)
+        _audit_failed_login(request, username=username, user_obj=user, reason="ambito_not_allowed")
+        return JsonResponse(
+            {"detail": "Non sei autorizzato ad accedere al gestionale interno."},
+            status=403,
+        )
     # ── Fine verifica ambito ───────────────────────────────────────────────
 
     login(request, user)

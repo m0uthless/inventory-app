@@ -14,6 +14,7 @@ from django.core import mail
 from rest_framework.test import APIClient
 
 from feedback.models import ReportRequest, ReportStatus
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -21,7 +22,7 @@ User = get_user_model()
 
 
 def _make_user(*, admin=False, email="user@example.com"):
-    u = User.objects.create_user(username=f"fb-{uuid.uuid4().hex[:8]}", password="pw", email=email)
+    u = make_archie_user(username=f"fb-{uuid.uuid4().hex[:8]}", password="pw", email=email)
     if admin:
         u.is_staff = True
         u.is_superuser = True

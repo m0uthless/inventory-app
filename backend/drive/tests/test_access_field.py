@@ -15,12 +15,13 @@ from django.core.files.base import ContentFile
 from rest_framework.test import APIClient
 
 from drive.models import DriveFile, DriveFolder
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
 
 def _viewer(*groups: Group):
-    user = get_user_model().objects.create_user(username=f"drive-{uuid.uuid4().hex[:6]}", password="pw")
+    user = make_archie_user(username=f"drive-{uuid.uuid4().hex[:6]}", password="pw")
     user.user_permissions.add(
         Permission.objects.get(codename="view_drivefile"),
         Permission.objects.get(codename="view_drivefolder"),

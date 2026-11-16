@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 
 from attendance.models import LeaveArea
 from core.models import AreaTask, AreaTaskComment, UserProfile
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -25,7 +26,7 @@ def _user(area=None, *, superuser=False, username=None):
     if superuser:
         user = User.objects.create_superuser(username=username, password="pw", email=f"{username}@example.com")
     else:
-        user = User.objects.create_user(username=username, password="pw", email=f"{username}@example.com")
+        user = make_archie_user(username=username, password="pw", email=f"{username}@example.com")
     profile, _ = UserProfile.objects.get_or_create(user=user)
     profile.leave_area = area
     profile.save(update_fields=["leave_area"])

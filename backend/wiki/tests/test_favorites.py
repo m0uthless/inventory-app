@@ -12,12 +12,13 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from wiki.models import WikiPage, WikiPageFavorite
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
 
 def _make_user(*, superuser: bool = False):
-    user = get_user_model().objects.create_user(username=f"fav_{uuid.uuid4().hex[:6]}", password="pw")
+    user = make_archie_user(username=f"fav_{uuid.uuid4().hex[:6]}", password="pw")
     if superuser:
         user.is_staff = True
         user.is_superuser = True

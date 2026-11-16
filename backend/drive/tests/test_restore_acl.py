@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from drive.models import DriveFile, DriveFolder
+from core.testing import make_archie_user
 
 
 pytestmark = pytest.mark.django_db
@@ -20,7 +21,7 @@ def _client(user):
 
 def _user(username: str):
     User = get_user_model()
-    return User.objects.create_user(username=username, password="pw")
+    return make_archie_user(username=username, password="pw")
 
 
 def test_drive_folder_bulk_restore_only_restores_accessible_deleted_rows():

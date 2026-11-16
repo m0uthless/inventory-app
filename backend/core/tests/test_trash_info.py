@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from crm.models import Contact, Customer, Site
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -46,7 +47,7 @@ def test_trash_info_skips_types_without_view_permission(api_client, superuser, c
     api_client.force_authenticate(user=superuser)
     api_client.delete(f"/api/customers/{customer.id}/")
 
-    user = get_user_model().objects.create_user(username="nobody", password="x")
+    user = make_archie_user(username="nobody", password="x")
     api_client.force_authenticate(user=user)
     res = api_client.get("/api/trash/info/", {"customers": str(customer.id)})
     assert res.status_code == 200

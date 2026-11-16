@@ -3,12 +3,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 
 from drive.models import DriveFile, DriveFolder
+from core.testing import make_archie_user
 
 
 @pytest.mark.django_db
 def test_search_hides_group_restricted_drive_results_without_membership(api_client):
     User = get_user_model()
-    user = User.objects.create_user(username="searcher", password="pw")
+    user = make_archie_user(username="searcher", password="pw")
     restricted_group = Group.objects.create(name="Drive Restricted")
 
     perm_folder = Permission.objects.get(codename="view_drivefolder")
@@ -42,7 +43,7 @@ def test_search_hides_group_restricted_drive_results_without_membership(api_clie
 @pytest.mark.django_db
 def test_search_uses_drivefile_name_field_instead_of_nonexistent_original_filename(api_client):
     User = get_user_model()
-    user = User.objects.create_user(username="drive-reader", password="pw")
+    user = make_archie_user(username="drive-reader", password="pw")
     perm_file = Permission.objects.get(codename="view_drivefile")
     user.user_permissions.add(perm_file)
 

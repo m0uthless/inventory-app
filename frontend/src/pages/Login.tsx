@@ -65,7 +65,7 @@ export default function Login() {
     setLoading(true)
     try {
       await api.get('/auth/csrf/')
-      await api.post('/auth/login/', { username: username.trim(), password, ...(portal ? { ambito: 'portal' } : {}) })
+      await api.post('/auth/login/', { username: username.trim(), password, ambito: portal ? 'portal' : 'site-repo' })
       if (portal) {
         window.location.assign(PORTAL_URL)
       } else {

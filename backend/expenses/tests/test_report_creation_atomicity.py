@@ -14,13 +14,14 @@ from django.db import DatabaseError
 from rest_framework.test import APIClient
 
 from expenses.models import EXPENSE_CATEGORY_ORDER, ExpenseItem, ExpenseReport
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
 
 def _make_user():
     User = get_user_model()
-    return User.objects.create_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
+    return make_archie_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw")
 
 
 def _auth_client(user):

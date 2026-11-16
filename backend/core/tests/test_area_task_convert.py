@@ -21,6 +21,7 @@ from rest_framework.test import APIClient
 from attendance.models import LeaveArea
 from core.models import AreaTask, AreaTaskComment, CustomerStatus, UserProfile
 from crm.models import Customer
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -37,7 +38,7 @@ def _user(area=None, *, superuser=False, can_add_issue=False, is_technician=Fals
     if superuser:
         user = User.objects.create_superuser(username=username, password="pw", email=email)
     else:
-        user = User.objects.create_user(username=username, password="pw", email=email)
+        user = make_archie_user(username=username, password="pw", email=email)
     if can_add_issue:
         perm = Permission.objects.get(codename="add_issue", content_type__app_label="issues")
         user.user_permissions.add(perm)

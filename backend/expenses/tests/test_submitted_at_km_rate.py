@@ -8,12 +8,13 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from expenses.models import ExpenseItem, TechnicianKmRate
+from core.testing import make_archie_user
 
 pytestmark = pytest.mark.django_db
 
 
 def _user(**kw):
-    return get_user_model().objects.create_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw", **kw)
+    return make_archie_user(username=f"u_{uuid.uuid4().hex[:6]}", password="pw", **kw)
 
 
 def _client(user):

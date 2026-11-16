@@ -95,6 +95,8 @@ All API routes are registered in `backend/config/urls.py` via a single DRF `Defa
 
 `IsInternalOrPortalDedicatedApp` in `DEFAULT_PERMISSION_CLASSES` is the core gate separating internal-staff access (Archie) from customer access (Portal) — this closed audit finding WP-03. **Any new ViewSet must explicitly extend this permission class**, or it risks silently bypassing the Portal/Archie boundary. Check this proactively whenever adding a ViewSet, the same way it was caught for `NotificationViewSet` during the 0.9.5 delivery.
 
+Since the 2026-11-15 QA fix (H-01) a non-Portal session passes the barrier **only with `core.access_archie`** (or superuser), and login refuses users with neither Archie access nor a Portal profile even when no `ambito` is sent. Test users hitting barrier-protected endpoints must have `access_archie`: use `core.testing.make_archie_user()`.
+
 ### Auth & CSRF
 
 Session-based (cookie) auth, not tokens. Frontend uses axios `withCredentials` + XSRF defaults (`X-CSRFToken` header from cookie). Key endpoints: `POST /api/auth/login/`, `POST /api/auth/logout/`, `GET /api/auth/csrf/`, `GET /api/me/`, `POST /api/me/change-password/`.

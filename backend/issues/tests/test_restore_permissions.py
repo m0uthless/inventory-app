@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 from core.models import CustomerStatus
 from crm.models import Customer
 from issues.models import Issue
+from core.testing import make_archie_user
 
 
 pytestmark = pytest.mark.django_db
@@ -16,9 +17,9 @@ def test_issue_restore_requires_change_permission():
     """Ensure Issues restore is protected by CanRestoreModelPermission."""
 
     User = get_user_model()
-    creator = User.objects.create_user(username="creator", password="p")
-    no_perm = User.objects.create_user(username="noperm", password="p")
-    has_perm = User.objects.create_user(username="hasperm", password="p")
+    creator = make_archie_user(username="creator", password="p")
+    no_perm = make_archie_user(username="noperm", password="p")
+    has_perm = make_archie_user(username="hasperm", password="p")
 
     # Grant change permission on Issue model
     perm = Permission.objects.get(codename="change_issue")
