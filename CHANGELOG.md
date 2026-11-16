@@ -21,6 +21,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Contratti: il caricamento del PDF falliva con errore 500 quando la cartella `media/contracts` era stata creata da un comando lanciato come root. All'avvio, il backend riallinea ora al proprio utente ogni file o cartella di `media/` che non gli appartiene, non solo la cartella principale; un errore di scrittura dei file restituisce un messaggio leggibile e finisce nel log. I test non scrivono più nel volume media reale.
 - Rimborso spese: chi non ha permessi `expenses.*` espliciti può ora compilare la propria nota (voci, tragitti, scontrini); prima creava la nota ma tutto il resto rispondeva 403. Vale la proprietà della nota, come per la nota stessa: le note altrui e quelle non più modificabili restano protette, eliminazioni comprese.
 - Portal, "Wi-Fi rapido" del device: il salvataggio usava l'id del device come id del Wi-Fi e non aggiornava nulla (404, poi 400). Ora aggiorna il Wi-Fi esistente o lo crea se manca.
+- Login di Archie in dev: il link "Portale clienti" portava al Portal di produzione, perché la build leggeva sempre `.env.production`. In dev ora apre il Portal sullo stesso host della pagina (porta 8081); in produzione non cambia nulla.
 
 ## [0.10.0] - 2026-11-04
 

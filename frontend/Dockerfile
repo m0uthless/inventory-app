@@ -18,7 +18,11 @@ ENV VITE_APP_ENV=${VITE_APP_ENV}
 
 # Copia frontend e builda
 COPY frontend/ ./frontend/
-RUN cd frontend && npm run build
+# B-01 (QA 2026-11-15): `npm run build` legge sempre .env.production, quindi
+# in dev il link "Portale clienti" portava alla produzione. In dev l'URL resta
+# vuoto e Login.tsx lo ricava dall'host della pagina (porta 8081). Una
+# variabile già presente ha la precedenza sui file .env di Vite.
+RUN cd frontend && if [ "$VITE_APP_ENV" = "development" ]; then VITE_PORTAL_URL= npm run build; else npm run build; fi
 
 # serve
 # Fase 6 (0.9.1, audit 2026-08-19, fix post-staging): nginx:1.27-alpine

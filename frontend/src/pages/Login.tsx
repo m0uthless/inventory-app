@@ -8,8 +8,10 @@ import { CampoIcon } from '../ui/campo'
 
 const LoginBackground = React.lazy(() => import('../features/login/LoginBackground'))
 
-// URL del Portale clienti (da variabile Vite, con ripiego).
-const PORTAL_URL = (import.meta.env.VITE_PORTAL_URL as string | undefined) ?? 'http://localhost:8081'
+// URL del Portale clienti: da variabile Vite (produzione), altrimenti lo stesso
+// host della pagina sulla porta 8081 del Portal (dev, B-01).
+const PORTAL_URL = (import.meta.env.VITE_PORTAL_URL as string | undefined)
+  || `${window.location.protocol}//${window.location.hostname}:8081`
 const VERSION = import.meta.env.VITE_APP_VERSION ?? 'dev'
 // Colore del Portale: è un prodotto distinto, con il suo blu (eccezione voluta al tema Archie).
 const PORTAL = { light: '#1a6bb5', dark: '#6fa8e0', bgLight: '#e3eefa', bgDark: '#172a40' }
