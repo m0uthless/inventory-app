@@ -16,6 +16,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Audit: la password del certificato Wi-Fi (`pass_certificato`) non viene più registrata in chiaro nelle modifiche dei device, e nessun valore cifrato (`enc::…`) finisce più nell'audit. Per ripulire lo storico: `manage.py sanitize_audit_history --dry-run`, poi senza `--dry-run`.
 - Bacheca e Changelog: creare, modificare ed eliminare comunicazioni e voci di changelog richiede ora il permesso `core.change_announcement` / `core.change_changelogentry` (i superuser restano abilitati). Prima bastava l'accesso ad Archie, e qualunque utente poteva scrivere via API. I pulsanti della UI seguono lo stesso permesso.
 - API: rimossa l'autenticazione HTTP Basic, attiva di default in DRF ma non usata da nessun client. Permetteva di provare credenziali aggirando il rate limit del login.
+- Cestino: il campo `deleted_at` non è più modificabile con POST/PUT/PATCH su clienti, siti, contatti, inventari, manutenzione, wiki, Drive, device, RIS/PACS e campi custom. Prima un PATCH cestinava un record senza il permesso di eliminazione, o lo ripristinava aggirando il blocco padre/figlio. Cestino e ripristino passano solo dalle azioni dedicate.
 
 ### Fixed
 

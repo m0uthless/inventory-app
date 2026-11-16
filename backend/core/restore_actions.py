@@ -20,6 +20,11 @@ class SoftDeleteRestoreActionsMixin:
     Viewsets can override hook methods for audit logging or business rules.
     """
 
+    def get_serializer(self, *args, **kwargs):
+        from core.mixins import make_deleted_at_read_only
+
+        return make_deleted_at_read_only(super().get_serializer(*args, **kwargs))
+
     restore_detail_status = status.HTTP_204_NO_CONTENT
     restore_returns_instance = False
     bulk_restore_status = status.HTTP_200_OK
