@@ -12,7 +12,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon, FilterOptionList, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { rwdToLevel, type AdminGroupRow, type AdminUserRow, type PermissionModule, type RwdLevel } from '../types/adminUsers'
 import { agoLabel } from '../utils/agoLabel'
-import UserDetailCard from '../features/users/UserDetailCard'
+import UserDetailModal from '../features/users/UserDetailModal'
 import { LEVEL_LABEL, fullName, hasArchieAccess, maxLevel, type LeaveAreaOption } from '../features/users/usersModel'
 import { UserAvatar } from '../features/users/usersUi'
 import { useLocalGrid } from '../features/users/useLocalGrid'
@@ -178,7 +178,7 @@ export default function PortalAccess() {
         />
       </Box>
       {current ? (
-        <UserDetailCard user={current} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)} initialTab="permessi" portalFirst
+        <UserDetailModal user={current} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)} portalFirst
           position={idx >= 0 ? `${idx + 1} di ${grid.rows.length}` : undefined}
           onPrev={idx > 0 ? () => setParam('open', String(grid.rows[idx - 1].id)) : undefined}
           onNext={idx >= 0 && idx < grid.rows.length - 1 ? () => setParam('open', String(grid.rows[idx + 1].id)) : undefined}

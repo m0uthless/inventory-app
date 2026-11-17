@@ -179,19 +179,26 @@ export function CreateUserDialog({ open, groups, onClose, onCreated }: { open: b
   )
 }
 
-export function CreateGroupDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (g: AdminGroupRow) => void }) {
+export function CreateGroupDialog({ open, onClose, onCreated, copyFrom, modules }: { open: boolean; onClose: () => void; onCreated: (g: AdminGroupRow) => void; copyFrom?: AdminGroupRow | null; modules?: PermissionModule[] }) {
   const toast = useToast()
   const [name, setName] = React.useState('')
   const [busy, setBusy] = React.useState(false)
-  React.useEffect(() => { if (open) setName('') }, [open])
+  React.useEffect(() => { if (open) setName(copyFrom ? `${copyFrom.name} (copia)` : '') }, [open, copyFrom])
   const submit = async () => {
+    // Duplicando, il nuovo gruppo nasce con gli stessi permessi (per modulo e speciali).
+    const ids = new Map<string, number>()
+    modules?.forEach((m) => m.extra_permissions.forEach((p) => ids.set(p.codename, p.id)))
+    const body = copyFrom
+      ? { name: name.trim(), module_permissions: copyFrom.permissions_state.modules, extra_permission_ids: copyFrom.permissions_state.extra_permissions.map((c) => ids.get(c)).filter((x): x is number => typeof x === 'number') }
+      : { name: name.trim() }
     setBusy(true)
-    try { const { data } = await api.post<AdminGroupRow>('/admin-groups/', { name: name.trim() }); toast.success('Gruppo creato.'); onCreated(data) }
+    try { const { data } = await api.post<AdminGroupRow>('/admin-groups/', body); toast.success(copyFrom ? 'Gruppo duplicato.' : 'Gruppo creato.'); onCreated(data) }
     catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
   }
   return (
-    <CampoDialog open={open} onClose={onClose} busy={busy} labelId="group-new-title" title="Nuovo gruppo" width={420} sub="Dopo averlo creato scegli i permessi per modulo."
-      footer={<><Box sx={{ flex: 1 }} /><Button variant="text" onClick={onClose} disabled={busy}>Annulla</Button><Button variant="contained" disabled={busy || !name.trim()} onClick={() => void submit()}>Crea gruppo</Button></>}>
+    <CampoDialog open={open} onClose={onClose} busy={busy} labelId="group-new-title" title={copyFrom ? `Duplica «${copyFrom.name}»` : 'Nuovo gruppo'} width={420}
+      sub={copyFrom ? 'Il nuovo gruppo parte con gli stessi permessi, senza utenti.' : 'Dopo averlo creato scegli i permessi per modulo.'}
+      footer={<><Box sx={{ flex: 1 }} /><Button variant="text" onClick={onClose} disabled={busy}>Annulla</Button><Button variant="contained" disabled={busy || !name.trim()} onClick={() => void submit()}>{copyFrom ? 'Duplica' : 'Crea gruppo'}</Button></>}>
       <TextField label="Nome del gruppo" required autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) void submit() }} />
     </CampoDialog>
   )

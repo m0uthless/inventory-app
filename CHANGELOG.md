@@ -7,6 +7,14 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Added
+
+- Utenti e gruppi: menu del tasto destro con voci rapide. Sugli utenti: apri, reimposta password (con conferma), aggiungi a un gruppo, copia email o username, vedi l'attività nell'Audit, disattiva o riattiva, elimina. Sui gruppi: apri, duplica con gli stessi permessi, copia i nomi dei membri, elimina. Le voci di modifica seguono le regole della finestra utente (account amministratori riservati ai superuser, il proprio account non si disattiva né si elimina).
+
+### Changed
+
+- Utenti e gruppi e Accesso Portal: l'utente si apre in una finestra larga e centrata sopra l'elenco al posto della scheda laterale. Testata con identità, «Reimposta password» e scorrimento tra gli utenti; al centro gruppi, permessi come matrice (una riga per modulo, colonne Nessuno, Lettura, Scrittura, Completo, con l'origine di ogni livello), permessi speciali e Portal; a lato anagrafica (nome e cognome, email da copiare, data di nascita con il prossimo compleanno, genere, area ferie con il suo coordinatore), ruoli, attività recente e account. Niente più schede interne né salvataggi per sezione: una barra «N modifiche da salvare» salva tutto insieme e chiede conferma se esci con modifiche in sospeso.
+
 ## [1.0.0] - 2026-11-16
 
 ### Added

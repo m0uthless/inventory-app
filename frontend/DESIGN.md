@@ -162,7 +162,7 @@ components:
 
 The surgical sterile field: a calm, neutral surface where only what matters is coloured. ARCHIE is an operating tool for technicians who spend whole days in tables and detail panels, so the surfaces stay quiet and the colour turns on for exactly three reasons: an action you can take, a thing you selected, a state you must notice. Everything else is ink on paper, separated by hairlines rather than shadows.
 
-Density stays high but comes from structure, not from shrinking: 13px Geist at real size, 40px rows, filters and sorting living in the column headers instead of extra toolbars, a detail card that floats over the table instead of squeezing it. The app is framed: sidebar and topbar share one tinted frame and the content sits inside it as a sheet with a rounded corner. Brand colour concentrates in two places only — the primary action and the dark band at the top of the detail card.
+Density stays high but comes from structure, not from shrinking: 13px Geist at real size, 40px rows, filters and sorting living in the column headers instead of extra toolbars, a record window that opens wide and centred over the dimmed list instead of squeezing it (the floating detail card is being phased out on desktop). The app is framed: sidebar and topbar share one tinted frame and the content sits inside it as a sheet with a rounded corner. Brand colour concentrates in two places only — the primary action and the dark band at the top of the detail card.
 
 Light is the default; dark is a first-class alternative built from the same tokens, not an inversion.
 
@@ -171,7 +171,7 @@ Light is the default; dark is a first-class alternative built from the same toke
 - Geist / Geist Mono; hierarchy by weight and position, not by size jumps.
 - Hairlines instead of shadows; shadow only on what floats.
 - Lists filtered and sorted from column headers; saved views as tabs.
-- Detail as a floating card over the list, with in-place edits that save at once and can be undone.
+- Detail as a record window over the list (Band header, main column + person/summary rail, one save bar for all pending edits); pages not yet migrated still use the floating card with in-place edits that save at once and can be undone.
 
 ## Colors
 
@@ -229,7 +229,8 @@ Seq 1–4 (#b5d4cb → #164d42, reversed lightness in dark): ordinal data only �
 - **Shell:** sidebar 232px (64px collapsed, icons only, counts as corner badges); topbar 52px with global search centred (520px, Ctrl K), notifications and profile on the right. Sidebar and topbar share the Frame colour; the workspace is a Steel Canvas sheet with a 14px top-left radius and a hairline edge.
 - **Content:** padding 20px 24px; page head (title + primary action) → KPI strip (optional, collapsible) → panel with saved-view tabs, filter row and table.
 - **Spacing:** 4px unit; common steps 4 / 8 / 12 / 16 / 24.
-- **Detail card:** floats over the table (never resizes it): 460px, inset 12px from the workspace edges; 760px variant when a side summary is needed.
+- **Record window:** `ui/campo/RecordModal` — centred over the dimmed list, `min(1120px, 100vw − 48px)` wide, 40px from the top, body on the canvas colour with 16px padding; content as a main column + 320px rail; full screen below 900px (md).
+- **Detail card (legacy):** floats over the table (never resizes it): 460px, inset 12px from the workspace edges; 760px variant when a side summary is needed. Being replaced page by page by the record window.
 - **Responsive:** < 1180px the card stays an overlay; < 860px sidebar becomes an off-canvas sheet, tables become card lists, the detail card goes full screen, the KPI strip becomes a horizontal snap strip. KPI tiles respond to their container width, not the viewport.
 
 ## Elevation & Depth
@@ -268,7 +269,10 @@ Tabs inside the panel header, 44px, label + count chip; active tab has a 2px pri
 ### Data table (`ServerDataGrid`)
 Header 36px on Paper 2, label 12/550; each header has a sort button (arrow only when active) and a funnel button aligned right, visible on hover/focus or when a filter is active. Funnel opens a popover: ascending/descending, checkbox list with counts (or date buckets / "contains" field), Remove / Apply. Active filters appear as removable tokens above the table with "Azzera filtri". Optional per-column search row toggled by the search icon. Rows 40px, hover Paper 2, selected Sterile Field with a 3px primary inner edge. Footer: "n di N", totals where meaningful.
 
-### Detail card (signature)
+### Record window (signature, from 17/11/2026)
+Chosen on the users page (preview `design-previews/ud-base.html`, variant D) and the standard for every page that opens a record; pages migrate one at a time, preview first. `ui/campo/RecordModal`: a wide window centred over the dimmed list. **Band header** (#17463c → #1f5a4d, radius 12px): avatar or type tile, title 20/650 in white, subtitle at 74% white, tags as translucent chips, then "3 di 12" with previous/next, actions as translucent outlined buttons (`bandButtonSx`), close × top right. **Body**: no tabs — everything for the record is visible at once as `RecordSection` panels (paper, hairline, radius 10px, title 14/650 with an optional hint and end action); a wide main column (the domain block: for users the permission matrix) and a 320px rail (person/summary, roles, recent activity, account actions). **Saving**: edits are local until the user saves; a dark sticky bar "N modifiche da salvare · Annulla · Salva le modifiche" appears at the bottom only when something is pending; leaving (close, Esc, click outside, previous/next) with pending edits asks for confirmation. **Permission matrix** (`features/users/PermMatrix`): one row per module, "Da dove" column, four level columns with a filled dot up to the level and a ringed dot on the choice; levels below the group's floor are disabled.
+
+### Detail card (legacy)
 Floating card over the list: dark Band header with ID, status badge, position "4 di 12", previous/next (J/K), "⋯" menu and close; title 18/650 in white; tabs as folder tabs — the active one takes the body colour. Body (Dettagli): **Proprietà** row collapsed by default (+/−, summary of two key values), expanded as a compact two-column label/value list where each value is a button that opens a menu or an inline input; changes save immediately, show a "… · salvato" toast with **Annulla** for 6s and are written to activity/audit. Then the domain block (next step + timeline for issues; workflow steps + amount for purchase orders), then supporting sections. Attività: filter (Tutto / Commenti / Modifiche), events and comment bubbles (customer comments tinted info), sticky composer with "Visibile al cliente nel Portale". Allegati / Documenti: drop zone, grouped file rows with type tile, internal/visible tag. Footer: secondary action left, primary step action right. "Modifica tutti i campi" in the ⋯ menu opens the full form.
 
 ### Inputs / Fields
@@ -285,7 +289,7 @@ Toast bottom-centre, ink background, with tick and optional Annulla. Multi-field
 ### Do:
 - **Do** read colours through `useTheme()` / theme tokens; switch palette and mode via the theme registry.
 - **Do** keep filters and sorting in the column headers and saved views in tabs.
-- **Do** open details as the floating card over the list and keep the list usable behind it.
+- **Do** open a record in the record window (`RecordModal`) over the dimmed list; the floating card remains only on pages not yet migrated.
 - **Do** save management fields in place with an undo toast and an audit entry.
 - **Do** use Geist Mono and a copy affordance for anything a technician might paste elsewhere.
 - **Do** check every screen at 1440px and 390px, light and dark.
