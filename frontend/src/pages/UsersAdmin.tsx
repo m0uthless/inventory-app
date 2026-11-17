@@ -16,7 +16,7 @@ import { USER_VIEWS, archieModules, fullName, openModules, roleTags, type LeaveA
 import { CreateGroupDialog, CreateUserDialog, GroupTag, RoleChip, UserAvatar } from '../features/users/usersUi'
 import { useLocalGrid } from '../features/users/useLocalGrid'
 import UserDetailModal from '../features/users/UserDetailModal'
-import GroupDetailCard from '../features/users/GroupDetailCard'
+import GroupDetailModal from '../features/users/GroupDetailModal'
 import { GroupCardMenu, UserRowMenu, type MenuAnchor } from '../features/users/usersMenus'
 
 type Section = 'users' | 'groups'
@@ -67,6 +67,7 @@ export default function UsersAdmin() {
   const current = openUserId ? users.find((u) => u.id === openUserId) ?? null : null
   const idx = current ? grid.rows.findIndex((r) => r.id === current.id) : -1
   const currentGroup = openGroupId ? groups.find((g) => g.id === openGroupId) ?? null : null
+  const gIdx = currentGroup ? groups.findIndex((g) => g.id === currentGroup.id) : -1
 
   const columns: GridColDef<AdminUserRow>[] = [
     { field: 'last_name', headerName: 'Utente', flex: 1.2, minWidth: 240, renderCell: (p) => (
@@ -214,7 +215,11 @@ export default function UsersAdmin() {
           onDeleted={(id) => { setUsers((l) => l.filter((u) => u.id !== id)); setParams({ open: null }); void reloadGroups() }} />
       ) : null}
       {section === 'groups' && currentGroup ? (
-        <GroupDetailCard group={currentGroup} modules={modules} users={users}
+        <GroupDetailModal group={currentGroup} modules={modules} users={users} currentUserIsSuperuser={Boolean(me?.is_superuser)}
+          position={gIdx >= 0 ? `${gIdx + 1} di ${groups.length}` : undefined}
+          onPrev={gIdx > 0 ? () => setParams({ gruppo: String(groups[gIdx - 1].id) }) : undefined}
+          onNext={gIdx >= 0 && gIdx < groups.length - 1 ? () => setParams({ gruppo: String(groups[gIdx + 1].id) }) : undefined}
+          onDuplicate={setDupGroup}
           onClose={() => setParams({ gruppo: null })}
           onSaved={(g) => { setGroups((l) => l.map((x) => (x.id === g.id ? g : x))); void load() }}
           onDeleted={(id) => { setGroups((l) => l.filter((g) => g.id !== id)); setParams({ gruppo: null }); void load() }}

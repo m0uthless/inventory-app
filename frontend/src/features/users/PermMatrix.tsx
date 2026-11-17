@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { Box, ButtonBase, Tooltip } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import type { PermissionModule, RwdLevel } from '../../types/adminUsers'
@@ -8,13 +9,18 @@ import { LEVELS, LEVEL_LABEL } from './usersModel'
  * Matrice dei permessi (anteprima ud-base): una riga per modulo, «Da dove» e quattro colonne
  * Nessuno · Lettura · Scrittura · Completo. Il pallino pieno segna fin dove arriva il livello,
  * quello cerchiato è la scelta; sotto il livello dato dai gruppi non si scende.
+ * La seconda colonna è «Da dove» per l'utente; il gruppo la usa per le «Eccezioni» (`sourceLabel` + `renderSource`).
+ * `changed` mette un puntino sui moduli modificati e non ancora salvati.
  */
-export function PermMatrix({ modules, get, onChange, disabled, showSource = true }: {
+export function PermMatrix({ modules, get, onChange, disabled, showSource = true, sourceLabel = 'Da dove', renderSource, changed }: {
   modules: PermissionModule[]
   get: (app: string) => { level: RwdLevel; floor?: RwdLevel; from?: string }
   onChange: (app: string, l: RwdLevel) => void
   disabled?: boolean
   showSource?: boolean
+  sourceLabel?: string
+  renderSource?: (app: string) => React.ReactNode
+  changed?: (app: string) => boolean
 }) {
   const cell = { height: 40, borderBottom: '1px solid', borderColor: 'divider' } as const
   return (
@@ -22,7 +28,7 @@ export function PermMatrix({ modules, get, onChange, disabled, showSource = true
       <Box component="thead">
         <Box component="tr">
           <Box component="th" scope="col" sx={{ textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: 'text.secondary', pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>Modulo</Box>
-          {showSource ? <Box component="th" scope="col" sx={{ textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: 'text.secondary', pb: 1, borderBottom: '1px solid', borderColor: 'divider', display: { xs: 'none', sm: 'table-cell' } }}>Da dove</Box> : null}
+          {showSource ? <Box component="th" scope="col" sx={{ textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: 'text.secondary', pb: 1, borderBottom: '1px solid', borderColor: 'divider', display: { xs: 'none', sm: 'table-cell' } }}>{sourceLabel}</Box> : null}
           {LEVELS.map((l) => <Box key={l} component="th" scope="col" sx={{ width: { xs: 56, sm: 84 }, textAlign: 'center', fontSize: 11.5, fontWeight: 600, color: 'text.secondary', pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>{LEVEL_LABEL[l]}</Box>)}
         </Box>
       </Box>
@@ -32,8 +38,11 @@ export function PermMatrix({ modules, get, onChange, disabled, showSource = true
           const manual = v.from === 'assegnato a mano'
           return (
             <Box component="tr" key={m.app_label}>
-              <Box component="th" scope="row" sx={{ ...cell, textAlign: 'left', fontWeight: 550, color: v.level === 'none' ? 'text.secondary' : 'text.primary', pr: 1.5 }}>{m.label}</Box>
-              {showSource ? <Box component="td" sx={{ ...cell, fontSize: 12, pr: 1.5, color: manual ? 'primary.main' : 'text.disabled', fontWeight: manual ? 550 : 400, display: { xs: 'none', sm: 'table-cell' } }}>{v.from || '—'}</Box> : null}
+              <Box component="th" scope="row" sx={{ ...cell, textAlign: 'left', fontWeight: 550, color: v.level === 'none' ? 'text.secondary' : 'text.primary', pr: 1.5 }}>
+                {m.label}
+                {changed?.(m.app_label) ? <Box component="span" aria-label="modificato" sx={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', bgcolor: 'warning.main', ml: 1, verticalAlign: 'middle' }} /> : null}
+              </Box>
+              {showSource ? <Box component="td" sx={{ ...cell, fontSize: 12, pr: 1.5, color: manual ? 'primary.main' : 'text.disabled', fontWeight: manual ? 550 : 400, display: { xs: 'none', sm: 'table-cell' } }}>{renderSource ? renderSource(m.app_label) : v.from || '—'}</Box> : null}
               {LEVELS.map((l) => {
                 const on = l === v.level
                 const fill = l !== 'none' && rwdLevelIndex(l) <= rwdLevelIndex(v.level)

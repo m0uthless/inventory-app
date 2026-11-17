@@ -1,0 +1,45 @@
+/* Finestra del gruppo (anteprima gd-base): riusa ud.css (finestra utente) e up.css (schede gruppo). */
+.rec-ava.sq { border-radius: 12px; }
+.rec-ava.sq .i { width: 24px; height: 24px; }
+.heat.band { margin-top: 10px; max-width: 360px; }
+.heat.band i { height: 8px; background: rgb(255 255 255 / .14); box-shadow: none; opacity: 1; }
+.heat.band i.lv-r { background: rgb(255 255 255 / .38); }
+.heat.band i.lv-w { background: rgb(255 255 255 / .62); }
+.heat.band i.lv-d { background: #fff; }
+
+/* Colonna «Eccezioni» della matrice: membri che su quel modulo hanno di più a mano */
+.pmat .c-exc { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pmat .c-exc .exc { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 5px; background: var(--sand-b, var(--warning-bg)); color: var(--warning); font-weight: 550; cursor: help; }
+.pmat tr.chg th[scope=row]::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e0a43a; margin-left: 7px; vertical-align: middle; }
+
+/* Membri */
+.mem-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mem-list li { display: flex; align-items: center; gap: 10px; padding: 6px 4px 6px 6px; border-radius: 8px; }
+.mem-list li:hover { background: var(--surface-2); }
+.mem-list li.gone { opacity: .45; }
+.mem-list li.gone b { text-decoration: line-through; }
+.mem-list li.new { background: var(--field); }
+.mem-list .who { flex: 1; min-width: 0; display: grid; line-height: 1.3; border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.mem-list .who b { font-size: 13px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-list .who small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-list .who:hover b { color: var(--primary); }
+.mem-list .rm { opacity: 0; width: 26px; height: 26px; }
+.mem-list li:hover .rm, .mem-list .rm:focus-visible, .mem-list li.gone .rm { opacity: 1; }
+.mem-add { position: relative; display: block; margin-top: 10px; }
+.mem-add input { width: 100%; height: 34px; padding: 0 10px 0 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.mem-add > .i { position: absolute; left: 10px; top: 9px; color: var(--muted); }
+.mem-sug { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-float); display: grid; gap: 1px; }
+.mem-sug button { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 8px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; font-size: 12.5px; }
+.mem-sug button:hover { background: var(--surface-2); }
+.mem-sug small { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.rcard .cnt-h { display: flex; align-items: baseline; gap: 6px; margin-bottom: 10px; }
+.rcard .cnt-h h3 { margin: 0; }
+.rcard .cnt-h span { font-size: 12px; color: var(--muted); }
+
+/* Nome del gruppo */
+.gname { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.gname:focus { border-color: var(--field-line); }
+.g-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+/* Barra: effetto sulle persone */
+.savebar .impact { font-size: 12.5px; opacity: .72; }

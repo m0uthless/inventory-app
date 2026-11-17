@@ -61,33 +61,6 @@ export function LevelPicker({ value, floor = 'none', onChange, disabled, label }
   )
 }
 
-/** Righe modulo → livello, con l'origine sotto il nome. */
-export function ModuleLevels({ modules, get, onChange, disabled }: {
-  modules: PermissionModule[]
-  get: (app: string) => { level: RwdLevel; floor?: RwdLevel; from?: string }
-  onChange: (app: string, l: RwdLevel) => void
-  disabled?: boolean
-}) {
-  return (
-    <Box>
-      {modules.map((m, i) => {
-        const v = get(m.app_label)
-        return (
-          <Box key={m.app_label} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.9, borderTop: i ? '1px solid' : 0, borderColor: 'divider', flexWrap: 'wrap' }}>
-            <Box sx={{ flex: 1, minWidth: 120 }}>
-              <Typography sx={{ fontSize: 13, color: v.level === 'none' ? 'text.secondary' : 'text.primary' }}>{m.label}</Typography>
-              {v.from ? (
-                <Typography sx={{ fontSize: 11, color: v.from === 'assegnato a mano' ? (t) => t.palette.archie.tints.peach.ink : 'text.secondary', fontWeight: v.from === 'assegnato a mano' ? 600 : 400 }}>{v.from}</Typography>
-              ) : null}
-            </Box>
-            <LevelPicker label={m.label} value={v.level} floor={v.floor} disabled={disabled} onChange={(l) => onChange(m.app_label, l)} />
-          </Box>
-        )
-      })}
-    </Box>
-  )
-}
-
 /** Permessi speciali (es. vedere le password), uno per uno. */
 export function ExtraPermissions({ modules, fromGroup, value, onToggle, disabled }: {
   modules: PermissionModule[]; fromGroup?: Set<string>; value: Set<string>; onToggle: (codename: string, on: boolean) => void; disabled?: boolean

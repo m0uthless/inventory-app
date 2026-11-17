@@ -14,6 +14,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 ### Changed
 
 - Utenti e gruppi e Accesso Portal: l'utente si apre in una finestra larga e centrata sopra l'elenco al posto della scheda laterale. Testata con identità, «Reimposta password» e scorrimento tra gli utenti; al centro gruppi, permessi come matrice (una riga per modulo, colonne Nessuno, Lettura, Scrittura, Completo, con l'origine di ogni livello), permessi speciali e Portal; a lato anagrafica (nome e cognome, email da copiare, data di nascita con il prossimo compleanno, genere, area ferie con il suo coordinatore), ruoli, attività recente e account. Niente più schede interne né salvataggi per sezione: una barra «N modifiche da salvare» salva tutto insieme e chiede conferma se esci con modifiche in sospeso.
+- Utenti e gruppi: anche il gruppo si apre nella stessa finestra. Testata con riepilogo e la striscia dei livelli, scorrimento tra i gruppi e «Duplica»; al centro la matrice dei permessi con la colonna «Eccezioni» (i membri che hanno già di più a mano), permessi speciali e Portal; a lato i membri, che ora si aggiungono e si tolgono direttamente dal gruppo, e nome, duplica ed elimina. La barra di salvataggio dice anche su quante persone ricade la modifica. Le API dei gruppi accettano `user_ids` con le stesse regole della modifica utente (account amministratori solo dal superuser, nessun utente Philips nei gruppi).
 
 ## [1.0.0] - 2026-11-16
 

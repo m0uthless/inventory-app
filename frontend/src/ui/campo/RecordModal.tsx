@@ -30,6 +30,8 @@ export type RecordModalProps = {
   actions?: React.ReactNode
   /** Numero di modifiche in sospeso: > 0 mostra la barra di salvataggio. */
   dirtyCount?: number
+  /** Nota accanto al conteggio nella barra (es. «riguarda 6 persone»). */
+  dirtyNote?: string
   saving?: boolean
   onSave?: () => void
   onDiscard?: () => void
@@ -59,7 +61,7 @@ export function RecordSection({ title, hint, end, children, sx }: { title?: Reac
 
 export function RecordModal({
   open, onClose, ariaLabel, avatar, title, subtitle, tags, status, position, onPrev, onNext, actions,
-  dirtyCount = 0, saving, onSave, onDiscard, children,
+  dirtyCount = 0, dirtyNote, saving, onSave, onDiscard, children,
 }: RecordModalProps) {
   const phone = useMediaQuery((t: Theme) => t.breakpoints.down('md'))
   const [confirm, setConfirm] = React.useState<null | (() => void)>(null)
@@ -114,7 +116,10 @@ export function RecordModal({
           '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
         }}>
           <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main', flex: 'none' }} />
-          <Typography sx={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{dirtyCount} {dirtyCount === 1 ? 'modifica da salvare' : 'modifiche da salvare'}</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
+            {dirtyCount} {dirtyCount === 1 ? 'modifica da salvare' : 'modifiche da salvare'}
+            {dirtyNote ? <Box component="span" sx={{ fontWeight: 400, opacity: 0.72, display: { xs: 'none', sm: 'inline' } }}> · {dirtyNote}</Box> : null}
+          </Typography>
           <Button size="small" onClick={onDiscard} disabled={saving} sx={{ color: 'inherit', border: '1px solid', borderColor: 'rgb(255 255 255 / .25)', '&:hover': { bgcolor: 'rgb(255 255 255 / .1)' } }}>Annulla</Button>
           <Button size="small" variant="contained" onClick={onSave} disabled={saving}>{saving ? 'Salvataggio…' : 'Salva le modifiche'}</Button>
         </Box>
