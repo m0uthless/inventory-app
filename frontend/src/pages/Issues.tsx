@@ -733,16 +733,19 @@ export default function Issues() {
 
   // ── Drawer: dettaglio ─────────────────────────────────────────────────────
   const [detailIssue, setDetailIssue] = React.useState<IssueRow | null>(null)
-  const [detailTab, setDetailTab] = React.useState(0)
+  // Clic sulla riga: seleziona; doppio clic o Invio: apre (come nelle altre pagine).
+  const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [comments, setComments] = React.useState<IssueComment[]>([])
   const [commentsLoading, setCommentsLoading] = React.useState(false)
   const [newComment, setNewComment] = React.useState('')
   const [sendingComment, setSendingComment] = React.useState(false)
 
-  const openDetail = React.useCallback((row: IssueRow, tab = 0) => {
+  // `scrollToActivity`: aperta dal conteggio dei commenti, la finestra va all'attività.
+  const openDetail = React.useCallback((row: IssueRow, scrollToActivity = 0) => {
     setDetailIssue(row)
-    setDetailTab(tab)
+    setSelectedId(row.id)
     setNewComment('')
+    if (scrollToActivity) window.setTimeout(() => document.getElementById('iss-att')?.scrollIntoView({ block: 'start' }), 250)
   }, [])
 
   // Ref che mantiene sempre le righe correnti senza finire nelle dep dell'effect
@@ -766,9 +769,9 @@ export default function Issues() {
     if (!Number.isFinite(id) || id <= 0) return
     openParamHandledRef.current = true
 
-    const showIssueDetail = (row: IssueRow, tab = 0) => {
+    const showIssueDetail = (row: IssueRow) => {
       setDetailIssue(row)
-      setDetailTab(tab)
+      setSelectedId(row.id)
       setNewComment('')
     }
 
@@ -1436,12 +1439,14 @@ export default function Issues() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: displaySortModel,
             onSortModelChange: handleSortModelChange,
-            onRowClick: (id) => {
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: (id) => {
               const row = rows.find((r) => r.id === id)
-              if (row) openDetail(row, 0)
+              if (row) openDetail(row)
             },
             onRowContextMenu: handleRowContextMenu,
-            getRowClassName: (row) => [isClosedIssueRow(row) ? 'row-closed-issue' : '', detailIssue?.id === row.id ? 'Mui-selected' : ''].filter(Boolean).join(' ') || undefined,
+            getRowClassName: (row) => [isClosedIssueRow(row) ? 'row-closed-issue' : '', selectedId === row.id ? 'Mui-selected' : ''].filter(Boolean).join(' ') || undefined,
             sx: {
               cursor: 'pointer',
               ...headerFilterGridSx,
@@ -1569,11 +1574,9 @@ export default function Issues() {
       </Dialog>
       <IssueDetail
         issue={detailIssue}
-        tab={detailTab === 1 ? 'att' : 'det'}
-        onTab={(t) => setDetailTab(t === 'att' ? 1 : 0)}
         position={detailIndex >= 0 ? `${detailIndex + 1} di ${rows.length}` : undefined}
-        onPrev={detailIndex > 0 ? () => openDetail(rows[detailIndex - 1], detailTab) : undefined}
-        onNext={detailIndex >= 0 && detailIndex < rows.length - 1 ? () => openDetail(rows[detailIndex + 1], detailTab) : undefined}
+        onPrev={detailIndex > 0 ? () => openDetail(rows[detailIndex - 1]) : undefined}
+        onNext={detailIndex >= 0 && detailIndex < rows.length - 1 ? () => openDetail(rows[detailIndex + 1]) : undefined}
         onClose={() => setDetailIssue(null)}
         comments={comments}
         commentsLoading={commentsLoading}

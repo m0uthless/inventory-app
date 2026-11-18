@@ -201,7 +201,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
         {stat('iss', issues?.length ?? null, ' issue aperta', ' issue aperte')}
         {p.showContracts ? stat('doc', contracts?.length ?? null, ' contratto', ' contratti', soon ? `${soon.c.title} scade il ${dIt(soon.c.end_date)}` : undefined) : null}
       </>}
-      position={editing ? undefined : p.position} onPrev={editing ? undefined : p.onPrev} onNext={editing ? undefined : p.onNext}
+      position={p.position} onPrev={p.onPrev} onNext={p.onNext}
       actions={<>
         {deleted
           ? (p.canChange ? <Button variant="outlined" onClick={p.onRestore} startIcon={<CampoIcon name="restore" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Ripristina</Button> : null)

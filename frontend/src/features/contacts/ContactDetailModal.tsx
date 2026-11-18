@@ -156,7 +156,7 @@ export function ContactWindow(p: ContactDetailModalProps & { detail: ContactModa
         {d.customer ? bandLink(customerLabel, openCustomer) : customerLabel}
         {siteId ? <> · {bandLink(siteLabel || 'Sito', () => openSite(siteId, siteLabel || 'Sito'))}</> : null}
       </>}
-      position={editing ? undefined : p.position} onPrev={editing ? undefined : p.onPrev} onNext={editing ? undefined : p.onNext}
+      position={p.position} onPrev={p.onPrev} onNext={p.onNext}
       actions={<>
         {deleted ? (p.canChange ? <Button variant="outlined" onClick={p.onRestore} startIcon={<CampoIcon name="restore" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Ripristina</Button> : null) : (
           <>

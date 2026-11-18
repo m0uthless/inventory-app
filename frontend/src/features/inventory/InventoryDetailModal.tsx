@@ -278,7 +278,7 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
         {d.monitors && d.monitors.length ? <BandStat n={d.monitors.length} one=" monitor" many=" monitor" onClick={() => scrollTo('mon')} /> : null}
         {warrantyOver ? <Box component="span" sx={{ height: 20, px: 0.9, borderRadius: '5px', fontSize: 11.5, fontWeight: 550, display: 'inline-flex', alignItems: 'center', bgcolor: 'rgb(224 164 58 / .28)', color: '#fde9c4' }}>garanzia scaduta il {dIt(d.warranty_end_date)}</Box> : null}
       </>}
-      position={editing ? undefined : p.position} onPrev={editing ? undefined : p.onPrev} onNext={editing ? undefined : p.onNext}
+      position={p.position} onPrev={p.onPrev} onNext={p.onNext}
       actions={<>
         {deleted ? (p.canChange ? <Button variant="outlined" onClick={p.onRestore} startIcon={<CampoIcon name="restore" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Ripristina</Button> : null)
           : !editing ? <Button variant="outlined" onClick={p.onNewIssue} startIcon={<CampoIcon name="plus" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Nuova issue</Button> : null}

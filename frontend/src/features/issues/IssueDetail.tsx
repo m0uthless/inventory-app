@@ -1,20 +1,19 @@
 import * as React from 'react'
-import { Link as RouterLink } from 'react-router-dom'
-import { Avatar, Box, Button, CircularProgress, InputBase, Link, Tooltip, Typography } from '@mui/material'
+import { useNavigate } from 'react-router-dom'
+import { Avatar, Box, Button, ButtonBase, CircularProgress, IconButton, InputBase, ListItemIcon, Menu, MenuItem, Popover, Tooltip, Typography } from '@mui/material'
 import EditIcon from '@mui/icons-material/EditOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import LinkIcon from '@mui/icons-material/Link'
-import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
 import CheckIcon from '@mui/icons-material/Check'
-import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined'
-import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
-import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
-import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import AddIcon from '@mui/icons-material/Add'
 
 import { api } from '@shared/api/client'
-import { FloatingDetail, DetailSection, Properties } from '../../ui/campo'
+import { useToast } from '@shared/ui/toast'
+import { buildQuery } from '@shared/utils/nav'
+import { copyToClipboard } from '@shared/utils/clipboard'
+import {
+  BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordLoader, RecordModal, RecordNotes, RecordRow, RecordRows,
+  RecordSection, RecordSelect, RecordValue, bandButtonSx, bandSolidSx, recordMono as mono, useRecordDraft,
+} from '../../ui/campo'
 import { inventoryDrawerPath } from '../../utils/entityPaths'
 import { useAuth } from '../../auth/AuthProvider'
 import { PERMS } from '../../auth/perms'
@@ -27,6 +26,14 @@ import {
   type CategoryOption, type IssueComment, type IssueRow, type UserOption,
 } from './types'
 
+/*
+ * Finestra della issue (DESIGN.md › Record window, anteprima design-previews/iss-base.html, variante A):
+ * testata con stato, collegamenti e l'azione principale (risolvi o riapri); al centro prossimo passo e
+ * procedura Wiki, descrizione, attività con il commento in fondo; a lato dettagli, tempo e dove intervenire.
+ * I dati si leggono come testo e «Modifica» nel ⋯ li trasforma in campi; stato, priorità e assegnatario
+ * si cambiano al volo con un clic (cambiano di continuo), con «Annulla» nel messaggio.
+ */
+
 export type IssueEvent = {
   id: number
   created_at: string
@@ -35,12 +42,10 @@ export type IssueEvent = {
   changes?: Record<string, { from?: unknown; to?: unknown } | [unknown, unknown]> | null
 }
 
-export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'category' | 'due_date' | 'servicenow_id' | 'customer' | 'customer_placeholder' | 'site' | 'inventory'>>
+export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'category' | 'due_date' | 'servicenow_id' | 'customer' | 'customer_placeholder' | 'site' | 'inventory' | 'title' | 'description'>>
 
 type Props = {
   issue: IssueRow | null
-  tab: 'det' | 'att'
-  onTab: (t: 'det' | 'att') => void
   position?: string
   onPrev?: () => void
   onNext?: () => void
@@ -56,8 +61,9 @@ type Props = {
   users: UserOption[]
   categories: CategoryOption[]
   meId?: number
-  /** Salvataggio immediato di un campo (con annulla, gestito dal chiamante). */
-  onPatch: (patch: IssuePatch, label: string) => void
+  /** Salvataggio di uno o più campi (con annulla, gestito dal chiamante). */
+  onPatch: (patch: IssuePatch, label: string) => Promise<void> | void
+  /** Modulo completo della issue. */
   onEdit: () => void
   onDelete: () => void
   onLinkInventory: () => void
@@ -166,189 +172,244 @@ function OpenTimeline({ issue, events }: { issue: IssueRow; events?: IssueEvent[
 
 const ava = (name: string) => name.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase()
 
-export default function IssueDetail(p: Props) {
-  const { issue } = p
-  const sites = useCustomerSites(issue && !issue.is_customer_placeholder ? issue.customer : null)
-  const { hasPerm } = useAuth()
-  const wiki = useIssueWiki(issue?.id ?? null, hasPerm(PERMS.wiki.page.view))
-  if (!issue) return null
-  const closed = issue.status === 'closed'
-  const resolved = issue.status === 'resolved'
-  const assignedToMe = p.meId != null && issue.assigned_to === p.meId
+type Draft = { title: string; description: string; due_date: string; category: string; servicenow_id: string; site: string }
+const toDraft = (i: IssueRow): Draft => ({
+  title: i.title ?? '', description: i.description ?? '', due_date: i.due_date ?? '', category: i.category ? String(i.category) : '',
+  servicenow_id: i.servicenow_id ?? '', site: i.site ? String(i.site) : '',
+})
 
-  const statusOptions = [
-    ...['open', 'in_progress'].map((s) => ({ value: s, label: <IssueStatusBadge status={s} /> })),
-    ...Object.entries(WAITING_REASON_META).map(([k, v]) => ({ value: `waiting:${k}`, label: <><IssueStatusBadge status="waiting" />&nbsp;<Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{v.label}</Box></> })),
-    { value: 'resolved', label: <IssueStatusBadge status="resolved" /> },
-    { value: 'closed', label: <IssueStatusBadge status="closed" /> },
-  ]
-  const statusCurrent = issue.status === 'waiting' ? `waiting:${issue.waiting_reason}` : issue.status
-
-  const props = [
-    {
-      key: 'status', label: 'Stato', current: statusCurrent, options: statusOptions, disabled: closed,
-      display: <><IssueStatusBadge status={issue.status} />{issue.status === 'waiting' && issue.waiting_reason_label ? <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>{issue.waiting_reason_label}</Box> : null}</>,
-      onChange: (v: string) => {
-        if (v.startsWith('waiting:')) p.onPatch({ status: 'waiting', waiting_reason: v.slice(8) }, 'Stato aggiornato')
-        else p.onPatch({ status: v, waiting_reason: '' }, 'Stato aggiornato')
-      },
-    },
-    {
-      key: 'priority', label: 'Priorità', current: issue.priority, disabled: closed,
-      options: ['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: <IssuePriorityMark priority={k} /> })),
-      display: <IssuePriorityMark priority={issue.priority} />,
-      onChange: (v: string) => p.onPatch({ priority: v }, 'Priorità aggiornata'),
-    },
-    {
-      key: 'assigned', label: 'Assegnata a', current: issue.assigned_to ? String(issue.assigned_to) : '', disabled: closed,
-      options: [{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box> }, ...p.users.map((u) => ({ value: String(u.id), label: u.label }))],
-      display: issue.assigned_to_full_name
-        ? <><Avatar sx={{ width: 18, height: 18, fontSize: 8, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{ava(issue.assigned_to_full_name)}</Avatar>{issue.assigned_to_full_name}</>
-        : <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>Nessuno</Box>,
-      onChange: (v: string) => p.onPatch({ assigned_to: v ? Number(v) : null }, 'Assegnatario aggiornato'),
-    },
-    {
-      key: 'due', label: 'Scadenza', disabled: closed,
-      text: { value: issue.due_date ?? '', type: 'date' as const },
-      display: issue.due_date ? fmtIssueDate(issue.due_date) : <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>Nessuna</Box>,
-      onChange: (v: string) => p.onPatch({ due_date: v || null }, 'Scadenza aggiornata'),
-    },
-    {
-      key: 'category', label: 'Categoria', current: issue.category ? String(issue.category) : '', disabled: closed,
-      options: [{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuna</Box> }, ...p.categories.map((c) => ({ value: String(c.id), label: c.label }))],
-      display: issue.category_label || <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>Nessuna</Box>,
-      onChange: (v: string) => p.onPatch({ category: v ? Number(v) : null }, 'Categoria aggiornata'),
-    },
-    {
-      key: 'customer', label: 'Cliente', disabled: closed, full: true,
-      display: <>{issue.customer_name || issue.customer_placeholder}{issue.is_customer_placeholder ? <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>· non in anagrafica</Box> : null}</>,
-      editor: (close: () => void) => (
-        <CustomerPicker
-          current={issue.is_customer_placeholder ? null : issue.customer}
-          onPick={(c) => {
-            close()
-            if (c.id === issue.customer && !issue.is_customer_placeholder) return
-            p.onPatch({ customer: c.id, customer_placeholder: '', site: null, inventory: null },
-              issue.inventory ? 'Cliente aggiornato, sito e inventario scollegati' : 'Cliente aggiornato')
-          }}
-        />
-      ),
-    },
-    {
-      key: 'site', label: 'Sito', disabled: closed || issue.is_customer_placeholder, full: true,
-      current: issue.site ? String(issue.site) : '',
-      options: [{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessun sito</Box> }, ...sites.map((x) => ({ value: String(x.id), label: x.label }))],
-      display: issue.site_name || <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>{issue.is_customer_placeholder ? 'Non disponibile con cliente non in anagrafica' : 'Nessuno'}</Box>,
-      onChange: (v: string) => p.onPatch(issue.inventory ? { site: v ? Number(v) : null, inventory: null } : { site: v ? Number(v) : null }, issue.inventory ? 'Sito aggiornato, inventario scollegato' : 'Sito aggiornato'),
-    },
-    {
-      key: 'sn', label: 'ServiceNow', disabled: closed,
-      text: { value: issue.servicenow_id ?? '', placeholder: 'CS0000000', mono: true },
-      display: issue.servicenow_id || <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400, fontFamily: 'inherit' }}>Da collegare</Box>,
-      onChange: (v: string) => p.onPatch({ servicenow_id: v.trim() }, 'Caso ServiceNow aggiornato'),
-    },
-  ]
-
-  const where: { icon: React.ReactNode; title: React.ReactNode; sub?: React.ReactNode }[] = [
-    { icon: <ApartmentOutlinedIcon />, title: issue.customer_name || issue.customer_placeholder || '—', sub: issue.is_customer_placeholder ? 'Cliente non presente in anagrafica' : 'Cliente' },
-  ]
-  if (issue.site_name) where.push({ icon: <PlaceOutlinedIcon />, title: issue.site_name, sub: 'Sito' })
-  where.push(issue.inventory
-    ? { icon: <DnsOutlinedIcon />, title: <Link component={RouterLink} to={inventoryDrawerPath(issue.inventory, { customer: issue.customer })} onClick={p.onClose} underline="hover">{issueInventoryLabel(issue)}</Link>, sub: 'Inventario collegato' }
-    : { icon: <DnsOutlinedIcon />, title: <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>Nessun inventario collegato</Box>, sub: closed ? undefined : <Link component="button" type="button" underline="hover" onClick={p.onLinkInventory} sx={{ fontSize: 11 }}>Collega un inventario</Link> })
-  if (issue.servicenow_id) where.push({
-    icon: <CloudSyncOutlinedIcon />,
-    title: <Link component="button" type="button" underline="hover" onClick={() => p.onOpenServiceNow(issue.servicenow_id)} sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12 }}>{issue.servicenow_id}</Link>,
-    sub: issue.servicenow_external_url ? <Link href={issue.servicenow_external_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ fontSize: 11 }}>Apri sul portale ServiceNow</Link> : 'Caso ServiceNow',
-  })
-
-  const footer = p.tab === 'det' ? (
-    <>
-      {!closed && !assignedToMe && p.meId != null ? (
-        <Button variant="outlined" startIcon={<PersonOutlineIcon />} onClick={() => p.onPatch({ assigned_to: p.meId! }, 'Assegnata a te')}>Assegna a me</Button>
-      ) : null}
-      <Box sx={{ flex: 1 }} />
-      {!closed && !resolved ? (
-        <Button variant="contained" startIcon={<CheckIcon />} onClick={() => p.onPatch({ status: 'resolved', waiting_reason: '' }, 'Issue risolta')}>Segna come risolta</Button>
-      ) : resolved ? (
-        <Button variant="outlined" onClick={() => p.onPatch({ status: 'in_progress' }, 'Issue riaperta')}>Riapri</Button>
-      ) : (
-        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Issue chiusa: non più modificabile.</Typography>
-      )}
-    </>
-  ) : (
-    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, width: '100%' }}>
-      <InputBase multiline maxRows={4} value={p.newComment} onChange={(e) => p.onNewCommentChange(e.target.value)} disabled={p.sendingComment}
-        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) p.onSendComment() }}
-        placeholder="Scrivi un commento… (Ctrl+Invio per inviare)" inputProps={{ 'aria-label': 'Scrivi un commento' }}
-        sx={{ flex: 1, minHeight: 34, px: 1.25, py: 0.75, fontSize: 13, bgcolor: 'background.paper', border: '1px solid', borderColor: 'archie.borderStrong', borderRadius: '8px', '&.Mui-focused': { borderColor: 'primary.main', boxShadow: (t) => t.palette.archie.focusRing } }} />
-      <Button variant="contained" onClick={p.onSendComment} disabled={!p.newComment.trim() || p.sendingComment}>
-        {p.sendingComment ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : 'Commenta'}
-      </Button>
-    </Box>
-  )
-
+/** Valore che si cambia al volo: clic, menu, scelta (stato, priorità, assegnatario). */
+function QuickPick({ label, value, options, onPick, disabled, after, wide }: {
+  label: string
+  value: React.ReactNode
+  options: { value: string; label: React.ReactNode; selected?: boolean }[]
+  onPick: (v: string) => void
+  disabled?: boolean
+  after?: React.ReactNode
+  wide?: boolean
+}) {
+  const [el, setEl] = React.useState<HTMLElement | null>(null)
   return (
-    <FloatingDetail
-      open
-      onClose={p.onClose}
-      ariaLabel="Dettaglio issue"
-      idLabel={`#${issue.id}`}
-      status={<IssueStatusBadge status={issue.status} onDark />}
-      title={issue.title}
-      subtitle={[issue.customer_name || issue.customer_placeholder, issue.site_name].filter(Boolean).join(' · ')}
-      tabs={[{ key: 'det', label: 'Dettagli' }, { key: 'att', label: p.events ? 'Attività' : 'Commenti', count: p.comments.length + visibleEvents(p.events).length }]}
-      tab={p.tab}
-      onTab={(k) => p.onTab(k as 'det' | 'att')}
-      position={p.position}
-      onPrev={p.onPrev}
-      onNext={p.onNext}
-      menu={[
-        { label: 'Modifica tutti i campi', icon: <EditIcon />, onClick: p.onEdit, disabled: closed },
-        { label: issue.inventory ? 'Cambia inventario collegato' : 'Collega un inventario', icon: <LinkIcon />, onClick: p.onLinkInventory, disabled: closed },
-        { label: 'Elimina', icon: <DeleteOutlineIcon />, onClick: p.onDelete, danger: true, disabled: closed },
-      ]}
-      footer={footer}
-    >
-      {p.tab === 'det' ? (
-        <>
-          <Properties
-            storageKey="issue-props-open"
-            props={props}
-            summary={<><IssuePriorityMark priority={issue.priority} /><Box component="span" sx={{ color: 'text.primary', fontWeight: 500 }}>{issue.assigned_to_full_name || 'Non assegnata'}</Box></>}
-          />
-          <NextStepCard wiki={wiki} canEdit={!closed && hasPerm(PERMS.issues.issue.change)} />
-          <OpenTimeline issue={issue} events={p.events} />
-          <IssueProcedure wiki={wiki} canEdit={!closed && hasPerm(PERMS.issues.issue.change)} />
-          <DetailSection title="Descrizione">
-            <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', color: issue.description ? 'text.primary' : 'text.disabled' }}>
-              {issue.description || 'Nessuna descrizione.'}
-            </Typography>
-          </DetailSection>
-          <DetailSection title="Dove intervenire">
-            <Box sx={{ display: 'grid', gap: 0.75 }}>
-              {where.map((w, i) => (
-                <Box key={i} sx={{ display: 'grid', gridTemplateColumns: '24px 1fr', gap: 1, alignItems: 'center' }}>
-                  <Box sx={{ width: 24, height: 24, borderRadius: '6px', display: 'grid', placeItems: 'center', bgcolor: 'archie.field', color: 'primary.main', '& svg': { fontSize: 14 } }}>{w.icon}</Box>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography component="div" sx={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.title}</Typography>
-                    {w.sub ? <Typography component="div" sx={{ fontSize: 11, color: 'text.secondary' }}>{w.sub}</Typography> : null}
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-          </DetailSection>
-          <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>
-            Creata da {issue.created_by_full_name || issue.created_by_username} il {fmtIssueDateTime(issue.created_at)} · aggiornata il {fmtIssueDateTime(issue.updated_at)}
-          </Typography>
-        </>
-      ) : (
-        <ActivityFeed comments={p.comments} events={p.events} loading={p.commentsLoading} />
-      )}
-    </FloatingDetail>
+    <Box sx={{ display: 'grid', gap: '3px', minWidth: 0, gridColumn: wide ? '1 / -1' : undefined }}>
+      <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 550, color: 'text.secondary' }}>{label}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.25, minHeight: 22 }}>
+        <ButtonBase disabled={disabled} aria-haspopup="menu" aria-label={`${label}: cambia`} onClick={(e) => setEl(e.currentTarget)} sx={{
+          display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 13, borderRadius: '6px', pr: 0.5, py: '1px',
+          '&:hover': { bgcolor: 'archie.surface2', boxShadow: (t) => `0 0 0 4px ${t.palette.archie.surface2}` }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+        }}>
+          {value}{disabled ? null : <Box component="span" sx={{ display: 'inline-flex', color: 'text.disabled' }}><CampoIcon name="chevD" size={13} /></Box>}
+        </ButtonBase>
+        {after}
+      </Box>
+      <Menu anchorEl={el} open={Boolean(el)} onClose={() => setEl(null)}>
+        {options.map((o) => (
+          <MenuItem key={o.value} selected={o.selected} onClick={() => { setEl(null); onPick(o.value) }} sx={{ fontSize: 13, gap: 1 }}>{o.label}</MenuItem>
+        ))}
+      </Menu>
+    </Box>
   )
 }
 
+export default function IssueDetail(p: Props) {
+  return p.issue ? <IssueWindow {...p} issue={p.issue} /> : null
+}
+
+function IssueWindow(p: Props & { issue: IssueRow }) {
+  const { issue } = p
+  const navigate = useNavigate()
+  const toast = useToast()
+  const sites = useCustomerSites(!issue.is_customer_placeholder ? issue.customer : null)
+  const { hasPerm } = useAuth()
+  const wiki = useIssueWiki(issue.id, hasPerm(PERMS.wiki.page.view))
+  const closed = issue.status === 'closed'
+  const resolved = issue.status === 'resolved'
+  const canChange = hasPerm(PERMS.issues.issue.change) && !closed
+
+  // ── Modifica: «Modifica» nel ⋯ trasforma i dati in campi; un solo salvataggio ──
+  const [editing, setEditing] = React.useState(false)
+  const { draft, changed, set, isDirty, reset } = useRecordDraft<Draft>(issue, () => toDraft(issue))
+  const v = editing ? draft : toDraft(issue)
+  const [busy, setBusy] = React.useState(false)
+  const stopEditing = () => { reset(); setEditing(false) }
+  const save = async () => {
+    if (!draft.title.trim()) { toast.error('Il titolo è obbligatorio.'); return }
+    const value: Record<keyof Draft, unknown> = {
+      title: draft.title.trim(), description: draft.description, due_date: draft.due_date || null, category: draft.category ? Number(draft.category) : null,
+      servicenow_id: draft.servicenow_id.trim(), site: draft.site ? Number(draft.site) : null,
+    }
+    const patch = Object.fromEntries(changed.map((k) => [k, value[k]])) as IssuePatch
+    // Cambiando sito l'inventario collegato (che sta in un altro sito) si scollega, come prima.
+    if (changed.includes('site') && issue.inventory) patch.inventory = null
+    setBusy(true)
+    try { await p.onPatch(patch, changed.includes('site') && issue.inventory ? 'Issue aggiornata, inventario scollegato' : 'Issue aggiornata'); setEditing(false) } finally { setBusy(false) }
+  }
+  const blocked = () => { if (editing && changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
+  const go = (path: string) => { if (!blocked()) { p.onClose(); navigate(path) } }
+
+  const [menu, setMenu] = React.useState<HTMLElement | null>(null)
+  const [custEl, setCustEl] = React.useState<HTMLElement | null>(null)
+  React.useEffect(() => { setMenu(null); setEditing(false) }, [issue.id])
+
+  // ── Testata ─────────────────────────────────────────────────────
+  const now = Date.now()
+  const due = issue.due_date ? new Date(`${issue.due_date}T18:00:00`).getTime() : null
+  const over = !closed && !resolved && due != null && now > due
+  const soon = !closed && !resolved && due != null && !over && due - now < DAY * 1.5
+  const customerLabel = issue.customer_name || issue.customer_placeholder || 'Cliente'
+  const scrollTo = (id: string) => document.getElementById(`iss-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const chip = (txt: React.ReactNode, warn?: boolean) => (
+    <Box component="span" sx={{ height: 20, px: 0.9, borderRadius: '5px', fontSize: 11.5, fontWeight: 550, display: 'inline-flex', alignItems: 'center', gap: 0.5, whiteSpace: 'nowrap',
+      bgcolor: warn ? 'rgb(224 164 58 / .28)' : 'rgb(255 255 255 / .12)', color: warn ? '#fde9c4' : '#e6f2ee', '& b': { color: '#fff', fontWeight: 700 } }}>{txt}</Box>
+  )
+  const bandLink = (label: React.ReactNode, onClick: () => void) => (
+    <ButtonBase onClick={onClick} sx={{ font: 'inherit', color: '#fff', fontWeight: 600, verticalAlign: 'baseline', textDecoration: 'underline', textDecorationColor: 'rgb(255 255 255 / .4)', textUnderlineOffset: '3px', '&:hover': { textDecorationColor: '#fff' }, '&.Mui-focusVisible': { outline: '2px solid rgb(255 255 255 / .6)', borderRadius: '3px' } }}>{label}</ButtonBase>
+  )
+
+  // ── Al volo: stato (con la causale di attesa), priorità, assegnatario ──
+  const statusOptions = [
+    ...['open', 'in_progress'].map((s) => ({ value: s, label: <IssueStatusBadge status={s} />, selected: issue.status === s })),
+    ...Object.entries(WAITING_REASON_META).map(([k, m]) => ({ value: `waiting:${k}`, label: <><IssueStatusBadge status="waiting" /><Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{m.label}</Box></>, selected: issue.status === 'waiting' && issue.waiting_reason === k })),
+    { value: 'resolved', label: <IssueStatusBadge status="resolved" />, selected: resolved },
+    { value: 'closed', label: <IssueStatusBadge status="closed" />, selected: closed },
+  ]
+  const pickStatus = (val: string) => {
+    if (val.startsWith('waiting:')) void p.onPatch({ status: 'waiting', waiting_reason: val.slice(8) }, 'Stato aggiornato')
+    else void p.onPatch({ status: val, waiting_reason: '' }, 'Stato aggiornato')
+  }
+  const assignee = issue.assigned_to_full_name
+    ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}><Avatar sx={{ width: 20, height: 20, fontSize: 9, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{ava(issue.assigned_to_full_name)}</Avatar>{issue.assigned_to_full_name}</Box>
+    : <Box component="span" sx={{ color: 'warning.main', fontWeight: 550 }}>Non assegnata</Box>
+
+  const issueLink = `${window.location.origin}/issues${buildQuery({ open: issue.id })}`
+
+  return (
+    <RecordModal open onClose={p.onClose} ariaLabel={`Issue ${issue.id}`} compact
+      title={<><Box component="span" sx={{ ...mono, fontSize: 15, fontWeight: 500, opacity: 0.75 }}>#{issue.id}</Box>{v.title.trim() || issue.title}</>}
+      status={<>
+        <BandChip>{STATUS_META[issue.status]?.label ?? issue.status_label}{issue.status === 'waiting' && issue.waiting_reason_label ? ` · ${issue.waiting_reason_label}` : ''}</BandChip>
+        {editing ? <BandEditing /> : null}
+      </>}
+      subtitle={<>
+        {issue.is_customer_placeholder ? customerLabel : bandLink(customerLabel, () => go(`/customers${buildQuery({ open: issue.customer })}`))}
+        {issue.site_name ? <> · {issue.site ? bandLink(issue.site_name, () => go(`/sites${buildQuery({ open: issue.site })}`)) : issue.site_name}</> : null}
+        {issue.inventory ? <> · {bandLink(issueInventoryLabel(issue), () => go(inventoryDrawerPath(issue.inventory!, { customer: issue.customer })))}</> : null}
+        {issue.servicenow_id ? <> · <Box component="span" sx={{ ...mono, fontSize: 12 }}>{issue.servicenow_id}</Box></> : null}
+      </>}
+      tags={<>
+        {chip(<>priorità <b>{(PRIORITY_META[issue.priority]?.label ?? issue.priority).toLowerCase()}</b></>, issue.priority === 'critical')}
+        {chip(issue.assigned_to_full_name ? <>assegnata a <b>{issue.assigned_to_full_name}</b></> : 'non assegnata', !issue.assigned_to)}
+        {due != null && !closed && !resolved ? chip(over ? <>scaduta il <b>{fmtIssueDate(issue.due_date)}</b></> : <>scade il <b>{fmtIssueDate(issue.due_date)}</b></>, over || soon) : null}
+        <BandStat n={p.comments.length} one=" commento" many=" commenti" onClick={() => scrollTo('att')} />
+      </>}
+      position={p.position} onPrev={p.onPrev} onNext={p.onNext}
+      actions={<>
+        {editing || closed ? null : resolved
+          ? <Button variant="outlined" onClick={() => void p.onPatch({ status: 'in_progress' }, 'Issue riaperta')} sx={bandButtonSx}>Riapri</Button>
+          : <Button variant="outlined" startIcon={<CheckIcon sx={{ fontSize: 16 }} />} onClick={() => void p.onPatch({ status: 'resolved', waiting_reason: '' }, 'Issue risolta')} sx={{ ...bandButtonSx, ...bandSolidSx }}>Segna come risolta</Button>}
+        <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" onClick={(e) => setMenu(e.currentTarget)} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' } }}><CampoIcon name="more" /></IconButton></Tooltip>
+        <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+          <MenuItem disabled={!canChange || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
+          <MenuItem disabled={!canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>Tutti i campi…</MenuItem>
+          <MenuItem disabled={!canChange} onClick={() => { setMenu(null); p.onLinkInventory() }}><ListItemIcon><CampoIcon name="server" size={16} /></ListItemIcon>{issue.inventory ? 'Cambia inventario collegato' : 'Collega un inventario'}</MenuItem>
+          <MenuItem onClick={() => { setMenu(null); void copyToClipboard(issueLink).then(() => toast.success('Link copiato')) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il link</MenuItem>
+          <MenuItem disabled={closed || !hasPerm(PERMS.issues.issue.delete)} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
+        </Menu>
+      </>}
+      editing={editing} dirtyCount={editing ? changed.length : 0} saving={busy} onSave={() => void save()} onDiscard={stopEditing}>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
+        {/* ── Colonna principale ── */}
+        <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <NextStepCard wiki={wiki} canEdit={canChange} />
+          <RecordSection title="Descrizione">
+            {editing ? <RecordNotes value={draft.description} onChange={set('description')} dirty={isDirty('description')} placeholder="Cosa succede, da quando, cosa è già stato provato" ariaLabel="Descrizione" />
+              : <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', color: issue.description ? 'text.primary' : 'text.disabled' }}>{issue.description || 'Nessuna descrizione.'}</Typography>}
+          </RecordSection>
+          <IssueProcedure wiki={wiki} canEdit={canChange} />
+          <Box id="iss-att" sx={{ scrollMarginTop: 16 }}>
+            <RecordSection title={<>Attività<Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: 'text.secondary' }}>{p.comments.length + visibleEvents(p.events).length}</Box></>}>
+              <ActivityFeed comments={p.comments} events={p.events} loading={p.commentsLoading} />
+              {closed ? <RecordEmpty>Issue chiusa: non si commenta più.</RecordEmpty> : (
+                <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <InputBase multiline minRows={2} maxRows={6} value={p.newComment} onChange={(e) => p.onNewCommentChange(e.target.value)} disabled={p.sendingComment}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) p.onSendComment() }}
+                    placeholder="Scrivi un commento… (Ctrl+Invio per inviare)" inputProps={{ 'aria-label': 'Scrivi un commento' }}
+                    sx={{ flex: 1, px: 1.25, py: 0.75, fontSize: 13, bgcolor: 'background.paper', border: '1px solid', borderColor: 'archie.borderStrong', borderRadius: '8px', '&.Mui-focused': { borderColor: 'primary.main', boxShadow: (t) => t.palette.archie.focusRing } }} />
+                  <Button variant="contained" onClick={p.onSendComment} disabled={!p.newComment.trim() || p.sendingComment}>
+                    {p.sendingComment ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : 'Commenta'}
+                  </Button>
+                </Box>
+              )}
+            </RecordSection>
+          </Box>
+        </Box>
+
+        {/* ── Colonna laterale ── */}
+        <Box component="aside" aria-label="Issue" sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <RecordSection title="Dettagli">
+            <RecordGrid>
+              {editing ? <RecordField editing label="Titolo" value={draft.title} onChange={set('title')} dirty={isDirty('title')} wide /> : null}
+              <QuickPick label="Stato" disabled={!canChange} options={statusOptions} onPick={pickStatus}
+                value={<><IssueStatusBadge status={issue.status} />{issue.status === 'waiting' && issue.waiting_reason_label ? <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{issue.waiting_reason_label}</Box> : null}</>} />
+              <QuickPick label="Priorità" disabled={!canChange} value={<IssuePriorityMark priority={issue.priority} />}
+                options={['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: <IssuePriorityMark priority={k} />, selected: issue.priority === k }))}
+                onPick={(val) => void p.onPatch({ priority: val }, 'Priorità aggiornata')} />
+              <QuickPick label="Assegnata a" wide disabled={!canChange} value={assignee}
+                options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box>, selected: !issue.assigned_to }, ...p.users.map((u) => ({ value: String(u.id), label: u.label, selected: issue.assigned_to === u.id }))]}
+                onPick={(val) => void p.onPatch({ assigned_to: val ? Number(val) : null }, 'Assegnatario aggiornato')}
+                after={!issue.assigned_to && canChange && p.meId != null ? <Button size="small" onClick={() => void p.onPatch({ assigned_to: p.meId! }, 'Assegnata a te')} sx={{ minWidth: 0, px: 0.5 }}>Assegna a me</Button> : null} />
+              <RecordField editing={editing} type="date" label="Scadenza" value={v.due_date} onChange={set('due_date')} dirty={isDirty('due_date')} show={(x) => fmtIssueDate(x)} />
+              {editing ? (
+                <RecordSelect label="Categoria" value={draft.category} onChange={set('category')} dirty={isDirty('category')}
+                  options={[{ value: '', label: 'Nessuna' }, ...p.categories.map((c) => ({ value: String(c.id), label: c.label }))]} />
+              ) : <RecordValue label="Categoria">{issue.category_label || null}</RecordValue>}
+              <RecordField editing={editing} label="ServiceNow" value={v.servicenow_id} onChange={set('servicenow_id')} dirty={isDirty('servicenow_id')} mono placeholder="CS0000000" wide
+                show={(x) => <RecordLink onClick={() => p.onOpenServiceNow(x)}><Box component="span" sx={{ ...mono, fontSize: 12.5 }}>{x}</Box></RecordLink>} />
+            </RecordGrid>
+            {editing ? <Typography sx={{ mt: 1.25, fontSize: 11.5, color: 'text.secondary' }}>Stato, priorità e assegnatario si cambiano al volo, anche fuori dalla modifica.</Typography> : null}
+          </RecordSection>
+
+          <RecordSection title="Tempo"><OpenTimeline issue={issue} events={p.events} /></RecordSection>
+
+          <RecordSection title="Dove intervenire">
+            <RecordRows>
+              <RecordRow lead={<CampoIcon name="building" size={18} />} title={customerLabel}
+                sub={issue.is_customer_placeholder ? 'Cliente non presente in anagrafica' : 'Cliente'}
+                end={editing ? <Button size="small" onClick={(e) => { e.stopPropagation(); setCustEl(e.currentTarget) }}>Cambia</Button> : undefined}
+                onClick={!editing && !issue.is_customer_placeholder ? () => go(`/customers${buildQuery({ open: issue.customer })}`) : undefined} />
+              {editing && !issue.is_customer_placeholder ? (
+                <Box sx={{ py: 1 }}>
+                  <RecordSelect label="Sito" value={draft.site} onChange={set('site')} dirty={isDirty('site')}
+                    options={[{ value: '', label: 'Nessun sito' }, ...sites.map((x) => ({ value: String(x.id), label: x.label }))]} />
+                </Box>
+              ) : issue.site_name ? (
+                <RecordRow lead={<CampoIcon name="pin" size={18} />} title={issue.site_name} sub="Sito" onClick={issue.site ? () => go(`/sites${buildQuery({ open: issue.site })}`) : undefined} />
+              ) : null}
+              {issue.inventory ? (
+                <RecordRow lead={<CampoIcon name="server" size={18} />} title={issueInventoryLabel(issue)} sub={<>Inventario{issue.inventory_hostname ? <> · <Box component="span" sx={mono}>{issue.inventory_hostname}</Box></> : null}</>}
+                  onClick={() => go(inventoryDrawerPath(issue.inventory!, { customer: issue.customer }))} />
+              ) : (
+                <RecordRow lead={<CampoIcon name="server" size={18} />} title={<Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>Nessun inventario collegato</Box>}
+                  end={canChange ? <Button size="small" onClick={(e) => { e.stopPropagation(); p.onLinkInventory() }}>Collega</Button> : undefined} />
+              )}
+            </RecordRows>
+            <Popover open={Boolean(custEl)} anchorEl={custEl} onClose={() => setCustEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }} slotProps={{ paper: { sx: { width: 320, p: 1 } } }}>
+              <CustomerPicker current={issue.is_customer_placeholder ? null : issue.customer} onPick={(c) => {
+                setCustEl(null)
+                if (c.id === issue.customer && !issue.is_customer_placeholder) return
+                void p.onPatch({ customer: c.id, customer_placeholder: '', site: null, inventory: null }, issue.inventory ? 'Cliente aggiornato, sito e inventario scollegati' : 'Cliente aggiornato')
+              }} />
+            </Popover>
+          </RecordSection>
+
+          <Typography sx={{ px: 0.5, fontSize: 11, color: 'text.disabled' }}>
+            Creata da {issue.created_by_full_name || issue.created_by_username} il {fmtIssueDateTime(issue.created_at)} · aggiornata il {fmtIssueDateTime(issue.updated_at)}
+          </Typography>
+        </Box>
+      </Box>
+    </RecordModal>
+  )
+}
 
 /** Eventi da mostrare: senza quelli che ripetono un commento o non cambiano nulla. */
 function visibleEvents(events?: IssueEvent[] | null) {
@@ -370,7 +431,7 @@ function ActivityFeed({ comments, events, loading }: { comments: IssueComment[];
   ].sort((a, b) => a.at.localeCompare(b.at))
   const evCount = visibleEvents(events).length
   const shown = items.filter((i) => filter === 'all' || i.kind === filter)
-  if (loading) return <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}><CircularProgress size={22} /></Box>
+  if (loading) return <RecordLoader />
   return (
     <Box sx={{ display: 'grid', gap: 1.5 }}>
       {events ? (

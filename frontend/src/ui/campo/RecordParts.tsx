@@ -11,7 +11,7 @@ import { recordMono } from './recordShared'
 
 const labelSx = { fontSize: 11.5, fontWeight: 550, color: 'text.secondary' } as const
 
-export function RecordInput({ label, value, onChange, dirty, disabled, missing, mono, placeholder, max, ariaLabel }: {
+export function RecordInput({ label, value, onChange, dirty, disabled, missing, mono, placeholder, max, ariaLabel, type }: {
   label: React.ReactNode
   value: string
   onChange: (v: string) => void
@@ -23,6 +23,7 @@ export function RecordInput({ label, value, onChange, dirty, disabled, missing, 
   placeholder?: string
   max?: number
   ariaLabel?: string
+  type?: 'text' | 'date'
 }) {
   const miss = missing && !value.trim()
   return (
@@ -30,7 +31,7 @@ export function RecordInput({ label, value, onChange, dirty, disabled, missing, 
       <Typography component="label" sx={labelSx}>
         {label}{miss ? <Box component="span" sx={{ ml: 0.75, color: 'warning.main', fontWeight: 600 }}>manca</Box> : null}
       </Typography>
-      <InputBase value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
+      <InputBase type={type} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
         inputProps={{ 'aria-label': ariaLabel ?? (typeof label === 'string' ? label : undefined), maxLength: max }}
         sx={(t) => ({
           height: 34, px: 1.25, fontSize: 13, borderRadius: '6px', border: '1px solid', bgcolor: 'background.paper',
@@ -63,10 +64,10 @@ export function RecordSelect({ label, value, onChange, options, dirty, disabled 
   )
 }
 
-export function RecordNotes({ value, onChange, dirty, disabled, placeholder }: { value: string; onChange: (v: string) => void; dirty?: boolean; disabled?: boolean; placeholder?: string }) {
+export function RecordNotes({ value, onChange, dirty, disabled, placeholder, ariaLabel = 'Note' }: { value: string; onChange: (v: string) => void; dirty?: boolean; disabled?: boolean; placeholder?: string; ariaLabel?: string }) {
   return (
     <InputBase multiline minRows={3} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
-      inputProps={{ 'aria-label': 'Note' }}
+      inputProps={{ 'aria-label': ariaLabel }}
       sx={(t) => ({ width: '100%', p: '8px 10px', fontSize: 13, lineHeight: 1.5, borderRadius: '6px', border: '1px solid', borderColor: dirty ? 'warning.main' : 'divider', '&.Mui-focused': { borderColor: 'primary.main', boxShadow: t.palette.archie.focusRing } })} />
   )
 }
@@ -118,7 +119,7 @@ export function RecordLink({ children, onClick }: { children: React.ReactNode; o
  * Un dato che si legge come testo e diventa un campo in modifica («Modifica» nel ⋯):
  * lo stesso schema per inventario, cliente, sito e contatto.
  */
-export function RecordField({ editing, label, value, onChange, dirty, wide, mono, placeholder, missing, max, show }: {
+export function RecordField({ editing, label, value, onChange, dirty, wide, mono, placeholder, missing, max, show, type }: {
   editing: boolean
   label: string
   value: string
@@ -132,11 +133,12 @@ export function RecordField({ editing, label, value, onChange, dirty, wide, mono
   max?: number
   /** Come mostrarlo in lettura (date, link…). */
   show?: (v: string) => React.ReactNode
+  type?: 'text' | 'date'
 }) {
   if (editing) {
     return (
       <Box sx={{ gridColumn: wide ? '1 / -1' : undefined, minWidth: 0 }}>
-        <RecordInput label={label} value={value} onChange={onChange} dirty={dirty} mono={mono} placeholder={placeholder} missing={missing} max={max} />
+        <RecordInput type={type} label={label} value={value} onChange={onChange} dirty={dirty} mono={mono} placeholder={placeholder} missing={missing} max={max} />
       </Box>
     )
   }

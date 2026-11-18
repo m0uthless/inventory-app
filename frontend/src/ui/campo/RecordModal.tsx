@@ -108,14 +108,16 @@ export function RecordModal({
             {tags ? <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: compact ? 1 : 1.1 }}>{tags}</Box> : null}
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 'none' }}>
-            {position ? <Typography sx={{ fontSize: 12, color: 'rgb(255 255 255 / .7)', mr: 0.25, fontVariantNumeric: 'tabular-nums' }}>{position}</Typography> : null}
-            {onPrev || onNext ? (
-              <>
-                <Tooltip title="Precedente"><span><IconButton aria-label="Precedente" disabled={!onPrev} onClick={onPrev ? guard(onPrev) : undefined} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' }, '&.Mui-disabled': { color: 'rgb(255 255 255 / .3)' } }}><CampoIcon name="chevL" /></IconButton></span></Tooltip>
-                <Tooltip title="Successivo"><span><IconButton aria-label="Successivo" disabled={!onNext} onClick={onNext ? guard(onNext) : undefined} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' }, '&.Mui-disabled': { color: 'rgb(255 255 255 / .3)' } }}><CampoIcon name="chevR" /></IconButton></span></Tooltip>
-              </>
-            ) : null}
             {actions}
+            {/* Posizione e frecce sempre per ultime: restano nello stesso punto anche quando i pulsanti
+                prima cambiano da un record all'altro. In modifica restano lì, spente. */}
+            {position || onPrev || onNext ? (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, ml: 0.5, pl: 1.25, borderLeft: '1px solid rgb(255 255 255 / .18)', opacity: editing ? 0.5 : 1 }}>
+                {position ? <Typography sx={{ fontSize: 12, color: 'rgb(255 255 255 / .7)', mr: 0.5, minWidth: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{position}</Typography> : null}
+                <Tooltip title="Precedente"><span><IconButton aria-label="Precedente" disabled={!onPrev || editing} onClick={onPrev ? guard(onPrev) : undefined} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' }, '&.Mui-disabled': { color: 'rgb(255 255 255 / .3)' } }}><CampoIcon name="chevL" /></IconButton></span></Tooltip>
+                <Tooltip title="Successivo"><span><IconButton aria-label="Successivo" disabled={!onNext || editing} onClick={onNext ? guard(onNext) : undefined} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' }, '&.Mui-disabled': { color: 'rgb(255 255 255 / .3)' } }}><CampoIcon name="chevR" /></IconButton></span></Tooltip>
+              </Box>
+            ) : null}
           </Box>
         </Box>
         <IconButton aria-label="Chiudi" onClick={close} sx={{ position: 'absolute', top: 10, right: 10, color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)', color: '#fff' } }}>
