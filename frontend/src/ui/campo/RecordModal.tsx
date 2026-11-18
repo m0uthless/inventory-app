@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Box, Button, Dialog, IconButton, Tooltip, Typography, useMediaQuery, type Theme } from '@mui/material'
 import { CampoIcon } from './CampoIcon'
 import { CampoDialog } from './CampoDialog'
+import { RecordFrameContext, recordBackdropSx, recordPaperSx } from './recordFrame'
 
 /**
  * Finestra di un record (DESIGN.md › Record window, anteprima design-previews/ud-base.html,
@@ -70,22 +71,35 @@ export function RecordModal({
   // Uscire (chiudere o passare a un altro record) con modifiche in sospeso chiede conferma.
   const guard = (go: () => void) => () => { if (dirtyCount > 0 && !saving) setConfirm(() => go); else go() }
   const close = guard(onClose)
-  const titleId = React.useId()
+  const ownId = React.useId()
+  // Dentro una pila di record il Dialog è del contenitore: qui solo testata, corpo e barra.
+  const host = React.useContext(RecordFrameContext)
+  const active = !host || host.active
+  const titleId = host ? host.titleId : ownId
+  React.useEffect(() => { if (host?.active) host.setClose(close) })
+  React.useEffect(() => { if (host?.active && open) host.reportOpen() }, [host, open])
 
-  return (
-    <Dialog
-      open={open} onClose={close} fullScreen={phone} scroll="body" aria-label={ariaLabel} aria-labelledby={titleId} maxWidth={false}
-      slotProps={{
-        backdrop: { sx: { bgcolor: 'rgb(10 20 18 / .38)' } },
-        paper: { sx: { width: phone ? '100%' : 'min(1120px, calc(100vw - 48px))', maxWidth: 'none', m: phone ? 0 : '40px auto', p: phone ? 1.25 : 2, borderRadius: phone ? 0 : '16px', bgcolor: 'background.default', backgroundImage: 'none', boxShadow: '0 30px 80px -20px rgb(10 30 25 / .45), 0 4px 14px rgb(10 30 25 / .12)', overflow: 'visible' } },
-      }}
-    >
+  const frame = (
+    <>
       {/* Testata Band */}
       <Box component="header" sx={{ position: 'relative', borderRadius: '12px', p: compact ? { xs: '14px 14px 16px', md: '14px 20px 15px' } : { xs: '16px 16px 18px', md: '18px 22px 20px' }, color: '#fff', background: (t) => `linear-gradient(160deg, ${t.palette.archie.band2}, ${t.palette.archie.band})` }}>
+        {host?.crumbs.length ? (
+          <Box component="nav" aria-label="Percorso" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, mb: 1, pr: 5, fontSize: 12, color: 'rgb(255 255 255 / .6)' }}>
+            {host.crumbs.map((c, i) => (
+              <React.Fragment key={i}>
+                {i ? <span aria-hidden>/</span> : null}
+                <Box component="button" type="button" onClick={guard(c.onBack)} sx={{
+                  border: 0, background: 'none', p: 0, font: 'inherit', fontWeight: 550, color: 'rgb(255 255 255 / .86)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '2px',
+                  '&:hover': { color: '#fff', textDecoration: 'underline', textUnderlineOffset: '3px' }, '&:focus-visible': { outline: '2px solid rgb(255 255 255 / .6)', borderRadius: '3px' },
+                }}>{i ? null : <CampoIcon name="chevL" size={14} />}{c.label}</Box>
+              </React.Fragment>
+            ))}
+          </Box>
+        ) : null}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: { xs: 'wrap', md: 'nowrap' }, pr: 5 }}>
           {avatar}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography component="h2" id={titleId} sx={{ fontSize: compact ? 19 : 20, lineHeight: 1.25, fontWeight: 650, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+            <Typography component="h2" id={active ? titleId : undefined} sx={{ fontSize: compact ? 19 : 20, lineHeight: 1.25, fontWeight: 650, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
               {title}{status}
             </Typography>
             {subtitle ? <Typography sx={{ mt: 0.4, fontSize: 12.5, color: 'rgb(255 255 255 / .74)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: { md: 'nowrap' } }}>{subtitle}</Typography> : null}
@@ -132,6 +146,15 @@ export function RecordModal({
         footer={<><Box sx={{ flex: 1 }} /><Button onClick={() => setConfirm(null)}>Continua a modificare</Button><Button variant="contained" color="error" onClick={() => { const go = confirm; setConfirm(null); onDiscard?.(); go?.() }}>Esci senza salvare</Button></>}>
         <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Puoi tornare indietro e usare «Salva le modifiche» nella barra in basso.</Typography>
       </CampoDialog>
+    </>
+  )
+  if (host) return frame
+  return (
+    <Dialog
+      open={open} onClose={close} fullScreen={phone} scroll="body" aria-label={ariaLabel} aria-labelledby={titleId} maxWidth={false}
+      slotProps={{ backdrop: { sx: recordBackdropSx }, paper: { sx: recordPaperSx(phone) } }}
+    >
+      {frame}
     </Dialog>
   )
 }

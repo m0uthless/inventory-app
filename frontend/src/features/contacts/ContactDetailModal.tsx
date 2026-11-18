@@ -4,13 +4,14 @@ import { Box, Button, ButtonBase, IconButton, ListItemIcon, Menu, MenuItem, Swit
 import { api } from '@shared/api/client'
 import { apiErrorToFormFeedback } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
-import { buildQuery } from '@shared/utils/nav'
 import {
   BandChip, CampoIcon, RecordEmpty, RecordInput, RecordLoader, RecordModal, RecordNotes, RecordReadOnly, RecordRow, RecordRows, RecordSection, RecordSelect,
   SectionCount, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
 import { AuditFeedPanel } from '../customers/CustomerTabs'
 import { PeopleList, type LinkedPerson } from '../records/linked'
+import { RecordStackContext } from '../records/recordStack'
+import { useOpenRecord } from '../records/recordStack'
 
 /*
  * Finestra del contatto (DESIGN.md › Record window, anteprima design-previews/core-base.html, pagina Contatti):
@@ -66,7 +67,7 @@ export default function ContactDetailModal(p: ContactDetailModalProps) {
   return p.detail ? <ContactWindow {...p} detail={p.detail} /> : null
 }
 
-function ContactWindow(p: ContactDetailModalProps & { detail: ContactModalDetail }) {
+export function ContactWindow(p: ContactDetailModalProps & { detail: ContactModalDetail }) {
   const d = p.detail
   const toast = useToast()
   const navigate = useNavigate()
@@ -96,7 +97,12 @@ function ContactWindow(p: ContactDetailModalProps & { detail: ContactModalDetail
   }
   const blocked = () => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
   const go = (path: string) => { if (!blocked()) navigate(path) }
-  const openContact = (id: number) => { if (!blocked()) p.onOpenContact(id) }
+  // Cliente, sito e colleghi si aprono nella stessa finestra, sopra il contatto.
+  const openRec = useOpenRecord(blocked, navigate)
+  const inStack = React.useContext(RecordStackContext) != null
+  const openContact = (id: number) => { if (inStack) openRec({ kind: 'contact', id, label: all?.find((x) => x.id === id)?.name ?? 'Contatto' }); else if (!blocked()) p.onOpenContact(id) }
+  const openCustomer = () => { if (d.customer) openRec({ kind: 'customer', id: d.customer, label: d.customer_display_name || d.customer_name || 'Cliente' }) }
+  const openSite = (id: number, label: string) => openRec({ kind: 'site', id, label })
 
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
   React.useEffect(() => { setMenu(null) }, [d.id])
@@ -141,8 +147,8 @@ function ContactWindow(p: ContactDetailModalProps & { detail: ContactModalDetail
       </>}
       subtitle={<>
         {draft.department.trim() || 'Reparto non indicato'} ·{' '}
-        {d.customer ? bandLink(customerLabel, () => go(`/customers${buildQuery({ open: d.customer })}`)) : customerLabel}
-        {siteId ? <> · {bandLink(siteLabel || 'Sito', () => go(`/sites${buildQuery({ open: siteId })}`))}</> : null}
+        {d.customer ? bandLink(customerLabel, openCustomer) : customerLabel}
+        {siteId ? <> · {bandLink(siteLabel || 'Sito', () => openSite(siteId, siteLabel || 'Sito'))}</> : null}
       </>}
       position={p.position} onPrev={p.onPrev} onNext={p.onNext}
       actions={<>
@@ -174,13 +180,13 @@ function ContactWindow(p: ContactDetailModalProps & { detail: ContactModalDetail
             <RecordRows>
               {d.customer ? (
                 <RecordRow lead={<CampoIcon name="building" size={18} />} title={customerLabel} sub="Cliente"
-                  onClick={() => go(`/customers${buildQuery({ open: d.customer })}`)} />
+                  onClick={openCustomer} />
               ) : null}
               {siteId ? (
                 <RecordRow lead={<CampoIcon name="pin" size={18} />} title={siteLabel || 'Sito'}
                   sub={['Sito', site ? [site.address_line1, site.city].filter(Boolean).join(', ') : null].filter(Boolean).join(' · ')}
                   end={site?.assets_count != null ? `${site.assets_count} ${site.assets_count === 1 ? 'inventario' : 'inventari'}` : undefined}
-                  onClick={() => go(`/sites${buildQuery({ open: siteId })}`)} />
+                  onClick={() => openSite(siteId, siteLabel || 'Sito')} />
               ) : null}
             </RecordRows>
             {!siteId ? <RecordEmpty>Lavora nella sede del cliente, non su un sito.</RecordEmpty> : null}
@@ -202,7 +208,7 @@ function ContactWindow(p: ContactDetailModalProps & { detail: ContactModalDetail
               {field('Telefono', 'phone', { mono: true })}
               {field('Email', 'email')}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-                <RecordReadOnly label="Cliente" onClick={d.customer ? () => go(`/customers${buildQuery({ open: d.customer })}`) : undefined}>{customerLabel}</RecordReadOnly>
+                <RecordReadOnly label="Cliente" onClick={d.customer ? openCustomer : undefined}>{customerLabel}</RecordReadOnly>
                 <RecordSelect label="Sito" value={draft.site} onChange={set('site')} dirty={isDirty('site')} disabled={!editable}
                   options={[{ value: '', label: 'Sede del cliente' }, ...(sites ?? []).map((s) => ({ value: String(s.id), label: s.display_name || s.name })),
                     ...(d.site && sites && !sites.some((s) => s.id === d.site) ? [{ value: String(d.site), label: d.site_display_name || d.site_name || `Sito ${d.site}` }] : [])]} />

@@ -15,6 +15,7 @@ import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import SiteDialog from '../features/sites/SiteDialog'
 import SiteDetailModal from '../features/sites/SiteDetailModal'
+import RecordStackHost from '../features/records/RecordStackHost'
 import SiteKpis, { useSiteSummary } from '../features/sites/SiteKpis'
 import { SiteStatusBadge } from '../features/sites/siteUi'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
@@ -657,22 +658,24 @@ export default function Sites() {
 
       {/* La finestra si apre solo con il sito già caricato: niente passaggio da una finestra di attesa. */}
       {drawerOpen && detail ? (
-        <SiteDetailModal
-          detail={detail}
-          statuses={statuses}
-          canChange={canChange}
-          canDelete={canDelete}
-          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
-          onClose={closeDrawer}
-          onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
-          onEdit={openEdit}
-          onDelete={() => setDeleteDlgOpen(true)}
-          onRestore={() => void doRestore()}
-          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onNewIssue={() => newIssueFor(detail)}
-        />
+        <RecordStackHost root={{ kind: 'site', id: detail.id, label: detail.display_name || detail.name }} onClose={closeDrawer}>
+          <SiteDetailModal
+            detail={detail}
+            statuses={statuses}
+            canChange={canChange}
+            canDelete={canDelete}
+            position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+            onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+            onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
+            onClose={closeDrawer}
+            onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
+            onEdit={openEdit}
+            onDelete={() => setDeleteDlgOpen(true)}
+            onRestore={() => void doRestore()}
+            onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+            onNewIssue={() => newIssueFor(detail)}
+          />
+        </RecordStackHost>
       ) : null}
 
       <ConfirmDeleteDialog

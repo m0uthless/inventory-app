@@ -37,6 +37,7 @@ import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
 import CustomerDetailModal from '../features/customers/CustomerDetailModal'
+import RecordStackHost from '../features/records/RecordStackHost'
 import CustomerKpis, { useCustomerSummary } from '../features/customers/CustomerKpis'
 import { daysTo, dIt, EXPIRING_DAYS, ExpiryMark, VendorMark, vendorColorOf } from '../features/customers/customerUi'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
@@ -771,31 +772,33 @@ export default function Customers() {
 
       {/* La finestra si apre solo con il cliente già caricato: niente passaggio da una finestra di attesa. */}
       {drawerOpen && detail ? (
-        <CustomerDetailModal
-          detail={detail}
-          loading={detailLoading}
-          statuses={statuses}
-          vendorColor={vendorColor}
-          canChange={canChange}
-          canDelete={canDelete}
-          canEditVpn={canEditVpn}
-          showContracts={hasPerm(PERMS.contracts.contract.view)}
-          showDevices={showDevices}
-          canEditDevices={hasPerm(PERMS.device.device.change)}
-          address={address}
-          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
-          onClose={closeDrawer}
-          onSaved={() => { if (detail) void loadDetail(detail.id, undefined, true); reloadAll() }}
-          onEdit={openEdit}
-          onDelete={() => setDeleteDlgOpen(true)}
-          onRestore={() => void doRestore()}
-          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onEditVpn={() => { if (detail) openVpnModal(detail) }}
-          onNewIssue={() => { if (detail) newIssueFor(detail) }}
-          reloadKey={vpnReload}
-        />
+        <RecordStackHost root={{ kind: 'customer', id: detail.id, label: detail.display_name || detail.name }} onClose={closeDrawer}>
+          <CustomerDetailModal
+            detail={detail}
+            loading={detailLoading}
+            statuses={statuses}
+            vendorColor={vendorColor}
+            canChange={canChange}
+            canDelete={canDelete}
+            canEditVpn={canEditVpn}
+            showContracts={hasPerm(PERMS.contracts.contract.view)}
+            showDevices={showDevices}
+            canEditDevices={hasPerm(PERMS.device.device.change)}
+            address={address}
+            position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+            onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+            onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
+            onClose={closeDrawer}
+            onSaved={() => { if (detail) void loadDetail(detail.id, undefined, true); reloadAll() }}
+            onEdit={openEdit}
+            onDelete={() => setDeleteDlgOpen(true)}
+            onRestore={() => void doRestore()}
+            onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+            onEditVpn={() => { if (detail) openVpnModal(detail) }}
+            onNewIssue={() => { if (detail) newIssueFor(detail) }}
+            reloadKey={vpnReload}
+          />
+        </RecordStackHost>
       ) : null}
 
       <ConfirmDeleteDialog

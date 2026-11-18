@@ -13,6 +13,7 @@ import LeafletMap from '../../ui/LeafletMap'
 import { AuditFeedPanel } from '../customers/CustomerTabs'
 import { Anchor, InventoriesSection, IssuesSection, PeopleList, WhereBlock, type LinkedInventory, type LinkedIssue, type LinkedPerson } from '../records/linked'
 import { ACTIVE_ISSUES } from '../records/linkedShared'
+import { useOpenRecord } from '../records/recordStack'
 
 /*
  * Finestra del sito (DESIGN.md › Record window, anteprima design-previews/core-base.html, pagina Siti):
@@ -81,7 +82,7 @@ export default function SiteDetailModal(p: SiteDetailModalProps) {
   return p.detail ? <SiteWindow {...p} detail={p.detail} /> : null
 }
 
-function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }) {
+export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }) {
   const d = p.detail
   const toast = useToast()
   const navigate = useNavigate()
@@ -112,7 +113,11 @@ function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }) {
     } catch (e) { toast.error(apiErrorToFormFeedback(e).message) } finally { setBusy(false) }
   }
   // Uscire verso un'altra pagina con modifiche in sospeso le perderebbe: prima si salva o si annulla.
-  const go = (path: string) => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return } navigate(path) }
+  const blocked = () => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
+  const go = (path: string) => { if (!blocked()) navigate(path) }
+  // Cliente e contatti si aprono nella stessa finestra, sopra il sito.
+  const openRec = useOpenRecord(blocked, navigate)
+  const openCustomer = () => { if (d.customer) openRec({ kind: 'customer', id: d.customer, label: d.customer_display_name || d.customer_name || 'Cliente' }) }
 
   // ── Testata ─────────────────────────────────────────────────────
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
@@ -145,7 +150,7 @@ function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }) {
       subtitle={<>
         Sito di{' '}
         {d.customer ? (
-          <ButtonBase onClick={() => go(`/customers${buildQuery({ open: d.customer })}`)} sx={{ font: 'inherit', color: '#fff', fontWeight: 600, verticalAlign: 'baseline', textDecoration: 'underline', textDecorationColor: 'rgb(255 255 255 / .4)', textUnderlineOffset: '3px', '&:hover': { textDecorationColor: '#fff' }, '&.Mui-focusVisible': { outline: '2px solid rgb(255 255 255 / .6)', borderRadius: '3px' } }}>{customerLabel}</ButtonBase>
+          <ButtonBase onClick={openCustomer} sx={{ font: 'inherit', color: '#fff', fontWeight: 600, verticalAlign: 'baseline', textDecoration: 'underline', textDecorationColor: 'rgb(255 255 255 / .4)', textUnderlineOffset: '3px', '&:hover': { textDecorationColor: '#fff' }, '&.Mui-focusVisible': { outline: '2px solid rgb(255 255 255 / .6)', borderRadius: '3px' } }}>{customerLabel}</ButtonBase>
         ) : customerLabel}
         {fullAddress ? ` · ${fullAddress}` : ' · indirizzo mancante'}
       </>}
@@ -178,7 +183,7 @@ function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }) {
           <Anchor id="site-con">
             <RecordSection title={<>Contatti del sito<SectionCount n={people?.length} /></>}
               end={<Button size="small" onClick={() => go(`/contacts${buildQuery({ customer: d.customer ?? undefined, site: d.id })}`)}>Apri elenco</Button>}>
-              {!people ? <RecordLoader /> : people.length ? <PeopleList people={people} primaryId={primary?.id ?? null} go={go} showSite={false} />
+              {!people ? <RecordLoader /> : people.length ? <PeopleList people={people} primaryId={primary?.id ?? null} go={go} onOpen={(id) => openRec({ kind: 'contact', id, label: people.find((x) => x.id === id)?.name ?? 'Contatto' })} showSite={false} />
                 : <RecordEmpty>Nessun contatto in questo sito.</RecordEmpty>}
             </RecordSection>
           </Anchor>
@@ -191,7 +196,7 @@ function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }) {
               {field('Nome', 'name')}
               {field(<>Nome breve <Box component="span" sx={{ fontWeight: 400, color: 'text.disabled' }}>come compare negli elenchi</Box></>, 'display_name', { placeholder: draft.name })}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-                <RecordReadOnly label="Cliente" onClick={d.customer ? () => go(`/customers${buildQuery({ open: d.customer })}`) : undefined}>{customerLabel}</RecordReadOnly>
+                <RecordReadOnly label="Cliente" onClick={d.customer ? openCustomer : undefined}>{customerLabel}</RecordReadOnly>
                 <RecordSelect label="Stato" value={draft.status} onChange={set('status')} dirty={isDirty('status')} disabled={!editable}
                   options={p.statuses.map((s) => ({ value: String(s.id), label: s.label, mark: <StatusMark k={s.key} color={markColor(s.key)} /> }))} />
               </Box>

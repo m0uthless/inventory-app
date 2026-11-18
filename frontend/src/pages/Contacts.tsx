@@ -15,6 +15,7 @@ import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import ContactDialog from '../features/contacts/ContactDialog'
 import ContactDetailModal from '../features/contacts/ContactDetailModal'
+import RecordStackHost from '../features/records/RecordStackHost'
 import ContactKpis, { useContactSummary } from '../features/contacts/ContactKpis'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
@@ -606,21 +607,23 @@ export default function Contacts() {
 
       {/* La finestra si apre solo con il contatto già caricato: niente passaggio da una finestra di attesa. */}
       {drawerOpen && detail ? (
-        <ContactDetailModal
-          detail={detail}
-          canChange={canChange}
-          canDelete={canDelete}
-          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
-          onClose={closeDrawer}
-          onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
-          onEdit={() => void openEdit()}
-          onDelete={() => setDeleteDlgOpen(true)}
-          onRestore={() => void doRestore()}
-          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onOpenContact={(id) => openDrawer(id, true)}
-        />
+        <RecordStackHost root={{ kind: 'contact', id: detail.id, label: detail.name }} onClose={closeDrawer}>
+          <ContactDetailModal
+            detail={detail}
+            canChange={canChange}
+            canDelete={canDelete}
+            position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+            onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+            onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
+            onClose={closeDrawer}
+            onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
+            onEdit={() => void openEdit()}
+            onDelete={() => setDeleteDlgOpen(true)}
+            onRestore={() => void doRestore()}
+            onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+            onOpenContact={(id) => openDrawer(id, true)}
+          />
+        </RecordStackHost>
       ) : null}
 
       <ConfirmDeleteDialog

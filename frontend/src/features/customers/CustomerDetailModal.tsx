@@ -15,6 +15,7 @@ import { deviceLabel, type DeviceListItem } from '../devices/types'
 import type { ContractListItem } from '../contracts/types'
 import { AuditFeedPanel } from './CustomerTabs'
 import { ACTIVE_ISSUES } from '../records/linkedShared'
+import { useOpenRecord } from '../records/recordStack'
 import { Anchor, InventoriesSection, IssuesSection, PeopleList, WhereBlock, type LinkedInventory as InvRow, type LinkedIssue as IssueRow, type LinkedPerson as Contact } from '../records/linked'
 import { daysTo, dIt, EXPIRING_DAYS } from './customerUi'
 
@@ -87,7 +88,7 @@ export default function CustomerDetailModal(p: CustomerDetailModalProps) {
   return p.detail ? <CustomerWindow {...p} detail={p.detail} /> : null
 }
 
-function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerModalDetail }) {
+export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerModalDetail }) {
   const d = p.detail
   const toast = useToast()
   const navigate = useNavigate()
@@ -132,7 +133,10 @@ function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerModalDet
     } catch (e) { toast.error(apiErrorToFormFeedback(e).message) } finally { setBusy(false) }
   }
   // Uscire verso un'altra pagina con modifiche in sospeso le perderebbe: prima si salva o si annulla.
-  const go = (path: string) => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return } navigate(path) }
+  const blocked = () => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
+  const go = (path: string) => { if (!blocked()) navigate(path) }
+  // Siti e contatti si aprono nella stessa finestra, sopra il cliente («‹ Cliente» per tornare).
+  const openRec = useOpenRecord(blocked, navigate)
 
   // ── Testata ─────────────────────────────────────────────────────
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
@@ -223,7 +227,7 @@ function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerModalDet
                       <RecordRow key={s.id} title={s.display_name || s.name}
                         sub={[s.address_line1, s.city].filter(Boolean).join(', ') || s.province || undefined}
                         end={<>{nx ? <SoftTag tone="info">{nx} issue</SoftTag> : null}<span>{ni} {ni === 1 ? 'inventario' : 'inventari'}</span></>}
-                        onClick={() => go(`/sites${buildQuery({ open: s.id })}`)} />
+                        onClick={() => openRec({ kind: 'site', id: s.id, label: s.display_name || s.name || 'Sito' })} />
                     )
                   })}
                 </RecordRows>
@@ -292,7 +296,7 @@ function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerModalDet
 
           <RecordSection title={<>Referenti<SectionCount n={people?.length} /></>} end={<Button size="small" onClick={() => go(`/contacts${buildQuery({ customer: d.id })}`)}>Tutti i contatti</Button>}>
             {!people ? <Loader /> : people.length ? (
-              <PeopleList people={people} primaryId={primary?.id ?? null} go={go} />
+              <PeopleList people={people} primaryId={primary?.id ?? null} go={go} onOpen={(id) => openRec({ kind: 'contact', id, label: people.find((x) => x.id === id)?.name ?? 'Contatto' })} />
             ) : <RecordEmpty>Nessun referente registrato.</RecordEmpty>}
           </RecordSection>
 
