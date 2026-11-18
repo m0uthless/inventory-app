@@ -157,6 +157,14 @@ class PurchaseOrderEntry(TimeStampedModel):
 
     notes           = models.TextField(blank=True, verbose_name="Note")
 
+    # Persona che segue il PO (sollecita il committente, carica i documenti). Una sola:
+    # basta il riferimento all'utente, senza tabella di associazione.
+    followed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="followed_purchase_orders",
+        verbose_name="Seguito da",
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="+",

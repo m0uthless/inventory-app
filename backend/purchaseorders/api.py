@@ -97,6 +97,7 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
     amount_mode_label   = serializers.CharField(source="get_amount_mode_display", read_only=True)
     status_label        = serializers.CharField(source="get_status_display",      read_only=True)
     created_by_username = serializers.CharField(source="created_by.username",   read_only=True, default=None)
+    followed_by_name    = serializers.SerializerMethodField()
     is_invoiced         = serializers.BooleanField(read_only=True)
     is_editable         = serializers.BooleanField(read_only=True)
     is_customer_placeholder = serializers.BooleanField(read_only=True)
@@ -123,6 +124,7 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
             "days", "daily_rate", "amount",
             "costs_incurred",
             "notes",
+            "followed_by", "followed_by_name",
             "created_by", "created_by_username",
             "created_at", "updated_at", "deleted_at",
         ]
@@ -135,9 +137,21 @@ class PurchaseOrderEntrySerializer(serializers.ModelSerializer):
             "is_invoiced",
             "is_customer_placeholder",
             "documents",
+            "followed_by_name",
             "created_by", "created_by_username",
             "created_at", "updated_at", "deleted_at",
         ]
+
+    def get_followed_by_name(self, obj):
+        u = obj.followed_by
+        if not u:
+            return None
+        return (f"{u.first_name} {u.last_name}".strip() or u.username)
+
+    def validate_followed_by(self, value):
+        if value is not None and not value.is_active:
+            raise serializers.ValidationError("La persona scelta non è più attiva.")
+        return value
 
     def get_customer_name(self, obj):
         """Nome del cliente collegato: il testo libero (customer_placeholder)
@@ -220,6 +234,7 @@ class PurchaseOrderEntryFilter(filters.FilterSet):
     client_q         = filters.CharFilter(method="filter_client_q")
     ref_q            = filters.CharFilter(method="filter_ref_q")
     month            = filters.NumberFilter(field_name="offer_date", lookup_expr="month")
+    followed_by      = filters.NumberFilter(field_name="followed_by_id")
 
     class Meta:
         model  = PurchaseOrderEntry
@@ -289,11 +304,12 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         # sottostanti prima di inviare il parametro `ordering` (vedi
         # PurchaseOrders.tsx, orderingMap passato a buildDrfListParams).
         "invoice_number", "customer__display_name",
+        "followed_by__first_name",
     ]
     ordering = ["-offer_date"]
 
     def get_queryset(self):
-        qs = PurchaseOrderEntry.objects.select_related("customer", "created_by", "updated_by").prefetch_related(
+        qs = PurchaseOrderEntry.objects.select_related("customer", "created_by", "updated_by", "followed_by").prefetch_related(
             "documents", "documents__uploaded_by",
         )
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
