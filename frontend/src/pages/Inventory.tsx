@@ -17,22 +17,21 @@ import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import InventoryDialog from '../features/inventory/InventoryDialog'
-import InventoryDetailCard, { type InventoryPatch, type InventoryTab } from '../features/inventory/InventoryDetailCard'
+import InventoryDetailModal from '../features/inventory/InventoryDetailModal'
+import RecordStackHost from '../features/records/RecordStackHost'
 import InventoryKpis, { useInventorySummary } from '../features/inventory/InventoryKpis'
 import { disabledFieldsFor, InventoryStatusBadge, invTypeIcon, OpenIssueMark, type InventoryFieldName } from '../features/inventory/inventoryUi'
-import { AuditFeedPanel } from '../features/customers/CustomerTabs'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
-import { buildQuery } from '@shared/utils/nav'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { isRecord } from '@shared/utils/guards'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 
 type LookupItem = { id: number; label: string; key?: string }
@@ -219,7 +218,6 @@ const emptyForm = (customer: number | '' = ''): InventoryForm => ({
 
 export default function Inventory() {
   const toast = useToast()
-  const undoToast = useUndoToast()
   const { hasPerm, me } = useAuth()
   const canViewSecrets = hasPerm(PERMS.inventory.inventory.view_secrets)
   const canChange = hasPerm(PERMS.inventory.inventory.change)
@@ -316,10 +314,8 @@ export default function Inventory() {
   const [types, setTypes] = React.useState<LookupItem[]>([])
 
   const [drawerOpen, setDrawerOpen] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState<InventoryTab>('det')
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<InventoryDetail | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
 
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
@@ -373,7 +369,6 @@ export default function Inventory() {
   }, [toast])
 
   const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
-    setDetailLoading(true)
     if (!keep) setDetail(null)
     try {
       const inc = forceIncludeDeleted ?? grid.includeDeleted
@@ -382,8 +377,6 @@ export default function Inventory() {
       setDetail(res.data)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
-    } finally {
-      setDetailLoading(false)
     }
   }, [toast, grid.includeDeleted])
 
@@ -399,18 +392,17 @@ export default function Inventory() {
     lastOpenRef.current = id
     setSelectedId(id)
     setDrawerOpen(true)
-    setDrawerTab('det')
     void loadDetail(id)
   }, [grid.openId, loadDetail])
 
-  const openDrawer = React.useCallback((id: number) => {
+  // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo inventario.
+  const openDrawer = React.useCallback((id: number, keep?: boolean) => {
     lastOpenRef.current = id
-    setDrawerTab((t) => (selectedId === id ? t : 'det'))
     setSelectedId(id)
     setDrawerOpen(true)
-    void loadDetail(id)
+    void loadDetail(id, undefined, keep)
     grid.setOpenId(id)
-  }, [grid, loadDetail, selectedId])
+  }, [grid, loadDetail])
 
   // ── Azioni riga / menu contestuale ──────────────────────────────────────────
   const pendingEditIdRef = React.useRef<number | null>(null)
@@ -549,7 +541,6 @@ export default function Inventory() {
   const closeDrawer = () => {
     lastOpenRef.current = null
     setDrawerOpen(false)
-    setSelectedId(null)
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
   }
@@ -637,28 +628,6 @@ export default function Inventory() {
       setDlgSaving(false)
     }
   }
-
-  // Modifica sul posto dalle Proprietà, con annulla.
-  const patchInventory = React.useCallback(async (patch: InventoryPatch, label: string) => {
-    if (!detail) return
-    const id = detail.id
-    const prev: Record<string, unknown> = {}
-    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
-    try {
-      await api.patch(itemPath(INVENTORIES_PATH, id), patch)
-      await loadDetail(id, undefined, true)
-      reloadAll()
-      undoToast.show(`${label} · salvato`, async () => {
-        try {
-          await api.patch(itemPath(INVENTORIES_PATH, id), prev)
-          await loadDetail(id, undefined, true)
-          reloadAll()
-        } catch (e) { toast.error(apiErrorToMessage(e)) }
-      })
-    } catch (e) {
-      toast.error(apiErrorToFormFeedback(e).message)
-    }
-  }, [detail, loadDetail, reloadAll, undoToast, toast])
 
   const doDelete = async () => {
     if (!detail) return
@@ -773,9 +742,11 @@ export default function Inventory() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openDrawer,
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: openDrawer,
             onRowContextMenu: handleRowContextMenu,
-            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
@@ -788,34 +759,30 @@ export default function Inventory() {
         items={contextMenuItems}
       />
 
-      {drawerOpen ? (
-        <InventoryDetailCard
-          detail={detail}
-          loading={detailLoading}
-          statuses={statuses}
-          types={types}
-          canChange={canChange}
-          canDelete={canDelete}
-          canViewSecrets={canViewSecrets}
-          canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
-          canUploadReports={hasPerm(PERMS.maintenance.event.change)}
-          tab={drawerTab}
-          onTab={setDrawerTab}
-          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
-          onClose={closeDrawer}
-          onEdit={() => void openEdit()}
-          onDelete={() => setDeleteDlgOpen(true)}
-          onRestore={() => void doRestore()}
-          onPatch={(patch, label) => void patchInventory(patch, label)}
-          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onNewIssue={() => { if (detail) openIssueFor(detail) }}
-          onOpenCustomer={() => { if (detail) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
-          onOpenSite={() => { if (detail?.site) navigate(`/sites${buildQuery({ open: detail.site })}`) }}
-          activityTab={detail ? <AuditFeedPanel appLabel="inventory" model="inventory" objectId={detail.id} noun="l'inventario"
-            fields={{ name: 'il nome', hostname: "l'hostname", local_ip: "l'IP locale", srsa_ip: "l'IP SRSA", knumber: 'il K-Number', serial_number: 'il seriale', status: 'lo stato', type: 'il tipo', site: 'il sito', location: 'la posizione', telefono: 'il telefono', manufacturer: 'il produttore', model: 'il modello', warranty_end_date: 'la fine garanzia', notes: 'le note', os_user: "l'utente OS", app_usr: "l'utente app", os_pwd: 'la password OS', app_pwd: 'la password app', vnc_pwd: 'la password VNC', tags: 'i tag', custom_fields: 'i campi personalizzati' }} /> : null}
-        />
+      {/* La finestra si apre solo con l'inventario già caricato: niente passaggio da una finestra di attesa. */}
+      {drawerOpen && detail ? (
+        <RecordStackHost root={{ kind: 'inventory', id: detail.id, label: detail.name }} onClose={closeDrawer}>
+          <InventoryDetailModal
+            detail={detail}
+            statuses={statuses}
+            types={types}
+            canChange={canChange}
+            canDelete={canDelete}
+            canViewSecrets={canViewSecrets}
+            canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
+            canUploadReports={hasPerm(PERMS.maintenance.event.change)}
+            position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+            onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+            onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
+            onClose={closeDrawer}
+            onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
+            onEditAll={() => void openEdit()}
+            onDelete={() => setDeleteDlgOpen(true)}
+            onRestore={() => void doRestore()}
+            onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+            onNewIssue={() => openIssueFor(detail)}
+          />
+        </RecordStackHost>
       ) : null}
 
       <InventoryDialog

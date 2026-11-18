@@ -235,7 +235,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
             </RecordSection>
           </Anchor>
 
-          <Anchor id="cust-inv"><InventoriesSection invs={invs} go={go} emptyText="Nessun inventario per questo cliente." resetKey={d.id} /></Anchor>
+          <Anchor id="cust-inv"><InventoriesSection invs={invs} go={go} emptyText="Nessun inventario per questo cliente." onOpen={(i) => openRec({ kind: 'inventory', id: i.id, label: i.name || i.hostname || `Inventario #${i.id}` })} resetKey={d.id} /></Anchor>
 
           {p.showDevices && devices && devices.length ? (
             <RecordSection title={<>Device<SectionCount n={devices.length} /></>} hint="Gestiti dal Portal; da qui si modificano i campi base.">

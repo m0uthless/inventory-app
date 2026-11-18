@@ -36,6 +36,8 @@ export type RecordModalProps = {
   /** Nota accanto al conteggio nella barra (es. «riguarda 6 persone»). */
   dirtyNote?: string
   saving?: boolean
+  /** Modalità modifica (es. inventario, «Modifica» dal ⋯): la barra resta visibile anche senza cambiamenti; Annulla esce. */
+  editing?: boolean
   onSave?: () => void
   onDiscard?: () => void
   children: React.ReactNode
@@ -64,7 +66,7 @@ export function RecordSection({ title, hint, end, children, sx }: { title?: Reac
 
 export function RecordModal({
   open, onClose, ariaLabel, avatar, compact, title, subtitle, tags, status, position, onPrev, onNext, actions,
-  dirtyCount = 0, dirtyNote, saving, onSave, onDiscard, children,
+  dirtyCount = 0, dirtyNote, saving, editing, onSave, onDiscard, children,
 }: RecordModalProps) {
   const phone = useMediaQuery((t: Theme) => t.breakpoints.down('md'))
   const [confirm, setConfirm] = React.useState<null | (() => void)>(null)
@@ -124,7 +126,7 @@ export function RecordModal({
       <Box sx={{ mt: 2 }}>{children}</Box>
 
       {/* Barra di salvataggio: compare solo con modifiche in sospeso */}
-      {dirtyCount > 0 ? (
+      {dirtyCount > 0 || editing ? (
         <Box role="status" sx={{
           position: 'sticky', bottom: { xs: 8, md: 12 }, zIndex: 2, mt: 2, display: 'flex', alignItems: 'center', gap: 1.25, p: '8px 8px 8px 14px', borderRadius: '10px',
           bgcolor: 'text.primary', color: 'background.default', boxShadow: (t) => t.palette.archie.shadowFloat,
@@ -133,11 +135,11 @@ export function RecordModal({
         }}>
           <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main', flex: 'none' }} />
           <Typography sx={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
-            {dirtyCount} {dirtyCount === 1 ? 'modifica da salvare' : 'modifiche da salvare'}
+            {dirtyCount ? `${dirtyCount} ${dirtyCount === 1 ? 'modifica da salvare' : 'modifiche da salvare'}` : 'In modifica · nessun cambiamento'}
             {dirtyNote ? <Box component="span" sx={{ fontWeight: 400, opacity: 0.72, display: { xs: 'none', sm: 'inline' } }}> · {dirtyNote}</Box> : null}
           </Typography>
           <Button size="small" onClick={onDiscard} disabled={saving} sx={{ color: 'inherit', border: '1px solid', borderColor: 'rgb(255 255 255 / .25)', '&:hover': { bgcolor: 'rgb(255 255 255 / .1)' } }}>Annulla</Button>
-          <Button size="small" variant="contained" onClick={onSave} disabled={saving}>{saving ? 'Salvataggio…' : 'Salva le modifiche'}</Button>
+          <Button size="small" variant="contained" onClick={onSave} disabled={saving || dirtyCount === 0} sx={{ '&.Mui-disabled': { bgcolor: 'rgb(255 255 255 / .14)', color: 'rgb(255 255 255 / .5)' } }}>{saving ? 'Salvataggio…' : 'Salva le modifiche'}</Button>
         </Box>
       ) : null}
 

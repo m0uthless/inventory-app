@@ -8,7 +8,7 @@ import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumb
 import GridOnOutlinedIcon from '@mui/icons-material/GridOnOutlined'
 import VpnLockIcon from '@mui/icons-material/VpnLock'
 import { api } from '@shared/api/client'
-import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
+import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 import { buildQuery } from '@shared/utils/nav'
@@ -18,13 +18,13 @@ import { useAuth } from '../auth/AuthProvider'
 import { PERMS } from '../auth/perms'
 import { useOwnPageHeader } from '../layout/PageHeaderContext'
 import { useStatusTokens } from '../theme/AppThemeProvider'
-import { CampoIcon, useUndoToast } from '../ui/campo'
+import { CampoIcon } from '../ui/campo'
 import { resolveItalianProvince } from '../data/italianProvinces'
 import type { RegionId } from '../data/italianRegions'
 import VpnModal from '../features/customers/VpnModal'
-import { AuditFeedPanel } from '../features/customers/CustomerTabs'
 import { vendorColorOf } from '../features/customers/customerUi'
-import InventoryDetailCard, { type InventoryCardDetail, type InventoryPatch, type InventoryTab } from '../features/inventory/InventoryDetailCard'
+import InventoryDetailModal, { type InventoryModalDetail as InventoryCardDetail } from '../features/inventory/InventoryDetailModal'
+import RecordStackHost from '../features/records/RecordStackHost'
 import { AssetTypeIcon } from '../features/inventory/inventoryUi'
 import { PROVINCE_NAME, REGION_NAME, RepoMap, regionOf } from '../features/siterepo/RepoMap'
 import { AssetHead, AssetRow, Chevron, CustomerBlock, focusInset, Highlight, NameCell, numSx, PrioMark } from '../features/siterepo/RepoTree'
@@ -63,7 +63,6 @@ export default function SiteRepository() {
   useOwnPageHeader()
   const { hasPerm } = useAuth()
   const toast = useToast()
-  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const location = useLocation()
   const tokens = useStatusTokens()
@@ -239,38 +238,18 @@ export default function SiteRepository() {
   // ── Pannello dell'asset ──
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<InventoryCardDetail | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-  const [tab, setTab] = React.useState<InventoryTab>('det')
   const loadDetail = React.useCallback(async (id: number) => {
-    setDetailLoading(true)
     try { const r = await api.get<InventoryCardDetail>(`/inventories/${id}/`); setDetail(r.data) }
     catch (e) { toast.error(apiErrorToMessage(e)); setDetail(null) }
-    finally { setDetailLoading(false) }
   }, [toast])
   const openAsset = (a: RepoAsset | number) => {
     const id = typeof a === 'number' ? a : a.id
-    if (id !== selectedId) { setTab('det'); setDetail(null) }
+    if (id !== selectedId) setDetail(null)
     setSelectedId(id)
     void loadDetail(id)
   }
   const closeAsset = React.useCallback(() => { setSelectedId(null); setDetail(null) }, [])
   const refreshCustomer = (cid: number) => { if (cid in content) void loadCustomer(cid); setReloadKey((k) => k + 1) }
-
-  const patchAsset = async (patch: InventoryPatch, label: string) => {
-    if (!detail) return
-    const { id, customer } = detail
-    const prev: Record<string, unknown> = {}
-    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
-    try {
-      await api.patch(`/inventories/${id}/`, patch)
-      await loadDetail(id)
-      refreshCustomer(customer)
-      undoToast.show(`${label} · salvato`, async () => {
-        try { await api.patch(`/inventories/${id}/`, prev); await loadDetail(id); refreshCustomer(customer) }
-        catch (e) { toast.error(apiErrorToMessage(e)) }
-      })
-    } catch (e) { toast.error(apiErrorToFormFeedback(e).message) }
-  }
 
   const openIssueFor = (a: { id: number; name: string; hostname?: string | null; knumber?: string | null; serial_number?: string | null; customer: number; customer_name?: string; site?: number | null }) => {
     navigate('/issues', { state: { createFromInventory: {
@@ -488,31 +467,27 @@ export default function SiteRepository() {
         </Box>
       )}
 
-      {selectedId != null ? (
-        <InventoryDetailCard
-          detail={detail}
-          loading={detailLoading}
-          statuses={statuses}
-          types={types}
-          canChange={canChange}
-          canDelete={canDelete}
-          canViewSecrets={canViewSecrets}
-          canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
-          canUploadReports={hasPerm(PERMS.maintenance.event.change)}
-          tab={tab}
-          onTab={setTab}
-          onClose={closeAsset}
-          onEdit={() => goInventory(selectedId)}
-          onDelete={() => { if (detail) setDel({ kind: 'asset', row: detail as RepoAsset, x: 0, y: 0 }) }}
-          onRestore={async () => { try { await api.post(`/inventories/${selectedId}/restore/`); toast.success('Asset ripristinato'); await loadDetail(selectedId); if (detail) refreshCustomer(detail.customer) } catch (e) { toast.error(apiErrorToMessage(e)) } }}
-          onPatch={(patch, label) => void patchAsset(patch, label)}
-          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onNewIssue={() => { if (detail) openIssueFor(detail) }}
-          onOpenCustomer={() => { if (detail) goCustomer(detail.customer) }}
-          onOpenSite={() => { if (detail?.site) goSite(detail.site) }}
-          activityTab={detail ? <AuditFeedPanel appLabel="inventory" model="inventory" objectId={detail.id} noun="l'inventario"
-            fields={{ name: 'il nome', hostname: "l'hostname", local_ip: "l'IP locale", srsa_ip: "l'IP SRSA", knumber: 'il K-Number', serial_number: 'il seriale', status: 'lo stato', type: 'il tipo', site: 'il sito', location: 'la posizione', telefono: 'il telefono', manufacturer: 'il produttore', model: 'il modello', warranty_end_date: 'la fine garanzia', notes: 'le note', os_user: "l'utente OS", app_usr: "l'utente app", os_pwd: 'la password OS', app_pwd: 'la password app', vnc_pwd: 'la password VNC', tags: 'i tag', custom_fields: 'i campi personalizzati' }} /> : null}
-        />
+      {/* L'inventario si apre nella finestra dei record, con cliente e sito nella stessa finestra. */}
+      {selectedId != null && detail ? (
+        <RecordStackHost root={{ kind: 'inventory', id: detail.id, label: detail.name }} onClose={closeAsset}>
+          <InventoryDetailModal
+            detail={detail}
+            statuses={statuses}
+            types={types}
+            canChange={canChange}
+            canDelete={canDelete}
+            canViewSecrets={canViewSecrets}
+            canViewMaintenance={hasPerm(PERMS.maintenance.event.view)}
+            canUploadReports={hasPerm(PERMS.maintenance.event.change)}
+            onClose={closeAsset}
+            onSaved={() => { void loadDetail(detail.id); refreshCustomer(detail.customer) }}
+            onEditAll={() => goInventory(selectedId)}
+            onDelete={() => setDel({ kind: 'asset', row: detail as RepoAsset, x: 0, y: 0 })}
+            onRestore={async () => { try { await api.post(`/inventories/${selectedId}/restore/`); toast.success('Asset ripristinato'); await loadDetail(selectedId); refreshCustomer(detail.customer) } catch (e) { toast.error(apiErrorToMessage(e)) } }}
+            onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+            onNewIssue={() => openIssueFor(detail)}
+          />
+        </RecordStackHost>
       ) : null}
 
       {vpn ? <VpnModal open onClose={() => setVpn(null)} customerId={vpn.id} customerName={vpn.display_name || vpn.name} /> : null}

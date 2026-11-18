@@ -6,12 +6,12 @@ import { buildQuery } from '@shared/utils/nav'
  * sito, dal sito un contatto, e «‹ Cliente» torna indietro. Fuori da una pila (es. nei test) i
  * collegamenti aprono la pagina del record.
  */
-export type StackKind = 'customer' | 'site' | 'contact'
+export type StackKind = 'customer' | 'site' | 'contact' | 'inventory'
 export type StackRef = { kind: StackKind; id: number; label: string }
 
 export const RecordStackContext = React.createContext<{ open: (r: StackRef) => void } | null>(null)
 
-const PAGE: Record<StackKind, string> = { customer: '/customers', site: '/sites', contact: '/contacts' }
+const PAGE: Record<StackKind, string> = { customer: '/customers', site: '/sites', contact: '/contacts', inventory: '/inventory' }
 export const recordPath = (r: { kind: StackKind; id: number }) => `${PAGE[r.kind]}${buildQuery({ open: r.id })}`
 
 /**

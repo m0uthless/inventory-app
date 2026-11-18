@@ -179,7 +179,7 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
         {/* ── Colonna principale: i record collegati ── */}
         <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
           <Anchor id="site-iss"><IssuesSection issues={issues} go={go} onNew={!deleted ? p.onNewIssue : undefined} showSite={false} /></Anchor>
-          <Anchor id="site-inv"><InventoriesSection invs={invs} go={go} showSite={false} emptyText="Nessun inventario in questo sito." resetKey={d.id} /></Anchor>
+          <Anchor id="site-inv"><InventoriesSection invs={invs} go={go} showSite={false} emptyText="Nessun inventario in questo sito." onOpen={(i) => openRec({ kind: 'inventory', id: i.id, label: i.name || i.hostname || `Inventario #${i.id}` })} resetKey={d.id} /></Anchor>
           <Anchor id="site-con">
             <RecordSection title={<>Contatti del sito<SectionCount n={people?.length} /></>}
               end={<Button size="small" onClick={() => go(`/contacts${buildQuery({ customer: d.customer ?? undefined, site: d.id })}`)}>Apri elenco</Button>}>

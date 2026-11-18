@@ -12,10 +12,11 @@ import { CustomerWindow, type CustomerModalDetail } from '../customers/CustomerD
 import { vendorColorOf } from '../customers/customerUi'
 import { SiteWindow, type SiteModalDetail } from '../sites/SiteDetailModal'
 import { ContactWindow, type ContactModalDetail } from '../contacts/ContactDetailModal'
+import { InventoryWindow, type InventoryModalDetail } from '../inventory/InventoryDetailModal'
 import { recordPath, type StackRef } from './recordStack'
 
 type Lookup = { id: number; label: string; key?: string }
-const URL = { customer: '/customers/', site: '/sites/', contact: '/contacts/' } as const
+const URL = { customer: '/customers/', site: '/sites/', contact: '/contacts/', inventory: '/inventories/' } as const
 
 function useLookup(url: string | null) {
   const [rows, setRows] = React.useState<Lookup[]>([])
@@ -59,6 +60,8 @@ export default function PushedRecord({ r, onClose, onLabel }: { r: StackRef; onC
 
   const customerStatuses = useLookup(r.kind === 'customer' ? '/customer-statuses/' : null)
   const siteStatuses = useLookup(r.kind === 'site' ? '/site-statuses/' : null)
+  const invStatuses = useLookup(r.kind === 'inventory' ? '/inventory-statuses/' : null)
+  const invTypes = useLookup(r.kind === 'inventory' ? '/inventory-types/' : null)
   const vendorOrder = React.useMemo(() => customerStatuses.map((x) => x.label), [customerStatuses])
 
   if (!detail) return null
@@ -85,6 +88,15 @@ export default function PushedRecord({ r, onClose, onLabel }: { r: StackRef; onC
     return (
       <SiteWindow {...common} detail={d} statuses={siteStatuses} canChange={hasPerm(PERMS.crm.site.change)} canDelete={hasPerm(PERMS.crm.site.delete)}
         onNewIssue={() => { if (d.customer) navigate('/issues', { state: { createForCustomer: { customerId: d.customer, customerName: d.customer_display_name || d.customer_name || '', siteId: d.id } } }) }} />
+    )
+  }
+  if (r.kind === 'inventory') {
+    const d = detail as unknown as InventoryModalDetail
+    return (
+      <InventoryWindow {...common} detail={d} statuses={invStatuses} types={invTypes} canChange={hasPerm(PERMS.inventory.inventory.change)} canDelete={hasPerm(PERMS.inventory.inventory.delete)}
+        canViewSecrets={hasPerm(PERMS.inventory.inventory.view_secrets)} canViewMaintenance={hasPerm(PERMS.maintenance.event.view)} canUploadReports={hasPerm(PERMS.maintenance.event.change)}
+        onEditAll={toPage}
+        onNewIssue={() => navigate('/issues', { state: { createFromInventory: { inventoryId: d.id, inventoryName: d.name, inventoryKnumber: d.knumber ?? null, inventorySerialNumber: d.serial_number ?? null, inventoryHostname: d.hostname ?? null, customerId: d.customer, customerName: d.customer_name || `Cliente #${d.customer}`, siteId: d.site ?? null } } })} />
     )
   }
   const d = detail as unknown as ContactModalDetail

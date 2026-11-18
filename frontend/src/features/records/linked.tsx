@@ -40,7 +40,7 @@ export function IssuesSection({ issues, go, onNew, showSite = true }: { issues: 
   )
 }
 
-export function InventoriesSection({ invs, go, showSite = true, emptyText, resetKey }: { invs: LinkedInventory[] | null; go: (path: string) => void; showSite?: boolean; emptyText: string; resetKey: unknown }) {
+export function InventoriesSection({ invs, go, onOpen, showSite = true, emptyText, resetKey }: { invs: LinkedInventory[] | null; go: (path: string) => void; onOpen?: (i: LinkedInventory) => void; showSite?: boolean; emptyText: string; resetKey: unknown }) {
   const [type, setType] = React.useState('')
   const [all, setAll] = React.useState(false)
   React.useEffect(() => { setType(''); setAll(false) }, [resetKey])
@@ -67,7 +67,7 @@ export function InventoriesSection({ invs, go, showSite = true, emptyText, reset
                 title={i.name || i.hostname || i.knumber || `Inventario #${i.id}`}
                 sub={[i.hostname && i.hostname !== i.name ? i.hostname : null, i.local_ip].filter(Boolean).join(' · ') || undefined}
                 end={<>{i.has_active_issue ? <Tooltip title="Ha issue aperte"><Box component="span" sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'info.main' }} /></Tooltip> : null}{showSite ? <span>{i.site_display_name || i.site_name || ''}</span> : null}</>}
-                onClick={() => go(`/inventory${buildQuery({ open: i.id })}`)} />
+                onClick={() => (onOpen ? onOpen(i) : go(`/inventory${buildQuery({ open: i.id })}`))} />
             ))}
           </RecordRows>
           {filtered.length > INV_PREVIEW ? (
