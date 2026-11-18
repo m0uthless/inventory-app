@@ -14,9 +14,8 @@ import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import SiteDialog from '../features/sites/SiteDialog'
-import SiteDetailCard, { type SitePatch, type SiteTab } from '../features/sites/SiteDetailCard'
+import SiteDetailModal from '../features/sites/SiteDetailModal'
 import SiteKpis, { useSiteSummary } from '../features/sites/SiteKpis'
-import { SiteActivityPanel, SiteContactsPanel, SiteInventoriesPanel, SiteIssuesPanel } from '../features/sites/SiteTabs'
 import { SiteStatusBadge } from '../features/sites/siteUi'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
@@ -31,7 +30,7 @@ import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 
 type LookupItem = { id: number; label: string; key?: string }
@@ -187,7 +186,6 @@ export default function Sites() {
   const canChange = hasPerm(PERMS.crm.site.change)
   const canDelete = hasPerm(PERMS.crm.site.delete)
   const toast = useToast()
-  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const loc = useLocation()
   const grid = useServerGrid({
@@ -276,8 +274,6 @@ export default function Sites() {
   const [drawerOpen, setDrawerOpen] = React.useState(false)
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<SiteDetail | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState<SiteTab>('det')
 
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
@@ -308,7 +304,6 @@ export default function Sites() {
   }, [toast])
 
   const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
-    setDetailLoading(true)
     if (!keep) setDetail(null)
     try {
       const inc = forceIncludeDeleted ?? grid.includeDeleted
@@ -317,8 +312,6 @@ export default function Sites() {
       setDetail(res.data)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
-    } finally {
-      setDetailLoading(false)
     }
   }, [toast, grid.includeDeleted])
 
@@ -328,7 +321,6 @@ export default function Sites() {
   const lastOpenRef = React.useRef<number | null>(null)
   const closeDrawer = React.useCallback(() => {
     setDrawerOpen(false)
-    setSelectedId(null)
     lastOpenRef.current = null
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
@@ -342,18 +334,17 @@ export default function Sites() {
     lastOpenRef.current = id
     setSelectedId(id)
     setDrawerOpen(true)
-    setDrawerTab('det')
     loadDetail(id)
   }, [grid.openId, loadDetail])
 
-  const openDrawer = React.useCallback((id: number) => {
+  // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo sito.
+  const openDrawer = React.useCallback((id: number, keep?: boolean) => {
     lastOpenRef.current = id
-    setDrawerTab((t) => (selectedId === id ? t : 'det'))
     setSelectedId(id)
     setDrawerOpen(true)
-    loadDetail(id)
+    loadDetail(id, undefined, keep)
     grid.setOpenId(id)
-  }, [grid, loadDetail, selectedId])
+  }, [grid, loadDetail])
 
   const doDelete = React.useCallback(async () => {
     if (!selectedId) return
@@ -570,28 +561,6 @@ export default function Sites() {
     }
   }
 
-  // Modifica sul posto dalle Proprietà, con annulla.
-  const patchSite = React.useCallback(async (patch: SitePatch, label: string) => {
-    if (!detail) return
-    const id = detail.id
-    const prev: Record<string, unknown> = {}
-    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
-    try {
-      await api.patch(`/sites/${id}/`, patch)
-      await loadDetail(id, undefined, true)
-      reloadAll()
-      undoToast.show(`${label} · salvato`, async () => {
-        try {
-          await api.patch(`/sites/${id}/`, prev)
-          await loadDetail(id, undefined, true)
-          reloadAll()
-        } catch (e) { toast.error(apiErrorToMessage(e)) }
-      })
-    } catch (e) {
-      toast.error(apiErrorToFormFeedback(e).message)
-    }
-  }, [detail, loadDetail, reloadAll, undoToast, toast])
-
   const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
   const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
 
@@ -669,9 +638,11 @@ export default function Sites() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openDrawer,
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: openDrawer,
             onRowContextMenu: handleRowContextMenu,
-            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
@@ -684,31 +655,23 @@ export default function Sites() {
         items={contextMenuItems}
       />
 
-      {drawerOpen ? (
-        <SiteDetailCard
+      {/* La finestra si apre solo con il sito già caricato: niente passaggio da una finestra di attesa. */}
+      {drawerOpen && detail ? (
+        <SiteDetailModal
           detail={detail}
-          loading={detailLoading}
           statuses={statuses}
           canChange={canChange}
           canDelete={canDelete}
-          tab={drawerTab}
-          onTab={setDrawerTab}
           position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
           onClose={closeDrawer}
+          onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
           onEdit={openEdit}
           onDelete={() => setDeleteDlgOpen(true)}
           onRestore={() => void doRestore()}
-          onPatch={(patch, label) => void patchSite(patch, label)}
           onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onNewIssue={() => { if (detail) newIssueFor(detail) }}
-          onOpenCustomer={() => { if (detail?.customer) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
-          onAllContacts={() => { if (detail) navigate(`/contacts${buildQuery({ customer: detail.customer ?? undefined, site: detail.id })}`) }}
-          inventoriesTab={detail ? <SiteInventoriesPanel siteId={detail.id} customerId={detail.customer ?? null} /> : null}
-          contactsTab={detail ? <SiteContactsPanel siteId={detail.id} customerId={detail.customer ?? null} /> : null}
-          issuesTab={detail ? <SiteIssuesPanel siteId={detail.id} siteName={detail.name} /> : null}
-          activityTab={detail ? <SiteActivityPanel siteId={detail.id} /> : null}
+          onNewIssue={() => newIssueFor(detail)}
         />
       ) : null}
 
