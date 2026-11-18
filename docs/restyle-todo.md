@@ -246,6 +246,8 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 - Fatte da `up-base.html` (2026-11-08), variante A. Il Profilo è una scheda flottante della stessa misura dei dettagli delle altre pagine (aperta dal menu utente e da /profile), con schede Dati, Aspetto, Sicurezza, Permessi, Attività. Backend: `/me` con `last_login` e `date_joined`, nuovo `GET /api/me/logins/` (ultimi 5 accessi riusciti).
 - Utenti e gruppi: interruttore Utenti/Gruppi nella testata, viste Attivi / Solo Portal / Account funzionali / Disattivati / Tutti, scheda utente flottante (Permessi con livelli e origine "gruppo X" o "assegnato a mano", Portal e clienti, permessi speciali; Anagrafica e ruoli; Attività), gruppi come schede con la striscia dei permessi e scheda del gruppo. La stessa scheda utente è usata da Accesso Portal. Rimossi `UserDrawer`/`GroupDrawer` e il vecchio drawer del Profilo.
 - Da valutare: descrizione dei gruppi (serve un campo), restyle della pagina Accesso Portal.
+- 17/11: utente e gruppo si aprono nella finestra (`RecordModal`, anteprime `ud-base` variante D e `gd-base`) al posto della scheda flottante; menu del tasto destro su utenti e gruppi; membri gestiti dalla finestra del gruppo (`user_ids`).
+- **[DEC] Permessi che non controllano nulla**: Piano ferie, Rimborso spese e Bug e feature compaiono nella matrice dei permessi, ma pagina e API sono aperte a ogni utente Archie (contano solo i flag del profilo: area ferie, coordinatore, segreteria spese); anche «Nessuno» non toglie l'accesso. Task di area (in `core`, dipende dall'area ferie) e Monitor (segue i permessi degli Inventari) non hanno una riga propria. Proposta: far valere i permessi per Rimborso spese e Bug e feature (verificare prima i gruppi in prod), togliere la riga Piano ferie dalla matrice. Tutti e cinque restano spegnibili dalla pagina Moduli.
 
 ## ServiceNow
 - Fatte da `sn-base.html` (2026-11-09): Casi variante A e Dashboard casi (variante B delle statistiche), che sostituisce le pagine Statistiche e Assenze tecnici (i vecchi indirizzi portano alla Dashboard).
@@ -285,6 +287,13 @@ Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); 
 - **[UI] Dashboard**: widget e card con gradienti (`BirthdaysCard`, `ContributorCard`, `QuickActionsPairCard`, …).
 - **[UI] PDF dei Piani di manutenzione**: intestazione a gradiente.
 - **[UI] `useDataGridZebraSx`** e alcune card hanno ancora gli stili del tema precedente nelle pagine non migrate.
+
+## Via il drawer: finestra dei record (dal 17/11)
+
+Standard nuovo (DESIGN.md › Record window): il record si apre in una finestra larga e centrata, una sola barra di salvataggio. Fatti: utente, gruppo, cliente (18/11, anteprima `core-base`). Ordine concordato: Cliente (anteprima `cd-base`) → Siti, Contatti, Inventari → Issue, Task di area, Contratti, PO (valutare anche la «pagina divisa») → per ultime, o restano col pannello: Audit, caso ServiceNow, eventi e todo di Manutenzione, Piano ferie, Monitor; Drive caso a sé.
+
+- **[UI] Record collegati nella stessa finestra**: nell'anteprima `core-base` cliente → sito → contatto si aprono nella stessa finestra con il percorso «‹ Cliente / …». Nell'app, finché Siti e Contatti non hanno la loro finestra, dal cliente si va alla pagina del record (`/sites?open=…`). Va fatto quando arrivano le finestre di Sito e Contatto.
+- **[UI] Mappa nei test automatici**: la mappa carica Leaflet da unpkg e la posizione da Nominatim; dove internet non c'è le richieste restano appese e Playwright aspetta prima di cliccare (i salvataggi sembrano non partire). Nei test nel browser bloccare `unpkg.com` e `nominatim` con una route; resta valida la voce su includere Leaflet nel bundle.
 
 ## Pagine da migrare (ordine deciso)
 

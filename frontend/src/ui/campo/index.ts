@@ -16,3 +16,4 @@ export { QuickForm, Pill, StaticPill, SelectPill, TextPill, DatePill, TogglePill
 export { quickFieldSx } from './quickFieldSx'
 export { RecordModal, RecordSection, BandTag, type RecordModalProps } from './RecordModal'
 export { bandButtonSx } from './recordModalStyles'
+export { RecordRow, RecordRows, RecordEmpty, SectionCount, SoftTag } from './RecordRows'

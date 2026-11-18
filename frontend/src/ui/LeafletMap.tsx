@@ -16,6 +16,8 @@ import { SHARED } from '../theme/constants'
 interface Props {
   address: string
   height?: number
+  /** Mentre cerca l'indirizzo mostra solo il fondo, senza spinner. */
+  quiet?: boolean
   zoom?: number
 }
 
@@ -113,7 +115,7 @@ async function geocode(address: string): Promise<{ lat: number; lon: number } | 
   }
 }
 
-export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) {
+export default function LeafletMap({ address, height = 250, zoom = 15, quiet = false }: Props) {
   const theme = useTheme()
   const containerRef = React.useRef<HTMLDivElement>(null)
   const mapRef = React.useRef<LeafletMapInstance | null>(null)
@@ -204,7 +206,7 @@ export default function LeafletMap({ address, height = 250, zoom = 15 }: Props) 
             bgcolor: 'grey.50',
           }}
         >
-          <CircularProgress size={24} sx={{ color: theme.palette.primary.main }} />
+          {quiet ? null : <CircularProgress size={24} sx={{ color: theme.palette.primary.main }} />}
         </Box>
       )}
       {state === 'error' && (

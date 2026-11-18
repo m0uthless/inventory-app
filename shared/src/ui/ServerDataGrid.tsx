@@ -49,6 +49,8 @@ type Props<R extends GridValidRowModel> = {
   sortModel: GridSortModel
   onSortModelChange: (model: GridSortModel) => void
   onRowClick?: (id: number) => void
+  /** Apre il record: doppio clic o Invio su una riga (il clic singolo resta per selezionare). */
+  onRowOpen?: (id: number) => void
   onRowContextMenu?: (row: R, event: React.MouseEvent<HTMLElement>) => void
   height?: number | string
   /** Altezza in base alle righe (aspetto "campo"): niente spazio vuoto sotto pochi risultati. */
@@ -455,6 +457,7 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
     sortModel,
     onSortModelChange,
     onRowClick,
+    onRowOpen,
     onRowContextMenu,
     height = '100%',
     autoHeight,
@@ -902,6 +905,12 @@ export default function ServerDataGrid<R extends GridValidRowModel>(props: Props
           const n = Number(params.id)
           if (!Number.isNaN(n)) onRowClick(n)
         }}
+        onRowDoubleClick={onRowOpen ? (params) => { const n = Number(params.id); if (!Number.isNaN(n)) onRowOpen(n) } : undefined}
+        onCellKeyDown={onRowOpen ? (params, event) => {
+          if (event.key !== 'Enter') return
+          const n = Number(params.id)
+          if (!Number.isNaN(n)) { event.preventDefault(); onRowOpen(n) }
+        } : undefined}
       />
       {campo ? (
         <CampoFooter rowCount={rowCount} paginationModel={paginationModel} onPaginationModelChange={onPaginationModelChange} label={inferredFooterLabel} />

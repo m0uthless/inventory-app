@@ -18,6 +18,8 @@ export type RecordModalProps = {
   avatar?: React.ReactNode
   title: React.ReactNode
   subtitle?: React.ReactNode
+  /** Testata snella (senza avatar o riquadro): meno alta, titolo 19px. */
+  compact?: boolean
   /** Etichette sotto il sottotitolo (ruoli, stato…), già nello stile per la Band. */
   tags?: React.ReactNode
   /** Badge accanto al titolo (es. «Disattivato»). */
@@ -60,7 +62,7 @@ export function RecordSection({ title, hint, end, children, sx }: { title?: Reac
 }
 
 export function RecordModal({
-  open, onClose, ariaLabel, avatar, title, subtitle, tags, status, position, onPrev, onNext, actions,
+  open, onClose, ariaLabel, avatar, compact, title, subtitle, tags, status, position, onPrev, onNext, actions,
   dirtyCount = 0, dirtyNote, saving, onSave, onDiscard, children,
 }: RecordModalProps) {
   const phone = useMediaQuery((t: Theme) => t.breakpoints.down('md'))
@@ -79,15 +81,15 @@ export function RecordModal({
       }}
     >
       {/* Testata Band */}
-      <Box component="header" sx={{ position: 'relative', borderRadius: '12px', p: { xs: '16px 16px 18px', md: '18px 22px 20px' }, color: '#fff', background: (t) => `linear-gradient(160deg, ${t.palette.archie.band2}, ${t.palette.archie.band})` }}>
+      <Box component="header" sx={{ position: 'relative', borderRadius: '12px', p: compact ? { xs: '14px 14px 16px', md: '14px 20px 15px' } : { xs: '16px 16px 18px', md: '18px 22px 20px' }, color: '#fff', background: (t) => `linear-gradient(160deg, ${t.palette.archie.band2}, ${t.palette.archie.band})` }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: { xs: 'wrap', md: 'nowrap' }, pr: 5 }}>
           {avatar}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography component="h2" id={titleId} sx={{ fontSize: 20, lineHeight: 1.25, fontWeight: 650, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+            <Typography component="h2" id={titleId} sx={{ fontSize: compact ? 19 : 20, lineHeight: 1.25, fontWeight: 650, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
               {title}{status}
             </Typography>
             {subtitle ? <Typography sx={{ mt: 0.4, fontSize: 12.5, color: 'rgb(255 255 255 / .74)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: { md: 'nowrap' } }}>{subtitle}</Typography> : null}
-            {tags ? <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.1 }}>{tags}</Box> : null}
+            {tags ? <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: compact ? 1 : 1.1 }}>{tags}</Box> : null}
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 'none' }}>
             {position ? <Typography sx={{ fontSize: 12, color: 'rgb(255 255 255 / .7)', mr: 0.25, fontVariantNumeric: 'tabular-nums' }}>{position}</Typography> : null}
