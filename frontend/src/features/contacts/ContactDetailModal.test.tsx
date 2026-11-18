@@ -32,6 +32,11 @@ const show = (props: Partial<ContactDetailModalProps> = {}) => {
   return { onSaved, onOpenContact }
 }
 
+const openEdit = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Modifica' }))
+}
+
 describe('ContactDetailModal', () => {
   beforeEach(() => {
     Object.values(api).forEach((f) => f.mockReset()); toast.error.mockReset(); navigate.mockReset()
@@ -51,7 +56,9 @@ describe('ContactDetailModal', () => {
 
   it('salva solo i campi cambiati, sito e primario compresi', async () => {
     const { onSaved } = show()
-    fireEvent.click(await screen.findByLabelText('Contatto primario'))
+    expect(await screen.findByText('No')).toBeInTheDocument()
+    await openEdit()
+    fireEvent.click(screen.getByLabelText('Contatto primario'))
     fireEvent.change(screen.getByLabelText('Telefono'), { target: { value: '0542 999' } })
     expect(screen.getByText('2 modifiche da salvare')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Salva le modifiche' }))
@@ -62,14 +69,16 @@ describe('ContactDetailModal', () => {
 
   it('con modifiche in sospeso non apre un altro contatto', async () => {
     const { onOpenContact } = show()
-    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'x@example.org' } })
+    await openEdit()
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'x@example.org' } })
     fireEvent.click(screen.getByText('Marco Bassi'))
     expect(onOpenContact).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('Salva o annulla le modifiche prima di aprire un altro record.')
   })
 
-  it('senza permesso di modifica i campi sono bloccati', async () => {
+  it('senza permesso di modifica «Modifica» è spento', async () => {
     show({ canChange: false })
-    expect(await screen.findByLabelText('Nome e cognome')).toBeDisabled()
+    fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
+    expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveAttribute('aria-disabled', 'true')
   })
 })

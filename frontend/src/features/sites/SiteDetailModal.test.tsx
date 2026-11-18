@@ -34,6 +34,11 @@ const show = (props: Partial<SiteDetailModalProps> = {}) => {
   return { onSaved }
 }
 
+const openEdit = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Modifica' }))
+}
+
 describe('SiteDetailModal', () => {
   beforeEach(() => {
     Object.values(api).forEach((f) => f.mockReset()); toast.error.mockReset(); navigate.mockReset()
@@ -54,7 +59,9 @@ describe('SiteDetailModal', () => {
 
   it("salva insieme anagrafica e note, solo i campi cambiati", async () => {
     const { onSaved } = show()
-    fireEvent.change(await screen.findByLabelText('CAP'), { target: { value: '40027' } })
+    expect(await screen.findByText('40026')).toBeInTheDocument()
+    await openEdit()
+    fireEvent.change(screen.getByLabelText('CAP'), { target: { value: '40027' } })
     fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Accesso dal pronto soccorso' } })
     expect(screen.getByText('2 modifiche da salvare')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Salva le modifiche' }))
@@ -65,14 +72,16 @@ describe('SiteDetailModal', () => {
 
   it('con modifiche in sospeso non apre un altro record', async () => {
     show()
-    fireEvent.change(await screen.findByLabelText('Città'), { target: { value: 'Castel San Pietro' } })
+    await openEdit()
+    fireEvent.change(screen.getByLabelText('Città'), { target: { value: 'Castel San Pietro' } })
     fireEvent.click(screen.getByText('PACS'))
     expect(toast.error).toHaveBeenCalledWith('Salva o annulla le modifiche prima di aprire un altro record.')
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  it('senza permesso di modifica i campi sono bloccati', async () => {
+  it('senza permesso di modifica «Modifica» è spento', async () => {
     show({ canChange: false })
-    expect(await screen.findByLabelText('Nome')).toBeDisabled()
+    fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
+    expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveAttribute('aria-disabled', 'true')
   })
 })

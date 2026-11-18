@@ -63,22 +63,6 @@ export function RecordSelect({ label, value, onChange, options, dirty, disabled 
   )
 }
 
-/** Valore non modificabile da qui; con `onClick` diventa un collegamento (es. il cliente del sito). */
-export function RecordReadOnly({ label, children, onClick }: { label: string; children: React.ReactNode; onClick?: () => void }) {
-  const box = { height: 34, display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, borderRadius: '6px', bgcolor: 'archie.surface2', fontSize: 13, color: 'text.secondary', minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } as const
-  return (
-    <Box sx={{ display: 'grid', gap: 0.5, minWidth: 0 }}>
-      <Typography sx={labelSx}>{label}</Typography>
-      {onClick ? (
-        <ButtonBase onClick={onClick} sx={{ ...box, justifyContent: 'space-between', color: 'primary.main', fontWeight: 550, '&:hover': { bgcolor: 'archie.field' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing } }}>
-          <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{children}</Box>
-          <Box component="span" aria-hidden sx={{ flex: 'none', fontSize: 14 }}>›</Box>
-        </ButtonBase>
-      ) : <Box sx={box}>{children}</Box>}
-    </Box>
-  )
-}
-
 export function RecordNotes({ value, onChange, dirty, disabled, placeholder }: { value: string; onChange: (v: string) => void; dirty?: boolean; disabled?: boolean; placeholder?: string }) {
   return (
     <InputBase multiline minRows={3} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
@@ -107,4 +91,69 @@ export function BandChip({ children }: { children: React.ReactNode }) {
 /** Sezione in arrivo: spazio fermo e vuoto, niente spinner. */
 export function RecordLoader() {
   return <Box aria-busy="true" sx={{ minHeight: 48 }} />
+}
+
+/** Un dato letto come testo (finestre in lettura): etichetta sopra, valore sotto, senza riquadro. */
+export function RecordValue({ label, children, wide, mono }: { label: string; children?: React.ReactNode; wide?: boolean; mono?: boolean }) {
+  const empty = children == null || children === '' || children === false
+  return (
+    <Box sx={{ display: 'grid', gap: '3px', minWidth: 0, gridColumn: wide ? '1 / -1' : undefined }}>
+      <Typography component="span" sx={labelSx}>{label}</Typography>
+      <Box component="span" sx={{ fontSize: mono ? 12.5 : 13, minHeight: 19, overflowWrap: 'anywhere', ...(mono ? recordMono : {}), color: empty ? 'text.disabled' : 'text.primary' }}>{empty ? '—' : children}</Box>
+    </Box>
+  )
+}
+
+/** Collegamento dentro un valore (cliente, sito): verde con la freccia, va a capo con il testo. */
+export function RecordLink({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+  if (!onClick) return <>{children}</>
+  return (
+    <ButtonBase onClick={onClick} sx={{ display: 'inline', justifySelf: 'start', font: 'inherit', fontSize: 13, fontWeight: 550, color: 'primary.main', textAlign: 'left', '&:hover': { textDecoration: 'underline', textUnderlineOffset: '3px' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing, borderRadius: '3px' } }}>
+      {children}<Box component="span" aria-hidden sx={{ ml: 0.5 }}>→</Box>
+    </ButtonBase>
+  )
+}
+
+/**
+ * Un dato che si legge come testo e diventa un campo in modifica («Modifica» nel ⋯):
+ * lo stesso schema per inventario, cliente, sito e contatto.
+ */
+export function RecordField({ editing, label, value, onChange, dirty, wide, mono, placeholder, missing, max, show }: {
+  editing: boolean
+  label: string
+  value: string
+  onChange: (v: string) => void
+  dirty?: boolean
+  wide?: boolean
+  mono?: boolean
+  placeholder?: string
+  /** Dato atteso: «manca» in modifica, in arancio in lettura. */
+  missing?: boolean
+  max?: number
+  /** Come mostrarlo in lettura (date, link…). */
+  show?: (v: string) => React.ReactNode
+}) {
+  if (editing) {
+    return (
+      <Box sx={{ gridColumn: wide ? '1 / -1' : undefined, minWidth: 0 }}>
+        <RecordInput label={label} value={value} onChange={onChange} dirty={dirty} mono={mono} placeholder={placeholder} missing={missing} max={max} />
+      </Box>
+    )
+  }
+  const v = value.trim()
+  return (
+    <RecordValue label={label} wide={wide} mono={mono && Boolean(v)}>
+      {v ? (show ? show(v) : v) : missing ? <Box component="span" sx={{ color: 'warning.main', fontWeight: 550, fontFamily: 'inherit' }}>manca</Box> : null}
+    </RecordValue>
+  )
+}
+
+/** Griglia a due colonne dei dati della colonna laterale. */
+export function RecordGrid({ children }: { children: React.ReactNode }) {
+  return <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '12px 16px' }}>{children}</Box>
+}
+
+/** Etichetta «In modifica» sulla testata. */
+export function BandEditing() {
+  return <Box component="span" sx={{ fontSize: 11.5, fontWeight: 650, px: 1, py: '2px', borderRadius: '5px', bgcolor: '#e0a43a', color: '#2b1d00' }}>In modifica</Box>
 }

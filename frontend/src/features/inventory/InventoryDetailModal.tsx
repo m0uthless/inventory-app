@@ -7,7 +7,7 @@ import { apiErrorToFormFeedback } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { buildQuery } from '@shared/utils/nav'
 import {
-  BandChip, BandStat, CampoIcon, RecordEmpty, RecordInput, RecordLoader, RecordModal, RecordNotes, RecordRow, RecordRows, RecordSection, RecordSelect,
+  BandChip, BandEditing, BandStat, CampoIcon, RecordLink, RecordValue, RecordEmpty, RecordInput, RecordLoader, RecordModal, RecordNotes, RecordRow, RecordRows, RecordSection, RecordSelect,
   SectionCount, SoftTag, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
 import { AuditFeedPanel } from '../customers/CustomerTabs'
@@ -107,27 +107,6 @@ export default function InventoryDetailModal(p: InventoryDetailModalProps) {
   return p.detail ? <InventoryWindow {...p} detail={p.detail} /> : null
 }
 
-/** Un dato letto come testo: etichetta sopra, valore sotto, senza riquadro. */
-function Val({ label, children, wide, monoText }: { label: string; children?: React.ReactNode; wide?: boolean; monoText?: boolean }) {
-  const empty = children == null || children === ''
-  return (
-    <Box sx={{ display: 'grid', gap: '3px', minWidth: 0, gridColumn: wide ? '1 / -1' : undefined }}>
-      <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 550, color: 'text.secondary' }}>{label}</Typography>
-      <Box component="span" sx={{ fontSize: monoText ? 12.5 : 13, minHeight: 19, overflowWrap: 'anywhere', ...(monoText ? mono : {}), color: empty ? 'text.disabled' : 'text.primary' }}>{empty ? '—' : children}</Box>
-    </Box>
-  )
-}
-
-/** Collegamento nel testo (cliente, sito): verde con la freccia. */
-function LinkVal({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
-  if (!onClick) return <>{children}</>
-  return (
-    <ButtonBase onClick={onClick} sx={{ display: 'inline', justifySelf: 'start', font: 'inherit', fontSize: 13, fontWeight: 550, color: 'primary.main', textAlign: 'left', '&:hover': { textDecoration: 'underline', textUnderlineOffset: '3px' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing, borderRadius: '3px' } }}>
-      {children}<Box component="span" sx={{ display: 'inline-flex', verticalAlign: '-2px', ml: 0.5 }}><CampoIcon name="arrowR" size={13} /></Box>
-    </ButtonBase>
-  )
-}
-
 /** Logo dell'applicazione a destra delle credenziali (public/logos/<nome>.png); senza file resta lo spazio vuoto. */
 function LogoSlot({ name, alt }: { name: string; alt: string }) {
   const [ok, setOk] = React.useState(true)
@@ -216,7 +195,7 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
           </Box>
         ) : <RecordInput label={label} value={draft[k]} onChange={set(k)} dirty={isDirty(k)} mono={opts.monoText} placeholder={opts.placeholder} />}
       </Box>
-    ) : <Val label={label} wide={opts.wide} monoText={opts.monoText}>{v[k] ? (opts.show ? opts.show(v[k]) : v[k]) : null}</Val>
+    ) : <RecordValue label={label} wide={opts.wide} mono={opts.monoText}>{v[k] ? (opts.show ? opts.show(v[k]) : v[k]) : null}</RecordValue>
   )
   const copyBtn = (value: string, label: string) => (
     <Tooltip title="Copia"><IconButton size="small" aria-label={label} onClick={() => p.onCopy(value)} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
@@ -284,7 +263,7 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
         {typeLabel ? <BandChip>{typeLabel}</BandChip> : null}
         {status && statusKey !== 'in_use' ? <BandChip>{status.label}</BandChip> : !status && d.status_label && d.status_key !== 'in_use' ? <BandChip>{d.status_label}</BandChip> : null}
         {deleted ? <BandChip>Nel cestino</BandChip> : null}
-        {editing ? <Box component="span" sx={{ fontSize: 11.5, fontWeight: 650, px: 1, py: '2px', borderRadius: '5px', bgcolor: '#e0a43a', color: '#2b1d00' }}>In modifica</Box> : null}
+        {editing ? <BandEditing /> : null}
       </>}
       subtitle={<>
         {d.hostname ? <><Box component="span" sx={{ ...mono, fontSize: 12 }}>{d.hostname}</Box> · </> : null}
@@ -395,9 +374,9 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
               {field('Nome', 'name', { wide: true })}
               {editing ? <RecordSelect label="Tipo" value={draft.type} onChange={set('type')} dirty={isDirty('type')} options={[{ value: '', label: '—' }, ...p.types.map((t) => ({ value: String(t.id), label: t.label }))]} />
-                : <Val label="Tipo">{typeLabel || null}</Val>}
+                : <RecordValue label="Tipo">{typeLabel || null}</RecordValue>}
               {editing ? <RecordSelect label="Stato" value={draft.status} onChange={set('status')} dirty={isDirty('status')} options={p.statuses.map((s) => ({ value: String(s.id), label: s.label }))} />
-                : <Val label="Stato">{d.status_label ? <InventoryStatusBadge statusKey={d.status_key} label={d.status_label} /> : null}</Val>}
+                : <RecordValue label="Stato">{d.status_label ? <InventoryStatusBadge statusKey={d.status_key} label={d.status_label} /> : null}</RecordValue>}
               {field('K-Number', 'knumber', { monoText: true, placeholder: 'K-000000' })}
               {field('Seriale', 'serial_number', { monoText: true })}
               {has('manufacturer') ? field('Produttore', 'manufacturer') : null}
@@ -408,11 +387,11 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
 
           <RecordSection title="Dove si trova">
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-              <Val label="Cliente"><LinkVal onClick={openCustomer}>{d.customer_name || 'Cliente'}</LinkVal></Val>
+              <RecordValue label="Cliente"><RecordLink onClick={openCustomer}>{d.customer_name || 'Cliente'}</RecordLink></RecordValue>
               {editing ? (
                 <RecordSelect label="Sito" value={draft.site} onChange={set('site')} dirty={isDirty('site')}
                   options={[{ value: '', label: 'Nessun sito' }, ...(sites ?? []).map((s) => ({ value: String(s.id), label: s.display_name || s.name }))]} />
-              ) : <Val label="Sito">{siteId ? <LinkVal onClick={() => openSite(siteId, siteLabel || 'Sito')}>{siteLabel || 'Sito'}</LinkVal> : <Box component="span" sx={{ color: 'warning.main', fontWeight: 550 }}>Nessun sito</Box>}</Val>}
+              ) : <RecordValue label="Sito">{siteId ? <RecordLink onClick={() => openSite(siteId, siteLabel || 'Sito')}>{siteLabel || 'Sito'}</RecordLink> : <Box component="span" sx={{ color: 'warning.main', fontWeight: 550 }}>Nessun sito</Box>}</RecordValue>}
               {has('location') ? field('Posizione', 'location', { wide: true, placeholder: 'es. Sala server, piano 2' }) : null}
               {has('telefono') ? field('Telefono', 'telefono', { monoText: true, placeholder: 'Interno o diretto' }) : null}
             </Box>

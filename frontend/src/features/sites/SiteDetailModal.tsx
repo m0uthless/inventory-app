@@ -1,12 +1,12 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, Button, ButtonBase, IconButton, ListItemIcon, Menu, MenuItem, Tooltip } from '@mui/material'
+import { Box, Button, ButtonBase, IconButton, ListItemIcon, Menu, MenuItem, Tooltip, Typography } from '@mui/material'
 import { api } from '@shared/api/client'
 import { apiErrorToFormFeedback } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { buildQuery } from '@shared/utils/nav'
 import {
-  BandChip, BandStat, CampoIcon, RecordEmpty, RecordInput, RecordLoader, RecordModal, RecordNotes, RecordReadOnly, RecordSection, RecordSelect,
+  BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordLoader, RecordModal, RecordNotes, RecordSection, RecordSelect, RecordValue,
   SectionCount, bandButtonSx, bandSolidSx, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
 import LeafletMap from '../../ui/LeafletMap'
@@ -95,7 +95,11 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
   const contacts = useList<LinkedPerson>('/contacts/', { site: d.id, page_size: 100, ordering: 'name' })
 
   // ── Anagrafica e note: modifiche locali, un solo salvataggio ────
+  // In lettura i dati sono testo; «Modifica» nel ⋯ li trasforma in campi (stesso schema dell'inventario).
+  const [editing, setEditing] = React.useState(false)
   const { draft, changed, set, isDirty, reset } = useRecordDraft<Draft>(d, () => toDraft(d))
+  const v = editing ? draft : toDraft(d)
+  const stopEditing = () => { reset(); setEditing(false) }
   const [busy, setBusy] = React.useState(false)
   const save = async () => {
     if (!draft.name.trim()) { toast.error('Il nome del sito è obbligatorio.'); return }
@@ -109,11 +113,12 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
       }
       await api.patch(`/sites/${d.id}/`, Object.fromEntries(changed.map((k) => [k, value[k]])))
       toast.success('Sito salvato.')
+      setEditing(false)
       p.onSaved()
     } catch (e) { toast.error(apiErrorToFormFeedback(e).message) } finally { setBusy(false) }
   }
   // Uscire verso un'altra pagina con modifiche in sospeso le perderebbe: prima si salva o si annulla.
-  const blocked = () => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
+  const blocked = () => { if (editing && changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
   const go = (path: string) => { if (!blocked()) navigate(path) }
   // Cliente e contatti si aprono nella stessa finestra, sopra il sito.
   const openRec = useOpenRecord(blocked, navigate)
@@ -121,14 +126,14 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
 
   // ── Testata ─────────────────────────────────────────────────────
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
-  React.useEffect(() => { setMenu(null) }, [d.id])
-  const status = p.statuses.find((s) => String(s.id) === draft.status)
+  React.useEffect(() => { setMenu(null); setEditing(false) }, [d.id])
+  const status = p.statuses.find((s) => String(s.id) === v.status)
   const statusKey = status?.key ?? d.status_key
   const statusLabel = status?.label ?? d.status_label ?? ''
   const customerLabel = d.customer_display_name || d.customer_name || 'cliente'
   const scrollTo = (id: string) => document.getElementById(`site-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  const placeLine = [draft.postal_code.trim(), draft.city.trim(), draft.province.trim() ? `(${draft.province.trim().toUpperCase()})` : ''].filter(Boolean).join(' ')
-  const fullAddress = [draft.address_line1.trim(), placeLine].filter(Boolean).join(', ')
+  const placeLine = [v.postal_code.trim(), v.city.trim(), v.province.trim() ? `(${v.province.trim().toUpperCase()})` : ''].filter(Boolean).join(' ')
+  const fullAddress = [v.address_line1.trim(), placeLine].filter(Boolean).join(', ')
   // La mappa segue l'indirizzo salvato, non quello che si sta scrivendo.
   const savedAddress = [d.address_line1, [d.postal_code, d.city].filter(Boolean).join(' '), d.province].filter((x) => x && String(x).trim()).join(', ')
 
@@ -136,16 +141,17 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
   const people = contacts ? [...(primary ? [primary] : []), ...contacts.filter((c) => c !== primary)] : null
   const shown = useShownWhenReady(Boolean(issues && invs && contacts))
 
-  const field = (label: React.ReactNode, k: keyof Draft, opts: { mono?: boolean; placeholder?: string; max?: number; missing?: boolean } = {}) => (
-    <RecordInput label={label} ariaLabel={typeof label === 'string' ? label : k} value={draft[k]} onChange={set(k)} dirty={isDirty(k)} disabled={!editable} {...opts} />
+  const field = (label: string, k: keyof Draft, opts: { mono?: boolean; placeholder?: string; max?: number; missing?: boolean; wide?: boolean } = {}) => (
+    <RecordField editing={editing} label={label} value={v[k]} onChange={set(k)} dirty={isDirty(k)} {...opts} />
   )
 
   return (
     <RecordModal open={shown} onClose={p.onClose} ariaLabel={`Sito ${d.display_name || d.name}`} compact
-      title={draft.display_name.trim() || draft.name.trim() || d.name}
+      title={v.display_name.trim() || v.name.trim() || d.name}
       status={<>
         {statusLabel && statusKey !== 'active' ? <BandChip><StatusMark k={statusKey} />{statusLabel}</BandChip> : null}
         {deleted ? <BandChip>Nel cestino</BandChip> : null}
+        {editing ? <BandEditing /> : null}
       </>}
       subtitle={<>
         Sito di{' '}
@@ -159,21 +165,22 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
         <BandStat n={issues?.length ?? null} one=" issue aperta" many=" issue aperte" onClick={() => scrollTo('iss')} />
         <BandStat n={contacts?.length ?? null} one=" contatto" many=" contatti" onClick={() => scrollTo('con')} />
       </>}
-      position={p.position} onPrev={p.onPrev} onNext={p.onNext}
+      position={editing ? undefined : p.position} onPrev={editing ? undefined : p.onPrev} onNext={editing ? undefined : p.onNext}
       actions={<>
         {deleted
           ? (p.canChange ? <Button variant="outlined" onClick={p.onRestore} startIcon={<CampoIcon name="restore" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Ripristina</Button> : null)
-          : <Button variant="outlined" onClick={p.onNewIssue} startIcon={<CampoIcon name="plus" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Nuova issue</Button>}
+          : editing ? null : <Button variant="outlined" onClick={p.onNewIssue} startIcon={<CampoIcon name="plus" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Nuova issue</Button>}
         {!deleted ? (
           <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" onClick={(e) => setMenu(e.currentTarget)} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' } }}><CampoIcon name="more" /></IconButton></Tooltip>
         ) : null}
         <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
-          <MenuItem disabled={!p.canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica tutti i campi</MenuItem>
+          <MenuItem disabled={!editable || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
+          <MenuItem disabled={!p.canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi (cliente, campi personalizzati)…</MenuItem>
           {savedAddress ? <MenuItem onClick={() => { setMenu(null); p.onCopy(savedAddress) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia l'indirizzo</MenuItem> : null}
           <MenuItem disabled={!p.canDelete} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
         </Menu>
       </>}
-      dirtyCount={editable ? changed.length : 0} saving={busy} onSave={() => void save()} onDiscard={reset}>
+      editing={editing} dirtyCount={editing ? changed.length : 0} saving={busy} onSave={() => void save()} onDiscard={stopEditing}>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
         {/* ── Colonna principale: i record collegati ── */}
@@ -192,21 +199,19 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
         {/* ── Colonna laterale: anagrafica e contesto ── */}
         <Box component="aside" aria-label="Sito" sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
           <RecordSection title="Anagrafica">
-            <Box sx={{ display: 'grid', gap: 1.25 }}>
-              {field('Nome', 'name')}
-              {field(<>Nome breve <Box component="span" sx={{ fontWeight: 400, color: 'text.disabled' }}>come compare negli elenchi</Box></>, 'display_name', { placeholder: draft.name })}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-                <RecordReadOnly label="Cliente" onClick={d.customer ? openCustomer : undefined}>{customerLabel}</RecordReadOnly>
-                <RecordSelect label="Stato" value={draft.status} onChange={set('status')} dirty={isDirty('status')} disabled={!editable}
+            <RecordGrid>
+              {field('Nome', 'name', { wide: true })}
+              {field('Nome breve', 'display_name', { wide: true, placeholder: draft.name })}
+              <RecordValue label="Cliente"><RecordLink onClick={d.customer ? openCustomer : undefined}>{customerLabel}</RecordLink></RecordValue>
+              {editing ? (
+                <RecordSelect label="Stato" value={draft.status} onChange={set('status')} dirty={isDirty('status')}
                   options={p.statuses.map((s) => ({ value: String(s.id), label: s.label, mark: <StatusMark k={s.key} color={markColor(s.key)} /> }))} />
-              </Box>
-              {field('Indirizzo', 'address_line1', { placeholder: 'Via e numero civico', missing: true })}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '78px minmax(0,1fr) 58px', gap: 1.25 }}>
-                {field('CAP', 'postal_code', { mono: true, max: 5 })}
-                {field('Città', 'city')}
-                {field('Prov.', 'province', { max: 2, placeholder: 'BO' })}
-              </Box>
-            </Box>
+              ) : <RecordValue label="Stato">{statusLabel ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}><StatusMark k={statusKey} color={markColor(statusKey)} />{statusLabel}</Box> : null}</RecordValue>}
+              {field('Indirizzo', 'address_line1', { wide: true, placeholder: 'Via e numero civico', missing: true })}
+              {field('CAP', 'postal_code', { mono: true, max: 5 })}
+              {field('Città', 'city')}
+              {field('Provincia', 'province', { max: 2, placeholder: 'BO' })}
+            </RecordGrid>
           </RecordSection>
 
           {savedAddress ? (
@@ -217,7 +222,8 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
           ) : null}
 
           <RecordSection title="Note">
-            <RecordNotes value={draft.notes} onChange={set('notes')} dirty={isDirty('notes')} disabled={!editable} placeholder="Note interne sul sito" />
+            {editing ? <RecordNotes value={draft.notes} onChange={set('notes')} dirty={isDirty('notes')} placeholder="Note interne sul sito" />
+              : d.notes ? <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{d.notes}</Typography> : <RecordEmpty>Nessuna nota.</RecordEmpty>}
           </RecordSection>
 
           <RecordSection title="Attività recente">

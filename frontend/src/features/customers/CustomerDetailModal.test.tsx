@@ -31,6 +31,11 @@ const show = (props: Partial<CustomerDetailModalProps> = {}) => {
   return { onSaved }
 }
 
+const openEdit = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Modifica' }))
+}
+
 describe('CustomerDetailModal', () => {
   beforeEach(() => {
     Object.values(api).forEach((f) => f.mockReset()); toast.error.mockReset()
@@ -49,6 +54,8 @@ describe('CustomerDetailModal', () => {
   it("l'anagrafica si salva tutta insieme dalla barra", async () => {
     const { onSaved } = show()
     expect(await screen.findByText('manca')).toBeInTheDocument()
+    expect(screen.queryByLabelText('P.IVA')).not.toBeInTheDocument()
+    await openEdit()
     fireEvent.change(screen.getByLabelText('P.IVA'), { target: { value: '00705271203' } })
     fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Martedì 7–9' } })
     expect(screen.getByText('2 modifiche da salvare')).toBeInTheDocument()
@@ -73,13 +80,15 @@ describe('CustomerDetailModal', () => {
 
   it('con modifiche in sospeso non apre un altro record', async () => {
     show()
-    fireEvent.change(await screen.findByLabelText('P.IVA'), { target: { value: '1' } })
+    await openEdit()
+    fireEvent.change(screen.getByLabelText('P.IVA'), { target: { value: '1' } })
     fireEvent.click(await screen.findByText('Ospedale S. Maria della Scaletta'))
     expect(toast.error).toHaveBeenCalledWith('Salva o annulla le modifiche prima di aprire un altro record.')
   })
 
-  it('senza permesso di modifica i campi sono bloccati', async () => {
+  it('senza permesso di modifica «Modifica» è spento', async () => {
     show({ canChange: false })
-    expect(await screen.findByLabelText('Ragione sociale')).toBeDisabled()
+    fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
+    expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveAttribute('aria-disabled', 'true')
   })
 })

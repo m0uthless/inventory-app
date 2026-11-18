@@ -6,8 +6,8 @@ import { apiErrorToFormFeedback } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { buildQuery } from '@shared/utils/nav'
 import {
-  BandChip, BandStat, CampoIcon, RecordEmpty, RecordInput, RecordLoader as Loader, RecordModal, RecordNotes, RecordReadOnly, RecordRow, RecordRows,
-  RecordSection, RecordSelect, SectionCount, SoftTag, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft, useShownWhenReady,
+  BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLoader as Loader, RecordModal, RecordNotes, RecordRow, RecordRows,
+  RecordSection, RecordSelect, RecordValue, SectionCount, SoftTag, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
 import LeafletMap from '../../ui/LeafletMap'
 import DeviceDialog from '../devices/DeviceDialog'
@@ -116,7 +116,11 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
   React.useEffect(() => { if (!pwShown) return; const t = window.setTimeout(() => setPwShown(false), 30000); return () => window.clearTimeout(t) }, [pwShown])
 
   // ── Anagrafica e note: modifiche locali, un solo salvataggio ────
+  // In lettura i dati sono testo; «Modifica» nel ⋯ li trasforma in campi (stesso schema dell'inventario).
+  const [editing, setEditing] = React.useState(false)
   const { draft, changed, set, isDirty, reset } = useRecordDraft<Draft>(d, () => toDraft(d))
+  const v = editing ? draft : toDraft(d)
+  const stopEditing = () => { reset(); setEditing(false) }
   const [busy, setBusy] = React.useState(false)
   const save = async () => {
     if (!draft.name.trim()) { toast.error('La ragione sociale è obbligatoria.'); return }
@@ -129,18 +133,19 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
       }
       await api.patch(`/customers/${d.id}/`, Object.fromEntries(changed.map((k) => [k, value[k]])))
       toast.success('Cliente salvato.')
+      setEditing(false)
       p.onSaved()
     } catch (e) { toast.error(apiErrorToFormFeedback(e).message) } finally { setBusy(false) }
   }
   // Uscire verso un'altra pagina con modifiche in sospeso le perderebbe: prima si salva o si annulla.
-  const blocked = () => { if (changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
+  const blocked = () => { if (editing && changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
   const go = (path: string) => { if (!blocked()) navigate(path) }
   // Siti e contatti si aprono nella stessa finestra, sopra il cliente («‹ Cliente» per tornare).
   const openRec = useOpenRecord(blocked, navigate)
 
   // ── Testata ─────────────────────────────────────────────────────
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
-  const vendorLabel = p.statuses.find((s) => String(s.id) === draft.status)?.label ?? d.status_label ?? ''
+  const vendorLabel = p.statuses.find((s) => String(s.id) === v.status)?.label ?? d.status_label ?? ''
   const nextContract = (contracts ?? []).map((c) => ({ c, n: daysTo(c.end_date) })).filter((x) => x.n >= 0).sort((a, b) => a.n - b.n)[0]
   const soon = nextContract && nextContract.n <= EXPIRING_DAYS ? nextContract : null
   const scrollTo = (id: string) => document.getElementById(`cust-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -148,7 +153,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
 
   const [editingDevice, setEditingDevice] = React.useState<DeviceListItem | null>(null)
   // Con ‹ › la finestra resta aperta (niente nuova animazione): lo stato locale riparte col nuovo cliente.
-  React.useEffect(() => { setMenu(null); setPwShown(false); setEditingDevice(null) }, [d.id])
+  React.useEffect(() => { setMenu(null); setPwShown(false); setEditingDevice(null); setEditing(false) }, [d.id])
 
   const siteStats = React.useMemo(() => {
     const inv = new Map<number, number>(); (invs ?? []).forEach((i) => { if (i.site) inv.set(i.site, (inv.get(i.site) ?? 0) + 1) })
@@ -156,8 +161,8 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
     return { inv, iss }
   }, [invs, issues])
 
-  const field = (label: React.ReactNode, k: keyof Draft, opts: { mono?: boolean; placeholder?: string; missing?: boolean; max?: number } = {}) => (
-    <RecordInput label={label} ariaLabel={typeof label === 'string' ? label : k} value={draft[k]} onChange={set(k)} dirty={isDirty(k)} disabled={!editable} {...opts} />
+  const field = (label: string, k: keyof Draft, opts: { mono?: boolean; placeholder?: string; missing?: boolean; max?: number; wide?: boolean } = {}) => (
+    <RecordField editing={editing} label={label} value={v[k]} onChange={set(k)} dirty={isDirty(k)} {...opts} />
   )
 
   const copyBtn = (v: string, label: string) => (
@@ -183,34 +188,36 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
 
   return (
     <RecordModal open={shown} onClose={p.onClose} ariaLabel={`Cliente ${d.display_name || d.name}`} compact
-      title={draft.display_name.trim() || d.display_name || d.name}
+      title={v.display_name.trim() || d.display_name || d.name}
       status={<>
         {vendorLabel ? <BandChip><Box component="i" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: p.vendorColor(vendorLabel) }} />{vendorLabel}</BandChip> : null}
         {deleted ? <BandChip>Nel cestino</BandChip> : null}
+        {editing ? <BandEditing /> : null}
       </>}
-      subtitle={<><Box component="span" sx={{ ...mono, fontSize: 12 }}>{d.code}</Box> · {draft.name || d.name}{d.city ? ` · ${d.city}${draft.province ? ` (${draft.province.toUpperCase()})` : ''}` : ''} · {draft.vat_number ? <>P.IVA <Box component="span" sx={{ ...mono, fontSize: 12 }}>{draft.vat_number}</Box></> : 'P.IVA mancante'}</>}
+      subtitle={<><Box component="span" sx={{ ...mono, fontSize: 12 }}>{d.code}</Box> · {v.name || d.name}{d.city ? ` · ${d.city}${v.province ? ` (${v.province.toUpperCase()})` : ''}` : ''} · {v.vat_number ? <>P.IVA <Box component="span" sx={{ ...mono, fontSize: 12 }}>{v.vat_number}</Box></> : 'P.IVA mancante'}</>}
       tags={<>
         {stat('sites', sites?.length ?? null, ' sito', ' siti')}
         {stat('inv', invs?.length ?? null, ' inventario', ' inventari')}
         {stat('iss', issues?.length ?? null, ' issue aperta', ' issue aperte')}
         {p.showContracts ? stat('doc', contracts?.length ?? null, ' contratto', ' contratti', soon ? `${soon.c.title} scade il ${dIt(soon.c.end_date)}` : undefined) : null}
       </>}
-      position={p.position} onPrev={p.onPrev} onNext={p.onNext}
+      position={editing ? undefined : p.position} onPrev={editing ? undefined : p.onPrev} onNext={editing ? undefined : p.onNext}
       actions={<>
         {deleted
           ? (p.canChange ? <Button variant="outlined" onClick={p.onRestore} startIcon={<CampoIcon name="restore" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Ripristina</Button> : null)
-          : <Button variant="outlined" onClick={p.onNewIssue} startIcon={<CampoIcon name="plus" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Nuova issue</Button>}
+          : editing ? null : <Button variant="outlined" onClick={p.onNewIssue} startIcon={<CampoIcon name="plus" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Nuova issue</Button>}
         {!deleted ? (
           <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" onClick={(e) => setMenu(e.currentTarget)} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' } }}><CampoIcon name="more" /></IconButton></Tooltip>
         ) : null}
         <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
-          <MenuItem disabled={!p.canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica tutti i campi</MenuItem>
+          <MenuItem disabled={!editable || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
+          <MenuItem disabled={!p.canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi (città, indirizzo, tag)…</MenuItem>
           <MenuItem onClick={() => { setMenu(null); p.onCopy(d.code) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il codice cliente</MenuItem>
           {d.vat_number ? <MenuItem onClick={() => { setMenu(null); p.onCopy(d.vat_number!) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia la P.IVA</MenuItem> : null}
           <MenuItem disabled={!p.canDelete} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
         </Menu>
       </>}
-      dirtyCount={editable ? changed.length : 0} saving={busy} onSave={() => void save()} onDiscard={reset}>
+      editing={editing} dirtyCount={editing ? changed.length : 0} saving={busy} onSave={() => void save()} onDiscard={stopEditing}>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
         {/* ── Colonna principale: i record collegati ── */}
@@ -277,21 +284,20 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
         {/* ── Colonna laterale: anagrafica e contesto ── */}
         <Box component="aside" aria-label="Cliente" sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
           <RecordSection title="Anagrafica">
-            <Box sx={{ display: 'grid', gap: 1.25 }}>
-              {field('Ragione sociale', 'name')}
-              {field(<>Nome breve <Box component="span" sx={{ fontWeight: 400, color: 'text.disabled' }}>come compare negli elenchi</Box></>, 'display_name', { placeholder: draft.name })}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-                <RecordSelect label="Vendor" value={draft.status} onChange={set('status')} dirty={isDirty('status')} disabled={!editable}
+            <RecordGrid>
+              {field('Ragione sociale', 'name', { wide: true })}
+              {field('Nome breve', 'display_name', { wide: true, placeholder: draft.name })}
+              {editing ? (
+                <RecordSelect label="Vendor" value={draft.status} onChange={set('status')} dirty={isDirty('status')}
                   options={p.statuses.map((st) => ({ value: String(st.id), label: st.label, mark: <Box component="i" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: p.vendorColor(st.label) }} /> }))} />
-                <RecordReadOnly label="Codice"><Box component="span" sx={{ ...mono, color: 'text.primary' }}>{d.code}</Box></RecordReadOnly>
-              </Box>
+              ) : <RecordValue label="Vendor">{vendorLabel ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}><Box component="i" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: p.vendorColor(vendorLabel) }} />{vendorLabel}</Box> : null}</RecordValue>}
+              <RecordValue label="Codice" mono>{d.code}</RecordValue>
               {field('P.IVA', 'vat_number', { mono: true, placeholder: '11 cifre', missing: true })}
               {field('Codice fiscale', 'tax_code', { mono: true })}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-                <Tooltip title="Sta nei campi personalizzati: si cambia da «Modifica tutti i campi»"><Box><RecordReadOnly label="Città">{d.city || '—'}</RecordReadOnly></Box></Tooltip>
-                {field('Provincia', 'province', { placeholder: 'es. BO', max: 2 })}
-              </Box>
-            </Box>
+              <RecordValue label="Città">{d.city || null}</RecordValue>
+              {field('Provincia', 'province', { placeholder: 'es. BO', max: 2 })}
+            </RecordGrid>
+            {editing ? <Typography sx={{ mt: 1.25, fontSize: 11.5, color: 'text.secondary' }}>La città e l'indirizzo stanno nei campi personalizzati: si cambiano da «Tutti i campi…» nel ⋯.</Typography> : null}
           </RecordSection>
 
           <RecordSection title={<>Referenti<SectionCount n={people?.length} /></>} end={<Button size="small" onClick={() => go(`/contacts${buildQuery({ customer: d.id })}`)}>Tutti i contatti</Button>}>
@@ -337,7 +343,8 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
           ) : null}
 
           <RecordSection title="Note">
-            <RecordNotes value={draft.notes} onChange={set('notes')} dirty={isDirty('notes')} disabled={!editable} placeholder="Note interne sul cliente" />
+            {editing ? <RecordNotes value={draft.notes} onChange={set('notes')} dirty={isDirty('notes')} placeholder="Note interne sul cliente" />
+              : d.notes ? <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{d.notes}</Typography> : <RecordEmpty>Nessuna nota.</RecordEmpty>}
           </RecordSection>
 
           <RecordSection title="Attività recente">
