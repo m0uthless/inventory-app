@@ -124,9 +124,11 @@ describe('AreaTasks page', () => {
     expect(screen.getByRole('button', { name: /Nuovo task/ })).toBeDisabled()
   })
 
-  it('opens the detail when a row is clicked', async () => {
+  it('a click selects the row, a double click opens the detail', async () => {
     renderPage()
     fireEvent.click(await screen.findByText('Rapporto mensile'))
+    expect(screen.queryByTestId('detail')).toBeNull()
+    fireEvent.doubleClick(screen.getByText('Rapporto mensile'))
     expect(await screen.findByTestId('detail')).toHaveTextContent('Rapporto mensile')
   })
 

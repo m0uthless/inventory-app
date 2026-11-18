@@ -169,7 +169,9 @@ export default function AreaTasks() {
   // ── Pannello ───────────────────────────────────────────────────────────────
   const [openTask, setOpenTask] = React.useState<AreaTaskRow | null>(null)
   const [openTab, setOpenTab] = React.useState(0)
-  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => { setOpenTab(tab); setOpenTask(row); grid.setOpenId(row.id) }, [grid])
+  // Clic sulla riga: seleziona; doppio clic o Invio: apre (come nelle altre pagine).
+  const [selectedId, setSelectedId] = React.useState<number | null>(null)
+  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => { setOpenTab(tab); setOpenTask(row); setSelectedId(row.id); grid.setOpenId(row.id) }, [grid])
   const closeDetail = React.useCallback(() => { setOpenTask(null); grid.setOpenId(null) }, [grid])
   // Apertura da URL (?open=): anche per un task fuori dalla pagina corrente.
   React.useEffect(() => {
@@ -488,9 +490,10 @@ export default function AreaTasks() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) openDetail(r) },
+            onRowClick: setSelectedId,
+            onRowOpen: (id) => { const r = rows.find((x) => x.id === id); if (r) openDetail(r) },
             onRowContextMenu: (row, e) => setContextMenu({ row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 }),
-            getRowClassName: (row) => (openTask?.id === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />

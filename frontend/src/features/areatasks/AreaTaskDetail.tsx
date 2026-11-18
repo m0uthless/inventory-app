@@ -8,7 +8,7 @@ import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import { useAuth } from '../../auth/AuthProvider'
 import { PERMS } from '../../auth/perms'
 import { useUndoToast } from '../../ui/campo'
-import AreaTaskDetailCard, { type AreaTaskPatch, type AreaTaskTab } from './AreaTaskDetailCard'
+import AreaTaskDetailCard, { type AreaTaskPatch } from './AreaTaskDetailCard'
 import AreaTaskDialog from './AreaTaskDialog'
 import ConvertToIssueDialog from './ConvertToIssueDialog'
 import DriveFilePickerDialog from './DriveFilePickerDialog'
@@ -22,7 +22,7 @@ type Props = {
   onClose: () => void
   onChanged: (task: AreaTaskRow) => void
   onDeleted: (id: number) => void
-  /** Scheda iniziale al primo render per questo task (0 = Dettagli, 1 = Commenti). Default 0. */
+  /** 1 = la finestra si apre già sui commenti (dal contatore dei commenti). */
   initialTab?: number
   /** Scorrimento nella lista della pagina (facoltativo). */
   position?: string
@@ -43,7 +43,6 @@ function hiddenFieldMessages(e: unknown): string {
 }
 
 type RawUser = { id: number; full_name?: string; username?: string }
-const TABS: AreaTaskTab[] = ['det', 'cm', 'all', 'att']
 
 /**
  * Pannello del task di area con la sua logica (commenti, allegati Drive, modifica,
@@ -63,7 +62,6 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
     currentRef.current = next
     setCurrentState(next)
   }, [])
-  const [tab, setTab] = React.useState<AreaTaskTab>('det')
   const [comments, setComments] = React.useState<AreaTaskComment[]>([])
   const [commentsLoading, setCommentsLoading] = React.useState(false)
   const [newComment, setNewComment] = React.useState('')
@@ -88,7 +86,6 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
   React.useEffect(() => {
     if (!task) { setCommentsLoading(false); return }
     setCurrent(task)
-    setTab(TABS[initialTab ?? 0] ?? 'det')
     setComments([])
     setNewComment('')
     setEditOpen(false)
@@ -242,7 +239,6 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
   // ── Trasforma in issue ──────────────────────────────────────────────────────
   const handleConverted = (result: { task: AreaTaskRow; issue: { id: number; title: string } }) => {
     apply(result.task)
-    setTab('det')
     toast.success(`Task trasformato nella issue #${result.issue.id}.`)
   }
 
@@ -255,8 +251,7 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
           task={current}
           meId={typeof me?.id === 'number' ? me.id : null}
           users={users}
-          tab={tab}
-          onTab={setTab}
+          focusComments={initialTab === 1}
           comments={comments}
           commentsLoading={commentsLoading}
           newComment={newComment}
@@ -270,7 +265,7 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
           canConvert={canConvert}
           onConvert={() => setConvertOpen(true)}
           onOpenIssue={(id) => navigate(`/issues${buildQuery({ open: id })}`)}
-          onPatch={(p, label) => { void patch(p, label) }}
+          onPatch={(p, label) => patch(p, label)}
           onEdit={openEdit}
           onDelete={() => setConfirmDelete(true)}
           onClose={onClose}
