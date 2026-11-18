@@ -85,6 +85,8 @@ export default function Rapportini() {
   const [selected, setSelected] = React.useState<Set<number>>(new Set())
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [openId, setOpenId] = React.useState<number | null>(null)
+  // Clic sulla riga: la evidenzia; doppio clic o Invio: apre la finestra.
+  const [focusId, setFocusId] = React.useState<number | null>(null)
   // La scheda resta aperta anche se il rapportino esce dalla vista (es. dopo il caricamento del PDF).
   const [open, setOpen] = React.useState<EventRow | null>(null)
   React.useEffect(() => {
@@ -277,8 +279,9 @@ export default function Rapportini() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: (id) => setOpenId(id),
-            getRowClassName: (r) => [openId === r.id ? 'Mui-selected' : '', selected.has(r.id) ? 'is-checked' : ''].join(' '),
+            onRowClick: setFocusId,
+            onRowOpen: (id) => { setFocusId(id); setOpenId(id) },
+            getRowClassName: (r) => [(openId ?? focusId) === r.id ? 'Mui-selected' : '', selected.has(r.id) ? 'is-checked' : ''].join(' '),
             sx: { ...headerFilterGridSx, cursor: 'pointer', '& .is-checked': { bgcolor: (t) => `${t.palette.archie.field} !important` } },
           }}
         />

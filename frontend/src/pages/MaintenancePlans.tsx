@@ -22,7 +22,7 @@ import { PERMS } from '../auth/perms'
 import { CampoIcon, FilterOptionList, KpiStrip, KpiTile, Meter, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import SectionNav from '../features/maintenance/MaintenanceNav'
 import PlanDialog from '../features/maintenance/PlanDialog'
-import PlanDetailCard, { type PlanTab } from '../features/maintenance/PlanDetailCard'
+import PlanDetailCard from '../features/maintenance/PlanDetailCard'
 import { generatePlanPdf } from '../features/maintenance/planPdf'
 import { planStateOf, scheduleText } from '../features/maintenance/mtModel'
 import { DueCell, PlanStateBadge } from '../features/maintenance/mtUi'
@@ -92,7 +92,8 @@ export default function MaintenancePlans() {
   // ── Scheda e dialoghi ──
   const [openId, setOpenId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<PlanRow | null>(null)
-  const [tab, setTab] = React.useState<PlanTab>('det')
+  // Clic sulla riga: la seleziona; doppio clic o Invio: apre la finestra.
+  const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [dlg, setDlg] = React.useState<{ plan: PlanRow | null } | null>(null)
   const [delPlan, setDelPlan] = React.useState<PlanRow | null>(null)
   const [delBusy, setDelBusy] = React.useState(false)
@@ -104,7 +105,7 @@ export default function MaintenancePlans() {
     if (row) { setDetail(row); return }
     api.get<PlanRow>(`/maintenance-plans/${openId}/`).then((r) => setDetail(r.data)).catch((e) => toast.error(apiErrorToMessage(e)))
   }, [openId, rows, toast])
-  const openPlan = (id: number) => { setTab((t) => (openId === id ? t : 'det')); setOpenId(id) }
+  const openPlan = (id: number) => { setSelectedId(id); setOpenId(id) }
   // Link diretto: /maintenance/plans?apri=<id> (es. «Apri il piano» dalle Scadenze).
   const [apri, setApri] = useUrlNumberParam('apri')
   React.useEffect(() => { if (apri !== '') { setOpenId(apri); setApri('', { replace: true }) } }, [apri, setApri])
@@ -224,8 +225,9 @@ export default function MaintenancePlans() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openPlan,
-            getRowClassName: (r) => (openId === r.id ? 'Mui-selected' : ''),
+            onRowClick: setSelectedId,
+            onRowOpen: openPlan,
+            getRowClassName: (r) => ((openId ?? selectedId) === r.id ? 'Mui-selected' : ''),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
@@ -234,8 +236,6 @@ export default function MaintenancePlans() {
       {detail ? (
         <PlanDetailCard
           plan={detail}
-          tab={tab}
-          onTab={setTab}
           reloadKey={cardReload}
           position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
           onPrev={idx > 0 ? () => openPlan(rows[idx - 1].id) : undefined}
