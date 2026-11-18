@@ -53,7 +53,7 @@ export function RecordSelect({ label, value, onChange, options, dirty, disabled 
     <Box sx={{ display: 'grid', gap: 0.5, minWidth: 0 }}>
       <Typography component="label" sx={labelSx}>{label}</Typography>
       <TextField select size="small" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
-        slotProps={{ htmlInput: { 'aria-label': label } }}
+        slotProps={{ htmlInput: { 'aria-label': label }, select: { displayEmpty: true } }}
         sx={{ '& .MuiOutlinedInput-root': { height: 34, fontSize: 13 }, '& fieldset': { borderColor: dirty ? 'warning.main' : undefined } }}>
         {options.map((o) => (
           <MenuItem key={o.value} value={o.value}><Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>{o.mark}{o.label}</Box></MenuItem>

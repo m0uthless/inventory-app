@@ -14,9 +14,8 @@ import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import ContactDialog from '../features/contacts/ContactDialog'
-import ContactDetailCard, { type ContactPatch, type ContactTab } from '../features/contacts/ContactDetailCard'
+import ContactDetailModal from '../features/contacts/ContactDetailModal'
 import ContactKpis, { useContactSummary } from '../features/contacts/ContactKpis'
-import { AuditFeedPanel } from '../features/customers/CustomerTabs'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
@@ -29,7 +28,7 @@ import { PERMS } from '../auth/perms'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
-import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 
 type CustomerItem = { id: number; code?: string; name?: string; display_name?: string | null }
@@ -150,7 +149,6 @@ export default function Contacts() {
   const canChange = hasPerm(PERMS.crm.contact.change)
   const canDelete = hasPerm(PERMS.crm.contact.delete)
   const toast = useToast()
-  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const loc = useLocation()
   const grid = useServerGrid({
@@ -239,8 +237,6 @@ export default function Contacts() {
   const [drawerOpen, setDrawerOpen] = React.useState(false)
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<ContactDetail | null>(null)
-  const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState<ContactTab>('det')
 
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
@@ -270,7 +266,6 @@ export default function Contacts() {
   }, [toast])
 
   const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
-    setDetailLoading(true)
     if (!keep) setDetail(null)
     try {
       const inc = forceIncludeDeleted ?? grid.includeDeleted
@@ -279,8 +274,6 @@ export default function Contacts() {
       setDetail(res.data)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
-    } finally {
-      setDetailLoading(false)
     }
   }, [toast, grid.includeDeleted])
 
@@ -288,20 +281,19 @@ export default function Contacts() {
   const lastOpenRef = React.useRef<number | null>(null)
   const closeDrawer = React.useCallback(() => {
     setDrawerOpen(false)
-    setSelectedId(null)
     lastOpenRef.current = null
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
   }, [grid, returnTo, navigate])
 
-  const openDrawer = React.useCallback((id: number) => {
+  // `keep`: passando a un altro contatto la finestra resta quella di prima finché arriva il nuovo.
+  const openDrawer = React.useCallback((id: number, keep?: boolean) => {
     lastOpenRef.current = id
-    setDrawerTab((t) => (selectedId === id ? t : 'det'))
     setSelectedId(id)
     setDrawerOpen(true)
-    loadDetail(id)
+    loadDetail(id, undefined, keep)
     grid.setOpenId(id)
-  }, [grid, loadDetail, selectedId])
+  }, [grid, loadDetail])
 
   React.useEffect(() => {
     if (!grid.openId) return
@@ -310,7 +302,6 @@ export default function Contacts() {
     lastOpenRef.current = id
     setSelectedId(id)
     setDrawerOpen(true)
-    setDrawerTab('det')
     loadDetail(id)
   }, [grid.openId, loadDetail])
 
@@ -517,28 +508,6 @@ export default function Contacts() {
     }
   }
 
-  // Modifica sul posto dalle Proprietà, con annulla.
-  const patchContact = React.useCallback(async (patch: ContactPatch, label: string) => {
-    if (!detail) return
-    const id = detail.id
-    const prev: Record<string, unknown> = {}
-    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
-    try {
-      await api.patch(`/contacts/${id}/`, patch)
-      await loadDetail(id, undefined, true)
-      reloadAll()
-      undoToast.show(`${label} · salvato`, async () => {
-        try {
-          await api.patch(`/contacts/${id}/`, prev)
-          await loadDetail(id, undefined, true)
-          reloadAll()
-        } catch (e) { toast.error(apiErrorToMessage(e)) }
-      })
-    } catch (e) {
-      toast.error(apiErrorToFormFeedback(e).message)
-    }
-  }, [detail, loadDetail, reloadAll, undoToast, toast])
-
   const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
   const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
 
@@ -618,9 +587,11 @@ export default function Contacts() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openDrawer,
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: openDrawer,
             onRowContextMenu: handleRowContextMenu,
-            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
@@ -633,28 +604,22 @@ export default function Contacts() {
         items={contextMenuItems}
       />
 
-      {drawerOpen ? (
-        <ContactDetailCard
+      {/* La finestra si apre solo con il contatto già caricato: niente passaggio da una finestra di attesa. */}
+      {drawerOpen && detail ? (
+        <ContactDetailModal
           detail={detail}
-          loading={detailLoading}
           canChange={canChange}
           canDelete={canDelete}
-          tab={drawerTab}
-          onTab={setDrawerTab}
           position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
           onClose={closeDrawer}
+          onSaved={() => { void loadDetail(detail.id, undefined, true); reloadAll() }}
           onEdit={() => void openEdit()}
           onDelete={() => setDeleteDlgOpen(true)}
           onRestore={() => void doRestore()}
-          onPatch={(patch, label) => void patchContact(patch, label)}
           onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onOpenCustomer={() => { if (detail?.customer) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
-          onOpenSite={() => { if (detail?.site) navigate(`/sites${buildQuery({ open: detail.site })}`) }}
-          onOpenContact={openDrawer}
-          activityTab={detail ? <AuditFeedPanel appLabel="crm" model="contact" objectId={detail.id} noun="il contatto"
-            fields={{ name: 'il nome', email: "l'email", phone: 'il telefono', department: 'il reparto', is_primary: 'il flag primario', site: 'il sito', customer: 'il cliente', notes: 'le note' }} /> : null}
+          onOpenContact={(id) => openDrawer(id, true)}
         />
       ) : null}
 

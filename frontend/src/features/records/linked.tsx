@@ -80,14 +80,14 @@ export function InventoriesSection({ invs, go, showSite = true, emptyText, reset
 }
 
 /** Persone compatte (colonna laterale o sezione): nome che apre il contatto, chiamata ed email a destra. */
-export function PeopleList({ people, primaryId, go, showSite = true }: { people: LinkedPerson[]; primaryId?: number | null; go: (path: string) => void; showSite?: boolean }) {
+export function PeopleList({ people, primaryId, go, onOpen, showSite = true }: { people: LinkedPerson[]; primaryId?: number | null; go: (path: string) => void; onOpen?: (id: number) => void; showSite?: boolean }) {
   return (
     <Box sx={{ display: 'grid', gap: '2px' }}>
       {people.map((c) => {
         const primary = c.id === primaryId || (primaryId == null && c.is_primary)
         return (
           <Box key={c.id} sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'center', gap: 1, py: 0.5 }}>
-            <ButtonBase onClick={() => go(`/contacts${buildQuery({ open: c.id })}`)} sx={{ display: 'grid', justifyItems: 'start', justifyContent: 'stretch', textAlign: 'left', minWidth: 0, lineHeight: 1.3, '&:hover .rr-title': { color: 'primary.main' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing, borderRadius: '4px' } }}>
+            <ButtonBase onClick={() => (onOpen ? onOpen(c.id) : go(`/contacts${buildQuery({ open: c.id })}`))} sx={{ display: 'grid', justifyItems: 'start', justifyContent: 'stretch', textAlign: 'left', minWidth: 0, lineHeight: 1.3, '&:hover .rr-title': { color: 'primary.main' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing, borderRadius: '4px' } }}>
               <Typography className="rr-title" noWrap component="span" sx={{ fontSize: 13, fontWeight: 550, maxWidth: '100%', display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
                 {c.name}{primary ? <Box component="span" sx={{ fontSize: 10.5, fontWeight: 600, px: 0.75, borderRadius: '4px', bgcolor: 'archie.field', color: 'primary.main' }}>primario</Box> : null}
               </Typography>
