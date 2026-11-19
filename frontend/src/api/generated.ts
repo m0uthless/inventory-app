@@ -4536,7 +4536,13 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** @description Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri. */
+    /**
+     * @description Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri.
+     *
+     *     `?area=mine`: solo le issue della propria area più quelle senza area
+     *     (contatore della barra laterale); chi non ha un'area vede i numeri
+     *     complessivi.
+     */
     get: operations['issues_summary_retrieve']
     put?: never
     post?: never
@@ -10161,6 +10167,9 @@ export interface components {
       /** Categoria */
       category?: number | null
       readonly category_label: string
+      area?: number | null
+      readonly area_label: string
+      readonly can_edit: string
       /** Assegnato a */
       assigned_to?: number | null
       readonly assigned_to_username: string
@@ -11691,6 +11700,9 @@ export interface components {
       /** Categoria */
       category?: number | null
       readonly category_label?: string
+      area?: number | null
+      readonly area_label?: string
+      readonly can_edit?: string
       /** Assegnato a */
       assigned_to?: number | null
       readonly assigned_to_username?: string
@@ -19760,6 +19772,7 @@ export interface operations {
   issues_list: {
     parameters: {
       query?: {
+        area?: number
         assigned_q?: string
         assigned_to?: number
         category?: number

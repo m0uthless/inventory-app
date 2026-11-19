@@ -20,6 +20,7 @@ import { PERMS } from '../../auth/perms'
 import IssueProcedure, { NextStepCard } from './IssueProcedure'
 import { useIssueWiki } from './useIssueWiki'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
+import { assigneesForArea } from './issueUsers'
 import {
   PRIORITY_META, STATUS_META, WAITING_REASON_META, fmtIssueDate, fmtIssueDateTime,
   issueAuthorInitials, issueAuthorName, issueInventoryLabel,
@@ -192,7 +193,9 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
   const wiki = useIssueWiki(issue.id, hasPerm(PERMS.wiki.page.view))
   const closed = issue.status === 'closed'
   const resolved = issue.status === 'resolved'
-  const canChange = hasPerm(PERMS.issues.issue.change) && !closed
+  // Issue di un'altra area: sola lettura (il backend risponde 403 a ogni scrittura).
+  const otherArea = issue.can_edit === false
+  const canChange = hasPerm(PERMS.issues.issue.change) && !closed && !otherArea
 
   // ── Modifica: «Modifica» nel ⋯ trasforma i dati in campi; un solo salvataggio ──
   const [editing, setEditing] = React.useState(false)
@@ -265,6 +268,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
         {issue.servicenow_id ? <> · <Box component="span" sx={{ ...mono, fontSize: 12 }}>{issue.servicenow_id}</Box></> : null}
       </>}
       tags={<>
+        {issue.area_label ? chip(<>area <b>{issue.area_label}</b></>) : null}
         {chip(<>priorità <b>{(PRIORITY_META[issue.priority]?.label ?? issue.priority).toLowerCase()}</b></>, issue.priority === 'critical')}
         {chip(issue.assigned_to_full_name ? <>assegnata a <b>{issue.assigned_to_full_name}</b></> : 'non assegnata', !issue.assigned_to)}
         {due != null && !closed && !resolved ? chip(over ? <>scaduta il <b>{fmtIssueDate(issue.due_date)}</b></> : <>scade il <b>{fmtIssueDate(issue.due_date)}</b></>, over || soon) : null}
@@ -272,7 +276,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
       </>}
       position={p.position} onPrev={p.onPrev} onNext={p.onNext}
       actions={<>
-        {editing || closed ? null : resolved
+        {editing || closed || otherArea ? null : resolved
           ? <Button variant="outlined" onClick={() => void p.onPatch({ status: 'in_progress' }, 'Issue riaperta')} sx={bandButtonSx}>Riapri</Button>
           : <Button variant="outlined" startIcon={<CheckIcon sx={{ fontSize: 16 }} />} onClick={() => void p.onPatch({ status: 'resolved', waiting_reason: '' }, 'Issue risolta')} sx={{ ...bandButtonSx, ...bandSolidSx }}>Segna come risolta</Button>}
         <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" onClick={(e) => setMenu(e.currentTarget)} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' } }}><CampoIcon name="more" /></IconButton></Tooltip>
@@ -281,7 +285,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
           <MenuItem disabled={!canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>Tutti i campi…</MenuItem>
           <MenuItem disabled={!canChange} onClick={() => { setMenu(null); p.onLinkInventory() }}><ListItemIcon><CampoIcon name="server" size={16} /></ListItemIcon>{issue.inventory ? 'Cambia inventario collegato' : 'Collega un inventario'}</MenuItem>
           <MenuItem onClick={() => { setMenu(null); void copyToClipboard(issueLink).then(() => toast.success('Link copiato')) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il link</MenuItem>
-          <MenuItem disabled={closed || !hasPerm(PERMS.issues.issue.delete)} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
+          <MenuItem disabled={closed || otherArea || !hasPerm(PERMS.issues.issue.delete)} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
         </Menu>
       </>}
       editing={editing} dirtyCount={editing ? changed.length : 0} saving={busy} onSave={() => void save()} onDiscard={stopEditing}>
@@ -289,6 +293,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
         {/* ── Colonna principale ── */}
         <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          {otherArea ? <Typography role="note" sx={{ fontSize: 12.5, p: '8px 10px', borderRadius: '8px', bgcolor: 'info.light', color: 'info.main' }}>Issue dell'area {issue.area_label}: puoi solo consultarla.</Typography> : null}
           <NextStepCard wiki={wiki} canEdit={canChange} />
           <RecordSection title="Descrizione">
             {editing ? <RecordNotes value={draft.description} onChange={set('description')} dirty={isDirty('description')} placeholder="Cosa succede, da quando, cosa è già stato provato" ariaLabel="Descrizione" />
@@ -298,7 +303,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
           <Box id="iss-att" sx={{ scrollMarginTop: 16 }}>
             <RecordSection title={<>Attività<Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: 'text.secondary' }}>{p.comments.length + visibleEvents(p.events).length}</Box></>}>
               <ActivityFeed comments={p.comments} events={p.events} loading={p.commentsLoading} />
-              {closed ? <RecordEmpty>Issue chiusa: non si commenta più.</RecordEmpty> : (
+              {closed ? <RecordEmpty>Issue chiusa: non si commenta più.</RecordEmpty> : otherArea ? null : (
                 <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
                   <InputBase multiline minRows={2} maxRows={6} value={p.newComment} onChange={(e) => p.onNewCommentChange(e.target.value)} disabled={p.sendingComment}
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) p.onSendComment() }}
@@ -324,7 +329,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
                 options={['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: <IssuePriorityMark priority={k} />, selected: issue.priority === k }))}
                 onPick={(val) => void p.onPatch({ priority: val }, 'Priorità aggiornata')} />
               <QuickPick label="Assegnata a" wide disabled={!canChange} value={assignee}
-                options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box>, selected: !issue.assigned_to }, ...p.users.map((u) => ({ value: String(u.id), label: u.label, selected: issue.assigned_to === u.id }))]}
+                options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box>, selected: !issue.assigned_to }, ...assigneesForArea(p.users, issue.area).map((u) => ({ value: String(u.id), label: u.label, selected: issue.assigned_to === u.id }))]}
                 onPick={(val) => void p.onPatch({ assigned_to: val ? Number(val) : null }, 'Assegnatario aggiornato')}
                 after={!issue.assigned_to && canChange && p.meId != null ? <Button size="small" onClick={() => void p.onPatch({ assigned_to: p.meId! }, 'Assegnata a te')} sx={{ minWidth: 0, px: 0.5 }}>Assegna a me</Button> : null} />
               <RecordField editing={editing} type="date" label="Scadenza" value={v.due_date} onChange={set('due_date')} dirty={isDirty('due_date')} show={(x) => fmtIssueDate(x)} />

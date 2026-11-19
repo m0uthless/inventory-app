@@ -17,6 +17,11 @@ export type IssueRow = {
   inventory_hostname: string | null
   category: number | null
   category_label: string | null
+  /** Area organizzativa (facoltativa): con un'area la modificano solo i suoi membri. */
+  area: number | null
+  area_label: string | null
+  /** Calcolato dal backend: false per le issue di un'altra area (sola lettura). */
+  can_edit: boolean
   assigned_to: number | null
   assigned_to_username: string | null
   assigned_to_full_name: string | null
@@ -62,7 +67,10 @@ export type UserOption = {
   is_philips?: boolean
   /** Permesso di gruppo «Può essere assegnatario delle issue». */
   is_issue_assignee?: boolean
+  /** Area del profilo (`UserProfile.leave_area`). */
+  leave_area?: number | null
 }
+export type AreaOption = { id: number; label: string }
 export type InventoryOption = {
   id: number
   name: string
@@ -83,6 +91,7 @@ export type IssueFormData = {
   customerPlaceholder: string
   site_id: number | ''
   category_id: number | ''
+  area_id: number | ''
   assigned_to_id: number | ''
   priority: string
   status: string
@@ -182,7 +191,7 @@ function todayIsoLocal() {
   return `${yyyy}-${mm}-${dd}`
 }
 
-export function createEmptyIssueForm(defaultAssignedToId?: number): IssueFormData {
+export function createEmptyIssueForm(defaultAssignedToId?: number, defaultAreaId?: number | null): IssueFormData {
   return {
     title: '',
     description: '',
@@ -192,6 +201,7 @@ export function createEmptyIssueForm(defaultAssignedToId?: number): IssueFormDat
     customerPlaceholder: '',
     site_id: '',
     category_id: '',
+    area_id: defaultAreaId ?? '',
     assigned_to_id: defaultAssignedToId ?? '',
     priority: 'medium',
     status: 'open',

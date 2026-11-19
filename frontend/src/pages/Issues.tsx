@@ -40,6 +40,7 @@ import {
   fmtIssueDate as fmtDate,
   PRIORITY_META,
   STATUS_META,
+  type AreaOption,
   type CategoryOption,
   type CustomerOption,
   type InventoryOption,
@@ -241,13 +242,22 @@ export default function Issues() {
     : grid.sortModel
 
   // ── Viste e filtri (dalle intestazioni di colonna) ──────────────────────
-  type IssueView = 'active' | 'mine' | 'overdue' | 'closed' | 'all'
+  type IssueView = 'active' | 'mine' | 'myarea' | 'overdue' | 'closed' | 'all'
+  const myArea = me?.profile?.leave_area ?? null
   // `?vista=mine|overdue|closed|all` dalla Dashboard; poi la vista vive nello stato della pagina.
-  const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
+  const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'myarea' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
   const [fStatus, setFStatus] = React.useState<string[]>([])
   const [fPriority, setFPriority] = React.useState<string[]>([])
   const [fCategory, setFCategory] = React.useState<string[]>([])
   const [fAssigned, setFAssigned] = React.useState<string[]>([])
+  const [fArea, setFArea] = React.useState<string[]>([])
+  const [areas, setAreas] = React.useState<AreaOption[]>([])
+  React.useEffect(() => {
+    let alive = true
+    api.get<{ results: AreaOption[] } | AreaOption[]>('/leave-areas/', { params: { page_size: 100 } })
+      .then((r) => { if (alive) setAreas(Array.isArray(r.data) ? r.data : r.data.results ?? []) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
   type ColQ = { id: string; title: string; customer: string; servicenow: string; assigned: string; priority: string; status: string; due: string }
   const EMPTY_COLQ: ColQ = { id: '', title: '', customer: '', servicenow: '', assigned: '', priority: '', status: '', due: '' }
   // ?cliente=<nome> (dalla pagina Clienti): ricerca per colonna già compilata.
@@ -255,16 +265,18 @@ export default function Issues() {
   const [colSearchOpen, setColSearchOpen] = React.useState(Boolean(clienteParam))
   const [colQ, setColQ] = React.useState<ColQ>(() => ({ ...EMPTY_COLQ, customer: clienteParam }))
   const colQActive = Object.values(colQ).some(Boolean)
-  const activeFilterCount = [fStatus, fPriority, fCategory, fAssigned].filter((f) => f.length).length + (view !== 'active' ? 1 : 0)
+  const activeFilterCount = [fStatus, fPriority, fCategory, fAssigned, fArea].filter((f) => f.length).length + (view !== 'active' ? 1 : 0)
 
   const resetFilters = () => {
-    setView('active'); setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([])
+    setView('active'); setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]); setFArea([])
   }
 
   const allExtraParams = React.useMemo(() => {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
-    if (view === 'active' || view === 'mine' || view === 'overdue') p.hide_closed = true
+    if (view === 'active' || view === 'mine' || view === 'myarea' || view === 'overdue') p.hide_closed = true
+    if (view === 'myarea' && myArea != null) p.area = myArea
+    else if (fArea.length) p.area = fArea[0]
     if (view === 'overdue') p.due_before = overdueBefore()
     if (view === 'closed') p.only_closed = true
     if (view === 'mine' && me?.id) p.assigned_to = me.id
@@ -287,7 +299,7 @@ export default function Issues() {
     if (colQ.due === 'later') p.due_after = iso(8)
     if (colQ.due === 'none') p.has_due = false
     return p
-  }, [grid.view, view, me?.id, fStatus, fPriority, fCategory, fAssigned, colQ])
+  }, [grid.view, view, me?.id, myArea, fStatus, fPriority, fCategory, fAssigned, fArea, colQ])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -385,7 +397,7 @@ export default function Issues() {
   // ── Drawer: crea / modifica ───────────────────────────────────────────────
   const [formOpen, setFormOpen] = React.useState(false)
   const [editIssue, setEditIssue] = React.useState<IssueRow | null>(null)
-  const [form, setForm] = React.useState<IssueFormData>(() => createEmptyForm(me?.id))
+  const [form, setForm] = React.useState<IssueFormData>(() => createEmptyForm(me?.id, myArea))
   const [formSaving, setFormSaving] = React.useState(false)
   const [formErrors, setFormErrors] = React.useState<Record<string, string>>({})
   const [linkInventoryOpen, setLinkInventoryOpen] = React.useState(false)
@@ -430,7 +442,7 @@ export default function Issues() {
 
   const openCreate = React.useCallback(() => {
     setEditIssue(null)
-    setForm(createEmptyForm(me?.id))
+    setForm(createEmptyForm(me?.id, myArea))
     setCustFormInput('')
     setFormErrors({})
     setInventoryOptions([])
@@ -438,7 +450,7 @@ export default function Issues() {
     setPendingInventory(null)
     setLinkInventoryOpen(false)
     setFormOpen(true)
-  }, [me?.id])
+  }, [me?.id, myArea])
 
   // Click sul numero ServiceNow di un'Issue → apre il drawer del caso
   // corrispondente nella pagina ServiceNow Case (solo quello: non tocca
@@ -498,7 +510,7 @@ export default function Issues() {
       }
       setEditIssue(null)
       setForm({
-        ...createEmptyForm(me?.id),
+        ...createEmptyForm(me?.id, myArea),
         customer: custOpt,
         site_id: cfi.siteId ?? '',
       })
@@ -517,7 +529,7 @@ export default function Issues() {
       // DB", come testo libero già pronto.
       setEditIssue(null)
       setForm({
-        ...createEmptyForm(me?.id),
+        ...createEmptyForm(me?.id, myArea),
         title: (cfsn.shortDescription.trim() || `Caso ServiceNow ${cfsn.number}`).slice(0, 255),
         description: cfsn.shortDescription,
         servicenow_id: cfsn.number,
@@ -533,7 +545,7 @@ export default function Issues() {
     } else if (st?.createForCustomer) {
       const cfc = st.createForCustomer
       setEditIssue(null)
-      setForm({ ...createEmptyForm(me?.id), customer: { id: cfc.customerId, label: cfc.customerName }, site_id: cfc.siteId ?? '' })
+      setForm({ ...createEmptyForm(me?.id, myArea), customer: { id: cfc.customerId, label: cfc.customerName }, site_id: cfc.siteId ?? '' })
       setCustFormInput(cfc.customerName)
       setFormErrors({})
       setInventoryOptions([])
@@ -546,7 +558,7 @@ export default function Issues() {
     }
 
     navigate(loc.pathname + loc.search, { replace: true, state: {} })
-  }, [loc, navigate, me?.id, openCreate])
+  }, [loc, navigate, me?.id, myArea, openCreate])
 
   const openEdit = React.useCallback((row: IssueRow) => {
     setEditIssue(row)
@@ -562,6 +574,7 @@ export default function Issues() {
       customerPlaceholder: row.customer_placeholder || '',
       site_id: row.site ?? '',
       category_id: row.category ?? '',
+      area_id: row.area ?? '',
       assigned_to_id: row.assigned_to ?? '',
       priority: row.priority,
       status: row.status,
@@ -658,6 +671,7 @@ export default function Issues() {
       servicenow_id: form.servicenow_id.trim(),
       customer_placeholder: form.useCustomerPlaceholder ? form.customerPlaceholder.trim() : '',
       category: form.category_id || null,
+      area: form.area_id || null,
       assigned_to: form.assigned_to_id || null,
       priority: form.priority,
       status: form.status,
@@ -911,12 +925,14 @@ export default function Issues() {
     fPriority.length ? { key: 'priority', label: 'Priorità', values: fPriority.map((x) => PRIORITY_META[x]?.label ?? x).join(', ') } : null,
     fCategory.length ? { key: 'category', label: 'Categoria', values: fCategory.map(catLabel).join(', ') } : null,
     fAssigned.length && view !== 'mine' ? { key: 'assigned', label: 'Assegnata a', values: fAssigned.map(userLabel).join(', ') } : null,
+    fArea.length && view !== 'myarea' ? { key: 'area', label: 'Area', values: fArea.map((id) => areas.find((a) => String(a.id) === id)?.label ?? id).join(', ') } : null,
   ].filter((x): x is ActiveFilter => Boolean(x))
   const removeFilter = (key: string) => {
     if (key === 'status') setFStatus([])
     if (key === 'priority') setFPriority([])
     if (key === 'category') setFCategory([])
     if (key === 'assigned') setFAssigned([])
+    if (key === 'area') setFArea([])
   }
   // Card su telefono: stato e scadenza in alto, titolo, cliente.
   const renderIssueCard = React.useCallback(({ row, onOpen, onContextMenu }: { row: IssueRow; onOpen: (id: number) => void; onContextMenu: (r: IssueRow, e: React.MouseEvent<HTMLElement>) => void }) => {
@@ -960,8 +976,9 @@ export default function Issues() {
       category_label: make('Categoria', fCategory, setFCategory, categories.map((c) => ({ value: String(c.id), label: c.label })), { single: true }),
     }
     if (view !== 'mine') cfg.assigned_to_full_name = make('Assegnata a', fAssigned, setFAssigned, assignableUsers.map((u) => ({ value: String(u.id), label: u.label })), { single: true, searchable: true })
+    if (view !== 'myarea') cfg.area_label = make('Area', fArea, setFArea, areas.map((a) => ({ value: String(a.id), label: a.label })), { single: true })
     return cfg
-  }, [fPriority, fStatus, fCategory, fAssigned, categories, assignableUsers, view])
+  }, [fPriority, fStatus, fCategory, fAssigned, fArea, categories, areas, assignableUsers, view])
 
   // ── Delete / restore ──────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = React.useState<IssueRow | null>(null)
@@ -1012,6 +1029,11 @@ export default function Issues() {
 
     const isClosed = row.status === 'closed'
     const isResolved = row.status === 'resolved'
+
+    // Issue di un'altra area: sola lettura, si può solo aprire.
+    if (row.can_edit === false) {
+      return [{ key: 'open', label: 'Apri dettaglio', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDetail(row, 0) }]
+    }
 
     return [
       {
@@ -1271,6 +1293,21 @@ export default function Issues() {
       ),
     },
     {
+      field: 'area_label',
+      headerName: 'Area',
+      width: 140,
+      sortable: false,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', minWidth: 0 }}>
+          {row.area_label ? (
+            <Typography variant="body2" noWrap>{row.area_label}</Typography>
+          ) : (
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
       field: 'comments_count',
       headerName: 'Commenti',
       width: 104,
@@ -1359,6 +1396,7 @@ export default function Issues() {
           tabs={[
             { key: 'active', label: 'Attive', count: kpiCounts?.active },
             { key: 'mine', label: 'Le mie', count: issueCounts?.mine },
+            ...(myArea != null ? [{ key: 'myarea', label: 'La mia area' }] : []),
             { key: 'overdue', label: 'Scadute', count: issueCounts?.overdue, tone: 'alert' },
             { key: 'closed', label: 'Risolte e chiuse', count: kpiCounts?.closed },
             { key: 'all', label: 'Tutte', count: kpiCounts?.all },
@@ -1382,7 +1420,7 @@ export default function Issues() {
             <TableBar
               filters={activeFilters}
               onRemoveFilter={removeFilter}
-              onClearFilters={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]) }}
+              onClearFilters={() => { setFStatus([]); setFPriority([]); setFCategory([]); setFAssigned([]); setFArea([]) }}
               q={grid.q}
               onQChange={grid.setQ}
               searchPlaceholder="Cerca titolo, cliente, ServiceNow, inventario…"
@@ -1457,6 +1495,7 @@ export default function Issues() {
         siteOptions={siteOptions}
         categories={categories}
         users={assignableUsers}
+        areas={areas}
         pendingInventory={pendingInventory}
         onClose={() => setFormOpen(false)}
         onSave={handleFormSave}

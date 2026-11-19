@@ -23,10 +23,10 @@ const issue = {
   due_date: null, days_open: 2, comments_count: 0, servicenow_external_url: null, created_at: '2026-11-16T08:40:00Z', updated_at: '2026-11-17T15:41:00Z', deleted_at: null,
 } as unknown as IssueRow
 
-const show = () => {
+const show = (over: Partial<IssueRow> = {}) => {
   const onPatch = vi.fn().mockResolvedValue(undefined)
   render(<ThemeProvider theme={theme}><MemoryRouter>
-    <IssueDetail issue={issue} onClose={vi.fn()} comments={[]} commentsLoading={false} events={[]} newComment="" sendingComment={false}
+    <IssueDetail issue={{ ...issue, ...over }} onClose={vi.fn()} comments={[]} commentsLoading={false} events={[]} newComment="" sendingComment={false}
       onNewCommentChange={vi.fn()} onSendComment={vi.fn()} users={[{ id: 7, label: 'Marco Bassi', username: 'mbassi' } as never]} categories={[{ id: 1, label: 'DICOM' }]} meId={5}
       onPatch={onPatch} onEdit={vi.fn()} onDelete={vi.fn()} onLinkInventory={vi.fn()} onOpenServiceNow={vi.fn()} />
   </MemoryRouter></ThemeProvider>)
@@ -61,5 +61,16 @@ describe('IssueDetail', () => {
     fireEvent.change(screen.getByLabelText('Titolo'), { target: { value: 'Worklist vuota sulla CT 2 (RIS)' } })
     fireEvent.click(screen.getByRole('button', { name: 'Salva le modifiche' }))
     await waitFor(() => expect(onPatch).toHaveBeenCalledWith({ title: 'Worklist vuota sulla CT 2 (RIS)', description: 'Dalle 7:30 niente worklist dal RIS.' }, 'Issue aggiornata'))
+  })
+
+  it('una issue di un\'altra area si apre in sola lettura', async () => {
+    show({ area: 3, area_label: 'Radiologia', can_edit: false })
+    expect(await screen.findByText('Issue dell\'area Radiologia: puoi solo consultarla.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Segna come risolta' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Assegna a me' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Scrivi un commento')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }))
+    expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Elimina' })).toHaveAttribute('aria-disabled', 'true')
   })
 })
