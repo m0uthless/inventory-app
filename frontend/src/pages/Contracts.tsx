@@ -1,6 +1,13 @@
 import * as React from 'react'
 import { Box, Button, Stack, Tooltip, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
+import AutorenewIcon from '@mui/icons-material/Autorenew'
+import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
+import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import type { GridColDef } from '@mui/x-data-grid'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -14,6 +21,7 @@ import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -328,6 +336,45 @@ export default function Contracts() {
 
   const [sellersOpen, setSellersOpen] = React.useState(false)
 
+  // ── Tasto destro sulla riga ──
+  const [ctx, setCtx] = React.useState<{ row: ContractListItem; x: number; y: number } | null>(null)
+  // Modifica / rinnovo / eliminazione dal menu: apre la finestra e, a contratto caricato, il dialogo.
+  const pendingRef = React.useRef<{ id: number; action: 'edit' | 'renew' | 'delete' } | null>(null)
+  const runFromRow = React.useCallback((id: number, action: 'edit' | 'renew' | 'delete') => { pendingRef.current = { id, action }; openDrawer(id) }, [openDrawer])
+  React.useEffect(() => {
+    const p = pendingRef.current
+    if (!detail || !p || p.id !== detail.id) return
+    pendingRef.current = null
+    if (p.action === 'edit') { setDlgContract(detail); setDlgOpen(true) }
+    else if (p.action === 'renew') setRenewOpen(true)
+    else setDeleteDlgOpen(true)
+  }, [detail])
+  const restoreFromRow = React.useCallback(async (id: number) => {
+    try {
+      await api.post(`/contracts/${id}/restore/`)
+      toast.success('Contratto ripristinato.')
+      reloadAll()
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }, [toast, reloadAll])
+  const ctxItems: RowContextMenuItem[] = (() => {
+    const r = ctx?.row
+    if (!r) return []
+    if (r.deleted_at) {
+      return [
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(r.id) },
+        { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, hidden: !canChange, onClick: () => void restoreFromRow(r.id) },
+      ]
+    }
+    return [
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(r.id) },
+      { key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, hidden: !canChange, onClick: () => runFromRow(r.id, 'edit') },
+      { key: 'renew', label: 'Rinnova…', icon: <AutorenewIcon fontSize="small" />, hidden: !canChange || r.status !== 'attivo', onClick: () => runFromRow(r.id, 'renew') },
+      { key: 'customer', label: 'Apri il cliente', icon: <BusinessOutlinedIcon fontSize="small" />, dividerBefore: true, onClick: () => navigate(`/customers${buildQuery({ open: r.customer })}`) },
+      { key: 'copy', label: 'Copia il codice', icon: <ContentCopyIcon fontSize="small" />, hidden: !r.code, onClick: async () => { await copyToClipboard(r.code); toast.success('Copiato') } },
+      { key: 'delete', label: 'Sposta nel cestino', icon: <DeleteOutlineIcon fontSize="small" />, hidden: !canDelete, dividerBefore: true, tone: 'danger', onClick: () => runFromRow(r.id, 'delete') },
+    ]
+  })()
+
   // ── Griglia, filtri da intestazione, esportazione ──
   const columns = React.useMemo(() => buildColumns(canViewValue), [canViewValue])
   const contractCard = React.useMemo(() => renderContractCard(), [])
@@ -512,6 +559,7 @@ export default function Contracts() {
             // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
             onRowClick: setSelectedId,
             onRowOpen: openDrawer,
+            onRowContextMenu: (row, e) => { setSelectedId(row.id); setCtx({ row, x: e.clientX + 2, y: e.clientY - 6 }) },
             getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
@@ -545,6 +593,7 @@ export default function Contracts() {
         />
       ) : null}
 
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <ContractDialog
         open={dlgOpen}
         contract={dlgContract}

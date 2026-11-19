@@ -1,6 +1,15 @@
 import * as React from 'react'
 import { Box, Button, Checkbox, Stack, Typography } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
+import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
+import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined'
+import CloseIcon from '@mui/icons-material/Close'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
+import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
+import { useNavigate } from 'react-router-dom'
 
 import { api } from '@shared/api/client'
 import { buildDrfListParams } from '@shared/api/drf'
@@ -11,6 +20,7 @@ import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -48,6 +58,7 @@ function useEvStats(reloadKey: unknown, customer: number | '') {
 /** Manutenzione › Rapportini (restyle "Campo sterile", anteprima design-previews/mt-base.html). */
 export default function Rapportini() {
   const toast = useToast()
+  const navigate = useNavigate()
   const { me, hasPerm } = useAuth()
   const canAdd = hasPerm(PERMS.maintenance.event.add)
   const canChange = hasPerm(PERMS.maintenance.event.change)
@@ -132,6 +143,28 @@ export default function Rapportini() {
       toast.success('Issue aperta')
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }
+
+  // ── Tasto destro sulla riga ──
+  const [ctx, setCtx] = React.useState<{ row: EventRow; x: number; y: number } | null>(null)
+  const rowPdfRef = React.useRef<HTMLInputElement | null>(null)
+  const [pdfTarget, setPdfTarget] = React.useState<number | null>(null)
+  const ctxItems: RowContextMenuItem[] = (() => {
+    const r = ctx?.row
+    if (!r) return []
+    const np = r.result === 'not_planned'
+    const bad = r.result === 'ko' || r.result === 'partial'
+    const on = selected.has(r.id)
+    return [
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => { setFocusId(r.id); setOpenId(r.id) } },
+      { key: 'sel', label: on ? 'Togli dalla selezione' : selected.size ? 'Aggiungi alla selezione' : 'Seleziona', icon: <CheckBoxOutlinedIcon fontSize="small" />, onClick: () => toggle(r.id) },
+      { key: 'pdf-up', label: r.pdf_url ? 'Sostituisci il PDF' : 'Carica il PDF', icon: <UploadFileOutlinedIcon fontSize="small" />, hidden: np || !canChange, disabled: busy, dividerBefore: true, onClick: () => { setPdfTarget(r.id); rowPdfRef.current?.click() } },
+      { key: 'pdf-open', label: 'Apri il PDF', icon: <PictureAsPdfOutlinedIcon fontSize="small" />, hidden: !r.pdf_url, onClick: () => { window.open(r.pdf_url ?? '', '_blank', 'noopener') } },
+      { key: 'issue', label: 'Apri issue', icon: <ReportProblemOutlinedIcon fontSize="small" />, hidden: !bad || !canAddIssue, onClick: () => void openIssue(r) },
+      { key: 'np', label: 'Segna come non prevista', icon: <CloseIcon fontSize="small" />, hidden: np || !canChange, onClick: () => void notPlanned(r.id) },
+      { key: 'plan', label: 'Apri il piano', icon: <BuildOutlinedIcon fontSize="small" />, dividerBefore: true, onClick: () => navigate(`/maintenance/plans?apri=${r.plan}`) },
+      { key: 'reset', label: 'Elimina il rapportino', icon: <DeleteOutlineIcon fontSize="small" />, hidden: !canReset, dividerBefore: true, tone: 'danger', onClick: () => setResetIds([r.id]) },
+    ]
+  })()
 
   // ── Colonne, filtri, esportazione ──
   const columns = React.useMemo<GridColDef<EventRow>[]>(() => [
@@ -281,6 +314,7 @@ export default function Rapportini() {
             onSortModelChange: grid.onSortModelChange,
             onRowClick: setFocusId,
             onRowOpen: (id) => { setFocusId(id); setOpenId(id) },
+            onRowContextMenu: (r, e) => { setFocusId(r.id); setCtx({ row: r, x: e.clientX + 2, y: e.clientY - 6 }) },
             getRowClassName: (r) => [(openId ?? focusId) === r.id ? 'Mui-selected' : '', selected.has(r.id) ? 'is-checked' : ''].join(' '),
             sx: { ...headerFilterGridSx, cursor: 'pointer', '& .is-checked': { bgcolor: (t) => `${t.palette.archie.field} !important` } },
           }}
@@ -306,6 +340,8 @@ export default function Rapportini() {
         />
       ) : null}
 
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
+      <input ref={rowPdfRef} type="file" accept="application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && pdfTarget != null) void uploadPdf([pdfTarget], f); setPdfTarget(null) }} />
       <RapportinoDialog open={rpOpen} rows={[]} techs={techs} customers={customers.map((c) => ({ id: c.id, name: c.display_name || c.name }))} canAddIssue={canAddIssue} onClose={() => setRpOpen(false)} onSaved={reloadAll} />
       <ConfirmDeleteDialog open={Boolean(resetIds)} busy={busy} title={resetIds && resetIds.length > 1 ? `Eliminare ${resetIds.length} rapportini?` : 'Eliminare il rapportino?'}
         description="L'eliminazione è definitiva, PDF compreso: la manutenzione torna nelle scadenze da fare." confirmText="Elimina"

@@ -357,8 +357,7 @@ export default function Maintenance() {
         />
       ) : null}
 
-      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems}
-        title={ctx?.row.inventory_name} subtitle={ctx ? [ctx.row.customer_name, ctx.row.site_name].filter(Boolean).join(' · ') : undefined} />
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <RapportinoDialog open={rpRows !== null} rows={rpRows ?? []} techs={techs} customers={stats?.customers ?? []} canAddIssue={canAddIssue} onClose={() => setRpRows(null)} onSaved={afterSave} />
       <DueDateOverrideDialog open={Boolean(overrideRow)} row={overrideRow} onClose={() => setOverrideRow(null)} onSaved={() => { reloadAll(); setOpen(null) }} />
     </Stack>

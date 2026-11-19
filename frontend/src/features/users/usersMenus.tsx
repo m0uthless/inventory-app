@@ -91,11 +91,10 @@ export function UserRowMenu({ anchor, onClose, groups, currentUserId, currentUse
   return (
     <>
       <RowContextMenu open={Boolean(anchor)} onClose={onClose} items={items}
-        anchorPosition={anchor ? { top: anchor.mouseY, left: anchor.mouseX } : undefined}
-        title={u ? fullName(u) : undefined} subtitle={u ? `@${u.username}` : undefined} />
+        anchorPosition={anchor ? { top: anchor.mouseY, left: anchor.mouseX } : undefined} />
       <RowContextMenu open={Boolean(groupMenu)} onClose={() => setGroupMenu(null)} items={groupItems}
         anchorPosition={groupMenu ? { top: groupMenu.mouseY, left: groupMenu.mouseX } : undefined}
-        title="Aggiungi a un gruppo" subtitle={g ? fullName(g) : undefined} />
+        title="Aggiungi a un gruppo" />
 
       <CampoDialog open={confirmPw} onClose={() => setConfirmPw(false)} busy={busy} labelId="pw-confirm-title" width={420}
         title={target ? `Reimpostare la password di ${fullName(target)}?` : ''} sub="Quella attuale smette subito di funzionare."
@@ -144,8 +143,7 @@ export function GroupCardMenu({ anchor, onClose, users, onOpen, onDuplicate, onD
   return (
     <>
       <RowContextMenu open={Boolean(anchor)} onClose={onClose} items={items}
-        anchorPosition={anchor ? { top: anchor.mouseY, left: anchor.mouseX } : undefined}
-        title={g?.name} subtitle={g ? `${members.length} ${members.length === 1 ? 'utente' : 'utenti'}` : undefined} />
+        anchorPosition={anchor ? { top: anchor.mouseY, left: anchor.mouseX } : undefined} />
       <ConfirmDeleteDialog open={Boolean(target)} busy={busy} title={target ? `Eliminare il gruppo «${target.name}»?` : ''}
         description={n ? `L'eliminazione è definitiva: ${n} ${n === 1 ? 'utente perde' : 'utenti perdono'} i permessi che arrivano da questo gruppo.` : "L'eliminazione è definitiva."}
         confirmText="Elimina" onClose={() => setTarget(null)} onConfirm={() => void doDelete()} />

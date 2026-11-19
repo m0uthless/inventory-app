@@ -2,6 +2,12 @@ import * as React from 'react'
 import { Box, Button, Stack, Typography } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import type { GridColDef } from '@mui/x-data-grid'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
+import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
+import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import { useNavigate } from 'react-router-dom'
 
 import { api } from '@shared/api/client'
@@ -13,6 +19,7 @@ import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -122,6 +129,26 @@ export default function MaintenancePlans() {
   }
   const pdf = (p: PlanRow) => void generatePlanPdf(p, theme, () => toast.warning('Popup bloccato dal browser. Abilita i popup per questo sito.'))
 
+  // ── Tasto destro sulla riga ──
+  const [ctx, setCtx] = React.useState<{ row: PlanRow; x: number; y: number } | null>(null)
+  const ctxItems: RowContextMenuItem[] = (() => {
+    const r = ctx?.row
+    if (!r) return []
+    if (r.deleted_at) {
+      return [
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openPlan(r.id) },
+        { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, hidden: !canChange, onClick: () => void doRestore(r) },
+      ]
+    }
+    return [
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openPlan(r.id) },
+      { key: 'edit', label: 'Modifica…', icon: <EditIcon fontSize="small" />, hidden: !canChange, onClick: () => setDlg({ plan: r }) },
+      { key: 'todo', label: 'Vedi le scadenze', icon: <EventOutlinedIcon fontSize="small" />, dividerBefore: true, onClick: () => navigate(`/maintenance?m_plan=${r.id}`) },
+      { key: 'pdf', label: 'Report PDF', icon: <PictureAsPdfOutlinedIcon fontSize="small" />, onClick: () => pdf(r) },
+      { key: 'delete', label: 'Sposta nel cestino', icon: <DeleteOutlineIcon fontSize="small" />, hidden: !canDelete, dividerBefore: true, tone: 'danger', onClick: () => setDelPlan(r) },
+    ]
+  })()
+
   // ── Colonne, filtri, esportazione ──
   const columns = React.useMemo<GridColDef<PlanRow>[]>(() => [
     { field: 'title', headerName: 'Piano', flex: 1, minWidth: 220, renderCell: (p) => <Box component="span" sx={{ fontWeight: 550, ...ellipsis }}>{p.row.title}</Box> },
@@ -227,6 +254,7 @@ export default function MaintenancePlans() {
             onSortModelChange: grid.onSortModelChange,
             onRowClick: setSelectedId,
             onRowOpen: openPlan,
+            onRowContextMenu: (r, e) => { setSelectedId(r.id); setCtx({ row: r, x: e.clientX + 2, y: e.clientY - 6 }) },
             getRowClassName: (r) => ((openId ?? selectedId) === r.id ? 'Mui-selected' : ''),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
@@ -251,6 +279,7 @@ export default function MaintenancePlans() {
         />
       ) : null}
 
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <PlanDialog open={dlg !== null} plan={dlg?.plan ?? null} customers={customers} onClose={() => setDlg(null)}
         onSaved={(id) => { setDlg(null); reloadAll(); setCardReload((n) => n + 1); setOpenId(id) }} />
       <ConfirmDeleteDialog open={Boolean(delPlan)} busy={delBusy} title="Spostare il piano nel cestino?" description={`«${delPlan?.title ?? ''}» verrà spostato nel cestino e potrà essere ripristinato.`} onClose={() => setDelPlan(null)} onConfirm={() => void doDelete()} />

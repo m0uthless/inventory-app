@@ -9,6 +9,8 @@ import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import { CampoIcon, PageHead } from '../ui/campo'
 import { archiveVars } from '../features/wiki/archive/archiveModel'
 import { FileIcon, FolderIcon } from '../features/drive/DriveIcons'
@@ -289,6 +291,39 @@ export default function Drive() {
     if (e.dataTransfer.files?.length) void handleUpload(e.dataTransfer.files)
   }
   const currentName = flat ? 'Drive' : crumbs[crumbs.length - 1].name
+
+  // ── Tasto destro su cartelle e file ──
+  const [ctx, setCtx] = React.useState<{ item: DrawerItem; x: number; y: number } | null>(null)
+  const onCtx = (item: DrawerItem) => (e: React.MouseEvent) => { e.preventDefault(); setCtx({ item, x: e.clientX + 2, y: e.clientY - 6 }) }
+  const ctxItems: RowContextMenuItem[] = (() => {
+    if (!ctx) return []
+    const it = ctx.item
+    const key = `${it.kind}-${it.data.id}`
+    const on = selected.has(key)
+    const canSelect = it.kind === 'folder' ? canDelete : canDelete || canChange
+    const ic = (name: Parameters<typeof CampoIcon>[0]['name']) => <CampoIcon name={name} size={16} />
+    const head: RowContextMenuItem[] = it.kind === 'folder'
+      ? [
+          { key: 'enter', label: 'Apri la cartella', icon: ic('folder'), strong: true, onClick: () => navigateTo(it.data.id) },
+          { key: 'detail', label: 'Dettagli', icon: ic('panel'), onClick: () => { setDetail(it); if (!floating) setPane(true) } },
+        ]
+      : [
+          { key: 'full', label: 'Anteprima', icon: ic('eye'), strong: true, onClick: () => setFull(it.data as DriveFile) },
+          { key: 'download', label: 'Scarica', icon: ic('download'), onClick: () => { window.open(`/api/drive-files/${it.data.id}/download/`, '_blank') } },
+          { key: 'detail', label: 'Dettagli', icon: ic('panel'), onClick: () => { setDetail(it); if (!floating) setPane(true) } },
+        ]
+    return [
+      ...head,
+      { key: 'link', label: 'Copia link', icon: ic('copy'), onClick: async () => {
+        await copyToClipboard(`${window.location.origin}/drive?${it.kind === 'file' ? `file=${it.data.id}` : `cartella=${it.data.id}`}`)
+        toast.success('Link copiato: chi lo apre deve avere accesso alla cartella')
+      } },
+      { key: 'sel', label: on ? 'Togli dalla selezione' : selected.size ? 'Aggiungi alla selezione' : 'Seleziona', icon: ic('check'), hidden: !canSelect, dividerBefore: true, onClick: () => toggle(key) },
+      { key: 'rename', label: 'Rinomina…', icon: ic('file'), hidden: !canChange, dividerBefore: true, onClick: () => { setRenameItem(it); setRenameName(it.data.name) } },
+      { key: 'move', label: 'Sposta in…', icon: ic('folder'), hidden: !canChange, onClick: () => openMove(it) },
+      { key: 'delete', label: 'Sposta nel cestino', icon: ic('trash'), hidden: !canDelete, dividerBefore: true, tone: 'danger', onClick: () => setDeleteItem(it) },
+    ]
+  })()
   const siblings = detail?.kind === 'file' ? files.filter((f) => f.folder === (detail.data as DriveFile).folder && f.id !== detail.data.id) : []
 
   return (
@@ -371,7 +406,7 @@ export default function Drive() {
               <div className="dr-side-h">Recenti</div>
               <ul>
                 {recent.map((f) => (
-                  <li key={f.id}><button type="button" onClick={() => openFile(f)}>
+                  <li key={f.id}><button type="button" onClick={() => openFile(f)} onContextMenu={onCtx({ kind: 'file', data: f })}>
                     <FileIcon kind={kindOf(f.name, f.mime_type)} ext={extOf(f.name)} size={38} />
                     <span className="d-n"><b>{f.name}</b><small>{f.folder_name ?? 'Drive'} · {rel(f.updated_at)}</small></span>
                   </button></li>
@@ -387,11 +422,11 @@ export default function Drive() {
           ) : viewMode === 'grid' ? (
             <ul className="d-grid">
               {folders.map((f) => (
-                <li key={`folder-${f.id}`}><button type="button" className={`d-gi${isOpen('folder', f.id) ? ' is-open' : ''}`} aria-label={`Cartella ${f.name}`} onClick={() => clickFolder(f)} onDoubleClick={() => navigateTo(f.id)} onKeyDown={(e) => enterKey(e, () => navigateTo(f.id))}>
+                <li key={`folder-${f.id}`}><button type="button" className={`d-gi${isOpen('folder', f.id) ? ' is-open' : ''}`} aria-label={`Cartella ${f.name}`} onClick={() => clickFolder(f)} onDoubleClick={() => navigateTo(f.id)} onKeyDown={(e) => enterKey(e, () => navigateTo(f.id))} onContextMenu={onCtx({ kind: 'folder', data: f })}>
                   <span className="d-gthumb"><FolderIcon size={56} badge={badgeOf(f)} /></span><b>{f.name}</b><small>{f.files_count} file</small></button></li>
               ))}
               {files.map((f) => (
-                <li key={`file-${f.id}`}><button type="button" className={`d-gi${isOpen('file', f.id) ? ' is-open' : ''}`} onClick={() => openFile(f)} onDoubleClick={() => setFull(f)} onKeyDown={(e) => enterKey(e, () => setFull(f))}>
+                <li key={`file-${f.id}`}><button type="button" className={`d-gi${isOpen('file', f.id) ? ' is-open' : ''}`} onClick={() => openFile(f)} onDoubleClick={() => setFull(f)} onKeyDown={(e) => enterKey(e, () => setFull(f))} onContextMenu={onCtx({ kind: 'file', data: f })}>
                   <span className="d-gthumb">{f.is_image ? <img src={`/api/drive-files/${f.id}/preview/`} alt="" loading="lazy" /> : <FileIcon kind={kindOf(f.name, f.mime_type)} ext={extOf(f.name)} size={64} />}</span>
                   <b>{f.name}</b><small>{f.size_human} · {rel(f.updated_at)}</small></button></li>
               ))}
@@ -403,7 +438,7 @@ export default function Drive() {
                 <tbody>
                   {folders.map((f) => (
                     <tr key={`folder-${f.id}`} className={`is-folder${selected.has(`folder-${f.id}`) ? ' is-sel' : ''}${isOpen('folder', f.id) ? ' is-open' : ''}`} tabIndex={0}
-                      onClick={() => clickFolder(f)} onDoubleClick={() => navigateTo(f.id)} onKeyDown={(e) => enterKey(e, () => navigateTo(f.id))}>
+                      onClick={() => clickFolder(f)} onDoubleClick={() => navigateTo(f.id)} onKeyDown={(e) => enterKey(e, () => navigateTo(f.id))} onContextMenu={onCtx({ kind: 'folder', data: f })}>
                       <td className="d-c-sel" onClick={(e) => e.stopPropagation()}>{canDelete ? <input type="checkbox" aria-label={`Seleziona cartella ${f.name}`} checked={selected.has(`folder-${f.id}`)} onChange={() => toggle(`folder-${f.id}`)} /> : null}</td>
                       <td className="d-c-name"><span className="d-nm"><FolderIcon size={22} badge={badgeOf(f)} /><span className="d-n"><b>{f.name}</b>{flat ? <small>{f.full_path}</small> : null}</span></span></td>
                       <td>{custCell(f.customers)}</td>
@@ -416,7 +451,7 @@ export default function Drive() {
                   ))}
                   {files.map((f) => (
                     <tr key={`file-${f.id}`} className={`${selected.has(`file-${f.id}`) ? 'is-sel' : ''}${isOpen('file', f.id) ? ' is-open' : ''}`} tabIndex={0}
-                      onClick={() => openFile(f)} onDoubleClick={() => setFull(f)} onKeyDown={(e) => enterKey(e, () => setFull(f))}>
+                      onClick={() => openFile(f)} onDoubleClick={() => setFull(f)} onKeyDown={(e) => enterKey(e, () => setFull(f))} onContextMenu={onCtx({ kind: 'file', data: f })}>
                       <td className="d-c-sel" onClick={(e) => e.stopPropagation()}>{canDelete || canChange ? <input type="checkbox" aria-label={`Seleziona file ${f.name}`} checked={selected.has(`file-${f.id}`)} onChange={() => toggle(`file-${f.id}`)} /> : null}</td>
                       <td className="d-c-name"><span className="d-nm"><FileIcon kind={kindOf(f.name, f.mime_type)} ext={extOf(f.name)} size={28} /><span className="d-n"><b>{f.name}</b>{flat ? <small>{f.folder_name ?? 'Drive'}</small> : null}</span></span></td>
                       <td>{custCell(f.customers)}</td>
@@ -459,6 +494,7 @@ export default function Drive() {
       </section>
 
 
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <DriveFullPreview file={full} onClose={() => setFull(null)} />
       <CreateFolderDialog open={createFolderOpen} name={createFolderName} busy={createFolderBusy} onNameChange={setCreateFolderName} onClose={() => setCreateFolderOpen(false)} onCreate={doCreateFolder} />
       <RenameDialog item={renameItem} name={renameName} busy={renameBusy} onNameChange={setRenameName} onClose={() => setRenameItem(null)} onRename={doRename} />
