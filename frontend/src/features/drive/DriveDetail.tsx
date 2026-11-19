@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { Autocomplete, Box, Button, IconButton, TextField, Tooltip } from '@mui/material'
+import { Autocomplete, Box, Button, Dialog, IconButton, ListItemIcon, Menu, MenuItem, TextField, Tooltip } from '@mui/material'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
-import { CampoIcon, FloatingDetail, type DetailMenuItem } from '../../ui/campo'
+import { CampoIcon, type DetailMenuItem } from '../../ui/campo'
 import type { BreadcrumbItem, CustomerMini, DrawerItem, DriveAccessRule, DriveFile, DriveFolder } from '../../pages/drive/types'
 import { FileIcon, FolderIcon } from './DriveIcons'
 import { KIND_LABEL, describeEvent, dshort, extOf, kindOf, rel, type AuditRow } from './driveModel'
@@ -15,7 +15,10 @@ type Props = {
   canChange: boolean
   canDelete: boolean
   canSeeAudit: boolean
+  /** La × del pannello: lo nasconde (schermo largo) o toglie la selezione (schermo stretto). */
   onClose: () => void
+  /** Anteprima del file a tutto schermo. */
+  onFull: (f: DriveFile) => void
   onOpenFolder: (id: number | null) => void
   onOpenFile: (f: DriveFile) => void
   onRename: (item: DrawerItem) => void
@@ -25,7 +28,10 @@ type Props = {
   onChanged: (item: DrawerItem) => void
 }
 
-/** Pannello del file o della cartella (anteprima d-base, variante A): testata con solo icona e nome. */
+/**
+ * Pannello fisso del file o della cartella, a destra dell'elenco (anteprima design-previews/drv-base.html, variante B):
+ * il clic su una riga lo riempie; sotto i 1500 px si apre sopra l'elenco, su mobile a tutto schermo.
+ */
 export default function DriveDetail(p: Props) {
   const toast = useToast()
   const { item } = p
@@ -34,13 +40,14 @@ export default function DriveDetail(p: Props) {
   const [editNotes, setEditNotes] = React.useState<string | null>(null)
   const [addingCustomer, setAddingCustomer] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  const [menuEl, setMenuEl] = React.useState<HTMLElement | null>(null)
 
   const isFile = item?.kind === 'file'
   const id = item?.data.id
   const parentId = item ? (item.kind === 'file' ? item.data.folder : item.data.parent) : null
 
   React.useEffect(() => {
-    setEditNotes(null); setAddingCustomer(false)
+    setEditNotes(null); setAddingCustomer(false); setMenuEl(null)
     if (parentId == null) { setCrumbs([]); return }
     let alive = true
     api.get<BreadcrumbItem[]>(`/drive-folders/${parentId}/breadcrumb/`).then((r) => { if (alive) setCrumbs(r.data ?? []) }).catch(() => { if (alive) setCrumbs([]) })
@@ -55,7 +62,14 @@ export default function DriveDetail(p: Props) {
     return () => { alive = false }
   }, [item, isFile, p.canSeeAudit])
 
-  if (!item) return null
+  if (!item) {
+    return (
+      <aside className="d-pane is-empty" aria-label="Dettagli">
+        <div className="d-pane-h"><b>Dettagli</b><Tooltip title="Chiudi il pannello"><IconButton size="small" aria-label="Chiudi il pannello" onClick={p.onClose}><CampoIcon name="x" size={16} /></IconButton></Tooltip></div>
+        <div className="d-pane-none"><CampoIcon name="file" size={22} /><span>Seleziona un file o una cartella per vederne i dettagli.</span></div>
+      </aside>
+    )
+  }
   const d = item.data
   const url = isFile ? `/drive-files/${d.id}/` : `/drive-folders/${d.id}/`
   const file = isFile ? (d as DriveFile) : null
@@ -85,11 +99,10 @@ export default function DriveDetail(p: Props) {
     navigator.clipboard?.writeText(link).then(() => toast.success('Link copiato: chi lo apre deve avere accesso alla cartella'), () => toast.error('Copia non riuscita'))
   }
   const download = () => window.open(`/api/drive-files/${d.id}/download/`, '_blank')
-  const preview = () => window.open(`/api/drive-files/${d.id}/preview/`, '_blank')
 
   const menu: DetailMenuItem[] = []
   if (p.canChange) {
-    menu.push({ label: 'Rinomina', icon: <CampoIcon name="file" size={16} />, onClick: () => p.onRename(item) })
+    menu.push({ label: 'Rinomina…', icon: <CampoIcon name="file" size={16} />, onClick: () => p.onRename(item) })
     menu.push({ label: 'Sposta in…', icon: <CampoIcon name="folder" size={16} />, onClick: () => p.onMove(item) })
   }
   if (p.canDelete) menu.push({ label: 'Sposta nel cestino', icon: <CampoIcon name="trash" size={16} />, onClick: () => p.onDelete(item), danger: true })
@@ -97,30 +110,31 @@ export default function DriveDetail(p: Props) {
   const where = [{ id: null as number | null, name: 'Drive' }, ...crumbs.map((c) => ({ id: c.id as number | null, name: c.name }))]
 
   return (
-    <FloatingDetail
-      open
-      onClose={p.onClose}
-      ariaLabel={isFile ? 'Dettaglio del file' : 'Dettaglio della cartella'}
-      title={<span className="d-fd-title">{file ? <FileIcon kind={kind!} ext={ext} size={34} /> : <FolderIcon size={28} badge={access.length ? 'lock' : d.customers.length ? 'customer' : null} />}<span>{d.name}</span></span>}
-      menu={menu.length ? menu : undefined}
-    >
+    <aside className="d-pane" aria-label={isFile ? 'Dettagli del file' : 'Dettagli della cartella'}>
+      <div className="d-pane-h">
+        {file ? <FileIcon kind={kind!} ext={ext} size={28} /> : <FolderIcon size={24} badge={access.length ? 'lock' : d.customers.length ? 'customer' : null} />}
+        <b title={d.name}>{d.name}</b>
+        <Tooltip title="Chiudi il pannello"><IconButton size="small" aria-label="Chiudi il pannello" onClick={p.onClose}><CampoIcon name="x" size={16} /></IconButton></Tooltip>
+      </div>
+      <div className="d-pane-body">
       <div className={`d-fd-prev t-${file ? kind : 'folder'}`}>
         {file && file.is_image ? <img src={`/api/drive-files/${d.id}/preview/`} alt={`Anteprima di ${d.name}`} loading="lazy" />
           : file && file.is_pdf ? <iframe src={`/api/drive-files/${d.id}/preview/`} title={`Anteprima di ${d.name}`} />
             : file ? <span className="d-noprev"><FileIcon kind={kind!} ext={ext} size={72} /><small>Nessuna anteprima per i file {ext ? `.${ext}` : 'di questo tipo'}: si apre dopo averlo scaricato</small></span>
               : <span className="d-noprev"><FolderIcon size={64} /><small>{folder!.children_count} {folder!.children_count === 1 ? 'cartella' : 'cartelle'} · {folder!.files_count} file</small></span>}
-        {file && file.is_previewable ? <button type="button" className="d-fd-open" onClick={preview}><CampoIcon name="eye" size={14} />Apri anteprima</button> : null}
+        {file && file.is_previewable ? <button type="button" className="d-fd-open" onClick={() => p.onFull(file)}><CampoIcon name="eye" size={14} />Tutto schermo</button> : null}
       </div>
-
       <div className="d-fd-acts">
         {file ? <Button variant="contained" startIcon={<CampoIcon name="download" size={16} />} onClick={download}>Scarica</Button>
           : <Button variant="contained" startIcon={<CampoIcon name="folder" size={16} />} onClick={() => p.onOpenFolder(d.id)}>Apri la cartella</Button>}
         <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="copy" size={16} />} onClick={copyLink}>Copia link</Button>
-        {p.canChange ? <Tooltip title="Rinomina"><IconButton aria-label="Rinomina" onClick={() => p.onRename(item)}><CampoIcon name="file" size={17} /></IconButton></Tooltip> : null}
-        {p.canChange ? <Tooltip title="Sposta"><IconButton aria-label="Sposta" onClick={() => p.onMove(item)}><CampoIcon name="folder" size={17} /></IconButton></Tooltip> : null}
-        {p.canDelete ? <Tooltip title="Sposta nel cestino"><IconButton aria-label="Sposta nel cestino" onClick={() => p.onDelete(item)} sx={{ '&:hover': { color: 'error.main' } }}><CampoIcon name="trash" size={17} /></IconButton></Tooltip> : null}
+        {menu.length ? <>
+          <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" onClick={(e) => setMenuEl(e.currentTarget)}><CampoIcon name="more" size={17} /></IconButton></Tooltip>
+          <Menu anchorEl={menuEl} open={Boolean(menuEl)} onClose={() => setMenuEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+            {menu.map((m) => <MenuItem key={m.label} onClick={() => { setMenuEl(null); m.onClick() }} sx={m.danger ? { color: 'error.main' } : undefined}><ListItemIcon sx={m.danger ? { color: 'error.main' } : undefined}>{m.icon}</ListItemIcon>{m.label}</MenuItem>)}
+          </Menu>
+        </> : null}
       </div>
-
       <section className="d-fd-sec">
         <h4>Dettagli</h4>
         <dl className="d-props">
@@ -211,6 +225,31 @@ export default function DriveDetail(p: Props) {
           </ul>
         </section>
       ) : null}
-    </FloatingDetail>
+      </div>
+    </aside>
+  )
+}
+
+/** Anteprima del file a tutto schermo (doppio clic o Invio sul file, o «Tutto schermo» nel pannello). */
+export function DriveFullPreview({ file, onClose }: { file: DriveFile | null; onClose: () => void }) {
+  const kind = file ? kindOf(file.name, file.mime_type) : null
+  const ext = file ? extOf(file.name) : ''
+  return (
+    <Dialog open={Boolean(file)} onClose={onClose} fullScreen aria-label={file ? `Anteprima di ${file.name}` : undefined}
+      PaperProps={{ sx: { bgcolor: 'rgb(10 20 18 / .97)', backgroundImage: 'none', display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 1.5, p: { xs: 1.5, md: '16px 24px 24px' } } }}>
+      {file ? <>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, color: '#fff', minWidth: 0 }}>
+          <FileIcon kind={kind!} ext={ext} size={28} />
+          <Box component="b" sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 15 }}>{file.name}</Box>
+          <Button variant="contained" startIcon={<CampoIcon name="download" size={16} />} onClick={() => window.open(`/api/drive-files/${file.id}/download/`, '_blank')}>Scarica</Button>
+          <IconButton aria-label="Chiudi l'anteprima" onClick={onClose} sx={{ color: '#fff' }}><CampoIcon name="x" /></IconButton>
+        </Box>
+        <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 0, '& img': { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }, '& iframe': { width: '100%', height: '100%', border: 0, bgcolor: '#fff', borderRadius: '6px' } }}>
+          {file.is_image ? <img src={`/api/drive-files/${file.id}/preview/`} alt={`Anteprima di ${file.name}`} />
+            : file.is_pdf ? <iframe src={`/api/drive-files/${file.id}/preview/`} title={`Anteprima di ${file.name}`} />
+              : <Box sx={{ display: 'grid', justifyItems: 'center', gap: 1.5, color: 'rgb(255 255 255 / .8)', fontSize: 13 }}><FileIcon kind={kind!} ext={ext} size={88} />Nessuna anteprima per i file {ext ? `.${ext}` : 'di questo tipo'}: si apre dopo averlo scaricato.</Box>}
+        </Box>
+      </> : null}
+    </Dialog>
   )
 }

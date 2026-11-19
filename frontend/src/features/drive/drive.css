@@ -18,7 +18,8 @@
 .dv .d-folder { filter: drop-shadow(0 1px 1px rgb(120 80 0 / .18)); }
 
 /* Riquadro: albero a sinistra, contenuto a destra */
-.dv .d-a { position: relative; display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: calc(100vh - 200px); border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.dv .d-a { position: relative; display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: calc(100vh - 200px); border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: clip; }
+.dv .d-a.has-pane { grid-template-columns: 272px minmax(0, 1fr) 360px; }
 .dv .dr-side { border-right: 1px solid var(--border); background: var(--surface-2); padding: 12px 10px 18px; overflow-y: auto; }
 .dv .dr-side .search { background: var(--surface); }
 .dv .dr-side-h { padding: 14px 8px 4px; font-size: 11px; font-weight: 600; color: var(--faint); }
@@ -100,6 +101,26 @@
 .dv .d-drop svg { color: var(--primary); }
 .dv .d-drop b { font-size: 15px; } .dv .d-drop small { font-size: 12px; color: var(--muted); }
 .dv .d-a.is-drop .d-drop { display: grid; }
+
+/* ── Pannello fisso del file (variante B di drv-base) ── */
+.dv .d-pane { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 120px); display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--border); background: var(--surface); }
+.dv .d-pane-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 54px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--border); }
+.dv .d-pane-h b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv .d-pane.is-empty .d-pane-h { grid-template-columns: minmax(0, 1fr) auto; }
+.dv .d-pane-body { overflow-y: auto; padding: 14px; display: grid; gap: 14px; align-content: start; }
+.dv .d-pane-none { display: grid; justify-items: center; gap: 10px; padding: 48px 24px; text-align: center; font-size: 13px; color: var(--muted); }
+.dv .d-pane-none svg { color: var(--faint); }
+.dv .d-pane .d-fd-prev { min-height: 200px; }
+.dv .d-pane .d-fd-prev iframe { height: 240px; } .dv .d-pane .d-fd-prev img { max-height: 240px; }
+.dv .d-tbl tr.is-open td:first-child { box-shadow: inset 2px 0 0 var(--primary), inset 0 1px 0 var(--field-line), inset 0 -1px 0 var(--field-line); }
+@media (max-width: 1500px) {
+  .dv .d-a.has-pane { grid-template-columns: 272px minmax(0, 1fr); }
+  .dv .d-pane { position: absolute; top: 0; right: 0; bottom: 0; width: 360px; max-height: none; z-index: 4; box-shadow: -12px 0 32px rgb(0 0 0 / .14); }
+}
+@media (max-width: 899.98px) {
+  .dv .d-a.has-pane { grid-template-columns: 1fr; }
+  .dv .d-pane { position: fixed; inset: 0; width: auto; z-index: 1250; border-left: 0; box-shadow: none; }
+}
 
 /* ── Pannello del file ── */
 .dv .d-fd-title { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
