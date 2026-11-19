@@ -237,17 +237,22 @@ class IssueSerializer(serializers.ModelSerializer):
             )
 
         # ── Assegnazione: solo chi ha il permesso di gruppo `issues.be_assignee` ──
-        # Controllato solo se `assigned_to` è nel payload: le issue con un
-        # assegnatario che nel frattempo ha perso il permesso restano modificabili.
-        if "assigned_to" in attrs and attrs["assigned_to"] is not None:
+        # Controllato solo se l'assegnatario cambia davvero: le issue con un
+        # assegnatario che nel frattempo ha perso il permesso restano modificabili
+        # (il modulo completo rimanda sempre `assigned_to`).
+        current_assignee_id = getattr(self.instance, "assigned_to_id", None)
+        assignee_changed = "assigned_to" in attrs and getattr(attrs["assigned_to"], "pk", None) != current_assignee_id
+        if assignee_changed and attrs["assigned_to"] is not None:
             if not is_eligible_issue_assignee(attrs["assigned_to"]):
                 errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue."
 
         # ── Assegnatario membro dell'area della issue ──
-        # Si ricontrolla solo se area o assegnatario sono nel payload (le issue
+        # Si ricontrolla solo se area o assegnatario cambiano davvero (le issue
         # con dati preesistenti restano modificabili); il superuser è esente,
         # come per i task di area.
-        if ("area" in attrs or "assigned_to" in attrs) and "assigned_to" not in errors:
+        current_area_id = getattr(self.instance, "area_id", None)
+        area_changed = "area" in attrs and getattr(attrs["area"], "pk", None) != current_area_id
+        if (area_changed or assignee_changed) and "assigned_to" not in errors:
             area = attrs["area"] if "area" in attrs else getattr(self.instance, "area", None)
             assignee = attrs["assigned_to"] if "assigned_to" in attrs else getattr(self.instance, "assigned_to", None)
             request = self.context.get("request")

@@ -285,3 +285,17 @@ def test_convert_copies_area():
 
     from issues.models import Issue
     assert Issue.objects.get(pk=resp.data["issue"]["id"]).area_id == area.id
+
+
+def test_convert_with_assignee_outside_task_area_leaves_issue_unassigned():
+    area, other = _area(), _area()
+    actor = _user(area, can_add_issue=True)
+    outsider = _user(other, is_technician=True)  # assegnatario issue, ma di un'altra area
+    task = AreaTask.objects.create(area=area, title="Assegnato fuori area", assigned_to=outsider)
+    resp = _client(actor).post(_url(task), {"customer": _customer().id}, format="json")
+    assert resp.status_code == 201, resp.data
+
+    from issues.models import Issue
+    issue = Issue.objects.get(pk=resp.data["issue"]["id"])
+    assert issue.area_id == area.id
+    assert issue.assigned_to_id is None

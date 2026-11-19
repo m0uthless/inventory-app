@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from django.utils import timezone
 from rest_framework import serializers, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status as drf_status
@@ -14,7 +15,7 @@ from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from audit.utils import log_event, to_change_value_for_field
 
-from wiki.models import WikiLink
+from wiki.models import WikiEntityType, WikiLink
 from wiki.api.helpers import _label_for_wiki_link, _path_for_wiki_link
 
 class WikiLinkSerializer(serializers.ModelSerializer):
@@ -76,11 +77,37 @@ class WikiLinkViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 qs = qs.none()
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
+    def _check_issue_link(self, entity_type, entity_id):
+        """Un collegamento Wiki su una issue è una scrittura sulla issue: per le
+        issue di un'altra area vale la sola lettura (vedi issues.api)."""
+        if entity_type != WikiEntityType.ISSUE or entity_id is None:
+            return
+        from issues.api import can_edit_issue
+        from issues.models import Issue
+
+        issue = Issue.objects.filter(pk=entity_id).only("id", "area_id").first()
+        if issue is not None and not can_edit_issue(self.request.user, issue):
+            raise PermissionDenied("Puoi modificare solo le issue della tua area.")
+
+    def _restore_obj(self, obj, request):
+        self._check_issue_link(obj.entity_type, obj.entity_id)
+        super()._restore_obj(obj, request)
+
+    def perform_destroy(self, instance):
+        self._check_issue_link(instance.entity_type, instance.entity_id)
+        super().perform_destroy(instance)
+
     # WikiLink non ha created_by/updated_by: override senza userstamp.
     def perform_create(self, serializer):
+        self._check_issue_link(serializer.validated_data.get("entity_type"), serializer.validated_data.get("entity_id"))
         instance = serializer.save()
         log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
 
     def perform_update(self, serializer):
+        self._check_issue_link(serializer.instance.entity_type, serializer.instance.entity_id)
+        self._check_issue_link(
+            serializer.validated_data.get("entity_type", serializer.instance.entity_type),
+            serializer.validated_data.get("entity_id", serializer.instance.entity_id),
+        )
         instance = serializer.save()
         log_event(actor=self.request.user, action="update", instance=instance, request=self.request)

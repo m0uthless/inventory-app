@@ -873,14 +873,18 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         return Response(serializer.data)
 
     @staticmethod
-    def _is_issue_assignable(user):
+    def _is_issue_assignable(user, area_id=None):
         """Stessa regola di eleggibilità usata da IssueSerializer.validate
         per assigned_to (permesso `issues.be_assignee`): calcolata qui a
         monte per poter omettere il campo invece di far fallire la validazione
         con un 400 che il chiamante non ha mai richiesto."""
         from core.technicians import is_eligible_issue_assignee
+        from issues.api import user_area_id
 
-        return is_eligible_issue_assignee(user)
+        if not is_eligible_issue_assignee(user):
+            return False
+        # La issue nasce nell'area del task: l'assegnatario deve farne parte.
+        return area_id is None or user_area_id(user) == area_id
 
     @action(detail=True, methods=['post'], url_path='convert-to-issue')
     def convert_to_issue(self, request, pk=None):
@@ -927,7 +931,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 # La issue nasce nell'area del task.
                 'area': task.area_id,
             }
-            if self._is_issue_assignable(task.assigned_to):
+            if self._is_issue_assignable(task.assigned_to, task.area_id):
                 payload['assigned_to'] = task.assigned_to_id
             serializer = IssueSerializer(data=payload)
             serializer.is_valid(raise_exception=True)

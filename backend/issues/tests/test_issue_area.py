@@ -265,3 +265,73 @@ def test_summary_without_param_is_global():
     _active_issues(_area(), 2)
     _active_issues(None, 1)
     assert _client(me).get("/api/issues/summary/").json()["active_count"] == 3
+
+
+# ── Revisione finale: assegnatario invariato, link Wiki generici ─────────────
+
+def _full_form(issue, **over):
+    """Come il modulo «Tutti i campi…»: rimanda sempre area e assegnatario."""
+    return {"title": "Titolo nuovo", "area": issue.area_id, "assigned_to": issue.assigned_to_id, **over}
+
+
+def test_full_form_with_unchanged_assignee_who_left_group_passes():
+    from django.contrib.auth.models import Group
+    me = _staff(None)
+    stale = _assignee(None)
+    issue = _issue(None, assigned_to=stale)
+    Group.objects.filter(user=stale).delete()
+    resp = _client(me).patch(f"/api/issues/{issue.pk}/", _full_form(issue), format="json")
+    assert resp.status_code == 200, resp.json()
+
+
+def test_full_form_with_unchanged_assignee_who_changed_area_passes():
+    area = _area()
+    me = _staff(area)
+    member = _assignee(area)
+    issue = _issue(area, assigned_to=member)
+    _in_area(member, _area())  # l'assegnatario cambia area
+    resp = _client(me).patch(f"/api/issues/{issue.pk}/", _full_form(issue), format="json")
+    assert resp.status_code == 200, resp.json()
+
+
+def test_full_form_changing_area_still_checks_unchanged_assignee():
+    old, new = _area(), _area("Nuova")
+    me = _staff(old)
+    issue = _issue(old, assigned_to=_assignee(old))
+    resp = _client(me).patch(f"/api/issues/{issue.pk}/", _full_form(issue, area=new.id), format="json")
+    assert resp.status_code == 400
+    assert "assigned_to" in resp.json()
+
+
+def _wiki_page():
+    from wiki.models import WikiPage
+    return WikiPage.objects.create(title="Procedura", slug=f"p-{uuid.uuid4().hex[:6]}", content_markdown="# P", is_published=True)
+
+
+def _wiki_user(area):
+    me = _staff(area)
+    me.user_permissions.add(*Permission.objects.filter(content_type__app_label="wiki"))
+    return User.objects.get(pk=me.pk)
+
+
+def test_generic_wiki_links_api_cannot_link_other_area_issue():
+    me = _wiki_user(_area())
+    issue = _issue(_area())
+    resp = _client(me).post("/api/wiki-links/", {"page": _wiki_page().pk, "entity_type": "issue", "entity_id": issue.pk}, format="json")
+    assert resp.status_code == 403
+
+
+def test_generic_wiki_links_api_cannot_delete_other_area_issue_link():
+    from wiki.models import WikiLink
+    me = _wiki_user(_area())
+    issue = _issue(_area())
+    link = WikiLink.objects.create(page=_wiki_page(), entity_type="issue", entity_id=issue.pk)
+    assert _client(me).delete(f"/api/wiki-links/{link.pk}/").status_code == 403
+
+
+def test_generic_wiki_links_api_allows_own_area_issue():
+    area = _area()
+    me = _wiki_user(area)
+    issue = _issue(area)
+    resp = _client(me).post("/api/wiki-links/", {"page": _wiki_page().pk, "entity_type": "issue", "entity_id": issue.pk}, format="json")
+    assert resp.status_code == 201, resp.json()
