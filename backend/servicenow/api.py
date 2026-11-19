@@ -273,7 +273,7 @@ class SnTechnicianAbsenceViewSet(SoftDeleteAuditMixin, RestoreActionMixin, views
     def get_queryset(self):
         qs = (
             Absence.objects
-            .filter(deleted_at__isnull=True, user__profile__is_servicenow_technician=True)
+            .filter(eligible_technician_q("user__"), deleted_at__isnull=True)
             .exclude(status=AbsenceStatus.RIFIUTATA)
             .select_related("user", "user__profile")
             .order_by("date", "day_part")
@@ -768,8 +768,6 @@ class ServiceNowCaseViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.M
             total = 0
             for u in technicians:
                 try:
-                    if not bool(u.profile.is_servicenow_technician):
-                        continue
                     if bool(u.profile.is_functional_account):
                         continue
                     u_is_philips = bool(u.profile.is_philips)

@@ -12,7 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from audit.utils import log_event, to_change_value_for_field
 from core.emails import send_templated_email
-from core.technicians import eligible_technician_q, is_eligible_technician
+from core.technicians import eligible_issue_assignee_q, is_eligible_issue_assignee
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
@@ -215,16 +215,12 @@ class IssueSerializer(serializers.ModelSerializer):
                 "Il cliente è obbligatorio, oppure spunta \"Cliente non presente in DB\" e inserisci un nome.",
             )
 
-        # ── Assegnazione: solo utenti tecnici ServiceNow non-Philips (categoria Biotron) ──
+        # ── Assegnazione: solo chi ha il permesso di gruppo `issues.be_assignee` ──
+        # Controllato solo se `assigned_to` è nel payload: le issue con un
+        # assegnatario che nel frattempo ha perso il permesso restano modificabili.
         if "assigned_to" in attrs and attrs["assigned_to"] is not None:
-            assignee = attrs["assigned_to"]
-            try:
-                profile = assignee.profile
-                is_assignable = is_eligible_technician(assignee) and not bool(profile.is_philips)
-            except Exception:
-                is_assignable = False
-            if not is_assignable:
-                errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue (deve essere un tecnico ServiceNow non Philips)."
+            if not is_eligible_issue_assignee(attrs["assigned_to"]):
+                errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue."
 
         if site is not None and customer is not None and site.customer_id != customer.id:
             errors["site"] = "Il sito selezionato non appartiene al cliente della issue."
@@ -344,13 +340,8 @@ class IssueFilter(filters.FilterSet):
 
 
 def notify_issue_created(user, issue):
-    """Broadcast a tutti i tecnici assegnabili (stessa regola di assigned_to)."""
-    # B-22: solo tecnici idonei (mai i clienti del Portal).
-    technicians = User.objects.filter(
-        eligible_technician_q(),
-        is_active=True,
-        profile__is_philips=False,
-    ).exclude(email="")
+    """Broadcast a tutti gli assegnatari issue (stessa regola di assigned_to)."""
+    technicians = User.objects.filter(eligible_issue_assignee_q(), is_active=True).exclude(email="")
     for recipient in technicians:
         send_templated_email(
             template_name="emails/issue_created.html",

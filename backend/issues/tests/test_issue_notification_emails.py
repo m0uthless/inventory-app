@@ -1,8 +1,8 @@
 """Test suite: email inviate da IssueViewSet su creazione/riassegnazione.
 
 Copre:
-- Nuova issue → broadcast a tutti i tecnici assegnabili (is_servicenow_technician
-  e non Philips), non ad altri utenti.
+- Nuova issue → broadcast a tutti gli assegnatari issue (permesso di gruppo
+  `issues.be_assignee`), non ad altri utenti né ai soli tecnici ServiceNow.
 - Nuova issue già assegnata → anche email dedicata al nuovo assegnatario.
 - Riassegnazione tra due utenti → email a entrambi.
 - Primo assegnamento (da vuoto) → solo al nuovo.
@@ -18,27 +18,29 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 from rest_framework.test import APIClient
 
-from core.models import CustomerStatus, UserProfile
+from core.models import CustomerStatus
 from crm.models import Customer
-from core.testing import make_technician
+from core.testing import grant_via_group, make_archie_user
 
 pytestmark = pytest.mark.django_db
 
 User = get_user_model()
 
 
-def _make_user(*, email="user@example.com", is_technician=False, is_philips=False, is_author=False):
-    user = make_technician(
+def _make_user(*, email="user@example.com", is_technician=False, is_sn_technician=False, is_author=False):
+    """`is_technician`: assegnatario issue (permesso di gruppo `issues.be_assignee`);
+    `is_sn_technician`: solo tecnico ServiceNow."""
+    user = make_archie_user(
         username=f"u_{uuid.uuid4().hex[:6]}", password="pw", email=email,
     )
     if is_author:
         user.is_staff = True
         user.is_superuser = True
         user.save(update_fields=["is_staff", "is_superuser"])
-    profile, _ = UserProfile.objects.get_or_create(user=user)
-    profile.is_servicenow_technician = is_technician
-    profile.is_philips = is_philips
-    profile.save(update_fields=["is_servicenow_technician", "is_philips"])
+    if is_technician:
+        grant_via_group(user, "issues.be_assignee")
+    if is_sn_technician:
+        grant_via_group(user, "servicenow.be_technician")
     return user
 
 
@@ -60,7 +62,7 @@ def test_new_issue_emails_all_assignable_technicians_only():
     tech1 = _make_user(email="tech1@example.com", is_technician=True)
     tech2 = _make_user(email="tech2@example.com", is_technician=True)
     _make_user(email="nontech@example.com", is_technician=False)
-    _make_user(email="philips@example.com", is_technician=True, is_philips=True)
+    _make_user(email="sntech@example.com", is_sn_technician=True)
     customer = _customer()
 
     client = _auth_client(author)

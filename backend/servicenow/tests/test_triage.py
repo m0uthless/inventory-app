@@ -13,7 +13,7 @@ from servicenow.models import (
     ServiceNowCase, ServiceNowCaseType, ServiceNowCaseCategory,
 )
 from attendance.models import Absence, DayPart
-from core.testing import make_technician
+from core.testing import make_archie_user, make_technician
 
 pytestmark = pytest.mark.django_db
 
@@ -21,16 +21,17 @@ User = get_user_model()
 
 
 def _make_tech(*, is_philips=False, is_servicenow_technician=True, is_functional_account=False, name="Tech"):
-    user = make_technician(
+    # Tecnico = permesso di gruppo `servicenow.be_technician`.
+    factory = make_technician if is_servicenow_technician else make_archie_user
+    user = factory(
         username=f"{name.lower()}_{uuid.uuid4().hex[:6]}",
         password="pw",
         first_name=name,
         last_name="Test",
     )
     user.profile.is_philips = is_philips
-    user.profile.is_servicenow_technician = is_servicenow_technician
     user.profile.is_functional_account = is_functional_account
-    user.profile.save(update_fields=["is_philips", "is_servicenow_technician", "is_functional_account"])
+    user.profile.save(update_fields=["is_philips", "is_functional_account"])
     return user
 
 

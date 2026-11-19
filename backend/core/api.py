@@ -43,6 +43,7 @@ class UserListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     is_philips = serializers.SerializerMethodField()
     is_servicenow_technician = serializers.SerializerMethodField()
+    is_issue_assignee = serializers.SerializerMethodField()
     leave_area = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
@@ -54,17 +55,26 @@ class UserListSerializer(serializers.ModelSerializer):
         except Exception:
             return False
 
-    def get_is_servicenow_technician(self, obj):
-        # B-22: True solo per i tecnici idonei (flag + profilo interno), così
-        # i selettori degli assegnatari non propongono i clienti del Portal.
+    def _eligible_ids(self, attr, q_factory):
+        # Calcolati una volta per richiesta (cache sul serializer radice).
         root = self.root
-        ids = getattr(root, "_eligible_technician_ids", None)
+        ids = getattr(root, attr, None)
         if ids is None:
-            from core.technicians import eligible_technician_q
+            ids = set(User.objects.filter(q_factory()).values_list("pk", flat=True))
+            setattr(root, attr, ids)
+        return ids
 
-            ids = set(User.objects.filter(eligible_technician_q()).values_list("pk", flat=True))
-            root._eligible_technician_ids = ids
-        return obj.pk in ids
+    def get_is_servicenow_technician(self, obj):
+        # Permesso di gruppo `servicenow.be_technician` + profilo interno (B-22).
+        from core.technicians import eligible_technician_q
+
+        return obj.pk in self._eligible_ids("_eligible_technician_ids", eligible_technician_q)
+
+    def get_is_issue_assignee(self, obj):
+        # Permesso di gruppo `issues.be_assignee` + accesso ad Archie.
+        from core.technicians import eligible_issue_assignee_q
+
+        return obj.pk in self._eligible_ids("_eligible_issue_assignee_ids", eligible_issue_assignee_q)
 
     def get_leave_area(self, obj):
         try:
@@ -74,7 +84,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician", "leave_area"]
+        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician", "is_issue_assignee", "leave_area"]
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -865,17 +875,12 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
     @staticmethod
     def _is_issue_assignable(user):
         """Stessa regola di eleggibilità usata da IssueSerializer.validate
-        per assigned_to (tecnico ServiceNow non Philips): calcolata qui a
+        per assigned_to (permesso `issues.be_assignee`): calcolata qui a
         monte per poter omettere il campo invece di far fallire la validazione
         con un 400 che il chiamante non ha mai richiesto."""
-        if user is None:
-            return False
-        profile = getattr(user, 'profile', None)
-        if profile is None:
-            return False
-        from core.technicians import is_eligible_technician
+        from core.technicians import is_eligible_issue_assignee
 
-        return is_eligible_technician(user) and not bool(profile.is_philips)
+        return is_eligible_issue_assignee(user)
 
     @action(detail=True, methods=['post'], url_path='convert-to-issue')
     def convert_to_issue(self, request, pk=None):

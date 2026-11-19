@@ -109,7 +109,8 @@ def test_case_cannot_be_assigned_to_portal_user(superuser, portal_customer_user)
 def test_issue_created_email_skips_portal_users(portal_customer_user):
     from issues import api as issues_api
 
-    tech = _flag(make_archie_user(username="tecnico2", password="pw", email="tecnico@example.com"))
+    tech = grant_via_group(make_archie_user(username="tecnico2", password="pw", email="tecnico@example.com"), "issues.be_assignee")
+    grant_via_group(portal_customer_user, "issues.be_assignee")
     issue = mock.Mock(title="T", description="", get_priority_display=lambda: "Alta")
     with mock.patch.object(issues_api, "send_templated_email", return_value=(True, None)) as send, \
             mock.patch.object(issues_api, "_issue_customer_display", return_value="Cliente"):

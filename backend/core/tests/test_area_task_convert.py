@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 from attendance.models import LeaveArea
 from core.models import AreaTask, AreaTaskComment, CustomerStatus, UserProfile
 from crm.models import Customer
-from core.testing import make_archie_user
+from core.testing import grant_via_group, make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -44,9 +44,9 @@ def _user(area=None, *, superuser=False, can_add_issue=False, is_technician=Fals
         user.user_permissions.add(perm)
     profile, _ = UserProfile.objects.get_or_create(user=user)
     profile.leave_area = area
-    profile.is_servicenow_technician = is_technician
-    profile.is_philips = False
-    profile.save(update_fields=["leave_area", "is_servicenow_technician", "is_philips"])
+    profile.save(update_fields=["leave_area"])
+    if is_technician:
+        grant_via_group(user, "issues.be_assignee")
     return User.objects.get(pk=user.pk)
 
 
