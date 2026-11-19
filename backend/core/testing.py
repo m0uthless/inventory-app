@@ -14,14 +14,23 @@ def make_archie_user(*args, **kwargs):
     return user
 
 
-def make_technician(*args, **kwargs):
-    """Utente interno con il flag "Tecnico ServiceNow": dalla B-22
-    (QA 2026-11-15) il flag nasce False e un tecnico deve avere un profilo
-    interno (vedi core.technicians)."""
-    from core.models import UserProfile
+def grant_via_group(user, perm: str):
+    """Dà ``perm`` ("app.codename") a ``user`` tramite un gruppo dedicato,
+    come si fa dalla pagina Gruppi."""
+    from django.contrib.auth.models import Group, Permission
 
-    user = make_archie_user(*args, **kwargs)
-    profile, _ = UserProfile.objects.get_or_create(user=user)
-    profile.is_servicenow_technician = True
-    profile.save(update_fields=["is_servicenow_technician"])
+    app_label, codename = perm.split(".", 1)
+    group, _ = Group.objects.get_or_create(name=f"test:{perm}")
+    group.permissions.add(Permission.objects.get(content_type__app_label=app_label, codename=codename))
+    user.groups.add(group)
     return user
+
+
+def make_technician(*args, **kwargs):
+    """Utente interno con il permesso di gruppo "È tecnico ServiceNow"."""
+    return grant_via_group(make_archie_user(*args, **kwargs), "servicenow.be_technician")
+
+
+def make_issue_assignee(*args, **kwargs):
+    """Utente interno con il permesso di gruppo "Può essere assegnatario delle issue"."""
+    return grant_via_group(make_archie_user(*args, **kwargs), "issues.be_assignee")

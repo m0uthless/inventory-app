@@ -128,6 +128,7 @@ class ServiceNowCase(TimeStampedModel):
         verbose_name = "ServiceNow Case"
         verbose_name_plural = "ServiceNow Case"
         ordering = ["-created_at"]
+        permissions = [("be_technician", "È tecnico ServiceNow")]
         constraints = [
             models.UniqueConstraint(
                 fields=["number"],
