@@ -1,22 +1,20 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Autocomplete, Avatar, Box, Button, ButtonBase, CircularProgress, IconButton, InputBase, Typography } from '@mui/material'
+import { Autocomplete, Avatar, Box, Button, ButtonBase, CircularProgress, IconButton, ListItemIcon, Menu, MenuItem, TextField, Tooltip, Typography } from '@mui/material'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { isRecord } from '@shared/utils/guards'
 import { useAuth, type Me } from '../../auth/AuthProvider'
-import { CampoIcon, DetailSection, FloatingDetail, QuickField, QuickFields, QuickGroup, quickFieldSx } from '../../ui/campo'
+import {
+  BandChip, BandEditing, CampoIcon, DetailSection, QuickField, RecordField, RecordGrid, RecordModal, RecordSection, RecordValue, bandButtonSx, bandSolidSx,
+} from '../../ui/campo'
 import { useList } from '../../ui/campo/ListRows'
 import { THEME_REGISTRY, resolveColorModePref, resolveThemeKey, type ColorModePref, type ThemeKey } from '../../theme/themeRegistry'
 import { actionMeta, entityIcon, entityLabel, objectTitle, whenLabel, type AuditEvent } from '../audit/auditModel'
 import { agoLabel } from '../../utils/agoLabel'
 import { SCORE_LABEL, deviceLabel, fullName, initialsOf, monthYear, passwordScore, summarizePermissions } from './profileModel'
 
-type Tab = 'dati' | 'aspetto' | 'sicurezza' | 'permessi' | 'attivita'
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'dati', label: 'Dati' }, { key: 'aspetto', label: 'Aspetto' }, { key: 'sicurezza', label: 'Sicurezza' }, { key: 'permessi', label: 'Permessi' }, { key: 'attivita', label: 'Attività' },
-]
 
 const tag = { display: 'inline-flex', alignItems: 'center', height: 22, px: 1, borderRadius: '5px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' } as const
 const help = { fontSize: 11.5, color: 'text.secondary' } as const
@@ -44,19 +42,19 @@ function useDatiForm(me: Me | null, onSaved: () => Promise<void>) {
   const dirty = !!me && (v.email !== (me.email || '') || v.first !== (me.first_name || '') || v.last !== (me.last_name || '') || (v.cust?.id ?? null) !== (me.profile?.preferred_customer ?? null))
   const save = async () => {
     setBusy(true)
-    try { await api.patch('/me/', { email: v.email, first_name: v.first, last_name: v.last, preferred_customer: v.cust?.id ?? null }); await onSaved(); toast.success('Profilo aggiornato.') }
-    catch (e) { toast.error(apiErrorToMessage(e)) } finally { setBusy(false) }
+    try { await api.patch('/me/', { email: v.email, first_name: v.first, last_name: v.last, preferred_customer: v.cust?.id ?? null }); await onSaved(); toast.success('Profilo aggiornato.'); return true }
+    catch (e) { toast.error(apiErrorToMessage(e)); return false } finally { setBusy(false) }
   }
   return { v, set, dirty, busy, save, reset: () => setV(initial()) }
 }
 
-function DatiTab({ me, form, onSaved }: { me: Me; form: DatiForm; onSaved: () => Promise<void> }) {
-  const toast = useToast()
+/** Dati personali nella colonna laterale: testo in lettura, campi dopo «Modifica i dati». */
+function DatiRail({ me, form, editing }: { me: Me; form: DatiForm; editing: boolean }) {
   const { v, set } = form
   const [custQ, setCustQ] = React.useState('')
   const [opts, setOpts] = React.useState<CustomerOption[]>([])
-  const [uploading, setUploading] = React.useState(false)
   React.useEffect(() => {
+    if (!editing) return
     let alive = true
     const t = window.setTimeout(() => {
       api.get('/customers/', { params: { search: custQ.trim() || undefined, page_size: 25 } }).then((r) => {
@@ -66,59 +64,27 @@ function DatiTab({ me, form, onSaved }: { me: Me; form: DatiForm; onSaved: () =>
       }).catch(() => {})
     }, 300)
     return () => { alive = false; window.clearTimeout(t) }
-  }, [custQ])
-  const avatar = async (file: File | null) => {
-    setUploading(true)
-    try {
-      if (file) { const fd = new FormData(); fd.append('avatar', file); await api.patch('/me/', fd) } else await api.patch('/me/', { avatar: '' })
-      await onSaved(); toast.success(file ? 'Foto aggiornata.' : 'Foto rimossa.')
-    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setUploading(false) }
-  }
-  const fact = (label: string, value: React.ReactNode) => (
-    <Box><Typography sx={help}>{label}</Typography><Typography sx={{ fontSize: 13, fontWeight: 600 }}>{value}</Typography></Box>
-  )
+  }, [custQ, editing])
+  const custDirty = (v.cust?.id ?? null) !== (me.profile?.preferred_customer ?? null)
   return (
-    <Box sx={{ display: 'grid', gap: 2.25 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75, p: 1.75, borderRadius: '10px', border: '1px solid', borderColor: 'divider',
-        background: (t) => `linear-gradient(120deg, ${t.palette.archie.tints.mint.bg} 0%, ${t.palette.archie.tints.sky.bg} 60%, ${t.palette.archie.tints.lilac.bg} 100%)` }}>
-        <Box sx={{ position: 'relative', flex: 'none' }}>
-          <Avatar src={me.profile?.avatar || undefined} sx={{ width: 64, height: 64, fontSize: 22, fontWeight: 750, bgcolor: 'background.paper', color: (t) => t.palette.archie.tints.mint.ink }}>{initialsOf(me)}</Avatar>
-          <IconButton component="label" size="small" aria-label="Cambia la foto" disabled={uploading}
-            sx={{ position: 'absolute', right: -6, bottom: -4, width: 26, height: 26, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', '&:hover': { bgcolor: 'background.paper' } }}>
-            {uploading ? <CircularProgress size={12} /> : <CampoIcon name="upload" size={13} />}
-            <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) void avatar(f); e.currentTarget.value = '' }} />
-          </IconButton>
-        </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: '6px 18px', minWidth: 0 }}>
-          {fact('Ultimo accesso', me.last_login ? agoLabel(me.last_login) : '—')}
-          {fact('In Archie da', monthYear(me.date_joined))}
-          {fact('Area ferie', me.profile?.leave_area_label || '—')}
-          {me.profile?.avatar ? <Box><Button size="small" variant="text" onClick={() => void avatar(null)} disabled={uploading} sx={{ px: 0, minWidth: 0 }}>Togli la foto</Button></Box> : null}
-        </Box>
-      </Box>
-      <QuickGroup title="Dati personali">
-        <QuickFields>
-          <QuickField label="Nome" value={v.first} onChange={(x) => set('first', x)} autoComplete="given-name" />
-          <QuickField label="Cognome" value={v.last} onChange={(x) => set('last', x)} autoComplete="family-name" />
-          <QuickField label="Email" type="email" value={v.email} onChange={(x) => set('email', x)} span={2} autoComplete="email" />
-          <QuickField label="Nome utente" value={me.username} onChange={() => {}} disabled span={2} help="Il nome utente non si può cambiare." />
-        </QuickFields>
-      </QuickGroup>
-      <QuickGroup title="Preferenze">
-        <Box sx={{ display: 'grid', gap: 0.6 }}>
-          <Typography component="label" htmlFor="profile-preferred-customer" sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary' }}>Cliente preferito</Typography>
-          <Autocomplete id="profile-preferred-customer" value={v.cust} onChange={(_e, x) => set('cust', x)} inputValue={custQ} onInputChange={(_e, x) => setCustQ(x)}
-            options={v.cust && !opts.some((o) => o.id === v.cust?.id) ? [v.cust, ...opts] : opts} filterOptions={(x) => x}
-            isOptionEqualToValue={(a, b) => a.id === b.id} getOptionLabel={(o) => o.label} noOptionsText="Nessun cliente"
-            slotProps={{ paper: { sx: { fontSize: 13.5 } } }}
-            renderInput={(p) => (
-              <InputBase ref={p.InputProps.ref} className={p.InputProps.className} endAdornment={p.InputProps.endAdornment} onMouseDown={p.InputProps.onMouseDown}
-                inputProps={p.inputProps} id={p.id} disabled={p.disabled} fullWidth placeholder="Nessuno" sx={[quickFieldSx(), { pr: '56px !important' }]} />
-            )} />
-          <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>Proposto per primo quando crei issue, inventari e rapportini.</Typography>
-        </Box>
-      </QuickGroup>
-    </Box>
+    <RecordSection title="Dati personali">
+      <RecordGrid>
+        <RecordField editing={editing} label="Nome" value={v.first} onChange={(x) => set('first', x)} dirty={v.first !== (me.first_name || '')} />
+        <RecordField editing={editing} label="Cognome" value={v.last} onChange={(x) => set('last', x)} dirty={v.last !== (me.last_name || '')} />
+        <RecordField editing={editing} label="Email" value={v.email} onChange={(x) => set('email', x)} dirty={v.email !== (me.email || '')} wide />
+        <RecordValue label="Nome utente" wide mono>{`@${me.username}`}</RecordValue>
+        {editing ? (
+          <Box sx={{ gridColumn: '1 / -1', display: 'grid', gap: 0.5 }}>
+            <Typography component="label" htmlFor="profile-preferred-customer" sx={{ fontSize: 11.5, fontWeight: 550, color: 'text.secondary' }}>Cliente preferito</Typography>
+            <Autocomplete id="profile-preferred-customer" size="small" value={v.cust} onChange={(_e, x) => set('cust', x)} inputValue={custQ} onInputChange={(_e, x) => setCustQ(x)}
+              options={v.cust && !opts.some((o) => o.id === v.cust?.id) ? [v.cust, ...opts] : opts} filterOptions={(x) => x}
+              isOptionEqualToValue={(a, b) => a.id === b.id} getOptionLabel={(o) => o.label} noOptionsText="Nessun cliente"
+              renderInput={(p) => <TextField {...p} placeholder="Nessuno" sx={custDirty ? { '& .MuiOutlinedInput-notchedOutline': { borderColor: 'warning.main', borderWidth: 2 } } : undefined} />} />
+          </Box>
+        ) : <RecordValue label="Cliente preferito" wide>{me.profile?.preferred_customer_name || null}</RecordValue>}
+      </RecordGrid>
+      <Typography sx={{ ...help, mt: 1.25 }}>{editing ? 'Il nome utente non si può cambiare.' : 'Il cliente preferito è proposto per primo quando crei issue, inventari e rapportini.'}</Typography>
+    </RecordSection>
   )
 }
 
@@ -183,6 +149,7 @@ function SicurezzaTab() {
   const [newP2, setNewP2] = React.useState('')
   const [err, setErr] = React.useState<Record<string, string>>({})
   const [busy, setBusy] = React.useState(false)
+  const [pwOpen, setPwOpen] = React.useState(false)
   const logins = useList<{ created_at: string; ip: string | null; user_agent: string }>('/me/logins/', {})
   const score = passwordScore(newP)
   const submit = async () => {
@@ -196,7 +163,7 @@ function SicurezzaTab() {
     setBusy(true)
     try {
       await api.post('/me/change-password/', { old_password: oldP, new_password: newP, new_password2: newP2 })
-      setOldP(''); setNewP(''); setNewP2(''); toast.success('Password cambiata. Resti collegato.')
+      setOldP(''); setNewP(''); setNewP2(''); setPwOpen(false); toast.success('Password cambiata. Resti collegato.')
     } catch (ex) {
       const d = isRecord(ex) && isRecord(ex.response) && isRecord(ex.response.data) ? ex.response.data : null
       const pick = (k: string) => { const v = d?.[k]; return typeof v === 'string' ? v : Array.isArray(v) && typeof v[0] === 'string' ? v[0] : undefined }
@@ -206,6 +173,12 @@ function SicurezzaTab() {
   }
   return (
     <Box sx={{ display: 'grid', gap: 2.5 }}>
+      {!pwOpen ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontSize: 13 }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 550, color: 'text.secondary', width: 90 }}>Password</Typography>
+          <Button size="small" variant="text" onClick={() => setPwOpen(true)} sx={{ px: 0.5 }}>Cambia la password</Button>
+        </Box>
+      ) : (
       <DetailSection title="Cambia password">
         <Box sx={{ display: 'grid', gap: 1.5 }}>
           <QuickField label="Password attuale" secret value={oldP} onChange={setOldP} error={err.old_password} autoComplete="current-password" />
@@ -219,11 +192,13 @@ function SicurezzaTab() {
             ) : null}
           </Box>
           <QuickField label="Ripeti la nuova password" secret value={newP2} onChange={setNewP2} error={err.new_password2} autoComplete="new-password" />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" disabled={busy || !oldP || !newP} onClick={() => void submit()}>Cambia password</Button>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button variant="text" disabled={busy} onClick={() => { setPwOpen(false); setOldP(''); setNewP(''); setNewP2(''); setErr({}) }}>Annulla</Button>
+            <Button variant="contained" disabled={busy || !oldP || !newP} onClick={() => void submit()}>Cambia la password</Button>
           </Box>
         </Box>
       </DetailSection>
+      )}
       <DetailSection title="Accessi recenti">
         {!logins ? <Typography sx={help}>Caricamento…</Typography> : !logins.length ? <Typography sx={help}>Nessun accesso registrato.</Typography> : (
           <Box sx={{ display: 'grid', gap: 0.75 }}>
@@ -253,15 +228,8 @@ function PermessiTab({ me }: { me: Me }) {
   )
   return (
     <Box sx={{ display: 'grid', gap: 2.25 }}>
-      <Typography sx={help}>Cosa puoi fare in Archie. I permessi arrivano dai gruppi: per cambiarli chiedi a chi gestisce gli utenti.</Typography>
-      <DetailSection title="Gruppi">
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {me.is_superuser ? <Box component="span" sx={{ ...tag, bgcolor: (t) => t.palette.archie.tints.sand.bg, color: (t) => t.palette.archie.tints.sand.ink }}>Superuser · accesso completo</Box> : null}
-          {(me.groups ?? []).map((g) => <Box key={g} component="span" sx={{ ...tag, borderRadius: '11px', border: '1px solid', borderColor: 'divider', fontWeight: 550 }}>{g}</Box>)}
-          {!me.is_superuser && !me.groups?.length ? <Typography sx={help}>Nessun gruppo.</Typography> : null}
-        </Box>
-      </DetailSection>
-      <DetailSection title="Moduli">
+      <Typography sx={help}>I permessi arrivano dai gruppi: per cambiarli chiedi a chi gestisce gli utenti.</Typography>
+      <DetailSection>
         {!mods.length ? <Typography sx={help}>Nessun permesso.</Typography> : (
           <Box sx={{ display: 'grid' }}>
             {mods.map((m, i) => (
@@ -277,6 +245,19 @@ function PermessiTab({ me }: { me: Me }) {
         )}
       </DetailSection>
     </Box>
+  )
+}
+
+// ── Gruppi (colonna laterale) ───────────────────────────────────────────
+function GruppiBlock({ me }: { me: Me }) {
+  return (
+    <RecordSection title="Gruppi">
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+          {me.is_superuser ? <Box component="span" sx={{ ...tag, bgcolor: (t) => t.palette.archie.tints.sand.bg, color: (t) => t.palette.archie.tints.sand.ink }}>Superuser · accesso completo</Box> : null}
+          {(me.groups ?? []).map((g) => <Box key={g} component="span" sx={{ ...tag, borderRadius: '11px', border: '1px solid', borderColor: 'divider', fontWeight: 550 }}>{g}</Box>)}
+          {!me.is_superuser && !me.groups?.length ? <Typography sx={help}>Nessun gruppo.</Typography> : null}
+        </Box>
+    </RecordSection>
   )
 }
 
@@ -299,33 +280,81 @@ function AttivitaTab({ me, onOpenAudit }: { me: Me; onOpenAudit: () => void }) {
   )
 }
 
-/** Profilo come scheda flottante (anteprima up-base, variante A), della stessa misura dei dettagli delle altre pagine. */
+/*
+ * Profilo nella finestra dei record (anteprima design-previews/bfp-base.html › Profilo): una pagina sola al posto
+ * delle cinque schede. Testata con la foto (si cambia dal pulsante sull'avatar), «Modifica i dati» come azione
+ * principale; al centro aspetto, sicurezza, permessi e attività; a lato dati personali e gruppi.
+ */
 export default function ProfileCard({ onClose }: { onClose: () => void }) {
   const { me, refreshMe } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = React.useState<Tab>('dati')
+  const toast = useToast()
   const form = useDatiForm(me, refreshMe)
+  const [editing, setEditing] = React.useState(false)
+  const [menu, setMenu] = React.useState<HTMLElement | null>(null)
+  const [uploading, setUploading] = React.useState(false)
   if (!me) return null
-  const footer = tab === 'dati' ? (
-    <>
-      <Typography sx={{ fontSize: 12, color: form.dirty ? 'text.secondary' : 'text.disabled' }}>{form.dirty ? 'Modifiche non salvate' : 'Nessuna modifica'}</Typography>
-      <Box sx={{ flex: 1 }} />
-      {form.dirty ? <Button size="small" variant="text" onClick={form.reset} disabled={form.busy}>Annulla</Button> : null}
-      <Button size="small" variant="contained" disabled={!form.dirty || form.busy} onClick={() => void form.save()}>Salva</Button>
-    </>
-  ) : undefined
+  const avatar = async (file: File | null) => {
+    setUploading(true)
+    try {
+      if (file) { const fd = new FormData(); fd.append('avatar', file); await api.patch('/me/', fd) } else await api.patch('/me/', { avatar: '' })
+      await refreshMe(); toast.success(file ? 'Foto aggiornata.' : 'Foto rimossa.')
+    } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setUploading(false) }
+  }
+  const v = form.v
+  const changed = [v.first !== (me.first_name || ''), v.last !== (me.last_name || ''), v.email !== (me.email || ''), (v.cust?.id ?? null) !== (me.profile?.preferred_customer ?? null)].filter(Boolean).length
   const role = me.is_superuser ? 'Superuser' : me.is_staff ? 'Staff' : null
+  const chip = (txt: React.ReactNode) => (
+    <Box component="span" sx={{ height: 20, px: 0.9, borderRadius: '5px', fontSize: 11.5, fontWeight: 550, display: 'inline-flex', alignItems: 'center', gap: 0.5, whiteSpace: 'nowrap', bgcolor: 'rgb(255 255 255 / .12)', color: '#e6f2ee', '& b': { color: '#fff', fontWeight: 700 } }}>{txt}</Box>
+  )
+  const openAudit = () => { onClose(); navigate(`/audit?actor=${me.id}`) }
   return (
-    <FloatingDetail open onClose={onClose} ariaLabel="Profilo"
-      idLabel={`@${me.username}`}
-      status={role ? <Box component="span" sx={{ ...tag, bgcolor: 'rgba(255,255,255,.14)', color: '#fff' }}>{role}</Box> : undefined}
-      title={fullName(me)} subtitle={[me.email, me.groups?.length ? me.groups.join(', ') : null].filter(Boolean).join(' · ')}
-      tabs={TABS} tab={tab} onTab={(k) => setTab(k as Tab)} footer={footer}>
-      {tab === 'dati' ? <DatiTab key={me.id} me={me} form={form} onSaved={refreshMe} />
-        : tab === 'aspetto' ? <AspettoTab me={me} onSaved={refreshMe} />
-          : tab === 'sicurezza' ? <SicurezzaTab />
-            : tab === 'permessi' ? <PermessiTab me={me} />
-              : <AttivitaTab me={me} onOpenAudit={() => { onClose(); navigate(`/audit?actor=${me.id}`) }} />}
-    </FloatingDetail>
+    <RecordModal open onClose={onClose} ariaLabel="Profilo"
+      avatar={
+        <Box sx={{ position: 'relative', flex: 'none' }}>
+          <Avatar src={me.profile?.avatar || undefined} sx={{ width: 56, height: 56, fontSize: 19, fontWeight: 750, bgcolor: '#e9f3f0', color: 'archie.band' }}>{initialsOf(me)}</Avatar>
+          <Tooltip title="Cambia la foto">
+            <IconButton component="label" size="small" aria-label="Cambia la foto" disabled={uploading}
+              sx={{ position: 'absolute', right: -6, bottom: -4, width: 24, height: 24, bgcolor: '#fff', color: 'archie.band', border: '2px solid', borderColor: 'archie.band', '&:hover': { bgcolor: '#fff' } }}>
+              {uploading ? <CircularProgress size={11} /> : <CampoIcon name="upload" size={12} />}
+              <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) void avatar(f); e.currentTarget.value = '' }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      }
+      title={fullName(me)}
+      status={<>{role ? <BandChip>{role}</BandChip> : null}{editing ? <BandEditing /> : null}</>}
+      subtitle={<><Box component="span" sx={{ fontFamily: '"Geist Mono", ui-monospace, monospace', fontSize: 12 }}>@{me.username}</Box>{me.email ? ` · ${me.email}` : ''}</>}
+      tags={<>
+        {(me.groups ?? []).map((g) => <React.Fragment key={g}>{chip(g)}</React.Fragment>)}
+        {me.last_login ? chip(<>ultimo accesso <b>{agoLabel(me.last_login)}</b></>) : null}
+        {me.date_joined ? chip(<>in Archie da <b>{monthYear(me.date_joined)}</b></>) : null}
+        {me.profile?.leave_area_label ? chip(<>area ferie <b>{me.profile.leave_area_label}</b></>) : null}
+      </>}
+      actions={<>
+        {!editing ? <Button variant="outlined" onClick={() => setEditing(true)} startIcon={<CampoIcon name="columns" size={15} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Modifica i dati</Button> : null}
+        <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" disabled={editing} onClick={(e) => setMenu(e.currentTarget)} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' } }}><CampoIcon name="more" /></IconButton></Tooltip>
+        <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+          <MenuItem onClick={() => { setMenu(null); openAudit() }}><ListItemIcon><CampoIcon name="history" size={16} /></ListItemIcon>Tutta la mia attività nell'Audit</MenuItem>
+          {me.profile?.avatar ? <MenuItem disabled={uploading} onClick={() => { setMenu(null); void avatar(null) }}><ListItemIcon><CampoIcon name="x" size={16} /></ListItemIcon>Togli la foto</MenuItem> : null}
+        </Menu>
+      </>}
+      editing={editing} dirtyCount={editing ? changed : 0} saving={form.busy}
+      onSave={() => { void form.save().then((ok) => { if (ok) setEditing(false) }) }}
+      onDiscard={() => { form.reset(); setEditing(false) }}>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
+        <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <RecordSection title="Aspetto"><AspettoTab me={me} onSaved={refreshMe} /></RecordSection>
+          <RecordSection title="Sicurezza"><SicurezzaTab /></RecordSection>
+          <RecordSection title="Cosa puoi fare"><PermessiTab me={me} /></RecordSection>
+          <RecordSection title="Attività recente"><AttivitaTab me={me} onOpenAudit={openAudit} /></RecordSection>
+        </Box>
+        <Box component="aside" aria-label="Dati personali" sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <DatiRail key={me.id} me={me} form={form} editing={editing} />
+          <GruppiBlock me={me} />
+        </Box>
+      </Box>
+    </RecordModal>
   )
 }

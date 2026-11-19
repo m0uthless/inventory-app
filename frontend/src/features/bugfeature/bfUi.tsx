@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { Box, Button, ButtonBase, Link, TextField, Typography } from '@mui/material'
+import { Box, Button, ButtonBase, IconButton, Link, ListItemIcon, Menu, MenuItem, TextField, Tooltip, Typography } from '@mui/material'
 import BugReportOutlinedIcon from '@mui/icons-material/BugReportOutlined'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import DoneRoundedIcon from '@mui/icons-material/DoneRounded'
-import { CampoDialog, CampoIcon, DetailSection, FloatingDetail, Pill, QuickForm, SelectPill } from '../../ui/campo'
+import { CampoDialog, CampoIcon, Pill, QuickForm, RecordGrid, RecordModal, RecordSection, RecordValue, SelectPill, bandButtonSx, bandSolidSx, recordMono } from '../../ui/campo'
 import { agoLabel } from '../../utils/agoLabel'
 import {
   KIND_LABEL, KIND_TONE, REJECT_REASONS, SECTIONS, STATUS_LABEL, appendReason, closedBy, firstLine, firstName, initials, sectionLabel,
@@ -42,10 +42,11 @@ export function Shot({ src, big }: { src: string; big?: boolean }) {
 }
 
 /** Scheda della bacheca. */
-export function ReportCard({ r, selected, onOpen }: { r: ReportRow; selected: boolean; onOpen: () => void }) {
+/** Scheda della bacheca: il clic la seleziona, doppio clic o Invio la apre (su mobile il tocco apre). */
+export function ReportCard({ r, selected, onSelect, onOpen }: { r: ReportRow; selected: boolean; onSelect: () => void; onOpen: () => void }) {
   const c = closedBy(r)
   return (
-    <ButtonBase onClick={onOpen} aria-pressed={selected} sx={{
+    <ButtonBase onClick={onSelect} onDoubleClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onOpen() } }} aria-pressed={selected} sx={{
       display: 'grid', gap: 1, width: '100%', textAlign: 'left', justifyContent: 'stretch', justifyItems: 'stretch', alignItems: 'start', p: '10px 12px', border: '1px solid', borderColor: selected ? 'archie.fieldLine' : 'divider', borderRadius: '8px',
       bgcolor: 'background.paper', boxShadow: selected ? (t) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none', '&:hover': { borderColor: selected ? 'archie.fieldLine' : 'text.disabled' },
       '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
@@ -186,60 +187,94 @@ export function RejectDialog({ open, busy, onClose, onSubmit }: { open: boolean;
 
 const fullDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 
-export function ReportDetail({ r, busy, position, onPrev, onNext, onClose, onResolve, onReject, onReopen, onUpload }: {
+/*
+ * Finestra della segnalazione (anteprima design-previews/bfp-base.html › Bug e feature): «Segna come risolta» /
+ * «Rifiuta» in testata per chi può chiuderla, «Riapri» se è chiusa; al centro esito, descrizione e screenshot
+ * (o lo spazio per aggiungerlo), a lato i dati e la storia. ‹ › scorrono la colonna della bacheca.
+ */
+export function ReportDetail({ r, busy, position, onPrev, onNext, onClose, onResolve, onReject, onReopen, onUpload, onCopyLink }: {
   r: ReportRow; busy: boolean; position?: string; onPrev?: () => void; onNext?: () => void; onClose: () => void
-  onResolve: () => void; onReject: () => void; onReopen: () => void; onUpload: (f: File) => void
+  onResolve: () => void; onReject: () => void; onReopen: () => void; onUpload: (f: File) => void; onCopyLink: () => void
 }) {
   const c = closedBy(r)
+  const [el, setEl] = React.useState<HTMLElement | null>(null)
+  React.useEffect(() => setEl(null), [r.id])
   const callout = (bg: string, fg: string, title: string, body?: string | null) => (
-    <Box sx={{ p: '10px 12px', borderRadius: '8px', bgcolor: bg }}>
+    <Box sx={{ p: '10px 14px', borderRadius: '10px', bgcolor: bg }}>
       <Typography sx={{ fontSize: 13, fontWeight: 650, color: fg }}>{title}</Typography>
-      {body ? <Typography sx={{ fontSize: 13, mt: 0.25, whiteSpace: 'pre-wrap' }}>{body}</Typography> : null}
+      {body ? <Typography sx={{ fontSize: 12.5, mt: 0.25, color: 'text.secondary', whiteSpace: 'pre-wrap' }}>{body}</Typography> : null}
     </Box>
   )
   const ev = (icon: React.ReactNode, who: React.ReactNode, at?: string | null) => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 13 }}>
-      <Box component="span" sx={{ width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: 'archie.neutralBg', color: 'text.secondary', flex: 'none' }}>{icon}</Box>
-      <Box component="span" sx={{ flex: 1, minWidth: 0 }}>{who}</Box>
-      <Typography component="time" sx={{ fontSize: 12, color: 'text.secondary' }}>{fullDate(at)}</Typography>
+    <Box sx={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr) auto', alignItems: 'center', gap: 1, fontSize: 13 }}>
+      <Box component="span" sx={{ width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: 'archie.neutralBg', color: 'text.secondary' }}>{icon}</Box>
+      <Box component="span" sx={{ minWidth: 0 }}>{who}</Box>
+      <Typography component="time" sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap' }}>{fullDate(at)}</Typography>
     </Box>
   )
+  const chip = (txt: React.ReactNode) => (
+    <Box component="span" sx={{ height: 20, px: 0.9, borderRadius: '5px', fontSize: 11.5, fontWeight: 550, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', bgcolor: 'rgb(255 255 255 / .12)', color: '#e6f2ee' }}>{txt}</Box>
+  )
+  const onBand = { ...bandButtonSx, color: '#fff', borderColor: 'rgb(255 255 255 / .4)', '&:hover': { borderColor: '#fff', bgcolor: 'rgb(255 255 255 / .1)' } }
   return (
-    <FloatingDetail open onClose={onClose} ariaLabel="Dettaglio segnalazione"
-      idLabel={`#${r.id}`} status={<StatusBadge status={r.status} onDark />}
-      title={firstLine(r.description)} subtitle={`${KIND_LABEL[r.kind]} · ${sectionLabel(r.section, r.section_label)} · ${agoLabel(r.created_at)}`}
+    <RecordModal open onClose={onClose} ariaLabel={`Segnalazione ${r.id}`} compact
+      title={firstLine(r.description)}
+      status={<StatusBadge status={r.status} onDark />}
+      subtitle={<><Box component="span" sx={{ ...recordMono, fontSize: 12 }}>#{r.id}</Box> · {KIND_LABEL[r.kind]} · {sectionLabel(r.section, r.section_label)} · aperta {agoLabel(r.created_at)}{r.created_by_full_name ? ` da ${r.created_by_full_name}` : ''}</>}
+      tags={<>
+        {r.screenshot_url ? chip('con screenshot') : null}
+        {r.status === 'open' ? chip(r.kind === 'bug' ? 'da sistemare' : 'da valutare') : null}
+      </>}
       position={position} onPrev={onPrev} onNext={onNext}
-      footer={r.can_resolve ? (r.status === 'open' ? (
-        <>
-          <Button variant="outlined" color="error" disabled={busy} onClick={onReject}>Rifiuta</Button>
-          <Box sx={{ flex: 1 }} />
-          <Button variant="contained" disabled={busy} onClick={onResolve} startIcon={<DoneRoundedIcon sx={{ fontSize: 17 }} />}>Segna come risolta</Button>
-        </>
-      ) : (<><Box sx={{ flex: 1 }} /><Button variant="outlined" disabled={busy} onClick={onReopen}>Riapri</Button></>)) : undefined}>
-      <Box sx={{ display: 'grid', gap: 2.25 }}>
-        {r.status === 'rejected' ? callout('archie.neutralBg', 'text.primary', `Rifiutata da ${c?.by ?? '—'} · ${agoLabel(c?.at)}`, r.rejection_reason) : null}
-        {r.status === 'resolved' ? callout('success.light', 'success.main', `Risolta da ${c?.by ?? '—'} · ${agoLabel(c?.at)}`, "Chi l'ha segnalata ha ricevuto la notifica.") : null}
-        <DetailSection title="Descrizione" end={<KindBadge kind={r.kind} />}>
-          <Typography sx={{ fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.description}</Typography>
-        </DetailSection>
-        {r.screenshot_url ? (
-          <DetailSection title="Screenshot" end={<Link href={r.screenshot_url} target="_blank" rel="noopener" underline="hover" sx={{ fontSize: 12.5, fontWeight: 550 }}>Apri a tutto schermo</Link>}>
-            <Shot src={r.screenshot_url} big />
-          </DetailSection>
-        ) : r.can_upload_screenshot && r.status === 'open' ? (
-          <DetailSection title="Screenshot">
-            <Box onPaste={(e: React.ClipboardEvent) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); onUpload(f) } }}>
-              <ImageDrop file={null} onFile={(f) => { if (f) onUpload(f) }} label="Aggiungi uno screenshot" />
+      actions={<>
+        {r.can_resolve ? (r.status === 'open' ? <>
+          <Button variant="outlined" disabled={busy} onClick={onResolve} startIcon={<DoneRoundedIcon sx={{ fontSize: 16 }} />} sx={{ ...bandButtonSx, ...bandSolidSx }}>Segna come risolta</Button>
+          <Button variant="outlined" disabled={busy} onClick={onReject} startIcon={<CampoIcon name="x" size={15} />} sx={onBand}>Rifiuta</Button>
+        </> : <Button variant="outlined" disabled={busy} onClick={onReopen} startIcon={<CampoIcon name="restore" size={15} />} sx={onBand}>Riapri</Button>) : null}
+        <Tooltip title="Altre azioni"><IconButton aria-label="Altre azioni" onClick={(e) => setEl(e.currentTarget)} sx={{ color: 'rgb(255 255 255 / .85)', '&:hover': { bgcolor: 'rgb(255 255 255 / .14)' } }}><CampoIcon name="more" /></IconButton></Tooltip>
+        <Menu anchorEl={el} open={Boolean(el)} onClose={() => setEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+          <MenuItem onClick={() => { setEl(null); onCopyLink() }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il link</MenuItem>
+        </Menu>
+      </>}>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
+        <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          {r.status === 'rejected' ? callout('archie.neutralBg', 'text.primary', `Rifiutata da ${c?.by ?? '—'} · ${agoLabel(c?.at)}`, r.rejection_reason) : null}
+          {r.status === 'resolved' ? callout('success.light', 'success.main', `Risolta da ${c?.by ?? '—'} · ${agoLabel(c?.at)}`, "Chi l'ha segnalata ha ricevuto la notifica.") : null}
+          <RecordSection title="Descrizione">
+            <Typography sx={{ fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.description}</Typography>
+          </RecordSection>
+          {r.screenshot_url ? (
+            <RecordSection title="Screenshot" end={<Link href={r.screenshot_url} target="_blank" rel="noopener" underline="hover" sx={{ fontSize: 12.5, fontWeight: 550 }}>Apri a tutto schermo</Link>}>
+              <Shot src={r.screenshot_url} big />
+            </RecordSection>
+          ) : r.can_upload_screenshot && r.status === 'open' ? (
+            <RecordSection title="Screenshot">
+              <Box onPaste={(e: React.ClipboardEvent) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); onUpload(f) } }}>
+                <ImageDrop file={null} onFile={(f) => { if (f) onUpload(f) }} label="Aggiungi uno screenshot" />
+              </Box>
+            </RecordSection>
+          ) : null}
+        </Box>
+
+        <Box component="aside" aria-label="Dati della segnalazione" sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <RecordSection title="Dati">
+            <RecordGrid>
+              <RecordValue label="Tipo"><KindBadge kind={r.kind} /></RecordValue>
+              <RecordValue label="Stato"><StatusBadge status={r.status} /></RecordValue>
+              <RecordValue label="Sezione">{sectionLabel(r.section, r.section_label)}</RecordValue>
+              <RecordValue label="Numero" mono>{`#${r.id}`}</RecordValue>
+              <RecordValue label="Aperta da" wide>{r.created_by_full_name ? <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.875 }}><Ava name={r.created_by_full_name} />{r.created_by_full_name}</Box> : null}</RecordValue>
+            </RecordGrid>
+          </RecordSection>
+          <RecordSection title="Storia">
+            <Box sx={{ display: 'grid', gap: 1 }}>
+              {ev(<CampoIcon name="plus" size={12} />, <><b style={{ fontWeight: 600 }}>{r.created_by_full_name ?? '—'}</b> l'ha aperta</>, r.created_at)}
+              {c ? ev(r.status === 'resolved' ? <DoneRoundedIcon sx={{ fontSize: 13 }} /> : <CampoIcon name="x" size={12} />, <><b style={{ fontWeight: 600 }}>{c.by ?? '—'}</b> l'ha {r.status === 'resolved' ? 'risolta' : 'rifiutata'}</>, c.at) : null}
             </Box>
-          </DetailSection>
-        ) : null}
-        <DetailSection title="Storia">
-          <Box sx={{ display: 'grid', gap: 1 }}>
-            {ev(<CampoIcon name="plus" size={12} />, <><b style={{ fontWeight: 600 }}>{r.created_by_full_name ?? '—'}</b> l'ha aperta</>, r.created_at)}
-            {c ? ev(r.status === 'resolved' ? <DoneRoundedIcon sx={{ fontSize: 13 }} /> : <CampoIcon name="x" size={12} />, <><b style={{ fontWeight: 600 }}>{c.by ?? '—'}</b> l'ha {r.status === 'resolved' ? 'risolta' : 'rifiutata'}</>, c.at) : null}
-          </Box>
-        </DetailSection>
+          </RecordSection>
+        </Box>
       </Box>
-    </FloatingDetail>
+    </RecordModal>
   )
 }
