@@ -37,7 +37,6 @@ export type AdminGroupRow = {
 export type AdminUserProfile = {
   avatar: string | null
   is_philips: boolean
-  is_servicenow_technician: boolean
   is_functional_account: boolean
   is_leave_coordinator: boolean
   leave_area: number | null
@@ -95,7 +94,6 @@ export type AdminUserWritePayload = Partial<{
   portal_access: PortalAccessPayload
   profile: Partial<{
     is_philips: boolean
-    is_servicenow_technician: boolean
     is_functional_account: boolean
     is_leave_coordinator: boolean
     leave_area: number | null

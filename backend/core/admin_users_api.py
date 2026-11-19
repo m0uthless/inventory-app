@@ -105,7 +105,6 @@ class UserAdminProfileSerializer(serializers.ModelSerializer):
         fields = [
             "avatar",
             "is_philips",
-            "is_servicenow_technician",
             "is_functional_account",
             "is_leave_coordinator",
             "leave_area",
@@ -302,7 +301,7 @@ class UserAdminViewSet(
         user.save()
 
         # ── Profilo Philips: profilo "circoscritto" all'app ServiceNow ──────
-        # Un utente Philips è automaticamente tecnico ServiceNow, non può
+        # Un utente Philips non può
         # essere coordinatore ferie né segreteria rimborsi spese, non ha area
         # ferie, non appartiene a nessun gruppo e non ha permessi sui moduli
         # Archie/Portal. Enforced qui (non solo lato UI) così una chiamata
@@ -314,7 +313,6 @@ class UserAdminViewSet(
             is_philips = UserProfile.objects.filter(user=user).values_list("is_philips", flat=True).first() or False
 
         if is_philips:
-            incoming_profile["is_servicenow_technician"] = True
             incoming_profile["is_leave_coordinator"] = False
             incoming_profile["is_expense_secretary"] = False
             incoming_profile["leave_area"] = None
@@ -395,7 +393,6 @@ class UserAdminViewSet(
             profile_data = data["profile"] or {}
             for field in (
                 "is_philips",
-                "is_servicenow_technician",
                 "is_functional_account",
                 "is_leave_coordinator",
                 "is_expense_secretary",

@@ -31,7 +31,6 @@ export type RoleTag = { label: string; tint: 'sand' | 'sky' | 'lilac' | 'mint' |
 export function roleTags(u: AdminUserRow): RoleTag[] {
   const t: RoleTag[] = []
   if (u.is_superuser) t.push({ label: 'Superuser', tint: 'sand' })
-  if (u.profile.is_servicenow_technician) t.push({ label: 'Tecnico ServiceNow', tint: 'sky' })
   if (u.profile.is_philips) t.push({ label: 'Philips', tint: 'lilac' })
   if (u.profile.is_leave_coordinator) t.push({ label: 'Coordinatore ferie', tint: 'sand' })
   if (u.profile.is_expense_secretary) t.push({ label: 'Segreteria spese', tint: 'mint' })

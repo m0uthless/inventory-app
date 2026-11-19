@@ -122,7 +122,7 @@ export default function UserDetailModal({ user, groups, modules, leaveAreas, all
   const setFlag = <K extends keyof Profile>(k: K, v: Profile[K]) => setProf((p) => ({ ...p, [k]: v }))
   // Philips: profilo limitato a ServiceNow (stesse regole del backend).
   const onPhilips = (on: boolean) => {
-    setProf((p) => ({ ...p, is_philips: on, ...(on ? { is_servicenow_technician: true, is_leave_coordinator: false, is_expense_secretary: false, leave_area: null } : {}) }))
+    setProf((p) => ({ ...p, is_philips: on, ...(on ? { is_leave_coordinator: false, is_expense_secretary: false, leave_area: null } : {}) }))
     if (on) { setGroupIds([]); setDirect({}); setExtra(new Set()); setPortalLevel('none'); setPortalCustomers([]); setPortalDefault(null) }
   }
 
@@ -134,7 +134,7 @@ export default function UserDetailModal({ user, groups, modules, leaveAreas, all
     if (last !== (user.last_name || '')) c.push('cognome')
     if (email !== (user.email || '')) c.push('email')
     if ([...groupIds].sort().join() !== user.groups.map((g) => g.id).sort().join()) c.push('gruppi')
-    for (const k of ['is_philips', 'is_servicenow_technician', 'is_functional_account', 'is_leave_coordinator', 'is_expense_secretary', 'leave_area', 'birth_date', 'gender'] as const) {
+    for (const k of ['is_philips', 'is_functional_account', 'is_leave_coordinator', 'is_expense_secretary', 'leave_area', 'birth_date', 'gender'] as const) {
       if ((prof[k] ?? null) !== (user.profile[k] ?? null)) c.push(k)
     }
     const apps = new Set([...Object.keys(direct), ...Object.keys(user.direct_permissions.modules)])
@@ -160,7 +160,7 @@ export default function UserDetailModal({ user, groups, modules, leaveAreas, all
     if (portalLevel !== 'none' && (!portalCustomers.length || !portalDefault)) { toast.error('Per il Portal scegli almeno un cliente e quello predefinito.'); return }
     void patch({
       first_name: first, last_name: last, email, group_ids: groupIds,
-      profile: { is_philips: prof.is_philips, is_servicenow_technician: prof.is_servicenow_technician, is_functional_account: prof.is_functional_account, is_leave_coordinator: prof.is_leave_coordinator, is_expense_secretary: prof.is_expense_secretary, leave_area: prof.leave_area, birth_date: prof.birth_date || null, gender: prof.gender || null },
+      profile: { is_philips: prof.is_philips, is_functional_account: prof.is_functional_account, is_leave_coordinator: prof.is_leave_coordinator, is_expense_secretary: prof.is_expense_secretary, leave_area: prof.leave_area, birth_date: prof.birth_date || null, gender: prof.gender || null },
       module_permissions: direct, extra_permission_ids: extraIds(),
       portal_access: { level: portalLevel, customer_id: portalDefault, customer_ids: portalCustomers.map((c) => c.id) },
     }, 'Modifiche salvate.')
@@ -324,7 +324,6 @@ export default function UserDetailModal({ user, groups, modules, leaveAreas, all
           </RecordSection>
 
           <RecordSection title="Ruoli">
-            <Toggle label="Tecnico ServiceNow" help="Si può assegnare ai casi e compare nelle statistiche" checked={prof.is_servicenow_technician} disabled={philips || locked} onChange={(v) => setFlag('is_servicenow_technician', v)} />
             <Toggle label="Philips" help="Tecnico Philips: vede solo ServiceNow" checked={prof.is_philips} disabled={locked} onChange={onPhilips} />
             <Toggle label="Coordinatore ferie" help="Approva le richieste della sua area" checked={prof.is_leave_coordinator} disabled={philips || locked} onChange={(v) => setFlag('is_leave_coordinator', v)} />
             <Toggle label="Segreteria spese" help="Vede e approva tutti i rimborsi" checked={prof.is_expense_secretary} disabled={philips || locked} onChange={(v) => setFlag('is_expense_secretary', v)} />

@@ -24,7 +24,7 @@ const user = (first: string, extra: Partial<AdminUserRow> = {}): AdminUserRow =>
   is_active: true, is_staff: false, is_superuser: false, date_joined: '2022-09-01T08:00:00Z', last_login: null,
   groups: [], group_permissions: { modules: {}, extra_permissions: [] }, direct_permissions: { modules: {}, extra_permissions: [] },
   has_portal_access: false, portal_profile: null,
-  profile: { avatar: null, is_philips: false, is_servicenow_technician: false, is_functional_account: false, is_leave_coordinator: false, leave_area: null, leave_area_name: null, is_expense_secretary: false, birth_date: null, gender: null },
+  profile: { avatar: null, is_philips: false, is_functional_account: false, is_leave_coordinator: false, leave_area: null, leave_area_name: null, is_expense_secretary: false, birth_date: null, gender: null },
   ...extra,
 })
 const inGroup = { groups: [{ id: 1, name: 'Tecnici' }] }

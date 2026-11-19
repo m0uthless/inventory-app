@@ -8,7 +8,7 @@ const user = (over: Partial<AdminUserRow> = {}): AdminUserRow => ({
   date_joined: '', last_login: null, groups: [{ id: 1, name: 'Tecnici' }],
   group_permissions: { modules: { crm: rwd(true, true) }, extra_permissions: ['core.access_archie'] },
   direct_permissions: { modules: {}, extra_permissions: [] }, has_portal_access: false, portal_profile: null,
-  profile: { avatar: null, is_philips: false, is_servicenow_technician: true, is_functional_account: false, is_leave_coordinator: false, leave_area: null, leave_area_name: null, is_expense_secretary: false, birth_date: null, gender: null },
+  profile: { avatar: null, is_philips: false, is_functional_account: false, is_leave_coordinator: false, leave_area: null, leave_area_name: null, is_expense_secretary: false, birth_date: null, gender: null },
   ...over,
 })
 const groups: AdminGroupRow[] = [{ id: 1, name: 'Tecnici', user_count: 1, permissions_state: { modules: { crm: rwd(true, true) }, extra_permissions: [] } }]
@@ -30,7 +30,8 @@ describe('usersModel', () => {
     expect(view('off')(user({ is_active: false }))).toBe(true)
   })
   it('roleTags and search', () => {
-    expect(roleTags(user()).map((t) => t.label)).toEqual(['Tecnico ServiceNow'])
+    expect(roleTags(user()).map((t) => t.label)).toEqual([])
+    expect(roleTags(user({ profile: { ...user().profile, is_leave_coordinator: true } })).map((t) => t.label)).toEqual(['Coordinatore ferie'])
     expect(matchUser(user(), 'spazz')).toBe(true)
     expect(matchUser(user(), 'rossi')).toBe(false)
   })

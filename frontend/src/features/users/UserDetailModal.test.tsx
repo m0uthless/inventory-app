@@ -27,7 +27,7 @@ const user: AdminUserRow = {
   group_permissions: { modules: { issues: RW, wiki: R }, extra_permissions: [] },
   direct_permissions: { modules: { issues: NONE, wiki: NONE }, extra_permissions: [] },
   has_portal_access: false, portal_profile: null,
-  profile: { avatar: null, is_philips: false, is_servicenow_technician: true, is_functional_account: false, is_leave_coordinator: false, leave_area: null, leave_area_name: null, is_expense_secretary: false, birth_date: null, gender: null },
+  profile: { avatar: null, is_philips: false, is_functional_account: false, is_leave_coordinator: false, leave_area: null, leave_area_name: null, is_expense_secretary: false, birth_date: null, gender: null },
 }
 
 const show = (props: Partial<React.ComponentProps<typeof UserDetailModal>> = {}) => {
@@ -62,6 +62,12 @@ describe('UserDetailModal', () => {
     expect(body.profile.gender).toBe('F')
     expect(body.module_permissions.wiki).toEqual({ r: true, w: true, d: true })
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
+  })
+
+  it('il ruolo «Tecnico ServiceNow» non è più un interruttore del profilo', () => {
+    show()
+    expect(screen.queryByText('Tecnico ServiceNow')).not.toBeInTheDocument()
+    expect(screen.getByText('Coordinatore ferie')).toBeInTheDocument()
   })
 
   it('sotto il livello del gruppo non si scende', () => {
