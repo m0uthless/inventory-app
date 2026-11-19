@@ -49,6 +49,7 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
+import { issueAssignees, toUserOption } from '../features/issues/issueUsers'
 import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -100,17 +101,6 @@ function toIdLabel(v: unknown, labelKeys: string[]): { id: number; label: string
   return { id, label: String(id) }
 }
 
-function toUserOption(v: unknown): UserOption | null {
-  if (!isRecord(v)) return null
-  const id = Number(v['id'])
-  if (!Number.isFinite(id)) return null
-  const username = typeof v['username'] === 'string' ? v['username'] : ''
-  const fullName = typeof v['full_name'] === 'string' ? v['full_name'] : ''
-  const label = (fullName || username || String(id)).trim()
-  const is_philips = v['is_philips'] === true
-  const is_servicenow_technician = v['is_servicenow_technician'] !== false
-  return { id, label, username, is_philips, is_servicenow_technician }
-}
 
 function toInventoryOption(v: unknown): InventoryOption | null {
   if (!isRecord(v)) return null
@@ -320,7 +310,7 @@ export default function Issues() {
 
   // Assegnabili alle issue: solo utenti "tecnico ServiceNow" e non Philips (categoria Biotron)
   const assignableUsers = React.useMemo(
-    () => users.filter((u) => u.is_servicenow_technician !== false && !u.is_philips),
+    () => issueAssignees(users),
     [users],
   )
 

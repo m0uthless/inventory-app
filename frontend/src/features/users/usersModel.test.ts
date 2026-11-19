@@ -31,6 +31,7 @@ describe('usersModel', () => {
   })
   it('roleTags and search', () => {
     expect(roleTags(user()).map((t) => t.label)).toEqual([])
+    expect(roleTags(user({ profile: { ...user().profile, is_philips: true } })).map((t) => t.label)).not.toContain('Philips')
     expect(roleTags(user({ profile: { ...user().profile, is_leave_coordinator: true } })).map((t) => t.label)).toEqual(['Coordinatore ferie'])
     expect(matchUser(user(), 'spazz')).toBe(true)
     expect(matchUser(user(), 'rossi')).toBe(false)

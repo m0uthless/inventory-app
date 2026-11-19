@@ -15,6 +15,7 @@ import { LEVEL_TO_RWD, rwdToLevel } from '../../types/adminUsers'
 import { archieModules, fullName, levelSource, maxLevel, portalModules, roleTags, type LeaveAreaOption } from './usersModel'
 import { ExtraPermissions, GroupTag, LevelPicker, ResetPasswordResultDialog, UserAvatar } from './usersUi'
 import { PermMatrix } from './PermMatrix'
+import { SHOW_PHILIPS } from './visibleProfiles'
 
 type CustomerOption = { id: number; label: string }
 type Profile = AdminUserRow['profile']
@@ -324,7 +325,7 @@ export default function UserDetailModal({ user, groups, modules, leaveAreas, all
           </RecordSection>
 
           <RecordSection title="Ruoli">
-            <Toggle label="Philips" help="Tecnico Philips: vede solo ServiceNow" checked={prof.is_philips} disabled={locked} onChange={onPhilips} />
+            {SHOW_PHILIPS ? <Toggle label="Philips" help="Tecnico Philips: vede solo ServiceNow" checked={prof.is_philips} disabled={locked} onChange={onPhilips} /> : null}
             <Toggle label="Coordinatore ferie" help="Approva le richieste della sua area" checked={prof.is_leave_coordinator} disabled={philips || locked} onChange={(v) => setFlag('is_leave_coordinator', v)} />
             <Toggle label="Segreteria spese" help="Vede e approva tutti i rimborsi" checked={prof.is_expense_secretary} disabled={philips || locked} onChange={(v) => setFlag('is_expense_secretary', v)} />
             <Toggle label="Account funzionale" help="Usato da integrazioni o come assegnatario automatico, non da una persona" checked={prof.is_functional_account} disabled={locked} onChange={(v) => setFlag('is_functional_account', v)} />

@@ -67,6 +67,7 @@ describe('UserDetailModal', () => {
   it('il ruolo «Tecnico ServiceNow» non è più un interruttore del profilo', () => {
     show()
     expect(screen.queryByText('Tecnico ServiceNow')).not.toBeInTheDocument()
+    expect(screen.queryByText('Philips')).not.toBeInTheDocument()
     expect(screen.getByText('Coordinatore ferie')).toBeInTheDocument()
   })
 

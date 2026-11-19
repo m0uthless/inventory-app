@@ -60,7 +60,8 @@ export type UserOption = {
   label: string
   username: string
   is_philips?: boolean
-  is_servicenow_technician?: boolean
+  /** Permesso di gruppo «Può essere assegnatario delle issue». */
+  is_issue_assignee?: boolean
 }
 export type InventoryOption = {
   id: number
