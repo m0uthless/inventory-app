@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Box, ButtonBase, InputBase, MenuItem, TextField, Typography } from '@mui/material'
+import { Box, ButtonBase, InputBase, Menu, MenuItem, TextField, Typography } from '@mui/material'
+import { CampoIcon } from './CampoIcon'
 
 /*
  * Pezzi comuni delle finestre dei record anagrafici (Cliente, Sito, Contatto — DESIGN.md › Record window):
@@ -158,4 +159,36 @@ export function RecordGrid({ children }: { children: React.ReactNode }) {
 /** Etichetta «In modifica» sulla testata. */
 export function BandEditing() {
   return <Box component="span" sx={{ fontSize: 11.5, fontWeight: 650, px: 1, py: '2px', borderRadius: '5px', bgcolor: '#e0a43a', color: '#2b1d00' }}>In modifica</Box>
+}
+
+/** Valore che si cambia sul posto da un piccolo menu (stato, priorità, assegnatario), senza passare da «Modifica». */
+export function QuickPick({ label, value, options, onPick, disabled, after, wide }: {
+  label: string
+  value: React.ReactNode
+  options: { value: string; label: React.ReactNode; selected?: boolean }[]
+  onPick: (v: string) => void
+  disabled?: boolean
+  after?: React.ReactNode
+  wide?: boolean
+}) {
+  const [el, setEl] = React.useState<HTMLElement | null>(null)
+  return (
+    <Box sx={{ display: 'grid', gap: '3px', minWidth: 0, gridColumn: wide ? '1 / -1' : undefined }}>
+      <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 550, color: 'text.secondary' }}>{label}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.25, minHeight: 22 }}>
+        <ButtonBase disabled={disabled} aria-haspopup="menu" aria-label={`${label}: cambia`} onClick={(e) => setEl(e.currentTarget)} sx={{
+          display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 13, borderRadius: '6px', pr: 0.5, py: '1px',
+          '&:hover': { bgcolor: 'archie.surface2', boxShadow: (t) => `0 0 0 4px ${t.palette.archie.surface2}` }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+        }}>
+          {value}{disabled ? null : <Box component="span" sx={{ display: 'inline-flex', color: 'text.disabled' }}><CampoIcon name="chevD" size={13} /></Box>}
+        </ButtonBase>
+        {after}
+      </Box>
+      <Menu anchorEl={el} open={Boolean(el)} onClose={() => setEl(null)}>
+        {options.map((o) => (
+          <MenuItem key={o.value} selected={o.selected} onClick={() => { setEl(null); onPick(o.value) }} sx={{ fontSize: 13, gap: 1 }}>{o.label}</MenuItem>
+        ))}
+      </Menu>
+    </Box>
+  )
 }

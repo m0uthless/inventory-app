@@ -11,7 +11,7 @@ import { useToast } from '@shared/ui/toast'
 import { buildQuery } from '@shared/utils/nav'
 import { copyToClipboard } from '@shared/utils/clipboard'
 import {
-  BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordLoader, RecordModal, RecordNotes, RecordRow, RecordRows,
+  BandChip, BandEditing, BandStat, CampoIcon, QuickPick, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordLoader, RecordModal, RecordNotes, RecordRow, RecordRows,
   RecordSection, RecordSelect, RecordValue, bandButtonSx, bandSolidSx, recordMono as mono, useRecordDraft,
 } from '../../ui/campo'
 import { inventoryDrawerPath } from '../../utils/entityPaths'
@@ -179,37 +179,6 @@ const toDraft = (i: IssueRow): Draft => ({
 })
 
 /** Valore che si cambia al volo: clic, menu, scelta (stato, priorità, assegnatario). */
-function QuickPick({ label, value, options, onPick, disabled, after, wide }: {
-  label: string
-  value: React.ReactNode
-  options: { value: string; label: React.ReactNode; selected?: boolean }[]
-  onPick: (v: string) => void
-  disabled?: boolean
-  after?: React.ReactNode
-  wide?: boolean
-}) {
-  const [el, setEl] = React.useState<HTMLElement | null>(null)
-  return (
-    <Box sx={{ display: 'grid', gap: '3px', minWidth: 0, gridColumn: wide ? '1 / -1' : undefined }}>
-      <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 550, color: 'text.secondary' }}>{label}</Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.25, minHeight: 22 }}>
-        <ButtonBase disabled={disabled} aria-haspopup="menu" aria-label={`${label}: cambia`} onClick={(e) => setEl(e.currentTarget)} sx={{
-          display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 13, borderRadius: '6px', pr: 0.5, py: '1px',
-          '&:hover': { bgcolor: 'archie.surface2', boxShadow: (t) => `0 0 0 4px ${t.palette.archie.surface2}` }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
-        }}>
-          {value}{disabled ? null : <Box component="span" sx={{ display: 'inline-flex', color: 'text.disabled' }}><CampoIcon name="chevD" size={13} /></Box>}
-        </ButtonBase>
-        {after}
-      </Box>
-      <Menu anchorEl={el} open={Boolean(el)} onClose={() => setEl(null)}>
-        {options.map((o) => (
-          <MenuItem key={o.value} selected={o.selected} onClick={() => { setEl(null); onPick(o.value) }} sx={{ fontSize: 13, gap: 1 }}>{o.label}</MenuItem>
-        ))}
-      </Menu>
-    </Box>
-  )
-}
-
 export default function IssueDetail(p: Props) {
   return p.issue ? <IssueWindow {...p} issue={p.issue} /> : null
 }

@@ -1,0 +1,33 @@
+/* ServiceNow, Monitor, Piano ferie nella finestra (anteprima rst-base). */
+.rst-desc { margin: 0; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; }
+.rst-shot { display: grid; width: 100%; height: 300px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: #eef2f1; cursor: zoom-in; position: relative; overflow: hidden; }
+.rst-shot .win { position: absolute; inset: 0 0 auto 0; height: 26px; background: #dfe5e3; display: flex; gap: 6px; align-items: center; padding: 0 10px; }
+.rst-shot .win i { width: 9px; height: 9px; border-radius: 50%; background: #c4ceca; }
+.rst-shot .err { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); width: 62%; padding: 16px 18px; background: #fff; border-radius: 6px; box-shadow: 0 4px 18px rgb(0 0 0 / .12); display: grid; grid-template-columns: 20px 1fr; gap: 2px 10px; text-align: left; }
+.rst-shot .err .i { color: var(--error); grid-row: span 2; width: 18px; height: 18px; } .rst-shot .err b { font-size: 13px; } .rst-shot .err small { font-size: 12px; color: var(--muted); font-family: "Geist Mono", ui-monospace, monospace; }
+.rst-ws { display: grid; grid-template-columns: 20px minmax(0, 1fr) 16px; gap: 12px; align-items: center; width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; text-align: left; cursor: pointer; color: var(--text); }
+.rst-ws:hover { border-color: var(--border-strong); } .rst-ws > .i { color: var(--muted); width: 18px; height: 18px; }
+.rst-ws b { display: block; font-size: 13.5px; font-family: "Geist Mono", ui-monospace, monospace; } .rst-ws small { font-size: 12px; color: var(--muted); }
+.mst { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 5px; font-size: 12px; font-weight: 550; background: var(--neutral-bg); color: var(--muted); white-space: nowrap; }
+.mst.ok { background: var(--success-bg); color: var(--success); } .mst.warn { background: var(--warning-bg); color: var(--warning); }
+.who-in { display: inline-flex; align-items: center; gap: 7px; }
+.pf-sw { display: inline-block; width: 13px; height: 13px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; } .pf-sw.sm { width: 10px; height: 10px; margin-right: 6px; vertical-align: 0; }
+.pf-cov { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-cov > span { display: grid; justify-items: center; min-width: 58px; padding: 7px 6px 6px; border-radius: 8px; background: var(--surface-2); line-height: 1.2; }
+.pf-cov small { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; } .pf-cov b { font-size: 17px; font-weight: 650; }
+.pf-cov em { font-style: normal; font-size: 11.5px; font-weight: 650; color: var(--success); } .pf-cov em.h { color: var(--faint); font-weight: 500; font-size: 10.5px; }
+.pf-cov .mid { background: var(--warning-bg); } .pf-cov .mid em { color: var(--warning); }
+.pf-cov .low { background: var(--error-bg); } .pf-cov .low em { color: var(--error); }
+.pf-cov .off { background: repeating-linear-gradient(135deg, var(--surface-2) 0 5px, transparent 5px 10px); color: var(--faint); }
+.seg-mini { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); }
+.seg-mini button { border: 0; background: none; font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 5px; color: var(--muted); cursor: pointer; }
+.seg-mini button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+.icon-btn.xs { width: 22px; height: 22px; vertical-align: -6px; } .icon-btn.xs .i { width: 13px; height: 13px; }
+.rec-main .rows .row > .i { width: 16px; height: 16px; color: var(--muted); }
+.rst-sibs { display: grid; gap: 6px; }
+.rst-sib { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; text-align: left; cursor: pointer; color: var(--text); }
+.rst-sib:hover { border-color: var(--border-strong); } .rst-sib > .i { width: 16px; height: 16px; color: var(--muted); }
+.rst-sib b { display: block; font-size: 13px; font-weight: 600; } .rst-sib small { font-size: 11.5px; color: var(--muted); font-family: "Geist Mono", ui-monospace, monospace; }
+.rst-sn { display: inline-flex !important; align-items: center; gap: 6px; }
+.rst-sn .icon-btn.xs { vertical-align: 0; }
+.pf-cov { gap: 5px; } .pf-cov > span { min-width: 52px; }

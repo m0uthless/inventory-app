@@ -73,6 +73,8 @@ export default function Monitor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openId, tick])
   const idx = detail ? rows.findIndex((r) => r.id === detail.id) : -1
+  // Clic sulla riga: la seleziona; doppio clic o Invio: apre la finestra.
+  const [focusId, setFocusId] = React.useState<number | null>(null)
 
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true)
@@ -173,21 +175,23 @@ export default function Monitor() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: (id) => grid.setOpenId(id),
-            getRowClassName: (row) => (detail?.id === row.id ? 'Mui-selected' : undefined),
+            onRowClick: setFocusId,
+            onRowOpen: (id) => { setFocusId(id); grid.setOpenId(id) },
+            getRowClassName: (row) => ((openId ?? focusId) === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
       </Box>
 
-      {detail && openId === detail.id ? (
+      {/* Con ‹ › la finestra resta quella di prima finché arriva il nuovo monitor. */}
+      {openId && detail ? (
         <MonitorDetailCard m={detail} canChange={canChange} canDelete={canDelete} canAudit={canAudit} busy={busy}
           position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
           onPrev={idx > 0 ? () => grid.setOpenId(rows[idx - 1].id) : undefined}
           onNext={idx >= 0 && idx < rows.length - 1 ? () => grid.setOpenId(rows[idx + 1].id) : undefined}
           onClose={() => grid.setOpenId(null)}
           onStato={(s) => setStato(detail, s)}
-          onEdit={() => openForm(detail)}
+          onSaved={reloadAll}
           onDelete={() => remove(detail)}
           onRestore={() => restore(detail)}
           onOpenInventory={(id) => navigate(`/inventory?open=${id}&return=${encodeURIComponent(loc.pathname + loc.search)}`)}

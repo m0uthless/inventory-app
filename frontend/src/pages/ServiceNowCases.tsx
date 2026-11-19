@@ -101,6 +101,8 @@ export default function ServiceNowCases() {
   const [detail, setDetail] = React.useState<ServiceNowCaseRow | null>(null)
   const [busy, setBusy] = React.useState(false)
   const openId = grid.openId
+  // Clic sulla riga: la seleziona; doppio clic o Invio: apre la finestra.
+  const [focusId, setFocusId] = React.useState<number | null>(null)
   React.useEffect(() => {
     if (!openId) { setDetail(null); return }
     let alive = true
@@ -177,9 +179,9 @@ export default function ServiceNowCases() {
     { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, hidden: !canDelete, tone: 'danger' as const, onClick: () => { setToDelete(ctx.row); setCtx(null) } },
   ]
   const detailMenu = (r: ServiceNowCaseRow): DetailMenuItem[] => [
-    ...(canIssue ? [{ label: 'Crea issue', onClick: () => createIssue(r) }] : []),
-    { label: 'Crea task', onClick: () => createTask(r) },
-    ...(r.category === 'philips' ? [{ label: 'Messaggio per il tecnico', onClick: () => setCopyText(philipsText(r)) }] : []),
+    ...(canIssue ? [{ label: 'Crea issue', icon: <BugReportOutlinedIcon fontSize="small" />, onClick: () => createIssue(r) }] : []),
+    { label: 'Crea task', icon: <TaskAltOutlinedIcon fontSize="small" />, onClick: () => createTask(r) },
+    ...(r.category === 'philips' ? [{ label: 'Messaggio per il tecnico', icon: <ChatBubbleOutlineIcon fontSize="small" />, onClick: () => setCopyText(philipsText(r)) }] : []),
   ]
 
   // ── Colonne (le stesse di prima) ──
@@ -246,15 +248,17 @@ export default function ServiceNowCases() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: (id) => grid.setOpenId(id),
+            onRowClick: setFocusId,
+            onRowOpen: (id) => { setFocusId(id); grid.setOpenId(id) },
             onRowContextMenu: (row, e) => setCtx({ row, x: e.clientX + 2, y: e.clientY - 6 }),
-            getRowClassName: (row) => (detail?.id === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => ((openId ?? focusId) === row.id ? 'Mui-selected' : undefined),
             sx: { cursor: 'pointer' },
           }}
         />
       </Box>
 
-      {detail && openId === detail.id ? (
+      {/* Con ‹ › la finestra resta quella di prima finché arriva il nuovo caso. */}
+      {openId && detail ? (
         <CaseDetailCard c={detail} busy={busy} canChange={canChange} canDelete={canDelete} menu={detailMenu(detail)}
           position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
           onPrev={idx > 0 ? () => grid.setOpenId(rows[idx - 1].id) : undefined}
