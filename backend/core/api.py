@@ -924,6 +924,8 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 'priority': task.priority,
                 'customer': request.data.get('customer'),
                 'site': request.data.get('site'),
+                # La issue nasce nell'area del task.
+                'area': task.area_id,
             }
             if self._is_issue_assignable(task.assigned_to):
                 payload['assigned_to'] = task.assigned_to_id

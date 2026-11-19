@@ -5,6 +5,7 @@ from django.utils import timezone
 import django_filters as filters
 
 from rest_framework import serializers, viewsets, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
@@ -533,6 +534,34 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         )
         self._notify_assignment_change(old_assigned_to_id=old_assigned_to_id, issue=issue)
 
+    # ── Sola lettura per le altre aree ──────────────────────────────────────
+
+    def _check_issue_area(self, issue):
+        """Le issue con un'area le modificano solo i membri di quell'area (o il
+        superuser): vale per ogni scrittura, commenti e Wiki compresi. Si guarda
+        l'area attuale, prima della modifica."""
+        if not can_edit_issue(self.request.user, issue):
+            raise PermissionDenied("Puoi modificare solo le issue della tua area.")
+
+    def update(self, request, *args, **kwargs):
+        self._check_issue_area(self.get_object())
+        return super().update(request, *args, **kwargs)
+
+    def perform_destroy(self, instance):
+        self._check_issue_area(instance)
+        super().perform_destroy(instance)
+
+    def _restore_obj(self, obj, request):
+        self._check_issue_area(obj)
+        super()._restore_obj(obj, request)
+
+    def _get_scoped_trash_queryset(self):
+        qs = super()._get_scoped_trash_queryset()
+        if getattr(self.request.user, "is_superuser", False):
+            return qs
+        uid = user_area_id(self.request.user)
+        return qs.filter(Q(area__isnull=True) | Q(area_id=uid)) if uid is not None else qs.filter(area__isnull=True)
+
     # ── email: nuova issue / riassegnazione ─────────────────────────────────
 
     def _notify_issue_created(self, issue):
@@ -545,13 +574,23 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
 
     @action(detail=False, methods=["get"], url_path="summary")
     def summary(self, request):
-        """Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri."""
+        """Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri.
+
+        `?area=mine`: solo le issue della propria area più quelle senza area
+        (contatore della barra laterale); chi non ha un'area vede i numeri
+        complessivi."""
         from django.db.models import Count, Q, Avg, F, ExpressionWrapper, fields as dj_fields
         from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
         from django.utils.timezone import now
         import datetime
 
-        qs = Issue.objects.filter(deleted_at__isnull=True)
+        scope = Q()
+        if request.query_params.get("area") == "mine":
+            uid = user_area_id(request.user)
+            if uid is not None:
+                scope = Q(area_id=uid) | Q(area__isnull=True)
+
+        qs = Issue.objects.filter(scope, deleted_at__isnull=True)
         counts = qs.aggregate(
             open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
             in_progress_count=Count("id", filter=Q(status=IssueStatus.IN_PROGRESS)),
@@ -567,6 +606,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         avg_row = (
             Issue.objects
             .filter(
+                scope,
                 deleted_at__isnull=True,
                 status__in=(IssueStatus.RESOLVED, IssueStatus.CLOSED),
                 opened_at__isnull=False,
@@ -612,7 +652,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
 
         buckets_qs = (
             Issue.objects
-            .filter(deleted_at__isnull=True)
+            .filter(scope, deleted_at__isnull=True)
             .annotate(eff_date=effective_date)
             .filter(eff_date__gte=cutoff)
             .annotate(period=trunc_fn)
@@ -636,6 +676,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         closed_qs = (
             Issue.objects
             .filter(
+                scope,
                 deleted_at__isnull=True,
                 status__in=(IssueStatus.RESOLVED, IssueStatus.CLOSED),
                 closed_at__isnull=False,
@@ -702,6 +743,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         if request.method == "GET":
             return Response([self._wiki_link_payload(link) for link in links.order_by("created_at")])
 
+        self._check_issue_area(issue)
         try:
             page_id = int(request.data.get("page"))
         except (TypeError, ValueError):
@@ -731,6 +773,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         if denied:
             return denied
         issue = self.get_object()
+        self._check_issue_area(issue)
         link = WikiLink.objects.select_related("page").filter(
             pk=link_pk, entity_type=WikiEntityType.ISSUE, entity_id=issue.id, deleted_at__isnull=True,
         ).first()
@@ -774,6 +817,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             qs = issue.comments.select_related("author").order_by("created_at")
             return Response(IssueCommentSerializer(qs, many=True).data)
 
+        self._check_issue_area(issue)
         serializer = IssueCommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         comment = serializer.save(issue=issue, author=request.user)
@@ -789,6 +833,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     @action(detail=True, methods=["patch", "delete"], url_path=r"comments/(?P<comment_pk>\d+)")
     def comment_detail(self, request, pk=None, comment_pk=None):
         issue = self.get_object()
+        self._check_issue_area(issue)
         try:
             comment = issue.comments.get(pk=comment_pk)
         except IssueComment.DoesNotExist:

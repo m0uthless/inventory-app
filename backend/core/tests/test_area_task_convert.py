@@ -274,3 +274,14 @@ def test_convert_with_non_assignable_assignee_leaves_issue_unassigned_and_skips_
     assert not any(
         ("assegnata a te" in m.subject or "riassegnata" in m.subject) for m in mail.outbox
     )
+
+
+def test_convert_copies_area():
+    area = _area()
+    actor = _user(area, can_add_issue=True)
+    task = AreaTask.objects.create(area=area, title="Con area")
+    resp = _client(actor).post(_url(task), {"customer": _customer().id}, format="json")
+    assert resp.status_code == 201, resp.data
+
+    from issues.models import Issue
+    assert Issue.objects.get(pk=resp.data["issue"]["id"]).area_id == area.id
