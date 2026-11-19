@@ -65,6 +65,20 @@ class IssueCommentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "issue", "author", "created_at", "updated_at"]
 
 
+def user_area_id(user):
+    """Area del profilo dell'utente (`UserProfile.leave_area`), o None."""
+    return getattr(getattr(user, "profile", None), "leave_area_id", None)
+
+
+def can_edit_issue(user, issue) -> bool:
+    """Una issue senza area la modifica chiunque abbia i permessi delle issue;
+    con un'area solo i membri di quell'area (o il superuser)."""
+    if issue.area_id is None or getattr(user, "is_superuser", False):
+        return True
+    uid = user_area_id(user)
+    return uid is not None and uid == issue.area_id
+
+
 class IssueSerializer(serializers.ModelSerializer):
     customer_name           = serializers.SerializerMethodField()
     customer_code           = serializers.CharField(source="customer.code",              read_only=True)
@@ -86,6 +100,12 @@ class IssueSerializer(serializers.ModelSerializer):
     comments_count          = serializers.SerializerMethodField()
     days_open               = serializers.SerializerMethodField()
     servicenow_external_url = serializers.SerializerMethodField()
+    area_label              = serializers.CharField(source="area.label", read_only=True, default=None)
+    can_edit                = serializers.SerializerMethodField()
+
+    def get_can_edit(self, obj):
+        request = self.context.get("request")
+        return bool(request) and can_edit_issue(request.user, obj)
 
     def get_customer_name(self, obj):
         if obj.customer_placeholder:
@@ -222,6 +242,19 @@ class IssueSerializer(serializers.ModelSerializer):
             if not is_eligible_issue_assignee(attrs["assigned_to"]):
                 errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue."
 
+        # ── Assegnatario membro dell'area della issue ──
+        # Si ricontrolla solo se area o assegnatario sono nel payload (le issue
+        # con dati preesistenti restano modificabili); il superuser è esente,
+        # come per i task di area.
+        if ("area" in attrs or "assigned_to" in attrs) and "assigned_to" not in errors:
+            area = attrs["area"] if "area" in attrs else getattr(self.instance, "area", None)
+            assignee = attrs["assigned_to"] if "assigned_to" in attrs else getattr(self.instance, "assigned_to", None)
+            request = self.context.get("request")
+            actor_is_superuser = bool(request and getattr(request.user, "is_superuser", False))
+            if area is not None and assignee is not None and not actor_is_superuser:
+                if user_area_id(assignee) != area.pk:
+                    errors["assigned_to"] = f"L'assegnatario deve far parte dell'area «{area.label}»."
+
         if site is not None and customer is not None and site.customer_id != customer.id:
             errors["site"] = "Il sito selezionato non appartiene al cliente della issue."
 
@@ -246,6 +279,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "site", "site_name",
             "inventory", "inventory_name", "inventory_knumber", "inventory_serial_number", "inventory_hostname",
             "category", "category_label",
+            "area", "area_label", "can_edit",
             "assigned_to", "assigned_to_username", "assigned_to_full_name", "assigned_to_avatar",
             "created_by", "created_by_username", "created_by_full_name",
             "priority", "priority_label",
@@ -265,6 +299,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "created_by_username", "created_by_full_name",
             "priority_label", "status_label", "waiting_reason_label",
             "comments_count", "days_open", "closed_at", "servicenow_external_url",
+            "area_label", "can_edit",
         ]
         extra_kwargs = {
             # Obbligatorio a livello di modello (FK non-null): qui diventa
@@ -285,6 +320,7 @@ class IssueFilter(filters.FilterSet):
     inventory   = filters.NumberFilter(field_name="inventory_id")
     category    = filters.NumberFilter(field_name="category_id")
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
+    area        = filters.NumberFilter(field_name="area_id")
     due_before  = filters.DateFilter(field_name="due_date", lookup_expr="lte")
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
@@ -446,7 +482,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         ).order_by("-created_at").values("external_url")[:1]
 
         qs = Issue.objects.select_related(
-            "customer", "site", "inventory", "category",
+            "customer", "site", "inventory", "category", "area",
             "assigned_to", "assigned_to__profile", "created_by",
         ).annotate(
             comments_count=Count("comments"),
