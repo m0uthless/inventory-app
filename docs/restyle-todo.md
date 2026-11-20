@@ -305,3 +305,57 @@ I pannelli di dettaglio di tutti i moduli sono già nello stile nuovo (`DrawerSh
 ## Fase 2
 
 - **Portal** (`frontend-portal/`): restyle dopo Archie; oggi resta volutamente invariato.
+
+## Issue per area e assegnabili per gruppo (19-20/11)
+
+Spec: `docs/superpowers/specs/2026-11-19-issue-area-assignee-groups-design.md`. Tutto su develop, non ancora rilasciato.
+
+- **Deploy in produzione:**
+  - lanciare `migrate` (`servicenow.0012`, `issues.0009`–`0011`, `core.0048`);
+  - dare ai gruppi i tre permessi «È tecnico ServiceNow», «Può essere assegnatario delle issue» e «Vede le issue di tutte le aree». Finché mancano i primi due nessuno è assegnabile e l'email «nuova issue» non parte.
+- **[UI] Verifica nel browser** (non fatta): selettore d'area accanto al titolo, Area nei Dettagli, sola lettura per le altre aree, menu col tasto destro di Contratti, Piani, Rapportini e Drive.
+- **[BE] Rimandati dalla revisione:**
+  - area disattivata accettata via API;
+  - nel modulo un assegnatario fuori area non compare nell'elenco;
+  - doppia `get_object()` su PATCH;
+  - «Assegna a me» visibile a chi non è assegnatario (preesistente);
+  - nei task si legge il titolo della issue convertita anche se è di un'altra area;
+  - `/api/wiki-links/` elenca id e note dei link a issue non visibili;
+  - l'etichetta Wiki senza utente non filtra;
+  - QuickPick «Area» toglie un assegnatario che ha perso il permesso.
+- **[BE] Test mancanti:**
+  - `active_issue_count` e riepiloghi di crm e inventory;
+  - ripristino e collegamenti Wiki di issue non visibili;
+  - superuser con un'area nel profilo.
+- **[DEC] Philips:** gli utenti Philips oggi non esistono. Se tornano, potranno diventare tecnici solo concedendo loro il permesso, perché oggi non possono stare in gruppi.
+
+## Generatore SQL PACS (20/11)
+
+Spec: `docs/superpowers/specs/2026-11-20-text2sql-design.md`; anteprima `design-previews/sql-base.html` (variante A). Su develop, non ancora rilasciato.
+
+- **Deploy in produzione:**
+  1. installare Ollama e il modello (default `qwen2.5-coder:7b`) sulla macchina scelta, server o VM;
+  2. impostare `OLLAMA_URL` in `.env.prod`;
+  3. avviare il servizio `text2sql-worker`;
+  4. lanciare `migrate` (`text2sql.0001`, `notifications.0004`);
+  5. dare il permesso «Usa il generatore SQL PACS» ai gruppi dei tecnici.
+- **[DEC] Dove far girare Ollama in produzione** e con quale modello. Su Poseidon il prototipo usa `qwen2.5-coder:3b`.
+- **Dev:** `.env.dev` punta all'Ollama del prototipo (`http://t2s-ollama:11434`). Dopo ogni ricreazione del container `text2sql-worker` va ripetuto `docker network connect text2sql-test_default inventory-app-text2sql-worker-1`.
+- **[UI] Verifica nel browser** della pagina (non fatta): stati, giudizio, Revisione, telefono.
+- **[UI] Rimandati dalla revisione:**
+  - la campanella veloce dura 20 minuti anche dopo la risposta (doppia costante `T2S_PENDING_KEY`);
+  - `?apri` oltre le prime 50 domande segna letta la notifica sbagliata;
+  - notifica orfana dopo una cancellazione o un «Riprova»;
+  - le righe dell'elenco non sono annunciate come pulsanti (`role="listitem"`);
+  - su telefono la risposta compare sotto l'elenco senza scorrere fin lì.
+- **[BE] Rimandati dalla revisione:**
+  - nessun limite di lunghezza su query corretta e nota;
+  - Redis manca nel `depends_on` del worker;
+  - con due worker si rimetterebbero in coda a vicenda all'avvio;
+  - l'admin Django mostra le domande a chi ha `view_text2sqlrequest`.
+- **[BE] Futuro (richiesto da Fede):** usare come esempi anche le Query della Wiki. L'aggancio è `engine.load_examples()`.
+
+## Ambiente dev e test
+
+- Nel DB dev il **modulo Wiki risulta spento**: riaccenderlo dalla pagina Moduli se non è voluto.
+- I test girano con il Redis dello stack dev, quindi la cache dei moduli spenti del dev arriva nei test e li fa fallire a caso (es. i test Wiki con la Wiki spenta). Per ora `text2sql/tests/conftest.py` usa una cache locale. **[BE]** Valutare `REDIS_URL` vuoto per tutta la suite, oppure un `conftest` globale con LocMemCache.
