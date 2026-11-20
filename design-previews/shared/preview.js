@@ -72,6 +72,7 @@
     { id: 'kno', label: 'Conoscenza', items: [
       { id: 'wiki', label: 'Wiki', icon: 'book' },
       { id: 'drive', label: 'Drive', icon: 'folder' },
+      { id: 'sql', label: 'Generatore SQL', icon: 'chat' },
     ] },
     { id: 'adm', label: 'Amministrazione', items: [
       { id: 'ctr', label: 'Contratti', icon: 'file' },
