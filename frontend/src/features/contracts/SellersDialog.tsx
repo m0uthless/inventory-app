@@ -105,7 +105,7 @@ export default function SellersDialog({ open, onClose }: Props) {
     const errs: Record<string, string> = {}
     if (!form.name.trim()) errs.name = 'Il nome è obbligatorio.'
     // I promemoria di rinnovo vanno all'utente Archie collegato o all'email inserita a mano.
-    if (!form.user && !form.email.trim()) errs.email = "Indica l'email del venditore o collega un utente di Archie."
+    if (form.is_active && !form.user && !form.email.trim()) errs.email = "Indica l'email del venditore o collega un utente di Archie."
     if (Object.keys(errs).length) {
       setErrors(errs)
       return

@@ -515,3 +515,20 @@ def test_defaults_gives_reminder_days_from_settings():
     assert client.get("/api/contracts/defaults/").data == {"reminder_days": 90}
     set_settings({"contracts.reminder_default_days": 60})
     assert client.get("/api/contracts/defaults/").data == {"reminder_days": 60}
+
+
+def test_legacy_seller_without_email_can_be_deactivated():
+    s = Seller.objects.create(name="Vecchio venditore", email="")
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.patch(f"/api/sellers/{s.id}/", {"is_active": False}, format="json")
+    assert resp.status_code == 200, resp.data
+
+
+def test_legacy_portal_user_link_does_not_block_other_edits():
+    portal = User.objects.create_user(username=f"vecchio_portal_{uuid.uuid4().hex[:6]}", password="pw", email="p@x.it")
+    s = Seller.objects.create(name="Collegato al Portal", user=portal)
+    client = _client(_internal_user(SELLER_PERMS))
+    assert client.patch(f"/api/sellers/{s.id}/", {"phone": "051 123"}, format="json").status_code == 200
+    # Cambiare utente ricontrolla la regola.
+    other = User.objects.create_user(username=f"altro_portal_{uuid.uuid4().hex[:6]}", password="pw")
+    assert client.patch(f"/api/sellers/{s.id}/", {"user": other.id}, format="json").status_code == 400

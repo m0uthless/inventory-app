@@ -98,10 +98,14 @@ class SellerSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         user = attrs["user"] if "user" in attrs else getattr(self.instance, "user", None)
         email = attrs["email"] if "email" in attrs else getattr(self.instance, "email", "")
+        active = attrs["is_active"] if "is_active" in attrs else getattr(self.instance, "is_active", True)
         errors = {}
-        if user is not None and not (user.is_active and (user.is_superuser or user.has_perm("core.access_archie"))):
+        # L'utente si controlla solo quando cambia: un collegamento vecchio non blocca le altre modifiche.
+        user_changed = "user" in attrs and getattr(attrs["user"], "pk", None) != getattr(self.instance, "user_id", None)
+        if user_changed and user is not None and not (user.is_active and (user.is_superuser or user.has_perm("core.access_archie"))):
             errors["user"] = "Scegli un utente di Archie attivo."
-        if user is None and not (email or "").strip():
+        # Un venditore disattivato non riceve promemoria: l'email serve solo a quelli attivi.
+        if active and user is None and not (email or "").strip():
             errors["email"] = "Indica l'email del venditore o collega un utente di Archie."
         if errors:
             raise serializers.ValidationError(errors)
