@@ -77,3 +77,28 @@ def test_update_without_assignee_change_does_not_record_assigned_to():
     assert resp.status_code == 200, resp.data
 
     assert "assigned_to" not in (_last_update_event(issue).changes or {})
+
+
+
+@pytest.mark.parametrize("before, after", [("old", "new"), (None, "new"), ("old", None)])
+def test_area_change_is_recorded_in_audit_changes(before, after):
+    from attendance.models import LeaveArea
+
+    author = _user(superuser=True)
+    areas = {k: LeaveArea.objects.create(key=f"a_{uuid.uuid4().hex[:6]}", label=k) for k in ("old", "new")}
+    areas[None] = None
+    issue = _issue(author)
+    issue.area = areas[before]
+    issue.save(update_fields=["area"])
+
+    client = APIClient()
+    client.force_authenticate(user=author)
+    resp = client.patch(f"/api/issues/{issue.id}/", {"area": areas[after].id if areas[after] else None}, format="json")
+    assert resp.status_code == 200, resp.data
+
+    assert _last_update_event(issue).changes == {
+        "area": {
+            "from": to_change_value_for_field("area", areas[before]),
+            "to": to_change_value_for_field("area", areas[after]),
+        }
+    }

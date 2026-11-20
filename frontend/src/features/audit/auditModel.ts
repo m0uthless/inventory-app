@@ -138,7 +138,7 @@ export function objectTitle(e: AuditEvent): string {
 // ── Modifiche ──────────────────────────────────────────────────────────────
 
 const FIELD_LABELS: Record<string, string> = {
-  status: 'Stato', priority: 'Priorità', assignee: 'Assegnata a', assigned_to: 'Assegnata a', title: 'Titolo', name: 'Nome', display_name: 'Nome visualizzato',
+  status: 'Stato', priority: 'Priorità', assignee: 'Assegnata a', assigned_to: 'Assegnata a', area: 'Area', title: 'Titolo', name: 'Nome', display_name: 'Nome visualizzato',
   description: 'Descrizione', notes: 'Note', note: 'Note', customer: 'Cliente', site: 'Sito', type: 'Tipo', category: 'Categoria',
   notice_days: 'Preavviso (giorni)', billing_freq: 'Fatturazione', amount: 'Importo', total_value: 'Valore', start_date: 'Inizio', end_date: 'Fine',
   result: 'Esito', pdf_file: 'PDF', date: 'Data', date_from: 'Dal', date_to: 'Al', reason: 'Motivo', hostname: 'Hostname', ip: 'IP', email: 'Email',

@@ -77,7 +77,7 @@ type Props = {
 const DAY = 864e5
 
 const FIELD_LABEL: Record<string, string> = {
-  status: 'lo stato', priority: 'la priorità', assigned_to: "l'assegnatario", due_date: 'la scadenza',
+  status: 'lo stato', priority: 'la priorità', assigned_to: "l'assegnatario", area: "l'area", due_date: 'la scadenza',
   category: 'la categoria', servicenow_id: 'il caso ServiceNow', title: 'il titolo', description: 'la descrizione',
   waiting_reason: 'la causale di attesa', inventory: "l'inventario collegato", site: 'il sito', customer: 'il cliente', opened_at: "la data di apertura",
 }

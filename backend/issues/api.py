@@ -516,12 +516,14 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     # ── perform_update override ───────────────────────────────────────────────
 
     def perform_update(self, serializer):
-        """Audit diff limitato a status, priority e assegnatario — i campi chiave per i report."""
+        """Audit diff limitato a status, priority, assegnatario e area — i campi chiave per i report."""
         old = serializer.instance
         old_status       = old.status
         old_priority     = old.priority
         old_assigned_to_id = old.assigned_to_id
         old_assigned_to    = old.assigned_to
+        old_area_id        = old.area_id
+        old_area           = old.area
         issue = serializer.save()
         changes = {}
         if old_status   != issue.status:   changes["status"]   = {"from": old_status,   "to": issue.status}
@@ -531,6 +533,12 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             changes["assigned_to"] = {
                 "from": to_change_value_for_field("assigned_to", old_assigned_to),
                 "to":   to_change_value_for_field("assigned_to", issue.assigned_to),
+            }
+        # Il passaggio da un'area all'altra cambia chi può modificare la issue.
+        if old_area_id != issue.area_id:
+            changes["area"] = {
+                "from": to_change_value_for_field("area", old_area),
+                "to":   to_change_value_for_field("area", issue.area),
             }
         log_event(
             self.request.user,
