@@ -263,9 +263,9 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 ## Accesso Portal
 - Fatta il 2026-11-09 direttamente nello stile di Utenti e gruppi (senza anteprima, su richiesta di Fede): viste Tutti / Attivi / Sospesi / Anche in Archie, filtro Cliente dall'intestazione, colonne Utente, Livello, Cliente predefinito, Altri clienti, Archie, Ultimo accesso; la scheda utente si apre con la sezione Portal in cima (`portalFirst`).
 
-## Titolo nella linguetta (mockup, da riprendere)
+## ~~Titolo nella linguetta~~ (scartato)
 
-Fede (20/11): riprendiamolo, insieme al colore per modulo, con un'anteprima aggiornata in `design-previews`.
+Fede (20/11), dopo l'anteprima aggiornata `tm-base` (ora tolta, resta in git): scartato insieme al colore per modulo. Non riproporlo.
 
 Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.
 
@@ -273,7 +273,9 @@ Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / L
 - **[DEC] Pulsanti principali nella riga delle viste**, a destra dopo "Salva vista"; la riga dei pulsanti sopra gli indicatori sparisce. Su telefono tutto resta com'è.
 - **[UI] Se approvato**: va nella struttura generale (`layout/AppLayout.tsx`, `PageHead`) per tutte le pagine; le pagine senza viste tengono i pulsanti dove sono.
 
-## Colore per modulo (da riprendere, 20/11)
+## ~~Colore per modulo~~ (scartato, 20/11)
+
+Scartato da Fede il 20/11 dopo l'anteprima `tm-base`. Resta valida la regola di DESIGN.md «nessun colore proprio per i moduli».
 
 Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); anteprima `design-previews/hm-base.html` (Issue) e interruttore "Colori modulo" in `db-base.html`, file `design-previews/shared/modcolors.css|js`.
 
