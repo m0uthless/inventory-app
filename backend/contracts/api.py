@@ -354,6 +354,13 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
 
     # ── Indicatori della pagina ───────────────────────────────────────────────
 
+    @action(detail=False, methods=["get"], url_path="defaults")
+    def defaults(self, request):
+        """Valori proposti nel modulo «Nuovo contratto» (dalle Impostazioni di Archie)."""
+        from core.app_settings import get_setting
+
+        return Response({"reminder_days": int(get_setting("contracts.reminder_default_days"))})
+
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
         """Conteggi per stato e per scadenza, prossime scadenze e (con il permesso

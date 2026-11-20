@@ -507,3 +507,11 @@ def test_contract_list_has_no_reminders_field():
     _contract(customer)
     row = _client(_internal_user(["view_contract"])).get("/api/contracts/").data["results"][0]
     assert "reminders" not in row
+
+
+def test_defaults_gives_reminder_days_from_settings():
+    from core.app_settings import set_settings
+    client = _client(_internal_user(["view_contract", "add_contract"]))
+    assert client.get("/api/contracts/defaults/").data == {"reminder_days": 90}
+    set_settings({"contracts.reminder_default_days": 60})
+    assert client.get("/api/contracts/defaults/").data == {"reminder_days": 60}
