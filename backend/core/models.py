@@ -96,6 +96,11 @@ class AppSetting(TimeStampedModel):
     key = models.CharField(max_length=128, unique=True)
     value = models.TextField()
 
+    class Meta:
+        permissions = [
+            ("manage_app_settings", "Gestisce le impostazioni di Archie"),
+        ]
+
     def __str__(self):
         return self.key
 class UserProfile(models.Model):

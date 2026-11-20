@@ -55,6 +55,7 @@ from maintenance.api import (
     MaintenancePlanInventoryViewSet,
     TechViewSet,
 )
+from core.app_settings_api import AppSettingsView, ContractReminderTestEmailView
 from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView, WikiQueryViewSet, WikiQueryLanguageViewSet
 from issues.api import IssueViewSet, IssueCategoryViewSet
 from feedback.api import ReportRequestViewSet
@@ -196,6 +197,8 @@ urlpatterns = [
 
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
+    path("api/app-settings/", AppSettingsView.as_view()),
+    path("api/app-settings/contracts/test-email/", ContractReminderTestEmailView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
     path("api/me/logins/", MeLoginsView.as_view()),
     path("api/sticky-note/", StickyNoteView.as_view()),

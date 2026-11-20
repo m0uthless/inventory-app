@@ -58,6 +58,7 @@ _CATEGORY_COLORS = {
     "feedback": ("Bug e feature", "#fbe5e2", "#8f2a21"),
     "deadlines": ("Scadenze", "#e2f2eb", "#175a4c"),
     "account": ("Account", "#edf1f0", "#4a5956"),
+    "contracts": ("Contratti", "#efe9f7", "#5b3f8c"),
 }
 _TEMPLATE_CATEGORY = {
     "issue_created": "issue",
@@ -72,6 +73,8 @@ _TEMPLATE_CATEGORY = {
     "deadline_digest": "deadlines",
     "notifications_digest": "deadlines",
     "password_reset": "account",
+    "contract_reminder": "contracts",
+    "contract_reminder_test": "contracts",
 }
 
 
