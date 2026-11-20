@@ -106,3 +106,22 @@ def test_refresh_notifications_keeps_text2sql_notifications():
         worker.process_next()
     call_command("refresh_notifications")
     assert Notification.objects.filter(notification_type="text2sql_ready", source_key=str(q.pk)).exists()
+
+
+def test_command_startup_waits_for_migrations():
+    """Con le migrazioni non ancora applicate (deploy: migrate si lancia a mano dopo
+    l'avvio) il lavoratore non cade: riprova finché la tabella esiste."""
+    from django.db.utils import ProgrammingError
+    from text2sql.management.commands import text2sql_worker as cmd
+
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise ProgrammingError('relation "text2sql_text2sqlrequest" does not exist')
+        return 0
+
+    with mock.patch.object(cmd.worker, "requeue_interrupted", side_effect=flaky), mock.patch.object(cmd.time, "sleep") as sleep:
+        assert cmd.requeue_when_ready() == 0
+    assert calls["n"] == 3 and sleep.call_count == 2
