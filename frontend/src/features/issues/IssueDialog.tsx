@@ -15,7 +15,7 @@ import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 
 import { DatePill, Pill, QuickForm, SelectPill, StaticPill, TextPill } from '../../ui/campo'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
-import { assigneesForArea } from './issueUsers'
+import { assigneeChoices, keepsAssignee } from './issueUsers'
 import {
   PRIORITY_META,
   STATUS_META,
@@ -70,12 +70,13 @@ export default function IssueDialog({
   onClose, onSave, onOpenLinkInventory, onCustomerInputChange, onFormChange,
 }: IssueDialogProps) {
   const isClosed = editIssue?.status === 'closed'
-  const assignable = assigneesForArea(users, form.area_id)
+  // `users` sono tutti gli utenti: si propongono gli assegnabili dell'area, più l'assegnatario attuale.
+  const assignable = assigneeChoices(users, form.area_id, form.assigned_to_id, editIssue?.assigned_to === form.assigned_to_id ? (editIssue?.assigned_to_full_name || editIssue?.assigned_to_username) : null)
   // Cambiando area, un assegnatario che non ne fa parte si svuota con un avviso.
   const [areaNotice, setAreaNotice] = React.useState(false)
   React.useEffect(() => { if (open) setAreaNotice(false) }, [open])
   const setArea = (areaId: number | '') => {
-    const keep = form.assigned_to_id === '' || assigneesForArea(users, areaId).some((u) => u.id === form.assigned_to_id)
+    const keep = keepsAssignee(users, form.assigned_to_id, areaId)
     setAreaNotice(!keep)
     onFormChange((f) => ({ ...f, area_id: areaId, assigned_to_id: keep ? f.assigned_to_id : '' }))
   }

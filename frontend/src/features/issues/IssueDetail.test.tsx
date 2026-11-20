@@ -23,11 +23,18 @@ const issue = {
   due_date: null, days_open: 2, comments_count: 0, servicenow_external_url: null, created_at: '2026-11-16T08:40:00Z', updated_at: '2026-11-17T15:41:00Z', deleted_at: null,
 } as unknown as IssueRow
 
-const show = (over: Partial<IssueRow> = {}) => {
+// Marco (7) è assegnabile in Radiologia; io (5) sono assegnabile senza area; Lia (8) ha perso il permesso ed è in Sistemi.
+const USERS = [
+  { id: 7, label: 'Marco Bassi', username: 'mbassi', is_issue_assignee: true, leave_area: 4 },
+  { id: 5, label: 'Io', username: 'io', is_issue_assignee: true, leave_area: null },
+  { id: 8, label: 'Lia Neri', username: 'lneri', is_issue_assignee: false, leave_area: 5 },
+]
+
+const show = (over: Partial<IssueRow> = {}, users = USERS) => {
   const onPatch = vi.fn().mockResolvedValue(undefined)
   render(<ThemeProvider theme={theme}><MemoryRouter>
     <IssueDetail issue={{ ...issue, ...over }} onClose={vi.fn()} comments={[]} commentsLoading={false} events={[]} newComment="" sendingComment={false}
-      onNewCommentChange={vi.fn()} onSendComment={vi.fn()} users={[{ id: 7, label: 'Marco Bassi', username: 'mbassi', leave_area: 4 } as never]} categories={[{ id: 1, label: 'DICOM' }]} meId={5}
+      onNewCommentChange={vi.fn()} onSendComment={vi.fn()} users={users} categories={[{ id: 1, label: 'DICOM' }]} meId={5}
       areas={[{ id: 4, label: 'Radiologia' }, { id: 5, label: 'Sistemi' }]}
       onPatch={onPatch} onEdit={vi.fn()} onDelete={vi.fn()} onLinkInventory={vi.fn()} onOpenServiceNow={vi.fn()} />
   </MemoryRouter></ThemeProvider>)
@@ -92,5 +99,30 @@ describe('IssueDetail', () => {
   it('in sola lettura l\'area non si cambia', async () => {
     show({ area: 4, area_label: 'Radiologia', can_edit: false })
     expect(await screen.findByRole('button', { name: 'Area: cambia' })).toBeDisabled()
+  })
+
+  it('«Assegna a me» non compare a chi non è assegnabile', async () => {
+    show({}, USERS.map((u) => (u.id === 5 ? { ...u, is_issue_assignee: false } : u)))
+    expect(await screen.findByRole('button', { name: 'Segna come risolta' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Assegna a me' })).not.toBeInTheDocument()
+  })
+
+  it('«Assegna a me» non compare se la issue è di un\'area diversa dalla mia', async () => {
+    show({ area: 4, area_label: 'Radiologia', can_edit: true }, USERS.map((u) => (u.id === 5 ? { ...u, leave_area: 5 } : u)))
+    expect(await screen.findByRole('button', { name: 'Segna come risolta' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Assegna a me' })).not.toBeInTheDocument()
+  })
+
+  it('un assegnatario fuori area resta fra le scelte, selezionato', async () => {
+    show({ area: 4, area_label: 'Radiologia', can_edit: true, assigned_to: 8, assigned_to_full_name: 'Lia Neri' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Assegnata a: cambia' }))
+    expect(screen.getByRole('menuitem', { name: 'Lia Neri' })).toHaveClass('Mui-selected')
+  })
+
+  it('cambiando area si tiene l\'assegnatario della nuova area anche se ha perso il permesso', async () => {
+    const { onPatch } = show({ area: 4, area_label: 'Radiologia', can_edit: true, assigned_to: 8, assigned_to_full_name: 'Lia Neri' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Area: cambia' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sistemi' }))
+    expect(onPatch).toHaveBeenCalledWith({ area: 5 }, 'Area aggiornata')
   })
 })

@@ -202,7 +202,10 @@ def _label_for_wiki_link(entity_type: str, entity_id: int, user=None) -> str | N
 
         from issues.visibility import visible_issues_q
 
-        # Una issue fuori dalla visibilità dell'utente si mostra solo come «#id».
+        # Una issue fuori dalla visibilità dell'utente si mostra solo come «#id»;
+        # senza utente non si sa cosa può vedere, quindi niente titolo.
+        if user is None:
+            return f"#{entity_id}"
         title = Issue.objects.filter(visible_issues_q(user), pk=entity_id).values_list("title", flat=True).first()
         return f"#{entity_id} {title}" if title else f"#{entity_id}"
     return None

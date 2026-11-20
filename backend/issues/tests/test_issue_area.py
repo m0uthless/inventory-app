@@ -335,3 +335,48 @@ def test_generic_wiki_links_api_allows_own_area_issue():
     issue = _issue(area)
     resp = _client(me).post("/api/wiki-links/", {"page": _wiki_page().pk, "entity_type": "issue", "entity_id": issue.pk}, format="json")
     assert resp.status_code == 201, resp.json()
+
+
+# ── Revisione 20/11: area disattivata, doppia get_object() ──
+
+def _inactive_area(label="Spenta"):
+    area = _area(label)
+    area.is_active = False
+    area.save(update_fields=["is_active"])
+    return area
+
+
+def test_create_with_inactive_area_is_rejected():
+    area = _inactive_area()
+    resp = _client(_staff()).post("/api/issues/", {"title": "T", "customer": _customer().id, "area": area.id}, format="json")
+    assert resp.status_code == 400
+    assert "area" in resp.json()
+
+
+def test_move_to_inactive_area_is_rejected():
+    issue = _issue()
+    resp = _client(_staff()).patch(f"/api/issues/{issue.pk}/", {"area": _inactive_area().id}, format="json")
+    assert resp.status_code == 400
+    assert "area" in resp.json()
+
+
+def test_issue_already_in_inactive_area_stays_editable():
+    area = _area()
+    me = _staff(area)
+    issue = _issue(area)
+    area.is_active = False
+    area.save(update_fields=["is_active"])
+    resp = _client(me).patch(f"/api/issues/{issue.pk}/", {"title": "Nuovo", "area": area.id}, format="json")
+    assert resp.status_code == 200, resp.json()
+
+
+def test_patch_loads_issue_once():
+    from unittest import mock
+
+    from issues.api import IssueViewSet
+
+    issue = _issue()
+    with mock.patch.object(IssueViewSet, "get_object", autospec=True, side_effect=IssueViewSet.get_object) as spy:
+        resp = _client(_staff()).patch(f"/api/issues/{issue.pk}/", {"title": "Nuovo"}, format="json")
+    assert resp.status_code == 200
+    assert spy.call_count == 1

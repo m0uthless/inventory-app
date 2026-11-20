@@ -14,6 +14,7 @@ const areas = [{ id: 4, label: 'Radiologia' }, { id: 5, label: 'Sistemi' }]
 const users: UserOption[] = [
   { id: 1, label: 'Anna Radi', username: 'anna', is_issue_assignee: true, leave_area: 4 },
   { id: 2, label: 'Sara Sist', username: 'sara', is_issue_assignee: true, leave_area: 5 },
+  { id: 3, label: 'Ugo Ex', username: 'ugo', is_issue_assignee: false, leave_area: 4 },
 ]
 
 function Harness({ initial }: { initial: IssueFormData }) {
@@ -49,5 +50,23 @@ describe('IssueDialog · area', () => {
     fireEvent.click(screen.getByText('Assegna'))
     expect(screen.getByRole('option', { name: /Anna Radi/ })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Sara Sist/ })).not.toBeInTheDocument()
+  })
+
+  it('un assegnatario fuori area si vede ancora nel selettore', () => {
+    render(<Harness initial={{ ...createEmptyIssueForm(2, 4) }} />)
+    expect(screen.getByText('Sara Sist')).toBeInTheDocument()
+  })
+
+  it('chi non è assegnabile non si propone', () => {
+    render(<Harness initial={createEmptyIssueForm(undefined, 4)} />)
+    fireEvent.click(screen.getByText('Assegna'))
+    expect(screen.queryByRole('option', { name: /Ugo Ex/ })).not.toBeInTheDocument()
+  })
+
+  it('cambiare area si tiene l\'assegnatario della nuova area anche senza permesso', () => {
+    render(<Harness initial={{ ...createEmptyIssueForm(3, 5) }} />)
+    fireEvent.click(screen.getByText('Sistemi'))
+    fireEvent.click(screen.getByRole('option', { name: 'Radiologia' }))
+    expect(state()).toEqual({ area: 4, assignee: 3 })
   })
 })

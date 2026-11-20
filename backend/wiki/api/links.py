@@ -1,6 +1,7 @@
 """wiki/api/links.py — WikiLink serializer + ViewSet."""
 from __future__ import annotations
 
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.exceptions import PermissionDenied
@@ -76,7 +77,20 @@ class WikiLinkViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 qs = qs.filter(page_id=int(page_id))
             except (TypeError, ValueError):
                 qs = qs.none()
+        qs = self._hide_invisible_issue_links(qs)
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
+
+    def _hide_invisible_issue_links(self, qs):
+        """I collegamenti a issue di un'altra area non si vedono affatto: id e
+        note direbbero che la issue esiste e di cosa parla (vedi issues.visibility)."""
+        from issues.models import Issue
+        from issues.visibility import can_see_all_areas, visible_issues_q
+
+        user = self.request.user
+        if can_see_all_areas(user):
+            return qs
+        visible = Issue.objects.filter(visible_issues_q(user)).values("pk")
+        return qs.exclude(Q(entity_type=WikiEntityType.ISSUE) & ~Q(entity_id__in=visible))
 
     def _check_issue_link(self, entity_type, entity_id):
         """Un collegamento Wiki su una issue è una scrittura sulla issue: per le

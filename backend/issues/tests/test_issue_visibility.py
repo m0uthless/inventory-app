@@ -129,13 +129,53 @@ def test_inventory_active_issue_badge_false_when_only_other_area(world):
     assert inv["has_active_issue"] is False
 
 
-def test_wiki_link_label_hides_invisible_issue_title(world):
+def _wiki_link(issue, notes=""):
     from wiki.models import WikiLink, WikiPage
     page = WikiPage.objects.create(title="P", slug=f"p-{uuid.uuid4().hex[:6]}", content_markdown="# P", is_published=True)
-    link = WikiLink.objects.create(page=page, entity_type="issue", entity_id=world["ib"].pk)
-    data = _client(_user(world["a"])).get(f"/api/wiki-links/{link.pk}/").json()
-    assert data["entity_label"] == f"#{world['ib'].pk}"
-    assert "Issue" not in data["entity_label"]
+    return WikiLink.objects.create(page=page, entity_type="issue", entity_id=issue.pk, notes=notes)
+
+
+def test_wiki_links_list_hides_links_to_invisible_issues(world):
+    visible, hidden = _wiki_link(world["ia"]), _wiki_link(world["ib"], notes="segreto")
+    ids = _ids(_client(_user(world["a"])).get("/api/wiki-links/?entity_type=issue").json())
+    assert visible.pk in ids
+    assert hidden.pk not in ids
+
+
+def test_wiki_link_detail_of_invisible_issue_is_404(world):
+    link = _wiki_link(world["ib"])
+    assert _client(_user(world["a"])).get(f"/api/wiki-links/{link.pk}/").status_code == 404
+
+
+def test_wiki_links_of_invisible_issue_visible_with_permission(world):
+    link = _wiki_link(world["ib"])
+    user = _user(world["a"])
+    user.user_permissions.add(Permission.objects.get(codename="view_all_areas"))
+    user = User.objects.get(pk=user.pk)
+    assert link.pk in _ids(_client(user).get("/api/wiki-links/").json())
+
+
+def test_wiki_links_to_other_entities_unaffected(world):
+    from wiki.models import WikiLink, WikiPage
+    page = WikiPage.objects.create(title="P", slug=f"p-{uuid.uuid4().hex[:6]}", content_markdown="# P", is_published=True)
+    link = WikiLink.objects.create(page=page, entity_type="customer", entity_id=world["customer"].pk)
+    assert link.pk in _ids(_client(_user(world["a"])).get("/api/wiki-links/").json())
+
+
+def test_wiki_link_restore_of_invisible_issue_is_404(world):
+    from django.utils import timezone
+    link = _wiki_link(world["ib"])
+    link.deleted_at = timezone.now()
+    link.save(update_fields=["deleted_at"])
+    resp = _client(_user(world["a"])).post(f"/api/wiki-links/{link.pk}/restore/")
+    assert resp.status_code == 404
+    link.refresh_from_db()
+    assert link.deleted_at is not None
+
+
+def test_wiki_link_label_without_user_hides_issue_title(world):
+    from wiki.api.helpers import _label_for_wiki_link
+    assert _label_for_wiki_link("issue", world["ib"].pk, None) == f"#{world['ib'].pk}"
 
 
 def test_audit_events_hide_invisible_issues(world):
@@ -179,3 +219,45 @@ def test_summary_without_area(world):
 def test_summary_by_area_still_respects_visibility(world):
     me = _user(world["a"])
     assert _client(me).get("/api/issues/summary/", {"area": world["b"].pk}).json()["active_count"] == 0
+
+
+# ── Test mancanti (revisione 20/11) ──
+
+def test_customer_active_issue_count_ignores_other_area(world):
+    c = _client(_user(world["a"]))
+    assert c.get(f"/api/customers/{world['customer'].pk}/").json()["active_issue_count"] == 1
+    world["ia"].delete()
+    world["i0"].delete()
+    assert c.get(f"/api/customers/{world['customer'].pk}/").json()["active_issue_count"] == 0
+
+
+def test_customers_summary_counts_only_visible(world):
+    data = _client(_user(world["a"])).get("/api/customers/summary/").json()
+    assert data["open_issues"] == 2
+    assert data["top_open_issues"]["count"] == 2
+
+
+def test_sites_summary_counts_only_visible(world):
+    data = _client(_user(world["a"])).get("/api/sites/summary/").json()
+    assert data["open_issues"] == 2
+    assert data["top_open_issues_list"][0]["count"] == 2
+
+
+def test_inventories_summary_priority_only_visible(world):
+    data = _client(_user(world["a"])).get("/api/inventories/summary/").json()
+    assert data["with_issue"] == 1
+    assert data["issue_priority"]["critical"] == 0
+    assert data["issue_priority"]["medium"] == 1
+
+
+def test_superuser_with_area_in_profile_sees_all(world):
+    su = User.objects.create_superuser(username=f"su_{uuid.uuid4().hex[:6]}", password="pw", email="su2@example.com")
+    profile, _ = UserProfile.objects.get_or_create(user=su)
+    profile.leave_area = world["a"]
+    profile.save(update_fields=["leave_area"])
+    su = User.objects.get(pk=su.pk)
+    c = _client(su)
+    ids = _ids(c.get("/api/issues/").json())
+    assert {world["ia"].pk, world["ib"].pk, world["i0"].pk} <= ids
+    assert c.get(f"/api/issues/{world['ib'].pk}/").json()["can_edit"] is True
+    assert c.get(f"/api/customers/{world['customer'].pk}/").json()["open_issues_count"] == 3

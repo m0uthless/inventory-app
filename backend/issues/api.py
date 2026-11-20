@@ -248,6 +248,11 @@ class IssueSerializer(serializers.ModelSerializer):
         # come per i task di area.
         current_area_id = getattr(self.instance, "area_id", None)
         area_changed = "area" in attrs and getattr(attrs["area"], "pk", None) != current_area_id
+        # Un'area disattivata o nel cestino non si sceglie più; le issue che ci
+        # stanno già restano modificabili.
+        new_area = attrs.get("area") if area_changed else None
+        if new_area is not None and (not new_area.is_active or new_area.deleted_at is not None):
+            errors["area"] = f"L'area «{new_area.label}» non è più attiva."
         if (area_changed or assignee_changed) and "assigned_to" not in errors:
             area = attrs["area"] if "area" in attrs else getattr(self.instance, "area", None)
             assignee = attrs["assigned_to"] if "assigned_to" in attrs else getattr(self.instance, "assigned_to", None)
@@ -560,8 +565,17 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             raise PermissionDenied("Puoi modificare solo le issue della tua area.")
 
     def update(self, request, *args, **kwargs):
-        self._check_issue_area(self.get_object())
-        return super().update(request, *args, **kwargs)
+        # Come UpdateModelMixin.update, ma la issue si carica una volta sola:
+        # serve prima per il controllo d'area, poi per il salvataggio.
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        self._check_issue_area(instance)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+        return Response(serializer.data)
 
     def perform_destroy(self, instance):
         self._check_issue_area(instance)

@@ -20,7 +20,7 @@ import { PERMS } from '../../auth/perms'
 import IssueProcedure, { NextStepCard } from './IssueProcedure'
 import { useIssueWiki } from './useIssueWiki'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
-import { assigneesForArea } from './issueUsers'
+import { assigneeChoices, canSelfAssign, keepsAssignee } from './issueUsers'
 import {
   PRIORITY_META, STATUS_META, WAITING_REASON_META, fmtIssueDate, fmtIssueDateTime,
   issueAuthorInitials, issueAuthorName, issueInventoryLabel,
@@ -202,7 +202,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
   // Cambio d'area al volo: un assegnatario che non fa parte della nuova area si toglie.
   const pickArea = (areaId: number | null) => {
     if (areaId === issue.area) return
-    const keep = !issue.assigned_to || assigneesForArea(p.users, areaId).some((u) => u.id === issue.assigned_to)
+    const keep = keepsAssignee(p.users, issue.assigned_to, areaId)
     if (keep) void p.onPatch({ area: areaId }, 'Area aggiornata')
     else void p.onPatch({ area: areaId, assigned_to: null }, "Area aggiornata. L'assegnatario non fa parte della nuova area: è stato tolto.")
   }
@@ -344,9 +344,9 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
                   ...(p.areas ?? []).map((a) => ({ value: String(a.id), label: a.label, selected: issue.area === a.id }))]}
                 onPick={(val) => pickArea(val ? Number(val) : null)} />
               <QuickPick label="Assegnata a" wide disabled={!canChange} value={assignee}
-                options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box>, selected: !issue.assigned_to }, ...assigneesForArea(p.users, issue.area).map((u) => ({ value: String(u.id), label: u.label, selected: issue.assigned_to === u.id }))]}
+                options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box>, selected: !issue.assigned_to }, ...assigneeChoices(p.users, issue.area, issue.assigned_to, issue.assigned_to_full_name || issue.assigned_to_username).map((u) => ({ value: String(u.id), label: u.label, selected: issue.assigned_to === u.id }))]}
                 onPick={(val) => void p.onPatch({ assigned_to: val ? Number(val) : null }, 'Assegnatario aggiornato')}
-                after={!issue.assigned_to && canChange && p.meId != null ? <Button size="small" onClick={() => void p.onPatch({ assigned_to: p.meId! }, 'Assegnata a te')} sx={{ minWidth: 0, px: 0.5 }}>Assegna a me</Button> : null} />
+                after={!issue.assigned_to && canChange && canSelfAssign(p.users, p.meId, issue.area) ? <Button size="small" onClick={() => void p.onPatch({ assigned_to: p.meId! }, 'Assegnata a te')} sx={{ minWidth: 0, px: 0.5 }}>Assegna a me</Button> : null} />
               <RecordField editing={editing} type="date" label="Scadenza" value={v.due_date} onChange={set('due_date')} dirty={isDirty('due_date')} show={(x) => fmtIssueDate(x)} />
               {editing ? (
                 <RecordSelect label="Categoria" value={draft.category} onChange={set('category')} dirty={isDirty('category')}

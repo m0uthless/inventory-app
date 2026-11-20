@@ -17,10 +17,6 @@ export function toUserOption(v: unknown): UserOption | null {
 /** Assegnabili alle issue: chi ha il permesso di gruppo «Può essere assegnatario delle issue». */
 export const issueAssignees = (users: UserOption[]): UserOption[] => users.filter((u) => u.is_issue_assignee)
 
-/** Con un'area si propongono solo i membri di quell'area; senza area tutti. */
-export const assigneesForArea = (users: UserOption[], areaId: number | '' | null | undefined): UserOption[] =>
-  areaId === '' || areaId == null ? users : users.filter((u) => u.leave_area === areaId)
-
 /** Scelta del menu «Area» della pagina Issue (per chi vede tutte le aree). */
 export type AreaChoice = 'all' | 'mine' | 'none' | number
 
@@ -41,4 +37,30 @@ export const defaultAreaChoice = (myArea: number | null): AreaChoice => (myArea 
 export function afterSaveOutcome(updated: { area: number | null; can_edit: boolean }, canSeeAll: boolean, myArea: number | null): 'ok' | 'readonly' | 'hidden' {
   if (updated.can_edit !== false) return 'ok'
   return !canSeeAll && myArea != null && updated.area != null && updated.area !== myArea ? 'hidden' : 'readonly'
+}
+
+const sameArea = (u: UserOption, areaId: number | '' | null | undefined) => areaId === '' || areaId == null || u.leave_area === areaId
+
+/** Scelte del selettore «Assegnata a» (`users` = tutti gli utenti): gli assegnabili
+ *  dell'area più l'assegnatario attuale, anche se è fuori area o ha perso il permesso,
+ *  così il selettore non resta vuoto. */
+export function assigneeChoices(users: UserOption[], areaId: number | '' | null | undefined, currentId: number | '' | null | undefined, currentLabel?: string | null): UserOption[] {
+  const choices = users.filter((u) => u.is_issue_assignee && sameArea(u, areaId))
+  if (currentId === '' || currentId == null || choices.some((u) => u.id === currentId)) return choices
+  const current = users.find((u) => u.id === currentId)
+  return [...choices, current ?? { id: currentId, label: currentLabel || `#${currentId}`, username: '', is_issue_assignee: false, leave_area: null }]
+}
+
+/** Cambiando area l'assegnatario resta se ne fa parte (come controlla il backend,
+ *  che sul solo cambio d'area non ricontrolla il permesso). */
+export function keepsAssignee(users: UserOption[], assigneeId: number | '' | null | undefined, areaId: number | '' | null | undefined): boolean {
+  if (assigneeId === '' || assigneeId == null || areaId === '' || areaId == null) return true
+  return users.find((u) => u.id === assigneeId)?.leave_area === areaId
+}
+
+/** «Assegna a me» solo a chi è assegnabile nell'area della issue. */
+export function canSelfAssign(users: UserOption[], meId: number | null | undefined, areaId: number | '' | null | undefined): boolean {
+  if (meId == null) return false
+  const me = users.find((u) => u.id === meId)
+  return Boolean(me?.is_issue_assignee && sameArea(me, areaId))
 }

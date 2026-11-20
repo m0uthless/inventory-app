@@ -1551,7 +1551,7 @@ export default function Issues() {
         customerLoading={custFormLoading}
         siteOptions={siteOptions}
         categories={categories}
-        users={assignableUsers}
+        users={users}
         areas={areas}
         pendingInventory={pendingInventory}
         onClose={() => setFormOpen(false)}
@@ -1671,7 +1671,7 @@ export default function Issues() {
         sendingComment={sendingComment}
         onNewCommentChange={setNewComment}
         onSendComment={handleSendComment}
-        users={assignableUsers}
+        users={users}
         areas={areas}
         categories={categories}
         meId={me?.id}
