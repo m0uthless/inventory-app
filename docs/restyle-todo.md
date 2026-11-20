@@ -315,7 +315,8 @@ Spec: `docs/superpowers/specs/2026-11-19-issue-area-assignee-groups-design.md`. 
 - **Deploy in produzione:**
   - lanciare `migrate` (`servicenow.0012`, `issues.0009`–`0011`, `core.0048`);
   - dare ai gruppi i tre permessi «È tecnico ServiceNow», «Può essere assegnatario delle issue» e «Vede le issue di tutte le aree». Finché mancano i primi due nessuno è assegnabile e l'email «nuova issue» non parte.
-- **[UI] Verifica nel browser** (non fatta): selettore d'area accanto al titolo, Area nei Dettagli, sola lettura per le altre aree, menu col tasto destro di Contratti, Piani, Rapportini e Drive.
+- ~~**[UI] Verifica nel browser**~~ fatta il 20/11 (Playwright): selettore d'area, Area nei Dettagli, assegnatario fuori area, cambio d'area, issue invisibile senza permesso, sola lettura con il permesso, menu col tasto destro di Contratti, Piani, Rapportini e Drive.
+- **[UI] Link a una issue invisibile** (`/issues?open=<id>` di un'altra area): compare l'avviso in inglese «No Issue matches the given query.» (messaggio 404 grezzo di DRF). Meglio un testo italiano, es. «Issue non trovata o non visibile».
 - ~~**Rimandati dalla revisione e test mancanti**~~ fatti il 20/11: area disattivata rifiutata, assegnatario fuori area o senza permesso visibile nel selettore e tenuto al cambio d'area, «Assegna a me» solo agli assegnabili, una sola `get_object()`, titolo della issue convertita nascosto nei task di altre aree, `/api/wiki-links/` senza i link a issue invisibili (404 su dettaglio e ripristino), etichetta Wiki senza utente senza titolo; test per conteggi e riepiloghi di crm e inventory e per il superuser con un'area.
 - **[DEC] Philips:** oggi non servono. Idea di Fede (20/11): spostare il flag Philips dal singolo utente all'appartenenza a un gruppo «Philips», così potranno avere i permessi di gruppo come gli altri. Da valutare quando torneranno.
 
@@ -331,7 +332,7 @@ Spec: `docs/superpowers/specs/2026-11-20-text2sql-design.md`; anteprima `design-
   5. dare il permesso «Usa il generatore SQL PACS» ai gruppi dei tecnici.
 - **[DEC] Dove far girare Ollama in produzione** e con quale modello. Su Poseidon il prototipo usa `qwen2.5-coder:3b`.
 - **Dev:** `.env.dev` punta all'Ollama del prototipo (`http://t2s-ollama:11434`). Dopo ogni ricreazione del container `text2sql-worker` va ripetuto `docker network connect text2sql-test_default inventory-app-text2sql-worker-1`.
-- **[UI] Verifica nel browser** della pagina (non fatta): stati, giudizio, Revisione, telefono.
+- ~~**[UI] Verifica nel browser**~~ fatta il 20/11: domanda vera all'Ollama del prototipo (28 s), campanella che si ferma alla risposta, notifica segnata letta, giudizio «Da correggere», Revisione, risposta in vista su telefono.
 - ~~**Rimandati dalla revisione**~~ fatti il 20/11: campanella veloce che si ferma alla risposta (`features/text2sql/pending.ts`), `?apri` oltre le prime 50 domande e notifica segnata con `POST /text2sql/{id}/seen/`, notifica tolta cancellando la domanda, righe dell'elenco come pulsanti, risposta portata in vista su telefono; limiti di lunghezza, Redis nel `depends_on`, un solo lavoratore con advisory lock di Postgres, admin solo per il superuser.
 - ~~**[BE] Query della Wiki come esempi**~~ fatto il 20/11: tutte le Query in SQL Oracle (`T2S_WIKI_LANGUAGE`, predefinito `sql`; in produzione controllare che la chiave del linguaggio sia questa).
 
@@ -354,3 +355,10 @@ Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Cont
 - **Task di area convertito in issue poi cestinata**: permettere la riconversione in una issue nuova; il badge dice che la issue è nel cestino.
 - **Contratti**: il PDF si scarica **e si vede** solo con `view_contract_value`. I ritocchi estetici della finestra vanno nella fase 2.
 - **Issue, pezzi dell'anteprima**: restano solo Allegati e «Dove intervenire» completo.
+
+## Task di area: verifica nel browser (20/11)
+
+- Fatta: issue collegata nel cestino (avviso, riconversione, «Issue #N nel cestino» in elenco), filtri a 1366 px, apertura con Invio.
+- **[UI] Esc nella finestra del task**: aperto con Invio dall'elenco, il primo Esc non chiude la finestra, serve il secondo. In Issue e Contratti il primo Esc chiude. Preesistente, causa da cercare.
+- Dati dev: il task T-4 è collegato alla issue #17 ma è «In attesa», non completato (dato di prova).
+
