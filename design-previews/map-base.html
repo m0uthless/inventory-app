@@ -49,7 +49,7 @@ h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
 .var-h span { font-size: 14px; font-weight: 600; }
 .var-p { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; min-height: 54px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
-.card h3 { margin: 0 0 12px; font-size: 15px; font-weight: 650; }
+.card h2 { margin: 0 0 12px; font-size: 15px; font-weight: 650; }
 .map { height: 170px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); position: relative; background: var(--m-land); }
 .addr { margin-top: 10px; font-size: 13px; }
 .addr b { display: block; font-weight: 600; }
@@ -64,7 +64,7 @@ h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
 /* Segnaposto dell'app */
 .pin { width: 26px; height: 34px; filter: drop-shadow(0 2px 3px rgb(0 0 0 / .25)); }
 .pin path { fill: var(--primary); } .pin circle { fill: var(--surface); }
-.maplibregl-ctrl-attrib { font-size: 9.5px; }
+.maplibregl-ctrl-attrib { font-size: 12px; }
 .maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib.maplibregl-compact { background: color-mix(in srgb, var(--surface) 85%, transparent) !important; color: var(--muted); }
 .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
 .maplibregl-ctrl-attrib-button { filter: var(--attrib-btn, none); }
@@ -85,7 +85,7 @@ h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
 .btn svg { width: 14px; height: 14px; }
 .c-meta { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); display: grid; grid-template-columns: auto minmax(0,1fr); gap: 4px 12px; font-size: 12.5px; }
 .c-meta span { color: var(--muted); }
-.c-attr { margin: 8px 0 0; font-size: 10.5px; color: var(--faint); }
+.c-attr { margin: 8px 0 0; font-size: 12px; color: var(--faint); }
 .thumb .maplibregl-canvas-container, .thumb canvas { border-radius: 10px; }
 /* Mappa ingrandita */
 .big-bg { position: fixed; inset: 0; background: rgb(10 20 18 / .45); display: grid; place-items: center; padding: 16px; z-index: 2000; }
@@ -109,7 +109,7 @@ h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
     <section>
       <div class="var-h"><b>A</b><span>Mappa chiara</span></div>
       <p class="var-p">Lo stile chiaro già pronto di OpenFreeMap (Positron, e il suo scuro nel tema scuro) al posto dei riquadri colorati di OpenStreetMap; segnaposto nel verde dell'app. Sobria, ma con i grigi suoi e non quelli di Archie.</p>
-      <div class="card"><h3>Dove</h3>
+      <div class="card"><h2>Dove</h2>
         <div class="map" id="map-a"><div class="fallback">Caricamento della mappa…</div>
           <div class="tools"><button class="tool" type="button" data-big="a" aria-label="Ingrandisci la mappa" title="Ingrandisci">⤢</button></div></div>
         <div class="addr"><b>Via di Corticella 120</b><span>40128 Bologna (BO) · <a href="#" onclick="return false">Apri nelle mappe</a></span></div>
@@ -119,7 +119,7 @@ h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
     <section>
       <div class="var-h"><b>B</b><span>Mappa nei colori dell'app</span></div>
       <p class="var-p">Mappa vettoriale (MapLibre + OpenFreeMap) ricolorata con i colori di Archie: terra acciaio, acqua grigio-azzurra, verde chirurgico solo per il segnaposto. Nitida su ogni schermo e coerente col tema.</p>
-      <div class="card"><h3>Dove</h3>
+      <div class="card"><h2>Dove</h2>
         <div class="map" id="map-b"><div class="fallback">Caricamento della mappa…</div>
           <div class="tools"><button class="tool" type="button" data-big="b" aria-label="Ingrandisci la mappa" title="Ingrandisci">⤢</button></div></div>
         <div class="addr"><b>Via di Corticella 120</b><span>40128 Bologna (BO) · <a href="#" onclick="return false">Apri nelle mappe</a></span></div>
@@ -129,7 +129,7 @@ h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
     <section>
       <div class="var-h"><b>C</b><span>Indirizzo in primo piano</span></div>
       <p class="var-p">L'indirizzo in primo piano con una miniatura ferma (nei colori dell'app) per orientarsi, e i pulsanti per aprirlo nell'app di mappe, copiarlo o vedere la mappa grande. Occupa meno spazio delle altre.</p>
-      <div class="card"><h3>Dove</h3>
+      <div class="card"><h2>Dove</h2>
         <div class="c-head">
           <div class="thumb" id="thumb"><svg class="pin static" viewBox="0 0 26 34" aria-hidden="true"><path d="M13 0C5.8 0 0 5.7 0 12.8 0 22.4 13 34 13 34s13-11.6 13-21.2C26 5.7 20.2 0 13 0z"/><circle cx="13" cy="12.8" r="4.6"/></svg></div>
           <div class="c-addr"><b>Via di Corticella 120</b><span>40128 Bologna (BO)</span></div>
