@@ -17,10 +17,40 @@ from core.technicians import eligible_issue_assignee_q, is_eligible_issue_assign
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
-from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
+from issues.models import Issue, IssueAttachment, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
 from issues.visibility import own_area_q, user_area_id, visible_issues_q
 from servicenow.models import ServiceNowCase
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from django.core.exceptions import ValidationError as DjangoValidationError
+from core.media import protected_media_response
+from core.uploads import sniff_mime, validate_upload
+
+# Allegati (spec 2026-11-20): 25 MB, tipi d'ufficio e di diagnostica.
+ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024
+ATTACHMENT_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "gif", "webp", "txt", "log", "csv", "zip", "docx", "xlsx"]
+_ZIPS = {"application/zip", "application/x-zip-compressed",
+         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+_REAL_MIME = {
+    "pdf": {"application/pdf"}, "png": {"image/png"}, "jpg": {"image/jpeg"}, "jpeg": {"image/jpeg"},
+    "gif": {"image/gif"}, "webp": {"image/webp"}, "zip": _ZIPS, "docx": _ZIPS, "xlsx": _ZIPS,
+}
+
+
+def _attachment_content_matches(f):
+    """Il contenuto deve corrispondere all'estensione (un .png deve essere davvero un PNG); i testi
+    (txt, log, csv) devono essere testo."""
+    ext = (f.name.rsplit(".", 1)[-1] if "." in f.name else "").lower()
+    real = sniff_mime(f)
+    if not real:
+        return
+    if ext in ("txt", "log", "csv"):
+        ok = real.startswith("text/") or real in ("application/csv", "inode/x-empty", "application/x-empty")
+    else:
+        ok = real in _REAL_MIME.get(ext, set())
+    if not ok:
+        raise DjangoValidationError(f"Il contenuto del file non corrisponde a un .{ext} ({real}).")
 from portal.permissions import IsInternalOrPortalDedicatedApp
 
 User = get_user_model()
@@ -95,6 +125,7 @@ class IssueSerializer(serializers.ModelSerializer):
     status_label            = serializers.CharField(source="get_status_display",         read_only=True)
     waiting_reason_label    = serializers.CharField(source="get_waiting_reason_display", read_only=True)
     comments_count          = serializers.SerializerMethodField()
+    attachments_count       = serializers.SerializerMethodField()
     days_open               = serializers.SerializerMethodField()
     servicenow_external_url = serializers.SerializerMethodField()
     area_label              = serializers.CharField(source="area.label", read_only=True, default=None)
@@ -143,6 +174,9 @@ class IssueSerializer(serializers.ModelSerializer):
 
     def get_comments_count(self, obj):
         return getattr(obj, "comments_count", 0)
+
+    def get_attachments_count(self, obj):
+        return getattr(obj, "attachments_count", None) or 0
 
     def get_servicenow_external_url(self, obj):
         # Valorizzato via annotazione (Subquery) sul queryset del ViewSet;
@@ -294,7 +328,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "waiting_reason", "waiting_reason_label",
             "opened_at", "closed_at", "days_open",
             "due_date",
-            "comments_count",
+            "comments_count", "attachments_count",
             "servicenow_external_url",
             "created_at", "updated_at", "deleted_at",
         ]
@@ -305,7 +339,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "assigned_to_username", "assigned_to_full_name", "assigned_to_avatar",
             "created_by_username", "created_by_full_name",
             "priority_label", "status_label", "waiting_reason_label",
-            "comments_count", "days_open", "closed_at", "servicenow_external_url",
+            "comments_count", "attachments_count", "days_open", "closed_at", "servicenow_external_url",
             "area_label", "can_edit",
         ]
         extra_kwargs = {
@@ -495,6 +529,11 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         ).annotate(
             comments_count=Count("comments"),
             servicenow_external_url=Subquery(external_url_sq),
+            # Sottoquery: un secondo Count sulla stessa join moltiplicherebbe i commenti.
+            attachments_count=Subquery(
+                IssueAttachment.objects.filter(issue=OuterRef("pk")).order_by().values("issue")
+                .annotate(n=Count("id")).values("n")[:1]
+            ),
         )
         # Visibilità per area: chi non ha `issues.view_all_areas` vede solo la
         # propria area e le issue senza area (le altre rispondono 404).
@@ -843,6 +882,89 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         return Response(self._wiki_link_payload(link))
 
     # ── Comments nested endpoint ──────────────────────────────────────────────
+
+    # ── Allegati (spec 2026-11-20) ─────────────────────────────────────────────
+
+    def _attachment_row(self, att: IssueAttachment) -> dict:
+        u = att.uploaded_by
+        url = (f"/api/drive-files/{att.drive_file_id}/download/" if att.drive_file_id
+               else f"/api/issues/{att.issue_id}/attachments/{att.pk}/download/")
+        return {
+            "id": att.pk, "name": att.name, "size": att.size, "mime_type": att.mime_type, "from_task": att.from_task,
+            "url": url, "created_at": att.created_at,
+            "uploaded_by_name": (f"{u.first_name} {u.last_name}".strip() or u.username) if u else None,
+        }
+
+    def _visible_attachments(self, issue: Issue, user) -> list[IssueAttachment]:
+        """Allegati visibili: i file caricati, e i collegamenti al Drive solo se l'utente vede quel file."""
+        from drive.access import has_file_access
+
+        out = []
+        for att in issue.attachments.select_related("uploaded_by", "drive_file"):
+            if att.file:
+                out.append(att)
+            elif att.drive_file_id and att.drive_file.deleted_at is None and has_file_access(user, att.drive_file):
+                out.append(att)
+        return out
+
+    def _check_can_attach(self, request, issue: Issue):
+        if not request.user.has_perm("issues.change_issue"):
+            raise PermissionDenied("Non hai il permesso di modificare le issue.")
+        self._check_issue_area(issue)
+        if issue.status == IssueStatus.CLOSED:
+            raise serializers.ValidationError({"detail": "Issue chiusa: allegati in sola lettura."})
+
+    @action(detail=True, methods=["get", "post"], url_path="attachments",
+            permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def attachments(self, request, pk=None):
+        if not request.user.has_perm("issues.view_issue"):
+            raise PermissionDenied()
+        issue = self.get_object()
+        if request.method == "GET":
+            return Response([self._attachment_row(a) for a in self._visible_attachments(issue, request.user)])
+        self._check_can_attach(request, issue)
+        files = request.FILES.getlist("file")
+        if not files:
+            raise serializers.ValidationError({"file": "Scegli almeno un file."})
+        for f in files:
+            validate_upload(f, label="file", max_bytes=ATTACHMENT_MAX_BYTES, allowed_extensions=ATTACHMENT_EXTENSIONS,
+                            content_validator=_attachment_content_matches)
+        created = []
+        for f in files:
+            att = IssueAttachment.objects.create(issue=issue, file=f, name=f.name[:255], size=f.size or 0,
+                                                 mime_type=(getattr(f, "content_type", "") or "")[:127], uploaded_by=request.user)
+            created.append(att)
+            log_event(request.user, action="update", instance=issue, changes={"allegati": {"from": None, "to": att.name}}, request=request)
+        return Response([self._attachment_row(a) for a in created], status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["delete"], url_path=r"attachments/(?P<att_pk>\d+)",
+            permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp])
+    def attachment_detail(self, request, pk=None, att_pk=None):
+        if not request.user.has_perm("issues.view_issue"):
+            raise PermissionDenied()
+        issue = self.get_object()
+        self._check_can_attach(request, issue)
+        att = issue.attachments.filter(pk=att_pk).first()
+        if att is None:
+            return Response({"detail": "Allegato non trovato."}, status=status.HTTP_404_NOT_FOUND)
+        name = att.name
+        if att.file:
+            att.file.delete(save=False)
+        att.delete()
+        log_event(request.user, action="update", instance=issue, changes={"allegati": {"from": name, "to": None}}, request=request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"], url_path=r"attachments/(?P<att_pk>\d+)/download",
+            permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp])
+    def attachment_download(self, request, pk=None, att_pk=None):
+        if not request.user.has_perm("issues.view_issue"):
+            raise PermissionDenied()
+        issue = self.get_object()
+        att = issue.attachments.filter(pk=att_pk).exclude(file="").first()
+        if att is None:
+            return Response({"detail": "Allegato non trovato."}, status=status.HTTP_404_NOT_FOUND)
+        inline = att.mime_type.startswith("image/") or att.mime_type == "application/pdf"
+        return protected_media_response(file_field=att.file, disposition="inline" if inline else "attachment", filename=att.name)
 
     @action(detail=True, methods=["get", "post"], url_path="comments")
     def comments(self, request, pk=None):

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
 
-from issues.models import Issue, IssueCategory, IssueComment
+from issues.models import Issue, IssueAttachment, IssueCategory, IssueComment
 
 
 @admin.register(IssueCategory)
@@ -44,3 +44,16 @@ class IssueCommentAdmin(admin.ModelAdmin):
     list_filter   = ("created_at",)
     search_fields = ("body", "author__username", "issue__title")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(IssueAttachment)
+class IssueAttachmentAdmin(admin.ModelAdmin):
+    """Allegati delle issue: solo consultazione (si gestiscono dalla finestra della issue)."""
+
+    list_display = ("name", "issue", "from_task", "size", "uploaded_by", "created_at")
+    list_filter = ("from_task",)
+    search_fields = ("name",)
+    readonly_fields = ("issue", "file", "drive_file", "name", "size", "mime_type", "from_task", "uploaded_by", "created_at")
+
+    def has_add_permission(self, request):
+        return False

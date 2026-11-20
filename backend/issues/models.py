@@ -210,3 +210,31 @@ class IssueComment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.author_id} on Issue #{self.issue_id}"
+
+
+
+def issue_attachment_path(instance, filename):
+    # Cartella protetta: nginx la blocca, i file passano solo da /api/issues/{id}/attachments/.
+    return f"issue_attachments/{instance.issue_id}/{filename}"
+
+
+class IssueAttachment(models.Model):
+    """Allegato di una issue (spec 2026-11-20): un file caricato oppure un collegamento a un file del
+    Drive (gli allegati ereditati da un task di area, con `from_task`). Esattamente uno dei due."""
+
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="attachments")
+    file = models.FileField(upload_to=issue_attachment_path, blank=True, max_length=500)
+    drive_file = models.ForeignKey("drive.DriveFile", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    name = models.CharField(max_length=255)
+    size = models.PositiveBigIntegerField(default=0)
+    mime_type = models.CharField(max_length=127, blank=True)
+    from_task = models.BooleanField(default=False)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["issue", "created_at"], name="issueatt_issue_idx")]
+
+    def __str__(self):
+        return f"{self.name} (issue #{self.issue_id})"
