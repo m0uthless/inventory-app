@@ -326,7 +326,8 @@ def test_soft_delete_and_restore():
 # ─── Venditori ───────────────────────────────────────────────────────────────
 
 def test_sellers_crud_and_user_link():
-    linked = User.objects.create_user(username=f"venditore_{uuid.uuid4().hex[:6]}", password="pw")
+    from core.testing import make_archie_user
+    linked = make_archie_user(username=f"venditore_{uuid.uuid4().hex[:6]}", password="pw")
     client = _client(_internal_user(["view_seller", "add_seller", "change_seller", "delete_seller"]))
 
     resp = client.post(
@@ -430,3 +431,79 @@ def test_portal_user_forbidden_on_restore_and_purge(resource, model_name):
 
     obj.refresh_from_db()
     assert obj.deleted_at is not None
+
+
+# ─── Venditore per i promemoria e dettaglio dei promemoria (fase 2) ──────────
+
+SELLER_PERMS = ["view_seller", "add_seller", "change_seller"]
+
+
+def test_seller_requires_email_without_user():
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.post("/api/sellers/", {"name": "Giulia Neri"}, format="json")
+    assert resp.status_code == 400
+    assert "email" in resp.data
+    assert client.post("/api/sellers/", {"name": "Giulia Neri", "email": "g@studioneri.it"}, format="json").status_code == 201
+
+
+def test_seller_rejects_portal_only_or_inactive_user():
+    portal = User.objects.create_user(username=f"solo_portal_{uuid.uuid4().hex[:6]}", password="pw", email="p@x.it")
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.post("/api/sellers/", {"name": "P", "user": portal.id}, format="json")
+    assert resp.status_code == 400 and "user" in resp.data
+    from core.testing import make_archie_user
+    off = make_archie_user(username=f"off_{uuid.uuid4().hex[:6]}", password="pw", email="o@x.it", is_active=False)
+    assert client.post("/api/sellers/", {"name": "O", "user": off.id}, format="json").status_code == 400
+
+
+def test_seller_reminder_email_prefers_user_email():
+    from core.testing import make_archie_user
+    u = make_archie_user(username=f"lu_{uuid.uuid4().hex[:6]}", password="pw", email="Luca@Biotron.it")
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.post("/api/sellers/", {"name": "Luca", "email": "vecchia@x.it", "user": u.id}, format="json")
+    assert resp.status_code == 201, resp.data
+    assert resp.data["reminder_email"] == "luca@biotron.it"
+    manual = client.post("/api/sellers/", {"name": "Giulia", "email": "g@x.it"}, format="json").data
+    assert manual["reminder_email"] == "g@x.it"
+
+
+def test_contract_detail_reminders_states():
+    from unittest import mock
+
+    from contracts.models import ContractReminder
+    from core.app_settings import set_settings
+    set_settings({"contracts.reminder_emails": "contratti@biotron.it"})
+    customer = _customer()
+    seller = Seller.objects.create(name="Giulia Neri", email="g@x.it")
+    c = _contract(customer, end_date=date(2026, 12, 31), reminder_days=60, seller=seller)
+    ContractReminder.objects.create(contract=c, due_on=date(2026, 11, 1), ok=True, to="g@x.it")
+    ContractReminder.objects.create(contract=c, due_on=date(2026, 11, 11), ok=False, error="SMTP giù")
+    with mock.patch("contracts.api.timezone.localdate", return_value=date(2026, 11, 20)):
+        data = _client(_internal_user(["view_contract"])).get(f"/api/contracts/{c.id}/").data
+    r = data["reminders"]
+    assert r["every"] == 10 and r["to"] == ["g@x.it"] and r["cc"] == ["contratti@biotron.it"] and r["seller_kind"] == "manual"
+    assert r["dates"][:4] == [
+        {"date": "2026-11-01", "state": "sent", "error": None},
+        {"date": "2026-11-11", "state": "failed", "error": "SMTP giù"},
+        {"date": "2026-11-21", "state": "next", "error": None},
+        {"date": "2026-12-01", "state": "planned", "error": None},
+    ]
+    assert r["dates"][-1] == {"date": "2026-12-31", "state": "planned", "error": None}
+
+
+def test_contract_detail_reminders_seller_kind_user_and_none():
+    from core.testing import make_archie_user
+    customer = _customer()
+    u = make_archie_user(username=f"k_{uuid.uuid4().hex[:6]}", password="pw", email="k@x.it")
+    with_user = _contract(customer, seller=Seller.objects.create(name="K", user=u))
+    without = _contract(customer)
+    client = _client(_internal_user(["view_contract"]))
+    assert client.get(f"/api/contracts/{with_user.id}/").data["reminders"]["seller_kind"] == "user"
+    assert client.get(f"/api/contracts/{without.id}/").data["reminders"]["seller_kind"] is None
+
+
+def test_contract_list_has_no_reminders_field():
+    customer = _customer()
+    _contract(customer)
+    row = _client(_internal_user(["view_contract"])).get("/api/contracts/").data["results"][0]
+    assert "reminders" not in row

@@ -79,14 +79,33 @@ class ContractDocumentPermissions(PortalModelPermissions):
 
 class SellerSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source="user.username", read_only=True, default=None)
+    # L'email che riceverà i promemoria di rinnovo (utente Archie o inserita a mano).
+    reminder_email = serializers.SerializerMethodField()
 
     class Meta:
         model = Seller
         fields = [
-            "id", "name", "email", "phone", "user", "user_username", "is_active",
+            "id", "name", "email", "phone", "user", "user_username", "reminder_email", "is_active",
             "created_at", "updated_at", "deleted_at",
         ]
-        read_only_fields = ["id", "user_username", "created_at", "updated_at", "deleted_at"]
+        read_only_fields = ["id", "user_username", "reminder_email", "created_at", "updated_at", "deleted_at"]
+
+    def get_reminder_email(self, obj):
+        if obj.user_id and obj.user.is_active and obj.user.email:
+            return obj.user.email.strip().lower()
+        return (obj.email or "").strip().lower() or None
+
+    def validate(self, attrs):
+        user = attrs["user"] if "user" in attrs else getattr(self.instance, "user", None)
+        email = attrs["email"] if "email" in attrs else getattr(self.instance, "email", "")
+        errors = {}
+        if user is not None and not (user.is_active and (user.is_superuser or user.has_perm("core.access_archie"))):
+            errors["user"] = "Scegli un utente di Archie attivo."
+        if user is None and not (email or "").strip():
+            errors["email"] = "Indica l'email del venditore o collega un utente di Archie."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class SellerViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -113,6 +132,7 @@ class ContractSerializer(serializers.ModelSerializer):
     billing_freq_label  = serializers.CharField(source="get_billing_freq_display", read_only=True)
     status_label        = serializers.CharField(source="get_status_display", read_only=True)
     reminder_date       = serializers.DateField(read_only=True)
+    reminders           = serializers.SerializerMethodField()
     expiry_state        = serializers.SerializerMethodField()
     # Opzionali: un contratto (es. assistenza) può non coprire alcun device.
     devices = serializers.PrimaryKeyRelatedField(
@@ -130,7 +150,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "contract_type", "contract_type_label",
             "seller", "seller_name",
             "company", "company_label",
-            "start_date", "end_date", "reminder_days", "reminder_date",
+            "start_date", "end_date", "reminder_days", "reminder_date", "reminders",
             "total_value", "billing_freq", "billing_freq_label",
             "status", "status_label", "expiry_state",
             "devices", "devices_detail",
@@ -147,6 +167,10 @@ class ContractSerializer(serializers.ModelSerializer):
         # né scrivibile (una PATCH con total_value viene ignorata).
         request = self.context.get("request")
         user = getattr(request, "user", None)
+        # Il calendario dei promemoria serve solo alla finestra del contratto.
+        view = self.context.get("view")
+        if getattr(view, "action", None) != "retrieve":
+            fields.pop("reminders", None)
         if not (user and user.has_perm(VALUE_PERM)):
             fields.pop("total_value", None)
             # Anche il PDF (che riporta il prezzo) è riservato a chi vede i valori.
@@ -156,6 +180,35 @@ class ContractSerializer(serializers.ModelSerializer):
 
     def get_customer_name(self, obj):
         return obj.customer.display_name or obj.customer.name
+
+    def get_reminders(self, obj):
+        """Destinatari e calendario dei promemoria di rinnovo, con l'esito degli invii.
+        Stati: sent, failed, skipped (data passata mai inviata), next, planned."""
+        from contracts import reminders
+        from core.app_settings import get_setting, office_emails
+
+        every = int(get_setting("contracts.reminder_every_days"))
+        to, cc = reminders.recipients(obj, office_emails())
+        email = reminders.seller_email(obj)
+        seller_kind = None
+        if email:
+            s = obj.seller
+            seller_kind = "user" if (s.user_id and s.user.is_active and s.user.email) else "manual"
+        history = {r.due_on: r for r in obj.reminders.all()}
+        today = timezone.localdate()
+        dates, next_marked = [], False
+        for d in reminders.schedule(obj, every):
+            r = history.get(d)
+            if r is not None:
+                state, error = ("sent", None) if r.ok else ("failed", r.error or None)
+            elif d < today:
+                state, error = "skipped", None
+            elif not next_marked:
+                state, error, next_marked = "next", None, True
+            else:
+                state, error = "planned", None
+            dates.append({"date": d.isoformat(), "state": state, "error": error})
+        return {"every": every, "to": to, "cc": cc, "seller_kind": seller_kind, "dates": dates}
 
     def get_expiry_state(self, obj):
         return obj.expiry_state_on(timezone.localdate())
