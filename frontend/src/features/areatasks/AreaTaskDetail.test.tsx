@@ -234,6 +234,13 @@ describe('AreaTaskDetail', () => {
     expect(await menu('Apri la issue #42')).toBeInTheDocument()
   })
 
+  it('when the issue was trashed the badge says so and the task can be converted again', async () => {
+    setup({ ...baseTask, status: 'completato', converted_to_issue: 42, converted_to_issue_title: 'Stampante rotta', converted_to_issue_deleted: true })
+    expect(await screen.findByText((_, el) => el?.tagName === 'P' && /La issue #42 è nel cestino/.test(el.textContent ?? ''))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Trasforma in issue/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Apri la issue' })).toBeNull()
+  })
+
   it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {
     auth.hasPerm = (perm: string) => perm !== 'issues.add_issue'
     setup()

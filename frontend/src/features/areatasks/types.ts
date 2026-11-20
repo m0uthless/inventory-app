@@ -32,6 +32,8 @@ export type AreaTaskRow = {
   drive_files_detail: TaskDriveFile[]
   converted_to_issue: number | null
   converted_to_issue_title: string | null
+  /** La issue collegata è nel cestino: il task si può convertire di nuovo. */
+  converted_to_issue_deleted?: boolean
 }
 
 export type AreaTaskComment = {

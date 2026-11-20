@@ -215,6 +215,15 @@ describe('AreaTasks page', () => {
       expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
     })
 
+    it('a task whose issue was trashed can be converted again', async () => {
+      rows = [row({ id: 5, title: 'Switch rack', status: 'completato', converted_to_issue: 42, converted_to_issue_title: 'Switch', converted_to_issue_deleted: true })]
+      renderPage()
+      expect(await screen.findByText('Issue #42 nel cestino')).toBeInTheDocument()
+      fireEvent.contextMenu(screen.getByText('Switch rack'))
+      expect(await screen.findByRole('menuitem', { name: 'Trasforma in issue' })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: 'Apri la issue #42' })).toBeNull()
+    })
+
     it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {
       auth.hasPerm = (perm: string) => perm !== 'issues.add_issue'
       renderPage()

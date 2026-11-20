@@ -150,6 +150,8 @@ export default function AreaTaskDetailCard(p: Props) {
   const edit = t.can_edit
   const open = isOpenTask(t)
   const issueId = t.converted_to_issue
+  // Issue nel cestino: non si apre più, il task si può convertire di nuovo.
+  const issueTrashed = Boolean(issueId && t.converted_to_issue_deleted)
   const canAct = edit && !issueId
   const users = t.assigned_to != null && !p.users.some((u) => u.id === t.assigned_to)
     ? [{ id: t.assigned_to, label: t.assigned_to_name ?? String(t.assigned_to) }, ...p.users] : p.users
@@ -226,8 +228,8 @@ export default function AreaTaskDetailCard(p: Props) {
           <MenuItem disabled={!canAct} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi…</MenuItem>
           {t.status === 'in_corso' && canAct ? <MenuItem onClick={() => { setMenu(null); void p.onPatch({ status: 'in_attesa' }, 'Stato: In attesa') }}><ListItemIcon><CampoIcon name="clock" size={16} /></ListItemIcon>Metti in attesa</MenuItem> : null}
           {p.canLinkFiles && canAct ? <MenuItem onClick={() => { setMenu(null); p.onLinkFiles() }}><ListItemIcon><CampoIcon name="folder" size={16} /></ListItemIcon>Collega file da Drive</MenuItem> : null}
-          {issueId ? <MenuItem onClick={() => { setMenu(null); p.onOpenIssue(issueId) }}><ListItemIcon><CampoIcon name="alert" size={16} /></ListItemIcon>Apri la issue #{issueId}</MenuItem>
-            : p.canConvert && open ? <MenuItem onClick={() => { setMenu(null); p.onConvert() }}><ListItemIcon><CampoIcon name="alert" size={16} /></ListItemIcon>Trasforma in issue</MenuItem> : null}
+          {issueId && !issueTrashed ? <MenuItem onClick={() => { setMenu(null); p.onOpenIssue(issueId) }}><ListItemIcon><CampoIcon name="alert" size={16} /></ListItemIcon>Apri la issue #{issueId}</MenuItem>
+            : p.canConvert && (open || issueTrashed) ? <MenuItem onClick={() => { setMenu(null); p.onConvert() }}><ListItemIcon><CampoIcon name="alert" size={16} /></ListItemIcon>Trasforma in issue</MenuItem> : null}
           <MenuItem onClick={() => { setMenu(null); void copyToClipboard(link).then(() => toast.success('Link copiato')) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il link</MenuItem>
           <MenuItem disabled={!edit} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
         </Menu>
@@ -240,8 +242,14 @@ export default function AreaTaskDetailCard(p: Props) {
           {issueId ? (
             <Box role="status" sx={{ display: 'flex', alignItems: 'center', gap: 1.25, p: '10px 12px', borderRadius: '10px', border: '1px solid', borderColor: 'info.main', bgcolor: 'info.light' }}>
               <Box sx={{ color: 'info.main', display: 'inline-flex', flex: 'none' }}><CampoIcon name="alert" size={16} /></Box>
-              <Typography sx={{ fontSize: 13, flex: 1, minWidth: 0 }}>Trasformato nella <b>issue #{issueId}</b>{t.converted_to_issue_title ? <> · {t.converted_to_issue_title}</> : null}: il lavoro continua lì.</Typography>
-              <Button size="small" variant="outlined" onClick={() => p.onOpenIssue(issueId)}>Apri la issue</Button>
+              {issueTrashed ? (
+                <Typography sx={{ fontSize: 13, flex: 1, minWidth: 0 }}>La <b>issue #{issueId}</b> è nel cestino: puoi trasformare di nuovo il task in una issue.</Typography>
+              ) : (
+                <>
+                  <Typography sx={{ fontSize: 13, flex: 1, minWidth: 0 }}>Trasformato nella <b>issue #{issueId}</b>{t.converted_to_issue_title ? <> · {t.converted_to_issue_title}</> : null}: il lavoro continua lì.</Typography>
+                  <Button size="small" variant="outlined" onClick={() => p.onOpenIssue(issueId)}>Apri la issue</Button>
+                </>
+              )}
             </Box>
           ) : null}
 
@@ -355,7 +363,7 @@ export default function AreaTaskDetailCard(p: Props) {
 
           <RecordSection title="Tempo"><TaskTimeline task={t} /></RecordSection>
 
-          {open && p.canConvert ? (
+          {(open || issueTrashed) && p.canConvert ? (
             <ButtonBase onClick={p.onConvert} aria-label="Trasforma in issue: serve un intervento su un cliente" sx={{
               display: 'grid', gridTemplateColumns: '28px minmax(0,1fr)', gap: 1.25, alignItems: 'center', p: '12px 14px', borderRadius: '10px', border: '1px dashed', borderColor: 'archie.borderStrong',
               bgcolor: 'background.paper', textAlign: 'left', justifyContent: 'stretch', '&:hover': { bgcolor: 'archie.surface2', borderColor: 'primary.main' }, '&.Mui-focusVisible': { boxShadow: (th) => th.palette.archie.focusRing },

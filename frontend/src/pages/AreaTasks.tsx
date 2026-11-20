@@ -263,7 +263,7 @@ export default function AreaTasks() {
       { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDetail(row, 0) },
       { key: 'comment', label: 'Commenta', icon: <ChatBubbleOutlineIcon fontSize="small" />, onClick: () => openDetail(row, 1), disabled: !edit },
       { key: 'next', label: `Segna come ${STATUS_META[NEXT_STATUS[row.status]].label}`, icon: <EditIcon fontSize="small" />, onClick: () => void setStatusFromRow(row), disabled: !edit, hidden: Boolean(row.converted_to_issue) },
-      row.converted_to_issue
+      row.converted_to_issue && !row.converted_to_issue_deleted
         ? { key: 'issue', label: `Apri la issue #${row.converted_to_issue}`, icon: <CampoIcon name="alert" />, onClick: () => navigate(`/issues${buildQuery({ open: row.converted_to_issue })}`) }
         : { key: 'convert', label: 'Trasforma in issue', icon: <CampoIcon name="alert" />, onClick: () => setConvertTarget(row), disabled: !edit, hidden: !canAddIssue },
       { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(row), tone: 'danger' as const, disabled: !edit },
@@ -294,8 +294,8 @@ export default function AreaTasks() {
           <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{row.title}</Typography>
           {row.comments_count ? commentChip(row.comments_count) : null}
           {row.converted_to_issue ? (
-            <Tooltip title={`Diventato la issue #${row.converted_to_issue}`}>
-              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '3px', ml: 1, flex: 'none', fontSize: 11, fontWeight: 600, color: 'info.main' }}><CampoIcon name="arrowR" size={12} />Issue #{row.converted_to_issue}</Box>
+            <Tooltip title={row.converted_to_issue_deleted ? `La issue #${row.converted_to_issue} è nel cestino: il task si può trasformare di nuovo` : `Diventato la issue #${row.converted_to_issue}`}>
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '3px', ml: 1, flex: 'none', fontSize: 11, fontWeight: 600, color: row.converted_to_issue_deleted ? 'text.secondary' : 'info.main' }}><CampoIcon name="arrowR" size={12} />Issue #{row.converted_to_issue}{row.converted_to_issue_deleted ? ' nel cestino' : ''}</Box>
             </Tooltip>
           ) : null}
         </Box>

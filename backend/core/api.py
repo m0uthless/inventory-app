@@ -367,6 +367,7 @@ class AreaTaskSerializer(serializers.ModelSerializer):
     can_edit         = serializers.SerializerMethodField()
     converted_to_issue = serializers.PrimaryKeyRelatedField(read_only=True)
     converted_to_issue_title = serializers.SerializerMethodField()
+    converted_to_issue_deleted = serializers.SerializerMethodField()
 
     class Meta:
         model  = AreaTask
@@ -376,12 +377,23 @@ class AreaTaskSerializer(serializers.ModelSerializer):
             'drive_files', 'drive_files_detail',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
             'completed_at', 'comments_count', 'can_edit',
-            'converted_to_issue', 'converted_to_issue_title',
+            'converted_to_issue', 'converted_to_issue_title', 'converted_to_issue_deleted',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'completed_at']
 
     def get_converted_to_issue_title(self, obj):
-        return obj.converted_to_issue.title if obj.converted_to_issue_id else None
+        # Il titolo di una issue di un'altra area non si legge (vedi issues.visibility).
+        from issues.visibility import can_see_issue
+
+        if not obj.converted_to_issue_id:
+            return None
+        request = self.context.get('request')
+        issue = obj.converted_to_issue
+        return issue.title if can_see_issue(getattr(request, 'user', None), issue) else None
+
+    def get_converted_to_issue_deleted(self, obj):
+        # Issue nel cestino: il task si può convertire di nuovo.
+        return bool(obj.converted_to_issue_id and obj.converted_to_issue.deleted_at is not None)
 
     @staticmethod
     def _display_name(user):
@@ -584,7 +596,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
 
     def get_queryset(self):
         qs = AreaTask.objects.select_related(
-            'area', 'created_by', 'assigned_to',
+            'area', 'created_by', 'assigned_to', 'converted_to_issue',
         ).prefetch_related('drive_files')
         if getattr(self, 'action', None) in ('list', 'retrieve'):
             qs = qs.annotate(comments_count=Count('comments'))
@@ -900,7 +912,11 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if task.converted_to_issue_id:
+        # Una issue nel cestino non blocca: il task si converte in una issue nuova.
+        def already_converted(t):
+            return bool(t.converted_to_issue_id and t.converted_to_issue.deleted_at is None)
+
+        if already_converted(task):
             return Response(
                 {'detail': 'Questo task è già stato convertito in una issue.'},
                 status=status.HTTP_409_CONFLICT,
@@ -914,7 +930,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             # (fuori dalla transazione) è solo un fast-path, non protegge da
             # un doppio submit concorrente.
             locked_task = AreaTask.objects.select_for_update().get(pk=task.pk)
-            if locked_task.converted_to_issue_id:
+            if already_converted(locked_task):
                 return Response(
                     {'detail': 'Questo task è già stato convertito in una issue.'},
                     status=status.HTTP_409_CONFLICT,
@@ -951,6 +967,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 IssueComment.objects.create(issue=issue, author=comment.author, body=comment.body)
 
             old_status = task.status
+            old_issue = task.converted_to_issue if task.converted_to_issue_id else None
             task.status = AreaTask.STATUS_COMPLETATO
             task.completed_at = timezone.now()
             task.converted_to_issue = issue
@@ -961,7 +978,10 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 actor=request.user, action="update", instance=task,
                 changes={
                     "status": {"from": old_status, "to": task.status},
-                    "converted_to_issue": {"from": None, "to": to_change_value_for_field("converted_to_issue", issue)},
+                    "converted_to_issue": {
+                        "from": to_change_value_for_field("converted_to_issue", old_issue) if old_issue else None,
+                        "to": to_change_value_for_field("converted_to_issue", issue),
+                    },
                 },
                 request=request,
             )

@@ -242,7 +242,7 @@ export default function AreaTaskDetail({ task, onClose, onChanged, onDeleted, in
     toast.success(`Task trasformato nella issue #${result.issue.id}.`)
   }
 
-  const canConvert = Boolean(current?.can_edit) && !current?.converted_to_issue && hasPerm(PERMS.issues.issue.add)
+  const canConvert = Boolean(current?.can_edit) && (!current?.converted_to_issue || Boolean(current?.converted_to_issue_deleted)) && hasPerm(PERMS.issues.issue.add)
 
   return (
     <>

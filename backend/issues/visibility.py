@@ -39,3 +39,13 @@ def visible_issues_q(user, prefix: str = "") -> Q:
     if user is None or can_see_all_areas(user):
         return Q()
     return own_area_q(user, prefix)
+
+
+def can_see_issue(user, issue) -> bool:
+    """Come ``visible_issues_q`` ma su una issue già caricata (niente query)."""
+    if user is None:
+        return False
+    if can_see_all_areas(user) or issue.area_id is None:
+        return True
+    uid = user_area_id(user)
+    return uid is None or uid == issue.area_id
