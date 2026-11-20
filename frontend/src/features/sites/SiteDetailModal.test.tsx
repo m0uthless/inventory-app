@@ -12,7 +12,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 const navigate = vi.hoisted(() => vi.fn())
 vi.mock('@shared/api/client', () => ({ api }))
 vi.mock('@shared/ui/toast', () => ({ useToast: () => toast }))
-vi.mock('../../ui/LeafletMap', () => ({ default: () => null }))
+vi.mock('../../ui/AddressMap', () => ({ default: () => null }))
 vi.mock('react-router-dom', async (orig) => ({ ...(await orig<typeof import('react-router-dom')>()), useNavigate: () => navigate }))
 
 const detail = {

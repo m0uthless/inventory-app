@@ -67,6 +67,8 @@ export default defineConfig({
           if (id.includes('/axios/')) return 'vendor-axios'
           // Sfondo animato della login: three.js e ShaderGradient solo in un chunk a parte, caricato da quella pagina.
           if (id.includes('/three/') || id.includes('/three-stdlib/') || id.includes('/@react-three/') || id.includes('/@shadergradient/') || id.includes('/camera-controls/')) return 'vendor-login-bg'
+          // Mappa (riquadro «Dove» di clienti e siti): MapLibre solo quando si apre una mappa.
+          if (id.includes('/maplibre-gl/')) return 'vendor-maplibre'
           return 'vendor'
         },
       },

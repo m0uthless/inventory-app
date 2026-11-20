@@ -7,7 +7,7 @@ import MonitorOutlinedIcon from '@mui/icons-material/MonitorOutlined'
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined'
 import { DrawerShell } from '@shared/ui/DrawerShell'
 import { DrawerSection, DrawerFieldList, DrawerAddressSection, DrawerLoadingState, DrawerEmptyState } from '@shared/ui/DrawerParts'
-import LeafletMap from '../../ui/LeafletMap'
+import AddressMap from '../../ui/AddressMap'
 import { useAuth } from '../../auth/AuthProvider'
 import { PERMS } from '../../auth/perms'
 import type { CustomerDetail } from './types'
@@ -191,7 +191,7 @@ export default function CustomerDrawer({
           </DrawerSection>
 
           {address ? (
-            <DrawerAddressSection address={address} mapSlot={<LeafletMap address={address} height={isMobile ? 180 : 240} zoom={15} />} />
+            <DrawerAddressSection address={address} mapSlot={<AddressMap address={address} height={isMobile ? 180 : 240} zoom={15} />} />
           ) : null}
 
           <DrawerSection icon={<NotesOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />} title="Note" variant="muted">

@@ -14,6 +14,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Mappa nel riquadro «Dove» di clienti e siti: nuova mappa nei colori dell'app (chiara e scura col tema), con il segnaposto nel colore principale e «Ingrandisci» per la mappa grande da muovere e ingrandire. Usa MapLibre con OpenFreeMap, senza chiavi; la libreria si carica solo quando si apre una mappa (prima Leaflet da unpkg a ogni apertura).
 - Contratti: niente più disdetta. «Preavviso di disdetta» diventa «Avviso di rinnovo» (`notice_days` → `reminder_days`, `notice_deadline` → `reminder_date` nell'API); gli stati di scadenza sono In corso, Da rinnovare, Scaduto (via «Preavviso» e «In scadenza»; filtro `expiry=ok|renew|expired`); la vista «Da gestire» diventa «Da rinnovare». Lo stato «Disdetto» diventa «Chiuso» anche nei dati; tolto il rinnovo automatico (`auto_renew`). Migrazione `contracts.0003`.
 - Venditori: senza un utente di Archie collegato l'email è obbligatoria (è quella che riceve i promemoria); l'utente collegato deve essere un utente di Archie attivo.
 

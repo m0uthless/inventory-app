@@ -9,7 +9,7 @@ import {
   BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLoader as Loader, RecordModal, RecordNotes, RecordRow, RecordRows,
   RecordSection, RecordSelect, RecordValue, SectionCount, SoftTag, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
-import LeafletMap from '../../ui/LeafletMap'
+import AddressMap from '../../ui/AddressMap'
 import DeviceDialog from '../devices/DeviceDialog'
 import { deviceLabel, type DeviceListItem } from '../devices/types'
 import type { ContractListItem } from '../contracts/types'
@@ -338,7 +338,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
           {p.address ? (
             <RecordSection title="Dove">
               <WhereBlock address={p.address} line1={street || p.address} line2={[cityPart, d.province ? `(${d.province})` : null].filter(Boolean).join(' ') || undefined}
-                map={<LeafletMap address={p.address} height={150} zoom={15} quiet />} />
+                map={<AddressMap address={p.address} height={150} zoom={15} quiet title={d.display_name || d.name} />} />
             </RecordSection>
           ) : null}
 
