@@ -11,9 +11,9 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - ~~**[BE] Procedura dalla Wiki**~~ fatto (2026-11-09): articoli Wiki collegati alla issue (`WikiLink` con `entity_type="issue"`, migrazione `wiki/0015`), passi ricavati dall'articolo (lista `- [ ]`, altrimenti il primo elenco numerato; `wiki/procedure.py`) e spunte salvate sul collegamento (`checked_steps`). Endpoint `GET/POST /issues/{id}/wiki/`, `PATCH/DELETE /issues/{id}/wiki/{link}/` (lettura: issue + Wiki; scrittura: modifica issue), audit sulla issue. Sezione «Procedura» nella scheda (`features/issues/IssueProcedure.tsx`) e, in cima sotto le Proprietà, la card «Prossimo passo» con il primo passo da fare e «Fatto» (a procedura finita: «Procedura completata»); stato condiviso in `useIssueWiki.ts`. Test in `issues/tests/test_issue_wiki.py`. In dev c'è l'articolo dimostrativo «Riavvio servizio MWL».
 - **[BE] Dove intervenire completo**: referente di reparto con telefono, device con seriale, credenziali bloccate. Oggi mostriamo cliente, sito, inventario collegato e ServiceNow.
 - **[BE] Scheda Allegati**: le issue non hanno allegati (solo i task di area hanno `drive_files`).
-- **[BE] "Visibile al cliente nel Portale"** su commenti e allegati, etichette Cliente/Interno nella cronologia.
-- **[BE] Indicatore "Entro SLA"** (percentuale e obiettivo): nessun dato SLA. Al suo posto: Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
-- **[BE] Variazione del tempo di risoluzione** ("−0,4 g sulla settimana prima"): `/issues/summary/` dà solo la media.
+- ~~**[BE] "Visibile al cliente nel Portale"**~~ su commenti e allegati: scartato da Fede (20/11).
+- ~~**[BE] Indicatore "Entro SLA"**~~: scartato da Fede (20/11). Restano Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
+- ~~**[BE] Variazione del tempo di risoluzione**~~: scartata da Fede (20/11), insieme allo SLA.
 - **[BE] "+ Salva vista"**: fatto, ma le viste sono salvate nel browser (per utente e pagina). Per averle su tutti i dispositivi serve salvarle sul server.
 - **[UI] Avviso "nessun inventario collegato"** (triangolo accanto al titolo nella vecchia tabella): tolto dalla riga come nell'anteprima; resta nel pannello ("Nessun inventario collegato · Collega un inventario").
 - **[UI] Ricerca Ctrl K a finestra** con risultati raggruppati (clienti, siti, device, issue, azioni): oggi Ctrl K porta il cursore nel campo e Invio apre la pagina Ricerca.
@@ -35,7 +35,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 ## Comportamenti globali
 
 - Pannelli di dettaglio (scheda flottante e drawer "campo"): si chiudono con un clic fuori e con Esc. I clic dentro menu, popover, dialoghi e messaggio con Annulla aperti dal pannello non lo chiudono.
-- **[UI] Mappa Leaflet** dei drawer Clienti/Siti: caricata da unpkg.com. Senza internet la richiesta resta appesa; valutare di includerla nel bundle.
+- **[DEC] Mappa dei drawer Clienti/Siti**: oggi Leaflet da unpkg.com, che senza internet resta appesa. Fede (20/11) vuole valutare un altro sistema di mappe, perché questa non gli piace esteticamente: preparare un confronto in `design-previews` invece di spostare Leaflet nel bundle.
 
 ## Pagina Clienti
 
@@ -246,6 +246,8 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 - Fatte da `up-base.html` (2026-11-08), variante A. Il Profilo è una scheda flottante della stessa misura dei dettagli delle altre pagine (aperta dal menu utente e da /profile), con schede Dati, Aspetto, Sicurezza, Permessi, Attività. Backend: `/me` con `last_login` e `date_joined`, nuovo `GET /api/me/logins/` (ultimi 5 accessi riusciti).
 - Utenti e gruppi: interruttore Utenti/Gruppi nella testata, viste Attivi / Solo Portal / Account funzionali / Disattivati / Tutti, scheda utente flottante (Permessi con livelli e origine "gruppo X" o "assegnato a mano", Portal e clienti, permessi speciali; Anagrafica e ruoli; Attività), gruppi come schede con la striscia dei permessi e scheda del gruppo. La stessa scheda utente è usata da Accesso Portal. Rimossi `UserDrawer`/`GroupDrawer` e il vecchio drawer del Profilo.
 - Da valutare: descrizione dei gruppi (serve un campo), restyle della pagina Accesso Portal.
+- 17/11: utente e gruppo si aprono nella finestra (`RecordModal`, anteprime `ud-base` variante D e `gd-base`) al posto della scheda flottante; menu del tasto destro su utenti e gruppi; membri gestiti dalla finestra del gruppo (`user_ids`).
+- **[DEC] Permessi che non controllano nulla**: Piano ferie, Rimborso spese e Bug e feature compaiono nella matrice dei permessi, ma pagina e API sono aperte a ogni utente Archie (contano solo i flag del profilo: area ferie, coordinatore, segreteria spese); anche «Nessuno» non toglie l'accesso. Task di area (in `core`, dipende dall'area ferie) e Monitor (segue i permessi degli Inventari) non hanno una riga propria. Proposta: far valere i permessi per Rimborso spese e Bug e feature (verificare prima i gruppi in prod), togliere la riga Piano ferie dalla matrice. Tutti e cinque restano spegnibili dalla pagina Moduli.
 
 ## ServiceNow
 - Fatte da `sn-base.html` (2026-11-09): Casi variante A e Dashboard casi (variante B delle statistiche), che sostituisce le pagine Statistiche e Assenze tecnici (i vecchi indirizzi portano alla Dashboard).
@@ -261,7 +263,9 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 ## Accesso Portal
 - Fatta il 2026-11-09 direttamente nello stile di Utenti e gruppi (senza anteprima, su richiesta di Fede): viste Tutti / Attivi / Sospesi / Anche in Archie, filtro Cliente dall'intestazione, colonne Utente, Livello, Cliente predefinito, Altri clienti, Archie, Ultimo accesso; la scheda utente si apre con la sezione Portal in cima (`portalFirst`).
 
-## Titolo nella linguetta (mockup, in attesa di decisione interna)
+## Titolo nella linguetta (mockup, da riprendere)
+
+Fede (20/11): riprendiamolo, insieme al colore per modulo, con un'anteprima aggiornata in `design-previews`.
 
 Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.
 
@@ -269,7 +273,7 @@ Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / L
 - **[DEC] Pulsanti principali nella riga delle viste**, a destra dopo "Salva vista"; la riga dei pulsanti sopra gli indicatori sparisce. Su telefono tutto resta com'è.
 - **[UI] Se approvato**: va nella struttura generale (`layout/AppLayout.tsx`, `PageHead`) per tutte le pagine; le pagine senza viste tengono i pulsanti dove sono.
 
-## Colore per modulo (rimandato)
+## Colore per modulo (da riprendere, 20/11)
 
 Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); anteprima `design-previews/hm-base.html` (Issue) e interruttore "Colori modulo" in `db-base.html`, file `design-previews/shared/modcolors.css|js`.
 
@@ -286,6 +290,13 @@ Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); 
 - **[UI] PDF dei Piani di manutenzione**: intestazione a gradiente.
 - **[UI] `useDataGridZebraSx`** e alcune card hanno ancora gli stili del tema precedente nelle pagine non migrate.
 
+## Via il drawer: finestra dei record (dal 17/11)
+
+Standard nuovo (DESIGN.md › Record window): il record si apre in una finestra larga e centrata, una sola barra di salvataggio. Fatti: utente, gruppo, cliente, sito, contatto (18/11, anteprima `core-base`). Navigazione nella stessa finestra fra cliente, sito e contatto fatta (pila con «‹ Cliente», 18/11). Inventari fatti (18/11, anteprima `inv-base` A seconda versione: lettura poi «Modifica» dal ⋯), anche nella pila e nel Site Repository. Lo schema «lettura, poi Modifica» vale ora anche per cliente, sito e contatto (18/11). Issue fatte (18/11, anteprima `iss-base` A; scartata la pagina divisa), frecce a destra in tutte le finestre. Task di area fatti (18/11, anteprima `tsk-base`). Contratti fatti (18/11, anteprima `ctr-base`; ritocchi estetici da decidere nei prossimi giorni). PO fatti (18/11, anteprima `pof-base`), con il nuovo «Seguito da». Il gruppo Issue/Task/Contratti/PO è chiuso. Manutenzione fatta (18/11, anteprima `mtw-base`: scadenza, piano, rapportino; «Modifica» apre i dialoghi esistenti). Audit fatto (19/11, anteprima `aud-base`). Drive fatto (19/11, pannello fisso, anteprima `drv-base` variante B). ServiceNow, Monitor, Piano ferie fatti (19/11, anteprima `rst-base`). Bug e feature e Profilo fatti (19/11, anteprima `bfp-base`). Con la vecchia scheda resta solo Moduli, per scelta. Loghi delle credenziali da fornire in `frontend/public/logos/`. Pezzi comuni in `ui/campo/RecordParts` + `recordShared` e `features/records/linked` (issue, inventari, persone, dove): il Contatto li riusa. Ordine concordato: Cliente (anteprima `cd-base`) → Siti, Contatti, Inventari → Issue, Task di area, Contratti, PO (valutare anche la «pagina divisa») → per ultime, o restano col pannello: Audit, caso ServiceNow, eventi e todo di Manutenzione, Piano ferie, Monitor; Drive caso a sé.
+
+- ~~**[UI] Record collegati nella stessa finestra**~~ fatto 18/11: `RecordStackHost` + `PushedRecord`; issue, inventari, contratti aprono ancora la loro pagina finché non hanno la finestra.
+- **[UI] Mappa nei test automatici**: la mappa carica Leaflet da unpkg e la posizione da Nominatim; dove internet non c'è le richieste restano appese e Playwright aspetta prima di cliccare (i salvataggi sembrano non partire). Nei test nel browser bloccare `unpkg.com` e `nominatim` con una route; resta valida la voce su includere Leaflet nel bundle.
+
 ## Pagine da migrare (ordine deciso)
 
 1. Clienti, Siti, Inventari, Contratti, Manutenzione (testata, indicatori, viste, filtri da intestazione).
@@ -296,3 +307,58 @@ I pannelli di dettaglio di tutti i moduli sono già nello stile nuovo (`DrawerSh
 ## Fase 2
 
 - **Portal** (`frontend-portal/`): restyle dopo Archie; oggi resta volutamente invariato.
+
+## Issue per area e assegnabili per gruppo (19-20/11)
+
+Spec: `docs/superpowers/specs/2026-11-19-issue-area-assignee-groups-design.md`. Tutto su develop, non ancora rilasciato.
+
+- **Deploy in produzione:**
+  - lanciare `migrate` (`servicenow.0012`, `issues.0009`–`0011`, `core.0048`);
+  - dare ai gruppi i tre permessi «È tecnico ServiceNow», «Può essere assegnatario delle issue» e «Vede le issue di tutte le aree». Finché mancano i primi due nessuno è assegnabile e l'email «nuova issue» non parte.
+- ~~**[UI] Verifica nel browser**~~ fatta il 20/11 (Playwright): selettore d'area, Area nei Dettagli, assegnatario fuori area, cambio d'area, issue invisibile senza permesso, sola lettura con il permesso, menu col tasto destro di Contratti, Piani, Rapportini e Drive.
+- ~~**[UI] Link a una issue invisibile**~~: fatto il 20/11, «Elemento non trovato o non visibile.» al posto del 404 grezzo di DRF (`shared/src/api/error.ts`).
+- ~~**Rimandati dalla revisione e test mancanti**~~ fatti il 20/11: area disattivata rifiutata, assegnatario fuori area o senza permesso visibile nel selettore e tenuto al cambio d'area, «Assegna a me» solo agli assegnabili, una sola `get_object()`, titolo della issue convertita nascosto nei task di altre aree, `/api/wiki-links/` senza i link a issue invisibili (404 su dettaglio e ripristino), etichetta Wiki senza utente senza titolo; test per conteggi e riepiloghi di crm e inventory e per il superuser con un'area.
+- **[DEC] Philips:** oggi non servono. Idea di Fede (20/11): spostare il flag Philips dal singolo utente all'appartenenza a un gruppo «Philips», così potranno avere i permessi di gruppo come gli altri. Da valutare quando torneranno.
+
+## Generatore SQL PACS (20/11)
+
+Spec: `docs/superpowers/specs/2026-11-20-text2sql-design.md`; anteprima `design-previews/sql-base.html` (variante A). Su develop, non ancora rilasciato.
+
+- **Deploy in produzione:**
+  1. installare Ollama e il modello (default `qwen2.5-coder:7b`) sulla macchina scelta, server o VM;
+  2. impostare `OLLAMA_URL` in `.env.prod`;
+  3. avviare il servizio `text2sql-worker`;
+  4. lanciare `migrate` (`text2sql.0001`, `notifications.0004`);
+  5. dare il permesso «Usa il generatore SQL PACS» ai gruppi dei tecnici.
+- **[DEC] Dove far girare Ollama in produzione** e con quale modello. Su Poseidon il prototipo usa `qwen2.5-coder:3b`.
+- **Dev:** `.env.dev` punta all'Ollama del prototipo (`http://t2s-ollama:11434`). Dopo ogni ricreazione del container `text2sql-worker` va ripetuto `docker network connect text2sql-test_default inventory-app-text2sql-worker-1`.
+- ~~**[UI] Verifica nel browser**~~ fatta il 20/11: domanda vera all'Ollama del prototipo (28 s), campanella che si ferma alla risposta, notifica segnata letta, giudizio «Da correggere», Revisione, risposta in vista su telefono.
+- ~~**Rimandati dalla revisione**~~ fatti il 20/11: campanella veloce che si ferma alla risposta (`features/text2sql/pending.ts`), `?apri` oltre le prime 50 domande e notifica segnata con `POST /text2sql/{id}/seen/`, notifica tolta cancellando la domanda, righe dell'elenco come pulsanti, risposta portata in vista su telefono; limiti di lunghezza, Redis nel `depends_on`, un solo lavoratore con advisory lock di Postgres, admin solo per il superuser.
+- ~~**[BE] Query della Wiki come esempi**~~ fatto il 20/11: tutte le Query in SQL Oracle (`T2S_WIKI_LANGUAGE`, predefinito `sql`; in produzione controllare che la chiave del linguaggio sia questa).
+
+## Ambiente dev e test
+
+- ~~Modulo Wiki spento nel DB dev~~: riacceso il 20/11.
+- ~~Test con il Redis dello stack dev~~: fatto il 20/11, `conftest` globale con LocMemCache vuota per ogni test.
+
+## Decisioni del 20/11 (giro di domande)
+
+Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Contratti fase 2.
+
+- **Generatore SQL PACS**: si rilascia con il **modulo spento** finché non c'è una macchina per Ollama; modello di produzione `qwen2.5-coder:7b`. Prima di accenderlo: **le Query della Wiki come esempi** (`engine.load_examples()`).
+- **Fix prima del rilascio, tutti i rimandati della revisione**:
+  - Issue per area: fuga in `/api/wiki-links/`, area disattivata via API, assegnatario fuori area / «Assegna a me» / QuickPick «Area», test mancanti e piccole cose;
+  - Generatore SQL: robustezza backend, notifiche, accessibilità e mobile.
+- **Test**: `conftest` globale con LocMemCache al posto del Redis del dev; togliere quello locale di `text2sql`.
+- **DB dev**: riaccendere il modulo Wiki.
+- **Verifiche nel browser**: le fa Claude con Playwright (Issue per area, Generatore SQL, Task di area) e manda gli screenshot.
+- **Task di area convertito in issue poi cestinata**: permettere la riconversione in una issue nuova; il badge dice che la issue è nel cestino.
+- **Contratti**: il PDF si scarica **e si vede** solo con `view_contract_value`. I ritocchi estetici della finestra vanno nella fase 2.
+- **Issue, pezzi dell'anteprima**: restano solo Allegati e «Dove intervenire» completo.
+
+## Task di area: verifica nel browser (20/11)
+
+- Fatta: issue collegata nel cestino (avviso, riconversione, «Issue #N nel cestino» in elenco), filtri a 1366 px, apertura con Invio.
+- ~~**[UI] Esc nella finestra del task**~~: fatto il 20/11, la finestra si riapriva da `?open=` prima che sparisse dall'URL; ora l'apertura da URL reagisce solo a un id nuovo.
+- Dati dev: il task T-4 è collegato alla issue #17 ma è «In attesa», non completato (dato di prova).
+

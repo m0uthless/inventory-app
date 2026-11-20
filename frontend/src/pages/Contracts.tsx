@@ -1,6 +1,13 @@
 import * as React from 'react'
 import { Box, Button, Stack, Tooltip, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
+import AutorenewIcon from '@mui/icons-material/Autorenew'
+import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
+import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import type { GridColDef } from '@mui/x-data-grid'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -14,6 +21,7 @@ import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
 import EntityListCard from '@shared/ui/EntityListCard'
 import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
+import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import { useToast } from '@shared/ui/toast'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -25,7 +33,7 @@ import { Can } from '../auth/Can'
 import { PERMS } from '../auth/perms'
 import { CampoIcon, FilterOptionList, PageHead, SaveViewDialog, TableBar, ViewTabs, headerFilterGridSx, useSavedViews, useUndoToast, type ActiveFilter } from '../ui/campo'
 import ContractDialog from '../features/contracts/ContractDialog'
-import ContractDetailCard, { type ContractPatch, type ContractTab } from '../features/contracts/ContractDetailCard'
+import ContractDetailCard, { type ContractPatch } from '../features/contracts/ContractDetailCard'
 import ContractKpis, { useContractStats } from '../features/contracts/ContractKpis'
 import ContractRenewDialog from '../features/contracts/ContractRenewDialog'
 import SellersDialog from '../features/contracts/SellersDialog'
@@ -195,7 +203,6 @@ export default function Contracts() {
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<ContractDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState<ContractTab>('det')
 
   const loadDetail = React.useCallback(async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
     setDetailLoading(true)
@@ -207,13 +214,13 @@ export default function Contracts() {
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDetailLoading(false) }
   }, [toast, grid.includeDeleted])
 
-  const openDrawer = React.useCallback((id: number) => {
-    setDrawerTab((t) => (selectedId === id ? t : 'det'))
+  // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo contratto.
+  const openDrawer = React.useCallback((id: number, keep?: boolean) => {
     setSelectedId(id)
     setDrawerOpen(true)
-    void loadDetail(id)
+    void loadDetail(id, undefined, keep)
     grid.setOpenId(id)
-  }, [grid, loadDetail, selectedId])
+  }, [grid, loadDetail])
 
   // Apertura dal link `?open=<id>` (es. scheda Contratti del cliente).
   const lastOpenRef = React.useRef<number | null>(null)
@@ -281,53 +288,92 @@ export default function Contracts() {
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
   const doDelete = React.useCallback(async () => {
-    if (!selectedId) return
+    const cid = detail?.id; if (!cid) return
     setDeleteBusy(true)
     try {
-      await api.delete(`/contracts/${selectedId}/`)
+      await api.delete(`/contracts/${cid}/`)
       toast.success('Contratto spostato nel cestino.')
       setDeleteDlgOpen(false); closeDrawer(); reloadAll()
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDeleteBusy(false) }
-  }, [selectedId, toast, closeDrawer, reloadAll])
+  }, [detail?.id, toast, closeDrawer, reloadAll])
 
   const doRestore = React.useCallback(async () => {
-    if (!selectedId) return
+    const cid = detail?.id; if (!cid) return
     try {
-      await api.post(`/contracts/${selectedId}/restore/`)
+      await api.post(`/contracts/${cid}/restore/`)
       toast.success('Contratto ripristinato.')
-      await loadDetail(selectedId, true)
+      await loadDetail(cid, true)
       reloadAll()
     } catch (e) { toast.error(apiErrorToMessage(e)) }
-  }, [selectedId, toast, loadDetail, reloadAll])
+  }, [detail?.id, toast, loadDetail, reloadAll])
 
   // ── Documento PDF ──
   const [documentBusy, setDocumentBusy] = React.useState(false)
   const uploadDocument = React.useCallback(async (file: File) => {
-    if (!selectedId) return
+    const cid = detail?.id; if (!cid) return
     setDocumentBusy(true)
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await api.post<ContractDetail>(`/contracts/${selectedId}/document/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const res = await api.post<ContractDetail>(`/contracts/${cid}/document/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       setDetail(res.data)
       toast.success('Documento caricato')
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDocumentBusy(false) }
-  }, [selectedId, toast])
+  }, [detail?.id, toast])
 
   // La rimozione del PDF è definitiva (niente cestino): sempre con conferma.
   const [deleteDocDlgOpen, setDeleteDocDlgOpen] = React.useState(false)
   const deleteDocument = React.useCallback(async () => {
-    if (!selectedId) return
+    const cid = detail?.id; if (!cid) return
     setDocumentBusy(true)
     try {
-      await api.delete(`/contracts/${selectedId}/document/`)
+      await api.delete(`/contracts/${cid}/document/`)
       toast.success('Documento rimosso')
       setDeleteDocDlgOpen(false)
-      await loadDetail(selectedId, undefined, true)
+      await loadDetail(cid, undefined, true)
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDocumentBusy(false) }
-  }, [selectedId, toast, loadDetail])
+  }, [detail?.id, toast, loadDetail])
 
   const [sellersOpen, setSellersOpen] = React.useState(false)
+
+  // ── Tasto destro sulla riga ──
+  const [ctx, setCtx] = React.useState<{ row: ContractListItem; x: number; y: number } | null>(null)
+  // Modifica / rinnovo / eliminazione dal menu: apre la finestra e, a contratto caricato, il dialogo.
+  const pendingRef = React.useRef<{ id: number; action: 'edit' | 'renew' | 'delete' } | null>(null)
+  const runFromRow = React.useCallback((id: number, action: 'edit' | 'renew' | 'delete') => { pendingRef.current = { id, action }; openDrawer(id) }, [openDrawer])
+  React.useEffect(() => {
+    const p = pendingRef.current
+    if (!detail || !p || p.id !== detail.id) return
+    pendingRef.current = null
+    if (p.action === 'edit') { setDlgContract(detail); setDlgOpen(true) }
+    else if (p.action === 'renew') setRenewOpen(true)
+    else setDeleteDlgOpen(true)
+  }, [detail])
+  const restoreFromRow = React.useCallback(async (id: number) => {
+    try {
+      await api.post(`/contracts/${id}/restore/`)
+      toast.success('Contratto ripristinato.')
+      reloadAll()
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }, [toast, reloadAll])
+  const ctxItems: RowContextMenuItem[] = (() => {
+    const r = ctx?.row
+    if (!r) return []
+    if (r.deleted_at) {
+      return [
+        { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(r.id) },
+        { key: 'restore', label: 'Ripristina', icon: <RestoreFromTrashIcon fontSize="small" />, hidden: !canChange, onClick: () => void restoreFromRow(r.id) },
+      ]
+    }
+    return [
+      { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDrawer(r.id) },
+      { key: 'edit', label: 'Modifica', icon: <EditIcon fontSize="small" />, hidden: !canChange, onClick: () => runFromRow(r.id, 'edit') },
+      { key: 'renew', label: 'Rinnova…', icon: <AutorenewIcon fontSize="small" />, hidden: !canChange || r.status !== 'attivo', onClick: () => runFromRow(r.id, 'renew') },
+      { key: 'customer', label: 'Apri il cliente', icon: <BusinessOutlinedIcon fontSize="small" />, dividerBefore: true, onClick: () => navigate(`/customers${buildQuery({ open: r.customer })}`) },
+      { key: 'copy', label: 'Copia il codice', icon: <ContentCopyIcon fontSize="small" />, hidden: !r.code, onClick: async () => { await copyToClipboard(r.code); toast.success('Copiato') } },
+      { key: 'delete', label: 'Sposta nel cestino', icon: <DeleteOutlineIcon fontSize="small" />, hidden: !canDelete, dividerBefore: true, tone: 'danger', onClick: () => runFromRow(r.id, 'delete') },
+    ]
+  })()
 
   // ── Griglia, filtri da intestazione, esportazione ──
   const columns = React.useMemo(() => buildColumns(canViewValue), [canViewValue])
@@ -510,14 +556,18 @@ export default function Contracts() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openDrawer,
-            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: openDrawer,
+            onRowContextMenu: (row, e) => { setSelectedId(row.id); setCtx({ row, x: e.clientX + 2, y: e.clientY - 6 }) },
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
       </Box>
 
-      {drawerOpen ? (
+      {/* La finestra si apre solo con il contratto già caricato: niente passaggio da una finestra di attesa. */}
+      {drawerOpen && detail ? (
         <ContractDetailCard
           detail={detail}
           loading={detailLoading}
@@ -527,17 +577,15 @@ export default function Contracts() {
           canDelete={canDelete}
           canViewValue={canViewValue}
           documentBusy={documentBusy}
-          tab={drawerTab}
-          onTab={setDrawerTab}
           position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
           onClose={closeDrawer}
           onEdit={openEdit}
           onDelete={() => setDeleteDlgOpen(true)}
           onRestore={() => void doRestore()}
           onRenew={() => setRenewOpen(true)}
-          onPatch={(patch, label) => void patchContract(patch, label)}
+          onPatch={(patch, label) => patchContract(patch, label)}
           onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
           onOpenCustomer={() => { if (detail) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
           onUploadDocument={(f) => void uploadDocument(f)}
@@ -545,6 +593,7 @@ export default function Contracts() {
         />
       ) : null}
 
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <ContractDialog
         open={dlgOpen}
         contract={dlgContract}

@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Box, Button, Link, Stack, Typography } from '@mui/material'
+import { Box, Button, Link, Stack, Typography, useMediaQuery } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import DoneRoundedIcon from '@mui/icons-material/DoneRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import { api } from '@shared/api/client'
@@ -18,6 +20,7 @@ export default function BugFeaturePage() {
   const loc = useLocation()
   const navigate = useNavigate()
   const toast = useToast()
+  const theme = useTheme()
   const [params, setParams] = useSearchParams()
   const closedPage = loc.pathname.startsWith('/bug-feature/resolved')
 
@@ -63,10 +66,14 @@ export default function BugFeaturePage() {
       { key: 'feature', title: 'Funzionalità richieste', tone: BOARD_TONES.feature, icon: <KindIcon kind="feature" />, items: (open ?? []).filter((r) => r.kind === 'feature') },
       { key: 'done', title: 'Chiuse di recente', tone: BOARD_TONES.done, icon: <DoneRoundedIcon sx={{ fontSize: 16 }} />, items: closed ?? [] },
     ]
-  const flat = columns.flatMap((c) => c.items)
   const openId = Number(params.get('open')) || null
-  const idx = flat.findIndex((r) => r.id === openId)
-  const current = idx >= 0 ? flat[idx] : null
+  // ‹ › scorrono la colonna della segnalazione aperta.
+  const col = columns.find((c) => c.items.some((r) => r.id === openId))?.items ?? []
+  const idx = col.findIndex((r) => r.id === openId)
+  const current = idx >= 0 ? col[idx] : null
+  // Clic sulla scheda: la seleziona; doppio clic o Invio: la apre. Su mobile il tocco apre.
+  const [focusId, setFocusId] = React.useState<number | null>(null)
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const select = (id: number | null) => setParams((p) => { const n = new URLSearchParams(p); if (id) n.set('open', String(id)); else n.delete('open'); return n }, { replace: true })
 
   // ── Azioni ──
@@ -117,7 +124,7 @@ export default function BugFeaturePage() {
               </Link>
             ) : null}>
             {loading ? <Typography sx={{ fontSize: 12.5, color: 'text.secondary', px: 0.5 }}>Caricamento…</Typography>
-              : c.items.length ? c.items.map((r) => <ReportCard key={r.id} r={r} selected={r.id === openId} onOpen={() => select(r.id)} />)
+              : c.items.length ? c.items.map((r) => <ReportCard key={r.id} r={r} selected={r.id === (openId ?? focusId)} onSelect={() => (isMobile ? select(r.id) : setFocusId(r.id))} onOpen={() => { setFocusId(r.id); select(r.id) }} />)
                 : <Typography sx={{ fontSize: 12.5, color: 'text.secondary', px: 0.5 }}>Niente qui.</Typography>}
           </BoardColumn>
         ))}
@@ -125,10 +132,11 @@ export default function BugFeaturePage() {
 
       {current ? (
         <ReportDetail r={current} busy={busy}
-          position={`${idx + 1} di ${flat.length}`}
-          onPrev={idx > 0 ? () => select(flat[idx - 1].id) : undefined}
-          onNext={idx < flat.length - 1 ? () => select(flat[idx + 1].id) : undefined}
+          position={`${idx + 1} di ${col.length}`}
+          onPrev={idx > 0 ? () => { setFocusId(col[idx - 1].id); select(col[idx - 1].id) } : undefined}
+          onNext={idx < col.length - 1 ? () => { setFocusId(col[idx + 1].id); select(col[idx + 1].id) } : undefined}
           onClose={() => select(null)}
+          onCopyLink={() => { void copyToClipboard(`${window.location.origin}/bug-feature?open=${current.id}`).then(() => toast.success('Link copiato')) }}
           onResolve={() => void patch(current.id, { status: 'resolved' }, "Segnalazione risolta: chi l'ha aperta riceve la notifica.")}
           onReject={() => setRejecting(true)}
           onReopen={() => void patch(current.id, { status: 'open' }, 'Segnalazione riaperta.')}

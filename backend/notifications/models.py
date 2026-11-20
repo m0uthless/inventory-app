@@ -7,6 +7,7 @@ from django.db import models
 class NotificationType(models.TextChoices):
     MAINTENANCE_DUE = "maintenance_due", "Manutenzione in scadenza"
     AREA_TASK_DUE = "area_task_due", "Task di area in scadenza"
+    TEXT2SQL_READY = "text2sql_ready", "Query SQL pronta"
 
 
 class Notification(models.Model):

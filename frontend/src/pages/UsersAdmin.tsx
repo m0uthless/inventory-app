@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Box, Button, ButtonBase, Stack, Typography } from '@mui/material'
+import { Box, Button, ButtonBase, Stack, Typography, useMediaQuery, type Theme } from '@mui/material'
 import type { GridColDef } from '@mui/x-data-grid'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -15,8 +15,9 @@ import { agoLabel } from '../utils/agoLabel'
 import { USER_VIEWS, archieModules, fullName, openModules, roleTags, type LeaveAreaOption, type UserView } from '../features/users/usersModel'
 import { CreateGroupDialog, CreateUserDialog, GroupTag, RoleChip, UserAvatar } from '../features/users/usersUi'
 import { useLocalGrid } from '../features/users/useLocalGrid'
-import UserDetailCard from '../features/users/UserDetailCard'
-import GroupDetailCard from '../features/users/GroupDetailCard'
+import UserDetailModal from '../features/users/UserDetailModal'
+import GroupDetailModal from '../features/users/GroupDetailModal'
+import { GroupCardMenu, UserRowMenu, type MenuAnchor } from '../features/users/usersMenus'
 
 type Section = 'users' | 'groups'
 const HEAT: Record<RwdLevel, (t: import('@mui/material').Theme) => string> = {
@@ -28,13 +29,19 @@ const HEAT: Record<RwdLevel, (t: import('@mui/material').Theme) => string> = {
 
 /** Utenti e gruppi (anteprima up-base, variante A): tabella con viste e scheda flottante; gruppi come schede. */
 export default function UsersAdmin() {
-  const { me } = useAuth()
+  const { me, hasPerm } = useAuth()
   const toast = useToast()
   const [sp, setSp] = useSearchParams()
   const section: Section = sp.get('sezione') === 'gruppi' ? 'groups' : 'users'
   const view: UserView = (USER_VIEWS.find((v) => v.key === sp.get('vista'))?.key ?? 'active')
   const openUserId = Number(sp.get('open')) || null
   const openGroupId = Number(sp.get('gruppo')) || null
+  // Clic: seleziona; doppio clic o Invio: apre (su telefono il tocco apre). La selezione resta dopo la chiusura.
+  const phone = useMediaQuery((t: Theme) => t.breakpoints.down('md'))
+  const [selUser, setSelUser] = React.useState<number | null>(null)
+  const [selGroup, setSelGroup] = React.useState<number | null>(null)
+  const openUser = (id: number) => { setSelUser(id); setParams({ open: String(id) }) }
+  const openGroup = (id: number) => { setSelGroup(id); setParams({ gruppo: String(id) }) }
   const setParams = (patch: Record<string, string | null>) => setSp((p) => { const n = new URLSearchParams(p); Object.entries(patch).forEach(([k, v]) => (v ? n.set(k, v) : n.delete(k))); return n }, { replace: true })
 
   const [loading, setLoading] = React.useState(true)
@@ -44,6 +51,10 @@ export default function UsersAdmin() {
   const [leaveAreas, setLeaveAreas] = React.useState<LeaveAreaOption[]>([])
   const [newUser, setNewUser] = React.useState(false)
   const [newGroup, setNewGroup] = React.useState(false)
+  const [dupGroup, setDupGroup] = React.useState<AdminGroupRow | null>(null)
+  const [userMenu, setUserMenu] = React.useState<MenuAnchor<AdminUserRow>>(null)
+  const [groupMenu, setGroupMenu] = React.useState<MenuAnchor<AdminGroupRow>>(null)
+  const anchor = <T,>(row: T, e: React.MouseEvent) => ({ row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 })
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -62,6 +73,7 @@ export default function UsersAdmin() {
   const current = openUserId ? users.find((u) => u.id === openUserId) ?? null : null
   const idx = current ? grid.rows.findIndex((r) => r.id === current.id) : -1
   const currentGroup = openGroupId ? groups.find((g) => g.id === openGroupId) ?? null : null
+  const gIdx = currentGroup ? groups.findIndex((g) => g.id === currentGroup.id) : -1
 
   const columns: GridColDef<AdminUserRow>[] = [
     { field: 'last_name', headerName: 'Utente', flex: 1.2, minWidth: 240, renderCell: (p) => (
@@ -91,8 +103,8 @@ export default function UsersAdmin() {
     ) },
   ]
 
-  const mobileCard: MobileCardRenderFn<AdminUserRow> = ({ row, onOpen }) => (
-    <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, display: 'grid', gap: 0.75, cursor: 'pointer' }}>
+  const mobileCard: MobileCardRenderFn<AdminUserRow> = ({ row, onOpen, onContextMenu }) => (
+    <Box onClick={() => onOpen(row.id)} onContextMenu={(e) => { e.preventDefault(); onContextMenu(row, e) }} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.25, display: 'grid', gap: 0.75, cursor: 'pointer' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
         <UserAvatar u={row} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -149,8 +161,10 @@ export default function UsersAdmin() {
               sortModel: grid.sortModel,
               onSortModelChange: grid.onSortModelChange,
               emptyState: grid.q.trim() ? { title: 'Nessun risultato', subtitle: 'Prova con un altro nome.' } : { title: 'Nessun utente in questa vista', subtitle: '' },
-              onRowClick: (id) => setParams({ open: String(id) }),
-              getRowClassName: (row) => (row.id === openUserId ? 'Mui-selected' : undefined),
+              onRowClick: setSelUser,
+              onRowOpen: openUser,
+              onRowContextMenu: (row, e) => { e.preventDefault(); setUserMenu(anchor(row, e)) },
+              getRowClassName: (row) => (row.id === (openUserId ?? selUser) ? 'Mui-selected' : undefined),
               sx: { cursor: 'pointer' },
             }}
           />
@@ -162,10 +176,11 @@ export default function UsersAdmin() {
               const members = users.filter((u) => u.groups.some((x) => x.id === g.id))
               const mods = archieModules(modules)
               return (
-                <ButtonBase key={g.id} onClick={() => setParams({ gruppo: String(g.id) })} sx={{
+                <ButtonBase key={g.id} onClick={() => (phone ? openGroup(g.id) : setSelGroup(g.id))} onDoubleClick={() => openGroup(g.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); openGroup(g.id) } }} onContextMenu={(e) => { e.preventDefault(); setGroupMenu(anchor(g, e)) }} sx={{
                   display: 'grid', gap: 1, justifyContent: 'stretch', justifyItems: 'stretch', alignItems: 'start', textAlign: 'left', p: 1.75, border: '1px solid', borderRadius: '10px', bgcolor: 'background.paper',
-                  borderColor: g.id === openGroupId ? 'archie.fieldLine' : 'divider', boxShadow: g.id === openGroupId ? (t) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none',
-                  '&:hover': { borderColor: g.id === openGroupId ? 'archie.fieldLine' : 'text.disabled' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+                  borderColor: g.id === (openGroupId ?? selGroup) ? 'archie.fieldLine' : 'divider', boxShadow: g.id === (openGroupId ?? selGroup) ? (t) => `inset 0 0 0 1px ${t.palette.archie.fieldLine}` : 'none',
+                  '&:hover': { borderColor: g.id === (openGroupId ?? selGroup) ? 'archie.fieldLine' : 'text.disabled' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography sx={{ flex: 1, fontSize: 14, fontWeight: 650 }}>{g.name}</Typography>
@@ -199,26 +214,37 @@ export default function UsersAdmin() {
       )}
 
       {section === 'users' && current ? (
-        <UserDetailCard user={current} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)}
+        <UserDetailModal user={current} allUsers={users} groups={groups} modules={modules} leaveAreas={leaveAreas} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)}
           position={idx >= 0 ? `${idx + 1} di ${grid.rows.length}` : undefined}
-          onPrev={idx > 0 ? () => setParams({ open: String(grid.rows[idx - 1].id) }) : undefined}
-          onNext={idx >= 0 && idx < grid.rows.length - 1 ? () => setParams({ open: String(grid.rows[idx + 1].id) }) : undefined}
+          onPrev={idx > 0 ? () => openUser(grid.rows[idx - 1].id) : undefined}
+          onNext={idx >= 0 && idx < grid.rows.length - 1 ? () => openUser(grid.rows[idx + 1].id) : undefined}
           onClose={() => setParams({ open: null })}
           onSaved={onUserSaved}
           onDeleted={(id) => { setUsers((l) => l.filter((u) => u.id !== id)); setParams({ open: null }); void reloadGroups() }} />
       ) : null}
       {section === 'groups' && currentGroup ? (
-        <GroupDetailCard group={currentGroup} modules={modules} users={users}
+        <GroupDetailModal group={currentGroup} modules={modules} users={users} currentUserIsSuperuser={Boolean(me?.is_superuser)}
+          position={gIdx >= 0 ? `${gIdx + 1} di ${groups.length}` : undefined}
+          onPrev={gIdx > 0 ? () => openGroup(groups[gIdx - 1].id) : undefined}
+          onNext={gIdx >= 0 && gIdx < groups.length - 1 ? () => openGroup(groups[gIdx + 1].id) : undefined}
+          onDuplicate={setDupGroup}
           onClose={() => setParams({ gruppo: null })}
           onSaved={(g) => { setGroups((l) => l.map((x) => (x.id === g.id ? g : x))); void load() }}
           onDeleted={(id) => { setGroups((l) => l.filter((g) => g.id !== id)); setParams({ gruppo: null }); void load() }}
           onOpenUser={(id) => setParams({ sezione: null, gruppo: null, open: String(id) })} />
       ) : null}
 
+      <UserRowMenu anchor={userMenu} onClose={() => setUserMenu(null)} groups={groups} currentUserId={me?.id} currentUserIsSuperuser={Boolean(me?.is_superuser)}
+        canAudit={hasPerm('audit.view_auditevent')} onOpen={openUser} onSaved={onUserSaved}
+        onDeleted={(id) => { setUsers((l) => l.filter((u) => u.id !== id)); if (openUserId === id) setParams({ open: null }); void reloadGroups() }} />
+      <GroupCardMenu anchor={groupMenu} onClose={() => setGroupMenu(null)} users={users}
+        onOpen={openGroup} onDuplicate={setDupGroup}
+        onDeleted={(id) => { setGroups((l) => l.filter((g) => g.id !== id)); if (openGroupId === id) setParams({ gruppo: null }); void load() }} />
+
       <CreateUserDialog open={newUser} groups={groups} onClose={() => setNewUser(false)}
         onCreated={(u) => { setNewUser(false); setUsers((l) => [...l, u]); setParams({ vista: null, open: String(u.id) }) }} />
-      <CreateGroupDialog open={newGroup} onClose={() => setNewGroup(false)}
-        onCreated={(g) => { setNewGroup(false); setGroups((l) => [...l, g]); setParams({ gruppo: String(g.id) }) }} />
+      <CreateGroupDialog open={newGroup || Boolean(dupGroup)} copyFrom={dupGroup} modules={modules} onClose={() => { setNewGroup(false); setDupGroup(null) }}
+        onCreated={(g) => { setNewGroup(false); setDupGroup(null); setGroups((l) => [...l, g]); setParams({ gruppo: String(g.id) }) }} />
     </Stack>
   )
 }

@@ -53,3 +53,12 @@ export function expiryHint(state: ExpiryState, end: string, notice: string | nul
     default: return 'Contratto non attivo: la scadenza non viene seguita.'
   }
 }
+
+/**
+ * Importo scritto a mano: «66.250,00» o «66250,00» (italiano) oppure «66250.00» (come arriva dal server).
+ * Con la virgola il punto separa le migliaia; senza virgola il punto è il decimale.
+ */
+export const parseAmount = (raw: string) => {
+  const t = raw.trim().replace(/\s|€/g, '')
+  return Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t)
+}

@@ -83,7 +83,6 @@ describe('AreaTaskDetail', () => {
         : Promise.resolve({ data: [] }),
     )
     setup()
-    fireEvent.click(await screen.findByRole('tab', { name: /Commenti\s*1/ }))
     expect(await screen.findByText('Primo commento')).toBeInTheDocument()
   })
 
@@ -92,7 +91,6 @@ describe('AreaTaskDetail', () => {
       data: { id: 2, task: 7, author: 1, author_name: 'Fede', body: 'Fatto', created_at: '2026-09-24T12:00:00Z', updated_at: '2026-09-24T12:00:00Z' },
     })
     const { onChanged } = setup()
-    fireEvent.click(await screen.findByRole('tab', { name: /Commenti/ }))
     fireEvent.change(await screen.findByPlaceholderText(/Scrivi un commento/), { target: { value: 'Fatto' } })
     fireEvent.click(screen.getByRole('button', { name: 'Commenta' }))
 
@@ -104,7 +102,6 @@ describe('AreaTaskDetail', () => {
   it('unlinks a file by patching the remaining visible ids', async () => {
     apiPatch.mockResolvedValue({ data: { ...baseTask, drive_files_detail: [] } })
     const { onChanged } = setup()
-    fireEvent.click(await screen.findByRole('tab', { name: /Allegati/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'Scollega verbale.pdf' }))
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/area-tasks/7/', { drive_files: [] }))
@@ -116,7 +113,6 @@ describe('AreaTaskDetail', () => {
       data: { ...baseTask, drive_files_detail: [...baseTask.drive_files_detail, { id: 99, name: 'nuovo.pdf', mime_type: '', size: 10, folder: null }] },
     })
     setup()
-    fireEvent.click(await screen.findByRole('tab', { name: /Allegati/ }))
     fireEvent.click(await screen.findByRole('button', { name: /Collega da Drive/ }))
     fireEvent.click(await screen.findByText('conferma-picker'))
 
@@ -127,7 +123,7 @@ describe('AreaTaskDetail', () => {
   it('edits the task with the assignable users of its area', async () => {
     apiPatch.mockResolvedValue({ data: { ...baseTask, title: 'Nuovo titolo', priority: 'high', assigned_to: 12, assigned_to_name: 'Anna Rossi' } })
     const { onChanged } = setup()
-    fireEvent.click(await menu('Modifica tutti i campi'))
+    fireEvent.click(await menu('Tutti i campi…'))
 
     await waitFor(() => expect(apiGet).toHaveBeenCalledWith('/users/', expect.objectContaining({ params: expect.objectContaining({ leave_area: 3 }) })))
     const title = await screen.findByLabelText(/Titolo/)
@@ -144,7 +140,7 @@ describe('AreaTaskDetail', () => {
   it('shows the server validation error for the assignee and keeps the dialog open', async () => {
     apiPatch.mockRejectedValue({ response: { data: { assigned_to: ["L'assegnatario deve appartenere all'area del task."] } } })
     setup()
-    fireEvent.click(await menu('Modifica tutti i campi'))
+    fireEvent.click(await menu('Tutti i campi…'))
     fireEvent.click(await screen.findByRole('button', { name: 'Salva modifiche' }))
     expect(await screen.findByText(/deve appartenere all'area/)).toBeInTheDocument()
   })
@@ -162,10 +158,9 @@ describe('AreaTaskDetail', () => {
 
   it('hides write actions on a read-only task', async () => {
     setup({ ...baseTask, can_edit: false })
-    expect(await menu('Modifica tutti i campi')).toHaveAttribute('aria-disabled', 'true')
+    expect(await menu('Tutti i campi…')).toHaveAttribute('aria-disabled', 'true')
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
-    expect(screen.getByText(/Sola lettura · area Ufficio/)).toBeInTheDocument()
-    fireEvent.click(await screen.findByRole('tab', { name: /Allegati/ }))
+    expect(screen.getAllByText('Sola lettura').length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: /Collega da Drive/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Scollega verbale.pdf' })).toBeNull()
   })
@@ -177,7 +172,7 @@ describe('AreaTaskDetail', () => {
       return Promise.resolve({ data: [] })
     })
     setup({ ...baseTask, assigned_to: 12, assigned_to_name: 'Anna Rossi' })
-    fireEvent.click(await menu('Modifica tutti i campi'))
+    fireEvent.click(await menu('Tutti i campi…'))
     const dlg = await screen.findByRole('dialog', { name: /Modifica task/ })
     expect(within(dlg).getByText('Anna Rossi')).toBeInTheDocument()
     expect(warn.mock.calls.filter((c) => String(c[0]).includes('out-of-range'))).toHaveLength(0)
@@ -197,7 +192,7 @@ describe('AreaTaskDetail', () => {
   it('toasts server errors on fields the dialog does not render and keeps it open', async () => {
     apiPatch.mockRejectedValue({ response: { data: { priority: ['Scelta non valida.'] } } })
     setup()
-    fireEvent.click(await menu('Modifica tutti i campi'))
+    fireEvent.click(await menu('Tutti i campi…'))
     fireEvent.click(await screen.findByRole('button', { name: 'Salva modifiche' }))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Scelta non valida.')))
     expect(screen.getByRole('dialog', { name: /Modifica task/ })).toBeInTheDocument()
@@ -208,11 +203,9 @@ describe('AreaTaskDetail', () => {
     apiPost.mockReturnValue(new Promise((r) => { resolveComment = r }))
     apiPatch.mockResolvedValue({ data: { ...baseTask, drive_files_detail: [] } })
     const { onChanged } = setup()
-    fireEvent.click(await screen.findByRole('tab', { name: /Commenti/ }))
     fireEvent.change(await screen.findByPlaceholderText(/Scrivi un commento/), { target: { value: 'Ciao' } })
     fireEvent.click(screen.getByRole('button', { name: 'Commenta' }))
     await waitFor(() => expect(apiPost).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole('tab', { name: /Allegati/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'Scollega verbale.pdf' }))
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ drive_files_detail: [] })))
     resolveComment({ data: { id: 2, task: 7, author: 1, author_name: 'Fede', body: 'Ciao', created_at: '2026-09-24T12:00:00Z', updated_at: '2026-09-24T12:00:00Z' } })
@@ -241,6 +234,13 @@ describe('AreaTaskDetail', () => {
     expect(await menu('Apri la issue #42')).toBeInTheDocument()
   })
 
+  it('when the issue was trashed the badge says so and the task can be converted again', async () => {
+    setup({ ...baseTask, status: 'completato', converted_to_issue: 42, converted_to_issue_title: 'Stampante rotta', converted_to_issue_deleted: true })
+    expect(await screen.findByText((_, el) => el?.tagName === 'P' && /La issue #42 è nel cestino/.test(el.textContent ?? ''))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Trasforma in issue/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Apri la issue' })).toBeNull()
+  })
+
   it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {
     auth.hasPerm = (perm: string) => perm !== 'issues.add_issue'
     setup()
@@ -259,7 +259,7 @@ describe('AreaTaskDetail', () => {
     })
     const { onChanged } = setup()
     fireEvent.click(await screen.findByRole('button', { name: /^Trasforma in issue/ }))
-    const dlg = await screen.findByRole('dialog')
+    const dlg = (await screen.findAllByRole('dialog')).at(-1)!
     const custInput = within(dlg).getByLabelText(/Cliente/)
     fireEvent.change(custInput, { target: { value: 'ACME' } })
     const option = await screen.findByText('ACME')

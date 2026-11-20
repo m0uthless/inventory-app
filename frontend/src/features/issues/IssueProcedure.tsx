@@ -7,7 +7,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import CheckIcon from '@mui/icons-material/Check'
 
 import { api } from '@shared/api/client'
-import { DetailSection } from '../../ui/campo'
+import { RecordSection } from '../../ui/campo'
 import type { IssueWiki } from './useIssueWiki'
 
 type PageOpt = { id: number; title: string; kb_code?: string; summary?: string | null }
@@ -26,7 +26,7 @@ export default function IssueProcedure({ wiki, canEdit }: { wiki: IssueWiki; can
   const { done, total } = wiki
 
   return (
-    <DetailSection
+    <RecordSection
       title="Procedura"
       end={total ? <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: done === total ? 'success.main' : 'text.secondary' }}>{done} di {total}</Typography> : undefined}
     >
@@ -74,7 +74,7 @@ export default function IssueProcedure({ wiki, canEdit }: { wiki: IssueWiki; can
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} slotProps={{ paper: { sx: { width: 340, p: 1 } } }}>
         <WikiPagePicker exclude={links.map((l) => l.page)} onPick={(id) => void link(id)} />
       </Popover>
-    </DetailSection>
+    </RecordSection>
   )
 }
 

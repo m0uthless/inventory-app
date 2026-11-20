@@ -154,6 +154,28 @@ class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["created_at", "action"]
     ordering = ["-created_at"]
 
+    def get_queryset(self):
+        """Visibilità delle issue per area: gli eventi delle issue che l'utente
+        non può vedere (titolo in `object_repr`, modifiche in `changes`) non si
+        mostrano."""
+        qs = super().get_queryset()
+        from django.contrib.contenttypes.models import ContentType
+        from django.db.models.functions import Cast
+        from django.db.models import CharField
+
+        from issues.models import Issue
+        from issues.visibility import visible_issues_q
+
+        visible = visible_issues_q(self.request.user)
+        if not visible:
+            return qs
+        hidden_ids = (
+            Issue.objects.exclude(visible)
+            .annotate(pk_str=Cast("pk", output_field=CharField()))
+            .values("pk_str")
+        )
+        return qs.exclude(content_type=ContentType.objects.get_for_model(Issue), object_id__in=hidden_ids)
+
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
         """Indicatori della pagina Audit (giorni nel fuso locale).

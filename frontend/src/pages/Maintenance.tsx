@@ -27,7 +27,7 @@ import { dShort } from '../features/contracts/contractModel'
 import MaintenanceKpis, { useTodoStats } from '../features/maintenance/MaintenanceKpis'
 import MaintenanceCalendar from '../features/maintenance/MaintenanceCalendar'
 import RapportinoDialog from '../features/maintenance/RapportinoDialog'
-import TodoDetailCard, { type TodoTab } from '../features/maintenance/TodoDetailCard'
+import TodoDetailCard from '../features/maintenance/TodoDetailCard'
 import SectionNav from '../features/maintenance/MaintenanceNav'
 import { DueDateOverrideDialog } from '../features/maintenance/MaintenanceLegacy'
 import { useNavigate } from 'react-router-dom'
@@ -115,11 +115,12 @@ export default function Maintenance() {
 
   // ── Scheda, dialoghi ──
   const [open, setOpen] = React.useState<TodoRow | null>(null)
-  const [tab, setTab] = React.useState<TodoTab>('det')
+  // Clic sulla riga: la evidenzia; doppio clic o Invio: apre la finestra.
+  const [focusKey, setFocusKey] = React.useState<string | null>(null)
   const [rpRows, setRpRows] = React.useState<TodoRow[] | null>(null)
   const [overrideRow, setOverrideRow] = React.useState<TodoRow | null>(null)
   const [cardReload, setCardReload] = React.useState(0)
-  const openRow = (r: TodoRow) => { setTab((t) => (open && rowKey(open) === rowKey(r) ? t : 'det')); setOpen(r) }
+  const openRow = (r: TodoRow) => { setFocusKey(rowKey(r)); setOpen(r) }
   const afterSave = () => { reloadAll(); clearSel(); setCardReload((n) => n + 1); setOpen(null) }
 
   const markNotPlanned = async (list: TodoRow[]) => {
@@ -318,9 +319,10 @@ export default function Maintenance() {
                 onPaginationModelChange: grid.onPaginationModelChange,
                 sortModel: grid.sortModel,
                 onSortModelChange: grid.onSortModelChange,
-                onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) openRow(r) },
+                onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) setFocusKey(rowKey(r)) },
+                onRowOpen: (id) => { const r = rows.find((x) => x.id === id); if (r) openRow(r) },
                 onRowContextMenu: (r, e) => setCtx({ row: r, x: e.clientX + 2, y: e.clientY - 6 }),
-                getRowClassName: (r) => [open && rowKey(r) === rowKey(open) ? 'Mui-selected' : '', checked.has(rowKey(r)) ? 'is-checked' : ''].join(' '),
+                getRowClassName: (r) => [focusKey === rowKey(r) ? 'Mui-selected' : '', checked.has(rowKey(r)) ? 'is-checked' : ''].join(' '),
                 sx: {
                   ...headerFilterGridSx, cursor: 'pointer',
                   '& .is-checked': { bgcolor: (t) => `${t.palette.archie.field} !important` },
@@ -341,8 +343,6 @@ export default function Maintenance() {
       {open ? (
         <TodoDetailCard
           row={open}
-          tab={tab}
-          onTab={setTab}
           reloadKey={cardReload}
           position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
           onPrev={idx > 0 ? () => openRow(rows[idx - 1]) : undefined}
@@ -357,8 +357,7 @@ export default function Maintenance() {
         />
       ) : null}
 
-      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems}
-        title={ctx?.row.inventory_name} subtitle={ctx ? [ctx.row.customer_name, ctx.row.site_name].filter(Boolean).join(' · ') : undefined} />
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <RapportinoDialog open={rpRows !== null} rows={rpRows ?? []} techs={techs} customers={stats?.customers ?? []} canAddIssue={canAddIssue} onClose={() => setRpRows(null)} onSaved={afterSave} />
       <DueDateOverrideDialog open={Boolean(overrideRow)} row={overrideRow} onClose={() => setOverrideRow(null)} onSaved={() => { reloadAll(); setOpen(null) }} />
     </Stack>

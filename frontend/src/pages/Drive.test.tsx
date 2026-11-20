@@ -110,7 +110,10 @@ describe('Drive page (restyle) — fix P1', () => {
 
     render(<Drive />)
 
+    // Il clic mostra la cartella nel pannello, il doppio clic ci entra.
     fireEvent.click(await screen.findByText('Cartella A'))
+    expect(apiGet.mock.calls.some(([url]) => url === '/drive-folders/10/children/')).toBe(false)
+    fireEvent.doubleClick(screen.getAllByText('Cartella A')[0])
 
     await waitFor(() => {
       const calls = apiGet.mock.calls.filter(([url]) => url === '/drive-folders/10/children/')
@@ -232,5 +235,28 @@ describe('Drive page (restyle) — fix P1', () => {
     // Se il bug del setState annidato fosse ancora presente, il toggle si
     // annullerebbe da solo e la barra di selezione non apparirebbe mai.
     await screen.findByText('1 selezionato')
+  })
+
+  it('il clic su un file lo mostra nel pannello fisso, il doppio clic lo apre a tutto schermo', async () => {
+    apiGet.mockImplementation((url: string, config?: Params) => {
+      if (url === '/customers/') return Promise.resolve({ data: { results: [] } })
+      if (url === '/drive-files/' && config?.params?.root) return Promise.resolve({ data: { results: [makeFile(1, 'documento.pdf')] } })
+      if (url === '/drive-folders/' || url === '/drive-files/') return Promise.resolve({ data: { results: [] } })
+      return Promise.resolve({ data: {} })
+    })
+    render(<Drive />)
+    expect(await screen.findByText(/Seleziona un file o una cartella/)).toBeInTheDocument()
+    const row = (await screen.findAllByText('documento.pdf'))[0]
+    fireEvent.click(row)
+    const pane = await screen.findByRole('complementary', { name: 'Dettagli del file' })
+    expect(pane).toHaveTextContent('Scarica')
+    fireEvent.doubleClick(row)
+    expect(await screen.findByRole('button', { name: "Chiudi l'anteprima" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: "Chiudi l'anteprima" }))
+    // La × del pannello lo nasconde; «Mostra i dettagli» lo riporta.
+    fireEvent.click(await screen.findByRole('button', { name: 'Chiudi il pannello' }, { timeout: 3000 }))
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Dettagli del file' })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Mostra i dettagli' }))
+    expect(await screen.findByRole('complementary', { name: 'Dettagli del file' })).toBeInTheDocument()
   })
 })

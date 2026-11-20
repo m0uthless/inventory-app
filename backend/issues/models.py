@@ -120,6 +120,13 @@ class Issue(TimeStampedModel):
         IssueCategory, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="issues", verbose_name="Categoria",
     )
+    # Area organizzativa (stessa `attendance.LeaveArea` del profilo utente e dei
+    # task di area). Facoltativa: senza area la issue la modifica chiunque abbia
+    # i permessi delle issue; con un'area solo i membri di quell'area.
+    area            = models.ForeignKey(
+        "attendance.LeaveArea", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="issues", verbose_name="Area",
+    )
     assigned_to     = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="assigned_issues",
@@ -155,11 +162,16 @@ class Issue(TimeStampedModel):
         verbose_name = "Issue"
         verbose_name_plural = "Issues"
         ordering = ["-created_at"]
+        permissions = [
+            ("be_assignee", "Può essere assegnatario delle issue"),
+            ("view_all_areas", "Vede le issue di tutte le aree"),
+        ]
         indexes = [
             models.Index(fields=["status"],              name="issue_status_idx"),
             models.Index(fields=["priority"],            name="issue_priority_idx"),
             models.Index(fields=["customer", "status"],  name="issue_customer_status_idx"),
             models.Index(fields=["assigned_to"],         name="issue_assigned_idx"),
+            models.Index(fields=["area"],                name="issue_area_idx"),
             models.Index(fields=["due_date"],            name="issue_due_date_idx"),
             models.Index(fields=["deleted_at"],          name="issue_deleted_at_idx"),
             models.Index(fields=["-created_at"],         name="issue_created_at_idx"),

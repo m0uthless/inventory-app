@@ -114,6 +114,10 @@ export type PurchaseOrderRow = {
 
   notes?: string | null
 
+  /** Persona che segue il PO («Seguito da»). */
+  followed_by?: number | null
+  followed_by_name?: string | null
+
   created_by?: number | null
   created_by_username?: string | null
   created_at?: string

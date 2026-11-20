@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from attendance.models import LeaveArea
 from core.models import UserProfile
-from core.testing import make_archie_user
+from core.testing import grant_via_group, make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -62,3 +62,16 @@ def test_leave_area_filter_excludes_inactive_and_ignores_garbage():
     client = _client(active)
     assert _ids(client.get(URL, {"leave_area": area.id})) == {active.id}
     assert active.id in _ids(client.get(URL, {"leave_area": "abc"}))
+
+
+def test_users_list_exposes_issue_assignee_flag():
+    me = _user()
+    assignee = grant_via_group(_user(), "issues.be_assignee")
+    tech = grant_via_group(_user(), "servicenow.be_technician")
+    data = _client(me).get(URL).data
+    rows = {r["id"]: r for r in (data["results"] if isinstance(data, dict) else data)}
+    assert rows[assignee.id]["is_issue_assignee"] is True
+    assert rows[assignee.id]["is_servicenow_technician"] is False
+    assert rows[tech.id]["is_issue_assignee"] is False
+    assert rows[tech.id]["is_servicenow_technician"] is True
+    assert rows[me.id]["is_issue_assignee"] is False

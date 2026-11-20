@@ -10,7 +10,20 @@ def _isolated_media_root(settings, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
-def _fresh_module_switches():
+def _local_cache(settings):
+    """I test girano accanto allo stack dev, che usa lo stesso Redis: la cache
+    dello stack (es. i moduli spenti) arrivava nei test e li faceva fallire a
+    caso. Ogni test ha una cache locale e vuota."""
+    from django.core.cache import cache
+
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_module_switches(_local_cache):
     """Lo stato dei moduli spenti e della manutenzione sta in cache
     (core/modules.py, core/maintenance.py) e il rollback del DB tra un test
     e l'altro non la invalida."""

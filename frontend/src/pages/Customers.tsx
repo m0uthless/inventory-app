@@ -22,7 +22,6 @@ import { useAuth } from '../auth/AuthProvider'
 import { api } from '@shared/api/client'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
-import { useCustomerKpis } from '../hooks/useCustomerKpis'
 import { useToast } from '@shared/ui/toast'
 import { copyToClipboard } from '@shared/utils/clipboard'
 import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
@@ -37,11 +36,11 @@ import { useUrlStringParam } from '@shared/hooks/useUrlParam'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
 import VpnModal from '../features/customers/VpnModal'
 import CustomerDialog from '../features/customers/CustomerDialog'
-import CustomerDetailCard, { type CustomerPatch, type CustomerTab } from '../features/customers/CustomerDetailCard'
+import CustomerDetailModal from '../features/customers/CustomerDetailModal'
+import RecordStackHost from '../features/records/RecordStackHost'
 import CustomerKpis, { useCustomerSummary } from '../features/customers/CustomerKpis'
-import { CustomerActivityPanel, CustomerDocumentsPanel, CustomerInventoriesPanel, CustomerSitesPanel } from '../features/customers/CustomerTabs'
 import { daysTo, dIt, EXPIRING_DAYS, ExpiryMark, VendorMark, vendorColorOf } from '../features/customers/customerUi'
-import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, useUndoToast, type ActiveFilter } from '../ui/campo'
+import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useStatusTokens } from '../theme/AppThemeProvider'
 import { useExportCsv } from '@shared/ui/useExportCsv'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
@@ -239,7 +238,6 @@ type ViewState = { view: CustView; status: string; vpn: string; contact: string 
 export default function Customers() {
   const { me, hasPerm } = useAuth()
   const toast = useToast()
-  const undoToast = useUndoToast()
   const navigate = useNavigate()
   const loc = useLocation()
   const tokens = useStatusTokens()
@@ -347,9 +345,7 @@ export default function Customers() {
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [detail, setDetail] = React.useState<CustomerDetail | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
-  const [drawerTab, setDrawerTab] = React.useState<CustomerTab>('det')
   const [vpnReload, setVpnReload] = React.useState(0)
-  const { sitesCount, invCount, driveCount, devicesCount, contractsCount, reset: resetKpis } = useCustomerKpis(detail?.id ?? null)
 
   const [deleteDlgOpen, setDeleteDlgOpen] = React.useState(false)
   const [deleteBusy, setDeleteBusy] = React.useState(false)
@@ -413,21 +409,19 @@ export default function Customers() {
     lastOpenRef.current = id
     setSelectedId(id)
     setDrawerOpen(true)
-    setDrawerTab('det')
     loadDetail(id)
   }, [grid.openId, loadDetail])
 
+  // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo cliente.
   const openDrawer = React.useCallback(
-    (id: number) => {
+    (id: number, keep?: boolean) => {
       lastOpenRef.current = id
       setSelectedId(id)
       setDrawerOpen(true)
-      setDrawerTab((t) => (selectedId === id ? t : 'det'))
-      if (selectedId !== id) resetKpis()
-      loadDetail(id)
+      loadDetail(id, undefined, keep)
       grid.setOpenId(id)
     },
-    [grid, loadDetail, resetKpis, selectedId],
+    [grid, loadDetail],
   )
 
   // Azioni riga / menu contestuale
@@ -561,7 +555,6 @@ export default function Customers() {
 
   const closeDrawer = () => {
     setDrawerOpen(false)
-    setSelectedId(null)
     lastOpenRef.current = null
     grid.setOpenId(null)
     if (returnTo) navigate(returnTo, { replace: true })
@@ -641,28 +634,6 @@ export default function Customers() {
     }
   }
 
-  // Modifica sul posto dalle Proprietà, con annulla.
-  const patchCustomer = React.useCallback(async (patch: CustomerPatch, label: string) => {
-    if (!detail) return
-    const id = detail.id
-    const prev: Record<string, unknown> = {}
-    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? null
-    try {
-      await api.patch(`/customers/${id}/`, patch)
-      await loadDetail(id, undefined, true)
-      reloadAll()
-      undoToast.show(`${label} · salvato`, async () => {
-        try {
-          await api.patch(`/customers/${id}/`, prev)
-          await loadDetail(id, undefined, true)
-          reloadAll()
-        } catch (e) { toast.error(apiErrorToMessage(e)) }
-      })
-    } catch (e) {
-      toast.error(apiErrorToFormFeedback(e).message)
-    }
-  }, [detail, loadDetail, reloadAll, undoToast, toast])
-
   const doDelete = async () => {
     if (!detail) return
     setDeleteBusy(true)
@@ -697,7 +668,6 @@ export default function Customers() {
 
   const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
   const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
-  const tabCount = (n?: number | null) => (typeof n === 'number' ? n : null)
 
   return (
     <Stack spacing={0} sx={{ height: '100%' }}>
@@ -774,9 +744,11 @@ export default function Customers() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openDrawer,
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: openDrawer,
             onRowContextMenu: handleRowContextMenu,
-            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
@@ -798,37 +770,35 @@ export default function Customers() {
         />
       )}
 
-      {drawerOpen ? (
-        <CustomerDetailCard
-          detail={detail}
-          loading={detailLoading}
-          statuses={statuses}
-          vendorColor={vendorColor}
-          canChange={canChange}
-          canDelete={canDelete}
-          canEditVpn={canEditVpn}
-          tab={drawerTab}
-          onTab={setDrawerTab}
-          counts={{ sites: tabCount(sitesCount), inventories: tabCount(invCount), drive: tabCount(driveCount), contracts: tabCount(contractsCount), devices: tabCount(devicesCount) }}
-          address={address}
-          position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
-          onClose={closeDrawer}
-          onEdit={openEdit}
-          onDelete={() => setDeleteDlgOpen(true)}
-          onRestore={() => void doRestore()}
-          onPatch={(patch, label) => void patchCustomer(patch, label)}
-          onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
-          onEditVpn={() => { if (detail) openVpnModal(detail) }}
-          onNewIssue={() => { if (detail) newIssueFor(detail) }}
-          onAllContacts={() => { if (detail) navigate(`/contacts${buildQuery({ customer: detail.id })}`) }}
-          reloadKey={vpnReload}
-          sitesTab={detail ? <CustomerSitesPanel customerId={detail.id} /> : null}
-          inventoriesTab={detail ? <CustomerInventoriesPanel customerId={detail.id} showDevices={showDevices} canEditDevices={hasPerm(PERMS.device.device.change)} /> : null}
-          documentsTab={detail ? <CustomerDocumentsPanel customerId={detail.id} showContracts={hasPerm(PERMS.contracts.contract.view)} /> : null}
-          activityTab={detail ? <CustomerActivityPanel customerId={detail.id} /> : null}
-        />
+      {/* La finestra si apre solo con il cliente già caricato: niente passaggio da una finestra di attesa. */}
+      {drawerOpen && detail ? (
+        <RecordStackHost root={{ kind: 'customer', id: detail.id, label: detail.display_name || detail.name }} onClose={closeDrawer}>
+          <CustomerDetailModal
+            detail={detail}
+            loading={detailLoading}
+            statuses={statuses}
+            vendorColor={vendorColor}
+            canChange={canChange}
+            canDelete={canDelete}
+            canEditVpn={canEditVpn}
+            showContracts={hasPerm(PERMS.contracts.contract.view)}
+            showDevices={showDevices}
+            canEditDevices={hasPerm(PERMS.device.device.change)}
+            address={address}
+            position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
+            onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+            onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
+            onClose={closeDrawer}
+            onSaved={() => { if (detail) void loadDetail(detail.id, undefined, true); reloadAll() }}
+            onEdit={openEdit}
+            onDelete={() => setDeleteDlgOpen(true)}
+            onRestore={() => void doRestore()}
+            onCopy={async (v: string) => { await copyToClipboard(v); toast.success('Copiato') }}
+            onEditVpn={() => { if (detail) openVpnModal(detail) }}
+            onNewIssue={() => { if (detail) newIssueFor(detail) }}
+            reloadKey={vpnReload}
+          />
+        </RecordStackHost>
       ) : null}
 
       <ConfirmDeleteDialog

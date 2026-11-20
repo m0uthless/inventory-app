@@ -1,0 +1,31 @@
+/* Contratti senza drawer (anteprima ctr-base). Riusa ud, cd, inv, iss, tsk. */
+.pb { position: relative; height: 34px; margin: 18px 6px 0; }
+.pb i { position: absolute; display: block; }
+.pb-track { left: 0; right: 0; top: 14px; height: 6px; border-radius: 3px; background: var(--neutral-bg); }
+.pb-fill { left: 0; top: 14px; height: 6px; border-radius: 3px; background: var(--primary); }
+.pb-fill.warn { background: var(--warning); } .pb-fill.err { background: var(--error); }
+.pb-notice { top: 8px; width: 2px; height: 18px; margin-left: -1px; background: var(--warning); border-radius: 1px; }
+.pb-notice em, .pb-now em { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10px; font-weight: 650; letter-spacing: .04em; white-space: nowrap; }
+.pb-notice em { color: var(--warning); }
+.pb-now { top: 6px; width: 2px; height: 22px; margin-left: -1px; background: var(--text); border-radius: 1px; }
+.pb-now em { top: auto; bottom: -15px; }
+.pb + .tl-f { margin-top: 10px; }
+.pb-box { margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: var(--neutral-bg); display: grid; gap: 2px; }
+.pb-box b { font-size: 13px; } .pb-box small { font-size: 12px; color: var(--muted); }
+.pb-box.warn { background: var(--warning-bg); } .pb-box.warn b { color: var(--warning); }
+.pb-box.err { background: var(--error-bg); } .pb-box.err b { color: var(--error); }
+.tl-tag.ok { background: var(--success-bg); color: var(--success); }
+.amt { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.amt b { font-size: 22px; font-weight: 650; letter-spacing: -.015em; } .amt span { font-size: 12px; color: var(--muted); }
+.amt-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.amt-grid > div { padding: 8px 12px; } .amt-grid > div + div { border-left: 1px solid var(--border); }
+.amt-grid small { display: block; font-size: 11px; color: var(--muted); } .amt-grid b { font-size: 13px; font-weight: 600; }
+.amt-grid + .acc-note { margin-top: 8px; }
+.docf { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.docf .t { display: grid; min-width: 0; line-height: 1.3; } .docf .t b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .docf .t small { font-size: 11.5px; color: var(--muted); }
+.docf .acts { display: inline-flex; } .docf .acts .icon-btn { width: 30px; height: 30px; }
+.upl { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 8px; background: none; font: inherit; text-align: left; color: var(--muted); cursor: pointer; }
+.upl:hover { border-color: var(--primary); color: var(--primary); }
+.upl b { display: block; font-size: 13px; color: var(--text); } .upl small { font-size: 12px; }
+.ven-b.exp-ok { background: rgb(255 255 255 / .16); } .ven-b.exp-warn { background: #e0a43a; color: #2b1d00; } .ven-b.exp-err { background: #f2b8b0; color: #5a1410; }
+.st.err { background: var(--error-bg); color: var(--error); }

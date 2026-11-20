@@ -31,8 +31,8 @@ const auth: { me: Record<string, unknown>; hasPerm: (perm: string) => boolean; i
 }
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => auth }))
 vi.mock('../features/areatasks/AreaTaskDetail', () => ({
-  default: (p: { task: AreaTaskRow | null; initialTab?: number }) =>
-    p.task ? <div data-testid="detail" data-initial-tab={p.initialTab ?? 0}>{p.task.title}</div> : null,
+  default: (p: { task: AreaTaskRow | null; initialTab?: number; onClose: () => void }) =>
+    p.task ? <div data-testid="detail" data-initial-tab={p.initialTab ?? 0}>{p.task.title}<button type="button" onClick={p.onClose}>Chiudi</button></div> : null,
 }))
 
 function row(over: Partial<AreaTaskRow>): AreaTaskRow {
@@ -69,6 +69,8 @@ beforeEach(() => {
   apiGet.mockImplementation((url: string) => {
     if (url === '/area-tasks/') return Promise.resolve({ data: { count: rows.length, results: rows } })
     if (url === '/area-tasks/stats/') return Promise.resolve({ data: stats })
+    const one = /^\/area-tasks\/(\d+)\/$/.exec(url)
+    if (one && rows.some((r) => r.id === Number(one[1]))) return Promise.resolve({ data: rows.find((r) => r.id === Number(one[1])) })
     if (url === '/leave-areas/') return Promise.resolve({ data: { results: [{ id: 3, label: 'Ufficio' }, { id: 4, label: 'Romagna' }] } })
     if (url === '/users/') return Promise.resolve({ data: [{ id: 12, full_name: 'Anna Rossi', username: 'anna' }] })
     return Promise.reject(new Error(`unexpected ${url}`))
@@ -124,10 +126,32 @@ describe('AreaTasks page', () => {
     expect(screen.getByRole('button', { name: /Nuovo task/ })).toBeDisabled()
   })
 
-  it('opens the detail when a row is clicked', async () => {
+  it('a click selects the row, a double click opens the detail', async () => {
     renderPage()
     fireEvent.click(await screen.findByText('Rapporto mensile'))
+    expect(screen.queryByTestId('detail')).toBeNull()
+    fireEvent.doubleClick(screen.getByText('Rapporto mensile'))
     expect(await screen.findByTestId('detail')).toHaveTextContent('Rapporto mensile')
+  })
+
+  it('?open= opens a task of the list', async () => {
+    renderPage('/tasks?open=2')
+    expect(await screen.findByTestId('detail')).toHaveTextContent('Rapporto mensile')
+  })
+
+  it('?open= opens a task outside the current page through the API', async () => {
+    const base = apiGet.getMockImplementation()!
+    apiGet.mockImplementation((url: string) => (url === '/area-tasks/77/' ? Promise.resolve({ data: row({ id: 77, title: 'Fuori pagina' }) }) : base(url)))
+    renderPage('/tasks?open=77')
+    expect(await screen.findByTestId('detail')).toHaveTextContent('Fuori pagina')
+  })
+
+  it('closing the detail keeps it closed (no reopening from the URL)', async () => {
+    renderPage()
+    fireEvent.doubleClick(await screen.findByText('Rapporto mensile'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Chiudi' }))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByTestId('detail')).toBeNull()
   })
 
   it('creates a task in the own area from the "Nuovo task" dialog and opens it', async () => {
@@ -211,6 +235,15 @@ describe('AreaTasks page', () => {
       fireEvent.contextMenu(screen.getByText('Switch rack'))
       expect(await screen.findByRole('menuitem', { name: 'Apri la issue #42' })).toBeInTheDocument()
       expect(screen.queryByRole('menuitem', { name: 'Trasforma in issue' })).toBeNull()
+    })
+
+    it('a task whose issue was trashed can be converted again', async () => {
+      rows = [row({ id: 5, title: 'Switch rack', status: 'completato', converted_to_issue: 42, converted_to_issue_title: 'Switch', converted_to_issue_deleted: true })]
+      renderPage()
+      expect(await screen.findByText('Issue #42 nel cestino')).toBeInTheDocument()
+      fireEvent.contextMenu(screen.getByText('Switch rack'))
+      expect(await screen.findByRole('menuitem', { name: 'Trasforma in issue' })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: 'Apri la issue #42' })).toBeNull()
     })
 
     it('hides "Trasforma in issue" when the user lacks issues.add_issue', async () => {

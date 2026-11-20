@@ -105,7 +105,6 @@ class UserAdminProfileSerializer(serializers.ModelSerializer):
         fields = [
             "avatar",
             "is_philips",
-            "is_servicenow_technician",
             "is_functional_account",
             "is_leave_coordinator",
             "leave_area",
@@ -302,7 +301,7 @@ class UserAdminViewSet(
         user.save()
 
         # ── Profilo Philips: profilo "circoscritto" all'app ServiceNow ──────
-        # Un utente Philips è automaticamente tecnico ServiceNow, non può
+        # Un utente Philips non può
         # essere coordinatore ferie né segreteria rimborsi spese, non ha area
         # ferie, non appartiene a nessun gruppo e non ha permessi sui moduli
         # Archie/Portal. Enforced qui (non solo lato UI) così una chiamata
@@ -314,7 +313,6 @@ class UserAdminViewSet(
             is_philips = UserProfile.objects.filter(user=user).values_list("is_philips", flat=True).first() or False
 
         if is_philips:
-            incoming_profile["is_servicenow_technician"] = True
             incoming_profile["is_leave_coordinator"] = False
             incoming_profile["is_expense_secretary"] = False
             incoming_profile["leave_area"] = None
@@ -395,7 +393,6 @@ class UserAdminViewSet(
             profile_data = data["profile"] or {}
             for field in (
                 "is_philips",
-                "is_servicenow_technician",
                 "is_functional_account",
                 "is_leave_coordinator",
                 "is_expense_secretary",
@@ -650,6 +647,8 @@ class GroupAdminWriteSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)
     module_permissions = serializers.DictField(required=False)
     extra_permission_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    # Membri del gruppo (elenco completo): chi manca esce, chi è nuovo entra.
+    user_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
 
 
 class GroupAdminCreateSerializer(serializers.Serializer):
@@ -703,6 +702,10 @@ class GroupAdminViewSet(
             instance.permissions.set(ids)
             changed_fields.append("permissions")
 
+        if "user_ids" in data:
+            self._apply_members(instance, set(data["user_ids"]), request.user)
+            changed_fields.append("members")
+
         log_event(
             actor=request.user,
             action="update",
@@ -714,6 +717,29 @@ class GroupAdminViewSet(
 
         out_serializer = self.get_serializer(instance)
         return Response(out_serializer.data)
+
+    @staticmethod
+    def _apply_members(group: Group, wanted: set[int], requester) -> None:
+        """Allinea i membri del gruppo a ``wanted`` con le stesse regole della
+        modifica del singolo utente: un account superuser o staff lo tocca solo
+        un superuser (B-10) e un utente Philips non appartiene a nessun gruppo."""
+        current = set(group.user_set.values_list("id", flat=True))
+        added, removed = wanted - current, current - wanted
+        if not added and not removed:
+            return
+        touched = list(User.objects.filter(id__in=added | removed).select_related("profile"))
+        unknown = added - {u.id for u in touched}
+        if unknown:
+            raise serializers.ValidationError({"user_ids": f"Utenti inesistenti: {sorted(unknown)}."})
+        if not getattr(requester, "is_superuser", False) and any(u.is_superuser or u.is_staff for u in touched):
+            raise PermissionDenied("Solo un superuser può cambiare i gruppi di un account amministratore.")
+        philips = [u.username for u in touched if u.id in added and getattr(getattr(u, "profile", None), "is_philips", False)]
+        if philips:
+            raise serializers.ValidationError({"user_ids": f"Gli utenti Philips non possono stare in un gruppo: {', '.join(philips)}."})
+        if added:
+            group.user_set.add(*[u for u in touched if u.id in added])
+        if removed:
+            group.user_set.remove(*[u for u in touched if u.id in removed])
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

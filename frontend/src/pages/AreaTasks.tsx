@@ -169,18 +169,30 @@ export default function AreaTasks() {
   // ── Pannello ───────────────────────────────────────────────────────────────
   const [openTask, setOpenTask] = React.useState<AreaTaskRow | null>(null)
   const [openTab, setOpenTab] = React.useState(0)
-  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => { setOpenTab(tab); setOpenTask(row); grid.setOpenId(row.id) }, [grid])
+  // Clic sulla riga: seleziona; doppio clic o Invio: apre (come nelle altre pagine).
+  const [selectedId, setSelectedId] = React.useState<number | null>(null)
+  const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => { setOpenTab(tab); setOpenTask(row); setSelectedId(row.id); grid.setOpenId(row.id) }, [grid])
   const closeDetail = React.useCallback(() => { setOpenTask(null); grid.setOpenId(null) }, [grid])
   // Apertura da URL (?open=): anche per un task fuori dalla pagina corrente.
+  // Si reagisce solo a un id nuovo: chiudendo, `?open=` sparisce dall'URL un attimo
+  // dopo il task aperto, e senza questo controllo la finestra si riaprirebbe (Esc
+  // andava premuto due volte).
+  const handledOpenId = React.useRef<number | null>(null)
+  const rowsRef = React.useRef(rows)
+  rowsRef.current = rows
+  const openTaskIdRef = React.useRef<number | null>(null)
+  openTaskIdRef.current = openTask?.id ?? null
   React.useEffect(() => {
     const id = grid.openId
-    if (!id || openTask?.id === id) return
-    const found = rows.find((r) => r.id === id)
+    if (id === handledOpenId.current) return
+    handledOpenId.current = id
+    if (!id || openTaskIdRef.current === id) return
+    const found = rowsRef.current.find((r) => r.id === id)
     if (found) { setOpenTask(found); return }
     let alive = true
     api.get<AreaTaskRow>(`/area-tasks/${id}/`).then((r) => { if (alive) setOpenTask(r.data) }).catch(() => {})
     return () => { alive = false }
-  }, [grid.openId, rows, openTask?.id])
+  }, [grid.openId])
   const openIndex = openTask ? rows.findIndex((r) => r.id === openTask.id) : -1
 
   // ── Nuovo task ─────────────────────────────────────────────────────────────
@@ -261,7 +273,7 @@ export default function AreaTasks() {
       { key: 'open', label: 'Apri', icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => openDetail(row, 0) },
       { key: 'comment', label: 'Commenta', icon: <ChatBubbleOutlineIcon fontSize="small" />, onClick: () => openDetail(row, 1), disabled: !edit },
       { key: 'next', label: `Segna come ${STATUS_META[NEXT_STATUS[row.status]].label}`, icon: <EditIcon fontSize="small" />, onClick: () => void setStatusFromRow(row), disabled: !edit, hidden: Boolean(row.converted_to_issue) },
-      row.converted_to_issue
+      row.converted_to_issue && !row.converted_to_issue_deleted
         ? { key: 'issue', label: `Apri la issue #${row.converted_to_issue}`, icon: <CampoIcon name="alert" />, onClick: () => navigate(`/issues${buildQuery({ open: row.converted_to_issue })}`) }
         : { key: 'convert', label: 'Trasforma in issue', icon: <CampoIcon name="alert" />, onClick: () => setConvertTarget(row), disabled: !edit, hidden: !canAddIssue },
       { key: 'delete', label: 'Elimina', icon: <DeleteOutlineIcon fontSize="small" />, onClick: () => setDeleteTarget(row), tone: 'danger' as const, disabled: !edit },
@@ -292,8 +304,8 @@ export default function AreaTasks() {
           <Typography noWrap sx={{ fontSize: 13, fontWeight: 550 }}>{row.title}</Typography>
           {row.comments_count ? commentChip(row.comments_count) : null}
           {row.converted_to_issue ? (
-            <Tooltip title={`Diventato la issue #${row.converted_to_issue}`}>
-              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '3px', ml: 1, flex: 'none', fontSize: 11, fontWeight: 600, color: 'info.main' }}><CampoIcon name="arrowR" size={12} />Issue #{row.converted_to_issue}</Box>
+            <Tooltip title={row.converted_to_issue_deleted ? `La issue #${row.converted_to_issue} è nel cestino: il task si può trasformare di nuovo` : `Diventato la issue #${row.converted_to_issue}`}>
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '3px', ml: 1, flex: 'none', fontSize: 11, fontWeight: 600, color: row.converted_to_issue_deleted ? 'text.secondary' : 'info.main' }}><CampoIcon name="arrowR" size={12} />Issue #{row.converted_to_issue}{row.converted_to_issue_deleted ? ' nel cestino' : ''}</Box>
             </Tooltip>
           ) : null}
         </Box>
@@ -488,9 +500,10 @@ export default function AreaTasks() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: (id) => { const r = rows.find((x) => x.id === id); if (r) openDetail(r) },
+            onRowClick: setSelectedId,
+            onRowOpen: (id) => { const r = rows.find((x) => x.id === id); if (r) openDetail(r) },
             onRowContextMenu: (row, e) => setContextMenu({ row, mouseX: e.clientX + 2, mouseY: e.clientY - 6 }),
-            getRowClassName: (row) => (openTask?.id === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />

@@ -5,6 +5,7 @@ from django.utils import timezone
 import django_filters as filters
 
 from rest_framework import serializers, viewsets, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
@@ -12,11 +13,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from audit.utils import log_event, to_change_value_for_field
 from core.emails import send_templated_email
-from core.technicians import eligible_technician_q, is_eligible_technician
+from core.technicians import eligible_issue_assignee_q, is_eligible_issue_assignee
 from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
+from issues.visibility import own_area_q, user_area_id, visible_issues_q
 from servicenow.models import ServiceNowCase
 from rest_framework.permissions import IsAuthenticated
 from portal.permissions import IsInternalOrPortalDedicatedApp
@@ -65,6 +67,15 @@ class IssueCommentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "issue", "author", "created_at", "updated_at"]
 
 
+def can_edit_issue(user, issue) -> bool:
+    """Una issue senza area la modifica chiunque abbia i permessi delle issue;
+    con un'area solo i membri di quell'area (o il superuser)."""
+    if issue.area_id is None or getattr(user, "is_superuser", False):
+        return True
+    uid = user_area_id(user)
+    return uid is not None and uid == issue.area_id
+
+
 class IssueSerializer(serializers.ModelSerializer):
     customer_name           = serializers.SerializerMethodField()
     customer_code           = serializers.CharField(source="customer.code",              read_only=True)
@@ -86,6 +97,12 @@ class IssueSerializer(serializers.ModelSerializer):
     comments_count          = serializers.SerializerMethodField()
     days_open               = serializers.SerializerMethodField()
     servicenow_external_url = serializers.SerializerMethodField()
+    area_label              = serializers.CharField(source="area.label", read_only=True, default=None)
+    can_edit                = serializers.SerializerMethodField()
+
+    def get_can_edit(self, obj):
+        request = self.context.get("request")
+        return bool(request) and can_edit_issue(request.user, obj)
 
     def get_customer_name(self, obj):
         if obj.customer_placeholder:
@@ -215,16 +232,35 @@ class IssueSerializer(serializers.ModelSerializer):
                 "Il cliente è obbligatorio, oppure spunta \"Cliente non presente in DB\" e inserisci un nome.",
             )
 
-        # ── Assegnazione: solo utenti tecnici ServiceNow non-Philips (categoria Biotron) ──
-        if "assigned_to" in attrs and attrs["assigned_to"] is not None:
-            assignee = attrs["assigned_to"]
-            try:
-                profile = assignee.profile
-                is_assignable = is_eligible_technician(assignee) and not bool(profile.is_philips)
-            except Exception:
-                is_assignable = False
-            if not is_assignable:
-                errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue (deve essere un tecnico ServiceNow non Philips)."
+        # ── Assegnazione: solo chi ha il permesso di gruppo `issues.be_assignee` ──
+        # Controllato solo se l'assegnatario cambia davvero: le issue con un
+        # assegnatario che nel frattempo ha perso il permesso restano modificabili
+        # (il modulo completo rimanda sempre `assigned_to`).
+        current_assignee_id = getattr(self.instance, "assigned_to_id", None)
+        assignee_changed = "assigned_to" in attrs and getattr(attrs["assigned_to"], "pk", None) != current_assignee_id
+        if assignee_changed and attrs["assigned_to"] is not None:
+            if not is_eligible_issue_assignee(attrs["assigned_to"]):
+                errors["assigned_to"] = "L'utente selezionato non è assegnabile alle issue."
+
+        # ── Assegnatario membro dell'area della issue ──
+        # Si ricontrolla solo se area o assegnatario cambiano davvero (le issue
+        # con dati preesistenti restano modificabili); il superuser è esente,
+        # come per i task di area.
+        current_area_id = getattr(self.instance, "area_id", None)
+        area_changed = "area" in attrs and getattr(attrs["area"], "pk", None) != current_area_id
+        # Un'area disattivata o nel cestino non si sceglie più; le issue che ci
+        # stanno già restano modificabili.
+        new_area = attrs.get("area") if area_changed else None
+        if new_area is not None and (not new_area.is_active or new_area.deleted_at is not None):
+            errors["area"] = f"L'area «{new_area.label}» non è più attiva."
+        if (area_changed or assignee_changed) and "assigned_to" not in errors:
+            area = attrs["area"] if "area" in attrs else getattr(self.instance, "area", None)
+            assignee = attrs["assigned_to"] if "assigned_to" in attrs else getattr(self.instance, "assigned_to", None)
+            request = self.context.get("request")
+            actor_is_superuser = bool(request and getattr(request.user, "is_superuser", False))
+            if area is not None and assignee is not None and not actor_is_superuser:
+                if user_area_id(assignee) != area.pk:
+                    errors["assigned_to"] = f"L'assegnatario deve far parte dell'area «{area.label}»."
 
         if site is not None and customer is not None and site.customer_id != customer.id:
             errors["site"] = "Il sito selezionato non appartiene al cliente della issue."
@@ -250,6 +286,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "site", "site_name",
             "inventory", "inventory_name", "inventory_knumber", "inventory_serial_number", "inventory_hostname",
             "category", "category_label",
+            "area", "area_label", "can_edit",
             "assigned_to", "assigned_to_username", "assigned_to_full_name", "assigned_to_avatar",
             "created_by", "created_by_username", "created_by_full_name",
             "priority", "priority_label",
@@ -269,6 +306,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "created_by_username", "created_by_full_name",
             "priority_label", "status_label", "waiting_reason_label",
             "comments_count", "days_open", "closed_at", "servicenow_external_url",
+            "area_label", "can_edit",
         ]
         extra_kwargs = {
             # Obbligatorio a livello di modello (FK non-null): qui diventa
@@ -289,6 +327,8 @@ class IssueFilter(filters.FilterSet):
     inventory   = filters.NumberFilter(field_name="inventory_id")
     category    = filters.NumberFilter(field_name="category_id")
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
+    area        = filters.NumberFilter(field_name="area_id")
+    no_area     = filters.BooleanFilter(field_name="area", lookup_expr="isnull")
     due_before  = filters.DateFilter(field_name="due_date", lookup_expr="lte")
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
@@ -344,13 +384,8 @@ class IssueFilter(filters.FilterSet):
 
 
 def notify_issue_created(user, issue):
-    """Broadcast a tutti i tecnici assegnabili (stessa regola di assigned_to)."""
-    # B-22: solo tecnici idonei (mai i clienti del Portal).
-    technicians = User.objects.filter(
-        eligible_technician_q(),
-        is_active=True,
-        profile__is_philips=False,
-    ).exclude(email="")
+    """Broadcast a tutti gli assegnatari issue (stessa regola di assigned_to)."""
+    technicians = User.objects.filter(eligible_issue_assignee_q(), is_active=True).exclude(email="")
     for recipient in technicians:
         send_templated_email(
             template_name="emails/issue_created.html",
@@ -455,12 +490,18 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         ).order_by("-created_at").values("external_url")[:1]
 
         qs = Issue.objects.select_related(
-            "customer", "site", "inventory", "category",
+            "customer", "site", "inventory", "category", "area",
             "assigned_to", "assigned_to__profile", "created_by",
         ).annotate(
             comments_count=Count("comments"),
             servicenow_external_url=Subquery(external_url_sq),
         )
+        # Visibilità per area: chi non ha `issues.view_all_areas` vede solo la
+        # propria area e le issue senza area (le altre rispondono 404).
+        qs = qs.filter(visible_issues_q(self.request.user))
+        # `?scope=mine`: la pagina Issue, a interruttore «Tutte le aree» spento.
+        if self.request.query_params.get("scope") == "mine":
+            qs = qs.filter(own_area_q(self.request.user))
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     # ── perform_create override ───────────────────────────────────────────────
@@ -481,12 +522,14 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     # ── perform_update override ───────────────────────────────────────────────
 
     def perform_update(self, serializer):
-        """Audit diff limitato a status, priority e assegnatario — i campi chiave per i report."""
+        """Audit diff limitato a status, priority, assegnatario e area — i campi chiave per i report."""
         old = serializer.instance
         old_status       = old.status
         old_priority     = old.priority
         old_assigned_to_id = old.assigned_to_id
         old_assigned_to    = old.assigned_to
+        old_area_id        = old.area_id
+        old_area           = old.area
         issue = serializer.save()
         changes = {}
         if old_status   != issue.status:   changes["status"]   = {"from": old_status,   "to": issue.status}
@@ -497,6 +540,12 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
                 "from": to_change_value_for_field("assigned_to", old_assigned_to),
                 "to":   to_change_value_for_field("assigned_to", issue.assigned_to),
             }
+        # Il passaggio da un'area all'altra cambia chi può modificare la issue.
+        if old_area_id != issue.area_id:
+            changes["area"] = {
+                "from": to_change_value_for_field("area", old_area),
+                "to":   to_change_value_for_field("area", issue.area),
+            }
         log_event(
             self.request.user,
             action="update",
@@ -505,6 +554,43 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             request=self.request,
         )
         self._notify_assignment_change(old_assigned_to_id=old_assigned_to_id, issue=issue)
+
+    # ── Sola lettura per le altre aree ──────────────────────────────────────
+
+    def _check_issue_area(self, issue):
+        """Le issue con un'area le modificano solo i membri di quell'area (o il
+        superuser): vale per ogni scrittura, commenti e Wiki compresi. Si guarda
+        l'area attuale, prima della modifica."""
+        if not can_edit_issue(self.request.user, issue):
+            raise PermissionDenied("Puoi modificare solo le issue della tua area.")
+
+    def update(self, request, *args, **kwargs):
+        # Come UpdateModelMixin.update, ma la issue si carica una volta sola:
+        # serve prima per il controllo d'area, poi per il salvataggio.
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        self._check_issue_area(instance)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+        return Response(serializer.data)
+
+    def perform_destroy(self, instance):
+        self._check_issue_area(instance)
+        super().perform_destroy(instance)
+
+    def _restore_obj(self, obj, request):
+        self._check_issue_area(obj)
+        super()._restore_obj(obj, request)
+
+    def _get_scoped_trash_queryset(self):
+        qs = super()._get_scoped_trash_queryset()
+        if getattr(self.request.user, "is_superuser", False):
+            return qs
+        uid = user_area_id(self.request.user)
+        return qs.filter(Q(area__isnull=True) | Q(area_id=uid)) if uid is not None else qs.filter(area__isnull=True)
 
     # ── email: nuova issue / riassegnazione ─────────────────────────────────
 
@@ -518,13 +604,28 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
 
     @action(detail=False, methods=["get"], url_path="summary")
     def summary(self, request):
-        """Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri."""
+        """Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri.
+
+        `?area=mine`: solo le issue della propria area più quelle senza area
+        (contatore della barra laterale); chi non ha un'area vede i numeri
+        complessivi."""
         from django.db.models import Count, Q, Avg, F, ExpressionWrapper, fields as dj_fields
         from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
         from django.utils.timezone import now
         import datetime
 
-        qs = Issue.objects.filter(deleted_at__isnull=True)
+        scope = visible_issues_q(request.user)
+        # `area`: `mine` (propria area + senza area), `none` (senza area) o l'id
+        # di un'area — lo stesso perimetro del menu «Area» della pagina Issue.
+        area_param = request.query_params.get("area")
+        if area_param == "mine":
+            scope &= own_area_q(request.user)
+        elif area_param == "none":
+            scope &= Q(area__isnull=True)
+        elif area_param and area_param.isdigit():
+            scope &= Q(area_id=int(area_param))
+
+        qs = Issue.objects.filter(scope, deleted_at__isnull=True)
         counts = qs.aggregate(
             open_count=Count("id", filter=Q(status=IssueStatus.OPEN)),
             in_progress_count=Count("id", filter=Q(status=IssueStatus.IN_PROGRESS)),
@@ -540,6 +641,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         avg_row = (
             Issue.objects
             .filter(
+                scope,
                 deleted_at__isnull=True,
                 status__in=(IssueStatus.RESOLVED, IssueStatus.CLOSED),
                 opened_at__isnull=False,
@@ -585,7 +687,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
 
         buckets_qs = (
             Issue.objects
-            .filter(deleted_at__isnull=True)
+            .filter(scope, deleted_at__isnull=True)
             .annotate(eff_date=effective_date)
             .filter(eff_date__gte=cutoff)
             .annotate(period=trunc_fn)
@@ -609,6 +711,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         closed_qs = (
             Issue.objects
             .filter(
+                scope,
                 deleted_at__isnull=True,
                 status__in=(IssueStatus.RESOLVED, IssueStatus.CLOSED),
                 closed_at__isnull=False,
@@ -675,6 +778,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         if request.method == "GET":
             return Response([self._wiki_link_payload(link) for link in links.order_by("created_at")])
 
+        self._check_issue_area(issue)
         try:
             page_id = int(request.data.get("page"))
         except (TypeError, ValueError):
@@ -704,6 +808,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         if denied:
             return denied
         issue = self.get_object()
+        self._check_issue_area(issue)
         link = WikiLink.objects.select_related("page").filter(
             pk=link_pk, entity_type=WikiEntityType.ISSUE, entity_id=issue.id, deleted_at__isnull=True,
         ).first()
@@ -747,6 +852,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             qs = issue.comments.select_related("author").order_by("created_at")
             return Response(IssueCommentSerializer(qs, many=True).data)
 
+        self._check_issue_area(issue)
         serializer = IssueCommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         comment = serializer.save(issue=issue, author=request.user)
@@ -762,6 +868,7 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     @action(detail=True, methods=["patch", "delete"], url_path=r"comments/(?P<comment_pk>\d+)")
     def comment_detail(self, request, pk=None, comment_pk=None):
         issue = self.get_object()
+        self._check_issue_area(issue)
         try:
             comment = issue.comments.get(pk=comment_pk)
         except IssueComment.DoesNotExist:

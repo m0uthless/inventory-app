@@ -79,6 +79,7 @@ from expenses.api import (
 )
 from purchaseorders.api import PurchaseOrderEntryViewSet
 from contracts.api import ContractViewSet, SellerViewSet
+from text2sql.api import Text2SqlViewSet
 
 router = DefaultRouter()
 router.register(r"customers", CustomerViewSet, basename="customer")
@@ -160,6 +161,7 @@ router.register(r"purchase-order-entries", PurchaseOrderEntryViewSet, basename="
 
 # Contratti
 router.register(r"contracts", ContractViewSet, basename="contract")
+router.register(r"text2sql", Text2SqlViewSet, basename="text2sql")
 router.register(r"sellers", SellerViewSet, basename="seller")
 
 # Lookups (core)

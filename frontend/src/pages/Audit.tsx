@@ -25,7 +25,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon, FilterOptionList, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import AuditKpis from '../features/audit/AuditKpis'
 import { useAuditStats } from '../features/audit/useAuditStats'
-import AuditDetailCard, { type AuditTab } from '../features/audit/AuditDetailCard'
+import AuditDetailCard from '../features/audit/AuditDetailCard'
 import { ActorCell, AuditActionBadge, ChangeSummary, ObjectCell } from '../features/audit/auditUi'
 import {
   ACTION_META, ENTITY, PERIODS, VIEWS, actorLabel, changeEntries, dateCell, entityKey, entityLabel, fieldLabel, fmtValue, objectTitle, periodStart, timeCell, whenLabel,
@@ -122,7 +122,8 @@ export default function Audit() {
 
   // ── Dettaglio ──
   const [detail, setDetail] = React.useState<AuditEvent | null>(null)
-  const [tab, setTab] = React.useState<AuditTab>('det')
+  // Clic sulla riga: la seleziona; doppio clic o Invio: apre la finestra.
+  const [focusId, setFocusId] = React.useState<number | null>(null)
   const selectedId = grid.openId ?? null
   React.useEffect(() => {
     if (!selectedId) { setDetail(null); return }
@@ -132,7 +133,7 @@ export default function Audit() {
     api.get<AuditEvent>(`/audit-events/${selectedId}/`).then((r) => { if (alive) setDetail(r.data) }).catch((e) => { if (alive) toast.error(apiErrorToMessage(e)) })
     return () => { alive = false }
   }, [selectedId, rows, toast])
-  const open = (id: number) => { setTab('det'); grid.setOpenId(id) }
+  const open = (id: number) => { setFocusId(id); grid.setOpenId(id) }
   const close = () => grid.setOpenId(null)
   const idx = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
 
@@ -253,17 +254,17 @@ export default function Audit() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: open,
-            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
+            onRowClick: setFocusId,
+            onRowOpen: open,
+            getRowClassName: (row) => ((selectedId ?? focusId) === row.id ? 'Mui-selected' : undefined),
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
       </Box>
-      {detail && selectedId === detail.id ? (
+      {/* Con ‹ › la finestra resta quella di prima finché arriva il nuovo evento. */}
+      {selectedId && detail ? (
         <AuditDetailCard
           ev={detail}
-          tab={tab}
-          onTab={setTab}
           position={idx >= 0 ? `${idx + 1} di ${rows.length}` : undefined}
           onPrev={idx > 0 ? () => open(rows[idx - 1].id) : undefined}
           onNext={idx >= 0 && idx < rows.length - 1 ? () => open(rows[idx + 1].id) : undefined}

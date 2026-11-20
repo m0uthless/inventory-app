@@ -1,0 +1,22 @@
+/* Purchase Order senza drawer (anteprima pof-base). Riusa ud, cd, inv, iss, tsk, ctr. */
+.pflow { list-style: none; margin: 0; padding: 0; display: grid; }
+.pflow li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: start; position: relative; padding-bottom: 14px; }
+.pflow li:last-child { padding-bottom: 0; }
+.pflow li:not(:last-child)::before { content: ""; position: absolute; left: 11px; top: 24px; bottom: 0; width: 2px; background: var(--border); }
+.pflow li.pf-done:not(:last-child)::before { background: var(--primary); }
+.pf-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--muted); background: var(--surface); box-shadow: inset 0 0 0 2px var(--border-strong); z-index: 1; }
+.pf-dot .i { width: 13px; height: 13px; stroke-width: 2.6; }
+.pflow li.pf-done .pf-dot { background: var(--primary); color: #fff; box-shadow: none; }
+.pflow li.pf-next .pf-dot { color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary), 0 0 0 4px var(--field); }
+.pf-t { display: grid; line-height: 1.3; min-height: 24px; } .pf-t b { font-size: 13px; font-weight: 600; line-height: 24px; } .pf-t small { font-size: 11.5px; color: var(--muted); }
+.pflow li:not(.pf-done):not(.pf-next) .pf-t b { color: var(--muted); font-weight: 500; }
+.pflow li.pf-next .pf-t small { color: var(--primary); font-weight: 600; }
+.dpill { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 6px; border: 1px dashed var(--border-strong); background: none; font: inherit; font-size: 11.5px; font-weight: 550; color: var(--muted); cursor: pointer; }
+.dpill .i { width: 13px; height: 13px; }
+.dpill.on { border: 1px solid var(--field-line); background: var(--field); color: var(--primary); }
+.dslots { display: grid; gap: 14px; }
+.dslot h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.dslot .rows { margin-bottom: 6px; }
+.upl.sm { padding: 7px 10px; } .upl.sm b { font-size: 12.5px; font-weight: 550; color: var(--muted); } .upl.sm:hover b { color: var(--primary); }
+.app-tag .i { width: 11px; height: 11px; vertical-align: -1px; }
+.ikv > span .i { width: 11px; height: 11px; vertical-align: -1px; color: var(--faint); }

@@ -16,7 +16,9 @@ import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded'
 import DoneAllIcon from '@mui/icons-material/DoneAll'
+import StorageRoundedIcon from '@mui/icons-material/StorageRounded'
 import { api } from '@shared/api/client'
+import { hasPending, settlePending } from '../features/text2sql/pending'
 
 // ─── Notifiche persistite (0.9.5) ───────────────────────────────────────────
 // La campanella legge da `/notifications/`, popolata periodicamente dal job
@@ -25,7 +27,7 @@ import { api } from '@shared/api/client'
 // della versione precedente (calcolo live a ogni apertura), qui c'è uno stato
 // letto/non letto persistito lato server.
 
-type NotificationType = 'maintenance_due' | 'area_task_due'
+type NotificationType = 'maintenance_due' | 'area_task_due' | 'text2sql_ready'
 
 type NotifItem = {
   id: number
@@ -45,6 +47,9 @@ type Props = {
 }
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000
+// Generatore SQL: finché c'è una domanda in attesa (segnale lasciato dalla pagina)
+// si controlla ogni 15 secondi, così la notifica arriva subito dopo la risposta.
+const FAST_POLL_MS = 15 * 1000
 
 function daysLeft(dateStr: string, today: Date): number {
   const due = new Date(dateStr)
@@ -66,6 +71,8 @@ export default function NotificationsBell({ enabled }: Props) {
         const rows: NotifItem[] = res.data?.results ?? res.data ?? []
         setItems(rows)
         setUnreadCount(rows.filter((r) => !r.is_read).length)
+        // Le domande al generatore SQL con la notifica arrivata non si aspettano più.
+        settlePending(rows)
       })
       .catch(() => {})
   }, [enabled])
@@ -73,7 +80,11 @@ export default function NotificationsBell({ enabled }: Props) {
   React.useEffect(() => {
     if (!enabled) return
     fetchAll()
-    const interval = setInterval(fetchAll, POLL_INTERVAL_MS)
+    let last = Date.now()
+    const interval = setInterval(() => {
+      if (hasPending() || Date.now() - last >= POLL_INTERVAL_MS) { last = Date.now(); fetchAll() }
+    }, FAST_POLL_MS)
+    window.addEventListener('notifications-changed', fetchAll)
     // Aggiorna il badge quando un override manutenzione o un task di area cambiano
     window.addEventListener('maintenance-due-date-changed', fetchAll)
     window.addEventListener('area-task-changed', fetchAll)
@@ -82,6 +93,7 @@ export default function NotificationsBell({ enabled }: Props) {
       clearInterval(interval)
       window.removeEventListener('maintenance-due-date-changed', fetchAll)
       window.removeEventListener('area-task-changed', fetchAll)
+      window.removeEventListener('notifications-changed', fetchAll)
     }
   }, [enabled, fetchAll])
 
@@ -193,7 +205,11 @@ export default function NotificationsBell({ enabled }: Props) {
                     onClick={(e) => goTo(item, e)}
                     sx={{ px: 2, py: 1, opacity: item.is_read ? 0.6 : 1 }}
                   >
-                    {item.notification_type === 'maintenance_due' ? (
+                    {item.notification_type === 'text2sql_ready' ? (
+                      <StorageRoundedIcon
+                        sx={{ fontSize: 16, color: item.title.includes('non riuscita') ? 'error.main' : 'success.main', mr: 1.25, flexShrink: 0, mt: 0.25 }}
+                      />
+                    ) : item.notification_type === 'maintenance_due' ? (
                       <BuildOutlinedIcon
                         sx={{
                           fontSize: 16,
@@ -230,6 +246,7 @@ export default function NotificationsBell({ enabled }: Props) {
                         {item.subtitle}
                       </Typography>
                     </Box>
+                    {item.notification_type === 'text2sql_ready' ? null : (
                     <Chip
                       size="small"
                       label={
@@ -239,6 +256,7 @@ export default function NotificationsBell({ enabled }: Props) {
                       variant={dl < 0 ? 'filled' : 'outlined'}
                       sx={{ fontSize: '0.68rem', ml: 1, flexShrink: 0, height: 20 }}
                     />
+                    )}
                   </ListItemButton>
                 )
               })}

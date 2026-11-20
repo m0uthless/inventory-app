@@ -10,6 +10,7 @@ describe('moduleForPath', () => {
     ['/wiki/queries', 'wiki'],
     ['/servicenow-dashboard', 'servicenow'],
     ['/maintenance/rapportini', 'maintenance'],
+    ['/knowledge/sql', 'text2sql'],
     ['/customers', null],
     ['/', null],
     ['/issuesx', null],
@@ -38,7 +39,7 @@ describe('moduleForPerm', () => {
 it('le chiavi coincidono con il backend (core/modules.py)', () => {
   expect(MODULES.map((m) => m.key).sort()).toEqual([
     'area_tasks', 'contracts', 'drive', 'expenses', 'feedback', 'issues',
-    'leave', 'maintenance', 'monitors', 'purchase_orders', 'servicenow', 'wiki',
+    'leave', 'maintenance', 'monitors', 'purchase_orders', 'servicenow', 'text2sql', 'wiki',
   ])
   for (const key of Object.values(WIDGET_MODULE)) expect(MODULES.some((m) => m.key === key)).toBe(true)
 })

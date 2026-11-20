@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 from attendance.models import LeaveArea
 from core.models import AreaTask, AreaTaskComment, CustomerStatus, UserProfile
 from crm.models import Customer
-from core.testing import make_archie_user
+from core.testing import grant_via_group, make_archie_user
 
 pytestmark = pytest.mark.django_db
 
@@ -44,9 +44,9 @@ def _user(area=None, *, superuser=False, can_add_issue=False, is_technician=Fals
         user.user_permissions.add(perm)
     profile, _ = UserProfile.objects.get_or_create(user=user)
     profile.leave_area = area
-    profile.is_servicenow_technician = is_technician
-    profile.is_philips = False
-    profile.save(update_fields=["leave_area", "is_servicenow_technician", "is_philips"])
+    profile.save(update_fields=["leave_area"])
+    if is_technician:
+        grant_via_group(user, "issues.be_assignee")
     return User.objects.get(pk=user.pk)
 
 
@@ -274,3 +274,83 @@ def test_convert_with_non_assignable_assignee_leaves_issue_unassigned_and_skips_
     assert not any(
         ("assegnata a te" in m.subject or "riassegnata" in m.subject) for m in mail.outbox
     )
+
+
+def test_convert_copies_area():
+    area = _area()
+    actor = _user(area, can_add_issue=True)
+    task = AreaTask.objects.create(area=area, title="Con area")
+    resp = _client(actor).post(_url(task), {"customer": _customer().id}, format="json")
+    assert resp.status_code == 201, resp.data
+
+    from issues.models import Issue
+    assert Issue.objects.get(pk=resp.data["issue"]["id"]).area_id == area.id
+
+
+def test_convert_with_assignee_outside_task_area_leaves_issue_unassigned():
+    area, other = _area(), _area()
+    actor = _user(area, can_add_issue=True)
+    outsider = _user(other, is_technician=True)  # assegnatario issue, ma di un'altra area
+    task = AreaTask.objects.create(area=area, title="Assegnato fuori area", assigned_to=outsider)
+    resp = _client(actor).post(_url(task), {"customer": _customer().id}, format="json")
+    assert resp.status_code == 201, resp.data
+
+    from issues.models import Issue
+    issue = Issue.objects.get(pk=resp.data["issue"]["id"])
+    assert issue.area_id == area.id
+    assert issue.assigned_to_id is None
+
+
+# ── Revisione 20/11: issue di un'altra area, issue nel cestino ──
+
+def _converted_task(area, issue_area=None):
+    from issues.models import Issue
+    issue = Issue.objects.create(title="Issue riservata", customer=_customer(), created_by=_user(area), area=issue_area)
+    task = AreaTask.objects.create(area=area, title="Task", converted_to_issue=issue, status=AreaTask.STATUS_COMPLETATO)
+    return task, issue
+
+
+def _view_tasks(user):
+    user.user_permissions.add(Permission.objects.get(codename="view_areatask", content_type__app_label="core"))
+    return User.objects.get(pk=user.pk)
+
+
+def test_converted_issue_title_hidden_when_issue_in_other_area():
+    area = _area()
+    task, issue = _converted_task(area, issue_area=_area())
+    data = _client(_view_tasks(_user(area))).get(f"/api/area-tasks/{task.id}/").json()
+    assert data["converted_to_issue"] == issue.id
+    assert data["converted_to_issue_title"] is None
+
+
+def test_converted_issue_title_shown_when_issue_visible():
+    area = _area()
+    task, _ = _converted_task(area, issue_area=area)
+    data = _client(_view_tasks(_user(area))).get(f"/api/area-tasks/{task.id}/").json()
+    assert data["converted_to_issue_title"] == "Issue riservata"
+    assert data["converted_to_issue_deleted"] is False
+
+
+def test_converted_issue_deleted_flag():
+    from django.utils import timezone
+    area = _area()
+    task, issue = _converted_task(area)
+    issue.deleted_at = timezone.now()
+    issue.save(update_fields=["deleted_at"])
+    data = _client(_view_tasks(_user(area))).get(f"/api/area-tasks/{task.id}/").json()
+    assert data["converted_to_issue_deleted"] is True
+
+
+def test_reconvert_allowed_when_issue_is_trashed():
+    from django.utils import timezone
+    from issues.models import Issue
+    area = _area()
+    task, old = _converted_task(area)
+    old.deleted_at = timezone.now()
+    old.save(update_fields=["deleted_at"])
+    resp = _client(_user(area, can_add_issue=True)).post(_url(task), {"customer": _customer().id}, format="json")
+    assert resp.status_code == 201, resp.data
+    task.refresh_from_db()
+    assert task.converted_to_issue_id == resp.data["issue"]["id"] != old.id
+    assert resp.data["task"]["converted_to_issue_deleted"] is False
+    assert Issue.objects.filter(pk=old.pk, deleted_at__isnull=False).exists()

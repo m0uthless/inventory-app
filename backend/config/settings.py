@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "expenses.apps.ExpensesConfig",
     "purchaseorders.apps.PurchaseOrdersConfig",
     "contracts.apps.ContractsConfig",
+    "text2sql.apps.Text2SqlConfig",
 ]
 
 # --- CSRF / Origin handling ---
@@ -226,7 +227,7 @@ else:
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Inventory App API",
-    "VERSION": "1.0.0",
+    "VERSION": "1.1.0",
 }
 
 REST_FRAMEWORK = {
@@ -422,3 +423,18 @@ ARCHIE_PUBLIC_URL = os.getenv("ARCHIE_PUBLIC_URL", "https://archie.biotron.it")
 #   invece un modal con un testo pronto da copiare e incollare a mano.
 # I case Biotron non sono mai toccati da questo switch.
 SERVICENOW_PHILIPS_NOTIFY_MODE = os.getenv("SERVICENOW_PHILIPS_NOTIFY_MODE", "teams")
+
+
+# ── Generatore SQL PACS (text2sql) ─────────────────────────────────────────
+# Ollama gira fuori da Archie (server o VM della rete): senza OLLAMA_URL il
+# generatore risponde «non configurato» e non mette domande in coda.
+T2S_OLLAMA_URL = os.environ.get("OLLAMA_URL", "").rstrip("/")
+T2S_MODEL = os.environ.get("T2S_MODEL", "qwen2.5-coder:7b")
+T2S_NUM_CTX = int(os.environ.get("T2S_NUM_CTX", "16384"))
+T2S_NUM_THREAD = int(os.environ.get("T2S_NUM_THREAD", "0"))
+T2S_TIMEOUT = int(os.environ.get("T2S_TIMEOUT", "900"))
+T2S_ORACLE_VERSION = os.environ.get("T2S_ORACLE_VERSION", "12")
+T2S_NUM_ESEMPI = int(os.environ.get("T2S_NUM_ESEMPI", "6"))
+# Chiave del linguaggio delle Query Wiki usate come esempi (tutte le SQL Oracle).
+T2S_WIKI_LANGUAGE = os.environ.get("T2S_WIKI_LANGUAGE", "sql")
+T2S_MAX_SCHEMA_TOKENS = int(os.environ.get("T2S_MAX_SCHEMA_TOKENS", "10000"))

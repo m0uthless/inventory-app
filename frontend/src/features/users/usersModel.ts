@@ -1,6 +1,7 @@
 import type { AdminGroupRow, AdminUserRow, ModuleRwd, PermissionModule, RwdLevel } from '../../types/adminUsers'
 import { rwdLevelIndex, rwdToLevel } from '../../types/adminUsers'
 import { MODULE_LABEL } from '../profile/profileModel'
+import { SHOW_PHILIPS } from './visibleProfiles'
 
 export type LeaveAreaOption = { id: number; label: string }
 
@@ -31,8 +32,7 @@ export type RoleTag = { label: string; tint: 'sand' | 'sky' | 'lilac' | 'mint' |
 export function roleTags(u: AdminUserRow): RoleTag[] {
   const t: RoleTag[] = []
   if (u.is_superuser) t.push({ label: 'Superuser', tint: 'sand' })
-  if (u.profile.is_servicenow_technician) t.push({ label: 'Tecnico ServiceNow', tint: 'sky' })
-  if (u.profile.is_philips) t.push({ label: 'Philips', tint: 'lilac' })
+  if (SHOW_PHILIPS && u.profile.is_philips) t.push({ label: 'Philips', tint: 'lilac' })
   if (u.profile.is_leave_coordinator) t.push({ label: 'Coordinatore ferie', tint: 'sand' })
   if (u.profile.is_expense_secretary) t.push({ label: 'Segreteria spese', tint: 'mint' })
   if (u.profile.is_functional_account) t.push({ label: 'Account funzionale', tint: 'neutral' })

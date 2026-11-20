@@ -138,7 +138,8 @@ export default function EntityListCard<R extends GridValidRowModel>(props: Props
             paginationModel={grid.paginationModel}
             onPaginationModelChange={grid.onPaginationModelChange}
             renderCard={mobileCard}
-            onRowClick={grid.onRowClick}
+            // Su telefono non c'è selezione: il tocco apre il record.
+            onRowClick={grid.onRowOpen ?? grid.onRowClick}
             onRowContextMenu={grid.onRowContextMenu as any}
             getRowId={grid.getRowId as any}
             filterConfig={grid.filterConfig}

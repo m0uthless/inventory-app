@@ -24,6 +24,10 @@ services:
       # anche in produzione.
       DJANGO_RUN_DEPLOY_CHECK: "1"
 
+  text2sql-worker:
+    env_file:
+      - ./.env.prod
+
   cron:
     env_file:
       - ./.env.prod

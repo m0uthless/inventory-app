@@ -375,7 +375,7 @@ def test_portal_access_requires_customer_when_not_none():
 
 # ── Profilo Philips: circoscritto a ServiceNow ──────────────────────────────
 
-def test_philips_forces_technician_and_clears_group_and_permissions():
+def test_philips_clears_group_and_permissions():
     admin = _make_user(with_manage_users=True)
     c = _client(admin)
     group = Group.objects.create(name=f"g_{uuid.uuid4().hex[:6]}")
@@ -402,7 +402,7 @@ def test_philips_forces_technician_and_clears_group_and_permissions():
     assert resp.status_code == 200
     data = resp.json()
     assert data["profile"]["is_philips"] is True
-    assert data["profile"]["is_servicenow_technician"] is True
+    assert "is_servicenow_technician" not in data["profile"]
     assert data["profile"]["is_leave_coordinator"] is False
     assert data["profile"]["is_expense_secretary"] is False
     assert data["profile"]["leave_area"] is None
@@ -429,7 +429,7 @@ def test_philips_lockdown_applies_even_when_only_saving_permessi_tab():
     data = resp.json()
     assert data["groups"] == []
     assert data["direct_permissions"]["modules"]["crm"] == {"r": False, "w": False, "d": False}
-    assert data["profile"]["is_servicenow_technician"] is True
+    assert "is_servicenow_technician" not in data["profile"]
 
 
 def test_only_superuser_can_grant_is_staff():
@@ -518,3 +518,23 @@ def test_assign_nonexistent_leave_area_returns_400_not_500():
         format="json",
     )
     assert resp.status_code == 400
+
+
+def test_profile_payload_ignores_removed_technician_flag():
+    """Il flag "Tecnico ServiceNow" non è più sul profilo (ora è il permesso di
+    gruppo `servicenow.be_technician`): un client vecchio che lo invia non
+    deve rompere il salvataggio né renderlo tecnico."""
+    from core.technicians import is_eligible_technician
+
+    admin = _make_user(with_manage_users=True)
+    target = _make_user()
+    resp = _client(admin).patch(
+        f"/api/admin-users/{target.id}/",
+        data={"profile": {"is_servicenow_technician": True, "is_leave_coordinator": True}},
+        format="json",
+    )
+    assert resp.status_code == 200, resp.json()
+    data = resp.json()
+    assert data["profile"]["is_leave_coordinator"] is True
+    assert "is_servicenow_technician" not in data["profile"]
+    assert is_eligible_technician(target) is False

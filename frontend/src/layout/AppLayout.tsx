@@ -224,7 +224,8 @@ export function AppLayout() {
     let active = true
     const fetchSummary = async () => {
       try {
-        const { data } = await api.get<IssueSummary>('/issues/summary/')
+        // Contatore: issue della propria area più quelle senza area.
+        const { data } = await api.get<IssueSummary>('/issues/summary/', { params: { area: 'mine' } })
         if (active) setIssueSummary(data)
       } catch {
         if (active) setIssueSummary(null)

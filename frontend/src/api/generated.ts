@@ -354,6 +354,54 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/admin/maintenance/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['admin_maintenance_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch: operations['admin_maintenance_partial_update']
+    trace?: never
+  }
+  '/api/admin/modules/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['admin_modules_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/admin/modules/{key}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch: operations['admin_modules_partial_update']
+    trace?: never
+  }
   '/api/admin/permission-modules/': {
     parameters: {
       query?: never
@@ -380,14 +428,14 @@ export interface paths {
     /**
      * @description CRUD comunicazioni bacheca.
      *     Lettura: tutti gli utenti autenticati.
-     *     Scrittura: solo gruppo admin o superuser.
+     *     Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
      */
     get: operations['announcements_list']
     put?: never
     /**
      * @description CRUD comunicazioni bacheca.
      *     Lettura: tutti gli utenti autenticati.
-     *     Scrittura: solo gruppo admin o superuser.
+     *     Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
      */
     post: operations['announcements_create']
     delete?: never
@@ -406,20 +454,20 @@ export interface paths {
     /**
      * @description CRUD comunicazioni bacheca.
      *     Lettura: tutti gli utenti autenticati.
-     *     Scrittura: solo gruppo admin o superuser.
+     *     Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
      */
     get: operations['announcements_retrieve']
     /**
      * @description CRUD comunicazioni bacheca.
      *     Lettura: tutti gli utenti autenticati.
-     *     Scrittura: solo gruppo admin o superuser.
+     *     Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
      */
     put: operations['announcements_update']
     post?: never
     /**
      * @description CRUD comunicazioni bacheca.
      *     Lettura: tutti gli utenti autenticati.
-     *     Scrittura: solo gruppo admin o superuser.
+     *     Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
      */
     delete: operations['announcements_destroy']
     options?: never
@@ -427,7 +475,7 @@ export interface paths {
     /**
      * @description CRUD comunicazioni bacheca.
      *     Lettura: tutti gli utenti autenticati.
-     *     Scrittura: solo gruppo admin o superuser.
+     *     Scrittura: superuser o core.change_announcement (IsStaffOrReadOnly).
      */
     patch: operations['announcements_partial_update']
     trace?: never
@@ -733,6 +781,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/area-tasks/stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Indicatori della pagina sull'area indicata (`?area=`, assente = tutte).
+     *     I completati contano solo se chiusi negli ultimi `HIDE_COMPLETED_AFTER_DAYS`
+     *     giorni, come nella lista.
+     */
+    get: operations['area_tasks_stats_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/area-tasks/summary/': {
     parameters: {
       query?: never
@@ -839,6 +908,32 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/audit-events/stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Indicatori della pagina Audit (giorni nel fuso locale).
+     *
+     *     - today: eventi di oggi, di cui modifiche (create/update/delete/restore);
+     *     - days: eventi per giorno negli ultimi 14 giorni (dal più vecchio a oggi);
+     *     - failed_24h: accessi falliti nelle ultime 24 ore e la coppia nome utente/IP più frequente;
+     *     - deleted_7d: eliminazioni negli ultimi 7 giorni;
+     *     - top_modifiers_7d: chi ha fatto più modifiche negli ultimi 7 giorni (massimo 3);
+     *     - system_7d: eventi senza utente (sincronizzazioni) negli ultimi 7 giorni.
+     */
+    get: operations['audit_events_stats_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/birthdays/': {
     parameters: {
       query?: never
@@ -871,15 +966,15 @@ export interface paths {
     }
     /**
      * @description CRUD voci di changelog.
-     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     *     Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+     *     core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
      */
     get: operations['changelog_entries_list']
     put?: never
     /**
      * @description CRUD voci di changelog.
-     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     *     Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+     *     core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
      */
     post: operations['changelog_entries_create']
     delete?: never
@@ -897,29 +992,29 @@ export interface paths {
     }
     /**
      * @description CRUD voci di changelog.
-     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     *     Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+     *     core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
      */
     get: operations['changelog_entries_retrieve']
     /**
      * @description CRUD voci di changelog.
-     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     *     Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+     *     core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
      */
     put: operations['changelog_entries_update']
     post?: never
     /**
      * @description CRUD voci di changelog.
-     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     *     Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+     *     core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
      */
     delete: operations['changelog_entries_destroy']
     options?: never
     head?: never
     /**
      * @description CRUD voci di changelog.
-     *     Lettura: tutti gli utenti autenticati. Scrittura: staff/superuser (vedi
-     *     IsStaffOrReadOnly, stesso criterio usato per le Announcements).
+     *     Lettura: tutti gli utenti autenticati. Scrittura: superuser o
+     *     core.change_changelogentry (IsStaffOrReadOnly, come le Announcements).
      */
     patch: operations['changelog_entries_partial_update']
     trace?: never
@@ -1270,6 +1365,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/contacts/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Indicatori della pagina Contatti (contatti non cestinati, stesso perimetro della lista). */
+    get: operations['contacts_summary_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/contracts/': {
     parameters: {
       query?: never
@@ -1461,6 +1573,27 @@ export interface paths {
     put?: never
     /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['contracts_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Conteggi per stato e per scadenza, prossime scadenze e (con il permesso
+     *     dedicato) il valore dei contratti attivi non scaduti. Accetta gli stessi
+     *     filtri cliente/venditore/società della lista.
+     */
+    get: operations['contracts_stats_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -2120,6 +2253,23 @@ export interface paths {
     put?: never
     /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['customers_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/customers/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Indicatori della pagina Clienti (clienti attivi, non cestinati). */
+    get: operations['customers_summary_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -3704,6 +3854,28 @@ export interface paths {
     patch: operations['inventories_partial_update']
     trace?: never
   }
+  '/api/inventories/{id}/maintenance/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Piani di manutenzione che coprono il sistema e interventi registrati (con rapportino).
+     *
+     *     Un piano copre il sistema se è dello stesso cliente e include il suo tipo; la
+     *     scadenza è quella del piano, salvo override per il singolo sistema.
+     */
+    get: operations['inventories_maintenance_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/inventories/{id}/purge/': {
     parameters: {
       query?: never
@@ -3829,6 +4001,23 @@ export interface paths {
     put?: never
     /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['inventories_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/inventories/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Indicatori della pagina Inventari (non cestinati, stesso perimetro della lista). */
+    get: operations['inventories_summary_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -4231,6 +4420,98 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/issues/{id}/wiki/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
+    get: operations['issues_wiki_retrieve']
+    put?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
+    post: operations['issues_wiki_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/issues/{id}/wiki/{link_pk}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
+    delete: operations['issues_wiki_destroy']
+    options?: never
+    head?: never
+    /**
+     * @description ViewSet per Issue.
+     *
+     *     Eredita da:
+     *     - RestoreActionMixin  → action `restore` standard (response con serializer)
+     *     - SoftDeleteAuditMixin → perform_destroy (soft-delete), perform_create, perform_update
+     *
+     *     Override specifici:
+     *     - perform_create: passa solo created_by (Issue non ha updated_by); audit
+     *       changes include title per la leggibilità nel log.
+     *     - perform_update: audit diff limitato a status/priority (i campi chiave
+     *       che interessano nelle notifiche e nei report).
+     *     - get_queryset: usa apply_soft_delete_filters standard + annotazione
+     *       comments_count.
+     */
+    patch: operations['issues_wiki_partial_update']
+    trace?: never
+  }
   '/api/issues/bulk_restore/': {
     parameters: {
       query?: never
@@ -4255,7 +4536,13 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** @description Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri. */
+    /**
+     * @description Conteggi per stato, avg chiusura e bucket grafico — globali, senza filtri.
+     *
+     *     `?area=mine`: solo le issue della propria area più quelle senza area
+     *     (contatore della barra laterale); chi non ha un'area vede i numeri
+     *     complessivi.
+     */
     get: operations['issues_summary_retrieve']
     put?: never
     post?: never
@@ -4492,6 +4779,26 @@ export interface paths {
     put?: never
     /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['maintenance_events_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-events/stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Indicatori della pagina Rapportini: mese corrente, conteggi delle viste
+     *     (KO e parziali, senza PDF, non previste) e carico per tecnico negli ultimi 90 giorni.
+     */
+    get: operations['maintenance_events_stats_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -4785,6 +5092,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/maintenance-plans/plan-stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Indicatori della pagina Piani: piani in corso, completati, con scadute,
+     *     archiviati e copertura del ciclo (fatte / coperte), con la regola di todo.
+     */
+    get: operations['maintenance_plans_plan_stats_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/maintenance-plans/todo/': {
     parameters: {
       query?: never
@@ -4793,14 +5120,33 @@ export interface paths {
       cookie?: never
     }
     /**
-     * @description Ritorna una riga per ogni (piano, inventory) con next_due_date valorizzata.
-     *     Le righe sono ordinate per next_due_date, cliente, sito.
-     *     Filtri: ?customer=ID  ?site=ID
-     *
-     *     Ottimizzazione: una sola query per tutti gli inventory invece di N query
-     *     (una per piano). Il join avviene in Python dopo aver caricato i dati.
+     * @description Una riga per ogni (piano, inventory) da fare nel ciclo corrente.
+     *     Filtri: ?customer ?site ?plan ?type (etichetta del tipo)
+     *     ?due=overdue|next30|later|override ?due_before ?due_from&due_to ?year ?search
+     *     Ogni riga riporta anche last_result / last_date (ultima esecuzione).
      */
     get: operations['maintenance_plans_todo_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/maintenance-plans/todo-stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * @description Indicatori della pagina Scadenze: conteggi per stato, copertura del ciclo,
+     *     prossime uscite (cliente · sito), carico dei prossimi 12 mesi, rapportini del
+     *     mese e KO/parziali recenti, scelte per i filtri. Stessi filtri di base di todo.
+     */
+    get: operations['maintenance_plans_todo_stats_retrieve']
     put?: never
     post?: never
     delete?: never
@@ -4853,6 +5199,23 @@ export interface paths {
      *     L'evento viene tracciato nell'audit log.
      */
     post: operations['me_change_password_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/me/logins/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Ultimi accessi riusciti dell'utente (scheda Sicurezza del Profilo). */
+    get: operations['me_logins_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -5022,6 +5385,23 @@ export interface paths {
     put?: never
     /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['monitors_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/monitors/stats/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Conteggi per le schede della pagina Monitor (solo monitor attivi). */
+    get: operations['monitors_stats_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -6665,6 +7045,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/sites/summary/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Indicatori della pagina Siti (siti non cestinati, stesso perimetro della lista). */
+    get: operations['sites_summary_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/sticky-note/': {
     parameters: {
       query?: never
@@ -6809,6 +7206,22 @@ export interface paths {
     put?: never
     /** @description Mixin per ViewSet con soft-delete e audit logging. */
     post: operations['techs_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/trash/info/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['trash_info_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -8249,6 +8662,24 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/wiki-pages/{id}/favorite/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description POST mette la stella, DELETE la toglie. Entrambe idempotenti. */
+    post: operations['wiki_pages_favorite_create']
+    /** @description POST mette la stella, DELETE la toglie. Entrambe idempotenti. */
+    delete: operations['wiki_pages_favorite_destroy']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/wiki-pages/{id}/rate/': {
     parameters: {
       query?: never
@@ -8897,6 +9328,7 @@ export interface components {
       action: components['schemas']['ActionEnum']
       actor?: number | null
       readonly actor_username: string
+      readonly actor_name: string
       readonly actor_email: string
       content_type?: number | null
       readonly content_type_app: string
@@ -8968,7 +9400,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     Contract: {
       readonly id: number
@@ -8998,8 +9430,6 @@ export interface components {
       readonly expiry_state: string
       devices?: number[]
       readonly devices_detail: string
-      readonly document_url: string
-      readonly document_filename: string
       notes?: string
       /** Format: date-time */
       readonly created_at: string
@@ -9041,7 +9471,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     /**
      * @description Mixin per serializer con campo custom_fields.
@@ -9086,6 +9516,13 @@ export interface components {
       readonly active_issue_count: number
       /** @default 0 */
       readonly contacts_count: number
+      /** @default 0 */
+      readonly open_issues_count: number
+      /** @default 0 */
+      readonly active_contracts_count: number
+      /** Format: date */
+      readonly next_contract_end: string
+      readonly next_contract_title: string
       tags?: string[] | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -9093,7 +9530,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     CustomerStatusLookup: {
       readonly id: number
@@ -9187,7 +9624,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     DeviceList: {
       readonly id: number
@@ -9227,7 +9664,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     DeviceManufacturer: {
       readonly id: number
@@ -9312,6 +9749,7 @@ export interface components {
       customers?: number[]
       /** @description Gruppi che possono accedere a questo file. Vuoto = tutti. */
       allowed_groups?: number[]
+      readonly access: string
       readonly created_by: number | null
       readonly created_by_name: string
       readonly updated_by: number | null
@@ -9322,7 +9760,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     DriveFolder: {
       readonly id: number
@@ -9332,6 +9770,7 @@ export interface components {
       customers?: number[]
       /** @description Gruppi che possono accedere a questa cartella. Vuoto = tutti. */
       allowed_groups?: number[]
+      readonly access: string
       readonly children_count: number
       readonly files_count: number
       readonly created_by: number | null
@@ -9344,7 +9783,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     /**
      * @description * `customer` - Cliente
@@ -9358,9 +9797,10 @@ export interface components {
      * @description * `customer` - Customer
      *     * `site` - Site
      *     * `inventory` - Inventory
+     *     * `issue` - Issue
      * @enum {string}
      */
-    EntityTypeEnum: 'customer' | 'site' | 'inventory'
+    EntityTypeEnum: 'customer' | 'site' | 'inventory' | 'issue'
     ExpenseItem: {
       readonly id: number
       readonly report: number
@@ -9474,6 +9914,11 @@ export interface components {
       readonly status_label: string
       /** Motivo rifiuto */
       readonly rejection_reason: string
+      /**
+       * Inviata il
+       * Format: date-time
+       */
+      readonly submitted_at: string | null
       /** Validata/rifiutata da */
       readonly validated_by: number | null
       readonly validated_by_name: string
@@ -9482,6 +9927,7 @@ export interface components {
        * Format: date-time
        */
       readonly validated_at: string | null
+      readonly km_rate: string
       readonly total_expenses: string
       readonly total_due: string
       readonly items: components['schemas']['ExpenseItem'][]
@@ -9584,7 +10030,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
       readonly has_active_issue: boolean
       readonly active_issue_priority: string | null
       readonly monitors: string
@@ -9616,7 +10062,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
       readonly has_active_issue: boolean
       readonly active_issue_priority: string | null
     }
@@ -9684,7 +10130,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
       readonly has_active_issue: boolean
       readonly active_issue_priority: string | null
       readonly monitors: string
@@ -9721,6 +10167,9 @@ export interface components {
       /** Categoria */
       category?: number | null
       readonly category_label: string
+      area?: number | null
+      readonly area_label: string
+      readonly can_edit: string
       /** Assegnato a */
       assigned_to?: number | null
       readonly assigned_to_username: string
@@ -9805,6 +10254,8 @@ export interface components {
       readonly inventory_hostname: string | null
       readonly inventory_knumber: string | null
       readonly customer_code: string
+      readonly customer_id: number
+      readonly site_id: number | null
       readonly customer_name: string
       readonly site_name: string
       /** Format: date */
@@ -9823,7 +10274,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     MaintenanceNotification: {
       readonly id: number
@@ -9848,7 +10299,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     /**
      * @description * `sent` - Sent
@@ -9871,6 +10322,8 @@ export interface components {
       readonly inventory_type_labels: string
       readonly covered_count: string
       readonly completed_count: number | null
+      readonly todo_count: string
+      readonly overdue_count: string
       title: string
       schedule_type: components['schemas']['ScheduleTypeEnum']
       interval_unit?:
@@ -9896,7 +10349,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     MaintenancePlanInventory: {
       readonly id: number
@@ -9928,6 +10381,7 @@ export interface components {
       inventory?: number | null
       readonly inventory_name: string
       readonly site_name: string | null
+      readonly customer_name: string | null
       produttore?: string
       modello?: string | null
       seriale?: string | null
@@ -10776,7 +11230,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedContract: {
       readonly id?: number
@@ -10806,8 +11260,6 @@ export interface components {
       readonly expiry_state?: string
       devices?: number[]
       readonly devices_detail?: string
-      readonly document_url?: string
-      readonly document_filename?: string
       notes?: string
       /** Format: date-time */
       readonly created_at?: string
@@ -10834,7 +11286,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     /**
      * @description Mixin per serializer con campo custom_fields.
@@ -10879,6 +11331,13 @@ export interface components {
       readonly active_issue_count: number
       /** @default 0 */
       readonly contacts_count: number
+      /** @default 0 */
+      readonly open_issues_count: number
+      /** @default 0 */
+      readonly active_contracts_count: number
+      /** Format: date */
+      readonly next_contract_end?: string
+      readonly next_contract_title?: string
       tags?: string[] | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -10886,7 +11345,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     /**
      * @description Mixin per serializer con campo custom_fields.
@@ -10944,7 +11403,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedDeviceManufacturer: {
       readonly id?: number
@@ -11029,6 +11488,7 @@ export interface components {
       customers?: number[]
       /** @description Gruppi che possono accedere a questo file. Vuoto = tutti. */
       allowed_groups?: number[]
+      readonly access?: string
       readonly created_by?: number | null
       readonly created_by_name?: string
       readonly updated_by?: number | null
@@ -11039,7 +11499,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedDriveFolder: {
       readonly id?: number
@@ -11049,6 +11509,7 @@ export interface components {
       customers?: number[]
       /** @description Gruppi che possono accedere a questa cartella. Vuoto = tutti. */
       allowed_groups?: number[]
+      readonly access?: string
       readonly children_count?: number
       readonly files_count?: number
       readonly created_by?: number | null
@@ -11061,7 +11522,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedExpenseItem: {
       readonly id?: number
@@ -11128,6 +11589,11 @@ export interface components {
       readonly status_label?: string
       /** Motivo rifiuto */
       readonly rejection_reason?: string
+      /**
+       * Inviata il
+       * Format: date-time
+       */
+      readonly submitted_at?: string | null
       /** Validata/rifiutata da */
       readonly validated_by?: number | null
       readonly validated_by_name?: string
@@ -11136,6 +11602,7 @@ export interface components {
        * Format: date-time
        */
       readonly validated_at?: string | null
+      readonly km_rate?: string
       readonly total_expenses?: string
       readonly total_due?: string
       readonly items?: components['schemas']['ExpenseItem'][]
@@ -11196,7 +11663,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
       readonly has_active_issue?: boolean
       readonly active_issue_priority?: string | null
       readonly monitors?: string
@@ -11233,6 +11700,9 @@ export interface components {
       /** Categoria */
       category?: number | null
       readonly category_label?: string
+      area?: number | null
+      readonly area_label?: string
+      readonly can_edit?: string
       /** Assegnato a */
       assigned_to?: number | null
       readonly assigned_to_username?: string
@@ -11295,6 +11765,8 @@ export interface components {
       readonly inventory_hostname?: string | null
       readonly inventory_knumber?: string | null
       readonly customer_code?: string
+      readonly customer_id?: number
+      readonly site_id?: number | null
       readonly customer_name?: string
       readonly site_name?: string
       /** Format: date */
@@ -11313,7 +11785,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedMaintenanceNotification: {
       readonly id?: number
@@ -11338,7 +11810,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     /**
      * @description Mixin per serializer con campo custom_fields.
@@ -11355,6 +11827,8 @@ export interface components {
       readonly inventory_type_labels?: string
       readonly covered_count?: string
       readonly completed_count?: number | null
+      readonly todo_count?: string
+      readonly overdue_count?: string
       title?: string
       schedule_type?: components['schemas']['ScheduleTypeEnum']
       interval_unit?:
@@ -11380,7 +11854,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedMaintenancePlanInventory: {
       readonly id?: number
@@ -11412,6 +11886,7 @@ export interface components {
       inventory?: number | null
       readonly inventory_name?: string
       readonly site_name?: string | null
+      readonly customer_name?: string | null
       produttore?: string
       modello?: string | null
       seriale?: string | null
@@ -11501,6 +11976,9 @@ export interface components {
       costs_incurred?: string | null
       /** Note */
       notes?: string
+      /** Seguito da */
+      followed_by?: number | null
+      readonly followed_by_name?: string
       readonly created_by?: number | null
       readonly created_by_username?: string
       /** Format: date-time */
@@ -11569,7 +12047,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedSeller: {
       readonly id?: number
@@ -11666,6 +12144,10 @@ export interface components {
       readonly primary_contact_phone?: string | null
       /** @default 0 */
       readonly contacts_count: number
+      /** @default 0 */
+      readonly assets_count: number
+      /** @default 0 */
+      readonly open_issues_count: number
       notes?: string | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -11673,7 +12155,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedSnTechnicianAbsence: {
       readonly id?: number
@@ -11727,7 +12209,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedTechnicianKmRate: {
       readonly id?: number
@@ -11900,7 +12382,7 @@ export interface components {
       page?: number
       readonly page_title?: string
       filename?: string
-      mime_type?: string | null
+      readonly mime_type?: string | null
       storage_key?: string
       /** Format: int64 */
       size_bytes?: number | null
@@ -11913,7 +12395,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedWikiCategory: {
       readonly id?: number
@@ -11927,7 +12409,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedWikiLink: {
       readonly id?: number
@@ -11944,7 +12426,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedWikiPage: {
       readonly id?: number
@@ -11961,10 +12443,13 @@ export interface components {
       readonly average_rating?: string
       readonly rating_count?: string
       readonly current_user_rating?: string
+      readonly is_favorite?: string
+      readonly favorited_at?: string
       readonly attachment_count?: string
       custom_fields?: unknown
       pdf_template_key?: string
       pdf_options?: unknown
+      readonly created_by?: number | null
       readonly created_by_username?: string
       readonly updated_by_username?: string
       /** Format: date-time */
@@ -11972,7 +12457,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at?: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at?: string | null
     }
     PatchedWikiQuery: {
       readonly id?: number
@@ -12121,6 +12606,9 @@ export interface components {
       costs_incurred?: string | null
       /** Note */
       notes?: string
+      /** Seguito da */
+      followed_by?: number | null
+      readonly followed_by_name: string
       readonly created_by: number | null
       readonly created_by_username: string
       /** Format: date-time */
@@ -12234,7 +12722,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     RispacsLite: {
       readonly id: number
@@ -12405,6 +12893,10 @@ export interface components {
       readonly primary_contact_phone: string | null
       /** @default 0 */
       readonly contacts_count: number
+      /** @default 0 */
+      readonly assets_count: number
+      /** @default 0 */
+      readonly open_issues_count: number
       notes?: string | null
       custom_fields?: unknown
       /** Format: date-time */
@@ -12412,7 +12904,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     SiteStatusLookup: {
       readonly id: number
@@ -12480,7 +12972,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     TechnicianKmRate: {
       readonly id: number
@@ -12556,11 +13048,6 @@ export interface components {
        */
       is_philips?: boolean
       /**
-       * Tecnico ServiceNow
-       * @description Se disattivato, l'utente non è assegnabile a nessun case ServiceNow (né Philips né Biotron) e non compare nel Triage / Statistiche. Impostabile solo da admin.
-       */
-      is_servicenow_technician?: boolean
-      /**
        * Account funzionale
        * @description Utente di servizio (es. ac.philips, ris.philips, cdd.biotron, jolly.philips) usato solo come assegnatario automatico di fallback per i case ServiceNow senza un tecnico reale disponibile: resta assegnabile normalmente, ma non compare nel pannello Triage né nella vista settimanale assenze, dato che non è una persona. Impostabile solo da admin.
        */
@@ -12633,6 +13120,7 @@ export interface components {
       is_active?: boolean
       readonly is_philips: string
       readonly is_servicenow_technician: string
+      readonly is_issue_assignee: string
       readonly leave_area: string
     }
     UserTask: {
@@ -12750,7 +13238,7 @@ export interface components {
       page: number
       readonly page_title: string
       filename: string
-      mime_type?: string | null
+      readonly mime_type: string | null
       storage_key?: string
       /** Format: int64 */
       size_bytes?: number | null
@@ -12763,7 +13251,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     WikiCategory: {
       readonly id: number
@@ -12777,7 +13265,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     WikiLink: {
       readonly id: number
@@ -12794,7 +13282,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     WikiPage: {
       readonly id: number
@@ -12811,10 +13299,13 @@ export interface components {
       readonly average_rating: string
       readonly rating_count: string
       readonly current_user_rating: string
+      readonly is_favorite: string
+      readonly favorited_at: string
       readonly attachment_count: string
       custom_fields?: unknown
       pdf_template_key?: string
       pdf_options?: unknown
+      readonly created_by: number | null
       readonly created_by_username: string
       readonly updated_by_username: string
       /** Format: date-time */
@@ -12822,7 +13313,7 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
       /** Format: date-time */
-      deleted_at?: string | null
+      readonly deleted_at: string | null
     }
     WikiPageRevision: {
       readonly id: number
@@ -13585,6 +14076,80 @@ export interface operations {
       }
     }
   }
+  admin_maintenance_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  admin_maintenance_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  admin_modules_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  admin_modules_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        key: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   admin_permission_modules_retrieve: {
     parameters: {
       query?: never
@@ -13759,12 +14324,15 @@ export interface operations {
     parameters: {
       query?: {
         area?: number
+        assigned_q?: string
         assigned_to?: number
         due_after?: string
         due_before?: string
+        is_open?: boolean
         mine?: boolean
         /** @description Which field to use when ordering the results. */
         ordering?: string
+        overdue?: boolean
         /** @description A page number within the paginated result set. */
         page?: number
         /** @description Number of results to return per page. */
@@ -13785,6 +14353,8 @@ export interface operations {
          *     * `completato` - Completato
          */
         status?: ('completato' | 'da_fare' | 'in_attesa' | 'in_corso')[]
+        title_q?: string
+        unassigned?: boolean
       }
       header?: never
       path?: never
@@ -14127,6 +14697,25 @@ export interface operations {
       }
     }
   }
+  area_tasks_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AreaTask']
+        }
+      }
+    }
+  }
   area_tasks_summary_retrieve: {
     parameters: {
       query?: never
@@ -14150,10 +14739,13 @@ export interface operations {
     parameters: {
       query?: {
         action?: string
+        actions?: string
         actor?: number
+        actor_null?: boolean
         app_label?: string
         created_after?: string
         created_before?: string
+        ip?: string
         model?: string
         object_id?: string
         /** @description Which field to use when ordering the results. */
@@ -14223,6 +14815,25 @@ export interface operations {
     }
   }
   audit_events_entities_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuditEvent']
+        }
+      }
+    }
+  }
+  audit_events_stats_retrieve: {
     parameters: {
       query?: never
       header?: never
@@ -14451,16 +15062,24 @@ export interface operations {
     parameters: {
       query?: {
         customer?: number
+        customer_q?: string
+        department_q?: string
+        email_q?: string
+        has_site?: boolean
         is_primary?: boolean
+        name_q?: string
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
         page?: number
         /** @description Number of results to return per page. */
         page_size?: number
+        phone_q?: string
         /** @description A search term. */
         search?: string
         site?: number
+        site_q?: string
+        unreachable?: boolean
       }
       header?: never
       path?: never
@@ -14708,6 +15327,25 @@ export interface operations {
       }
     }
   }
+  contacts_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contact']
+        }
+      }
+    }
+  }
   contracts_list: {
     parameters: {
       query?: {
@@ -14721,6 +15359,14 @@ export interface operations {
          */
         contract_type?: 'altro' | 'assistenza' | 'licenza' | 'noleggio'
         customer?: number
+        /**
+         * @description * `ok` - ok
+         *     * `notice` - notice
+         *     * `expiring` - expiring
+         *     * `expired` - expired
+         *     * `attention` - attention
+         */
+        expiry?: 'attention' | 'expired' | 'expiring' | 'notice' | 'ok'
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -15044,6 +15690,25 @@ export interface operations {
         'application/json': components['schemas']['Contract']
       }
     }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       200: {
         headers: {
@@ -15410,6 +16075,15 @@ export interface operations {
     parameters: {
       query?: {
         city?: string
+        city_q?: string
+        code_q?: string
+        contact_q?: string
+        contract_expiring?: boolean
+        has_contact?: boolean
+        has_open_issues?: boolean
+        has_vpn?: boolean
+        incomplete?: boolean
+        name_q?: string
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -15420,6 +16094,7 @@ export interface operations {
         /** @description A search term. */
         search?: string
         status?: number
+        vat_q?: string
       }
       header?: never
       path?: never
@@ -15758,6 +16433,25 @@ export interface operations {
         'multipart/form-data': components['schemas']['Customer']
       }
     }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Customer']
+        }
+      }
+    }
+  }
+  customers_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       200: {
         headers: {
@@ -18575,7 +19269,16 @@ export interface operations {
   inventories_list: {
     parameters: {
       query?: {
+        asset_q?: string
+        code_q?: string
         customer?: number
+        customer_q?: string
+        has_active_issue?: boolean
+        hostname_q?: string
+        incomplete?: boolean
+        ip_q?: string
+        name_q?: string
+        not_operational?: boolean
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -18585,6 +19288,7 @@ export interface operations {
         /** @description A search term. */
         search?: string
         site?: number
+        site_q?: string
         status?: number
         type?: number
       }
@@ -18728,6 +19432,28 @@ export interface operations {
       }
     }
   }
+  inventories_maintenance_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this inventory. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InventoryWrite']
+        }
+      }
+    }
+  }
   inventories_purge_create: {
     parameters: {
       query?: never
@@ -18823,6 +19549,25 @@ export interface operations {
         'multipart/form-data': components['schemas']['InventoryWrite']
       }
     }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InventoryWrite']
+        }
+      }
+    }
+  }
+  inventories_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       200: {
         headers: {
@@ -19027,12 +19772,17 @@ export interface operations {
   issues_list: {
     parameters: {
       query?: {
+        area?: number
+        assigned_q?: string
         assigned_to?: number
         category?: number
         customer?: number
+        customer_q?: string
         due_after?: string
         due_before?: string
+        has_due?: boolean
         hide_closed?: boolean
+        id_q?: string
         inventory?: number
         only_closed?: boolean
         /** @description Which field to use when ordering the results. */
@@ -19050,6 +19800,7 @@ export interface operations {
         priority?: ('critical' | 'high' | 'low' | 'medium')[]
         /** @description A search term. */
         search?: string
+        servicenow_q?: string
         site?: number
         /**
          * @description * `open` - Aperta
@@ -19059,6 +19810,7 @@ export interface operations {
          *     * `closed` - Chiusa
          */
         status?: ('closed' | 'in_progress' | 'open' | 'resolved' | 'waiting')[]
+        title_q?: string
       }
       header?: never
       path?: never
@@ -19316,6 +20068,107 @@ export interface operations {
         'application/json': components['schemas']['Issue']
         'application/x-www-form-urlencoded': components['schemas']['Issue']
         'multipart/form-data': components['schemas']['Issue']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Issue']
+        }
+      }
+    }
+  }
+  issues_wiki_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Issue. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Issue']
+        }
+      }
+    }
+  }
+  issues_wiki_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Issue. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Issue']
+        'application/x-www-form-urlencoded': components['schemas']['Issue']
+        'multipart/form-data': components['schemas']['Issue']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Issue']
+        }
+      }
+    }
+  }
+  issues_wiki_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Issue. */
+        id: number
+        link_pk: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  issues_wiki_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Issue. */
+        id: number
+        link_pk: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedIssue']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedIssue']
+        'multipart/form-data': components['schemas']['PatchedIssue']
       }
     }
     responses: {
@@ -19796,6 +20649,25 @@ export interface operations {
         'application/json': components['schemas']['MaintenanceEvent']
       }
     }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenanceEvent']
+        }
+      }
+    }
+  }
+  maintenance_events_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       200: {
         headers: {
@@ -20510,7 +21382,45 @@ export interface operations {
       }
     }
   }
+  maintenance_plans_plan_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlan']
+        }
+      }
+    }
+  }
   maintenance_plans_todo_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MaintenancePlan']
+        }
+      }
+    }
+  }
+  maintenance_plans_todo_stats_retrieve: {
     parameters: {
       query?: never
       header?: never
@@ -20583,10 +21493,29 @@ export interface operations {
       }
     }
   }
+  me_logins_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   monitors_list: {
     parameters: {
       query?: {
         inventory?: number
+        inventory__isnull?: boolean
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -20855,6 +21784,25 @@ export interface operations {
       }
     }
   }
+  monitors_stats_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Monitor']
+        }
+      }
+    }
+  }
   notifications_list: {
     parameters: {
       query?: {
@@ -21033,13 +21981,17 @@ export interface operations {
     parameters: {
       query?: {
         amount_mode?: string
+        client_q?: string
         customer?: number
+        description_q?: string
+        followed_by?: number
         invoiced?: boolean
         /**
          * @description * `ordinario` - Ordinario
          *     * `extra` - Extra
          */
         kind?: ('extra' | 'ordinario')[]
+        month?: number
         offer_date_after?: string
         offer_date_before?: string
         /** @description Which field to use when ordering the results. */
@@ -21048,6 +22000,7 @@ export interface operations {
         page?: number
         /** @description Number of results to return per page. */
         page_size?: number
+        ref_q?: string
         /** @description A search term. */
         search?: string
         /**
@@ -22042,6 +22995,7 @@ export interface operations {
          */
         category?: ('biotron' | 'philips')[]
         number?: string
+        opened_date?: string
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -22063,6 +23017,7 @@ export interface operations {
          *     * `closed` - Chiuso
          */
         status?: ('closed' | 'in_progress' | 'open')[]
+        unassigned?: boolean
       }
       header?: never
       path?: never
@@ -22704,7 +23659,14 @@ export interface operations {
   sites_list: {
     parameters: {
       query?: {
+        city_q?: string
+        contact_q?: string
         customer?: number
+        customer_q?: string
+        has_inventories?: boolean
+        has_open_issues?: boolean
+        incomplete?: boolean
+        name_q?: string
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -22950,6 +23912,25 @@ export interface operations {
         'multipart/form-data': components['schemas']['Site']
       }
     }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Site']
+        }
+      }
+    }
+  }
+  sites_summary_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       200: {
         headers: {
@@ -23271,6 +24252,24 @@ export interface operations {
         content: {
           'application/json': components['schemas']['Tech']
         }
+      }
+    }
+  }
+  trash_info_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }
@@ -24512,8 +25511,9 @@ export interface operations {
          * @description * `customer` - Customer
          *     * `site` - Site
          *     * `inventory` - Inventory
+         *     * `issue` - Issue
          */
-        entity_type?: 'customer' | 'inventory' | 'site'
+        entity_type?: 'customer' | 'inventory' | 'issue' | 'site'
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -24890,6 +25890,55 @@ export interface operations {
         content: {
           'application/json': components['schemas']['WikiPage']
         }
+      }
+    }
+  }
+  wiki_pages_favorite_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Pagina. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiPage']
+        'application/x-www-form-urlencoded': components['schemas']['WikiPage']
+        'multipart/form-data': components['schemas']['WikiPage']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WikiPage']
+        }
+      }
+    }
+  }
+  wiki_pages_favorite_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description A unique integer value identifying this Pagina. */
+        id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }

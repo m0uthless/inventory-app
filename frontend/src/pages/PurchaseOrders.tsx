@@ -21,6 +21,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid'
 
 import { useLocation, useNavigate } from 'react-router-dom'
+import { buildQuery } from '@shared/utils/nav'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 
@@ -30,7 +31,7 @@ import { useDrfList } from '@shared/hooks/useDrfList'
 
 import { api } from '@shared/api/client'
 import PurchaseOrderDialog from '../features/purchaseorders/PurchaseOrderDialog'
-import PurchaseOrderDetailCard, { type PoPatch, type PoEvent } from '../features/purchaseorders/PurchaseOrderDetailCard'
+import PurchaseOrderDetailCard, { type PoPatch, type PoEvent, type PoUser } from '../features/purchaseorders/PurchaseOrderDetailCard'
 import { Committente, PoStatusBadge } from '../features/purchaseorders/PoBadges'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, headerFilterGridSx, useUndoToast } from '../ui/campo'
 import type { ColumnFilterConfig } from '@shared/ui/ServerDataGrid'
@@ -177,6 +178,13 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
           {p.row.amount_mode === 'giornate' && p.row.days ? <Box sx={{ fontSize: 11, color: 'text.secondary' }}>{Number(p.row.days).toLocaleString('it-IT')} gg × {formatEuro(p.row.daily_rate)}</Box> : null}
         </Box>
       ),
+    },
+    {
+      field: 'followed_by_name',
+      headerName: 'Seguito da',
+      width: 150,
+      sortable: false,
+      renderCell: (p) => <Box component="span" sx={{ color: p.value ? 'text.primary' : 'text.disabled' }}>{(p.value as string) || '—'}</Box>,
     },
     {
       field: 'costs_incurred',
@@ -413,9 +421,9 @@ export default function PurchaseOrders() {
   }, [toast])
 
   const loadDetail = React.useCallback(
-    async (id: number, forceIncludeDeleted?: boolean) => {
+    async (id: number, forceIncludeDeleted?: boolean, keep?: boolean) => {
       setDetailLoading(true)
-      setDetail(null)
+      if (!keep) setDetail(null)
       try {
         const inc = forceIncludeDeleted ?? grid.includeDeleted
         const incParams = includeDeletedParams(inc)
@@ -433,11 +441,12 @@ export default function PurchaseOrders() {
     [toast, grid.includeDeleted],
   )
 
+  // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo PO.
   const openDrawer = React.useCallback(
-    (id: number) => {
+    (id: number, keep?: boolean) => {
       setSelectedId(id)
       setDrawerOpen(true)
-      loadDetail(id)
+      loadDetail(id, undefined, keep)
       grid.setOpenId(id)
     },
     [grid, loadDetail],
@@ -623,10 +632,10 @@ export default function PurchaseOrders() {
   }, [grid, returnTo, navigate])
 
   const doDelete = React.useCallback(async () => {
-    if (!selectedId) return
+    const cid = detail?.id; if (!cid) return
     setDeleteBusy(true)
     try {
-      await api.delete(`/purchase-order-entries/${selectedId}/`)
+      await api.delete(`/purchase-order-entries/${cid}/`)
       toast.success('Purchase Order eliminato.')
       setDeleteDlgOpen(false)
       closeDrawer()
@@ -636,7 +645,7 @@ export default function PurchaseOrders() {
     } finally {
       setDeleteBusy(false)
     }
-  }, [selectedId, toast, closeDrawer, reloadList])
+  }, [detail?.id, toast, closeDrawer, reloadList])
 
   const doBulkRestore = async (): Promise<boolean> => {
     const ids = selectedIds.filter((n) => Number.isFinite(n))
@@ -657,19 +666,19 @@ export default function PurchaseOrders() {
   }
 
   const doRestore = React.useCallback(async () => {
-    if (!selectedId) return
+    const cid = detail?.id; if (!cid) return
     setRestoreBusy(true)
     try {
-      await api.post(`/purchase-order-entries/${selectedId}/restore/`)
+      await api.post(`/purchase-order-entries/${cid}/restore/`)
       toast.success('Purchase Order ripristinato.')
-      await loadDetail(selectedId)
+      await loadDetail(cid, undefined, true)
       reloadList()
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
       setRestoreBusy(false)
     }
-  }, [selectedId, toast, loadDetail, reloadList])
+  }, [detail?.id, toast, loadDetail, reloadList])
 
   // ── Workflow: avanzamento / ritorno di stato ────────────────────────────────
 
@@ -693,31 +702,31 @@ export default function PurchaseOrders() {
         toast.success('Stato aggiornato')
         setTransitionState(null)
         reloadList()
-        if (selectedId === id) await loadDetail(id)
+        if (detail?.id === id) await loadDetail(id)
       } catch (e) {
         toast.error(apiErrorToMessage(e))
       } finally {
         setTransitionBusy(false)
       }
     },
-    [transitionState, selectedId, toast, reloadList, loadDetail],
+    [transitionState, detail?.id, toast, reloadList, loadDetail],
   )
 
   // ── Workflow: upload documento (drawer, indipendente dalla transizione) ────
 
   const uploadDocument = React.useCallback(
     async (slot: DocumentSlot, file: File) => {
-      if (!selectedId) return
+      const cid = detail?.id; if (!cid) return
       setUploadingSlot(slot)
       try {
         const fd = new FormData()
         fd.append('kind', slot)
         fd.append('file', file)
-        await api.post(`/purchase-order-entries/${selectedId}/documents/`, fd, {
+        await api.post(`/purchase-order-entries/${cid}/documents/`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
         toast.success('Documento caricato')
-        await loadDetail(selectedId)
+        await loadDetail(cid, undefined, true)
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -725,19 +734,19 @@ export default function PurchaseOrders() {
         setUploadingSlot(null)
       }
     },
-    [selectedId, toast, loadDetail, reloadList],
+    [detail?.id, toast, loadDetail, reloadList],
   )
 
   const [deletingDocId, setDeletingDocId] = React.useState<number | null>(null)
 
   const deleteDocument = React.useCallback(
     async (docId: number) => {
-      if (!selectedId) return
+      const cid = detail?.id; if (!cid) return
       setDeletingDocId(docId)
       try {
-        await api.delete(`/purchase-order-entries/${selectedId}/documents/${docId}/`)
+        await api.delete(`/purchase-order-entries/${cid}/documents/${docId}/`)
         toast.success('Documento eliminato')
-        await loadDetail(selectedId)
+        await loadDetail(cid, undefined, true)
         reloadList()
       } catch (e) {
         toast.error(apiErrorToMessage(e))
@@ -745,10 +754,18 @@ export default function PurchaseOrders() {
         setDeletingDocId(null)
       }
     },
-    [selectedId, toast, loadDetail, reloadList],
+    [detail?.id, toast, loadDetail, reloadList],
   )
 
-  const [poTab, setPoTab] = React.useState<'det' | 'doc' | 'att'>('det')
+  // Persone che possono seguire un PO (non Philips).
+  const [poUsers, setPoUsers] = React.useState<PoUser[]>([])
+  React.useEffect(() => {
+    let alive = true
+    api.get<{ id: number; full_name?: string; username?: string; is_philips?: boolean }[]>('/users/')
+      .then((r) => { if (alive) setPoUsers((Array.isArray(r.data) ? r.data : []).filter((u) => !u.is_philips).map((u) => ({ id: u.id, label: u.full_name || u.username || String(u.id) }))) })
+      .catch(() => { if (alive) setPoUsers([]) })
+    return () => { alive = false }
+  }, [])
   const canAudit = hasPerm('audit.view_auditevent')
   const [poEvents, setPoEvents] = React.useState<PoEvent[] | null>(null)
   React.useEffect(() => {
@@ -783,7 +800,7 @@ export default function PurchaseOrders() {
       ],
     })
   }
-  const drawerIndex = drawerOpen && selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
+  const drawerIndex = drawerOpen && detail ? rows.findIndex((r) => r.id === detail.id) : -1
 
   // Modifica sul posto dal pannello: salva subito, con Annulla (PATCH inverso).
   const undoToast = useUndoToast()
@@ -791,15 +808,15 @@ export default function PurchaseOrders() {
     if (!detail) return
     const id = detail.id
     const prev: Record<string, unknown> = {}
-    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? (k === 'costs_incurred' ? null : '')
+    for (const k of Object.keys(patch)) prev[k] = (detail as Record<string, unknown>)[k] ?? (k === 'costs_incurred' || k === 'followed_by' ? null : '')
     try {
       await api.patch(`/purchase-order-entries/${id}/`, patch)
-      await loadDetail(id)
+      await loadDetail(id, undefined, true)
       reloadList()
       undoToast.show(`${label} · salvato`, async () => {
         try {
           await api.patch(`/purchase-order-entries/${id}/`, prev)
-          await loadDetail(id)
+          await loadDetail(id, undefined, true)
           reloadList()
         } catch (e) {
           toast.error(apiErrorToMessage(e))
@@ -1038,9 +1055,11 @@ export default function PurchaseOrders() {
             onPaginationModelChange: grid.onPaginationModelChange,
             sortModel: grid.sortModel,
             onSortModelChange: grid.onSortModelChange,
-            onRowClick: openDrawer,
+            // Clic: seleziona la riga; doppio clic o Invio: apre la finestra.
+            onRowClick: setSelectedId,
+            onRowOpen: openDrawer,
             onRowContextMenu: handleRowContextMenu,
-            getRowClassName: (row) => (drawerOpen && selectedId === row.id ? 'Mui-selected' : undefined),
+            getRowClassName: (row) => (selectedId === row.id ? 'Mui-selected' : undefined),
             rowHeight: 50,
             columnSearch: {
               open: colSearchOpen,
@@ -1067,19 +1086,21 @@ export default function PurchaseOrders() {
         items={contextMenuItems}
       />
 
-      {drawerOpen ? (
+      {/* La finestra si apre solo con il PO già caricato: niente passaggio da una finestra di attesa. */}
+      {drawerOpen && detail ? (
         <PurchaseOrderDetailCard
           detail={detail}
           loading={detailLoading}
           committenteColor={detail ? committenteColor(detail.client_name, statusTokens.clientChipPalette).color : 'transparent'}
           canChange={canChange}
           canDelete={canDelete}
-          tab={poTab}
-          onTab={setPoTab}
           events={poEvents}
+          users={poUsers}
+          meId={me?.id ?? null}
+          onOpenCustomer={() => { if (detail?.customer) navigate(`/customers${buildQuery({ open: detail.customer })}`) }}
           position={drawerIndex >= 0 ? `${drawerIndex + 1} di ${rows.length}` : undefined}
-          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id) : undefined}
-          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id) : undefined}
+          onPrev={drawerIndex > 0 ? () => openDrawer(rows[drawerIndex - 1].id, true) : undefined}
+          onNext={drawerIndex >= 0 && drawerIndex < rows.length - 1 ? () => openDrawer(rows[drawerIndex + 1].id, true) : undefined}
           onClose={closeDrawer}
           onEdit={() => void openEdit()}
           onDelete={() => setDeleteDlgOpen(true)}

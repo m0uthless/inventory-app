@@ -184,7 +184,7 @@ def _attachment_accel_response(*, file_field, filename: str, mime_type: str | No
     return protected_media_response(file_field=file_field, disposition=disposition, filename=filename)
 
 
-def _label_for_wiki_link(entity_type: str, entity_id: int) -> str | None:
+def _label_for_wiki_link(entity_type: str, entity_id: int, user=None) -> str | None:
     if entity_type == "customer":
         from crm.models import Customer
 
@@ -200,8 +200,14 @@ def _label_for_wiki_link(entity_type: str, entity_id: int) -> str | None:
     if entity_type == "issue":
         from issues.models import Issue
 
-        title = Issue.objects.filter(pk=entity_id).values_list("title", flat=True).first()
-        return f"#{entity_id} {title}" if title else None
+        from issues.visibility import visible_issues_q
+
+        # Una issue fuori dalla visibilità dell'utente si mostra solo come «#id»;
+        # senza utente non si sa cosa può vedere, quindi niente titolo.
+        if user is None:
+            return f"#{entity_id}"
+        title = Issue.objects.filter(visible_issues_q(user), pk=entity_id).values_list("title", flat=True).first()
+        return f"#{entity_id} {title}" if title else f"#{entity_id}"
     return None
 
 

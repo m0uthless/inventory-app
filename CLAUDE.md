@@ -151,7 +151,7 @@ For releases, changelog edits or packaging use the `archie-release` skill. Alway
 
 ## Roadmap guardrails
 
-- The `pacs_sql` module (Oracle Vue PACS text-to-SQL) is currently **on HOLD** — do not develop or extend it until explicitly unblocked, even if related schema/reference files are present in the project.
+- The PACS text-to-SQL generator (formerly `pacs_sql`, on hold) was **unblocked by Fede on 2026-11-20** and is being built as the `text2sql` app under Conoscenza — see `docs/superpowers/specs/2026-11-20-text2sql-design.md`. It only generates queries; Archie never connects to or executes anything on the PACS.
 - `pacs_log_report.py` (if encountered) is a standalone local tool and will **not** be integrated into Archie — it belongs to a separate future project.
 
 ## Security notes worth carrying into any change

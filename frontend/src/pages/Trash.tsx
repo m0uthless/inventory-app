@@ -346,8 +346,7 @@ export default function Trash() {
           />
         </Box>
       )}
-      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems}
-        title={ctx?.row.title} />
+      <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
       <PurgeDialog rows={purgeRows} busy={busy} onClose={() => setPurgeRows(null)} onConfirm={(list) => void purge(list)} />
     </Stack>
   )

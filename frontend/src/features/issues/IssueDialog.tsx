@@ -11,14 +11,17 @@ import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined'
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
 import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded'
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded'
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 
 import { DatePill, Pill, QuickForm, SelectPill, StaticPill, TextPill } from '../../ui/campo'
 import { IssuePriorityMark, IssueStatusBadge } from './IssueBadges'
+import { assigneeChoices, keepsAssignee } from './issueUsers'
 import {
   PRIORITY_META,
   STATUS_META,
   WAITING_REASON_META,
   issueInventoryLabel,
+  type AreaOption,
   type CategoryOption,
   type CustomerOption,
   type IssueFormData,
@@ -41,6 +44,7 @@ type IssueDialogProps = {
   siteOptions: SiteOption[]
   categories: CategoryOption[]
   users: UserOption[]
+  areas: AreaOption[]
   pendingInventory?: InventoryOption | null
   onClose: () => void
   onSave: () => void
@@ -51,7 +55,7 @@ type IssueDialogProps = {
 
 const FIELD_LABEL: Record<string, string> = {
   title: 'Titolo', customer: 'Cliente', customer_placeholder: 'Cliente', site: 'Sito', priority: 'Priorità', status: 'Stato', waiting_reason: 'In attesa di',
-  category: 'Categoria', assigned_to: 'Assegnata a', opened_at: 'Data di apertura', due_date: 'Scadenza', servicenow_id: 'Caso ServiceNow', description: 'Descrizione', inventory: 'Inventario',
+  category: 'Categoria', area: 'Area', assigned_to: 'Assegnata a', opened_at: 'Data di apertura', due_date: 'Scadenza', servicenow_id: 'Caso ServiceNow', description: 'Descrizione', inventory: 'Inventario',
 }
 const initials = (s: string) => s.replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase()
 const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low']
@@ -62,10 +66,20 @@ const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low']
  * Una issue chiusa si apre in sola lettura.
  */
 export default function IssueDialog({
-  open, editIssue, form, saving, errors, customerOptions, customerLoading, siteOptions, categories, users, pendingInventory,
+  open, editIssue, form, saving, errors, customerOptions, customerLoading, siteOptions, categories, users, areas, pendingInventory,
   onClose, onSave, onOpenLinkInventory, onCustomerInputChange, onFormChange,
 }: IssueDialogProps) {
   const isClosed = editIssue?.status === 'closed'
+  // `users` sono tutti gli utenti: si propongono gli assegnabili dell'area, più l'assegnatario attuale.
+  const assignable = assigneeChoices(users, form.area_id, form.assigned_to_id, editIssue?.assigned_to === form.assigned_to_id ? (editIssue?.assigned_to_full_name || editIssue?.assigned_to_username) : null)
+  // Cambiando area, un assegnatario che non ne fa parte si svuota con un avviso.
+  const [areaNotice, setAreaNotice] = React.useState(false)
+  React.useEffect(() => { if (open) setAreaNotice(false) }, [open])
+  const setArea = (areaId: number | '') => {
+    const keep = keepsAssignee(users, form.assigned_to_id, areaId)
+    setAreaNotice(!keep)
+    onFormChange((f) => ({ ...f, area_id: areaId, assigned_to_id: keep ? f.assigned_to_id : '' }))
+  }
   const set = <K extends keyof IssueFormData>(k: K, v: IssueFormData[K]) => onFormChange((f) => ({ ...f, [k]: v }))
   const errs = Object.entries(errors).filter(([, m]) => m).map(([k, m]) => (FIELD_LABEL[k] ? `${FIELD_LABEL[k]}: ${m}` : m))
   const setFreeCustomer = (on: boolean) => onFormChange((f) => ({
@@ -80,7 +94,8 @@ export default function IssueDialog({
       open={open} onClose={onClose} mode={editIssue ? 'edit' : 'create'} saving={saving} onSubmit={onSave} readOnly={isClosed}
       crumb={{ icon: <ErrorOutlineRoundedIcon />, label: 'Issue', extra: editIssue ? `#${editIssue.id}` : undefined }}
       submitLabel={editIssue ? 'Salva modifiche' : 'Crea issue'}
-      notice={isClosed ? <>Questa issue è <b>chiusa</b> e non si può modificare. Lo stato «Chiusa» si imposta da solo 48 ore dopo la risoluzione.</> : undefined}
+      notice={isClosed ? <>Questa issue è <b>chiusa</b> e non si può modificare. Lo stato «Chiusa» si imposta da solo 48 ore dopo la risoluzione.</>
+        : areaNotice ? <>L'assegnatario non fa parte della nuova area: scegline un altro.</> : undefined}
       title={{ value: form.title, onChange: (v) => set('title', v), placeholder: 'Titolo della issue', label: 'Titolo', error: errors.title }}
       description={{ value: form.description, onChange: (v) => set('description', v), placeholder: 'Cosa succede, da quando, cosa è già stato provato…', label: 'Descrizione' }}
       errors={errs}
@@ -125,9 +140,11 @@ export default function IssueDialog({
             <SelectPill icon={<HourglassEmptyRoundedIcon />} placeholder="In attesa di" required value={form.waiting_reason} error={Boolean(errors.waiting_reason)}
               options={Object.entries(WAITING_REASON_META).map(([k, v]) => ({ value: k, label: v.label }))} onChange={(v) => set('waiting_reason', String(v))} />
           ) : null}
+          <SelectPill icon={<GroupsOutlinedIcon />} placeholder="Area" title="Area" value={form.area_id} emptyLabel="Nessuna area" error={Boolean(errors.area)}
+            options={areas.map((a) => ({ value: a.id, label: a.label }))} onChange={(v) => setArea(v === '' ? '' : Number(v))} />
           <SelectPill icon={<PersonOutlineRoundedIcon />} placeholder="Assegna" title="Assegnata a" value={form.assigned_to_id} emptyLabel="Nessuno"
-            onChange={(v) => set('assigned_to_id', v === '' ? '' : Number(v))}
-            options={users.map((u) => ({ value: u.id, label: u.label, node: <><Avatar sx={{ width: 20, height: 20, fontSize: 9, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{initials(u.label)}</Avatar>{u.label}</> }))}
+            onChange={(v) => { setAreaNotice(false); set('assigned_to_id', v === '' ? '' : Number(v)) }}
+            options={assignable.map((u) => ({ value: u.id, label: u.label, node: <><Avatar sx={{ width: 20, height: 20, fontSize: 9, fontWeight: 700, bgcolor: 'archie.field', color: 'primary.main' }}>{initials(u.label)}</Avatar>{u.label}</> }))}
             render={(o) => <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>{o.node}</Box>} />
           <SelectPill icon={<FolderOutlinedIcon />} placeholder="Categoria" value={form.category_id} emptyLabel="Nessuna"
             options={categories.map((c) => ({ value: c.id, label: c.label }))} onChange={(v) => set('category_id', v === '' ? '' : Number(v))} />

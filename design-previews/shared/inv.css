@@ -1,0 +1,74 @@
+/* Inventari senza drawer (anteprima inv-base): pezzi in più rispetto a cd.css. */
+.net { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.net-t { position: relative; display: grid; gap: 2px; padding: 10px 36px 10px 12px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.net-t small { font-size: 11.5px; color: var(--muted); }
+.net-t b { font-family: "Geist Mono", ui-monospace, monospace; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.net-t .cp { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 28px; height: 28px; }
+.acc { display: grid; gap: 12px; max-width: none; }
+.credg h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.acc-note { display: flex; gap: 6px; align-items: flex-start; margin: 0; font-size: 11px; line-height: 1.45; color: var(--faint); }
+.acc-note .i { width: 12px; height: 12px; flex: none; margin-top: 2px; }
+.acc.compact .net { grid-template-columns: 1fr; }
+.acc.compact .cred > div { grid-template-columns: 62px minmax(0, 1fr) auto; }
+.rec-sh h3 .i, .rcard .hd h3 .i { width: 14px; height: 14px; color: var(--muted); vertical-align: -2px; margin-right: 4px; }
+.tagl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tagl span { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 4px; background: var(--neutral-bg); color: var(--muted); }
+.det2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; align-items: start; }
+.c-list tr.is-sel td { background: var(--field); }
+.c-list tr.is-sel td:first-child { box-shadow: inset 2px 0 0 var(--field-line); }
+.c-list tr { user-select: none; }
+.vsel .st-dot { background: var(--muted); }
+.vsel .st-dot.ok { background: var(--success); }
+.st:empty { display: none; }
+@media (max-width: 900px) { .det2 { grid-template-columns: 1fr; } }
+.credg { display: grid; min-width: 0; }
+
+/* ── Seconda versione: dati come testo, «Modifica» dal ⋯ li trasforma in campi ── */
+.ikvs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.ikv { display: grid; gap: 3px; min-width: 0; }
+.ikv.wide { grid-column: 1 / -1; }
+.ikv > span:first-child { font-size: 11.5px; font-weight: 550; color: var(--muted); }
+.ikv > b { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; min-height: 19px; }
+.ikv > b.mono { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12.5px; }
+.ikv-none { color: var(--faint); font-weight: 400; }
+.ikv input, .ikv select, .net-t.edit input, .cred input { height: 32px; width: 100%; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); font: inherit; font-size: 13px; color: var(--text); min-width: 0; }
+.ikv input.mono, .net-t.edit input.mono, .cred input.mono { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12.5px; }
+.ikv input:focus, .ikv select:focus, .net-t.edit input:focus, .cred input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
+.ikv .dirty, .net-t.edit .dirty, .cred .dirty { border-color: #e0a43a; }
+.ikv-link { justify-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 550; color: var(--primary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-align: left; }
+.ikv-link .i { width: 13px; height: 13px; }
+.ikv-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.st-inline { display: inline-flex; align-items: center; gap: 6px; }
+.st-inline i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.st-inline i.ok { background: var(--success); } .st-inline i.aperta { background: var(--info); } .st-inline i.warn { background: var(--warning); }
+.notes-ro { margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.kplate { display: block; width: 100%; max-width: 420px; height: auto; margin: 0 0 14px; }
+.rec-head .ven-b.editing { background: #e0a43a; color: #2b1d00; }
+.record.is-editing .rec-sec, .record.is-editing .rcard { border-color: var(--border-strong); }
+
+.net-t.edit { padding: 8px 10px; gap: 4px; }
+.credbox { display: grid; grid-template-columns: minmax(0, 1fr) 64px; border: 1px solid var(--border); border-radius: 8px; }
+.credbox .cred { border: 0; border-radius: 8px 0 0 8px; }
+.cred > div > input { height: 28px; }
+.logo-slot { position: relative; display: grid; place-items: center; border-left: 1px dashed var(--border); padding: 8px; }
+.logo-slot img { max-width: 44px; max-height: 44px; object-fit: contain; position: relative; z-index: 1; background: var(--surface); }
+.logo-slot em { font-style: normal; font-size: 10px; color: var(--faint); font-family: "Geist Mono", ui-monospace, monospace; position: absolute; }
+.logo-slot:has(img) em { display: none; }
+.credg h4 { display: flex; align-items: baseline; gap: 8px; }
+.credg h4 small { font-weight: 400; color: var(--faint); font-size: 11.5px; }
+.acc.compact .credbox { grid-template-columns: minmax(0, 1fr) 52px; }
+
+.subh { margin: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.rows.closed .t b { font-weight: 500; color: var(--muted); }
+.rows.closed .row:hover .t b { color: var(--primary); }
+.st.done { background: var(--neutral-bg); color: var(--muted); }
+
+.menu-anchor { position: relative; display: inline-flex; }
+.inv-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 210px; display: grid; padding: 4px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 12px 30px -8px rgb(10 30 25 / .3); }
+.inv-menu button { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; text-align: left; }
+.inv-menu button .i { width: 15px; height: 15px; color: var(--muted); }
+.inv-menu button:hover:not(:disabled) { background: var(--surface-2); }
+.inv-menu button:disabled { color: var(--faint); cursor: not-allowed; }
+.inv-menu button.danger { color: var(--error); } .inv-menu button.danger .i { color: var(--error); }
+.det2 .ikvs { align-content: start; }
+@media (max-width: 900px) { .ikvs { grid-template-columns: 1fr 1fr; } }

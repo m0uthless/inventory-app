@@ -43,6 +43,7 @@ class UserListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     is_philips = serializers.SerializerMethodField()
     is_servicenow_technician = serializers.SerializerMethodField()
+    is_issue_assignee = serializers.SerializerMethodField()
     leave_area = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
@@ -54,17 +55,26 @@ class UserListSerializer(serializers.ModelSerializer):
         except Exception:
             return False
 
-    def get_is_servicenow_technician(self, obj):
-        # B-22: True solo per i tecnici idonei (flag + profilo interno), così
-        # i selettori degli assegnatari non propongono i clienti del Portal.
+    def _eligible_ids(self, attr, q_factory):
+        # Calcolati una volta per richiesta (cache sul serializer radice).
         root = self.root
-        ids = getattr(root, "_eligible_technician_ids", None)
+        ids = getattr(root, attr, None)
         if ids is None:
-            from core.technicians import eligible_technician_q
+            ids = set(User.objects.filter(q_factory()).values_list("pk", flat=True))
+            setattr(root, attr, ids)
+        return ids
 
-            ids = set(User.objects.filter(eligible_technician_q()).values_list("pk", flat=True))
-            root._eligible_technician_ids = ids
-        return obj.pk in ids
+    def get_is_servicenow_technician(self, obj):
+        # Permesso di gruppo `servicenow.be_technician` + profilo interno (B-22).
+        from core.technicians import eligible_technician_q
+
+        return obj.pk in self._eligible_ids("_eligible_technician_ids", eligible_technician_q)
+
+    def get_is_issue_assignee(self, obj):
+        # Permesso di gruppo `issues.be_assignee` + accesso ad Archie.
+        from core.technicians import eligible_issue_assignee_q
+
+        return obj.pk in self._eligible_ids("_eligible_issue_assignee_ids", eligible_issue_assignee_q)
 
     def get_leave_area(self, obj):
         try:
@@ -74,7 +84,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician", "leave_area"]
+        fields = ["id", "username", "first_name", "last_name", "full_name", "is_active", "is_philips", "is_servicenow_technician", "is_issue_assignee", "leave_area"]
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -357,6 +367,7 @@ class AreaTaskSerializer(serializers.ModelSerializer):
     can_edit         = serializers.SerializerMethodField()
     converted_to_issue = serializers.PrimaryKeyRelatedField(read_only=True)
     converted_to_issue_title = serializers.SerializerMethodField()
+    converted_to_issue_deleted = serializers.SerializerMethodField()
 
     class Meta:
         model  = AreaTask
@@ -366,12 +377,23 @@ class AreaTaskSerializer(serializers.ModelSerializer):
             'drive_files', 'drive_files_detail',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
             'completed_at', 'comments_count', 'can_edit',
-            'converted_to_issue', 'converted_to_issue_title',
+            'converted_to_issue', 'converted_to_issue_title', 'converted_to_issue_deleted',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'completed_at']
 
     def get_converted_to_issue_title(self, obj):
-        return obj.converted_to_issue.title if obj.converted_to_issue_id else None
+        # Il titolo di una issue di un'altra area non si legge (vedi issues.visibility).
+        from issues.visibility import can_see_issue
+
+        if not obj.converted_to_issue_id:
+            return None
+        request = self.context.get('request')
+        issue = obj.converted_to_issue
+        return issue.title if can_see_issue(getattr(request, 'user', None), issue) else None
+
+    def get_converted_to_issue_deleted(self, obj):
+        # Issue nel cestino: il task si può convertire di nuovo.
+        return bool(obj.converted_to_issue_id and obj.converted_to_issue.deleted_at is not None)
 
     @staticmethod
     def _display_name(user):
@@ -574,7 +596,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
 
     def get_queryset(self):
         qs = AreaTask.objects.select_related(
-            'area', 'created_by', 'assigned_to',
+            'area', 'created_by', 'assigned_to', 'converted_to_issue',
         ).prefetch_related('drive_files')
         if getattr(self, 'action', None) in ('list', 'retrieve'):
             qs = qs.annotate(comments_count=Count('comments'))
@@ -863,19 +885,18 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         return Response(serializer.data)
 
     @staticmethod
-    def _is_issue_assignable(user):
+    def _is_issue_assignable(user, area_id=None):
         """Stessa regola di eleggibilità usata da IssueSerializer.validate
-        per assigned_to (tecnico ServiceNow non Philips): calcolata qui a
+        per assigned_to (permesso `issues.be_assignee`): calcolata qui a
         monte per poter omettere il campo invece di far fallire la validazione
         con un 400 che il chiamante non ha mai richiesto."""
-        if user is None:
-            return False
-        profile = getattr(user, 'profile', None)
-        if profile is None:
-            return False
-        from core.technicians import is_eligible_technician
+        from core.technicians import is_eligible_issue_assignee
+        from issues.api import user_area_id
 
-        return is_eligible_technician(user) and not bool(profile.is_philips)
+        if not is_eligible_issue_assignee(user):
+            return False
+        # La issue nasce nell'area del task: l'assegnatario deve farne parte.
+        return area_id is None or user_area_id(user) == area_id
 
     @action(detail=True, methods=['post'], url_path='convert-to-issue')
     def convert_to_issue(self, request, pk=None):
@@ -891,7 +912,11 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if task.converted_to_issue_id:
+        # Una issue nel cestino non blocca: il task si converte in una issue nuova.
+        def already_converted(t):
+            return bool(t.converted_to_issue_id and t.converted_to_issue.deleted_at is None)
+
+        if already_converted(task):
             return Response(
                 {'detail': 'Questo task è già stato convertito in una issue.'},
                 status=status.HTTP_409_CONFLICT,
@@ -905,7 +930,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             # (fuori dalla transazione) è solo un fast-path, non protegge da
             # un doppio submit concorrente.
             locked_task = AreaTask.objects.select_for_update().get(pk=task.pk)
-            if locked_task.converted_to_issue_id:
+            if already_converted(locked_task):
                 return Response(
                     {'detail': 'Questo task è già stato convertito in una issue.'},
                     status=status.HTTP_409_CONFLICT,
@@ -919,8 +944,10 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 'priority': task.priority,
                 'customer': request.data.get('customer'),
                 'site': request.data.get('site'),
+                # La issue nasce nell'area del task.
+                'area': task.area_id,
             }
-            if self._is_issue_assignable(task.assigned_to):
+            if self._is_issue_assignable(task.assigned_to, task.area_id):
                 payload['assigned_to'] = task.assigned_to_id
             serializer = IssueSerializer(data=payload)
             serializer.is_valid(raise_exception=True)
@@ -940,6 +967,7 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 IssueComment.objects.create(issue=issue, author=comment.author, body=comment.body)
 
             old_status = task.status
+            old_issue = task.converted_to_issue if task.converted_to_issue_id else None
             task.status = AreaTask.STATUS_COMPLETATO
             task.completed_at = timezone.now()
             task.converted_to_issue = issue
@@ -950,7 +978,10 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
                 actor=request.user, action="update", instance=task,
                 changes={
                     "status": {"from": old_status, "to": task.status},
-                    "converted_to_issue": {"from": None, "to": to_change_value_for_field("converted_to_issue", issue)},
+                    "converted_to_issue": {
+                        "from": to_change_value_for_field("converted_to_issue", old_issue) if old_issue else None,
+                        "to": to_change_value_for_field("converted_to_issue", issue),
+                    },
                 },
                 request=request,
             )

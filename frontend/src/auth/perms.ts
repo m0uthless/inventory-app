@@ -80,6 +80,9 @@ export const PERMS = {
     },
   },
 
+  text2sql: {
+    use: 'text2sql.use_text2sql',
+  },
   wiki: {
     page: {
       view: 'wiki.view_wikipage',
@@ -116,6 +119,7 @@ export const PERMS = {
       add: 'issues.add_issue',
       change: 'issues.change_issue',
       delete: 'issues.delete_issue',
+      viewAllAreas: 'issues.view_all_areas',
     },
   },
 
