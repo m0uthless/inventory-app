@@ -83,3 +83,38 @@ Ogni parte si può consegnare da sola.
 - Nomi esatti delle etichette dei permessi e dei messaggi di errore.
 - Dove mettere la costante che nasconde Philips (accanto a `usersModel.ts`).
 - Test: criterio tecnico/assegnatario (con e senza permesso, superuser, portal), regola di area su tutte le scritture, conversione task→issue con area.
+
+
+---
+
+## Parte 3 · Visibilità per area e «Area» nei Dettagli (aggiunta 2026-11-20, approvata)
+
+### Perché
+
+Fede vuole che chi non ha un permesso dedicato veda solo le issue della propria area (e quelle senza area). Chi ha il permesso, o il superuser, parte dalla sua area e con un interruttore vede tutte le aree. Dalla finestra della issue, anche su telefono, l'area deve cambiarsi senza passare dal modulo completo.
+
+### Decisioni (di Fede)
+
+- Nuovo permesso di gruppo `issues.view_all_areas` «Vede le issue di tutte le aree». Il superuser lo ha sempre.
+- **Restrizione vera, ovunque (scelta 1)**: il server filtra le issue in ogni lettura, non solo nella pagina Issue.
+- Chi ha il permesso parte dalla propria area. L'interruttore «Tutte le aree» nella barra dell'elenco Issue allarga la vista e la scelta viene ricordata. Le issue delle altre aree restano in sola lettura: il permesso è per vedere, non per modificare.
+- Campo «Area» nei Dettagli della finestra della issue, cambiabile al volo (come «Assegnata a»). Se l'assegnatario non fa parte della nuova area, lo si toglie con un avviso.
+
+### Regola di visibilità
+
+Una funzione unica `visible_issues_q(user, prefix="")` in `issues/visibility.py`:
+- superuser o permesso `issues.view_all_areas` → nessun filtro;
+- utente con area nel profilo → `area = sua area` oppure `area vuota`;
+- utente senza area nel profilo → nessun filtro (**scelta mia**, coerente col contatore).
+
+Si applica a:
+- `IssueViewSet.get_queryset` (elenco, dettaglio, commenti, Wiki, ripristino): una issue non visibile dà 404;
+- `IssueViewSet.summary` (KPI e contatore, insieme a `?area=mine`);
+- i conteggi e i badge delle altre pagine: `open_issues_count` di cliente e sito, `active_issue_count` del cliente, `has_active_issue` / `active_issue_priority` dell'inventario;
+- l'etichetta delle issue nei collegamenti Wiki (`wiki/api/helpers.py`): una issue non visibile si mostra come «#id» senza titolo.
+
+Non si applica alle email automatiche (digest scadenze, notifiche di assegnazione): vanno a chi è assegnatario, e l'assegnatario è dell'area per costruzione. **Scelta mia.**
+
+### Interruttore «Tutte le aree»
+
+Il nuovo parametro `?scope=mine` dell'elenco restringe alla propria area più le issue senza area. Lo manda solo la pagina Issue, solo a chi ha il permesso e solo a interruttore spento. Le altre pagine non lo mandano, quindi chi ha il permesso continua a vedere tutto nella scheda del cliente. A chi non ha il permesso l'interruttore non si mostra, perché il server lo restringe già. Lo stato viene ricordato in `localStorage`.
