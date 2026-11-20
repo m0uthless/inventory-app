@@ -11,6 +11,7 @@ import type { GridColDef } from '@mui/x-data-grid'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useDrfList } from '@shared/hooks/useDrfList'
+import { useList } from '../ui/campo/ListRows'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import EntityListCard from '@shared/ui/EntityListCard'
@@ -34,6 +35,9 @@ import { useNavigate } from 'react-router-dom'
 import { overrideTipOf, rowKey, todayIso, type Result } from '../features/maintenance/mtModel'
 import { DueCell, PlanCell, ResultBadge } from '../features/maintenance/mtUi'
 import type { TodoRow } from './maintenanceTypes'
+
+// Elenco vuoto stabile mentre si caricano le scelte (stesso riferimento a ogni render).
+const NO_ROWS: never[] = []
 
 type View = 'all' | 'over' | 'soon' | 'later' | 'ovr'
 const VIEWS: View[] = ['all', 'over', 'soon', 'later', 'ovr']
@@ -65,7 +69,7 @@ export default function Maintenance() {
   const canEditDue = hasPerm(PERMS.maintenance.plan.change)
   const canAddIssue = hasPerm(PERMS.issues.issue.add)
   const { exporting, exportCsv } = useExportCsv()
-  const { rows: techs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
+  const techs = useList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' }) ?? NO_ROWS
 
   // ── Vista, modalità e filtri (URL) ──
   const [modeRaw, setModeRaw] = useUrlStringParam('modo')

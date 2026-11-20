@@ -5,6 +5,7 @@ import BuildRoundedIcon from '@mui/icons-material/BuildRounded'
 import { api } from '@shared/api/client'
 import { isoOf, type TodoStats } from '../../maintenance/mtModel'
 import WidgetShell, { BigNumber, WidgetNote } from './WidgetShell'
+import { fetchAll } from '../../../api/fetchAll'
 
 type Row = { next_due_date: string }
 
@@ -18,10 +19,10 @@ export default function MaintenanceWidget() {
     let alive = true
     api.get<TodoStats>('/maintenance-plans/todo-stats/').then((r) => { if (alive) setStats(r.data) }).catch(() => {})
     const from = new Date(); const to = new Date(); to.setDate(to.getDate() + 13)
-    api.get<{ results: Row[] }>('/maintenance-plans/todo/', { params: { due_from: isoOf(from), due_to: isoOf(to), page_size: 500 } })
-      .then((r) => {
+    fetchAll<Row>('/maintenance-plans/todo/', { due_from: isoOf(from), due_to: isoOf(to) })
+      .then((rows) => {
         const counts = new Map<string, number>()
-        for (const x of r.data.results ?? []) counts.set(x.next_due_date, (counts.get(x.next_due_date) ?? 0) + 1)
+        for (const x of rows) counts.set(x.next_due_date, (counts.get(x.next_due_date) ?? 0) + 1)
         const list = Array.from({ length: 14 }, (_, i) => { const d = new Date(from); d.setDate(d.getDate() + i); const iso = isoOf(d); return { iso, n: counts.get(iso) ?? 0 } })
         if (alive) setDays(list)
       }).catch(() => { if (alive) setDays([]) })

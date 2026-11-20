@@ -26,7 +26,6 @@ import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 
 import { api } from '@shared/api/client'
@@ -79,6 +78,7 @@ import {
 } from '../features/purchaseorders/types'
 import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
 import { useStatusTokens } from '../theme/AppThemeProvider'
+import { fetchAll } from '../api/fetchAll'
 
 type OpenCreateState = { openCreate?: boolean }
 
@@ -411,10 +411,7 @@ export default function PurchaseOrders() {
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', {
-        params: { ordering: 'name', page_size: 500 },
-      })
-      setCustomers(res.data.results ?? [])
+      setCustomers(await fetchAll<CustomerItem>('/customers/', { ordering: 'name' }))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     }

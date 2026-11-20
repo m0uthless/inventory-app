@@ -1,7 +1,7 @@
 import * as React from 'react'
-import { api } from '@shared/api/client'
 import { KpiStrip, KpiTile, SegmentBar } from '../../ui/campo'
 import type { PurchaseOrderRow, PurchaseOrderStatus, PurchaseOrderSummary } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 /** Statistiche dell'anno calcolate dalle righe (stessi filtri anno/tipo della lista). */
 export type PoYearStats = {
@@ -24,15 +24,7 @@ export function usePoYearStats(year: number, kind: string | null, reloadKey: unk
   React.useEffect(() => {
     let alive = true
     ;(async () => {
-      const rows: PurchaseOrderRow[] = []
-      let page = 1
-      while (page < 20) {
-        const r = await api.get('/purchase-order-entries/', { params: { year, ...(kind ? { kind } : {}), page, page_size: 500 } })
-        const d = r.data as { results?: PurchaseOrderRow[]; next?: string | null }
-        rows.push(...(d.results ?? []))
-        if (!d.next) break
-        page++
-      }
+      const rows = await fetchAll<PurchaseOrderRow>('/purchase-order-entries/', { year, ...(kind ? { kind } : {}) })
       const byStatus = EMPTY()
       const monthly = Array(12).fill(0) as number[]
       let oldest: number | null = null

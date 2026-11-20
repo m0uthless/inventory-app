@@ -23,14 +23,9 @@ import {
   type DeviceListItem,
   type DeviceLookup,
 } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 type SiteOption = { id: number; name?: string | null; display_name?: string | null }
-
-function listOf<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[]
-  const results = (data as { results?: unknown } | null)?.results
-  return Array.isArray(results) ? (results as T[]) : []
-}
 
 const asId = (v: unknown): number | '' => {
   const s = String(v ?? '')
@@ -74,16 +69,16 @@ export default function DeviceDialog({ open, customerId, device, onClose, onSave
     setLoading(true)
 
     const lookups = Promise.all([
-      api.get('/sites/', { params: { customer: customerId, page_size: 500, ordering: 'name' } }),
-      api.get('/device-types/', { params: { page_size: 500 } }),
-      api.get('/device-statuses/', { params: { page_size: 500 } }),
-      api.get('/device-manufacturers/', { params: { page_size: 500 } }),
+      fetchAll<SiteOption>('/sites/', { customer: customerId, ordering: 'name' }),
+      fetchAll<DeviceLookup>('/device-types/'),
+      fetchAll<DeviceLookup>('/device-statuses/'),
+      fetchAll<DeviceLookup>('/device-manufacturers/'),
     ]).then(([s, t, st, m]) => {
       if (cancelled) return
-      setSites(listOf<SiteOption>(s.data))
-      setTypes(listOf<DeviceLookup>(t.data))
-      setStatuses(listOf<DeviceLookup>(st.data))
-      setManufacturers(listOf<DeviceLookup>(m.data))
+      setSites(s)
+      setTypes(t)
+      setStatuses(st)
+      setManufacturers(m)
     })
 
     const detail =

@@ -1,16 +1,15 @@
 /* Report PDF stampabile di un piano di manutenzione (spostato da pages/MaintenancePlans.tsx, invariato). */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Theme } from '@mui/material/styles'
-import { api } from '@shared/api/client'
 import { escapeHtml } from '@shared/utils/html'
 import type { PlanRow } from '../../pages/maintenanceTypes'
+import { fetchAll } from '../../api/fetchAll'
 
 export async function generatePlanPdf(plan: PlanRow, theme: Theme, onPopupBlocked: () => void) {
   // 1. Rapportini del piano
   let events: any[] = []
   try {
-    const r = await api.get('/maintenance-events/', { params: { plan: plan.id, ordering: '-performed_at', page_size: 500 } })
-    events = r.data.results ?? []
+    events = await fetchAll('/maintenance-events/', { plan: plan.id, ordering: '-performed_at' })
   } catch { /* non bloccante */ }
 
   // 2. Inventory filtrati per i tipi previsti dal piano (campo `type` del filterset)
@@ -21,9 +20,7 @@ export async function generatePlanPdf(plan: PlanRow, theme: Theme, onPopupBlocke
       // Una chiamata per tipo (il filterset accetta un solo `type` per chiamata)
       const results = await Promise.all(
         typeIds.map(tid =>
-          api.get('/inventories/', {
-            params: { customer: plan.customer, type: tid, ordering: 'knumber', page_size: 500 },
-          }).then(r => r.data.results ?? [])
+          fetchAll('/inventories/', { customer: plan.customer, type: tid, ordering: 'knumber' })
         )
       )
       inventories = results.flat()

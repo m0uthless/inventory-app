@@ -14,6 +14,7 @@ import { api } from '@shared/api/client'
 import { buildDrfListParams } from '@shared/api/drf'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useDrfList } from '@shared/hooks/useDrfList'
+import { useList } from '../ui/campo/ListRows'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
@@ -34,6 +35,9 @@ import { generatePlanPdf } from '../features/maintenance/planPdf'
 import { planStateOf, scheduleText } from '../features/maintenance/mtModel'
 import { DueCell, PlanStateBadge } from '../features/maintenance/mtUi'
 import type { PlanRow } from './maintenanceTypes'
+
+// Elenco vuoto stabile mentre si caricano le scelte (stesso riferimento a ogni render).
+const NO_ROWS: never[] = []
 
 type View = 'active' | 'overdue' | 'completed' | 'archived'
 const VIEWS: View[] = ['active', 'overdue', 'completed', 'archived']
@@ -94,7 +98,7 @@ export default function MaintenancePlans() {
   const [statsKey, setStatsKey] = React.useState(0)
   const stats = usePlanStats(statsKey, customerF)
   const reloadAll = React.useCallback(() => { reload(); setStatsKey((n) => n + 1) }, [reload])
-  const { rows: customers } = useDrfList<Customer>('/customers/', { ordering: 'display_name', page_size: 500 })
+  const customers = useList<Customer>('/customers/', { ordering: 'display_name', page_size: 500 }) ?? NO_ROWS
 
   // ── Scheda e dialoghi ──
   const [openId, setOpenId] = React.useState<number | null>(null)

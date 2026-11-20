@@ -45,6 +45,7 @@ import {
 } from '../features/contracts/types'
 import { formatEuro } from '../features/purchaseorders/types'
 import { CONTRACT_VIEWS, VIEWS, VIEW_PARAMS, type ContractView } from '../features/contracts/contractViews'
+import { fetchAll } from '../api/fetchAll'
 
 type OpenCreateState = { openCreate?: boolean }
 type ViewState = { view: ContractView; customer: number | ''; company: number | ''; seller: number | ''; type: string; year: number | '' }
@@ -182,13 +183,12 @@ export default function Contracts() {
   const loadSellers = React.useCallback(async () => {
     if (!canViewSellers) return
     try {
-      const res = await api.get<ApiPage<Seller>>('/sellers/', { params: { ordering: 'name', page_size: 500 } })
-      setSellers(res.data.results ?? [])
+      setSellers(await fetchAll<Seller>('/sellers/', { ordering: 'name' }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast, canViewSellers])
   React.useEffect(() => {
-    api.get<ApiPage<CustomerOption>>('/customers/', { params: { ordering: 'name', page_size: 500 } })
-      .then((r) => setCustomers(r.data.results ?? [])).catch((e) => toast.error(apiErrorToMessage(e)))
+    fetchAll<CustomerOption>('/customers/', { ordering: 'name' })
+      .then(setCustomers).catch((e) => toast.error(apiErrorToMessage(e)))
     api.get<ApiPage<CompanyOption> | CompanyOption[]>('/customer-statuses/')
       .then((r) => setCompanies(Array.isArray(r.data) ? r.data : (r.data.results ?? []))).catch((e) => toast.error(apiErrorToMessage(e)))
     void loadSellers()

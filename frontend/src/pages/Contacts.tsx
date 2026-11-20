@@ -11,7 +11,6 @@ import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { api } from '@shared/api/client'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import ContactDialog from '../features/contacts/ContactDialog'
 import ContactDetailModal from '../features/contacts/ContactDetailModal'
@@ -31,6 +30,7 @@ import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
+import { fetchAll } from '../api/fetchAll'
 
 type CustomerItem = { id: number; code?: string; name?: string; display_name?: string | null }
 
@@ -253,16 +253,14 @@ export default function Contacts() {
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', { params: { ordering: 'name', page_size: 500 } })
-      setCustomers(res.data.results ?? [])
+      setCustomers(await fetchAll<CustomerItem>('/customers/', { ordering: 'name' }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
   const loadSitesForCustomer = React.useCallback(async (cust: number | '') => {
     try {
       if (cust === '') { setSites([]); return }
-      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { customer: cust, ordering: 'name', page_size: 500 } })
-      setSites(res.data.results ?? [])
+      setSites(await fetchAll<SiteItem>('/sites/', { customer: cust, ordering: 'name' }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 

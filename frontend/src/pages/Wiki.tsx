@@ -16,6 +16,7 @@ import {
   NO_CAT, catColor, catIcon, cVars, dshort, matchesPage, r1, rel, snippetOf,
   type ApiList, type WikiCategory, type WikiPageRow,
 } from '../features/wiki/archive/archiveModel'
+import { fetchAll } from '../api/fetchAll'
 
 type Sort = 'upd' | 'views' | 'title'
 const SORTS: [Sort, string][] = [['upd', 'Aggiornate'], ['views', 'Più lette'], ['title', 'A–Z']]
@@ -53,8 +54,8 @@ export default function Wiki() {
     let alive = true
     Promise.all([
       api.get<ApiList<WikiCategory>>('/wiki-categories/', { params: { ordering: 'sort_order,name', page_size: 200 } }),
-      api.get<ApiList<WikiPageRow>>('/wiki-pages/', { params: { page_size: 500, ordering: '-updated_at' } }),
-    ]).then(([c, p]) => { if (alive) { setCats(c.data.results ?? []); setPages(p.data.results ?? []) } })
+      fetchAll<WikiPageRow>('/wiki-pages/', { ordering: '-updated_at' }),
+    ]).then(([c, p]) => { if (alive) { setCats(c.data.results ?? []); setPages(p) } })
       .catch((e) => toast.error(apiErrorToMessage(e)))
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Box, Button, ButtonBase, CircularProgress, Typography } from '@mui/material'
 import { api } from '@shared/api/client'
 import { CampoIcon, type CampoIconName } from './CampoIcon'
+import { API_MAX_PAGE_SIZE, fetchAll } from '../../api/fetchAll'
 
 /*
  * Righe a filo delle schede dei pannelli "Campo sterile" (siti, inventari,
@@ -21,7 +22,12 @@ export function useList<T>(url: string, params: Record<string, unknown> | null, 
     if (!params) { setRows([]); return }
     let alive = true
     setRows(null)
-    api.get(url, { params }).then((r) => { if (alive) setRows(list(r.data as Page<T>)) }).catch(() => { if (alive) setRows([]) })
+    // Oltre il limite del backend (200 per pagina) si leggono tutte le pagine: prima si tagliava in silenzio.
+    const { page_size: size, ...rest } = params
+    const load = Number(size) >= API_MAX_PAGE_SIZE
+      ? fetchAll<T>(url, rest)
+      : api.get(url, { params }).then((r) => list(r.data as Page<T>))
+    load.then((r) => { if (alive) setRows(r) }).catch(() => { if (alive) setRows([]) })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, key, reloadKey])

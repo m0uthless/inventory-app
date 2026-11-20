@@ -22,6 +22,7 @@ import type { BreadcrumbItem, CustomerMini, DrawerItem, DriveFile, DriveFolder }
 import { CreateFolderDialog } from './drive/CreateFolderDialog'
 import { RenameDialog } from './drive/RenameDialog'
 import { MoveDialog } from './drive/MoveDialog'
+import { fetchAll } from '../api/fetchAll'
 
 type Upload = { current: number; total: number; fileName: string; overall: number }
 const listOf = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { results?: T[] })?.results ?? [])) as T[]
@@ -91,12 +92,12 @@ export default function Drive() {
   React.useEffect(() => { const t = setTimeout(() => setSearch(q.trim()), 300); return () => clearTimeout(t) }, [q])
 
   React.useEffect(() => {
-    api.get('/customers/', { params: { page_size: 500, ordering: 'display_name' } }).then((r) => setAllCustomers(listOf<CustomerMini>(r.data))).catch(() => {})
+    fetchAll<CustomerMini>('/customers/', { ordering: 'display_name' }).then(setAllCustomers).catch(() => {})
   }, [])
 
   // Albero completo delle cartelle accessibili (si aggiorna dopo ogni modifica).
   React.useEffect(() => {
-    api.get('/drive-folders/', { params: { page_size: 500, ordering: 'name' } }).then((r) => setTree(listOf<DriveFolder>(r.data))).catch(() => {})
+    fetchAll<DriveFolder>('/drive-folders/', { ordering: 'name' }).then(setTree).catch(() => {})
   }, [reloadKey])
 
   // ── Contenuto: cartella corrente, oppure risultati di ricerca o filtro cliente ──
@@ -107,20 +108,20 @@ export default function Drive() {
     setLoading(true)
     try {
       if (term || cust) {
-        const p: Record<string, unknown> = { page_size: 200 }
+        const p: Record<string, unknown> = {}
         if (term) p.search = term
         if (cust) p.customer = cust.id
-        const [fo, fi] = await Promise.all([api.get('/drive-folders/', { params: p }), api.get('/drive-files/', { params: { ...p, ordering: '-updated_at' } })])
+        const [fo, fi] = await Promise.all([fetchAll<DriveFolder>('/drive-folders/', p), fetchAll<DriveFile>('/drive-files/', { ...p, ordering: '-updated_at' })])
         if (loadRequestId.current !== requestId) return // risposta superata da una più recente
-        setFolders(listOf<DriveFolder>(fo.data)); setFiles(listOf<DriveFile>(fi.data)); setBreadcrumb([])
+        setFolders(fo); setFiles(fi); setBreadcrumb([])
       } else if (id === null) {
         const [fo, fi, rc] = await Promise.all([
-          api.get('/drive-folders/', { params: { root: 'true', page_size: 200 } }),
-          api.get('/drive-files/', { params: { root: 'true', page_size: 200 } }),
+          fetchAll<DriveFolder>('/drive-folders/', { root: 'true' }),
+          fetchAll<DriveFile>('/drive-files/', { root: 'true' }),
           api.get('/drive-files/', { params: { ordering: '-updated_at', page_size: 6 } }),
         ])
         if (loadRequestId.current !== requestId) return
-        setFolders(listOf<DriveFolder>(fo.data)); setFiles(listOf<DriveFile>(fi.data)); setRecent(listOf<DriveFile>(rc.data)); setBreadcrumb([])
+        setFolders(fo); setFiles(fi); setRecent(listOf<DriveFile>(rc.data)); setBreadcrumb([])
       } else {
         const res = await api.get(`/drive-folders/${id}/children/`)
         if (loadRequestId.current !== requestId) return

@@ -2,7 +2,6 @@ import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Button, IconButton, ListItemIcon, Menu, MenuItem, Tooltip, Typography } from '@mui/material'
 import CheckIcon from '@mui/icons-material/Check'
-import { api } from '@shared/api/client'
 import { buildQuery } from '@shared/utils/nav'
 import {
   BandChip, CampoIcon, RecordEmpty, RecordGrid, RecordLink, RecordLoader, RecordModal, RecordRow, RecordRows, RecordSection, RecordValue,
@@ -13,6 +12,7 @@ import { daysLabel, dShort } from '../contracts/contractModel'
 import type { EventRow, PlanRow, TodoRow } from '../../pages/maintenanceTypes'
 import { dueStateOf, planStateOf, RESULT_LABEL, scheduleText, type Result } from './mtModel'
 import { ResultBadge } from './mtUi'
+import { fetchAll } from '../../api/fetchAll'
 
 /*
  * Finestra del piano di manutenzione, anteprima design-previews/mtw-base.html › Piani: «Report PDF» come
@@ -49,7 +49,7 @@ function useCovered(plan: PlanRow) {
   React.useEffect(() => {
     let alive = true
     setRows(null)
-    Promise.all((plan.inventory_types ?? []).map((t) => api.get('/inventories/', { params: { customer: plan.customer, type: t, ordering: 'knumber', page_size: 500 } }).then((r) => (r.data.results ?? []) as Inv[])))
+    Promise.all((plan.inventory_types ?? []).map((t) => fetchAll<Inv>('/inventories/', { customer: plan.customer, type: t, ordering: 'knumber' })))
       .then((all) => { if (alive) setRows(all.flat()) }).catch(() => { if (alive) setRows([]) })
     return () => { alive = false }
   }, [plan.id, plan.customer, plan.inventory_types])

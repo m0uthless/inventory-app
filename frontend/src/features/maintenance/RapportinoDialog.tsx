@@ -12,6 +12,7 @@ import { ChoiceChips, FieldLabel } from '../contracts/ContractFormParts'
 import { dShort } from '../contracts/contractModel'
 import type { TodoRow } from '../../pages/maintenanceTypes'
 import { dueStateOf, isoOf, nextDueAfter, rowKey, scheduleText, todayIso, type Result } from './mtModel'
+import { fetchAll } from '../../api/fetchAll'
 
 type Tech = { id: number; full_name: string }
 type Props = {
@@ -68,8 +69,8 @@ export default function RapportinoDialog({ open, rows, techs, customers, canAddI
 
   React.useEffect(() => {
     if (!freeCustomer) { setFreeRows([]); return }
-    api.get<{ results: TodoRow[] }>('/maintenance-plans/todo/', { params: { customer: freeCustomer, page_size: 500 } })
-      .then((r) => setFreeRows(r.data.results ?? [])).catch((e) => toast.error(apiErrorToMessage(e)))
+    fetchAll<TodoRow>('/maintenance-plans/todo/', { customer: freeCustomer })
+      .then(setFreeRows).catch((e) => toast.error(apiErrorToMessage(e)))
   }, [freeCustomer, toast])
 
   const needNote = res === 'ko' || res === 'partial'

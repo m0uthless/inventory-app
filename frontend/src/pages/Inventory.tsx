@@ -14,7 +14,6 @@ import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { api } from '@shared/api/client'
 import { itemActionPath, itemPath, type CollectionPath } from '@shared/api/apiPaths'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 import InventoryDialog from '../features/inventory/InventoryDialog'
 import InventoryDetailModal from '../features/inventory/InventoryDetailModal'
@@ -33,6 +32,7 @@ import { isRecord } from '@shared/utils/guards'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
+import { fetchAll } from '../api/fetchAll'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -339,8 +339,7 @@ export default function Inventory() {
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', { params: { ordering: 'name', page_size: 500 } })
-      setCustomers(res.data.results ?? [])
+      setCustomers(await fetchAll<CustomerItem>('/customers/', { ordering: 'name' }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
@@ -355,16 +354,14 @@ export default function Inventory() {
   const loadFilterSites = React.useCallback(async () => {
     try {
       if (customerId === '') { setFilterSites([]); return }
-      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { ordering: 'name', page_size: 500, customer: customerId } })
-      setFilterSites(res.data.results ?? [])
+      setFilterSites(await fetchAll<SiteItem>('/sites/', { ordering: 'name', customer: customerId }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [customerId, toast])
 
   const loadSitesForDialogCustomer = React.useCallback(async (cust: number | '') => {
     try {
       if (cust === '') { setDlgSites([]); return }
-      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { ordering: 'name', page_size: 500, customer: cust } })
-      setDlgSites(res.data.results ?? [])
+      setDlgSites(await fetchAll<SiteItem>('/sites/', { ordering: 'name', customer: cust }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 

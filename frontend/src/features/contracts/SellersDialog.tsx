@@ -22,6 +22,7 @@ import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../../auth/AuthProvider'
 import type { Seller } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 type UserOption = { id: number; label: string }
 type RawUser = { id: number; full_name?: string; username?: string }
@@ -62,8 +63,7 @@ export default function SellersDialog({ open, onClose }: Props) {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const r = await api.get('/sellers/', { params: { page_size: 200, ordering: 'name' } })
-      setSellers(listOf<Seller>(r.data))
+      setSellers(await fetchAll<Seller>('/sellers/', { ordering: 'name' }))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {

@@ -27,6 +27,7 @@ import {
   type AreaOption,
   type CategoryOption, type IssueComment, type IssueRow, type UserOption,
 } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 /*
  * Finestra della issue (DESIGN.md › Record window, anteprima design-previews/iss-base.html, variante A):
@@ -470,9 +471,7 @@ function useCustomerSites(customerId: number | null) {
   React.useEffect(() => {
     if (!customerId) { setSites([]); return }
     let alive = true
-    api.get('/sites/', { params: { customer: customerId, page_size: 200, ordering: 'name' } }).then((r) => {
-      const d = r.data as { results?: Record<string, unknown>[] } | Record<string, unknown>[]
-      const list = Array.isArray(d) ? d : d.results ?? []
+    fetchAll<Record<string, unknown>>('/sites/', { customer: customerId, ordering: 'name' }).then((list) => {
       if (alive) setSites(list.map((x) => ({ id: Number(x.id), label: String(x.display_name || x.name || x.id) })))
     }).catch(() => { if (alive) setSites([]) })
     return () => { alive = false }

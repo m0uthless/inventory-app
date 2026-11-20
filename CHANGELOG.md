@@ -20,6 +20,10 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 **Dopo il deploy**: lanciare `migrate`, ricreare il servizio `cron` (`up -d --force-recreate cron`), impostare gli indirizzi dell'ufficio in Impostazioni di Archie e dare il permesso «Gestisce le impostazioni di Archie» a chi deve gestirle. I contratti già dentro la finestra dell'avviso ricevono un promemoria alle 8 del giorno dopo il deploy.
 
+### Fixed
+
+- Elenchi tagliati a 200: in circa quaranta punti (scelta di clienti, siti, inventari e device nei moduli, calendario e piani della Manutenzione e PDF dei piani, Rapportini, Drive, Wiki e Query, Contratti, Purchase Order) l'app chiedeva 500 elementi ma il backend ne dà al massimo 200 per pagina, e quelli oltre il duecentesimo sparivano senza avviso. Ora si leggono tutte le pagine (`frontend/src/api/fetchAll.ts`, e `useList` delle schede).
+
 ## [1.1.0] - 2026-11-20
 
 ### Added

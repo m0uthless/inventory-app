@@ -11,6 +11,7 @@ import { CampoIcon } from '../../ui/campo'
 import { ChoiceChips, FieldLabel } from '../contracts/ContractFormParts'
 import type { PlanRow } from '../../pages/maintenanceTypes'
 import { scheduleText } from './mtModel'
+import { fetchAll } from '../../api/fetchAll'
 
 type Customer = { id: number; name: string; display_name?: string | null }
 type Lookup = { id: number; label: string; is_hw?: boolean }
@@ -64,8 +65,8 @@ export default function PlanDialog({ open, plan, customers, onClose, onSaved }: 
     if (!open) return
     setF(plan ? fromPlan(plan) : EMPTY); setErrors({})
     // Tutti i tipi: si propongono quelli hardware, ma restano visibili quelli già nel piano.
-    api.get('/inventory-types/', { params: { ordering: 'label', page_size: 500 } })
-      .then((r) => setTypes(Array.isArray(r.data) ? r.data : (r.data?.results ?? []))).catch(() => {})
+    fetchAll<(typeof types)[number]>('/inventory-types/', { ordering: 'label' })
+      .then(setTypes).catch(() => {})
   }, [open, plan])
 
   // Prossima scadenza calcolata dal backend sulla base della cadenza.
