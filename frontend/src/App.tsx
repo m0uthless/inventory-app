@@ -29,6 +29,7 @@ const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Modules = lazy(() => import('./pages/Modules'))
+const AppSettings = lazy(() => import('./pages/AppSettings'))
 const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
 const ServiceNowDashboard = lazy(() => import('./pages/ServiceNowDashboard'))
@@ -248,6 +249,7 @@ const router = createBrowserRouter([
         element: <RequirePerm perm="core.manage_users">{lazyEl(<PortalAccess />)}</RequirePerm>,
       },
       { path: 'moduli', element: <RequireSuperuser>{lazyEl(<Modules />)}</RequireSuperuser> },
+      { path: 'impostazioni', element: lazyEl(<AppSettings />) },
       { path: '*', element: lazyEl(<NotFound />) },
     ],
   },

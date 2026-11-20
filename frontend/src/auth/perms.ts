@@ -163,6 +163,7 @@ export const PERMS = {
   core: {
     manageUsers: 'core.manage_users',
     accessArchie: 'core.access_archie',
+    manageAppSettings: 'core.manage_app_settings',
   },
 } as const
 

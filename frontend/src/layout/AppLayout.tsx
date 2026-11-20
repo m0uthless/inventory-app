@@ -20,6 +20,7 @@ import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '@shared/api/client'
+import { PERMS } from '../auth/perms'
 import { useAuth } from '../auth/AuthProvider'
 import AppFooter from './AppFooter'
 import GlobalSearch from './GlobalSearch'
@@ -38,6 +39,7 @@ import { getPageTitle, type NavLeaf } from './appNav'
 import { useModules } from '../modules/useModules'
 import { ModuleGate } from '../modules/ModuleGate'
 import { MaintenanceBar } from '../modules/MaintenanceBar'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import ToggleOnOutlinedIcon from '@mui/icons-material/ToggleOnOutlined'
 import { AppSidebar } from './AppSidebar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
@@ -368,6 +370,11 @@ export function AppLayout() {
         {hasPerm('core.manage_users') && (
           <MenuItem onClick={() => { setUserAnchorEl(null); nav('/accesso-portal') }} sx={menuItemSx}>
             <BusinessOutlinedIcon />Accesso Portal
+          </MenuItem>
+        )}
+        {hasPerm(PERMS.core.manageAppSettings) && (
+          <MenuItem onClick={() => { setUserAnchorEl(null); nav('/impostazioni') }} sx={menuItemSx}>
+            <SettingsOutlinedIcon />Impostazioni
           </MenuItem>
         )}
         {me?.is_superuser && (
