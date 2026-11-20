@@ -5,8 +5,9 @@ venditore di riferimento (`Seller`) e, opzionalmente, i dispositivi coperti
 (`ContractDevice`). I contratti senza dispositivi sono ammessi (es. assistenza).
 
 Scadenza: `expiry_state_on()` classifica un contratto attivo rispetto a una
-data (ok / notice / expiring / expired); bozza e disdetto non hanno scadenza
-monitorata ("none"). `notice_deadline` è l'ultimo giorno utile per la disdetta.
+data (ok / renew / expired); bozza e chiuso non hanno scadenza monitorata
+("none"). `reminder_date` è il giorno dell'avviso di rinnovo: da lì partono i
+promemoria per preparare e proporre il nuovo contratto (vedi reminders.py).
 """
 from __future__ import annotations
 
@@ -39,19 +40,19 @@ class BillingFrequency(models.TextChoices):
 class ContractStatus(models.TextChoices):
     BOZZA    = "bozza",    "Bozza"
     ATTIVO   = "attivo",   "Attivo"
-    DISDETTO = "disdetto", "Disdetto"
+    CHIUSO   = "chiuso",   "Chiuso"
 
 
 class ExpiryState:
-    NONE     = "none"
-    OK       = "ok"
-    NOTICE   = "notice"
-    EXPIRING = "expiring"
-    EXPIRED  = "expired"
+    NONE    = "none"
+    OK      = "ok"
+    RENEW   = "renew"     # dalla data dell'avviso di rinnovo alla fine compresa
+    EXPIRED = "expired"
 
 
-# Giorni alla scadenza entro cui il contratto è considerato "in scadenza".
-EXPIRING_DAYS = 30
+# Limiti dell'anticipo dell'avviso di rinnovo (giorni prima della fine).
+REMINDER_DAYS_MIN = 1
+REMINDER_DAYS_MAX = 365
 
 
 def contract_document_upload_path(instance, filename):
@@ -110,9 +111,8 @@ class Contract(TimeStampedModel):
 
     start_date = models.DateField()
     end_date   = models.DateField()
-    auto_renew = models.BooleanField(default=False)
-    # Giorni di preavviso per la disdetta rispetto a end_date.
-    notice_days = models.PositiveIntegerField(default=90)
+    # Avviso di rinnovo: giorni prima della fine (vedi reminder_date).
+    reminder_days = models.PositiveIntegerField(default=90)
 
     total_value  = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     billing_freq = models.CharField(
@@ -160,11 +160,11 @@ class Contract(TimeStampedModel):
         return f"{self.code} — {self.title}"
 
     @property
-    def notice_deadline(self) -> date:
-        """Ultimo giorno utile per la disdetta. Limitato a `date.min` se il
-        preavviso porterebbe prima dell'anno 1 (OverflowError → 500 in lista)."""
+    def reminder_date(self) -> date:
+        """Giorno dell'avviso di rinnovo. Limitato a `date.min` se l'anticipo
+        porterebbe prima dell'anno 1 (OverflowError → 500 in lista)."""
         try:
-            return self.end_date - timedelta(days=self.notice_days)
+            return self.end_date - timedelta(days=self.reminder_days)
         except OverflowError:
             return date.min
 
@@ -173,10 +173,8 @@ class Contract(TimeStampedModel):
             return ExpiryState.NONE
         if self.end_date < today:
             return ExpiryState.EXPIRED
-        if (self.end_date - today).days <= EXPIRING_DAYS:
-            return ExpiryState.EXPIRING
-        if today >= self.notice_deadline:
-            return ExpiryState.NOTICE
+        if today >= self.reminder_date:
+            return ExpiryState.RENEW
         return ExpiryState.OK
 
 

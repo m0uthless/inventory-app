@@ -25,42 +25,37 @@ def _contract(**kw):
     )[0]
     data = dict(
         customer=customer, code="C-1", title="Contratto", status=ContractStatus.ATTIVO,
-        start_date=date(2026, 1, 1), end_date=TODAY + timedelta(days=200), notice_days=90,
+        start_date=date(2026, 1, 1), end_date=TODAY + timedelta(days=200), reminder_days=90,
     )
     data.update(kw)
     return Contract.objects.create(**data)
 
 
-def test_notice_deadline():
-    c = _contract(end_date=date(2027, 3, 31), notice_days=90)
-    assert c.notice_deadline == date(2026, 12, 31)
+def test_reminder_date():
+    c = _contract(end_date=date(2027, 3, 31), reminder_days=90)
+    assert c.reminder_date == date(2026, 12, 31)
 
 
-@pytest.mark.parametrize("status", [ContractStatus.BOZZA, ContractStatus.DISDETTO])
-def test_expiry_state_bozza_and_disdetto_are_none(status):
+@pytest.mark.parametrize("status", [ContractStatus.BOZZA, ContractStatus.CHIUSO])
+def test_expiry_state_none_when_not_active(status):
     c = _contract(status=status, end_date=TODAY - timedelta(days=10))
     assert c.expiry_state_on(TODAY) == "none"
 
 
-def test_expiry_state_expired():
+def test_expiry_state_expired_after_end():
     c = _contract(end_date=date(2026, 10, 26))
     assert c.expiry_state_on(TODAY) == "expired"
 
 
-def test_expiry_state_expiring():
-    c = _contract(end_date=TODAY + timedelta(days=30))
-    assert c.expiry_state_on(TODAY) == "expiring"
-    c2 = _contract(code="C-2", end_date=TODAY + timedelta(days=31), notice_days=0)
-    assert c2.expiry_state_on(TODAY) == "ok"
-
-
-def test_expiry_state_notice():
-    c = _contract(end_date=TODAY + timedelta(days=60), notice_days=90)
-    assert c.expiry_state_on(TODAY) == "notice"
+def test_expiry_state_renew_from_reminder_date():
+    assert _contract(end_date=TODAY + timedelta(days=50), reminder_days=60).expiry_state_on(TODAY) == "renew"
+    assert _contract(code="C-2", end_date=TODAY + timedelta(days=50), reminder_days=30).expiry_state_on(TODAY) == "ok"
+    # Il giorno della fine è ancora «da rinnovare».
+    assert _contract(code="C-3", end_date=TODAY, reminder_days=30).expiry_state_on(TODAY) == "renew"
 
 
 def test_expiry_state_ok():
-    c = _contract(end_date=TODAY + timedelta(days=200), notice_days=90)
+    c = _contract(end_date=TODAY + timedelta(days=200), reminder_days=90)
     assert c.expiry_state_on(TODAY) == "ok"
 
 
@@ -73,8 +68,8 @@ def test_code_unique_only_among_active():
     assert _contract(code="DUP").pk
 
 
-def test_notice_deadline_clamped_near_date_min():
+def test_reminder_date_overflow_is_date_min():
     # end_date a ridosso di date.min: niente OverflowError (romperebbe la lista).
-    c = _contract(code="C-MIN", end_date=date.min + timedelta(days=5), notice_days=90)
-    assert c.notice_deadline == date.min
+    c = _contract(code="C-MIN", end_date=date.min + timedelta(days=5), reminder_days=90)
+    assert c.reminder_date == date.min
     c.expiry_state_on(TODAY)

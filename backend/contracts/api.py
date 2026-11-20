@@ -27,15 +27,11 @@ from core.uploads import validate_upload
 from device.models import Device
 from portal.permissions import IsInternalOrPortalDedicatedApp, PortalModelPermissions
 
-from .models import EXPIRING_DAYS, Contract, ContractStatus, Seller
+from .models import REMINDER_DAYS_MAX, REMINDER_DAYS_MIN, Contract, ContractStatus, Seller
 
 DOCUMENT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB
 DOCUMENT_ALLOWED_EXTENSIONS = ["pdf"]
 DOCUMENT_ALLOWED_CONTENT_TYPES = ["application/pdf"]
-
-# Tetto ai giorni di preavviso: evita OverflowError nel calcolo di
-# `notice_deadline` (end_date - notice_days) con valori assurdi.
-NOTICE_DAYS_MAX = 3650
 
 VALUE_PERM = "contracts.view_contract_value"
 
@@ -116,7 +112,7 @@ class ContractSerializer(serializers.ModelSerializer):
     contract_type_label = serializers.CharField(source="get_contract_type_display", read_only=True)
     billing_freq_label  = serializers.CharField(source="get_billing_freq_display", read_only=True)
     status_label        = serializers.CharField(source="get_status_display", read_only=True)
-    notice_deadline     = serializers.DateField(read_only=True)
+    reminder_date       = serializers.DateField(read_only=True)
     expiry_state        = serializers.SerializerMethodField()
     # Opzionali: un contratto (es. assistenza) può non coprire alcun device.
     devices = serializers.PrimaryKeyRelatedField(
@@ -134,7 +130,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "contract_type", "contract_type_label",
             "seller", "seller_name",
             "company", "company_label",
-            "start_date", "end_date", "notice_days", "notice_deadline", "auto_renew",
+            "start_date", "end_date", "reminder_days", "reminder_date",
             "total_value", "billing_freq", "billing_freq_label",
             "status", "status_label", "expiry_state",
             "devices", "devices_detail",
@@ -143,7 +139,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "created_at", "updated_at", "deleted_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "deleted_at"]
-        extra_kwargs = {"notice_days": {"max_value": NOTICE_DAYS_MAX}}
+        extra_kwargs = {"reminder_days": {"min_value": REMINDER_DAYS_MIN, "max_value": REMINDER_DAYS_MAX}}
 
     def get_fields(self):
         fields = super().get_fields()
@@ -216,20 +212,18 @@ class ContractSerializer(serializers.ModelSerializer):
 
 def expiry_q(state: str, today) -> Q:
     """Q equivalente a `Contract.expiry_state_on(today) == state` (solo contratti attivi)."""
-    expiring_until = today + timedelta(days=EXPIRING_DAYS)
-    # Termine di disdetta raggiunto: end_date - notice_days <= today  ⇔  end_date <= today + notice_days
-    notice_reached = Q(end_date__lte=ExpressionWrapper(Value(today) + F("notice_days") * timedelta(days=1), output_field=DateField()))
+    # Avviso di rinnovo raggiunto: end_date - reminder_days <= today  ⇔  end_date <= today + reminder_days
+    reminder_reached = Q(end_date__lte=ExpressionWrapper(Value(today) + F("reminder_days") * timedelta(days=1), output_field=DateField()))
     active = Q(status=ContractStatus.ATTIVO)
-    not_expiring = Q(end_date__gt=expiring_until)
     by_state = {
         "expired": Q(end_date__lt=today),
-        "expiring": Q(end_date__gte=today, end_date__lte=expiring_until),
-        "notice": not_expiring & notice_reached,
-        "ok": not_expiring & ~notice_reached,
+        "renew": Q(end_date__gte=today) & reminder_reached,
+        "ok": Q(end_date__gte=today) & ~reminder_reached,
     }
-    if state == "attention":
-        return active & (by_state["expiring"] | by_state["notice"])
     return active & by_state[state]
+
+
+EXPIRY_STATES = ("ok", "renew", "expired")
 
 
 class ContractFilter(filters.FilterSet):
@@ -240,15 +234,15 @@ class ContractFilter(filters.FilterSet):
     # Limitato a 1..9999 (range di datetime.date): fuori range → 400, non 500.
     year = filters.NumberFilter(method="filter_year", min_value=1, max_value=9999)
     # Stato di scadenza come Contract.expiry_state_on, tradotto in query:
-    # ok | notice | expiring | expired, più "attention" = notice + expiring.
+    # ok | renew | expired.
     expiry = filters.ChoiceFilter(
         method="filter_expiry",
-        choices=[(k, k) for k in ("ok", "notice", "expiring", "expired", "attention")],
+        choices=[(k, k) for k in EXPIRY_STATES],
     )
 
     class Meta:
         model  = Contract
-        fields = ["customer", "seller", "company", "status", "contract_type", "auto_renew", "year"]
+        fields = ["customer", "seller", "company", "status", "contract_type", "year"]
 
     def filter_expiry(self, queryset, name, value):
         return queryset.filter(expiry_q(value, timezone.localdate()))
@@ -320,7 +314,7 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
                 base = base.filter(**{f"{key}_id": int(v)})
         counts = base.aggregate(
             **{f"st_{s}": Count("id", filter=Q(status=s)) for s in ContractStatus.values},
-            **{f"ex_{s}": Count("id", filter=expiry_q(s, today)) for s in ("ok", "notice", "expiring", "expired")},
+            **{f"ex_{s}": Count("id", filter=expiry_q(s, today)) for s in EXPIRY_STATES},
         )
         upcoming = (
             base.filter(status=ContractStatus.ATTIVO, end_date__gte=today)
@@ -329,12 +323,12 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
         data = {
             "active": counts["st_attivo"],
             "by_status": {s: counts[f"st_{s}"] for s in ContractStatus.values},
-            "by_expiry": {s: counts[f"ex_{s}"] for s in ("ok", "notice", "expiring", "expired")},
+            "by_expiry": {s: counts[f"ex_{s}"] for s in EXPIRY_STATES},
             "next_deadlines": [
                 {
                     "id": c.id, "code": c.code, "title": c.title,
                     "customer_name": c.customer.display_name or c.customer.name,
-                    "end_date": c.end_date.isoformat(), "notice_deadline": c.notice_deadline.isoformat(),
+                    "end_date": c.end_date.isoformat(), "reminder_date": c.reminder_date.isoformat(),
                     "expiry_state": c.expiry_state_on(today),
                 }
                 for c in upcoming

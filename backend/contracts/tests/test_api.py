@@ -1,7 +1,7 @@
 """Test delle API `/api/contracts/` e `/api/sellers/` (modulo Contratti, fase 1).
 
 Copre permessi (view_contract, view_contract_value, esclusione Portal),
-validazioni (date, device di altro cliente, notice_days), filtro per anno,
+validazioni (date, device di altro cliente, reminder_days), filtro per anno,
 documento PDF, soft delete/restore e anagrafica venditori.
 """
 from __future__ import annotations
@@ -189,13 +189,22 @@ def test_end_before_start_rejected():
     assert "end_date" in resp.data
 
 
-def test_notice_days_capped():
+@pytest.mark.parametrize("days, ok", [(0, False), (366, False), (365, True), (1, True)])
+def test_reminder_days_bounds(days, ok):
     customer = _customer()
     client = _client(_internal_user(ALL_CONTRACT_PERMS))
 
-    resp = client.post("/api/contracts/", _payload(customer, notice_days=3651), format="json")
-    assert resp.status_code == 400
-    assert "notice_days" in resp.data
+    resp = client.post("/api/contracts/", _payload(customer, reminder_days=days), format="json")
+    assert (resp.status_code == 201) is ok, resp.data
+    if not ok:
+        assert "reminder_days" in resp.data
+
+
+def test_auto_renew_not_in_payload():
+    customer = _customer()
+    c = _contract(customer)
+    data = _client(_internal_user(["view_contract"])).get(f"/api/contracts/{c.id}/").data
+    assert "auto_renew" not in data and "notice_days" not in data and "notice_deadline" not in data
 
 
 # ─── Valore economico ────────────────────────────────────────────────────────
@@ -226,15 +235,15 @@ def test_total_value_not_writable_without_perm():
 
 # ─── Campi calcolati e filtri ────────────────────────────────────────────────
 
-def test_expiry_state_and_notice_deadline_in_payload():
+def test_expiry_state_and_reminder_date_in_payload():
     customer = _customer()
     today = timezone.localdate()
     end = today + timedelta(days=60)
-    c = _contract(customer, start_date=today - timedelta(days=300), end_date=end, notice_days=90)
+    c = _contract(customer, start_date=today - timedelta(days=300), end_date=end, reminder_days=90)
 
     data = _client(_internal_user(["view_contract"])).get(f"/api/contracts/{c.id}/").data
-    assert data["notice_deadline"] == (end - timedelta(days=90)).isoformat()
-    assert data["expiry_state"] == "notice"
+    assert data["reminder_date"] == (end - timedelta(days=90)).isoformat()
+    assert data["expiry_state"] == "renew"
     assert data["status_label"] == "Attivo"
 
 
