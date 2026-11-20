@@ -152,3 +152,13 @@ def test_module_off_returns_404():
     finally:
         ModuleSwitch.objects.filter(key="text2sql").delete()
         invalidate_cache()
+
+
+def test_review_puts_unreviewed_first():
+    from django.utils import timezone
+    u = _tech()
+    reviewed = _done(u, feedback="ok", reviewed_at=timezone.now())
+    pending = _done(u, feedback="ok")
+    body = _c(_su()).get(f"{URL}review/").json()
+    ids = [r["id"] for r in (body["results"] if isinstance(body, dict) else body)]
+    assert ids.index(pending.pk) < ids.index(reviewed.pk)

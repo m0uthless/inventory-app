@@ -82,3 +82,11 @@ def test_generate_not_configured(settings):
     settings.T2S_OLLAMA_URL = ""
     with pytest.raises(engine.EngineError, match="non configurato"):
         engine.generate("quanti esami oggi?")
+
+
+def test_generate_connection_dropped(settings):
+    import http.client
+    settings.T2S_OLLAMA_URL = "http://ollama.test:11434"
+    with mock.patch("urllib.request.urlopen", side_effect=http.client.RemoteDisconnected("closed")):
+        with pytest.raises(engine.EngineError, match="chiuso la connessione"):
+            engine.generate("quanti esami oggi?")

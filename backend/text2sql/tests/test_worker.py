@@ -125,3 +125,51 @@ def test_command_startup_waits_for_migrations():
     with mock.patch.object(cmd.worker, "requeue_interrupted", side_effect=flaky), mock.patch.object(cmd.time, "sleep") as sleep:
         assert cmd.requeue_when_ready() == 0
     assert calls["n"] == 3 and sleep.call_count == 2
+
+
+def test_request_deleted_while_running_does_not_come_back():
+    u = _user()
+    q = _q(u)
+
+    def gen(_question):
+        Text2SqlRequest.objects.filter(pk=q.pk).delete()  # il tecnico la cancella durante l'elaborazione
+        return RESULT
+
+    with mock.patch("text2sql.engine.generate", side_effect=gen):
+        worker.process_next()
+    assert not Text2SqlRequest.objects.filter(pk=q.pk).exists()
+    assert not Notification.objects.filter(source_key=str(q.pk), notification_type="text2sql_ready").exists()
+
+
+def test_failed_final_save_still_closes_the_request():
+    q = _q(_user())
+    real_update = Text2SqlRequest.objects.filter(pk=q.pk).update
+    calls = {"n": 0}
+
+    class FlakyQS:
+        def __init__(self, qs):
+            self.qs = qs
+
+        def update(self, **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                from django.db import OperationalError
+                raise OperationalError("server closed the connection")
+            return self.qs.update(**kw)
+
+    orig_filter = Text2SqlRequest.objects.filter
+
+    def filt(*a, **kw):
+        qs = orig_filter(*a, **kw)
+        return FlakyQS(qs) if kw.get("status") == "running" else qs
+
+    with mock.patch("text2sql.engine.generate", return_value=RESULT), mock.patch.object(Text2SqlRequest.objects, "filter", side_effect=filt):
+        worker.process_next()
+    q.refresh_from_db()
+    assert q.status == "error"
+    assert real_update  # usato solo per chiarezza
+
+
+def test_audit_does_not_store_the_question_text():
+    q = _q(_user())
+    assert "Quanti studi" not in str(q)

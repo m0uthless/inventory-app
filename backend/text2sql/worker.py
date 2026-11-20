@@ -67,17 +67,42 @@ def process_next() -> bool:
     try:
         result = engine.generate(obj.question)
     except engine.EngineError as e:
-        obj.status, obj.error = Text2SqlRequest.STATUS_ERROR, str(e)
+        fields = {"status": Text2SqlRequest.STATUS_ERROR, "error": str(e)}
     except Exception:  # noqa: BLE001 — una domanda andata male non deve fermare la coda
         logger.exception("Generatore SQL: errore imprevisto sulla domanda %s", obj.pk)
-        obj.status, obj.error = Text2SqlRequest.STATUS_ERROR, "Errore imprevisto del generatore: riprova o avvisa l'amministratore."
+        fields = {"status": Text2SqlRequest.STATUS_ERROR, "error": UNEXPECTED}
     else:
-        obj.status = Text2SqlRequest.STATUS_DONE
-        obj.sql, obj.kind, obj.warnings, obj.seconds = result["sql"], result["kind"], result["warnings"], result["seconds"]
-    obj.finished_at = timezone.now()
-    obj.save()
+        fields = {"status": Text2SqlRequest.STATUS_DONE, "sql": result["sql"], "kind": result["kind"],
+                  "warnings": result["warnings"], "seconds": result["seconds"]}
+    fields["finished_at"] = timezone.now()
+    if not _close(obj.pk, fields):
+        return True  # cancellata durante l'elaborazione: niente da salvare né da notificare
+    for k, v in fields.items():
+        setattr(obj, k, v)
     try:
         _notify(obj)
     except Exception:  # noqa: BLE001
         logger.exception("Generatore SQL: notifica non creata per la domanda %s", obj.pk)
     return True
+
+
+UNEXPECTED = "Errore imprevisto del generatore: riprova o avvisa l'amministratore."
+
+
+def _close(pk: int, fields: dict) -> bool:
+    """Chiude la domanda solo se esiste ancora ed è «in elaborazione» (un UPDATE, mai un
+    INSERT: una domanda cancellata nel frattempo non deve ricomparire). Se il salvataggio
+    fallisce prova almeno a segnarla «non riuscita», così la pagina non resta in attesa."""
+    try:
+        return Text2SqlRequest.objects.filter(pk=pk, status=Text2SqlRequest.STATUS_RUNNING).update(**fields) > 0
+    except Exception:  # noqa: BLE001
+        logger.exception("Generatore SQL: salvataggio non riuscito per la domanda %s", pk)
+    try:
+        fallback = {"status": Text2SqlRequest.STATUS_ERROR, "error": UNEXPECTED, "finished_at": fields["finished_at"]}
+        if Text2SqlRequest.objects.filter(pk=pk, status=Text2SqlRequest.STATUS_RUNNING).update(**fallback) > 0:
+            fields.clear()
+            fields.update(fallback)
+            return True
+    except Exception:  # noqa: BLE001
+        logger.exception("Generatore SQL: domanda %s rimasta in elaborazione", pk)
+    return False

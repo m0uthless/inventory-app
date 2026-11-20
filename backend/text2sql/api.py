@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -111,7 +112,7 @@ class Text2SqlViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Ret
         denied = self._require_superuser(request)
         if denied:
             return denied
-        qs = Text2SqlRequest.objects.select_related("user").exclude(feedback="").order_by("reviewed_at", "-feedback_at", "-id")
+        qs = Text2SqlRequest.objects.select_related("user").exclude(feedback="").order_by(F("reviewed_at").asc(nulls_first=True), "-feedback_at", "-id")
         fb = request.query_params.get("feedback")
         if fb in ("ok", "ko"):
             qs = qs.filter(feedback=fb)

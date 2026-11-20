@@ -10,6 +10,7 @@ Archie non esegue mai le query: le restituisce da copiare.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import time
@@ -213,6 +214,8 @@ def _call_ollama(system: str, user: str) -> str:
         raise EngineError(f"Ollama non raggiungibile ({base}): {e.reason}") from e
     except TimeoutError as e:
         raise EngineError(f"Il generatore non ha risposto entro {settings.T2S_TIMEOUT} secondi.") from e
+    except (OSError, http.client.HTTPException) as e:
+        raise EngineError(f"Ollama ha chiuso la connessione durante la generazione ({base}): riprova.") from e
     return data.get("message", {}).get("content", "")
 
 

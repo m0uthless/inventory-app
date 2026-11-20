@@ -55,7 +55,9 @@ class Text2SqlRequest(models.Model):
         ]
 
     def __str__(self):
-        return f"#{self.pk} {self.question[:60]}"
+        # Niente testo della domanda: può contenere il nome di un paziente e finisce
+        # nell'Audit (object_repr), che resterebbe anche dopo la cancellazione.
+        return f"Domanda #{self.pk}"
 
     @property
     def example_markdown(self) -> str:
