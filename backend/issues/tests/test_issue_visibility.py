@@ -136,3 +136,22 @@ def test_wiki_link_label_hides_invisible_issue_title(world):
     data = _client(_user(world["a"])).get(f"/api/wiki-links/{link.pk}/").json()
     assert data["entity_label"] == f"#{world['ib'].pk}"
     assert "Issue" not in data["entity_label"]
+
+
+def test_audit_events_hide_invisible_issues(world):
+    from audit.utils import log_event
+    me = _user(world["a"], "audit")
+    for issue in (world["ia"], world["ib"], world["i0"]):
+        log_event(actor=None, action="update", instance=issue, changes={"status": {"from": "open", "to": "in_progress"}})
+    body = _client(me).get("/api/audit-events/", {"app_label": "issues", "model": "issue"}).json()
+    seen = {r["object_id"] for r in (body["results"] if isinstance(body, dict) else body)}
+    assert str(world["ia"].pk) in seen and str(world["i0"].pk) in seen
+    assert str(world["ib"].pk) not in seen
+
+
+def test_audit_events_all_issues_with_permission(world):
+    from audit.utils import log_event
+    me = grant_via_group(_user(world["a"], "audit"), "issues.view_all_areas")
+    log_event(actor=None, action="update", instance=world["ib"], changes={"status": {"from": "open", "to": "in_progress"}})
+    body = _client(me).get("/api/audit-events/", {"app_label": "issues", "model": "issue"}).json()
+    assert str(world["ib"].pk) in {r["object_id"] for r in (body["results"] if isinstance(body, dict) else body)}

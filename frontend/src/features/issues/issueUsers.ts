@@ -25,3 +25,11 @@ export const assigneesForArea = (users: UserOption[], areaId: number | '' | null
  *  (interruttore «Tutte le aree» spento → `mine`); per gli altri restringe già il server. */
 export const issueScopeParam = (canSeeAll: boolean, allAreas: boolean, myArea: number | null): 'mine' | undefined =>
   canSeeAll && !allAreas && myArea != null ? 'mine' : undefined
+
+/** Dopo un salvataggio dalla finestra: `ok` (si può annullare), `readonly` (la issue è
+ *  passata a un'altra area: si vede ma non si modifica più, quindi niente annulla),
+ *  `hidden` (l'utente non vede le altre aree: la issue sparisce, si chiude la finestra). */
+export function afterSaveOutcome(updated: { area: number | null; can_edit: boolean }, canSeeAll: boolean, myArea: number | null): 'ok' | 'readonly' | 'hidden' {
+  if (updated.can_edit !== false) return 'ok'
+  return !canSeeAll && myArea != null && updated.area != null && updated.area !== myArea ? 'hidden' : 'readonly'
+}

@@ -51,7 +51,7 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
-import { issueAssignees, issueScopeParam, toUserOption } from '../features/issues/issueUsers'
+import { afterSaveOutcome, issueAssignees, issueScopeParam, toUserOption } from '../features/issues/issueUsers'
 import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -841,9 +841,20 @@ export default function Issues() {
     for (const k of Object.keys(patch)) prev[k] = (detailIssue as Record<string, unknown>)[k]
     try {
       const r = await api.patch<IssueRow>(`/issues/${id}/`, patch)
-      syncIssueState(r.data)
       reload()
       setKpiReload((n) => n + 1)
+      // Spostata in un'altra area: non si può più modificare (né annullare).
+      const outcome = afterSaveOutcome(r.data, canSeeAllAreas, myArea)
+      if (outcome === 'hidden') {
+        setDetailIssue(null)
+        toast.success(`${label}. La issue è passata a un'altra area e non è più tra le tue.`)
+        return
+      }
+      syncIssueState(r.data)
+      if (outcome === 'readonly') {
+        toast.success(`${label}. La issue è passata a un'altra area: ora puoi solo consultarla.`)
+        return
+      }
       undoToast.show(`${label} · salvato`, async () => {
         try {
           const back = await api.patch<IssueRow>(`/issues/${id}/`, prev)
@@ -857,11 +868,11 @@ export default function Issues() {
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     }
-  }, [detailIssue, syncIssueState, reload, undoToast, toast])
+  }, [detailIssue, syncIssueState, reload, undoToast, toast, canSeeAllAreas, myArea])
 
   const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
 
-  const issueCounts = useIssueCounts(kpiReload, me?.id)
+  const issueCounts = useIssueCounts(kpiReload, me?.id, scopeParam)
   // Viste salvate (scheda + filtri + ordinamento + ricerca)
   type ViewState = { view: IssueView; fStatus: string[]; fPriority: string[]; fCategory: string[]; fAssigned: string[]; q: string; sort: GridSortModel }
   const saved = useSavedViews<ViewState>('issues', me?.username)
@@ -914,7 +925,7 @@ export default function Issues() {
   const [kpiCounts, setKpiCounts] = React.useState<{ active: number; closed: number; all: number } | null>(null)
   React.useEffect(() => {
     let alive = true
-    api.get('/issues/summary/').then((r) => {
+    api.get('/issues/summary/', scopeParam ? { params: { area: 'mine' } } : undefined).then((r) => {
       const d = r.data as Record<string, number>
       if (alive) setKpiCounts({
         active: d.active_count ?? 0,
@@ -923,7 +934,7 @@ export default function Issues() {
       })
     }).catch(() => {})
     return () => { alive = false }
-  }, [kpiReload])
+  }, [kpiReload, scopeParam])
 
   const userLabel = (id: string) => users.find((u) => String(u.id) === id)?.label ?? id
   const catLabel = (id: string) => categories.find((c) => String(c.id) === id)?.label ?? id
@@ -1387,6 +1398,7 @@ export default function Issues() {
       />
       <IssuesKpis
         reloadKey={kpiReload}
+        scope={scopeParam}
         counts={issueCounts}
         view={view}
         priority={fPriority}

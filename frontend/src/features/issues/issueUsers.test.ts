@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assigneesForArea, issueAssignees, issueScopeParam, toUserOption } from './issueUsers'
+import { afterSaveOutcome, assigneesForArea, issueAssignees, issueScopeParam, toUserOption } from './issueUsers'
 
 describe('issueUsers', () => {
   it('toUserOption legge is_issue_assignee (assente = false)', () => {
@@ -34,5 +34,15 @@ describe('issueUsers', () => {
     expect(issueScopeParam(false, false, 4)).toBeUndefined()
     expect(issueScopeParam(false, true, 4)).toBeUndefined()
     expect(issueScopeParam(true, false, null)).toBeUndefined()
+  })
+  it('afterSaveOutcome: dopo aver spostato la issue fuori dalla propria area l\'annulla non è possibile', () => {
+    expect(afterSaveOutcome({ area: 4, can_edit: true }, false, 4)).toBe('ok')
+    expect(afterSaveOutcome({ area: null, can_edit: true }, false, 4)).toBe('ok')
+    // Può vedere tutte le aree: la vede ancora, ma in sola lettura.
+    expect(afterSaveOutcome({ area: 5, can_edit: false }, true, 4)).toBe('readonly')
+    // Non può vedere le altre aree: la issue sparisce.
+    expect(afterSaveOutcome({ area: 5, can_edit: false }, false, 4)).toBe('hidden')
+    // Senza area nel profilo vede tutto: al più sola lettura.
+    expect(afterSaveOutcome({ area: 5, can_edit: false }, false, null)).toBe('readonly')
   })
 })

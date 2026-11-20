@@ -52,11 +52,12 @@ async function count(params: Record<string, unknown>) {
 
 /** Conteggi per indicatori e schede, calcolati con l'elenco filtrato (nessuna API nuova). */
 // eslint-disable-next-line react-refresh/only-export-components
-export function useIssueCounts(reloadKey: number, meId?: number) {
+export function useIssueCounts(reloadKey: number, meId?: number, scope?: 'mine') {
   const [c, setC] = React.useState<IssueCounts | null>(null)
   React.useEffect(() => {
     let alive = true
-    const active = { hide_closed: true }
+    // `scope`: stesso perimetro dell'elenco (interruttore «Tutte le aree» spento).
+    const active = { hide_closed: true, ...(scope ? { scope } : {}) }
     Promise.all([
       count({ ...active, due_before: overdueBefore() }),
       count({ ...active, due_after: addDays(0), due_before: addDays(0) }),
@@ -70,11 +71,13 @@ export function useIssueCounts(reloadKey: number, meId?: number) {
       if (alive) setC({ overdue, dueToday, dueWeek, mine, byPriority: { critical, high, medium, low } })
     }).catch(() => {})
     return () => { alive = false }
-  }, [reloadKey, meId])
+  }, [reloadKey, meId, scope])
   return c
 }
 
 type Props = {
+  /** Stesso perimetro dell'elenco: `mine` = propria area più issue senza area. */
+  scope?: 'mine'
   reloadKey: number
   counts: IssueCounts | null
   view: string
@@ -84,13 +87,13 @@ type Props = {
 }
 
 /** Fascia indicatori della pagina Issue (DESIGN.md › KPI strip), dati reali. */
-export default function IssuesKpis({ reloadKey, counts, view, priority, onView, onPriorityPick }: Props) {
+export default function IssuesKpis({ reloadKey, counts, view, priority, onView, onPriorityPick, scope }: Props) {
   const [s, setS] = React.useState<Summary | null>(null)
   React.useEffect(() => {
     let alive = true
-    api.get<Summary>('/issues/summary/').then((r) => { if (alive) setS(r.data) }).catch(() => {})
+    api.get<Summary>('/issues/summary/', scope ? { params: { area: 'mine' } } : undefined).then((r) => { if (alive) setS(r.data) }).catch(() => {})
     return () => { alive = false }
-  }, [reloadKey])
+  }, [reloadKey, scope])
 
   const opened = s ? daily(s.chart_buckets) : []
   const closed = s ? daily(s.closed_buckets) : []
