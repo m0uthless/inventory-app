@@ -53,6 +53,13 @@ describe('ContractReminders', () => {
     expect(screen.getByText('… altri 6 inviati')).toBeInTheDocument()
   })
 
+  it('ripiegando date saltate non le chiama «inviati»', () => {
+    const skipped = Array.from({ length: 7 }, (_, i) => ({ date: `2026-0${i + 1}-01`, state: 'skipped' as const, error: null }))
+    show({ dates: [...skipped, { date: '2026-11-17', state: 'sent', error: null }, { date: '2026-11-27', state: 'next', error: null }] })
+    expect(screen.getByText('… altre 6 date passate')).toBeInTheDocument()
+    expect(screen.queryByText(/altri 6 inviati/)).toBeNull()
+  })
+
   it('senza indirizzi: avvisa che non parte nulla', () => {
     show({ seller_kind: null, to: [], cc: [] }, '')
     expect(screen.getByText(/Nessun destinatario/)).toBeInTheDocument()

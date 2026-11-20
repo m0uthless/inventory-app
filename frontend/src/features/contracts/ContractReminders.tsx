@@ -26,10 +26,10 @@ export default function ContractReminders({ reminders: r, sellerName, active, en
   )
 
   const past = r.dates.filter((d) => d.state === 'sent' || d.state === 'failed' || d.state === 'skipped')
-  type Row = { kind: 'date'; d: Reminders['dates'][number]; i: number } | { kind: 'gap'; n: number }
+  type Row = { kind: 'date'; d: Reminders['dates'][number]; i: number } | { kind: 'gap'; n: number; allSent: boolean }
   const rows: Row[] = r.dates.map((d, i) => ({ kind: 'date', d, i }))
   const shown: Row[] = past.length > FOLD_AFTER
-    ? [rows[0], { kind: 'gap', n: past.length - 2 }, ...rows.slice(past.length - 1)]
+    ? [rows[0], { kind: 'gap', n: past.length - 2, allSent: past.slice(1, -1).every((d) => d.state === 'sent') }, ...rows.slice(past.length - 1)]
     : rows
 
   return (
@@ -53,7 +53,7 @@ export default function ContractReminders({ reminders: r, sellerName, active, en
               return (
                 <Box component="li" key={`gap-${k}`} sx={{ display: 'grid', gridTemplateColumns: '14px 120px minmax(0,1fr)', gap: 1, alignItems: 'center', py: 0.6, fontSize: 12.5, color: 'text.secondary' }}>
                   <Box sx={{ width: 10, height: 10, borderRadius: '50%', border: '2px dotted', borderColor: 'archie.borderStrong', justifySelf: 'center' }} />
-                  <span>… altri {row.n} inviati</span><span />
+                  <span>{row.allSent ? `… altri ${row.n} inviati` : `… altre ${row.n} date passate`}</span><span />
                 </Box>
               )
             }
