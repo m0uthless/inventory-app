@@ -50,6 +50,7 @@ MODULE_LABELS: dict[str, str] = {
     "expenses": "Note Spese",
     "purchaseorders": "Purchase Order",
     "contracts": "Contratti",
+    "text2sql": "Generatore SQL",
     "portal": "Portale Clienti",
     "core": "Core / Sistema",
     "custom_fields": "Campi Personalizzati",
