@@ -14,7 +14,7 @@ export type IssueAttachment = {
 }
 
 /** Dimensione leggibile: «2 KB», «1,4 MB». */
-export function fmtBytes(n: number): string {
+function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
   return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`
