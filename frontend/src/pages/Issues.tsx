@@ -14,7 +14,7 @@ import {
   ButtonBase,
 } from '@mui/material'
 
-import { Dialog, DialogActions, DialogContent, DialogTitle, ListItemText, Menu, MenuItem } from '@mui/material'
+import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
@@ -255,13 +255,13 @@ export default function Issues() {
       return v && /^\d+$/.test(v) ? Number(v) : null
     } catch { return null }
   })
-  const savedChoice = areaChoiceState === 'mine' && myArea == null ? null : areaChoiceState
+  // «mine» veniva dal vecchio menu: ora si sceglie l'area.
+  const savedChoice = areaChoiceState === 'mine' ? null : areaChoiceState
   const areaChoice: AreaChoice = canSeeAllAreas ? (savedChoice ?? defaultAreaChoice(myArea)) : 'all'
   const setAreaChoice = (c: AreaChoice) => { setAreaChoiceState(c); try { localStorage.setItem('issues_area_choice', String(c)) } catch { /* solo in memoria */ } }
   const areaParams = areaChoiceParams(areaChoice)
   const areaListKey = JSON.stringify(areaParams.list)
   const summaryArea = areaParams.summaryArea
-  const [areaMenu, setAreaMenu] = React.useState<HTMLElement | null>(null)
   // `?vista=mine|overdue|closed|all` dalla Dashboard; poi la vista vive nello stato della pagina.
   const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'myarea' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
   const [fStatus, setFStatus] = React.useState<string[]>([])
@@ -1402,10 +1402,34 @@ export default function Issues() {
 
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // Selettore d'area accanto al titolo, come nei Task di area (solo per chi vede tutte le aree).
+  const areaSwitch = (
+    <Box role="group" aria-label="Area" sx={{ display: 'inline-flex', flexWrap: 'wrap', p: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'archie.surface2' }}>
+      {[
+        ...areas.map((a) => ({ key: a.id as AreaChoice, label: a.label, mine: a.id === myArea })),
+        { key: 'none' as AreaChoice, label: 'Senza area', mine: false },
+        { key: 'all' as AreaChoice, label: 'Tutte', mine: false },
+      ].map((o) => {
+        const on = o.key === areaChoice
+        return (
+          <ButtonBase key={String(o.key)} aria-pressed={on} onClick={() => setAreaChoice(o.key)} sx={{
+            height: 28, px: 1.25, gap: 0.75, borderRadius: '6px', fontSize: 13, fontWeight: 550, color: on ? 'text.primary' : 'text.secondary',
+            bgcolor: on ? 'background.paper' : 'transparent', boxShadow: on ? (t) => `0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px ${t.palette.divider}` : 'none',
+            '&:hover': { color: 'text.primary' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+          }}>
+            {o.label}
+            {o.mine ? <Box component="small" sx={{ fontSize: 10, fontWeight: 600, color: 'primary.main', bgcolor: 'archie.field', borderRadius: '4px', px: 0.625 }}>la tua</Box> : null}
+          </ButtonBase>
+        )
+      })}
+    </Box>
+  )
+
   return (
     <Stack spacing={0} sx={{ height: '100%' }}>
       <PageHead
         title="Issue"
+        inline={canSeeAllAreas ? areaSwitch : undefined}
         actions={<Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>Nuova issue</Button>}
       />
       <IssuesKpis
@@ -1435,26 +1459,6 @@ export default function Issues() {
           ]}
           end={
             <>
-              {canSeeAllAreas ? (
-                <>
-                  <Button size="small" color="inherit" aria-haspopup="menu" onClick={(e) => setAreaMenu(e.currentTarget)}
-                    endIcon={<CampoIcon name="chevD" size={13} />} sx={{ mr: 1, fontWeight: 550, color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                    Area: {areaChoice === 'all' ? 'tutte' : areaChoice === 'mine' ? 'la mia' : areaChoice === 'none' ? 'senza area' : (areas.find((a) => a.id === areaChoice)?.label ?? `#${areaChoice}`)}
-                  </Button>
-                  <Menu anchorEl={areaMenu} open={Boolean(areaMenu)} onClose={() => setAreaMenu(null)}>
-                    {[
-                      { key: 'all' as AreaChoice, label: 'Tutte le aree' },
-                      ...(myArea != null ? [{ key: 'mine' as AreaChoice, label: 'La mia area', hint: 'con le issue senza area' }] : []),
-                      ...areas.map((a) => ({ key: a.id as AreaChoice, label: a.label })),
-                      { key: 'none' as AreaChoice, label: 'Senza area' },
-                    ].map((o) => (
-                      <MenuItem key={String(o.key)} selected={areaChoice === o.key} onClick={() => { setAreaMenu(null); setAreaChoice(o.key) }} sx={{ fontSize: 13 }}>
-                        <ListItemText primary={o.label} secondary={'hint' in o ? o.hint : undefined} primaryTypographyProps={{ fontSize: 13 }} secondaryTypographyProps={{ fontSize: 11.5 }} />
-                      </MenuItem>
-                    ))}
-                  </Menu>
-                </>
-              ) : null}
               <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
                 sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
                 Salva vista

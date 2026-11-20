@@ -34,8 +34,8 @@ describe('issueUsers', () => {
     expect(areaChoiceParams('none')).toEqual({ list: { no_area: true }, summaryArea: 'none' })
     expect(areaChoiceParams(5)).toEqual({ list: { area: 5 }, summaryArea: '5' })
   })
-  it('menu «Area»: si parte dalla propria area se c\'è, altrimenti da tutte', () => {
-    expect(defaultAreaChoice(4)).toBe('mine')
+  it('selettore «Area»: si parte dalla propria area se c\'è, altrimenti da tutte', () => {
+    expect(defaultAreaChoice(4)).toBe(4)
     expect(defaultAreaChoice(null)).toBe('all')
   })
   it('afterSaveOutcome: dopo aver spostato la issue fuori dalla propria area l\'annulla non è possibile', () => {

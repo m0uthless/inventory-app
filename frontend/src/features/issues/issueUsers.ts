@@ -32,8 +32,8 @@ export function areaChoiceParams(choice: AreaChoice): { list: Record<string, str
   return { list: {}, summaryArea: undefined }
 }
 
-/** Si parte dalla propria area (più le issue senza area) se c'è, altrimenti da tutte. */
-export const defaultAreaChoice = (myArea: number | null): AreaChoice => (myArea != null ? 'mine' : 'all')
+/** Si parte dalla propria area se c'è, altrimenti da tutte (come nei Task di area). */
+export const defaultAreaChoice = (myArea: number | null): AreaChoice => (myArea != null ? myArea : 'all')
 
 /** Dopo un salvataggio dalla finestra: `ok` (si può annullare), `readonly` (la issue è
  *  passata a un'altra area: si vede ma non si modifica più, quindi niente annulla),
