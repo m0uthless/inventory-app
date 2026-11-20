@@ -13,6 +13,9 @@ export type IssueAttachment = {
   uploaded_by_name: string | null; created_at: string
 }
 
+// 25 MB meno un margine per le intestazioni della richiesta multipart (limite di nginx).
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 - 64 * 1024
+
 /** Dimensione leggibile: «2 KB», «1,4 MB». */
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -41,16 +44,24 @@ export default function IssueAttachments({ issueId, canEdit, onChanged, onCount 
   const upload = async (files: FileList | File[] | null) => {
     const list = Array.from(files ?? [])
     if (!list.length || busy) return
-    const body = new FormData()
-    list.forEach((f) => body.append('file', f))
+    // Prima dell'invio: nginx rifiuta le richieste oltre 25 MB con un errore generico.
+    const big = list.find((f) => f.size > MAX_UPLOAD_BYTES)
+    if (big) { toast.error(`«${big.name}» supera i 25 MB: caricalo nel Drive o su OneDrive.`); if (inputRef.current) inputRef.current.value = ''; return }
     setBusy(true)
+    let done = 0
     try {
-      await api.post(`/issues/${issueId}/attachments/`, body)
-      toast.success(list.length === 1 ? 'File allegato' : `${list.length} file allegati`)
-      load(); onChanged?.()
+      // Un file per richiesta: insieme si sommerebbero oltre il limite della richiesta.
+      for (const f of list) {
+        const body = new FormData()
+        body.append('file', f)
+        await api.post(`/issues/${issueId}/attachments/`, body)
+        done++
+      }
+      toast.success(done === 1 ? 'File allegato' : `${done} file allegati`)
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''
+      if (done) { load(); onChanged?.() }
     }
   }
   const remove = async () => {

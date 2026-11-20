@@ -88,4 +88,23 @@ describe('IssueAttachments', () => {
     show(false)
     expect(await screen.findByText('Nessun allegato.')).toBeInTheDocument()
   })
+
+  it('più file: una richiesta per file (nginx limita la richiesta intera a 25 MB)', async () => {
+    api.post.mockResolvedValue({ data: [] })
+    show()
+    await screen.findByText('schermata.png')
+    fireEvent.change(screen.getByLabelText('Allega file'), { target: { files: [new File(['a'], 'a.png'), new File(['b'], 'b.pdf')] } })
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2))
+    expect((api.post.mock.calls[0][1] as FormData).getAll('file')).toHaveLength(1)
+  })
+
+  it('un file oltre 25 MB non parte e lo dice', async () => {
+    show()
+    await screen.findByText('schermata.png')
+    const big = new File(['x'], 'enorme.zip')
+    Object.defineProperty(big, 'size', { value: 26 * 1024 * 1024 })
+    fireEvent.change(screen.getByLabelText('Allega file'), { target: { files: [big] } })
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('«enorme.zip» supera i 25 MB: caricalo nel Drive o su OneDrive.'))
+    expect(api.post).not.toHaveBeenCalled()
+  })
 })
