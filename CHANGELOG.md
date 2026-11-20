@@ -7,6 +7,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-20
+
 ### Added
 - Purchase Order: «Seguito da», la persona che segue il PO (sollecita il committente, carica i documenti). Si sceglie al volo dalla finestra, con «Lo seguo io» quando non lo segue nessuno, ed è una colonna dell'elenco; si filtra via API con `followed_by`. Nuovo campo `followed_by` (migrazione `purchaseorders.0008`).
 
