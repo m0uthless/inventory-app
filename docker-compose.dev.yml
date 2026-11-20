@@ -15,6 +15,10 @@ services:
     env_file:
       - ./.env.dev
 
+  text2sql-worker:
+    env_file:
+      - ./.env.dev
+
   frontend:
     build:
       context: .

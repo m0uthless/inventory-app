@@ -163,6 +163,20 @@ services:
       - datafiles:/app/data
       - media:/app/media
 
+  # Generatore SQL PACS: elabora in coda le domande chiamando Ollama, che gira
+  # fuori da Archie (OLLAMA_URL). Una domanda alla volta.
+  text2sql-worker:
+    build: ./backend
+    restart: unless-stopped
+    entrypoint: []
+    command: python manage.py text2sql_worker
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   caddy_data:
   caddy_config:

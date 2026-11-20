@@ -63,7 +63,7 @@ MODULES: tuple[Module, ...] = (
     ),
     Module("leave", "Piano ferie", ("absences", "leave-holidays")),
     Module("feedback", "Bug e feature", ("feedback-items",)),
-    Module("text2sql", "Generatore SQL", ("text2sql",)),
+    Module("text2sql", "Generatore SQL", ("text2sql",), notification_types=("text2sql_ready",)),
 )
 
 MODULES_BY_KEY: dict[str, Module] = {m.key: m for m in MODULES}
