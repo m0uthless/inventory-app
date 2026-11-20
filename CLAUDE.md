@@ -127,6 +127,10 @@ File/folder storage with API-side ACLs (`backend/drive/`). Nginx deliberately bl
 
 **Device/VLAN exclusivity:** `Device` records are manageable from the main Archie frontend too, limited to the base fields (`customer` on create, `site`, `type`, `status`, `manufacturer`, `model`, `serial_number`, `inventario`, `note`); Archie never sends `ip`, `aetitle`, `reparto`, `room`, `location`, `vlan`, `dose`, `wifi`, `rispacs`, which stay Portal-managed and are preserved on PATCH. Devices created from Archie are inherited by the customer's Portal through the existing `customer` scoping in `DeviceViewSet` (no Archie-specific code there). `VLAN`, `DeviceWifi` (Fernet-encrypted password, `.p12` upload), `Rispacs` M2M, `DeviceType` (with `dose_sr`) and `DeviceManufacturer` (logo) editing remain **exclusive to `frontend-portal`**.
 
+### Impostazioni di Archie (app settings)
+
+Application-level settings live in `core.AppSetting` (key/value) behind the typed registry `core/app_settings.py` (`get_setting`, `set_settings`, `office_emails`); API `GET/PATCH /api/app-settings/`, page `/impostazioni`. Access: superuser or `core.manage_app_settings`. Add new settings to the registry (key, section, kind, default, bounds), never read `AppSetting` rows directly.
+
 ### Custom fields
 
 `backend/custom_fields/` provides a generic, admin-configurable custom-fields system; `core.mixins.CustomFieldsValidationMixin` is how app serializers validate/normalize the `custom_fields` payload.
@@ -139,7 +143,7 @@ File/folder storage with API-side ACLs (`backend/drive/`). Nginx deliberately bl
 
 ### Runtime topology (docker-compose.yml)
 
-`caddy` (edge proxy, ports 80/443/8081) → `frontend` / `frontend-portal` (static builds, internal 8080) and `backend_nginx` (static/media + proxy to `backend`). `backend` is Django/Gunicorn behind nginx, healthcheck on `/api/health/`. `db` is Postgres 16, `redis` is cache/broker. `cron` runs the same backend image with an empty entrypoint, looping management commands directly in shell (`refresh_notifications` every 15 min, `close_resolved_issues` every hour) — there is no Celery beat or real scheduler. `RUN_MIGRATIONS` / `RUN_COLLECTSTATIC` are env-controlled and disabled in the prod compose override, where they run as explicit deploy steps instead.
+`caddy` (edge proxy, ports 80/443/8081) → `frontend` / `frontend-portal` (static builds, internal 8080) and `backend_nginx` (static/media + proxy to `backend`). `backend` is Django/Gunicorn behind nginx, healthcheck on `/api/health/`. `db` is Postgres 16, `redis` is cache/broker. `cron` runs the same backend image with an empty entrypoint, looping management commands directly in shell (`refresh_notifications` every 15 min, `send_deadline_digest` and `send_contract_reminders` checked every 15 min but acting only at 8:00 local, `close_resolved_issues` every hour) — there is no Celery beat or real scheduler. `RUN_MIGRATIONS` / `RUN_COLLECTSTATIC` are env-controlled and disabled in the prod compose override, where they run as explicit deploy steps instead.
 
 Dev override: `docker-compose.dev.yml`. Production override: `docker-compose.prod.yml` + `.env.prod`.
 

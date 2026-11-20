@@ -362,3 +362,12 @@ Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Cont
 - ~~**[UI] Esc nella finestra del task**~~: fatto il 20/11, la finestra si riapriva da `?open=` prima che sparisse dall'URL; ora l'apertura da URL reagisce solo a un id nuovo.
 - Dati dev: il task T-4 è collegato alla issue #17 ma è «In attesa», non completato (dato di prova).
 
+## Contratti fase 2 (20/11)
+
+Spec `docs/superpowers/specs/2026-11-20-contracts-renewal-reminders-design.md`, piano `docs/superpowers/plans/2026-11-20-contracts-renewal-reminders.md`, anteprima `design-previews/ctr2-base.html`. Su develop, non rilasciato.
+
+- ~~Promemoria di rinnovo, Impostazioni di Archie, via la disdetta, stato «Chiuso», via il rinnovo automatico~~ fatti il 20/11.
+- **Deploy in produzione:** `migrate` (`contracts.0003`, `0004`, `core.0049`, `notifications.0005`), ricreare `cron`, impostare gli indirizzi dell'ufficio in `/impostazioni`, dare «Gestisce le impostazioni di Archie».
+- **[DEC] Dev:** l'SMTP del dev è reale e i venditori demo hanno email finte: il cron delle 8 scrive a quegli indirizzi.
+- **[UI] Restano per i Contratti:** ricerca asincrona di clienti e device nel modulo (limite 200), statistiche e cruscotto (fase 3 della spec di ottobre).
+

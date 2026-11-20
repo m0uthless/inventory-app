@@ -7,6 +7,18 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Added
+
+- Contratti, promemoria di rinnovo: per ogni contratto attivo, dalla data dell'avviso di rinnovo (N giorni prima della fine, scelto contratto per contratto: 30, 60, 90, 180 o a mano) parte un'email per preparare e proporre il nuovo contratto, poi una ogni 10 giorni finché il contratto non viene rinnovato (fine spostata in avanti) o chiuso, fino alla scadenza. Un'email a sé per ogni contratto: A il venditore, Cc gli indirizzi dell'ufficio; senza venditore tutto l'ufficio in A; nessun importo. Il venditore utente di Archie la riceve anche nella campanella («Contratto da rinnovare»). Invio alle 8 dal servizio `cron` (`manage.py send_contract_reminders`), senza doppioni; dopo un fermo parte un solo promemoria di recupero. Nella finestra del contratto la sezione «Promemoria di rinnovo» mostra a chi vanno e il calendario con l'esito (inviato, non riuscito, saltato, prossimo, previsto). Migrazioni `contracts.0004`, `notifications.0005`.
+- Impostazioni di Archie (menu utente): pannello per le configurazioni dell'applicazione, per il superuser e per chi ha il nuovo permesso «Gestisce le impostazioni di Archie» (`core.manage_app_settings`, migrazione `core.0049`). Prima sezione, Contratti: indirizzi dell'ufficio per i promemoria (separati da «;», controllati), avviso predefinito per i nuovi contratti, ogni quanti giorni ripetere il promemoria, email di prova. Ogni modifica va nell'Audit.
+
+### Changed
+
+- Contratti: niente più disdetta. «Preavviso di disdetta» diventa «Avviso di rinnovo» (`notice_days` → `reminder_days`, `notice_deadline` → `reminder_date` nell'API); gli stati di scadenza sono In corso, Da rinnovare, Scaduto (via «Preavviso» e «In scadenza»; filtro `expiry=ok|renew|expired`); la vista «Da gestire» diventa «Da rinnovare». Lo stato «Disdetto» diventa «Chiuso» anche nei dati; tolto il rinnovo automatico (`auto_renew`). Migrazione `contracts.0003`.
+- Venditori: senza un utente di Archie collegato l'email è obbligatoria (è quella che riceve i promemoria); l'utente collegato deve essere un utente di Archie attivo.
+
+**Dopo il deploy**: lanciare `migrate`, ricreare il servizio `cron` (`up -d --force-recreate cron`), impostare gli indirizzi dell'ufficio in Impostazioni di Archie e dare il permesso «Gestisce le impostazioni di Archie» a chi deve gestirle. I contratti già dentro la finestra dell'avviso ricevono un promemoria alle 8 del giorno dopo il deploy.
+
 ## [1.1.0] - 2026-11-20
 
 ### Added
