@@ -18,6 +18,7 @@ from core.permissions import CanRestoreModelPermission
 from core.mixins import SoftDeleteAuditMixin, RestoreActionMixin
 from core.soft_delete import apply_soft_delete_filters
 from issues.models import Issue, IssueCategory, IssueComment, IssueStatus, get_placeholder_customer
+from issues.visibility import own_area_q, user_area_id, visible_issues_q
 from servicenow.models import ServiceNowCase
 from rest_framework.permissions import IsAuthenticated
 from portal.permissions import IsInternalOrPortalDedicatedApp
@@ -64,11 +65,6 @@ class IssueCommentSerializer(serializers.ModelSerializer):
             "body", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "issue", "author", "created_at", "updated_at"]
-
-
-def user_area_id(user):
-    """Area del profilo dell'utente (`UserProfile.leave_area`), o None."""
-    return getattr(getattr(user, "profile", None), "leave_area_id", None)
 
 
 def can_edit_issue(user, issue) -> bool:
@@ -494,6 +490,12 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
             comments_count=Count("comments"),
             servicenow_external_url=Subquery(external_url_sq),
         )
+        # Visibilità per area: chi non ha `issues.view_all_areas` vede solo la
+        # propria area e le issue senza area (le altre rispondono 404).
+        qs = qs.filter(visible_issues_q(self.request.user))
+        # `?scope=mine`: la pagina Issue, a interruttore «Tutte le aree» spento.
+        if self.request.query_params.get("scope") == "mine":
+            qs = qs.filter(own_area_q(self.request.user))
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     # ── perform_create override ───────────────────────────────────────────────
@@ -589,11 +591,9 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         from django.utils.timezone import now
         import datetime
 
-        scope = Q()
+        scope = visible_issues_q(request.user)
         if request.query_params.get("area") == "mine":
-            uid = user_area_id(request.user)
-            if uid is not None:
-                scope = Q(area_id=uid) | Q(area__isnull=True)
+            scope &= own_area_q(request.user)
 
         qs = Issue.objects.filter(scope, deleted_at__isnull=True)
         counts = qs.aggregate(

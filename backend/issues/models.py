@@ -162,7 +162,10 @@ class Issue(TimeStampedModel):
         verbose_name = "Issue"
         verbose_name_plural = "Issues"
         ordering = ["-created_at"]
-        permissions = [("be_assignee", "Può essere assegnatario delle issue")]
+        permissions = [
+            ("be_assignee", "Può essere assegnatario delle issue"),
+            ("view_all_areas", "Vede le issue di tutte le aree"),
+        ]
         indexes = [
             models.Index(fields=["status"],              name="issue_status_idx"),
             models.Index(fields=["priority"],            name="issue_priority_idx"),

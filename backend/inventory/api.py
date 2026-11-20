@@ -16,6 +16,7 @@ from crm.models import Site
 from inventory.models import Inventory
 from audit.utils import log_event
 from issues.models import Issue, IssueStatus
+from issues.visibility import visible_issues_q
 from core.soft_delete import apply_soft_delete_filters
 from core.crypto import decrypt
 from core.integrity import raise_integrity_error_as_validation
@@ -435,7 +436,10 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
             )
 
         # Aliases for frontend ordering fields
+        # Solo le issue visibili all'utente (visibilità per area).
+        visible = visible_issues_q(self.request.user)
         active_issue_qs = Issue.objects.filter(
+            visible,
             inventory_id=OuterRef("pk"),
             deleted_at__isnull=True,
             status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS],
@@ -455,6 +459,7 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
         from django.db.models import Subquery, CharField as DjCharField
         top_priority_qs = (
             Issue.objects.filter(
+                visible,
                 inventory_id=OuterRef("pk"),
                 deleted_at__isnull=True,
                 status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS],

@@ -23,6 +23,7 @@ from crm.models import Customer, Site, Contact, CustomerVpnAccess
 # crm.models (non crm.api), quindi non si crea alcun ciclo.
 from inventory.models import Inventory
 from issues.models import IssueStatus
+from issues.visibility import visible_issues_q
 from core.crypto import decrypt
 from audit.utils import build_changes, log_event, to_change_value_for_field, to_primitive
 from core.soft_delete import apply_soft_delete_filters
@@ -428,6 +429,7 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
             # has_active_issue.
             active_issue_count=_count_subquery(
                 Inventory.objects.filter(
+                    visible_issues_q(self.request.user, prefix="issues__"),
                     customer_id=OuterRef("pk"),
                     deleted_at__isnull=True,
                     issues__deleted_at__isnull=True,
@@ -446,11 +448,11 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
             ),
         )
 
-        qs = self._annotate_restyle(qs)
+        qs = self._annotate_restyle(qs, self.request.user)
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     @staticmethod
-    def _annotate_restyle(qs):
+    def _annotate_restyle(qs, user=None):
         from django.apps import apps
         from issues.models import Issue
         Contract = apps.get_model("contracts", "Contract")
@@ -460,6 +462,7 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
         return qs.annotate(
             open_issues_count=_count_subquery(
                 Issue.objects.filter(
+                    visible_issues_q(user),
                     customer_id=OuterRef("pk"), deleted_at__isnull=True,
                     status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS, IssueStatus.WAITING],
                 )
@@ -805,6 +808,7 @@ class SiteViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMixin, R
             ),
             open_issues_count=_count_subquery(
                 Issue.objects.filter(
+                    visible_issues_q(self.request.user),
                     site_id=OuterRef("pk"), deleted_at__isnull=True,
                     status__in=[IssueStatus.OPEN, IssueStatus.IN_PROGRESS, IssueStatus.WAITING],
                 ),

@@ -24,7 +24,8 @@ class WikiLinkSerializer(serializers.ModelSerializer):
     entity_path = serializers.SerializerMethodField()
 
     def get_entity_label(self, obj):
-        label = _label_for_wiki_link(obj.entity_type, obj.entity_id)
+        request = self.context.get("request")
+        label = _label_for_wiki_link(obj.entity_type, obj.entity_id, getattr(request, "user", None))
         if label:
             return label
         fallback_type = {
