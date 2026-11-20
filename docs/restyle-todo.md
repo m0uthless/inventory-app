@@ -11,9 +11,9 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - ~~**[BE] Procedura dalla Wiki**~~ fatto (2026-11-09): articoli Wiki collegati alla issue (`WikiLink` con `entity_type="issue"`, migrazione `wiki/0015`), passi ricavati dall'articolo (lista `- [ ]`, altrimenti il primo elenco numerato; `wiki/procedure.py`) e spunte salvate sul collegamento (`checked_steps`). Endpoint `GET/POST /issues/{id}/wiki/`, `PATCH/DELETE /issues/{id}/wiki/{link}/` (lettura: issue + Wiki; scrittura: modifica issue), audit sulla issue. Sezione «Procedura» nella scheda (`features/issues/IssueProcedure.tsx`) e, in cima sotto le Proprietà, la card «Prossimo passo» con il primo passo da fare e «Fatto» (a procedura finita: «Procedura completata»); stato condiviso in `useIssueWiki.ts`. Test in `issues/tests/test_issue_wiki.py`. In dev c'è l'articolo dimostrativo «Riavvio servizio MWL».
 - **[BE] Dove intervenire completo**: referente di reparto con telefono, device con seriale, credenziali bloccate. Oggi mostriamo cliente, sito, inventario collegato e ServiceNow.
 - **[BE] Scheda Allegati**: le issue non hanno allegati (solo i task di area hanno `drive_files`).
-- **[BE] "Visibile al cliente nel Portale"** su commenti e allegati, etichette Cliente/Interno nella cronologia.
-- **[BE] Indicatore "Entro SLA"** (percentuale e obiettivo): nessun dato SLA. Al suo posto: Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
-- **[BE] Variazione del tempo di risoluzione** ("−0,4 g sulla settimana prima"): `/issues/summary/` dà solo la media.
+- ~~**[BE] "Visibile al cliente nel Portale"**~~ su commenti e allegati: scartato da Fede (20/11).
+- ~~**[BE] Indicatore "Entro SLA"**~~: scartato da Fede (20/11). Restano Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
+- ~~**[BE] Variazione del tempo di risoluzione**~~: scartata da Fede (20/11), insieme allo SLA.
 - **[BE] "+ Salva vista"**: fatto, ma le viste sono salvate nel browser (per utente e pagina). Per averle su tutti i dispositivi serve salvarle sul server.
 - **[UI] Avviso "nessun inventario collegato"** (triangolo accanto al titolo nella vecchia tabella): tolto dalla riga come nell'anteprima; resta nel pannello ("Nessun inventario collegato · Collega un inventario").
 - **[UI] Ricerca Ctrl K a finestra** con risultati raggruppati (clienti, siti, device, issue, azioni): oggi Ctrl K porta il cursore nel campo e Invio apre la pagina Ricerca.
@@ -35,7 +35,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 ## Comportamenti globali
 
 - Pannelli di dettaglio (scheda flottante e drawer "campo"): si chiudono con un clic fuori e con Esc. I clic dentro menu, popover, dialoghi e messaggio con Annulla aperti dal pannello non lo chiudono.
-- **[UI] Mappa Leaflet** dei drawer Clienti/Siti: caricata da unpkg.com. Senza internet la richiesta resta appesa; valutare di includerla nel bundle.
+- **[DEC] Mappa dei drawer Clienti/Siti**: oggi Leaflet da unpkg.com, che senza internet resta appesa. Fede (20/11) vuole valutare un altro sistema di mappe, perché questa non gli piace esteticamente: preparare un confronto in `design-previews` invece di spostare Leaflet nel bundle.
 
 ## Pagina Clienti
 
@@ -263,7 +263,9 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 ## Accesso Portal
 - Fatta il 2026-11-09 direttamente nello stile di Utenti e gruppi (senza anteprima, su richiesta di Fede): viste Tutti / Attivi / Sospesi / Anche in Archie, filtro Cliente dall'intestazione, colonne Utente, Livello, Cliente predefinito, Altri clienti, Archie, Ultimo accesso; la scheda utente si apre con la sezione Portal in cima (`portalFirst`).
 
-## Titolo nella linguetta (mockup, in attesa di decisione interna)
+## Titolo nella linguetta (mockup, da riprendere)
+
+Fede (20/11): riprendiamolo, insieme al colore per modulo, con un'anteprima aggiornata in `design-previews`.
 
 Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.
 
@@ -271,7 +273,7 @@ Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / L
 - **[DEC] Pulsanti principali nella riga delle viste**, a destra dopo "Salva vista"; la riga dei pulsanti sopra gli indicatori sparisce. Su telefono tutto resta com'è.
 - **[UI] Se approvato**: va nella struttura generale (`layout/AppLayout.tsx`, `PageHead`) per tutte le pagine; le pagine senza viste tengono i pulsanti dove sono.
 
-## Colore per modulo (rimandato)
+## Colore per modulo (da riprendere, 20/11)
 
 Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); anteprima `design-previews/hm-base.html` (Issue) e interruttore "Colori modulo" in `db-base.html`, file `design-previews/shared/modcolors.css|js`.
 
@@ -314,20 +316,8 @@ Spec: `docs/superpowers/specs/2026-11-19-issue-area-assignee-groups-design.md`. 
   - lanciare `migrate` (`servicenow.0012`, `issues.0009`–`0011`, `core.0048`);
   - dare ai gruppi i tre permessi «È tecnico ServiceNow», «Può essere assegnatario delle issue» e «Vede le issue di tutte le aree». Finché mancano i primi due nessuno è assegnabile e l'email «nuova issue» non parte.
 - **[UI] Verifica nel browser** (non fatta): selettore d'area accanto al titolo, Area nei Dettagli, sola lettura per le altre aree, menu col tasto destro di Contratti, Piani, Rapportini e Drive.
-- **[BE] Rimandati dalla revisione:**
-  - area disattivata accettata via API;
-  - nel modulo un assegnatario fuori area non compare nell'elenco;
-  - doppia `get_object()` su PATCH;
-  - «Assegna a me» visibile a chi non è assegnatario (preesistente);
-  - nei task si legge il titolo della issue convertita anche se è di un'altra area;
-  - `/api/wiki-links/` elenca id e note dei link a issue non visibili;
-  - l'etichetta Wiki senza utente non filtra;
-  - QuickPick «Area» toglie un assegnatario che ha perso il permesso.
-- **[BE] Test mancanti:**
-  - `active_issue_count` e riepiloghi di crm e inventory;
-  - ripristino e collegamenti Wiki di issue non visibili;
-  - superuser con un'area nel profilo.
-- **[DEC] Philips:** gli utenti Philips oggi non esistono. Se tornano, potranno diventare tecnici solo concedendo loro il permesso, perché oggi non possono stare in gruppi.
+- ~~**Rimandati dalla revisione e test mancanti**~~ fatti il 20/11: area disattivata rifiutata, assegnatario fuori area o senza permesso visibile nel selettore e tenuto al cambio d'area, «Assegna a me» solo agli assegnabili, una sola `get_object()`, titolo della issue convertita nascosto nei task di altre aree, `/api/wiki-links/` senza i link a issue invisibili (404 su dettaglio e ripristino), etichetta Wiki senza utente senza titolo; test per conteggi e riepiloghi di crm e inventory e per il superuser con un'area.
+- **[DEC] Philips:** oggi non servono. Idea di Fede (20/11): spostare il flag Philips dal singolo utente all'appartenenza a un gruppo «Philips», così potranno avere i permessi di gruppo come gli altri. Da valutare quando torneranno.
 
 ## Generatore SQL PACS (20/11)
 
@@ -342,20 +332,25 @@ Spec: `docs/superpowers/specs/2026-11-20-text2sql-design.md`; anteprima `design-
 - **[DEC] Dove far girare Ollama in produzione** e con quale modello. Su Poseidon il prototipo usa `qwen2.5-coder:3b`.
 - **Dev:** `.env.dev` punta all'Ollama del prototipo (`http://t2s-ollama:11434`). Dopo ogni ricreazione del container `text2sql-worker` va ripetuto `docker network connect text2sql-test_default inventory-app-text2sql-worker-1`.
 - **[UI] Verifica nel browser** della pagina (non fatta): stati, giudizio, Revisione, telefono.
-- **[UI] Rimandati dalla revisione:**
-  - la campanella veloce dura 20 minuti anche dopo la risposta (doppia costante `T2S_PENDING_KEY`);
-  - `?apri` oltre le prime 50 domande segna letta la notifica sbagliata;
-  - notifica orfana dopo una cancellazione o un «Riprova»;
-  - le righe dell'elenco non sono annunciate come pulsanti (`role="listitem"`);
-  - su telefono la risposta compare sotto l'elenco senza scorrere fin lì.
-- **[BE] Rimandati dalla revisione:**
-  - nessun limite di lunghezza su query corretta e nota;
-  - Redis manca nel `depends_on` del worker;
-  - con due worker si rimetterebbero in coda a vicenda all'avvio;
-  - l'admin Django mostra le domande a chi ha `view_text2sqlrequest`.
-- **[BE] Futuro (richiesto da Fede):** usare come esempi anche le Query della Wiki. L'aggancio è `engine.load_examples()`.
+- ~~**Rimandati dalla revisione**~~ fatti il 20/11: campanella veloce che si ferma alla risposta (`features/text2sql/pending.ts`), `?apri` oltre le prime 50 domande e notifica segnata con `POST /text2sql/{id}/seen/`, notifica tolta cancellando la domanda, righe dell'elenco come pulsanti, risposta portata in vista su telefono; limiti di lunghezza, Redis nel `depends_on`, un solo lavoratore con advisory lock di Postgres, admin solo per il superuser.
+- ~~**[BE] Query della Wiki come esempi**~~ fatto il 20/11: tutte le Query in SQL Oracle (`T2S_WIKI_LANGUAGE`, predefinito `sql`; in produzione controllare che la chiave del linguaggio sia questa).
 
 ## Ambiente dev e test
 
-- Nel DB dev il **modulo Wiki risulta spento**: riaccenderlo dalla pagina Moduli se non è voluto.
-- I test girano con il Redis dello stack dev, quindi la cache dei moduli spenti del dev arriva nei test e li fa fallire a caso (es. i test Wiki con la Wiki spenta). Per ora `text2sql/tests/conftest.py` usa una cache locale. **[BE]** Valutare `REDIS_URL` vuoto per tutta la suite, oppure un `conftest` globale con LocMemCache.
+- ~~Modulo Wiki spento nel DB dev~~: riacceso il 20/11.
+- ~~Test con il Redis dello stack dev~~: fatto il 20/11, `conftest` globale con LocMemCache vuota per ogni test.
+
+## Decisioni del 20/11 (giro di domande)
+
+Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Contratti fase 2.
+
+- **Generatore SQL PACS**: si rilascia con il **modulo spento** finché non c'è una macchina per Ollama; modello di produzione `qwen2.5-coder:7b`. Prima di accenderlo: **le Query della Wiki come esempi** (`engine.load_examples()`).
+- **Fix prima del rilascio, tutti i rimandati della revisione**:
+  - Issue per area: fuga in `/api/wiki-links/`, area disattivata via API, assegnatario fuori area / «Assegna a me» / QuickPick «Area», test mancanti e piccole cose;
+  - Generatore SQL: robustezza backend, notifiche, accessibilità e mobile.
+- **Test**: `conftest` globale con LocMemCache al posto del Redis del dev; togliere quello locale di `text2sql`.
+- **DB dev**: riaccendere il modulo Wiki.
+- **Verifiche nel browser**: le fa Claude con Playwright (Issue per area, Generatore SQL, Task di area) e manda gli screenshot.
+- **Task di area convertito in issue poi cestinata**: permettere la riconversione in una issue nuova; il badge dice che la issue è nel cestino.
+- **Contratti**: il PDF si scarica **e si vede** solo con `view_contract_value`. I ritocchi estetici della finestra vanno nella fase 2.
+- **Issue, pezzi dell'anteprima**: restano solo Allegati e «Dove intervenire» completo.
