@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afterSaveOutcome, assigneesForArea, issueAssignees, issueScopeParam, toUserOption } from './issueUsers'
+import { afterSaveOutcome, areaChoiceParams, assigneesForArea, defaultAreaChoice, issueAssignees, toUserOption } from './issueUsers'
 
 describe('issueUsers', () => {
   it('toUserOption legge is_issue_assignee (assente = false)', () => {
@@ -28,12 +28,15 @@ describe('issueUsers', () => {
     expect(assigneesForArea(users, 4).map((u) => u.id)).toEqual([1])
     expect(assigneesForArea(users, '').map((u) => u.id)).toEqual([1, 2, 3])
   })
-  it('issueScopeParam: «Tutte le aree» spento restringe solo chi può vedere tutto', () => {
-    expect(issueScopeParam(true, false, 4)).toBe('mine')
-    expect(issueScopeParam(true, true, 4)).toBeUndefined()
-    expect(issueScopeParam(false, false, 4)).toBeUndefined()
-    expect(issueScopeParam(false, true, 4)).toBeUndefined()
-    expect(issueScopeParam(true, false, null)).toBeUndefined()
+  it('menu «Area»: parametri dell\'elenco e del riepilogo', () => {
+    expect(areaChoiceParams('all')).toEqual({ list: {}, summaryArea: undefined })
+    expect(areaChoiceParams('mine')).toEqual({ list: { scope: 'mine' }, summaryArea: 'mine' })
+    expect(areaChoiceParams('none')).toEqual({ list: { no_area: true }, summaryArea: 'none' })
+    expect(areaChoiceParams(5)).toEqual({ list: { area: 5 }, summaryArea: '5' })
+  })
+  it('menu «Area»: si parte dalla propria area se c\'è, altrimenti da tutte', () => {
+    expect(defaultAreaChoice(4)).toBe('mine')
+    expect(defaultAreaChoice(null)).toBe('all')
   })
   it('afterSaveOutcome: dopo aver spostato la issue fuori dalla propria area l\'annulla non è possibile', () => {
     expect(afterSaveOutcome({ area: 4, can_edit: true }, false, 4)).toBe('ok')

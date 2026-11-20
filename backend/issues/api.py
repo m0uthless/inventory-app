@@ -323,6 +323,7 @@ class IssueFilter(filters.FilterSet):
     category    = filters.NumberFilter(field_name="category_id")
     assigned_to = filters.NumberFilter(field_name="assigned_to_id")
     area        = filters.NumberFilter(field_name="area_id")
+    no_area     = filters.BooleanFilter(field_name="area", lookup_expr="isnull")
     due_before  = filters.DateFilter(field_name="due_date", lookup_expr="lte")
     due_after   = filters.DateFilter(field_name="due_date", lookup_expr="gte")
     hide_closed = filters.BooleanFilter(method="filter_hide_closed")
@@ -600,8 +601,15 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
         import datetime
 
         scope = visible_issues_q(request.user)
-        if request.query_params.get("area") == "mine":
+        # `area`: `mine` (propria area + senza area), `none` (senza area) o l'id
+        # di un'area — lo stesso perimetro del menu «Area» della pagina Issue.
+        area_param = request.query_params.get("area")
+        if area_param == "mine":
             scope &= own_area_q(request.user)
+        elif area_param == "none":
+            scope &= Q(area__isnull=True)
+        elif area_param and area_param.isdigit():
+            scope &= Q(area_id=int(area_param))
 
         qs = Issue.objects.filter(scope, deleted_at__isnull=True)
         counts = qs.aggregate(

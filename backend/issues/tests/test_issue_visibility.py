@@ -155,3 +155,27 @@ def test_audit_events_all_issues_with_permission(world):
     log_event(actor=None, action="update", instance=world["ib"], changes={"status": {"from": "open", "to": "in_progress"}})
     body = _client(me).get("/api/audit-events/", {"app_label": "issues", "model": "issue"}).json()
     assert str(world["ib"].pk) in {r["object_id"] for r in (body["results"] if isinstance(body, dict) else body)}
+
+
+# ── Menu «Area» della pagina Issue ────────────────────────────────────────────
+
+def test_filter_no_area(world):
+    su = User.objects.create_superuser(username="root_na", password="pw", email="na@example.com")
+    ids = _ids(_client(su).get("/api/issues/", {"no_area": "true"}).json())
+    assert world["i0"].pk in ids
+    assert world["ia"].pk not in ids and world["ib"].pk not in ids
+
+
+def test_summary_by_area_id(world):
+    su = User.objects.create_superuser(username="root_sa", password="pw", email="sa@example.com")
+    assert _client(su).get("/api/issues/summary/", {"area": world["b"].pk}).json()["active_count"] == 1
+
+
+def test_summary_without_area(world):
+    su = User.objects.create_superuser(username="root_sn", password="pw", email="sn@example.com")
+    assert _client(su).get("/api/issues/summary/", {"area": "none"}).json()["active_count"] == 1
+
+
+def test_summary_by_area_still_respects_visibility(world):
+    me = _user(world["a"])
+    assert _client(me).get("/api/issues/summary/", {"area": world["b"].pk}).json()["active_count"] == 0

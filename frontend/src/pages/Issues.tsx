@@ -14,7 +14,7 @@ import {
   ButtonBase,
 } from '@mui/material'
 
-import { Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Switch } from '@mui/material'
+import { Dialog, DialogActions, DialogContent, DialogTitle, ListItemText, Menu, MenuItem } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
@@ -51,7 +51,7 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
-import { afterSaveOutcome, issueAssignees, issueScopeParam, toUserOption } from '../features/issues/issueUsers'
+import { afterSaveOutcome, areaChoiceParams, defaultAreaChoice, issueAssignees, toUserOption, type AreaChoice } from '../features/issues/issueUsers'
 import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -247,9 +247,21 @@ export default function Issues() {
   const myArea = me?.profile?.leave_area ?? null
   // «Tutte le aree»: solo per chi può vedere tutte le aree (gli altri li restringe il server).
   const canSeeAllAreas = hasPerm(PERMS.issues.issue.viewAllAreas)
-  const [allAreas, setAllAreasState] = React.useState(() => { try { return localStorage.getItem('issues_all_areas') === '1' } catch { return false } })
-  const setAllAreas = (on: boolean) => { setAllAreasState(on); try { localStorage.setItem('issues_all_areas', on ? '1' : '0') } catch { /* solo in memoria */ } }
-  const scopeParam = issueScopeParam(canSeeAllAreas, allAreas, myArea)
+  // Menu «Area» (solo per chi vede tutte le aree; gli altri li restringe il server).
+  const [areaChoiceState, setAreaChoiceState] = React.useState<AreaChoice | null>(() => {
+    try {
+      const v = localStorage.getItem('issues_area_choice')
+      if (v === 'all' || v === 'mine' || v === 'none') return v
+      return v && /^\d+$/.test(v) ? Number(v) : null
+    } catch { return null }
+  })
+  const savedChoice = areaChoiceState === 'mine' && myArea == null ? null : areaChoiceState
+  const areaChoice: AreaChoice = canSeeAllAreas ? (savedChoice ?? defaultAreaChoice(myArea)) : 'all'
+  const setAreaChoice = (c: AreaChoice) => { setAreaChoiceState(c); try { localStorage.setItem('issues_area_choice', String(c)) } catch { /* solo in memoria */ } }
+  const areaParams = areaChoiceParams(areaChoice)
+  const areaListKey = JSON.stringify(areaParams.list)
+  const summaryArea = areaParams.summaryArea
+  const [areaMenu, setAreaMenu] = React.useState<HTMLElement | null>(null)
   // `?vista=mine|overdue|closed|all` dalla Dashboard; poi la vista vive nello stato della pagina.
   const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'myarea' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
   const [fStatus, setFStatus] = React.useState<string[]>([])
@@ -281,7 +293,7 @@ export default function Issues() {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
     if (view === 'active' || view === 'mine' || view === 'myarea' || view === 'overdue') p.hide_closed = true
-    if (scopeParam) p.scope = scopeParam
+    Object.assign(p, JSON.parse(areaListKey) as DrfParams)
     if (view === 'myarea' && myArea != null) p.area = myArea
     else if (fArea.length) p.area = fArea[0]
     if (view === 'overdue') p.due_before = overdueBefore()
@@ -306,7 +318,7 @@ export default function Issues() {
     if (colQ.due === 'later') p.due_after = iso(8)
     if (colQ.due === 'none') p.has_due = false
     return p
-  }, [grid.view, view, me?.id, myArea, scopeParam, fStatus, fPriority, fCategory, fAssigned, fArea, colQ])
+  }, [grid.view, view, me?.id, myArea, areaListKey, fStatus, fPriority, fCategory, fAssigned, fArea, colQ])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -872,7 +884,7 @@ export default function Issues() {
 
   const detailIndex = detailIssue ? rows.findIndex((r) => r.id === detailIssue.id) : -1
 
-  const issueCounts = useIssueCounts(kpiReload, me?.id, scopeParam)
+  const issueCounts = useIssueCounts(kpiReload, me?.id, areaListKey)
   // Viste salvate (scheda + filtri + ordinamento + ricerca)
   type ViewState = { view: IssueView; fStatus: string[]; fPriority: string[]; fCategory: string[]; fAssigned: string[]; q: string; sort: GridSortModel }
   const saved = useSavedViews<ViewState>('issues', me?.username)
@@ -925,7 +937,7 @@ export default function Issues() {
   const [kpiCounts, setKpiCounts] = React.useState<{ active: number; closed: number; all: number } | null>(null)
   React.useEffect(() => {
     let alive = true
-    api.get('/issues/summary/', scopeParam ? { params: { area: 'mine' } } : undefined).then((r) => {
+    api.get('/issues/summary/', summaryArea ? { params: { area: summaryArea } } : undefined).then((r) => {
       const d = r.data as Record<string, number>
       if (alive) setKpiCounts({
         active: d.active_count ?? 0,
@@ -934,7 +946,7 @@ export default function Issues() {
       })
     }).catch(() => {})
     return () => { alive = false }
-  }, [kpiReload, scopeParam])
+  }, [kpiReload, summaryArea])
 
   const userLabel = (id: string) => users.find((u) => String(u.id) === id)?.label ?? id
   const catLabel = (id: string) => categories.find((c) => String(c.id) === id)?.label ?? id
@@ -1398,7 +1410,7 @@ export default function Issues() {
       />
       <IssuesKpis
         reloadKey={kpiReload}
-        scope={scopeParam}
+        summaryArea={summaryArea}
         counts={issueCounts}
         view={view}
         priority={fPriority}
@@ -1423,9 +1435,25 @@ export default function Issues() {
           ]}
           end={
             <>
-              {canSeeAllAreas && myArea != null ? (
-                <FormControlLabel sx={{ mr: 1, '& .MuiFormControlLabel-label': { fontSize: 12.5, color: 'text.secondary', whiteSpace: 'nowrap' } }}
-                  control={<Switch size="small" checked={allAreas} onChange={(e) => setAllAreas(e.target.checked)} />} label="Tutte le aree" />
+              {canSeeAllAreas ? (
+                <>
+                  <Button size="small" color="inherit" aria-haspopup="menu" onClick={(e) => setAreaMenu(e.currentTarget)}
+                    endIcon={<CampoIcon name="chevD" size={13} />} sx={{ mr: 1, fontWeight: 550, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                    Area: {areaChoice === 'all' ? 'tutte' : areaChoice === 'mine' ? 'la mia' : areaChoice === 'none' ? 'senza area' : (areas.find((a) => a.id === areaChoice)?.label ?? `#${areaChoice}`)}
+                  </Button>
+                  <Menu anchorEl={areaMenu} open={Boolean(areaMenu)} onClose={() => setAreaMenu(null)}>
+                    {[
+                      { key: 'all' as AreaChoice, label: 'Tutte le aree' },
+                      ...(myArea != null ? [{ key: 'mine' as AreaChoice, label: 'La mia area', hint: 'con le issue senza area' }] : []),
+                      ...areas.map((a) => ({ key: a.id as AreaChoice, label: a.label })),
+                      { key: 'none' as AreaChoice, label: 'Senza area' },
+                    ].map((o) => (
+                      <MenuItem key={String(o.key)} selected={areaChoice === o.key} onClick={() => { setAreaMenu(null); setAreaChoice(o.key) }} sx={{ fontSize: 13 }}>
+                        <ListItemText primary={o.label} secondary={'hint' in o ? o.hint : undefined} primaryTypographyProps={{ fontSize: 13 }} secondaryTypographyProps={{ fontSize: 11.5 }} />
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </>
               ) : null}
               <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
                 sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>

@@ -21,10 +21,19 @@ export const issueAssignees = (users: UserOption[]): UserOption[] => users.filte
 export const assigneesForArea = (users: UserOption[], areaId: number | '' | null | undefined): UserOption[] =>
   areaId === '' || areaId == null ? users : users.filter((u) => u.leave_area === areaId)
 
-/** Parametro `scope` dell'elenco Issue: chi vede tutte le aree parte dalla propria
- *  (interruttore «Tutte le aree» spento → `mine`); per gli altri restringe già il server. */
-export const issueScopeParam = (canSeeAll: boolean, allAreas: boolean, myArea: number | null): 'mine' | undefined =>
-  canSeeAll && !allAreas && myArea != null ? 'mine' : undefined
+/** Scelta del menu «Area» della pagina Issue (per chi vede tutte le aree). */
+export type AreaChoice = 'all' | 'mine' | 'none' | number
+
+/** Parametri dell'elenco e del riepilogo (`/issues/summary/?area=`) per la scelta del menu. */
+export function areaChoiceParams(choice: AreaChoice): { list: Record<string, string | number | boolean>; summaryArea: string | undefined } {
+  if (choice === 'mine') return { list: { scope: 'mine' }, summaryArea: 'mine' }
+  if (choice === 'none') return { list: { no_area: true }, summaryArea: 'none' }
+  if (typeof choice === 'number') return { list: { area: choice }, summaryArea: String(choice) }
+  return { list: {}, summaryArea: undefined }
+}
+
+/** Si parte dalla propria area (più le issue senza area) se c'è, altrimenti da tutte. */
+export const defaultAreaChoice = (myArea: number | null): AreaChoice => (myArea != null ? 'mine' : 'all')
 
 /** Dopo un salvataggio dalla finestra: `ok` (si può annullare), `readonly` (la issue è
  *  passata a un'altra area: si vede ma non si modifica più, quindi niente annulla),
