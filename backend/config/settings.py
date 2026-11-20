@@ -435,4 +435,6 @@ T2S_NUM_THREAD = int(os.environ.get("T2S_NUM_THREAD", "0"))
 T2S_TIMEOUT = int(os.environ.get("T2S_TIMEOUT", "900"))
 T2S_ORACLE_VERSION = os.environ.get("T2S_ORACLE_VERSION", "12")
 T2S_NUM_ESEMPI = int(os.environ.get("T2S_NUM_ESEMPI", "6"))
+# Chiave del linguaggio delle Query Wiki usate come esempi (tutte le SQL Oracle).
+T2S_WIKI_LANGUAGE = os.environ.get("T2S_WIKI_LANGUAGE", "sql")
 T2S_MAX_SCHEMA_TOKENS = int(os.environ.get("T2S_MAX_SCHEMA_TOKENS", "10000"))

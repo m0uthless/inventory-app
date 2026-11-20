@@ -16,6 +16,66 @@ from text2sql.models import Text2SqlRequest
 logger = logging.getLogger(__name__)
 
 
+# Chiave dell'advisory lock di Postgres che tiene un solo lavoratore attivo.
+LOCK_KEY = 7_201_120
+
+
+class SingleWorkerLock:
+    """Un solo lavoratore elabora la coda: Ollama fa una domanda alla volta, e
+    all'avvio `requeue_interrupted` rimette in coda tutto ciò che è «in
+    elaborazione», che con due lavoratori sarebbe il lavoro dell'altro.
+
+    Il lock sta su una connessione propria, fuori da `close_old_connections`;
+    se la connessione cade (database riavviato) il lock si perde e `held()` lo dice."""
+
+    def __init__(self):
+        self._conn = None
+
+    def acquire(self) -> bool:
+        from django.db import connections
+
+        self.release()
+        conn = connections.create_connection("default")
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_try_advisory_lock(%s)", [LOCK_KEY])
+                ok = bool(cur.fetchone()[0])
+        except Exception:
+            conn.close()
+            raise
+        if ok:
+            self._conn = conn
+        else:
+            conn.close()
+        return ok
+
+    def held(self) -> bool:
+        if self._conn is None:
+            return False
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            return True
+        except Exception:  # noqa: BLE001 — connessione persa: il lock non c'è più
+            self.release()
+            return False
+
+    def release(self) -> None:
+        if self._conn is None:
+            return
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(%s)", [LOCK_KEY])
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            try:
+                self._conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._conn = None
+
+
 def requeue_interrupted() -> int:
     """All'avvio: le domande rimaste «in elaborazione» (lavoratore riavviato) tornano in coda."""
     return Text2SqlRequest.objects.filter(status=Text2SqlRequest.STATUS_RUNNING).update(

@@ -176,6 +176,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Cache dei moduli spenti (is_module_enabled) e delle notifiche.
+      redis:
+        condition: service_healthy
 
 volumes:
   caddy_data:

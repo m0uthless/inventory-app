@@ -173,3 +173,43 @@ def test_failed_final_save_still_closes_the_request():
 def test_audit_does_not_store_the_question_text():
     q = _q(_user())
     assert "Quanti studi" not in str(q)
+
+
+# ── Un solo lavoratore alla volta (revisione 20/11) ──
+
+def test_single_worker_lock_excludes_a_second_worker():
+    first, second = worker.SingleWorkerLock(), worker.SingleWorkerLock()
+    try:
+        assert first.acquire() is True
+        assert second.acquire() is False
+        assert first.held() is True
+        first.release()
+        assert second.acquire() is True
+    finally:
+        first.release()
+        second.release()
+
+
+def test_worker_waits_for_the_lock_before_requeueing():
+    from text2sql.management.commands import text2sql_worker as cmd
+
+    running = _q(_user(), status="running")
+    other = worker.SingleWorkerLock()
+    assert other.acquire()
+    mine = worker.SingleWorkerLock()
+    sleeps = []
+
+    def fake_sleep(s):
+        sleeps.append(s)
+        assert Text2SqlRequest.objects.get(pk=running.pk).status == "running"  # niente requeue mentre l'altro lavora
+        other.release()
+
+    try:
+        # close_old_connections chiuderebbe la connessione della transazione del test.
+        with mock.patch.object(cmd, "close_old_connections"):
+            assert cmd.start(mine, sleep=fake_sleep) == 1
+        assert len(sleeps) == 1
+        assert Text2SqlRequest.objects.get(pk=running.pk).status == "queued"
+    finally:
+        other.release()
+        mine.release()

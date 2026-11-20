@@ -92,9 +92,30 @@ def _knowledge() -> tuple[str, list[str]]:
 
 
 def load_examples() -> list[str]:
-    """Esempi validati. Oggi solo dal file; è il punto in cui aggiungere altre fonti
-    (es. le Query della Wiki di un linguaggio dedicato) senza toccare il resto."""
-    return list(_knowledge()[1])
+    """Esempi validati: quelli del file più le Query della Wiki in SQL Oracle
+    (linguaggio `settings.T2S_WIKI_LANGUAGE`, decisione di Fede del 20/11)."""
+    return list(_knowledge()[1]) + wiki_examples()
+
+
+def wiki_examples() -> list[str]:
+    """Query della Wiki nel formato degli esempi del file (`### Domanda:` + blocco sql)."""
+    from wiki.models import WikiQuery
+
+    rows = (
+        WikiQuery.objects.filter(language__key=settings.T2S_WIKI_LANGUAGE, deleted_at__isnull=True)
+        .order_by("id").values_list("title", "description", "body")
+    )
+    examples = []
+    for title, description, body in rows:
+        body = (body or "").strip().replace("```", "")
+        if not body:
+            continue
+        # Titolo e descrizione su una riga sola: un «### » o un ``` a capo
+        # spezzerebbero l'esempio (vedi split_examples).
+        head = " ".join(f"### Domanda: {title}".split()).replace("```", "")
+        note = " ".join((description or "").split()).replace("```", "")
+        examples.append(f"{head}\n{note}\n```sql\n{body}\n```" if note else f"{head}\n```sql\n{body}\n```")
+    return examples
 
 
 # ── Scelta di schema ed esempi ─────────────────────────────────────────────

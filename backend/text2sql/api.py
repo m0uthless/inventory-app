@@ -14,6 +14,8 @@ from portal.permissions import IsInternalOrPortalDedicatedApp
 from text2sql.models import Text2SqlRequest
 
 MAX_QUESTION = 2000
+MAX_CORRECTED_SQL = 20000
+MAX_NOTE = 2000
 
 
 class CanUseText2Sql(BasePermission):
@@ -57,8 +59,8 @@ class Text2SqlReviewSerializer(Text2SqlSerializer):
 
 class FeedbackSerializer(serializers.Serializer):
     feedback = serializers.ChoiceField(choices=["ok", "ko"])
-    corrected_sql = serializers.CharField(required=False, allow_blank=True, default="")
-    feedback_note = serializers.CharField(required=False, allow_blank=True, default="")
+    corrected_sql = serializers.CharField(required=False, allow_blank=True, default="", max_length=MAX_CORRECTED_SQL)
+    feedback_note = serializers.CharField(required=False, allow_blank=True, default="", max_length=MAX_NOTE)
 
 
 class Text2SqlViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
@@ -81,9 +83,23 @@ class Text2SqlViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Ret
         obj = serializer.save(user=self.request.user)
         log_event(actor=self.request.user, action="create", instance=obj, request=self.request)
 
+    def _notifications(self, obj):
+        from notifications.models import Notification, NotificationType
+
+        return Notification.objects.filter(recipient_id=obj.user_id, notification_type=NotificationType.TEXT2SQL_READY, source_key=str(obj.pk))
+
     def perform_destroy(self, instance):
         log_event(actor=self.request.user, action="delete", instance=instance, request=self.request)
+        # La notifica «Query SQL pronta» porterebbe a una domanda che non c'è più.
+        self._notifications(instance).delete()
         instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="seen")
+    def seen(self, request, pk=None):
+        """La risposta è stata aperta: la sua notifica diventa letta."""
+        obj = self.get_object()
+        self._notifications(obj).filter(is_read=False).update(is_read=True, read_at=timezone.now())
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["patch"], url_path="feedback")
     def feedback(self, request, pk=None):

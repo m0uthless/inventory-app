@@ -18,6 +18,7 @@ import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded'
 import DoneAllIcon from '@mui/icons-material/DoneAll'
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded'
 import { api } from '@shared/api/client'
+import { hasPending, settlePending } from '../features/text2sql/pending'
 
 // ─── Notifiche persistite (0.9.5) ───────────────────────────────────────────
 // La campanella legge da `/notifications/`, popolata periodicamente dal job
@@ -49,8 +50,6 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000
 // Generatore SQL: finché c'è una domanda in attesa (segnale lasciato dalla pagina)
 // si controlla ogni 15 secondi, così la notifica arriva subito dopo la risposta.
 const FAST_POLL_MS = 15 * 1000
-const T2S_PENDING_KEY = 't2s_pending_until'
-const t2sPending = () => { try { return Number(localStorage.getItem(T2S_PENDING_KEY) || 0) > Date.now() } catch { return false } }
 
 function daysLeft(dateStr: string, today: Date): number {
   const due = new Date(dateStr)
@@ -72,6 +71,8 @@ export default function NotificationsBell({ enabled }: Props) {
         const rows: NotifItem[] = res.data?.results ?? res.data ?? []
         setItems(rows)
         setUnreadCount(rows.filter((r) => !r.is_read).length)
+        // Le domande al generatore SQL con la notifica arrivata non si aspettano più.
+        settlePending(rows)
       })
       .catch(() => {})
   }, [enabled])
@@ -81,7 +82,7 @@ export default function NotificationsBell({ enabled }: Props) {
     fetchAll()
     let last = Date.now()
     const interval = setInterval(() => {
-      if (t2sPending() || Date.now() - last >= POLL_INTERVAL_MS) { last = Date.now(); fetchAll() }
+      if (hasPending() || Date.now() - last >= POLL_INTERVAL_MS) { last = Date.now(); fetchAll() }
     }, FAST_POLL_MS)
     window.addEventListener('notifications-changed', fetchAll)
     // Aggiorna il badge quando un override manutenzione o un task di area cambiano

@@ -1,17 +1,17 @@
 import * as React from 'react'
-import { Box, Button, ButtonBase, InputBase, Typography } from '@mui/material'
+import { Box, Button, ButtonBase, InputBase, Typography, useMediaQuery, useTheme } from '@mui/material'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import { useSearchParams } from 'react-router-dom'
 
-import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 
 import { useAuth } from '../auth/AuthProvider'
 import { PageHead } from '../ui/campo'
-import { T2S_PENDING_KEY, isWaiting, t2sApi, type T2sFeedbackPayload, type T2sRequest } from '../features/text2sql/api'
+import { isWaiting, t2sApi, type T2sFeedbackPayload, type T2sRequest } from '../features/text2sql/api'
+import { addPending, dropPending, setPendingIds } from '../features/text2sql/pending'
 import Text2SqlAnswer from '../features/text2sql/Text2SqlAnswer'
 import Text2SqlReview from '../features/text2sql/Text2SqlReview'
 import { KindBadge, StatusBadge } from '../features/text2sql/T2sBadges'
@@ -19,23 +19,10 @@ import { fmtWhen } from '../features/text2sql/time'
 
 const MAX = 2000
 const POLL_MS = 3000
-const PENDING_MS = 20 * 60 * 1000
 const card = { bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px' } as const
 
-const setPending = (on: boolean) => {
-  try { if (on) localStorage.setItem(T2S_PENDING_KEY, String(Date.now() + PENDING_MS)); else localStorage.removeItem(T2S_PENDING_KEY) } catch { /* solo in memoria */ }
-  window.dispatchEvent(new Event('notifications-changed'))
-}
-
-/** Segna come letta la notifica «Query SQL pronta» della domanda appena aperta. */
-async function markNotificationRead(id: number) {
-  try {
-    const { data } = await api.get('/notifications/', { params: { page_size: 50 } })
-    const rows: { id: number; link: string; is_read: boolean; notification_type: string }[] = data?.results ?? data ?? []
-    const n = rows.find((r) => r.notification_type === 'text2sql_ready' && !r.is_read && r.link.endsWith(`apri=${id}`))
-    if (n) { await api.post(`/notifications/${n.id}/mark_read/`); window.dispatchEvent(new Event('notifications-changed')) }
-  } catch { /* la notifica resta da leggere: nessun danno */ }
-}
+/** Avvisa la campanella che le domande in attesa sono cambiate. */
+const pokeBell = () => window.dispatchEvent(new Event('notifications-changed'))
 
 /** Conoscenza › Generatore SQL (anteprima design-previews/sql-base.html, variante A · Elenco e risposta). */
 export default function Text2Sql() {
@@ -44,7 +31,7 @@ export default function Text2Sql() {
   const isSu = Boolean(me?.is_superuser)
   const [params, setParams] = useSearchParams()
   const [view, setView] = React.useState<'mine' | 'review'>('mine')
-  const [items, setItems] = React.useState<T2sRequest[] | null>(null)
+  const [items, setItems] = React.useState<(T2sRequest & { extra?: boolean })[] | null>(null)
   const [selId, setSelId] = React.useState<number | null>(() => (Number(params.get('apri')) || null))
   const [draft, setDraft] = React.useState('')
   const [sending, setSending] = React.useState(false)
@@ -52,8 +39,12 @@ export default function Text2Sql() {
   const load = React.useCallback(async () => {
     try {
       const rows = await t2sApi.list()
-      setItems(rows)
-      if (!rows.some(isWaiting)) setPending(false)
+      setItems((cur) => {
+        // Una domanda aperta da ?apri fuori dalle prime 50 resta in elenco.
+        const extra = (cur ?? []).filter((x) => x.extra && !rows.some((r) => r.id === x.id))
+        return [...rows, ...extra]
+      })
+      setPendingIds(rows.filter(isWaiting).map((r) => r.id))
       return rows
     } catch (e) { toast.error(apiErrorToMessage(e)); return null }
   }, [toast])
@@ -75,9 +66,33 @@ export default function Text2Sql() {
     const next = new URLSearchParams(params); next.delete('apri'); setParams(next, { replace: true })
   }, [params, setParams])
 
-  const selected = (items ?? []).find((x) => x.id === selId) ?? (items ?? [])[0] ?? null
+  // ?apri di una domanda che non è fra le prime 50: la si carica a parte.
+  const missingId = items && selId && !items.some((x) => x.id === selId) ? selId : null
+  React.useEffect(() => {
+    if (!missingId) return
+    let alive = true
+    t2sApi.get(missingId)
+      .then((row) => { if (alive) setItems((cur) => (cur ?? []).some((x) => x.id === row.id) ? cur : [...(cur ?? []), { ...row, extra: true }]) })
+      .catch(() => { if (alive) setSelId(null) })
+    return () => { alive = false }
+  }, [missingId])
+
+  // Mentre si carica la domanda di ?apri non si ripiega sulla prima: si segnerebbe letta la notifica sbagliata.
+  const selected = (items ?? []).find((x) => x.id === selId) ?? (missingId ? null : (items ?? [])[0] ?? null)
   const selectedDoneId = selected && !isWaiting(selected) ? selected.id : null
-  React.useEffect(() => { if (selectedDoneId) void markNotificationRead(selectedDoneId) }, [selectedDoneId])
+  React.useEffect(() => {
+    if (!selectedDoneId) return
+    t2sApi.seen(selectedDoneId).then(pokeBell).catch(() => { /* la notifica resta da leggere: nessun danno */ })
+  }, [selectedDoneId])
+
+  // Su telefono la risposta sta sotto l'elenco: scegliendo una domanda la si porta in vista.
+  const theme = useTheme()
+  const narrow = useMediaQuery(theme.breakpoints.down('md'))
+  const answerRef = React.useRef<HTMLDivElement>(null)
+  const pick = (id: number) => {
+    setSelId(id)
+    if (narrow) window.requestAnimationFrame(() => answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 
   const ask = async (question: string) => {
     const q = question.trim()
@@ -86,7 +101,7 @@ export default function Text2Sql() {
     try {
       const created = await t2sApi.create(q)
       setItems((cur) => [created, ...(cur ?? [])]); setSelId(created.id); setDraft('')
-      setPending(true)
+      addPending(created.id); pokeBell()
       toast.success('Domanda in coda: ti arriva una notifica quando la query è pronta')
       return created
     } catch (e) { toast.error(apiErrorToMessage(e)); return null } finally { setSending(false) }
@@ -101,6 +116,7 @@ export default function Text2Sql() {
   const remove = async (it: T2sRequest) => {
     try {
       await t2sApi.remove(it.id)
+      dropPending(it.id); pokeBell()
       setItems((cur) => (cur ?? []).filter((x) => x.id !== it.id))
       if (selId === it.id) setSelId(null)
     } catch (e) { toast.error(apiErrorToMessage(e)) }
@@ -158,10 +174,11 @@ export default function Text2Sql() {
                 {(items ?? []).map((x) => {
                   const on = selected?.id === x.id
                   return (
-                    <ButtonBase key={x.id} role="listitem" aria-current={on || undefined} onClick={() => setSelId(x.id)} sx={{
-                      display: 'grid', gap: '5px', justifyItems: 'stretch', textAlign: 'left', px: 1.5, py: 1.25, borderBottom: '1px solid', borderColor: 'divider',
+                    <Box key={x.id} role="listitem" sx={{ display: 'grid', borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 0 } }}>
+                    <ButtonBase aria-current={on || undefined} onClick={() => pick(x.id)} sx={{
+                      display: 'grid', gap: '5px', justifyItems: 'stretch', textAlign: 'left', px: 1.5, py: 1.25,
                       bgcolor: on ? 'archie.field' : 'transparent', boxShadow: on ? (t) => `inset 2px 0 0 ${t.palette.archie.fieldLine}` : 'none',
-                      '&:last-of-type': { borderBottom: 0 }, '&:hover': { bgcolor: on ? 'archie.field' : 'archie.surface2' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+                      '&:hover': { bgcolor: on ? 'archie.field' : 'archie.surface2' }, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
                     }}>
                       <Typography component="span" sx={{ fontSize: 13, fontWeight: 550, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{x.question}</Typography>
                       <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 11.5, color: 'text.secondary' }}>
@@ -172,10 +189,11 @@ export default function Text2Sql() {
                         {fmtWhen(x.created_at)}
                       </Box>
                     </ButtonBase>
+                    </Box>
                   )
                 })}
               </Box>
-              <Box sx={{ ...card, p: 2, minWidth: 0 }}>
+              <Box ref={answerRef} sx={{ ...card, p: 2, minWidth: 0, scrollMarginTop: 72 }}>
                 {selected ? <Text2SqlAnswer item={selected} onFeedback={feedback} onRetry={(it) => void retry(it)} onDelete={(it) => void remove(it)} /> : null}
               </Box>
             </Box>

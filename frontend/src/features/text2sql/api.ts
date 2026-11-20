@@ -27,11 +27,13 @@ export type T2sFeedbackPayload = { feedback: 'ok' | 'ko'; corrected_sql: string;
 
 const rowsOf = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { results?: T[] })?.results ?? [])) as T[]
 
-export const T2S_PENDING_KEY = 't2s_pending_until'
 export const isWaiting = (r: Pick<T2sRequest, 'status'>) => r.status === 'queued' || r.status === 'running'
 
 export const t2sApi = {
   list: async () => rowsOf<T2sRequest>((await api.get('/text2sql/', { params: { page_size: 50 } })).data),
+  get: async (id: number) => (await api.get<T2sRequest>(`/text2sql/${id}/`)).data,
+  /** La risposta è stata aperta: la sua notifica diventa letta. */
+  seen: async (id: number) => { await api.post(`/text2sql/${id}/seen/`) },
   create: async (question: string) => (await api.post<T2sRequest>('/text2sql/', { question })).data,
   remove: async (id: number) => { await api.delete(`/text2sql/${id}/`) },
   feedback: async (id: number, p: T2sFeedbackPayload) => (await api.patch<T2sRequest>(`/text2sql/${id}/feedback/`, p)).data,

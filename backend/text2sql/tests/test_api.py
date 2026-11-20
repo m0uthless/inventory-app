@@ -162,3 +162,68 @@ def test_review_puts_unreviewed_first():
     body = _c(_su()).get(f"{URL}review/").json()
     ids = [r["id"] for r in (body["results"] if isinstance(body, dict) else body)]
     assert ids.index(pending.pk) < ids.index(reviewed.pk)
+
+
+# ── Revisione 20/11 ──
+
+def test_feedback_rejects_too_long_correction_and_note():
+    from text2sql.api import MAX_CORRECTED_SQL, MAX_NOTE
+    me = _tech()
+    q = _done(me)
+    r = _c(me).patch(f"{URL}{q.pk}/feedback/", {"feedback": "ko", "corrected_sql": "x" * (MAX_CORRECTED_SQL + 1)}, format="json")
+    assert r.status_code == 400 and "corrected_sql" in r.json()
+    r = _c(me).patch(f"{URL}{q.pk}/feedback/", {"feedback": "ko", "feedback_note": "x" * (MAX_NOTE + 1)}, format="json")
+    assert r.status_code == 400 and "feedback_note" in r.json()
+    q.refresh_from_db()
+    assert q.feedback == ""
+
+
+def test_admin_hidden_from_staff_with_view_permission(client):
+    from django.contrib.auth.models import Permission
+    staff = make_archie_user(username=f"st_{uuid.uuid4().hex[:6]}", password="pw")
+    staff.is_staff = True
+    staff.save(update_fields=["is_staff"])
+    staff.user_permissions.add(Permission.objects.get(codename="view_text2sqlrequest"))
+    client.force_login(staff)
+    assert client.get("/admin/text2sql/text2sqlrequest/").status_code == 403
+
+
+def test_admin_visible_to_superuser(client):
+    client.force_login(_su())
+    assert client.get("/admin/text2sql/text2sqlrequest/").status_code == 200
+
+
+def _notif(q):
+    from notifications.models import Notification, NotificationType
+    return Notification.objects.create(recipient=q.user, notification_type=NotificationType.TEXT2SQL_READY, source_key=str(q.pk),
+                                       title="Query SQL pronta", link=f"/knowledge/sql?apri={q.pk}", event_date=timezone_today())
+
+
+def timezone_today():
+    from django.utils import timezone
+    return timezone.localdate()
+
+
+def test_delete_removes_its_notification():
+    from notifications.models import Notification
+    me = _tech()
+    q, keep = _done(me), _done(me)
+    _notif(q), _notif(keep)
+    assert _c(me).delete(f"{URL}{q.pk}/").status_code == 204
+    assert list(Notification.objects.filter(recipient=me).values_list("source_key", flat=True)) == [str(keep.pk)]
+
+
+def test_seen_marks_only_its_notification_read():
+    me = _tech()
+    q, other = _done(me), _done(me)
+    n, n_other = _notif(q), _notif(other)
+    assert _c(me).post(f"{URL}{q.pk}/seen/").status_code == 204
+    n.refresh_from_db(); n_other.refresh_from_db()
+    assert n.is_read is True and n.read_at is not None
+    assert n_other.is_read is False
+
+
+def test_seen_of_other_user_is_404():
+    q = _done(_tech())
+    _notif(q)
+    assert _c(_tech()).post(f"{URL}{q.pk}/seen/").status_code == 404
