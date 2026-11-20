@@ -371,5 +371,6 @@ Spec `docs/superpowers/specs/2026-11-20-contracts-renewal-reminders-design.md`, 
 - ~~Promemoria di rinnovo, Impostazioni di Archie, via la disdetta, stato «Chiuso», via il rinnovo automatico~~ fatti il 20/11.
 - **Deploy in produzione:** `migrate` (`contracts.0003`, `0004`, `core.0049`, `notifications.0005`), ricreare `cron`, impostare gli indirizzi dell'ufficio in `/impostazioni`, dare «Gestisce le impostazioni di Archie».
 - **[DEC] Dev:** l'SMTP del dev è reale e i venditori demo hanno email finte: il cron delle 8 scrive a quegli indirizzi.
-- **[UI] Restano per i Contratti:** ricerca asincrona di clienti e device nel modulo (limite 200), statistiche e cruscotto (fase 3 della spec di ottobre).
+- ~~Limite di 200 clienti/device nel modulo~~ risolto il 20/11 in tutta l'app con `fetchAll` (variante A scelta da Fede: si leggono tutte le pagine; la ricerca mentre si scrive servirà solo se si arriva alle migliaia).
+- **[UI] Restano per i Contratti:** statistiche e cruscotto (fase 3 della spec di ottobre).
 
