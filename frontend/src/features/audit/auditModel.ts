@@ -140,7 +140,7 @@ export function objectTitle(e: AuditEvent): string {
 const FIELD_LABELS: Record<string, string> = {
   status: 'Stato', priority: 'Priorità', assignee: 'Assegnata a', assigned_to: 'Assegnata a', area: 'Area', title: 'Titolo', name: 'Nome', display_name: 'Nome visualizzato',
   description: 'Descrizione', notes: 'Note', note: 'Note', customer: 'Cliente', site: 'Sito', type: 'Tipo', category: 'Categoria',
-  notice_days: 'Preavviso (giorni)', billing_freq: 'Fatturazione', amount: 'Importo', total_value: 'Valore', start_date: 'Inizio', end_date: 'Fine',
+  notice_days: 'Avviso di rinnovo (giorni)', reminder_days: 'Avviso di rinnovo (giorni)', billing_freq: 'Fatturazione', amount: 'Importo', total_value: 'Valore', start_date: 'Inizio', end_date: 'Fine',
   result: 'Esito', pdf_file: 'PDF', date: 'Data', date_from: 'Dal', date_to: 'Al', reason: 'Motivo', hostname: 'Hostname', ip: 'IP', email: 'Email',
   phone: 'Telefono', is_active: 'Attivo', groups: 'Gruppi', due_date_override: 'Scadenza modificata', next_due_date: 'Prossima scadenza',
   year: 'Anno', month: 'Mese', advances_total: 'Anticipi', rejection_reason: 'Motivo rifiuto', km: 'Km', destination: 'Destinazione',

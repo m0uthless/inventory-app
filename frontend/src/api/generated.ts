@@ -480,6 +480,41 @@ export interface paths {
     patch: operations['announcements_partial_update']
     trace?: never
   }
+  '/api/app-settings/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description GET: impostazioni per sezione. PATCH {chiave: valore}: tutto o niente. */
+    get: operations['app_settings_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** @description GET: impostazioni per sezione. PATCH {chiave: valore}: tutto o niente. */
+    patch: operations['app_settings_partial_update']
+    trace?: never
+  }
+  '/api/app-settings/contracts/test-email/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Email di prova agli indirizzi dell'ufficio dei promemoria dei contratti. */
+    post: operations['app_settings_contracts_test_email_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/area-tasks/': {
     parameters: {
       query?: never
@@ -1573,6 +1608,23 @@ export interface paths {
     put?: never
     /** @description Ripristina più oggetti. Body: {"ids": [1, 2, 3]} o lista diretta. */
     post: operations['contracts_bulk_restore_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/contracts/defaults/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Valori proposti nel modulo «Nuovo contratto» (dalle Impostazioni di Archie). */
+    get: operations['contracts_defaults_retrieve']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -7212,6 +7264,110 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/text2sql/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    get: operations['text2sql_list']
+    put?: never
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    post: operations['text2sql_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/text2sql/{id}/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    get: operations['text2sql_retrieve']
+    put?: never
+    post?: never
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    delete: operations['text2sql_destroy']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/text2sql/{id}/feedback/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    patch: operations['text2sql_feedback_partial_update']
+    trace?: never
+  }
+  '/api/text2sql/{id}/reviewed/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    post: operations['text2sql_reviewed_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/text2sql/{id}/seen/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description La risposta è stata aperta: la sua notifica diventa letta. */
+    post: operations['text2sql_seen_create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/text2sql/review/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description Le proprie domande al generatore. La revisione (`review/`, `reviewed/`) è del superuser. */
+    get: operations['text2sql_review_retrieve']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/trash/info/': {
     parameters: {
       query?: never
@@ -9312,6 +9468,7 @@ export interface components {
       readonly can_edit: string
       readonly converted_to_issue: number
       readonly converted_to_issue_title: string
+      readonly converted_to_issue_deleted: string
     }
     /**
      * @description * `da_fare` - Da fare
@@ -9419,10 +9576,9 @@ export interface components {
       start_date: string
       /** Format: date */
       end_date: string
-      notice_days?: number
+      reminder_days?: number
       /** Format: date */
-      readonly notice_deadline: string
-      auto_renew?: boolean
+      readonly reminder_date: string
       billing_freq?: components['schemas']['BillingFreqEnum']
       readonly billing_freq_label: string
       status?: components['schemas']['ContractStatusEnum']
@@ -9441,10 +9597,10 @@ export interface components {
     /**
      * @description * `bozza` - Bozza
      *     * `attivo` - Attivo
-     *     * `disdetto` - Disdetto
+     *     * `chiuso` - Chiuso
      * @enum {string}
      */
-    ContractStatusEnum: 'bozza' | 'attivo' | 'disdetto'
+    ContractStatusEnum: 'bozza' | 'attivo' | 'chiuso'
     /**
      * @description * `assistenza` - Assistenza
      *     * `noleggio` - Noleggio
@@ -9945,6 +10101,12 @@ export interface components {
      */
     ExpenseReportStatusEnum: 'bozza' | 'inviata' | 'validata' | 'rifiutata'
     /**
+     * @description * `ok` - Corretta
+     *     * `ko` - Da correggere
+     * @enum {string}
+     */
+    FeedbackEnum: 'ok' | 'ko'
+    /**
      * @description * `text` - Testo
      *     * `number` - Numero
      *     * `date` - Data
@@ -10423,9 +10585,12 @@ export interface components {
     /**
      * @description * `maintenance_due` - Manutenzione in scadenza
      *     * `area_task_due` - Task di area in scadenza
+     *     * `text2sql_ready` - Query SQL pronta
+     *     * `contract_renewal` - Contratto da rinnovare
      * @enum {string}
      */
-    NotificationTypeEnum: 'maintenance_due' | 'area_task_due'
+    NotificationTypeEnum:
+      'maintenance_due' | 'area_task_due' | 'text2sql_ready' | 'contract_renewal'
     /** @enum {unknown} */
     NullEnum: null
     PaginatedAnnouncementList: {
@@ -10938,6 +11103,21 @@ export interface components {
       previous?: string | null
       results: components['schemas']['Tech'][]
     }
+    PaginatedText2SqlList: {
+      /** @example 123 */
+      count: number
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null
+      results: components['schemas']['Text2Sql'][]
+    }
     PaginatedUserDashboardLayoutList: {
       /** @example 123 */
       count: number
@@ -11189,6 +11369,7 @@ export interface components {
       readonly can_edit?: string
       readonly converted_to_issue?: number
       readonly converted_to_issue_title?: string
+      readonly converted_to_issue_deleted?: string
     }
     PatchedChangelogEntry: {
       readonly id?: number
@@ -11249,10 +11430,9 @@ export interface components {
       start_date?: string
       /** Format: date */
       end_date?: string
-      notice_days?: number
+      reminder_days?: number
       /** Format: date */
-      readonly notice_deadline?: string
-      auto_renew?: boolean
+      readonly reminder_date?: string
       billing_freq?: components['schemas']['BillingFreqEnum']
       readonly billing_freq_label?: string
       status?: components['schemas']['ContractStatusEnum']
@@ -12056,6 +12236,7 @@ export interface components {
       phone?: string
       user?: number | null
       readonly user_username?: string
+      readonly reminder_email?: string
       is_active?: boolean
       /** Format: date-time */
       readonly created_at?: string
@@ -12225,6 +12406,40 @@ export interface components {
       readonly created_at?: string
       /** Format: date-time */
       readonly updated_at?: string
+    }
+    PatchedText2Sql: {
+      readonly id?: number
+      /** Domanda */
+      question?: string
+      /** Stato */
+      readonly status?: components['schemas']['Text2SqlStatusEnum']
+      /** Query */
+      readonly sql?: string
+      /** Tipo */
+      readonly kind?: components['schemas']['Text2SqlKindEnum']
+      /** Avvisi */
+      readonly warnings?: unknown
+      /**
+       * Secondi
+       * Format: double
+       */
+      readonly seconds?: number | null
+      /** Errore */
+      readonly error?: string
+      /** Format: date-time */
+      readonly created_at?: string
+      /** Format: date-time */
+      readonly started_at?: string | null
+      /** Format: date-time */
+      readonly finished_at?: string | null
+      /** Giudizio */
+      readonly feedback?: components['schemas']['FeedbackEnum']
+      /** Query corretta */
+      readonly corrected_sql?: string
+      /** Nota */
+      readonly feedback_note?: string
+      /** Format: date-time */
+      readonly feedback_at?: string | null
     }
     PatchedUserAdmin: {
       readonly id?: number
@@ -12780,6 +12995,7 @@ export interface components {
       phone?: string
       user?: number | null
       readonly user_username: string
+      readonly reminder_email: string
       is_active?: boolean
       /** Format: date-time */
       readonly created_at: string
@@ -12989,6 +13205,55 @@ export interface components {
       /** Format: date-time */
       readonly updated_at: string
     }
+    Text2Sql: {
+      readonly id: number
+      /** Domanda */
+      question: string
+      /** Stato */
+      readonly status: components['schemas']['Text2SqlStatusEnum']
+      /** Query */
+      readonly sql: string
+      /** Tipo */
+      readonly kind: components['schemas']['Text2SqlKindEnum']
+      /** Avvisi */
+      readonly warnings: unknown
+      /**
+       * Secondi
+       * Format: double
+       */
+      readonly seconds: number | null
+      /** Errore */
+      readonly error: string
+      /** Format: date-time */
+      readonly created_at: string
+      /** Format: date-time */
+      readonly started_at: string | null
+      /** Format: date-time */
+      readonly finished_at: string | null
+      /** Giudizio */
+      readonly feedback: components['schemas']['FeedbackEnum']
+      /** Query corretta */
+      readonly corrected_sql: string
+      /** Nota */
+      readonly feedback_note: string
+      /** Format: date-time */
+      readonly feedback_at: string | null
+    }
+    /**
+     * @description * `read` - Lettura
+     *     * `write` - Scrittura
+     *     * `impossible` - Impossibile
+     * @enum {string}
+     */
+    Text2SqlKindEnum: 'read' | 'write' | 'impossible'
+    /**
+     * @description * `queued` - In coda
+     *     * `running` - In elaborazione
+     *     * `done` - Pronta
+     *     * `error` - Non riuscita
+     * @enum {string}
+     */
+    Text2SqlStatusEnum: 'queued' | 'running' | 'done' | 'error'
     /**
      * @description * `amministrativo` - Amministrativo
      *     * `diagnostico` - Diagnostico
@@ -14320,6 +14585,60 @@ export interface operations {
       }
     }
   }
+  app_settings_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  app_settings_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  app_settings_contracts_test_email_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   area_tasks_list: {
     parameters: {
       query?: {
@@ -15349,7 +15668,6 @@ export interface operations {
   contracts_list: {
     parameters: {
       query?: {
-        auto_renew?: boolean
         company?: number
         /**
          * @description * `assistenza` - Assistenza
@@ -15361,12 +15679,10 @@ export interface operations {
         customer?: number
         /**
          * @description * `ok` - ok
-         *     * `notice` - notice
-         *     * `expiring` - expiring
+         *     * `renew` - renew
          *     * `expired` - expired
-         *     * `attention` - attention
          */
-        expiry?: 'attention' | 'expired' | 'expiring' | 'notice' | 'ok'
+        expiry?: 'expired' | 'ok' | 'renew'
         /** @description Which field to use when ordering the results. */
         ordering?: string
         /** @description A page number within the paginated result set. */
@@ -15379,9 +15695,9 @@ export interface operations {
         /**
          * @description * `bozza` - Bozza
          *     * `attivo` - Attivo
-         *     * `disdetto` - Disdetto
+         *     * `chiuso` - Chiuso
          */
-        status?: 'attivo' | 'bozza' | 'disdetto'
+        status?: 'attivo' | 'bozza' | 'chiuso'
         year?: number
       }
       header?: never
@@ -15690,6 +16006,25 @@ export interface operations {
         'application/json': components['schemas']['Contract']
       }
     }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Contract']
+        }
+      }
+    }
+  }
+  contracts_defaults_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
     responses: {
       200: {
         headers: {
@@ -19784,6 +20119,7 @@ export interface operations {
         hide_closed?: boolean
         id_q?: string
         inventory?: number
+        no_area?: boolean
         only_closed?: boolean
         /** @description Which field to use when ordering the results. */
         ordering?: string
@@ -24251,6 +24587,200 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Tech']
+        }
+      }
+    }
+  }
+  text2sql_list: {
+    parameters: {
+      query?: {
+        /** @description Which field to use when ordering the results. */
+        ordering?: string
+        /** @description A page number within the paginated result set. */
+        page?: number
+        /** @description Number of results to return per page. */
+        page_size?: number
+        /** @description A search term. */
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaginatedText2SqlList']
+        }
+      }
+    }
+  }
+  text2sql_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Text2Sql']
+        'application/x-www-form-urlencoded': components['schemas']['Text2Sql']
+        'multipart/form-data': components['schemas']['Text2Sql']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Text2Sql']
+        }
+      }
+    }
+  }
+  text2sql_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Text2Sql']
+        }
+      }
+    }
+  }
+  text2sql_destroy: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description No response body */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  text2sql_feedback_partial_update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PatchedText2Sql']
+        'application/x-www-form-urlencoded': components['schemas']['PatchedText2Sql']
+        'multipart/form-data': components['schemas']['PatchedText2Sql']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Text2Sql']
+        }
+      }
+    }
+  }
+  text2sql_reviewed_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Text2Sql']
+        'application/x-www-form-urlencoded': components['schemas']['Text2Sql']
+        'multipart/form-data': components['schemas']['Text2Sql']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Text2Sql']
+        }
+      }
+    }
+  }
+  text2sql_seen_create: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Text2Sql']
+        'application/x-www-form-urlencoded': components['schemas']['Text2Sql']
+        'multipart/form-data': components['schemas']['Text2Sql']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Text2Sql']
+        }
+      }
+    }
+  }
+  text2sql_review_retrieve: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Text2Sql']
         }
       }
     }

@@ -28,7 +28,7 @@ export type ContractRenewDialogProps = {
 /**
  * Rinnovo manuale: propone il periodo successivo (stessa durata, a partire dal
  * giorno dopo la fine attuale); alla conferma aggiorna `start_date`/`end_date`
- * del contratto con una PATCH. `auto_renew` non ha alcun effetto qui.
+ * del contratto con una PATCH: l'avviso di rinnovo si sposta con la nuova fine.
  */
 export default function ContractRenewDialog({ open, contract, onClose, onRenewed }: ContractRenewDialogProps) {
   const toast = useToast()

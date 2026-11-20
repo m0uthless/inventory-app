@@ -1,7 +1,7 @@
-export type ExpiryState = 'none' | 'ok' | 'notice' | 'expiring' | 'expired'
+export type ExpiryState = 'none' | 'ok' | 'renew' | 'expired'
 
 export type ContractType = 'assistenza' | 'noleggio' | 'licenza' | 'altro'
-export type ContractStatus = 'bozza' | 'attivo' | 'disdetto'
+export type ContractStatus = 'bozza' | 'attivo' | 'chiuso'
 export type BillingFrequency = 'una_tantum' | 'mensile' | 'trimestrale' | 'annuale'
 
 export const CONTRACT_TYPE_OPTIONS: { value: ContractType; label: string }[] = [
@@ -14,7 +14,7 @@ export const CONTRACT_TYPE_OPTIONS: { value: ContractType; label: string }[] = [
 export const CONTRACT_STATUS_OPTIONS: { value: ContractStatus; label: string }[] = [
   { value: 'bozza', label: 'Bozza' },
   { value: 'attivo', label: 'Attivo' },
-  { value: 'disdetto', label: 'Disdetto' },
+  { value: 'chiuso', label: 'Chiuso' },
 ]
 
 export const BILLING_FREQ_OPTIONS: { value: BillingFrequency; label: string }[] = [
@@ -30,8 +30,7 @@ export const EXPIRY_CHIP: Record<
 > = {
   none: { label: '—', color: 'default' },
   ok: { label: 'In corso', color: 'success' },
-  notice: { label: 'Preavviso', color: 'warning' },
-  expiring: { label: 'In scadenza', color: 'warning' },
+  renew: { label: 'Da rinnovare', color: 'warning' },
   expired: { label: 'Scaduto', color: 'error' },
 }
 
@@ -42,6 +41,8 @@ export type Seller = {
   phone: string
   user: number | null
   user_username: string | null
+  /** L'email che riceverà i promemoria di rinnovo (utente Archie o inserita a mano). */
+  reminder_email: string | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -65,9 +66,9 @@ export type ContractListItem = {
   company_label: string | null
   start_date: string
   end_date: string
-  notice_days: number
-  notice_deadline: string | null
-  auto_renew: boolean
+  /** Avviso di rinnovo: giorni prima della fine. */
+  reminder_days: number
+  reminder_date: string | null
   /** Assente se l'utente non ha `contracts.view_contract_value`. Decimal serializzato come stringa. */
   total_value?: string
   billing_freq: BillingFrequency
@@ -86,7 +87,17 @@ export type ContractListItem = {
   deleted_at: string | null
 }
 
-export type ContractDetail = ContractListItem
+export type ReminderState = 'sent' | 'failed' | 'skipped' | 'next' | 'planned'
+export type ContractReminders = {
+  every: number
+  to: string[]
+  cc: string[]
+  seller_kind: 'user' | 'manual' | null
+  dates: { date: string; state: ReminderState; error: string | null }[]
+}
+
+/** Il dettaglio porta anche il calendario dei promemoria di rinnovo. */
+export type ContractDetail = ContractListItem & { reminders?: ContractReminders }
 
 export type CustomerOption = {
   id: number

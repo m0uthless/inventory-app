@@ -39,7 +39,7 @@ export type ContractDialogProps = {
 const STEPS = ['Cliente e tipo', 'Periodo', 'Valore e documenti'] as const
 const STEP_FIELDS: (keyof FormErrors)[][] = [
   ['customer', 'contract_type', 'seller', 'company'],
-  ['start_date', 'end_date', 'notice_days'],
+  ['start_date', 'end_date', 'reminder_days'],
   ['code', 'title', 'total_value', 'billing_freq', 'devices', 'notes', 'status'],
 ]
 const stepOf = (errs: FormErrors) => Math.max(0, STEP_FIELDS.findIndex((fs) => fs.some((k) => errs[k])))
@@ -64,6 +64,10 @@ export default function ContractDialog({ open, contract, initialCustomer = null,
     setErrors({}); setStep(0); setPdf(null)
     if (contract) { setF(formFromContract(contract)); return }
     setF(emptyForm(initialCustomer))
+    // Avviso di rinnovo proposto: quello delle Impostazioni di Archie (senza risposta resta 90).
+    api.get<{ reminder_days: number }>('/contracts/defaults/')
+      .then((r) => { const n = r.data?.reminder_days; if (Number.isInteger(n)) setF((x) => ({ ...x, reminder_days: n })) })
+      .catch(() => {})
     // Codice proposto: il successivo dell'ultimo dell'anno.
     const year = new Date().getFullYear()
     api.get<{ results?: { code: string }[] }>('/contracts/', { params: { search: String(year), ordering: '-code', page_size: 1 } })
@@ -208,7 +212,7 @@ export default function ContractDialog({ open, contract, initialCustomer = null,
   // ── Modifica: scheda unica con riepilogo ──────────────────────────
   const sheet = (
     <>
-      {head('Modifica a sinistra: a destra vedi subito periodo, disdetta e rate.')}
+      {head('Modifica a sinistra: a destra vedi subito periodo, avviso di rinnovo e rate.')}
       <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <Box sx={(t) => ({
           display: 'grid', gridTemplateColumns: '1fr', minHeight: '100%',

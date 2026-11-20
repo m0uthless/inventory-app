@@ -263,7 +263,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
                   {(contracts ?? []).map((c) => {
                     const n = daysTo(c.end_date)
                     const tag = c.expiry_state === 'expired' || n < 0 ? <SoftTag tone="neutral">scaduto</SoftTag>
-                      : n <= EXPIRING_DAYS || c.expiry_state === 'notice' || c.expiry_state === 'expiring' ? <SoftTag tone="warning">tra {n} {n === 1 ? 'giorno' : 'giorni'}</SoftTag>
+                      : n <= EXPIRING_DAYS || c.expiry_state === 'renew' ? <SoftTag tone="warning">tra {n} {n === 1 ? 'giorno' : 'giorni'}</SoftTag>
                         : <SoftTag tone="success">in corso</SoftTag>
                     return (
                       <RecordRow key={`c${c.id}`} lead={<CampoIcon name="receipt" size={18} />} title={c.title}

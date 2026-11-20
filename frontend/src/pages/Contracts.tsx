@@ -44,13 +44,9 @@ import {
   type CompanyOption, type ContractDetail, type ContractListItem, type CustomerOption, type Seller,
 } from '../features/contracts/types'
 import { formatEuro } from '../features/purchaseorders/types'
+import { CONTRACT_VIEWS, VIEWS, VIEW_PARAMS, type ContractView } from '../features/contracts/contractViews'
 
 type OpenCreateState = { openCreate?: boolean }
-type ContractView = 'all' | 'att' | 'exp' | 'run' | 'draft' | 'canc'
-const VIEWS: ContractView[] = ['all', 'att', 'exp', 'run', 'draft', 'canc']
-const VIEW_PARAMS: Record<ContractView, Record<string, string>> = {
-  all: {}, att: { expiry: 'attention' }, exp: { expiry: 'expired' }, run: { expiry: 'ok' }, draft: { status: 'bozza' }, canc: { status: 'disdetto' },
-}
 type ViewState = { view: ContractView; customer: number | ''; company: number | ''; seller: number | ''; type: string; year: number | '' }
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -72,8 +68,8 @@ function buildColumns(canViewValue: boolean): GridColDef<ContractListItem>[] {
     {
       field: 'start_date', headerName: 'Periodo', width: 112,
       renderCell: (p) => (
-        <Tooltip title={`${dShort(p.row.start_date)} → ${dShort(p.row.end_date)}${p.row.notice_deadline ? ` · disdetta entro ${dShort(p.row.notice_deadline)}` : ''}`}>
-          <Box sx={{ width: '100%' }}><PeriodBar compact start={p.row.start_date} end={p.row.end_date} notice={p.row.notice_deadline} state={p.row.expiry_state} /></Box>
+        <Tooltip title={`${dShort(p.row.start_date)} → ${dShort(p.row.end_date)}${p.row.reminder_date ? ` · avviso di rinnovo ${dShort(p.row.reminder_date)}` : ''}`}>
+          <Box sx={{ width: '100%' }}><PeriodBar compact start={p.row.start_date} end={p.row.end_date} reminder={p.row.reminder_date} state={p.row.expiry_state} /></Box>
         </Tooltip>
       ),
     },
@@ -84,7 +80,7 @@ function buildColumns(canViewValue: boolean): GridColDef<ContractListItem>[] {
     } satisfies GridColDef<ContractListItem>] : []),
     {
       field: 'status', headerName: 'Stato', width: 126, sortable: false,
-      renderCell: (p) => <StateCell status={p.row.status} label={p.row.status_label} state={p.row.expiry_state} end={p.row.end_date} notice={p.row.notice_deadline} />,
+      renderCell: (p) => <StateCell status={p.row.status} label={p.row.status_label} state={p.row.expiry_state} end={p.row.end_date} reminder={p.row.reminder_date} />,
     },
   ]
 }
@@ -94,13 +90,13 @@ function renderContractCard(): MobileCardRenderFn<ContractListItem> {
     <Box onClick={() => onOpen(row.id)} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: 1.5, cursor: 'pointer', display: 'grid', gap: 0.75, '&:active': { bgcolor: 'action.hover' } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
         <Typography noWrap sx={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{row.title}</Typography>
-        <StateCell status={row.status} label={row.status_label} state={row.expiry_state} end={row.end_date} notice={row.notice_deadline} />
+        <StateCell status={row.status} label={row.status_label} state={row.expiry_state} end={row.end_date} reminder={row.reminder_date} />
       </Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, fontSize: 13, color: 'text.secondary', minWidth: 0 }}>
         <Box component="span" sx={ellipsis}>{row.customer_name} · {row.contract_type_label}</Box>
         <Box component="span" sx={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, flex: 'none' }}>{row.code}</Box>
       </Box>
-      <PeriodBar start={row.start_date} end={row.end_date} notice={row.notice_deadline} state={row.expiry_state} />
+      <PeriodBar start={row.start_date} end={row.end_date} reminder={row.reminder_date} state={row.expiry_state} />
     </Box>
   )
 }
@@ -454,8 +450,7 @@ export default function Contracts() {
         { label: 'Società', getValue: (r) => r.company_label ?? '' },
         { label: 'Inizio', getValue: (r) => r.start_date },
         { label: 'Fine', getValue: (r) => r.end_date },
-        { label: 'Disdetta entro', getValue: (r) => r.notice_deadline ?? '' },
-        { label: 'Rinnovo automatico', getValue: (r) => (r.auto_renew ? 'Sì' : 'No') },
+        { label: 'Avviso di rinnovo', getValue: (r) => r.reminder_date ?? '' },
         { label: 'Fatturazione', getValue: (r) => r.billing_freq_label },
         ...(canViewValue ? [{ label: 'Valore', getValue: (r: ContractListItem) => r.total_value ?? '' }] : []),
         { label: 'Stato', getValue: (r) => r.status_label },
@@ -468,7 +463,7 @@ export default function Contracts() {
     if (grid.view === 'deleted' && !searching && !hasActiveFilters) return { title: 'Cestino vuoto', subtitle: 'Non ci sono contratti eliminati.' }
     if (searching || hasActiveFilters || view !== 'all') {
       return {
-        title: 'Nessun contratto', subtitle: view === 'att' ? 'Nessun contratto da gestire: niente in scadenza né oltre la disdetta.' : view === 'exp' ? 'Nessun contratto scaduto da sistemare.' : 'Nessun contratto corrisponde: prova a modificare la ricerca, la vista o i filtri.',
+        title: 'Nessun contratto', subtitle: view === 'att' ? 'Nessun contratto da rinnovare: nessuno ha raggiunto la data dell\'avviso.' : view === 'exp' ? 'Nessun contratto scaduto da sistemare.' : 'Nessun contratto corrisponde: prova a modificare la ricerca, la vista o i filtri.',
         action: (
           <Stack direction="row" spacing={1} justifyContent="center">
             {searching ? <Button variant="outlined" onClick={() => grid.setQ('')}>Cancella ricerca</Button> : null}
@@ -485,7 +480,6 @@ export default function Contracts() {
 
   const drawerIndex = selectedId != null ? rows.findIndex((r) => r.id === selectedId) : -1
   const openColumnsRef = React.useRef<((el: HTMLElement) => void) | null>(null)
-  const att = stats ? stats.by_expiry.notice + stats.by_expiry.expiring : undefined
 
   return (
     <Stack spacing={0} sx={{ height: '100%' }}>
@@ -505,12 +499,10 @@ export default function Contracts() {
           value={savedId ? `saved:${savedId}` : view}
           onChange={(k) => { if (k.startsWith('saved:')) { applySaved(k.slice(6)); return } setView(k) }}
           tabs={[
-            { key: 'all', label: 'Tutti', count: stats ? stats.by_status.bozza + stats.by_status.attivo + stats.by_status.disdetto : undefined },
-            { key: 'att', label: 'Da gestire', count: att },
-            { key: 'exp', label: 'Scaduti', count: stats?.by_expiry.expired },
-            { key: 'run', label: 'In corso', count: stats?.by_expiry.ok },
-            { key: 'draft', label: 'Bozze', count: stats?.by_status.bozza },
-            { key: 'canc', label: 'Disdetti', count: stats?.by_status.disdetto },
+            ...CONTRACT_VIEWS.map((v) => ({ key: v.key, label: v.label, count: stats ? ({
+              all: stats.by_status.bozza + stats.by_status.attivo + stats.by_status.chiuso, att: stats.by_expiry.renew, exp: stats.by_expiry.expired,
+              run: stats.by_expiry.ok, draft: stats.by_status.bozza, canc: stats.by_status.chiuso,
+            } as Record<ContractView, number>)[v.key] : undefined })),
             ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
           ]}
           end={
