@@ -132,6 +132,7 @@ def send_templated_email(
     context: dict,
     subject: str,
     recipient_list: list[str],
+    cc: list[str] | None = None,
 ) -> tuple[bool, str | None]:
     """Renderizza `template_name` (un template che fa
     `{% extends base_template %}` + `{% block content %}`) e invia
@@ -175,6 +176,7 @@ def send_templated_email(
             body=plain_body,
             from_email=from_email,
             to=recipient_list,
+            cc=cc or None,
         )
         message.attach_alternative(html_body, "text/html")
 

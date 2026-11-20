@@ -178,6 +178,28 @@ class Contract(TimeStampedModel):
         return ExpiryState.OK
 
 
+class ContractReminder(models.Model):
+    """Promemoria di rinnovo inviato (o tentato) per una data del calendario
+    (vedi reminders.py). Il vincolo unico impedisce doppi invii per la stessa data."""
+
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name="reminders")
+    due_on   = models.DateField()
+    sent_at  = models.DateTimeField(auto_now_add=True)
+    to       = models.TextField(blank=True)
+    cc       = models.TextField(blank=True)
+    ok       = models.BooleanField(default=False)
+    error    = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["due_on"]
+        constraints = [
+            models.UniqueConstraint(fields=["contract", "due_on"], name="uq_contract_reminder_due"),
+        ]
+
+    def __str__(self):
+        return f"{self.contract_id} · {self.due_on}"
+
+
 class ContractDevice(models.Model):
     """Collegamento Contratto ↔ Device (tabella through della M2M)."""
 

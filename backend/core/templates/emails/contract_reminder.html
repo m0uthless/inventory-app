@@ -1,0 +1,16 @@
+{% extends base_template %}
+{% block content %}<p style="margin:0 0 8px;font-size:12px;line-height:18px;font-weight:600;color:#5b3f8c;">Promemoria {{ position }} di {{ total }}</p>
+<h1 class="h1" style="margin:0 0 6px;font-size:22px;line-height:28px;font-weight:650;letter-spacing:-0.3px;color:#15201e;">Il contratto {{ code }} scade il {{ end_date|date:"d/m/Y" }}</h1>
+<p style="margin:0;font-size:14px;line-height:22px;color:#5b6b67;">{% if greeting_name %}Ciao {{ greeting_name }}{% else %}Buongiorno{% endif %}, {% if days_left > 0 %}mancano <b style="color:#15201e;">{{ days_left }} giorni</b> alla fine{% else %}oggi è l'ultimo giorno{% endif %} del contratto con <b style="color:#15201e;">{{ customer_name }}</b>: è il momento di preparare e proporre il rinnovo.</p>
+<div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;font-size:13px;line-height:20px;color:#15201e;">
+<tr><td width="110" valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;color:#5b6b67;">Contratto</td><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;word-wrap:break-word;overflow-wrap:anywhere;">{{ title }}<br><span style="color:#5b6b67;font-size:12px;">{{ code }} · {{ type_label }}{% if company_label %} · {{ company_label }}{% endif %}</span></td></tr>
+<tr><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;color:#5b6b67;">Cliente</td><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;">{{ customer_name }}</td></tr>
+<tr><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;color:#5b6b67;">Periodo</td><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;">{{ start_date|date:"d/m/Y" }} → <b>{{ end_date|date:"d/m/Y" }}</b></td></tr>
+{% if seller_name %}<tr><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;color:#5b6b67;">Venditore</td><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;">{{ seller_name }}</td></tr>{% endif %}
+<tr><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;border-bottom:1px solid #d5dedb;color:#5b6b67;">Device</td><td valign="top" style="padding:8px 0;border-top:1px solid #d5dedb;border-bottom:1px solid #d5dedb;">{{ devices_count }} collegat{{ devices_count|pluralize:"o,i" }}</td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;"><tr><td>{% include "emails/_button.html" with label="Apri il contratto in Archie" url="/contracts?open=" id=contract_id %}</td></tr></table>
+<p style="margin:18px 0 0;font-size:12px;line-height:18px;color:#5b6b67;">{% if next_date %}Se il contratto non viene rinnovato, il prossimo promemoria arriva il {{ next_date|date:"d/m/Y" }}.{% else %}È l'ultimo promemoria.{% endif %} I promemoria si fermano quando in Archie si sposta in avanti la data di fine o si segna il contratto come chiuso.</p>
+<p style="margin:8px 0 0;font-size:11px;line-height:16px;color:#66766f;">Ricevi questa email perché sei il venditore del contratto o un indirizzo dell'ufficio impostato in Archie.</p>
+{% endblock %}

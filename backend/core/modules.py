@@ -54,7 +54,7 @@ MODULES: tuple[Module, ...] = (
         search_kinds=("wiki_page",),
     ),
     Module("drive", "Drive", ("drive-folders", "drive-files"), search_kinds=("drive_folder", "drive_file")),
-    Module("contracts", "Contratti", ("contracts", "sellers")),
+    Module("contracts", "Contratti", ("contracts", "sellers"), notification_types=("contract_renewal",)),
     Module("purchase_orders", "Purchase Order", ("purchase-order-entries",)),
     Module(
         "expenses",
