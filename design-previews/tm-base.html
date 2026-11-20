@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titolo e colore per modulo · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c; --primary-ink: #fff; --rail: #e3eae8; --bg: #eef2f1; --sheet: #f4f7f6; --surface: #fff; --surface-2: #f5f8f7;
+  --border: #d5dedb; --border-strong: #b9c7c3; --text: #15201e; --muted: #5b6b67; --faint: #66766f; --field: #e2f0eb; --field-line: #1f6b5c;
+  --success: #2e7d4f; --success-bg: #e3f3e9; --warning: #9a5b00; --warning-bg: #fbefd9; --error: #c2362b; --error-bg: #fbe5e2; --info: #2f5f9e; --info-bg: #e5edf8;
+  --focus: 0 0 0 3px rgb(31 107 92 / .28); --shadow: 0 12px 32px -12px rgb(16 40 34 / .22), 0 2px 6px rgb(16 40 34 / .06);
+  /* Colori dei moduli (tenui, distinti dai colori di stato) */
+  --mc-sky: #4a82c6; --mc-lilac: #7d70cf; --mc-sand: #b08326; --mc-peach: #c9733f; --mc-teal: #2f8a8f; --mc-plum: #a35c8f; --mc-slate: #6f7f7b;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --primary-ink: #0b1513; --rail: #0e1514; --bg: #0f1615; --sheet: #172120; --surface: #151e1c; --surface-2: #1a2523;
+  --border: #2a3734; --border-strong: #3b4c48; --text: #e4ecea; --muted: #93a4a0; --faint: #849591; --field: #183a33; --field-line: #5fb8a3;
+  --success: #5cc48a; --success-bg: #173327; --warning: #e0a43a; --warning-bg: #3a2c12; --error: #f07466; --error-bg: #3c1d1a; --info: #7fa8e0; --info-bg: #1b2a40;
+  --focus: 0 0 0 3px rgb(95 184 163 / .35); --shadow: 0 16px 40px -12px rgb(0 0 0 / .6);
+  --mc-sky: #74a6e2; --mc-lilac: #a297ef; --mc-sand: #d6aa4e; --mc-peach: #e6935f; --mc-teal: #5cb6bb; --mc-plum: #cf86bb; --mc-slate: #93a4a0;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--rail); color: var(--text); font: 14px/1.45 Geist, system-ui, sans-serif; overflow: hidden; }
+.shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); height: 100%; }
+/* Barra laterale */
+.side { padding: 12px 10px; overflow-y: auto; }
+.brand { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 6px; margin-bottom: 10px; }
+.brand b { font-size: 26px; font-weight: 600; letter-spacing: -.04em; color: var(--primary); }
+.grp { font-size: 11.5px; font-weight: 600; color: var(--muted); margin: 14px 8px 4px; }
+.nav { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 9px; border-radius: 8px; color: var(--text); text-decoration: none; font-size: 13.5px; border: 1px solid transparent; cursor: pointer; }
+.nav svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.nav:hover { background: var(--surface-2); }
+.nav.on { background: var(--surface); border-color: var(--field-line); font-weight: 600; }
+.nav .cnt { margin-left: auto; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 6px; background: var(--field); }
+/* Colori dei moduli in barra laterale: icona nel colore, scritte neutre */
+:root[data-mc="mod"] .nav svg, :root[data-mc="cat"] .nav svg { color: var(--mc); stroke-width: 2.1; }
+:root[data-mc]:not([data-mc="off"])[data-active="mod"] .nav.on { background: color-mix(in srgb, var(--mc) 12%, var(--surface)); border-color: color-mix(in srgb, var(--mc) 55%, transparent); }
+:root[data-mc]:not([data-mc="off"])[data-active="mod"] .nav.on .cnt { background: color-mix(in srgb, var(--mc) 20%, var(--surface)); }
+:root[data-mc="cat"] .grp { color: var(--gc); }
+/* Destra: barra in alto + foglio */
+.main { display: grid; grid-template-rows: 56px minmax(0, 1fr); min-width: 0; }
+.top { display: flex; align-items: center; gap: 12px; padding: 0 18px 0 0; position: relative; }
+.search { position: absolute; left: 50%; transform: translateX(-50%); width: min(520px, 44%); height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 13px; }
+.search kbd { margin-left: auto; font: 11px "Geist Mono", monospace; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.search svg, .icon svg { width: 16px; height: 16px; }
+.right { margin-left: auto; display: flex; align-items: center; gap: 14px; font-size: 13px; font-weight: 600; }
+.av { width: 28px; height: 28px; border-radius: 50%; background: var(--field); display: grid; place-items: center; font-size: 11px; }
+.sheet { background: var(--sheet); border-top-left-radius: 14px; overflow: auto; padding: 22px 24px 120px; position: relative; }
+/* Linguetta: il foglio sale nella barra in alto fino al titolo e scende con una curva prima della ricerca */
+.tab-title { display: none; }
+:root[data-title="tab"] .tab-title {
+  display: flex; align-items: center; gap: 10px; align-self: stretch; margin-top: 10px; padding: 0 22px; background: var(--sheet);
+  border-top-left-radius: 14px; border-top-right-radius: 14px; position: relative; font-size: 21px; font-weight: 650; letter-spacing: -.01em;
+}
+:root[data-title="tab"] .tab-title::after {
+  content: ""; position: absolute; right: -14px; bottom: 0; width: 14px; height: 14px;
+  background: radial-gradient(circle at 100% 0, transparent 14px, var(--sheet) 14.5px);
+}
+:root[data-title="tab"] .sheet { border-top-left-radius: 0; }
+:root[data-title="tab"] .page-head h1, :root[data-title="tab"] .page-head .pg-ic { display: none; }
+/* Senza altri comandi la testata nella pagina sparisce del tutto */
+:root[data-title="tab"] .page-head:not(:has(.seg)) { display: none; }
+/* Testata della pagina */
+.page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; min-height: 36px; flex-wrap: wrap; }
+.page-head h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -.02em; }
+.pg-ic, .tab-ic { display: none; }
+:root[data-mc="mod"] .pg-ic, :root[data-mc="cat"] .pg-ic, :root[data-mc="mod"] .tab-ic, :root[data-mc="cat"] .tab-ic { display: inline-grid; place-items: center; color: var(--mc); }
+.pg-ic svg { width: 24px; height: 24px; stroke-width: 2.3; } .tab-ic svg { width: 20px; height: 20px; stroke-width: 2.3; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.seg span { padding: 4px 10px; border-radius: 6px; font-size: 13px; color: var(--muted); }
+.seg span.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.btn { height: 34px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--primary); color: var(--primary-ink); font: inherit; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.btn svg { width: 15px; height: 15px; }
+.head-act { margin-left: auto; }
+:root[data-title="tab"] .head-act { display: none; }
+/* Indicatori */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.kpi.on { border-color: var(--field-line); box-shadow: inset 0 0 0 1px var(--field-line); }
+.kpi small { color: var(--muted); font-size: 12.5px; } .kpi b { display: block; font-size: 26px; font-weight: 650; margin: 2px 0; } .kpi span { font-size: 12px; color: var(--muted); }
+/* Viste + tabella */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.views { display: flex; align-items: center; gap: 4px; padding: 0 14px; height: 48px; border-bottom: 1px solid var(--border); }
+.view { padding: 0 10px; height: 100%; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); border-bottom: 2px solid transparent; }
+.view.on { color: var(--text); font-weight: 600; border-color: var(--primary); }
+.view i { font-style: normal; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 6px; background: var(--surface-2); }
+.views .sv { margin-left: auto; color: var(--primary); font-size: 13px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+.views .sv svg { width: 15px; height: 15px; }
+.views .btn { display: none; margin-left: 10px; height: 30px; }
+:root[data-title="tab"] .views .btn { display: inline-flex; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 500; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); }
+td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: 0; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.chip.open { background: var(--info-bg); color: var(--info); } .chip.wip { background: var(--warning-bg); color: var(--warning); } .chip.wait { background: var(--surface-2); color: var(--muted); }
+.chip.ok { background: var(--success-bg); color: var(--success); } .chip.err { background: var(--error-bg); color: var(--error); }
+.pr { font-size: 12.5px; } .pr.crit { color: var(--error); font-weight: 600; } .late { color: var(--error); font-weight: 600; }
+.mono { font-family: "Geist Mono", monospace; font-size: 12px; }
+/* Barra dei comandi dell'anteprima */
+.pv { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px);
+  padding: 6px 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); z-index: 10; font-size: 12.5px; }
+.pv .lbl { color: var(--muted); font-weight: 600; margin-left: 4px; }
+.pv button, .pv a { height: 28px; padding: 0 9px; border-radius: 6px; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.pv button[aria-pressed="true"] { background: var(--field); color: var(--text); font-weight: 600; }
+.pv button:hover, .pv a:hover { background: var(--surface-2); color: var(--text); }
+.pv .sep { width: 1px; height: 18px; background: var(--border); }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); } .side { display: none; }
+  .search { position: static; transform: none; width: auto; flex: 1; margin-left: 12px; }
+  :root[data-title="tab"] .tab-title { display: none; }
+  :root[data-title="tab"] .page-head h1, :root[data-title="tab"] .head-act { display: flex; }
+  :root[data-title="tab"] .page-head .pg-ic { display: none; }
+  :root[data-title="tab"] .views .btn { display: none; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sheet { border-radius: 0; padding: 16px 16px 140px; }
+  .hide-sm { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" aria-label="Navigazione">
+    <div class="brand"><b>archie</b></div>
+    <nav data-nav></nav>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="tab-title" data-tab-title></div>
+      <div class="search"><span data-i="search"></span>Cerca clienti, siti, inventari, issue…<kbd>Ctrl K</kbd></div>
+      <div class="right"><span class="icon" data-i="bell"></span><span class="av">FM</span><span class="hide-sm">Federico Mutuale</span></div>
+    </header>
+    <main class="sheet" data-page></main>
+  </div>
+</div>
+
+<div class="pv" role="toolbar" aria-label="Controlli anteprima">
+  <a href="index.html">‹ Indice</a>
+  <span class="lbl">Titolo</span><button data-set="title:page">Nella pagina</button><button data-set="title:tab">Linguetta</button>
+  <span class="sep"></span>
+  <span class="lbl">Colori</span><button data-set="mc:off">Spenti</button><button data-set="mc:mod">Per modulo</button><button data-set="mc:cat">Per categoria</button>
+  <span class="sep"></span>
+  <span class="lbl">Voce attiva</span><button data-set="active:green">Verde</button><button data-set="active:mod">Del colore</button>
+  <span class="sep"></span>
+  <span class="lbl">Pagina</span><button data-set="page:issues">Issue</button><button data-set="page:contracts">Contratti</button>
+  <span class="sep"></span>
+  <button data-theme>Tema</button>
+</div>
+
+<script src="shared/preview.js"></script>
+<script>
+(() => {
+  const ic = (n) => Preview.icon(n)
+  const html = document.documentElement
+  // Moduli: [chiave, etichetta, icona, colore del modulo, contatore]
+  const GROUPS = [
+    ['Operatività', 'sky', [['dash', 'Dashboard', 'dashboard', 'slate'], ['issues', 'Issue', 'alert', 'sky', 19], ['tasks', 'Task di area', 'task', 'lilac'], ['maint', 'Manutenzione', 'wrench', 'sand'], ['sn', 'ServiceNow', 'cloud', 'teal']]],
+    ['Anagrafiche', 'sand', [['repo', 'Site Repository', 'server', 'teal'], ['cust', 'Clienti', 'building', 'sky'], ['sites', 'Siti', 'pin', 'sand'], ['contacts', 'Contatti', 'users', 'lilac'], ['mon', 'Monitor', 'monitor', 'slate']]],
+    ['Conoscenza', 'lilac', [['wiki', 'Wiki', 'book', 'lilac'], ['drive', 'Drive', 'folder', 'sky'], ['sql', 'Generatore SQL', 'chat', 'teal']]],
+    ['Amministrazione', 'peach', [['contracts', 'Contratti', 'file', 'peach'], ['po', 'Purchase Order', 'receipt', 'sand'], ['exp', 'Rimborso spese', 'bag', 'plum'], ['leave', 'Piano ferie', 'calendar', 'lilac']]],
+    ['Sistema', 'slate', [['audit', 'Audit', 'history', 'slate'], ['trash', 'Cestino', 'trash', 'slate'], ['bugs', 'Bug e feature', 'activity', 'plum', 5]]],
+  ]
+  const MOD = {}; GROUPS.forEach(([g, gc, items]) => items.forEach(([k, l, i, c, n]) => { MOD[k] = { l, i, c, gc, n } }))
+  const state = { title: 'page', mc: 'mod', active: 'green', page: 'issues' }
+  try { Object.assign(state, JSON.parse(localStorage.getItem('archie-preview-tm') || '{}')) } catch (e) { /* niente */ }
+  const colorOf = (k) => `var(--mc-${state.mc === 'cat' ? MOD[k].gc : MOD[k].c})`
+
+  const nav = () => GROUPS.map(([g, gc, items]) => `<div class="grp" style="--gc: var(--mc-${gc})">${g}</div>` + items.map(([k]) => {
+    const m = MOD[k]
+    return `<a class="nav${k === state.page ? ' on' : ''}" style="--mc: ${colorOf(k)}" data-go="${k}">${ic(m.i)}<span>${m.l}</span>${m.n ? `<span class="cnt">${m.n}</span>` : ''}</a>`
+  }).join('')).join('')
+
+  const issues = () => `
+    <div class="page-head" style="--mc: ${colorOf('issues')}"><span class="pg-ic">${ic('alert')}</span><h1>Issue</h1>
+      <span class="seg"><span>AVEC</span><span>Romagna</span><span>Senza area</span><span class="on">Tutte</span></span>
+      <button class="btn head-act">${ic('plus')}Nuova issue</button></div>
+    <div class="kpis">
+      <div class="kpi on"><small>Attive</small><b>19</b><span>2 aperte negli ultimi 7 giorni</span></div>
+      <div class="kpi"><small>Scadute</small><b>9</b><span>2 entro 7 giorni</span></div>
+      <div class="kpi"><small>Tempo medio di chiusura</small><b>6,4 <span>giorni</span></b><span>dall'apertura alla risoluzione</span></div>
+      <div class="kpi"><small>Risolte negli ultimi 30 giorni</small><b>3</b><span>10 risolte o chiuse in tutto</span></div>
+    </div>
+    <section class="panel">
+      <div class="views"><span class="view on">Attive <i>19</i></span><span class="view">Le mie <i>1</i></span><span class="view">Scadute <i>9</i></span><span class="view hide-sm">Risolte e chiuse <i>10</i></span><span class="view hide-sm">Tutte <i>29</i></span>
+        <span class="sv">${ic('plus')}Salva vista</span><button class="btn">${ic('plus')}Nuova issue</button></div>
+      <table><thead><tr><th>ID</th><th>Priorità</th><th>Stato</th><th>Titolo</th><th class="hide-sm">Cliente · sito</th><th class="hide-sm">Scadenza</th></tr></thead><tbody>
+        <tr><td class="mono">#34</td><td class="pr">Media</td><td><span class="chip open">Aperta</span></td><td><b>Test Issue Area</b></td><td class="hide-sm">Azienda Ospedaliera Estense</td><td class="hide-sm">—</td></tr>
+        <tr><td class="mono">#11</td><td class="pr">Alta</td><td><span class="chip open">Aperta</span></td><td><b>Masterizzatore CD paziente bloccato</b></td><td class="hide-sm">Clinica Villa Serena</td><td class="hide-sm">24/11</td></tr>
+        <tr><td class="mono">#22</td><td class="pr">Media</td><td><span class="chip wip">In lavorazione</span></td><td><b>Richiesta export studi per ricerca</b></td><td class="hide-sm">Istituto Ortopedico Colli</td><td class="hide-sm late">14/11 · scaduta</td></tr>
+        <tr><td class="mono">#26</td><td class="pr crit">Critica</td><td><span class="chip wip">In lavorazione</span></td><td><b>Aggiornamento client PACS 4.4</b></td><td class="hide-sm">Azienda Sanitaria Friuli</td><td class="hide-sm late">09/11 · scaduta</td></tr>
+        <tr><td class="mono">#19</td><td class="pr">Alta</td><td><span class="chip wait">In attesa</span></td><td><b>Switch di sala TC senza link</b></td><td class="hide-sm">Azienda Sanitaria Friuli</td><td class="hide-sm late">02/11 · scaduta</td></tr>
+      </tbody></table>
+    </section>`
+
+  const contracts = () => `
+    <div class="page-head" style="--mc: ${colorOf('contracts')}"><span class="pg-ic">${ic('file')}</span><h1>Contratti</h1>
+      <button class="btn head-act">${ic('plus')}Nuovo contratto</button></div>
+    <div class="kpis">
+      <div class="kpi on"><small>Attivi</small><b>15 <span>di 24</span></b><span>1.193.749,00 € di valore in corso</span></div>
+      <div class="kpi"><small>Da rinnovare</small><b>1</b><span>avviso di rinnovo partito</span></div>
+      <div class="kpi"><small>Scaduti</small><b>2</b><span>ancora attivi: rinnova o segna chiuso</span></div>
+      <div class="kpi"><small>Prossime scadenze</small><b style="font-size:14px;font-weight:600">CT-2025-017 · 07/12</b><span>poi CT-2024-018 · 31/12</span></div>
+    </div>
+    <section class="panel">
+      <div class="views"><span class="view on">Tutti <i>24</i></span><span class="view">Da rinnovare <i>1</i></span><span class="view">Scaduti <i>2</i></span><span class="view hide-sm">In corso <i>12</i></span><span class="view hide-sm">Chiusi <i>5</i></span>
+        <span class="sv">${ic('plus')}Salva vista</span><button class="btn">${ic('plus')}Nuovo contratto</button></div>
+      <table><thead><tr><th>Codice</th><th>Contratto</th><th class="hide-sm">Cliente</th><th>Fine</th><th>Stato</th></tr></thead><tbody>
+        <tr><td class="mono">CT-2025-017</td><td><b>Assistenza</b></td><td class="hide-sm">Azienda Ospedaliera Scaligera</td><td>07/12/2026</td><td><span class="chip wip">Da rinnovare</span></td></tr>
+        <tr><td class="mono">CT-2024-018</td><td><b>Assistenza PACS e RIS</b></td><td class="hide-sm">AUSL Imola</td><td>31/12/2026</td><td><span class="chip ok">In corso</span></td></tr>
+        <tr><td class="mono">CT-2022-012</td><td><b>Assistenza robot masterizzatore</b></td><td class="hide-sm">Azienda Ospedaliera Estense</td><td>31/10/2026</td><td><span class="chip err">Scaduto</span></td></tr>
+        <tr><td class="mono">CT-2021-007</td><td><b>Noleggio stampante pellicole</b></td><td class="hide-sm">AUSL Bologna</td><td>31/05/2025</td><td><span class="chip wait">Chiuso</span></td></tr>
+      </tbody></table>
+    </section>`
+
+  const render = () => {
+    html.setAttribute('data-title', state.title); html.setAttribute('data-mc', state.mc); html.setAttribute('data-active', state.active)
+    document.querySelector('[data-nav]').innerHTML = nav()
+    document.querySelector('[data-page]').innerHTML = state.page === 'contracts' ? contracts() : issues()
+    const m = MOD[state.page]
+    const tab = document.querySelector('[data-tab-title]')
+    tab.style.setProperty('--mc', colorOf(state.page)); tab.innerHTML = `<span class="tab-ic">${ic(m.i)}</span>${m.l}`
+    document.querySelectorAll('[data-i]').forEach((el) => { el.innerHTML = ic(el.dataset.i) })
+    document.querySelectorAll('[data-set]').forEach((b) => { const [k, v] = b.dataset.set.split(':'); b.setAttribute('aria-pressed', String(state[k] === v)) })
+    try { localStorage.setItem('archie-preview-tm', JSON.stringify(state)) } catch (e) { /* niente */ }
+  }
+  document.addEventListener('click', (e) => {
+    const s = e.target.closest('[data-set]'); if (s) { const [k, v] = s.dataset.set.split(':'); state[k] = v; render() }
+    const g = e.target.closest('[data-go]'); if (g && (g.dataset.go === 'issues' || g.dataset.go === 'contracts')) { state.page = g.dataset.go; render() }
+    if (e.target.closest('[data-theme]')) {
+      const dark = html.getAttribute('data-theme') === 'dark' || (!html.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches)
+      html.setAttribute('data-theme', dark ? 'light' : 'dark')
+    }
+  })
+  render()
+})()
+</script>
+</body>
+</html>
