@@ -902,6 +902,7 @@ export default function Issues() {
   // Eventi di audit per Attività e timeline (solo con il permesso di vedere l'audit).
   const canAudit = hasPerm('audit.view_auditevent')
   const [events, setEvents] = React.useState<IssueEvent[] | null>(null)
+  const [eventsReload, setEventsReload] = React.useState(0)
   React.useEffect(() => {
     if (!detailIssue || !canAudit) { setEvents(null); return }
     let alive = true
@@ -909,7 +910,7 @@ export default function Issues() {
       .then((r) => { const d = r.data as { results?: IssueEvent[] } | IssueEvent[]; if (alive) setEvents(Array.isArray(d) ? d : d.results ?? []) })
       .catch(() => { if (alive) setEvents(null) })
     return () => { alive = false }
-  }, [detailIssue, canAudit])
+  }, [detailIssue, canAudit, eventsReload])
   const { exporting, exportCsv } = useExportCsv()
   const exportVisible = () => {
     const { page: _p, page_size: _ps, ...params } = listParams as Record<string, unknown>
@@ -1676,6 +1677,7 @@ export default function Issues() {
         categories={categories}
         meId={me?.id}
         onPatch={patchIssue}
+        onActivityChanged={() => setEventsReload((n) => n + 1)}
         onEdit={() => {
           if (!detailIssue) return
           openEdit(detailIssue)

@@ -66,30 +66,37 @@ export default function InventoryCredentials({ inventoryId }: { inventoryId: num
   return (
     <Box>
       {head('Le password si nascondono da sole dopo 30 secondi')}
-      <Box sx={{ ml: 4.5, border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden' }}>
-        {rows.map((r) => {
-          const value = String(data[r.key] ?? '')
-          const isShown = Boolean(shown[r.key])
-          return (
-            <Box key={r.key} sx={{ position: 'relative', display: 'grid', gridTemplateColumns: '120px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 38, pl: 1.25, pr: 0.5,
-              '& + &': { borderTop: '1px solid', borderColor: 'divider' }, ...(isShown ? { bgcolor: 'warning.light' } : {}) }}>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary' }} noWrap>{r.group} · {r.label}</Typography>
-              <Box sx={{ ...mono, fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {r.secret && !isShown ? <Box component="span" aria-label="Password nascosta" sx={{ letterSpacing: '.12em', color: 'text.secondary' }}>••••••••</Box> : value}
-              </Box>
-              <Box sx={{ display: 'inline-flex' }}>
-                {r.secret ? (
-                  <Tooltip title={isShown ? 'Nascondi' : 'Mostra · si nasconde dopo 30 secondi'}>
-                    <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => setShown((s) => ({ ...s, [r.key]: !s[r.key] }))}
-                      sx={{ width: 28, height: 28, color: isShown ? 'warning.main' : undefined }}><CampoIcon name={isShown ? 'eyeOff' : 'eye'} size={14} /></IconButton>
-                  </Tooltip>
-                ) : null}
-                <Tooltip title="Copia"><IconButton size="small" aria-label={r.secret ? 'Copia la password' : "Copia l'utente"} onClick={() => copy(value, r.secret ? 'Password' : 'Utenza')} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
-              </Box>
-              {isShown ? <Box aria-hidden sx={{ position: 'absolute', left: 0, bottom: 0, height: 2, bgcolor: 'warning.main', animation: `${countdown} 30s linear forwards`, '@media (prefers-reduced-motion: reduce)': { animation: 'none', width: '100%' } }} /> : null}
+      <Box sx={{ display: 'grid', gap: 1, ml: 4 }}>
+        {[...new Set(rows.map((r) => r.group))].map((group) => (
+          <Box key={group}>
+            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>{group}</Typography>
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden' }}>
+              {rows.filter((r) => r.group === group).map((r) => {
+                const value = String(data[r.key] ?? '')
+                const isShown = Boolean(shown[r.key])
+                return (
+                  <Box key={r.key} sx={{ position: 'relative', display: 'grid', gridTemplateColumns: '64px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 36, pl: 1.25, pr: 0.5,
+                    '& + &': { borderTop: '1px solid', borderColor: 'divider' }, ...(isShown ? { bgcolor: 'warning.light' } : {}) }}>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{r.label}</Typography>
+                    <Box title={r.secret && !isShown ? undefined : value} sx={{ ...mono, fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.secret && !isShown ? <Box component="span" aria-label="Password nascosta" sx={{ letterSpacing: '.12em', color: 'text.secondary' }}>••••••••</Box> : value}
+                    </Box>
+                    <Box sx={{ display: 'inline-flex' }}>
+                      {r.secret ? (
+                        <Tooltip title={isShown ? 'Nascondi' : 'Mostra · si nasconde dopo 30 secondi'}>
+                          <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => setShown((st) => ({ ...st, [r.key]: !st[r.key] }))}
+                            sx={{ width: 28, height: 28, color: isShown ? 'warning.main' : undefined }}><CampoIcon name={isShown ? 'eyeOff' : 'eye'} size={14} /></IconButton>
+                        </Tooltip>
+                      ) : null}
+                      <Tooltip title="Copia"><IconButton size="small" aria-label={r.secret ? 'Copia la password' : "Copia l'utente"} onClick={() => copy(value, r.secret ? 'Password' : 'Utenza')} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
+                    </Box>
+                    {isShown ? <Box aria-hidden sx={{ position: 'absolute', left: 0, bottom: 0, height: 2, bgcolor: 'warning.main', animation: `${countdown} 30s linear forwards`, '@media (prefers-reduced-motion: reduce)': { animation: 'none', width: '100%' } }} /> : null}
+                  </Box>
+                )
+              })}
             </Box>
-          )
-        })}
+          </Box>
+        ))}
       </Box>
     </Box>
   )

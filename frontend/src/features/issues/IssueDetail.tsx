@@ -71,6 +71,8 @@ type Props = {
   meId?: number
   /** Salvataggio di uno o più campi (con annulla, gestito dal chiamante). */
   onPatch: (patch: IssuePatch, label: string) => Promise<void> | void
+  /** Dopo un allegato aggiunto o tolto: la pagina ricarica l'attività. */
+  onActivityChanged?: () => void
   /** Modulo completo della issue. */
   onEdit: () => void
   onDelete: () => void
@@ -104,6 +106,9 @@ function describeEvent(e: IssueEvent): React.ReactNode {
   return ch.map(([k, v], i) => {
     // Due formati nell'audit: {from, to} (recente) e [from, to] (storico).
     const [from, to] = Array.isArray(v) ? v : [v?.from, v?.to]
+    if (k === 'allegati') {
+      return <React.Fragment key={k}>{i ? '; ' : ''}{to ? <>ha allegato <b>{String(to)}</b></> : <>ha tolto l'allegato <b>{String(from)}</b></>}</React.Fragment>
+    }
     return (
       <React.Fragment key={k}>
         {i ? '; ' : ''}ha cambiato {FIELD_LABEL[k] ?? k}
@@ -318,7 +323,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
           </RecordSection>
           <Box id="iss-all" sx={{ scrollMarginTop: 16 }}>
             <RecordSection title={<>Allegati{attCount ? <Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: 'text.secondary' }}>{attCount}</Box> : null}</>}>
-              <IssueAttachments issueId={issue.id} canEdit={canChange && !editing} onCount={setAttCount} />
+              <IssueAttachments issueId={issue.id} canEdit={canChange && !editing} onCount={setAttCount} onChanged={p.onActivityChanged} />
             </RecordSection>
           </Box>
           <IssueProcedure wiki={wiki} canEdit={canChange} />
