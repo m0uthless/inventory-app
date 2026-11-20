@@ -354,3 +354,25 @@ def test_reconvert_allowed_when_issue_is_trashed():
     assert task.converted_to_issue_id == resp.data["issue"]["id"] != old.id
     assert resp.data["task"]["converted_to_issue_deleted"] is False
     assert Issue.objects.filter(pk=old.pk, deleted_at__isnull=False).exists()
+
+
+# ── Allegati ereditati dal task (spec 2026-11-20) ──
+
+def _drive_file(name):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from drive.models import DriveFile
+    return DriveFile.objects.create(name=name, file=SimpleUploadedFile(name, b"x"))
+
+
+def test_convert_copies_task_files_as_task_attachments():
+    from issues.models import IssueAttachment
+    area = _area()
+    task = AreaTask.objects.create(area=area, title="Con allegati")
+    a, b = _drive_file("verbale.pdf"), _drive_file("foto.png")
+    task.drive_files.add(a, b)
+    resp = _client(_user(area, can_add_issue=True)).post(_url(task), {"customer": _customer().id}, format="json")
+    assert resp.status_code == 201, resp.data
+    atts = IssueAttachment.objects.filter(issue_id=resp.data["issue"]["id"]).order_by("name")
+    assert [(x.name, x.from_task, x.drive_file_id, bool(x.file)) for x in atts] == [
+        ("[Task] foto.png", True, b.id, False), ("[Task] verbale.pdf", True, a.id, False),
+    ]

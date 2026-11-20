@@ -966,6 +966,15 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             for comment in task.comments.all():
                 IssueComment.objects.create(issue=issue, author=comment.author, body=comment.body)
 
+            # Gli allegati del task (file del Drive) passano alla issue come collegamenti, non copie:
+            # restano i permessi del Drive (spec 2026-11-20).
+            from issues.models import IssueAttachment
+            for f in task.drive_files.filter(deleted_at__isnull=True):
+                IssueAttachment.objects.create(
+                    issue=issue, drive_file=f, name=f"[Task] {f.name}"[:255], size=f.size or 0,
+                    mime_type=f.mime_type or "", from_task=True, uploaded_by=request.user,
+                )
+
             old_status = task.status
             old_issue = task.converted_to_issue if task.converted_to_issue_id else None
             task.status = AreaTask.STATUS_COMPLETATO

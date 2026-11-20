@@ -157,3 +157,35 @@ def test_attachments_count_in_detail():
     issue = _issue(); c = _client(_user())
     c.post(_url(issue), {"file": [_png("a.png"), _png("b.png")]}, format="multipart")
     assert c.get(f"/api/issues/{issue.pk}/").json()["attachments_count"] == 2
+
+
+# ── Collegamenti a file del Drive (ereditati dai task) ──
+
+def _linked(issue, name="verbale.pdf", **file_kw):
+    from drive.models import DriveFile
+    f = DriveFile.objects.create(name=name, file=SimpleUploadedFile(name, PDF), **file_kw)
+    return IssueAttachment.objects.create(issue=issue, drive_file=f, name=f"[Task] {name}", from_task=True), f
+
+
+def test_drive_attachment_listed_with_drive_url():
+    issue = _issue()
+    att, f = _linked(issue)
+    rows = _client(_user()).get(_url(issue)).json()
+    assert rows == [dict(rows[0], name="[Task] verbale.pdf", from_task=True, url=f"/api/drive-files/{f.id}/download/")]
+
+
+def test_drive_attachment_hidden_without_drive_access():
+    from django.contrib.auth.models import Group
+    issue = _issue()
+    att, f = _linked(issue)
+    f.allowed_groups.add(Group.objects.create(name=f"riservato_{uuid.uuid4().hex[:4]}"))
+    assert _client(_user()).get(_url(issue)).json() == []
+
+
+def test_drive_attachment_of_trashed_drive_file_hidden():
+    from django.utils import timezone
+    issue = _issue()
+    att, f = _linked(issue)
+    f.deleted_at = timezone.now()
+    f.save(update_fields=["deleted_at"])
+    assert _client(_user()).get(_url(issue)).json() == []
