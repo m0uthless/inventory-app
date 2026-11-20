@@ -10,7 +10,7 @@ import type { CampoIconName } from '../ui/campo'
  */
 export type ModuleKey =
   | 'issues' | 'area_tasks' | 'maintenance' | 'servicenow'
-  | 'monitors' | 'wiki' | 'drive'
+  | 'monitors' | 'wiki' | 'drive' | 'text2sql'
   | 'contracts' | 'purchase_orders' | 'expenses' | 'leave' | 'feedback'
 
 export type ModuleDef = {
@@ -76,6 +76,13 @@ export const MODULES: ModuleDef[] = [
     routes: ['/drive'],
     goes: ['Pagina Drive e voce nel menu', 'Caricamento e scaricamento dei file', 'File e cartelle nella ricerca'],
     stays: [],
+  },
+  {
+    key: 'text2sql', label: 'Generatore SQL', group: 'Conoscenza', icon: 'chat',
+    description: 'Query Oracle per il PACS Philips Vue a partire da una domanda in italiano.',
+    routes: ['/knowledge/sql'],
+    goes: ['Pagina Generatore SQL e voce nel menu', 'Elaborazione delle domande in coda', 'Notifiche «Query SQL pronta»'],
+    stays: ['Storico delle domande e giudizi'],
   },
   {
     key: 'contracts', label: 'Contratti', group: 'Amministrazione', icon: 'file',

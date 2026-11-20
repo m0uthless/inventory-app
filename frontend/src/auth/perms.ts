@@ -80,6 +80,9 @@ export const PERMS = {
     },
   },
 
+  text2sql: {
+    use: 'text2sql.use_text2sql',
+  },
   wiki: {
     page: {
       view: 'wiki.view_wikipage',

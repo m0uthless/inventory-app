@@ -23,6 +23,7 @@ const Wiki = lazy(() => import('./pages/Wiki'))
 const WikiPage = lazy(() => import('./pages/WikiPage'))
 const WikiStats = lazy(() => import('./pages/WikiStats'))
 const WikiQueries = lazy(() => import('./pages/WikiQueries'))
+const Text2Sql = lazy(() => import('./pages/Text2Sql'))
 const Search = lazy(() => import('./pages/Search'))
 const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
@@ -176,6 +177,10 @@ const router = createBrowserRouter([
       {
         path: 'wiki/queries',
         element: <RequirePerm perm="wiki.view_wikiquery">{lazyEl(<WikiQueries />)}</RequirePerm>,
+      },
+      {
+        path: 'knowledge/sql',
+        element: <RequirePerm perm="text2sql.use_text2sql">{lazyEl(<Text2Sql />)}</RequirePerm>,
       },
       {
         path: 'wiki/:id',

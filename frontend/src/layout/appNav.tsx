@@ -80,6 +80,7 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { label: 'Drive', path: '/drive', icon: <CampoIcon name="folder" />, permAny: ['drive.view_drivefolder', 'drive.view_drivefile'] },
+      { label: 'Generatore SQL', path: '/knowledge/sql', icon: <CampoIcon name="chat" />, perm: 'text2sql.use_text2sql' },
     ],
   },
   {
