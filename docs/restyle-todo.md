@@ -316,7 +316,7 @@ Spec: `docs/superpowers/specs/2026-11-19-issue-area-assignee-groups-design.md`. 
   - lanciare `migrate` (`servicenow.0012`, `issues.0009`–`0011`, `core.0048`);
   - dare ai gruppi i tre permessi «È tecnico ServiceNow», «Può essere assegnatario delle issue» e «Vede le issue di tutte le aree». Finché mancano i primi due nessuno è assegnabile e l'email «nuova issue» non parte.
 - ~~**[UI] Verifica nel browser**~~ fatta il 20/11 (Playwright): selettore d'area, Area nei Dettagli, assegnatario fuori area, cambio d'area, issue invisibile senza permesso, sola lettura con il permesso, menu col tasto destro di Contratti, Piani, Rapportini e Drive.
-- **[UI] Link a una issue invisibile** (`/issues?open=<id>` di un'altra area): compare l'avviso in inglese «No Issue matches the given query.» (messaggio 404 grezzo di DRF). Meglio un testo italiano, es. «Issue non trovata o non visibile».
+- ~~**[UI] Link a una issue invisibile**~~: fatto il 20/11, «Elemento non trovato o non visibile.» al posto del 404 grezzo di DRF (`shared/src/api/error.ts`).
 - ~~**Rimandati dalla revisione e test mancanti**~~ fatti il 20/11: area disattivata rifiutata, assegnatario fuori area o senza permesso visibile nel selettore e tenuto al cambio d'area, «Assegna a me» solo agli assegnabili, una sola `get_object()`, titolo della issue convertita nascosto nei task di altre aree, `/api/wiki-links/` senza i link a issue invisibili (404 su dettaglio e ripristino), etichetta Wiki senza utente senza titolo; test per conteggi e riepiloghi di crm e inventory e per il superuser con un'area.
 - **[DEC] Philips:** oggi non servono. Idea di Fede (20/11): spostare il flag Philips dal singolo utente all'appartenenza a un gruppo «Philips», così potranno avere i permessi di gruppo come gli altri. Da valutare quando torneranno.
 
@@ -359,6 +359,6 @@ Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Cont
 ## Task di area: verifica nel browser (20/11)
 
 - Fatta: issue collegata nel cestino (avviso, riconversione, «Issue #N nel cestino» in elenco), filtri a 1366 px, apertura con Invio.
-- **[UI] Esc nella finestra del task**: aperto con Invio dall'elenco, il primo Esc non chiude la finestra, serve il secondo. In Issue e Contratti il primo Esc chiude. Preesistente, causa da cercare.
+- ~~**[UI] Esc nella finestra del task**~~: fatto il 20/11, la finestra si riapriva da `?open=` prima che sparisse dall'URL; ora l'apertura da URL reagisce solo a un id nuovo.
 - Dati dev: il task T-4 è collegato alla issue #17 ma è «In attesa», non completato (dato di prova).
 

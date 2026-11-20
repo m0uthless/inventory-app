@@ -23,6 +23,8 @@ function coerceString(v: unknown): string | undefined {
   return undefined
 }
 
+const DJANGO_NOT_FOUND = /^No \w+ matches the given query\.?$/
+
 function statusFallback(status?: number): string | undefined {
   switch (status) {
     case 400:
@@ -113,6 +115,9 @@ export function getApiErrorMessage(err: unknown): string {
 
     if (isRecord(data)) {
       const detail = coerceString(data.detail)
+      // get_object_or_404 di Django non traduce mai il suo messaggio: un record
+      // inesistente o fuori dal proprio perimetro (es. issue di un'altra area).
+      if (detail && DJANGO_NOT_FOUND.test(detail)) return 'Elemento non trovato o non visibile.'
       if (detail) return detail
 
       const nonField = firstMessageFromArray(data.non_field_errors)

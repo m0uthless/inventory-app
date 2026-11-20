@@ -174,15 +174,25 @@ export default function AreaTasks() {
   const openDetail = React.useCallback((row: AreaTaskRow, tab = 0) => { setOpenTab(tab); setOpenTask(row); setSelectedId(row.id); grid.setOpenId(row.id) }, [grid])
   const closeDetail = React.useCallback(() => { setOpenTask(null); grid.setOpenId(null) }, [grid])
   // Apertura da URL (?open=): anche per un task fuori dalla pagina corrente.
+  // Si reagisce solo a un id nuovo: chiudendo, `?open=` sparisce dall'URL un attimo
+  // dopo il task aperto, e senza questo controllo la finestra si riaprirebbe (Esc
+  // andava premuto due volte).
+  const handledOpenId = React.useRef<number | null>(null)
+  const rowsRef = React.useRef(rows)
+  rowsRef.current = rows
+  const openTaskIdRef = React.useRef<number | null>(null)
+  openTaskIdRef.current = openTask?.id ?? null
   React.useEffect(() => {
     const id = grid.openId
-    if (!id || openTask?.id === id) return
-    const found = rows.find((r) => r.id === id)
+    if (id === handledOpenId.current) return
+    handledOpenId.current = id
+    if (!id || openTaskIdRef.current === id) return
+    const found = rowsRef.current.find((r) => r.id === id)
     if (found) { setOpenTask(found); return }
     let alive = true
     api.get<AreaTaskRow>(`/area-tasks/${id}/`).then((r) => { if (alive) setOpenTask(r.data) }).catch(() => {})
     return () => { alive = false }
-  }, [grid.openId, rows, openTask?.id])
+  }, [grid.openId])
   const openIndex = openTask ? rows.findIndex((r) => r.id === openTask.id) : -1
 
   // ── Nuovo task ─────────────────────────────────────────────────────────────

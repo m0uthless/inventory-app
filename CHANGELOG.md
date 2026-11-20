@@ -49,6 +49,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Task di area: se la issue in cui era stato trasformato finisce nel cestino, il task lo dice («La issue #N è nel cestino») e si può trasformare di nuovo in una issue nuova; prima restava un collegamento morto e la conversione rispondeva 409. Nuovo campo `converted_to_issue_deleted`.
 - Generatore SQL: la campanella torna al ritmo normale appena arriva la risposta, invece di controllare ogni 15 secondi per 20 minuti; aprendo una domanda dalla notifica oltre le prime 50 la si carica e si segna letta la sua notifica, non quella della prima domanda (nuova azione `POST /api/text2sql/{id}/seen/`); cancellare una domanda (anche con «Riprova») toglie la sua notifica; le righe dell'elenco sono annunciate come pulsanti; su telefono scegliere una domanda porta in vista la risposta.
 - Generatore SQL, lavoratore: un solo `text2sql-worker` alla volta elabora la coda (lock di Postgres); un secondo resta in attesa e subentra se il primo cade, invece di rimettere in coda le domande in corso dell'altro. Il servizio aspetta anche Redis all'avvio. Query corretta e nota del giudizio hanno un limite di lunghezza (20.000 e 2.000 caratteri).
+- Task di area: aperta la finestra con Invio (o doppio clic) dall'elenco, il primo Esc non la chiudeva: la finestra si riapriva subito dall'indirizzo `?open=`, ancora presente per un attimo.
+- Messaggi d'errore: «No … matches the given query.» (un record inesistente o non visibile, es. il link a una issue di un'altra area) diventa «Elemento non trovato o non visibile.», in Archie e nel Portal.
 - Test: la suite usa una cache locale e vuota per ogni test invece del Redis dello stack dev, che faceva fallire a caso i test dei moduli spenti.
 
 ### Security
