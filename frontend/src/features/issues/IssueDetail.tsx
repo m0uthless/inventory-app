@@ -28,6 +28,9 @@ import {
   type CategoryOption, type IssueComment, type IssueRow, type UserOption,
 } from './types'
 import { fetchAll } from '../../api/fetchAll'
+import IssueAttachments from './IssueAttachments'
+import SiteReferent from './SiteReferent'
+import InventoryCredentials from '../inventory/InventoryCredentials'
 
 /*
  * Finestra della issue (DESIGN.md › Record window, anteprima design-previews/iss-base.html, variante A):
@@ -229,6 +232,8 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
   const blocked = () => { if (editing && changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
   const go = (path: string) => { if (!blocked()) { p.onClose(); navigate(path) } }
 
+  const [attCount, setAttCount] = React.useState(issue.attachments_count ?? 0)
+  React.useEffect(() => { setAttCount(issue.attachments_count ?? 0) }, [issue.id, issue.attachments_count])
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
   const [custEl, setCustEl] = React.useState<HTMLElement | null>(null)
   React.useEffect(() => { setMenu(null); setEditing(false) }, [issue.id])
@@ -284,6 +289,7 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
         {chip(issue.assigned_to_full_name ? <>assegnata a <b>{issue.assigned_to_full_name}</b></> : 'non assegnata', !issue.assigned_to)}
         {due != null && !closed && !resolved ? chip(over ? <>scaduta il <b>{fmtIssueDate(issue.due_date)}</b></> : <>scade il <b>{fmtIssueDate(issue.due_date)}</b></>, over || soon) : null}
         <BandStat n={p.comments.length} one=" commento" many=" commenti" onClick={() => scrollTo('att')} />
+        {attCount ? <BandStat n={attCount} one=" allegato" many=" allegati" onClick={() => scrollTo('all')} /> : null}
       </>}
       position={p.position} onPrev={p.onPrev} onNext={p.onNext}
       actions={<>
@@ -310,6 +316,11 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
             {editing ? <RecordNotes value={draft.description} onChange={set('description')} dirty={isDirty('description')} placeholder="Cosa succede, da quando, cosa è già stato provato" ariaLabel="Descrizione" />
               : <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', color: issue.description ? 'text.primary' : 'text.disabled' }}>{issue.description || 'Nessuna descrizione.'}</Typography>}
           </RecordSection>
+          <Box id="iss-all" sx={{ scrollMarginTop: 16 }}>
+            <RecordSection title={<>Allegati{attCount ? <Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: 'text.secondary' }}>{attCount}</Box> : null}</>}>
+              <IssueAttachments issueId={issue.id} canEdit={canChange && !editing} onCount={setAttCount} />
+            </RecordSection>
+          </Box>
           <IssueProcedure wiki={wiki} canEdit={canChange} />
           <Box id="iss-att" sx={{ scrollMarginTop: 16 }}>
             <RecordSection title={<>Attività<Box component="span" sx={{ ml: 0.75, fontSize: 12, fontWeight: 400, color: 'text.secondary' }}>{p.comments.length + visibleEvents(p.events).length}</Box></>}>
@@ -375,10 +386,12 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
               ) : issue.site_name ? (
                 <RecordRow lead={<CampoIcon name="pin" size={18} />} title={issue.site_name} sub="Sito" onClick={issue.site ? () => go(`/sites${buildQuery({ open: issue.site })}`) : undefined} />
               ) : null}
-              {issue.inventory ? (
-                <RecordRow lead={<CampoIcon name="server" size={18} />} title={issueInventoryLabel(issue)} sub={<>Inventario{issue.inventory_hostname ? <> · <Box component="span" sx={mono}>{issue.inventory_hostname}</Box></> : null}</>}
+              {!editing && issue.site ? <SiteReferent siteId={issue.site} /> : null}
+              {issue.inventory ? (<>
+                <RecordRow lead={<CampoIcon name="server" size={18} />} title={issueInventoryLabel(issue)} sub={<>Inventario{issue.inventory_hostname ? <> · <Box component="span" sx={mono}>{issue.inventory_hostname}</Box></> : null}{issue.inventory_serial_number ? <> · S/N <Box component="span" sx={mono}>{issue.inventory_serial_number}</Box></> : null}{issue.inventory_knumber ? <> · <Box component="span" sx={mono}>{issue.inventory_knumber}</Box></> : null}</>}
                   onClick={() => go(inventoryDrawerPath(issue.inventory!, { customer: issue.customer }))} />
-              ) : (
+                {!editing ? <InventoryCredentials inventoryId={issue.inventory} /> : null}
+              </>) : (
                 <RecordRow lead={<CampoIcon name="server" size={18} />} title={<Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>Nessun inventario collegato</Box>}
                   end={canChange ? <Button size="small" onClick={(e) => { e.stopPropagation(); p.onLinkInventory() }}>Collega</Button> : undefined} />
               )}
