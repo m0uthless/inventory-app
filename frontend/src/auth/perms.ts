@@ -116,6 +116,7 @@ export const PERMS = {
       add: 'issues.add_issue',
       change: 'issues.change_issue',
       delete: 'issues.delete_issue',
+      viewAllAreas: 'issues.view_all_areas',
     },
   },
 

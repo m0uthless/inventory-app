@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assigneesForArea, issueAssignees, toUserOption } from './issueUsers'
+import { assigneesForArea, issueAssignees, issueScopeParam, toUserOption } from './issueUsers'
 
 describe('issueUsers', () => {
   it('toUserOption legge is_issue_assignee (assente = false)', () => {
@@ -27,5 +27,12 @@ describe('issueUsers', () => {
     ]
     expect(assigneesForArea(users, 4).map((u) => u.id)).toEqual([1])
     expect(assigneesForArea(users, '').map((u) => u.id)).toEqual([1, 2, 3])
+  })
+  it('issueScopeParam: «Tutte le aree» spento restringe solo chi può vedere tutto', () => {
+    expect(issueScopeParam(true, false, 4)).toBe('mine')
+    expect(issueScopeParam(true, true, 4)).toBeUndefined()
+    expect(issueScopeParam(false, false, 4)).toBeUndefined()
+    expect(issueScopeParam(false, true, 4)).toBeUndefined()
+    expect(issueScopeParam(true, false, null)).toBeUndefined()
   })
 })

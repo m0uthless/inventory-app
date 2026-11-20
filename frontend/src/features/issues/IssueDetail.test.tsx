@@ -27,7 +27,8 @@ const show = (over: Partial<IssueRow> = {}) => {
   const onPatch = vi.fn().mockResolvedValue(undefined)
   render(<ThemeProvider theme={theme}><MemoryRouter>
     <IssueDetail issue={{ ...issue, ...over }} onClose={vi.fn()} comments={[]} commentsLoading={false} events={[]} newComment="" sendingComment={false}
-      onNewCommentChange={vi.fn()} onSendComment={vi.fn()} users={[{ id: 7, label: 'Marco Bassi', username: 'mbassi' } as never]} categories={[{ id: 1, label: 'DICOM' }]} meId={5}
+      onNewCommentChange={vi.fn()} onSendComment={vi.fn()} users={[{ id: 7, label: 'Marco Bassi', username: 'mbassi', leave_area: 4 } as never]} categories={[{ id: 1, label: 'DICOM' }]} meId={5}
+      areas={[{ id: 4, label: 'Radiologia' }, { id: 5, label: 'Sistemi' }]}
       onPatch={onPatch} onEdit={vi.fn()} onDelete={vi.fn()} onLinkInventory={vi.fn()} onOpenServiceNow={vi.fn()} />
   </MemoryRouter></ThemeProvider>)
   return { onPatch }
@@ -72,5 +73,24 @@ describe('IssueDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }))
     expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('menuitem', { name: 'Elimina' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('l\'area si cambia dai Dettagli; un assegnatario fuori dalla nuova area si toglie', async () => {
+    const { onPatch } = show({ area: 4, area_label: 'Radiologia', can_edit: true, assigned_to: 7, assigned_to_full_name: 'Marco Bassi' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Area: cambia' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sistemi' }))
+    expect(onPatch).toHaveBeenCalledWith({ area: 5, assigned_to: null }, "Area aggiornata. L'assegnatario non fa parte della nuova area: è stato tolto.")
+  })
+
+  it('con un assegnatario della nuova area cambia solo l\'area', async () => {
+    const { onPatch } = show({ area: 5, area_label: 'Sistemi', can_edit: true, assigned_to: 7, assigned_to_full_name: 'Marco Bassi' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Area: cambia' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Radiologia' }))
+    expect(onPatch).toHaveBeenCalledWith({ area: 4 }, 'Area aggiornata')
+  })
+
+  it('in sola lettura l\'area non si cambia', async () => {
+    show({ area: 4, area_label: 'Radiologia', can_edit: false })
+    expect(await screen.findByRole('button', { name: 'Area: cambia' })).toBeDisabled()
   })
 })

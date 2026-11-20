@@ -24,6 +24,7 @@ import { assigneesForArea } from './issueUsers'
 import {
   PRIORITY_META, STATUS_META, WAITING_REASON_META, fmtIssueDate, fmtIssueDateTime,
   issueAuthorInitials, issueAuthorName, issueInventoryLabel,
+  type AreaOption,
   type CategoryOption, type IssueComment, type IssueRow, type UserOption,
 } from './types'
 
@@ -43,7 +44,7 @@ export type IssueEvent = {
   changes?: Record<string, { from?: unknown; to?: unknown } | [unknown, unknown]> | null
 }
 
-export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'category' | 'due_date' | 'servicenow_id' | 'customer' | 'customer_placeholder' | 'site' | 'inventory' | 'title' | 'description'>>
+export type IssuePatch = Partial<Pick<IssueRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'area' | 'category' | 'due_date' | 'servicenow_id' | 'customer' | 'customer_placeholder' | 'site' | 'inventory' | 'title' | 'description'>>
 
 type Props = {
   issue: IssueRow | null
@@ -60,6 +61,8 @@ type Props = {
   onNewCommentChange: (v: string) => void
   onSendComment: () => void
   users: UserOption[]
+  /** Aree selezionabili nei Dettagli. */
+  areas?: AreaOption[]
   categories: CategoryOption[]
   meId?: number
   /** Salvataggio di uno o più campi (con annulla, gestito dal chiamante). */
@@ -196,6 +199,13 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
   // Issue di un'altra area: sola lettura (il backend risponde 403 a ogni scrittura).
   const otherArea = issue.can_edit === false
   const canChange = hasPerm(PERMS.issues.issue.change) && !closed && !otherArea
+  // Cambio d'area al volo: un assegnatario che non fa parte della nuova area si toglie.
+  const pickArea = (areaId: number | null) => {
+    if (areaId === issue.area) return
+    const keep = !issue.assigned_to || assigneesForArea(p.users, areaId).some((u) => u.id === issue.assigned_to)
+    if (keep) void p.onPatch({ area: areaId }, 'Area aggiornata')
+    else void p.onPatch({ area: areaId, assigned_to: null }, "Area aggiornata. L'assegnatario non fa parte della nuova area: è stato tolto.")
+  }
 
   // ── Modifica: «Modifica» nel ⋯ trasforma i dati in campi; un solo salvataggio ──
   const [editing, setEditing] = React.useState(false)
@@ -328,6 +338,11 @@ function IssueWindow(p: Props & { issue: IssueRow }) {
               <QuickPick label="Priorità" disabled={!canChange} value={<IssuePriorityMark priority={issue.priority} />}
                 options={['critical', 'high', 'medium', 'low'].map((k) => ({ value: k, label: <IssuePriorityMark priority={k} />, selected: issue.priority === k }))}
                 onPick={(val) => void p.onPatch({ priority: val }, 'Priorità aggiornata')} />
+              <QuickPick label="Area" disabled={!canChange}
+                value={issue.area_label ?? <Box component="span" sx={{ color: 'text.secondary' }}>Nessuna area</Box>}
+                options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuna area</Box>, selected: !issue.area },
+                  ...(p.areas ?? []).map((a) => ({ value: String(a.id), label: a.label, selected: issue.area === a.id }))]}
+                onPick={(val) => pickArea(val ? Number(val) : null)} />
               <QuickPick label="Assegnata a" wide disabled={!canChange} value={assignee}
                 options={[{ value: '', label: <Box component="span" sx={{ color: 'text.secondary' }}>Nessuno</Box>, selected: !issue.assigned_to }, ...assigneesForArea(p.users, issue.area).map((u) => ({ value: String(u.id), label: u.label, selected: issue.assigned_to === u.id }))]}
                 onPick={(val) => void p.onPatch({ assigned_to: val ? Number(val) : null }, 'Assegnatario aggiornato')}

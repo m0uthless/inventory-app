@@ -14,7 +14,7 @@ import {
   ButtonBase,
 } from '@mui/material'
 
-import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material'
+import { Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Switch } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
@@ -31,6 +31,7 @@ import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMe
 import type { GridColDef, GridSortModel } from '@mui/x-data-grid'
 
 import { useAuth } from '../auth/AuthProvider'
+import { PERMS } from '../auth/perms'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
@@ -50,7 +51,7 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
-import { issueAssignees, toUserOption } from '../features/issues/issueUsers'
+import { issueAssignees, issueScopeParam, toUserOption } from '../features/issues/issueUsers'
 import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
 import { useExportCsv } from '@shared/ui/useExportCsv'
@@ -244,6 +245,11 @@ export default function Issues() {
   // ── Viste e filtri (dalle intestazioni di colonna) ──────────────────────
   type IssueView = 'active' | 'mine' | 'myarea' | 'overdue' | 'closed' | 'all'
   const myArea = me?.profile?.leave_area ?? null
+  // «Tutte le aree»: solo per chi può vedere tutte le aree (gli altri li restringe il server).
+  const canSeeAllAreas = hasPerm(PERMS.issues.issue.viewAllAreas)
+  const [allAreas, setAllAreasState] = React.useState(() => { try { return localStorage.getItem('issues_all_areas') === '1' } catch { return false } })
+  const setAllAreas = (on: boolean) => { setAllAreasState(on); try { localStorage.setItem('issues_all_areas', on ? '1' : '0') } catch { /* solo in memoria */ } }
+  const scopeParam = issueScopeParam(canSeeAllAreas, allAreas, myArea)
   // `?vista=mine|overdue|closed|all` dalla Dashboard; poi la vista vive nello stato della pagina.
   const [view, setView] = React.useState<IssueView>(() => { const v = new URLSearchParams(window.location.search).get('vista'); return v === 'mine' || v === 'myarea' || v === 'overdue' || v === 'closed' || v === 'all' ? v : 'active' })
   const [fStatus, setFStatus] = React.useState<string[]>([])
@@ -275,6 +281,7 @@ export default function Issues() {
     const p: DrfParams = {}
     if (grid.view === 'deleted') p.deleted = 'true'
     if (view === 'active' || view === 'mine' || view === 'myarea' || view === 'overdue') p.hide_closed = true
+    if (scopeParam) p.scope = scopeParam
     if (view === 'myarea' && myArea != null) p.area = myArea
     else if (fArea.length) p.area = fArea[0]
     if (view === 'overdue') p.due_before = overdueBefore()
@@ -299,7 +306,7 @@ export default function Issues() {
     if (colQ.due === 'later') p.due_after = iso(8)
     if (colQ.due === 'none') p.has_due = false
     return p
-  }, [grid.view, view, me?.id, myArea, fStatus, fPriority, fCategory, fAssigned, fArea, colQ])
+  }, [grid.view, view, me?.id, myArea, scopeParam, fStatus, fPriority, fCategory, fAssigned, fArea, colQ])
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -1403,10 +1410,16 @@ export default function Issues() {
             ...saved.views.map((v) => ({ key: `saved:${v.id}`, label: v.name, onRemove: () => { saved.remove(v.id); setSavedId(null) } })),
           ]}
           end={
-            <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
-              sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
-              Salva vista
-            </Button>
+            <>
+              {canSeeAllAreas && myArea != null ? (
+                <FormControlLabel sx={{ mr: 1, '& .MuiFormControlLabel-label': { fontSize: 12.5, color: 'text.secondary', whiteSpace: 'nowrap' } }}
+                  control={<Switch size="small" checked={allAreas} onChange={(e) => setAllAreas(e.target.checked)} />} label="Tutte le aree" />
+              ) : null}
+              <Button size="small" onClick={() => setSaveOpen(true)} startIcon={<CampoIcon name="plus" size={14} />}
+                sx={{ color: 'primary.main', fontWeight: 550, display: { xs: 'none', sm: 'inline-flex' } }}>
+                Salva vista
+              </Button>
+            </>
           }
         />
         <SaveViewDialog open={saveOpen} onClose={() => setSaveOpen(false)}
@@ -1615,6 +1628,7 @@ export default function Issues() {
         onNewCommentChange={setNewComment}
         onSendComment={handleSendComment}
         users={assignableUsers}
+        areas={areas}
         categories={categories}
         meId={me?.id}
         onPatch={patchIssue}

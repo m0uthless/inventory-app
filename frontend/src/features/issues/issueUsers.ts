@@ -20,3 +20,8 @@ export const issueAssignees = (users: UserOption[]): UserOption[] => users.filte
 /** Con un'area si propongono solo i membri di quell'area; senza area tutti. */
 export const assigneesForArea = (users: UserOption[], areaId: number | '' | null | undefined): UserOption[] =>
   areaId === '' || areaId == null ? users : users.filter((u) => u.leave_area === areaId)
+
+/** Parametro `scope` dell'elenco Issue: chi vede tutte le aree parte dalla propria
+ *  (interruttore «Tutte le aree» spento → `mine`); per gli altri restringe già il server. */
+export const issueScopeParam = (canSeeAll: boolean, allAreas: boolean, myArea: number | null): 'mine' | undefined =>
+  canSeeAll && !allAreas && myArea != null ? 'mine' : undefined
