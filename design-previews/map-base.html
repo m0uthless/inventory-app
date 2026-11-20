@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mappa nelle schede · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c; --primary-ink: #ffffff; --bg: #eef2f1; --surface: #ffffff; --surface-2: #f5f8f7;
+  --border: #d5dedb; --border-strong: #b9c7c3; --text: #15201e; --muted: #5b6b67; --faint: #66766f;
+  --field: #e2f0eb; --neutral-bg: #edf1f0; --focus: 0 0 0 3px rgb(31 107 92 / .28);
+  --shadow-float: 0 12px 32px -12px rgb(16 40 34 / .22), 0 2px 6px rgb(16 40 34 / .06);
+  /* Colori della mappa B (vettoriale) */
+  --m-land: #eef2f1; --m-water: #c9dbe0; --m-park: #d6e9df; --m-road: #ffffff; --m-road-main: #cfe5dc; --m-road-line: #d5dedb;
+  --m-building: #e4eae8; --m-label: #5b6b67; --m-label-halo: #ffffff; --m-rail: #c9d3d0;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --primary-ink: #0b1513; --bg: #0f1615; --surface: #151e1c; --surface-2: #1a2523;
+  --border: #2a3734; --border-strong: #3b4c48; --text: #e4ecea; --muted: #93a4a0; --faint: #849591;
+  --field: #183a33; --neutral-bg: #1e2928; --focus: 0 0 0 3px rgb(95 184 163 / .35);
+  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / .6);
+  --m-land: #151e1c; --m-water: #1a2d32; --m-park: #1a3027; --m-road: #24302d; --m-road-main: #2a4840; --m-road-line: #2f3d3a;
+  --m-building: #212c2a; --m-label: #93a4a0; --m-label-halo: #151e1c; --m-rail: #33423e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --primary: #5fb8a3; --primary-ink: #0b1513; --bg: #0f1615; --surface: #151e1c; --surface-2: #1a2523;
+    --border: #2a3734; --border-strong: #3b4c48; --text: #e4ecea; --muted: #93a4a0; --faint: #849591;
+    --field: #183a33; --neutral-bg: #1e2928; --focus: 0 0 0 3px rgb(95 184 163 / .35);
+    --shadow-float: 0 16px 40px -12px rgb(0 0 0 / .6);
+    --m-land: #151e1c; --m-water: #1a2d32; --m-park: #1a3027; --m-road: #24302d; --m-road-main: #2a4840; --m-road-line: #2f3d3a;
+    --m-building: #212c2a; --m-label: #93a4a0; --m-label-halo: #151e1c; --m-rail: #33423e;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 Geist, system-ui, sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 96px; }
+h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
+.lead { color: var(--muted); margin: 0 0 22px; max-width: 760px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 1020px) { .grid { grid-template-columns: minmax(0, 1fr); max-width: 380px; } }
+.var-h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; }
+.var-h b { font-size: 13px; padding: 2px 8px; border-radius: 6px; background: var(--field); }
+.var-h span { font-size: 14px; font-weight: 600; }
+.var-p { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; min-height: 54px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+.card h3 { margin: 0 0 12px; font-size: 15px; font-weight: 650; }
+.map { height: 170px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); position: relative; background: var(--m-land); }
+.addr { margin-top: 10px; font-size: 13px; }
+.addr b { display: block; font-weight: 600; }
+.addr span { color: var(--muted); font-size: 12.5px; }
+.addr a { color: var(--primary); }
+.tools { position: absolute; right: 6px; top: 6px; z-index: 500; display: flex; gap: 4px; }
+.tool { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.tool:hover { border-color: var(--primary); color: var(--primary); }
+.tool:focus-visible { outline: none; box-shadow: var(--focus); }
+.tool svg { width: 15px; height: 15px; }
+.fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); font-size: 12px; text-align: center; padding: 12px; }
+/* Segnaposto dell'app */
+.pin { width: 26px; height: 34px; filter: drop-shadow(0 2px 3px rgb(0 0 0 / .25)); }
+.pin path { fill: var(--primary); } .pin circle { fill: var(--surface); }
+.maplibregl-ctrl-attrib { font-size: 9.5px; }
+.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib.maplibregl-compact { background: color-mix(in srgb, var(--surface) 85%, transparent) !important; color: var(--muted); }
+.maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+.maplibregl-ctrl-attrib-button { filter: var(--attrib-btn, none); }
+:root[data-theme="dark"] { --attrib-btn: invert(1); }
+/* C · indirizzo in primo piano */
+.c-head { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; align-items: center; }
+.thumb { width: 92px; height: 92px; border-radius: 10px; overflow: hidden; position: relative; border: 1px solid var(--border); background: var(--m-land); }
+.thumb img { position: absolute; width: 256px; height: 256px; image-rendering: auto; filter: saturate(.5); }
+:root[data-theme="dark"] .thumb img { filter: none; }
+.thumb .pin.static { position: absolute; left: 50%; top: 50%; width: 20px; height: 26px; transform: translate(-50%, -100%); }
+.thumb .maplibregl-marker .pin { width: 20px; height: 26px; }
+.c-addr b { display: block; font-size: 15px; font-weight: 650; line-height: 1.3; }
+.c-addr span { color: var(--muted); font-size: 12.5px; }
+.c-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; text-decoration: none; }
+.btn:hover { border-color: var(--primary); color: var(--primary); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.btn svg { width: 14px; height: 14px; }
+.c-meta { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); display: grid; grid-template-columns: auto minmax(0,1fr); gap: 4px 12px; font-size: 12.5px; }
+.c-meta span { color: var(--muted); }
+.c-attr { margin: 8px 0 0; font-size: 10.5px; color: var(--faint); }
+.thumb .maplibregl-canvas-container, .thumb canvas { border-radius: 10px; }
+/* Mappa ingrandita */
+.big-bg { position: fixed; inset: 0; background: rgb(10 20 18 / .45); display: grid; place-items: center; padding: 16px; z-index: 2000; }
+.big-bg[hidden] { display: none; }
+.big { width: min(920px, 100%); background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-float); overflow: hidden; }
+.big-h { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.big-h b { flex: 1; font-size: 14px; }
+.big-m { height: min(560px, 70vh); position: relative; }
+.pv-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-float); z-index: 1500; }
+.pv-bar a, .pv-bar button { height: 30px; padding: 0 10px; border-radius: 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; }
+.pv-bar button:hover, .pv-bar a:hover { background: var(--surface-2); color: var(--text); }
+.pv-bar .name { padding: 0 8px; font-weight: 600; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mappa nelle schede di Cliente e Sito</h1>
+  <p class="lead">Il riquadro «Dove» della colonna laterale, a grandezza reale (Sito «Casa della Comunità Navile», Via di Corticella 120, Bologna). Tutte e tre senza chiavi né costi; il tema chiaro/scuro si cambia dalla barra in basso. Il pulsante con le frecce apre la mappa grande.</p>
+
+  <div class="grid">
+    <section>
+      <div class="var-h"><b>A</b><span>Mappa chiara</span></div>
+      <p class="var-p">Lo stile chiaro già pronto di OpenFreeMap (Positron, e il suo scuro nel tema scuro) al posto dei riquadri colorati di OpenStreetMap; segnaposto nel verde dell'app. Sobria, ma con i grigi suoi e non quelli di Archie.</p>
+      <div class="card"><h3>Dove</h3>
+        <div class="map" id="map-a"><div class="fallback">Caricamento della mappa…</div>
+          <div class="tools"><button class="tool" type="button" data-big="a" aria-label="Ingrandisci la mappa" title="Ingrandisci">⤢</button></div></div>
+        <div class="addr"><b>Via di Corticella 120</b><span>40128 Bologna (BO) · <a href="#" onclick="return false">Apri nelle mappe</a></span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="var-h"><b>B</b><span>Mappa nei colori dell'app</span></div>
+      <p class="var-p">Mappa vettoriale (MapLibre + OpenFreeMap) ricolorata con i colori di Archie: terra acciaio, acqua grigio-azzurra, verde chirurgico solo per il segnaposto. Nitida su ogni schermo e coerente col tema.</p>
+      <div class="card"><h3>Dove</h3>
+        <div class="map" id="map-b"><div class="fallback">Caricamento della mappa…</div>
+          <div class="tools"><button class="tool" type="button" data-big="b" aria-label="Ingrandisci la mappa" title="Ingrandisci">⤢</button></div></div>
+        <div class="addr"><b>Via di Corticella 120</b><span>40128 Bologna (BO) · <a href="#" onclick="return false">Apri nelle mappe</a></span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="var-h"><b>C</b><span>Indirizzo in primo piano</span></div>
+      <p class="var-p">L'indirizzo in primo piano con una miniatura ferma (nei colori dell'app) per orientarsi, e i pulsanti per aprirlo nell'app di mappe, copiarlo o vedere la mappa grande. Occupa meno spazio delle altre.</p>
+      <div class="card"><h3>Dove</h3>
+        <div class="c-head">
+          <div class="thumb" id="thumb"><svg class="pin static" viewBox="0 0 26 34" aria-hidden="true"><path d="M13 0C5.8 0 0 5.7 0 12.8 0 22.4 13 34 13 34s13-11.6 13-21.2C26 5.7 20.2 0 13 0z"/><circle cx="13" cy="12.8" r="4.6"/></svg></div>
+          <div class="c-addr"><b>Via di Corticella 120</b><span>40128 Bologna (BO)</span></div>
+        </div>
+        <div class="c-acts">
+          <a class="btn" href="https://www.google.com/maps/search/?api=1&query=Via%20di%20Corticella%20120%2C%2040128%20Bologna" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Apri in Google Maps</a>
+          <button class="btn" type="button" data-copy><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copia l'indirizzo</span></button>
+          <button class="btn" type="button" data-big="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Mappa</button>
+        </div>
+        <div class="c-meta"><span>Cliente</span><b>Azienda Sanitaria Felsinea</b><span>Referente</span><b>Andrea Tosi · 051 6806 112</b></div>
+        <p class="c-attr">Mappa © OpenStreetMap · OpenFreeMap</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="big-bg" data-big-bg hidden>
+  <div class="big" role="dialog" aria-modal="true" aria-label="Mappa">
+    <div class="big-h"><b>Casa della Comunità Navile · Via di Corticella 120, Bologna</b><button class="tool" type="button" data-big-close aria-label="Chiudi">✕</button></div>
+    <div class="big-m" id="map-big"></div>
+  </div>
+</div>
+
+<div class="pv-bar" role="toolbar" aria-label="Controlli anteprima">
+  <a href="index.html" title="Indice">‹ Indice</a><span class="name">Mappa</span>
+  <button type="button" data-theme-btn>Tema chiaro/scuro</button>
+</div>
+
+<script>
+(async () => {
+  // ?proxy=1 passa da un proxy locale (solo per le verifiche di Claude dal browser isolato).
+  const W = new URLSearchParams(location.search).get('proxy') ? 'http://127.0.0.1:8766/p/' : 'https://'
+  const loadCss = (u) => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = W + u; document.head.append(l) }
+  const loadJs = (u) => new Promise((ok) => { const sc = document.createElement('script'); sc.src = W + u; sc.onload = ok; sc.onerror = ok; document.head.append(sc) })
+  loadCss('unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css')
+  await loadJs('unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js')
+  const LAT = 44.5226, LON = 11.3478, ZOOM = 15
+  const html = document.documentElement
+  const css = (v) => getComputedStyle(html).getPropertyValue(v).trim()
+  const isDark = () => html.getAttribute('data-theme') === 'dark' || (!html.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches)
+  const pinSvg = '<svg class="pin" viewBox="0 0 26 34" aria-hidden="true"><path d="M13 0C5.8 0 0 5.7 0 12.8 0 22.4 13 34 13 34s13-11.6 13-21.2C26 5.7 20.2 0 13 0z"/><circle cx="13" cy="12.8" r="4.6"/></svg>'
+  const clearFallback = (el) => el.querySelector('.fallback')?.remove()
+  const failMsg = (el) => { const f = el.querySelector('.fallback'); if (f) f.textContent = 'Mappa non raggiungibile (serve internet). L\'indirizzo resta sotto.' }
+
+  // ── B · MapLibre + OpenFreeMap, ricolorata coi token ──
+  const recolor = (map) => {
+    const C = { land: css('--m-land'), water: css('--m-water'), park: css('--m-park'), road: css('--m-road'), roadMain: css('--m-road-main'), line: css('--m-road-line'),
+      building: css('--m-building'), label: css('--m-label'), halo: css('--m-label-halo'), rail: css('--m-rail') }
+    for (const l of map.getStyle().layers) {
+      const id = l.id
+      try {
+        if (l.type === 'background') map.setPaintProperty(id, 'background-color', C.land)
+        else if (l.type === 'fill') {
+          const col = /water/.test(id) ? C.water : /park|wood|grass|landcover|landuse/.test(id) ? C.park : /building/.test(id) ? C.building : C.land
+          map.setPaintProperty(id, 'fill-color', col)
+          if (/building/.test(id)) map.setPaintProperty(id, 'fill-outline-color', C.line)
+        } else if (l.type === 'line') {
+          const col = /water|river|stream|canal/.test(id) ? C.water : /rail/.test(id) ? C.rail : /casing|outline/.test(id) ? C.line : /motorway|trunk|primary|secondary/.test(id) ? C.roadMain : /boundary/.test(id) ? C.line : C.road
+          map.setPaintProperty(id, 'line-color', col)
+        } else if (l.type === 'symbol' && l.layout && l.layout['text-field'] !== undefined) {
+          map.setPaintProperty(id, 'text-color', C.label)
+          map.setPaintProperty(id, 'text-halo-color', C.halo)
+          if (/poi/.test(id)) map.setLayoutProperty(id, 'visibility', 'none')
+        } else if (l.type === 'symbol' && /poi/.test(id)) map.setLayoutProperty(id, 'visibility', 'none')
+      } catch (e) { /* proprietà non applicabile al livello */ }
+    }
+  }
+  /* `mode`: 'plain' (A, stile Positron/Dark così com'è), 'app' (B, ricolorata), 'thumb' (C, ferma, senza attribuzione). */
+  const maplibreIn = (el, zoom, interactive, mode = 'app') => {
+    if (!window.maplibregl) { failMsg(el); return null }
+    const style = mode === 'plain' && isDark() ? 'dark' : 'positron'
+    const map = new maplibregl.Map({ container: el, style: `${W}tiles.openfreemap.org/styles/${style}`, center: [LON, LAT], zoom: zoom - 0.6,
+      attributionControl: mode === 'thumb' ? false : { compact: true }, interactive, dragRotate: false, pitchWithRotate: false })
+    map.on('style.load', () => {
+      if (mode !== 'plain') recolor(map)
+      // Senza i nomi dei negozi: nelle schede conta la via.
+      for (const l of map.getStyle().layers) if (/poi/.test(l.id)) map.setLayoutProperty(l.id, 'visibility', 'none')
+      clearFallback(el)
+    })
+    map.on('error', () => failMsg(el))
+    const dot = document.createElement('div'); dot.innerHTML = pinSvg
+    new maplibregl.Marker({ element: dot.firstChild, anchor: 'bottom' }).setLngLat([LON, LAT]).addTo(map)
+    if (interactive) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
+    return map
+  }
+
+  // ── C · miniatura ferma, nei colori dell'app ──
+  const thumb = () => {
+    const el = document.getElementById('thumb')
+    ;[...el.children].forEach((c) => { if (!c.classList.contains('pin')) c.remove() })
+    el.querySelector('.pin')?.remove()
+    return maplibreIn(el, 15.6, false, 'thumb')
+  }
+
+  let maps = []
+  const draw = () => {
+    maps.forEach((m) => m && m.remove()); maps = []
+    const a = document.getElementById('map-a'), b = document.getElementById('map-b')
+    a.className = 'map'; b.className = 'map'
+    ;[a, b].forEach((el) => { [...el.children].forEach((c) => { if (!c.classList.contains('tools') && !c.classList.contains('fallback')) c.remove() }); if (!el.querySelector('.fallback')) { const f = document.createElement('div'); f.className = 'fallback'; f.textContent = 'Caricamento della mappa…'; el.prepend(f) } })
+    maps.push(maplibreIn(a, ZOOM, false, 'plain'), maplibreIn(b, ZOOM, false, 'app'), thumb())
+  }
+
+  // Ingrandita
+  const bg = document.querySelector('[data-big-bg]'); let big = null
+  const openBig = (v) => {
+    bg.hidden = false
+    const el = document.getElementById('map-big'); el.innerHTML = ''; el.className = 'big-m'
+    const f = document.createElement('div'); f.className = 'fallback'; f.textContent = 'Caricamento della mappa…'; el.append(f)
+    big = maplibreIn(el, 16, true, v === 'a' ? 'plain' : 'app')
+    bg.querySelector('[data-big-close]').focus()
+  }
+  const closeBig = () => { bg.hidden = true; big && big.remove(); big = null }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-big]'); if (t) openBig(t.dataset.big)
+    if (e.target.closest('[data-big-close]') || e.target === bg) closeBig()
+    const c = e.target.closest('[data-copy]')
+    if (c) { navigator.clipboard?.writeText('Via di Corticella 120, 40128 Bologna (BO)').catch(() => {}); c.querySelector('span').textContent = 'Copiato'; setTimeout(() => { c.querySelector('span').textContent = "Copia l'indirizzo" }, 1600) }
+  })
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !bg.hidden) closeBig() })
+  document.querySelector('[data-theme-btn]').addEventListener('click', () => {
+    html.setAttribute('data-theme', isDark() ? 'light' : 'dark')
+    try { localStorage.setItem('archie-preview-map-theme', html.getAttribute('data-theme')) } catch (e) { /* niente */ }
+    draw()
+  })
+  try { const t = localStorage.getItem('archie-preview-map-theme'); if (t) html.setAttribute('data-theme', t) } catch (e) { /* niente */ }
+  draw()
+})()
+</script>
+</body>
+</html>
