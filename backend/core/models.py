@@ -651,3 +651,27 @@ class MaintenanceMode(models.Model):
         super().save(*args, **kwargs)
         from core.maintenance import invalidate_cache
         invalidate_cache()
+
+
+class SavedView(models.Model):
+    """Vista salvata di un utente per una pagina (filtri, scheda, ricerca…).
+
+    Prima stavano nel browser; sul server l'utente le ritrova su ogni dispositivo.
+    `key` la sceglie il client: resta l'id della vista anche subito dopo il salvataggio.
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_views")
+    page = models.CharField(max_length=64)
+    key = models.CharField(max_length=40)
+    name = models.CharField(max_length=80)
+    state = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [models.UniqueConstraint(fields=["user", "page", "key"], name="uq_savedview_user_page_key")]
+        indexes = [models.Index(fields=["user", "page"], name="ix_savedview_user_page")]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} · {self.page} · {self.name}"

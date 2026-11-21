@@ -22,6 +22,7 @@ from config.system_stats_api import HealthAPIView, SystemStatsView
 
 from portal.api import PortalMeView, PortalConfigView, PortalSwitchCustomerView
 
+from core.saved_views_api import SavedViewViewSet
 from core.api import (
     CustomerStatusViewSet,
     SiteStatusViewSet,
@@ -114,6 +115,7 @@ router.register(r"drive-folders", DriveFolderViewSet, basename="drive-folder")
 router.register(r"announcements", AnnouncementViewSet, basename="announcement")
 router.register(r"changelog-entries", ChangelogEntryViewSet, basename="changelog-entry")
 router.register(r"user-tasks", UserTaskViewSet, basename="user-task")
+router.register(r"saved-views", SavedViewViewSet, basename="saved-view")
 router.register(r"area-tasks", AreaTaskViewSet, basename="area-task")
 router.register(r"notifications", NotificationViewSet, basename="notification")
 router.register(r"dashboard-widgets", DashboardWidgetViewSet, basename="dashboard-widget")

@@ -14,7 +14,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - ~~**[BE] "Visibile al cliente nel Portale"**~~ su commenti e allegati: scartato da Fede (20/11).
 - ~~**[BE] Indicatore "Entro SLA"**~~: scartato da Fede (20/11). Restano Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
 - ~~**[BE] Variazione del tempo di risoluzione**~~: scartata da Fede (20/11), insieme allo SLA.
-- **[BE] "+ Salva vista"**: fatto, ma le viste sono salvate nel browser (per utente e pagina). Per averle su tutti i dispositivi serve salvarle sul server.
+- ~~**[BE] "+ Salva vista"**~~ sul server dal 21/11 (`core.SavedView`), con caricamento delle viste del browser al primo avvio.
 - **[UI] Avviso "nessun inventario collegato"** (triangolo accanto al titolo nella vecchia tabella): tolto dalla riga come nell'anteprima; resta nel pannello ("Nessun inventario collegato · Collega un inventario").
 - **[UI] Ricerca Ctrl K a finestra** con risultati raggruppati (clienti, siti, device, issue, azioni): oggi Ctrl K porta il cursore nel campo e Invio apre la pagina Ricerca.
 
