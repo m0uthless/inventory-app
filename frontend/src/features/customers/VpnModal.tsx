@@ -34,6 +34,8 @@ export type VpnAccess = {
   applicativo: string | null
   utenza: string | null
   password: string | null
+  /** La password non arriva col GET normale: si chiede con `?reveal=1` (resta nell'Audit). */
+  has_password?: boolean
   remote_address: string | null
   porta: string | null
   note: string | null
@@ -146,6 +148,16 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
   const [mode, setMode] = React.useState<'view' | 'edit'>('view')
   const [form, setForm] = React.useState<VpnForm>(emptyForm())
   const [showPassword, setShowPassword] = React.useState(false)
+  // Password in chiaro solo su «Mostra», chiesta al momento (`?reveal=1`, registrata nell'Audit).
+  const [revealed, setRevealed] = React.useState<string | null>(null)
+  React.useEffect(() => { setRevealed(null) }, [open, customerId])
+  const toggleReveal = async () => {
+    if (revealed !== null) { setRevealed(null); return }
+    try {
+      const r = await api.get<VpnAccess>(`/customers/${customerId}/vpn/`, { params: { reveal: '1' } })
+      setRevealed(r.data.password ?? null)
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }
   const [confirmDelete, setConfirmDelete] = React.useState(false)
 
   // ── Fetch on open ──
@@ -282,7 +294,7 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
                 Password
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-                {canViewSecrets && vpn.password ? (
+                {canViewSecrets && vpn.has_password ? (
                   <>
                     <Typography
                       variant="body2"
@@ -290,21 +302,21 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
                         fontFamily: 'monospace', fontSize: '0.78rem',
                         bgcolor: 'action.hover', px: 0.75, py: 0.25,
                         borderRadius: 0.75, border: '0.5px solid', borderColor: 'divider',
-                        letterSpacing: showPassword ? undefined : '3px',
+                        letterSpacing: revealed !== null ? undefined : '3px',
                       }}
                     >
-                      {showPassword ? vpn.password : '••••••••'}
+                      {revealed ?? '••••••••'}
                     </Typography>
-                    <Tooltip title={showPassword ? 'Nascondi' : 'Mostra'}>
-                      <IconButton size="small" sx={{ p: 0.5 }} onClick={() => setShowPassword((p) => !p)}>
-                        {showPassword ? <VisibilityOffIcon sx={{ fontSize: 14 }} /> : <VisibilityIcon sx={{ fontSize: 14 }} />}
+                    <Tooltip title={revealed !== null ? 'Nascondi' : 'Mostra'}>
+                      <IconButton size="small" sx={{ p: 0.5 }} aria-label={revealed !== null ? 'Nascondi la password' : 'Mostra la password'} onClick={() => void toggleReveal()}>
+                        {revealed !== null ? <VisibilityOffIcon sx={{ fontSize: 14 }} /> : <VisibilityIcon sx={{ fontSize: 14 }} />}
                       </IconButton>
                     </Tooltip>
-                    {showPassword && <CopyButton value={vpn.password} />}
+                    {revealed !== null && <CopyButton value={revealed} />}
                   </>
                 ) : (
-                  <Typography variant="body2" sx={{ color: vpn.password ? 'text.secondary' : 'text.disabled', letterSpacing: vpn.password ? '3px' : undefined, fontSize: '0.75rem' }}>
-                    {vpn.password ? '••••••••' : '—'}
+                  <Typography variant="body2" sx={{ color: vpn.has_password ? 'text.secondary' : 'text.disabled', letterSpacing: vpn.has_password ? '3px' : undefined, fontSize: '0.75rem' }}>
+                    {vpn.has_password ? '••••••••' : '—'}
                   </Typography>
                 )}
               </Box>

@@ -1166,19 +1166,25 @@ class VpnSecretsPermissionMixin:
         super().__init__(*args, **kwargs)
         if not self._can_view_vpn_secrets():
             self.fields.pop("password", None)
+            self.fields.pop("has_password", None)
 
 
 class CustomerVpnAccessSerializer(VpnSecretsPermissionMixin, serializers.ModelSerializer):
     customer = serializers.IntegerField(source="customer_id", read_only=True)
-    # Restituisce la password decifrata (solo se l'utente ha il permesso)
+    # Password decifrata solo se l'utente ha il permesso **e** la chiede (`reveal` nel
+    # contesto, da `?reveal=1`): il GET normale dice solo se c'è.
     password = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
     # Campo write-only per ricevere la password in chiaro dal client
     password_input = serializers.CharField(
         write_only=True, required=False, allow_blank=True, allow_null=True
     )
 
+    def get_has_password(self, obj) -> bool:
+        return bool(obj.password)
+
     def get_password(self, obj):
-        if not self._can_view_vpn_secrets():
+        if not self._can_view_vpn_secrets() or not self.context.get("reveal"):
             return None
         try:
             return decrypt(obj.password) if obj.password else None
@@ -1200,6 +1206,7 @@ class CustomerVpnAccessSerializer(VpnSecretsPermissionMixin, serializers.ModelSe
             "applicativo",
             "utenza",
             "password",
+            "has_password",
             "password_input",
             "remote_address",
             "porta",
@@ -1225,8 +1232,8 @@ class CustomerVpnAccessViewSet(viewsets.ViewSet):
     def _get_customer(self, customer_pk):
         return Customer.objects.filter(pk=customer_pk, deleted_at__isnull=True).first()
 
-    def _serializer(self, instance=None, data=None, partial=False, request=None):
-        ctx = {"request": request}
+    def _serializer(self, instance=None, data=None, partial=False, request=None, reveal=False):
+        ctx = {"request": request, "reveal": reveal}
         if data is not None:
             return CustomerVpnAccessSerializer(instance, data=data, partial=partial, context=ctx)
         return CustomerVpnAccessSerializer(instance, context=ctx)
@@ -1239,8 +1246,14 @@ class CustomerVpnAccessViewSet(viewsets.ViewSet):
             vpn = customer.vpn_access
         except CustomerVpnAccess.DoesNotExist:
             return Response({"detail": "Nessun accesso VPN configurato."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = self._serializer(vpn, request=request)
-        return Response(serializer.data)
+        reveal = request.query_params.get("reveal") == "1"
+        serializer = self._serializer(vpn, request=request, reveal=reveal)
+        data = serializer.data
+        if data.get("password"):
+            # Chi legge la password in chiaro resta nell'Audit (mai il valore).
+            log_event(actor=request.user, action="view_secret", instance=vpn, request=request,
+                      metadata={"field": "password"}, subject=f"Password VPN di {customer}")
+        return Response(data)
 
     def create(self, request, customer_pk=None):
         customer = self._get_customer(customer_pk)

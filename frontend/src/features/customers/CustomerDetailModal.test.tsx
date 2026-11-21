@@ -91,4 +91,28 @@ describe('CustomerDetailModal', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Altre azioni' }))
     expect(screen.getByRole('menuitem', { name: 'Modifica' })).toHaveAttribute('aria-disabled', 'true')
   })
+
+  it('VPN: la password non arriva con la scheda, si chiede solo su «Mostra» e «Copia»', async () => {
+    const onCopy = vi.fn()
+    api.get.mockImplementation((url: string, cfg?: { params?: Record<string, string> }) => {
+      if (url === '/customers/2/vpn/') return Promise.resolve({ data: cfg?.params?.reveal === '1' ? { utenza: 'tech', password: 'S3greta', has_password: true } : { utenza: 'tech', password: null, has_password: true } })
+      return Promise.resolve({ data: LISTS[url] ?? [] })
+    })
+    render(<ThemeProvider theme={theme}><MemoryRouter>
+      <CustomerDetailModal detail={{ ...detail, has_vpn: true }} loading={false} statuses={[]} vendorColor={() => '#3f7fbf'}
+        canChange canDelete canEditVpn showContracts={false} showDevices={false} canEditDevices={false} address={null}
+        onClose={vi.fn()} onSaved={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onRestore={vi.fn()} onCopy={onCopy} onEditVpn={vi.fn()} onNewIssue={vi.fn()} />
+    </MemoryRouter></ThemeProvider>)
+    const btn = await screen.findByRole('button', { name: 'Mostra la password VPN' })
+    const reveals = () => api.get.mock.calls.filter(([u, c]) => u === '/customers/2/vpn/' && c?.params?.reveal === '1').length
+    expect(reveals()).toBe(0)
+    expect(screen.queryByText('S3greta')).not.toBeInTheDocument()
+    fireEvent.click(btn)
+    expect(await screen.findByText('S3greta')).toBeInTheDocument()
+    expect(reveals()).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Nascondi la password VPN' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copia la password VPN' }))
+    await waitFor(() => expect(onCopy).toHaveBeenCalledWith('S3greta'))
+    expect(reveals()).toBe(2)
+  })
 })

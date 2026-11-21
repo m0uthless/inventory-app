@@ -2,7 +2,7 @@ import type { CampoIconName } from '../../ui/campo'
 
 // Registro Audit (restyle "Campo sterile", anteprima design-previews/au-base.html, variante A · Registro).
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout' | 'rate'
+export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout' | 'rate' | 'view_secret'
 
 export type AuditEvent = {
   id: number
@@ -47,6 +47,7 @@ export const ACTION_META: Record<AuditAction, { label: string; tone: 'success' |
   logout: { label: 'Uscita', tone: 'neutral' },
   login_failed: { label: 'Accesso fallito', tone: 'error' },
   rate: { label: 'Valutato', tone: 'neutral' },
+  view_secret: { label: 'Password letta', tone: 'info' },
 }
 export const actionMeta = (a: string) => ACTION_META[a as AuditAction] ?? { label: a || '—', tone: 'neutral' as const }
 

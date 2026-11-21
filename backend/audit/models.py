@@ -13,6 +13,7 @@ class AuditEvent(models.Model):
         LOGIN_FAILED = "login_failed", "Login Failed"
         LOGOUT = "logout", "Logout"
         RATE = "rate", "Rate"
+        VIEW_SECRET = "view_secret", "View secret"
 
     created_at = models.DateTimeField(auto_now_add=True)
 
