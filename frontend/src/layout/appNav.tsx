@@ -87,7 +87,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'adm', label: 'Amministrazione', items: [
       { label: 'Contratti', path: '/contracts', icon: <CampoIcon name="file" />, perm: 'contracts.view_contract' },
       { label: 'Purchase Order', path: '/purchase-orders', icon: <CampoIcon name="bag" />, perm: 'purchaseorders.view_purchaseorderentry' },
-      { label: 'Rimborso spese', path: '/rimborso-spese', icon: <CampoIcon name="receipt" /> },
+      { label: 'Rimborso spese', path: '/rimborso-spese', icon: <CampoIcon name="receipt" />, perm: 'expenses.view_expensereport' },
       { label: 'Piano ferie', path: '/piano-ferie', icon: <CampoIcon name="calendar" /> },
     ],
   },
@@ -99,7 +99,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permAny: ['crm.view_customer', 'crm.view_site', 'crm.view_contact', 'inventory.view_inventory'],
       },
       {
-        label: 'Bug e feature', path: '/bug-feature', icon: <CampoIcon name="message" />, count: 'feedback',
+        label: 'Bug e feature', path: '/bug-feature', icon: <CampoIcon name="message" />, count: 'feedback', perm: 'feedback.view_reportrequest',
         match: (p) => prefix('/bug-feature')(p) && !p.startsWith('/bug-feature/resolved'),
         children: [{ label: 'Chiuse', path: '/bug-feature/resolved' }],
       },
@@ -146,6 +146,7 @@ const ROUTE_TITLES: Array<[prefix: string, title: string]> = [
   ['/utenti', 'Utenti e gruppi'],
   ['/accesso-portal', 'Accesso Portal'],
   ['/moduli', 'Moduli'],
+  ['/impostazioni', 'Impostazioni'],
   ['/audit', 'Audit'],
   ['/drive', 'Drive'],
   ['/trash', 'Cestino'],

@@ -13,6 +13,7 @@ import TodayPanel from '../features/servicenow/TodayPanel'
 import { WeekAbsences } from '../features/servicenow/SnAbsences'
 import type { AbsenceTechnician } from '../features/servicenow/absenceShared'
 import { isServiceNowCategoryVisible, type ServiceNowCategory } from '../features/servicenow/visibleCategories'
+import { fmtNumber } from '@shared/utils/number'
 
 const NOW = new Date()
 const YEARS = [NOW.getFullYear(), NOW.getFullYear() - 1, NOW.getFullYear() - 2]
@@ -118,7 +119,7 @@ export default function ServiceNowDashboard() {
             {data ? (
               <>
                 <Box sx={{ display: 'flex', gap: 2.25, flexWrap: 'wrap', fontSize: 12.5, color: 'text.secondary', mb: 1.75, '& b': { color: 'text.primary', fontSize: 15, mr: 0.4, fontVariantNumeric: 'tabular-nums' } }}>
-                  <span><b>{data.kpi.total.toLocaleString('it-IT')}</b>casi in {periodName}</span>
+                  <span><b>{fmtNumber(data.kpi.total)}</b>casi in {periodName}</span>
                   {top ? <span>più casi: <b style={{ fontSize: 13 }}>{firstName(top.name)}</b>({top.count})</span> : null}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2.25, alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' } }}>

@@ -11,6 +11,7 @@ import type { GridColDef } from '@mui/x-data-grid'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useDrfList } from '@shared/hooks/useDrfList'
+import { useList } from '../ui/campo/ListRows'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import EntityListCard from '@shared/ui/EntityListCard'
@@ -29,11 +30,16 @@ import MaintenanceCalendar from '../features/maintenance/MaintenanceCalendar'
 import RapportinoDialog from '../features/maintenance/RapportinoDialog'
 import TodoDetailCard from '../features/maintenance/TodoDetailCard'
 import SectionNav from '../features/maintenance/MaintenanceNav'
+import MtAreaSwitch from '../features/maintenance/MtAreaSwitch'
+import { defaultMtArea, mtAreaParams, readMtArea, saveMtArea, type MtAreaChoice } from '../features/maintenance/areaChoice'
 import { DueDateOverrideDialog } from '../features/maintenance/MaintenanceLegacy'
 import { useNavigate } from 'react-router-dom'
 import { overrideTipOf, rowKey, todayIso, type Result } from '../features/maintenance/mtModel'
 import { DueCell, PlanCell, ResultBadge } from '../features/maintenance/mtUi'
 import type { TodoRow } from './maintenanceTypes'
+
+// Elenco vuoto stabile mentre si caricano le scelte (stesso riferimento a ogni render).
+const NO_ROWS: never[] = []
 
 type View = 'all' | 'over' | 'soon' | 'later' | 'ovr'
 const VIEWS: View[] = ['all', 'over', 'soon', 'later', 'ovr']
@@ -65,7 +71,7 @@ export default function Maintenance() {
   const canEditDue = hasPerm(PERMS.maintenance.plan.change)
   const canAddIssue = hasPerm(PERMS.issues.issue.add)
   const { exporting, exportCsv } = useExportCsv()
-  const { rows: techs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
+  const techs = useList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' }) ?? NO_ROWS
 
   // ── Vista, modalità e filtri (URL) ──
   const [modeRaw, setModeRaw] = useUrlStringParam('modo')
@@ -82,12 +88,25 @@ export default function Maintenance() {
 
   const grid = useServerGrid({ defaultOrdering: 'next_due_date', allowedOrderingFields: ['next_due_date', 'customer_name'], defaultPageSize: 25 })
 
+  // Area (piano): la propria se c'è, «Senza area» o «Tutte»; chi vede tutte le aree sceglie anche le altre.
+  const myArea = me?.profile?.leave_area ?? null
+  const canSeeAllAreas = Boolean(me?.is_superuser) || hasPerm('maintenance.view_all_areas')
+  const [areaChoice, setAreaChoiceState] = React.useState<MtAreaChoice>(() => readMtArea() ?? defaultMtArea(myArea))
+  const setAreaChoice = (c: MtAreaChoice) => { setAreaChoiceState(c); saveMtArea(c) }
+  const [areas, setAreas] = React.useState<{ id: number; label: string }[]>([])
+  React.useEffect(() => {
+    let alive = true
+    api.get<{ results: { id: number; label: string }[] } | { id: number; label: string }[]>('/leave-areas/', { params: { page_size: 100 } })
+      .then((r) => { if (alive) setAreas(Array.isArray(r.data) ? r.data : r.data.results ?? []) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
   const scope = React.useMemo(() => ({
+    ...mtAreaParams(areaChoice),
     ...(customerF !== '' ? { customer: customerF } : {}),
     ...(planF !== '' ? { plan: planF } : {}),
     ...(typeF ? { type: typeF } : {}),
     ...(grid.search.trim() ? { search: grid.search.trim() } : {}),
-  }), [customerF, planF, typeF, grid.search])
+  }), [customerF, planF, typeF, grid.search, areaChoice])
   const listParams = React.useMemo(() => ({
     ...scope,
     page: grid.paginationModel.page + 1,
@@ -100,7 +119,7 @@ export default function Maintenance() {
   // La griglia vuole id numerici: piano e inventario in un solo numero; la selezione usa rowKey.
   const rows = React.useMemo(() => rawRows.map((r) => ({ ...r, id: r.plan_id * 1_000_000 + r.inventory_id })), [rawRows])
   const [statsKey, setStatsKey] = React.useState(0)
-  const stats = useTodoStats(statsKey, { ...(customerF !== '' ? { customer: customerF } : {}), ...(planF !== '' ? { plan: planF } : {}) })
+  const stats = useTodoStats(statsKey, { ...mtAreaParams(areaChoice), ...(customerF !== '' ? { customer: customerF } : {}), ...(planF !== '' ? { plan: planF } : {}) })
   const reloadAll = React.useCallback(() => { reload(); setStatsKey((n) => n + 1) }, [reload])
 
   // ── Selezione (anche tra pagine e tra elenco e calendario) ──
@@ -266,6 +285,7 @@ export default function Maintenance() {
           </>
         }
       />
+      <Box sx={{ mb: 1.5 }}><MtAreaSwitch areas={areas} value={areaChoice} onChange={setAreaChoice} myArea={myArea} canSeeAll={canSeeAllAreas} /></Box>
       <MaintenanceKpis stats={stats} view={view} onView={(v) => { setView(v); setMode('list') }} onCustomer={(id) => setCustomerF(customerF === id ? '' : id, opts)} />
 
       <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 'none' }}>

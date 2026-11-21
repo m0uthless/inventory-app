@@ -259,4 +259,26 @@ describe('Drive page (restyle) — fix P1', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mostra i dettagli' }))
     expect(await screen.findByRole('complementary', { name: 'Dettagli del file' })).toBeInTheDocument()
   })
+
+  it('sposta più elementi selezionati insieme', async () => {
+    apiGet.mockImplementation((url: string, config?: Params) => {
+      if (url === '/customers/') return Promise.resolve({ data: { results: [] } })
+      if (url === '/drive-folders/tree/' || (url === '/drive-folders/' && !config?.params?.root)) return Promise.resolve({ data: [makeFolder(9, 'Archivio')] })
+      if (url === '/drive-folders/' && config?.params?.root) return Promise.resolve({ data: { results: [makeFolder(9, 'Archivio')] } })
+      if (url === '/drive-files/' && config?.params?.root) return Promise.resolve({ data: { results: [makeFile(1, 'uno.pdf'), makeFile(2, 'due.pdf')] } })
+      return Promise.resolve({ data: {} })
+    })
+    apiPost.mockResolvedValue({ data: {} })
+    render(<Drive />)
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Seleziona file uno.pdf/ }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Seleziona file due.pdf/ }))
+    await screen.findByText('2 selezionati')
+    fireEvent.click(screen.getByRole('button', { name: 'Sposta' }))
+    expect(await screen.findByText('Sposta 2 elementi in…')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Sposta$/, hidden: false }))
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2))
+    expect(apiPost).toHaveBeenCalledWith('/drive-files/1/move/', { folder: null })
+    expect(apiPost).toHaveBeenCalledWith('/drive-files/2/move/', { folder: null })
+  })
 })
+

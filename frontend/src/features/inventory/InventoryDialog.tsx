@@ -61,7 +61,7 @@ export default function InventoryDialog({
     if (extra?.secret && !canViewSecrets) return <QuickField key={k} label={FIELD_LABEL[k]} value="" onChange={() => {}} disabled help="Non autorizzato" />
     return (
       <QuickField key={k} label={FIELD_LABEL[k]} value={String(form[k] ?? '')} onChange={(v) => set(k, v as never)} error={errors[k]}
-        disabled={isFieldDisabled(k)} help={fieldHelpText(k)} secret={extra?.secret} mono={extra?.mono} type={extra?.type} />
+        disabled={isFieldDisabled(k)} help={extra?.secret && mode === 'edit' ? 'Vuota = invariata' : fieldHelpText(k)} secret={extra?.secret} mono={extra?.mono} type={extra?.type} />
     )
   }
   const addTag = () => {

@@ -3,6 +3,7 @@ from django.db import IntegrityError, transaction
 import datetime
 
 import django_filters as filters
+from maintenance.visibility import visible_plans_q
 from django.db.models import Count, Exists, F, OuterRef, Q
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -139,6 +140,16 @@ class InventoryDetailSerializer(CustomFieldsValidationMixin, SecretsPermissionMi
     vnc_pwd = DecryptedSecretField(required=False, allow_null=True)
 
     monitors = serializers.SerializerMethodField()
+
+    def to_representation(self, instance):
+        # Le password non viaggiano mai con il dettaglio (si leggono da `secrets/`, con traccia
+        # nell'Audit): chi ha il permesso vede solo quali sono impostate.
+        data = super().to_representation(instance)
+        for f in self._secret_fields:
+            data.pop(f, None)
+        if self._can_view_secrets():
+            data["secrets_set"] = [f for f in self._secret_fields if getattr(instance, f, None)]
+        return data
 
     def get_monitors(self, obj):
         qs = obj.monitors.filter(deleted_at__isnull=True).order_by("produttore", "modello")
@@ -391,8 +402,32 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
     ordering = ["hostname"]
     purge_permission = "inventory.delete_inventory"
 
+    @action(detail=True, methods=["get"], url_path="secrets")
+    def secrets(self, request, pk=None):
+        """Password dell'inventario in chiaro, solo con `inventory.view_secrets`.
+
+        Ogni lettura resta nell'Audit (`view_secret`, i nomi dei campi, mai i valori).
+        """
+        user = request.user
+        if not (user.is_superuser or user.has_perm("inventory.view_secrets")):
+            raise PermissionDenied("Serve il permesso Credenziali.")
+        inv = self.get_object()
+        fields = SecretsPermissionMixin._secret_fields
+        values = {}
+        for f in fields:
+            raw = getattr(inv, f, None)
+            try:
+                values[f] = decrypt(raw) if raw else None
+            except Exception:
+                values[f] = None
+        read = [f for f in fields if values[f]]
+        if read:
+            log_event(actor=user, action="view_secret", instance=inv, request=request,
+                      metadata={"fields": read}, subject=f"Credenziali di {inv}")
+        return Response(values)
+
     def get_serializer_class(self):
-        # list: lightweight (no secrets), retrieve: full (includes secrets), write: secrets write-only
+        # list: lightweight (no secrets), retrieve: full (secrets_set, no values), write: secrets write-only
         if getattr(self, "action", "") == "list":
             return InventoryListSerializer
         if getattr(self, "action", "") == "retrieve":
@@ -543,6 +578,7 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
                     customer_id=inv.customer_id, inventory_types=inv.type_id,
                     is_active=True, deleted_at__isnull=True,
                 )
+                .filter(visible_plans_q(request.user))
                 .distinct()
                 .order_by("next_due_date", "title")
             )
@@ -559,6 +595,7 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
 
         events = (
             MaintenanceEvent.objects.filter(inventory=inv, deleted_at__isnull=True)
+            .filter(visible_plans_q(request.user, prefix="plan__"))
             .select_related("plan", "tech", "created_by", "inventory", "inventory__site", "inventory__customer")
             .order_by("-performed_at", "-id")[:50]
         )

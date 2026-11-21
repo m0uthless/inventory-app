@@ -40,7 +40,7 @@ function CustomerChip({
       spacing={0.75}
       sx={{
         border: '1px solid',
-        borderColor: 'grey.200',
+        borderColor: 'divider',
         borderRadius: 1,
         px: 1.5,
         py: 0.75,

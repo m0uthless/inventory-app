@@ -1,7 +1,7 @@
 """Test delle API `/api/contracts/` e `/api/sellers/` (modulo Contratti, fase 1).
 
 Copre permessi (view_contract, view_contract_value, esclusione Portal),
-validazioni (date, device di altro cliente, notice_days), filtro per anno,
+validazioni (date, device di altro cliente, reminder_days), filtro per anno,
 documento PDF, soft delete/restore e anagrafica venditori.
 """
 from __future__ import annotations
@@ -189,13 +189,22 @@ def test_end_before_start_rejected():
     assert "end_date" in resp.data
 
 
-def test_notice_days_capped():
+@pytest.mark.parametrize("days, ok", [(0, False), (366, False), (365, True), (1, True)])
+def test_reminder_days_bounds(days, ok):
     customer = _customer()
     client = _client(_internal_user(ALL_CONTRACT_PERMS))
 
-    resp = client.post("/api/contracts/", _payload(customer, notice_days=3651), format="json")
-    assert resp.status_code == 400
-    assert "notice_days" in resp.data
+    resp = client.post("/api/contracts/", _payload(customer, reminder_days=days), format="json")
+    assert (resp.status_code == 201) is ok, resp.data
+    if not ok:
+        assert "reminder_days" in resp.data
+
+
+def test_auto_renew_not_in_payload():
+    customer = _customer()
+    c = _contract(customer)
+    data = _client(_internal_user(["view_contract"])).get(f"/api/contracts/{c.id}/").data
+    assert "auto_renew" not in data and "notice_days" not in data and "notice_deadline" not in data
 
 
 # ─── Valore economico ────────────────────────────────────────────────────────
@@ -226,15 +235,15 @@ def test_total_value_not_writable_without_perm():
 
 # ─── Campi calcolati e filtri ────────────────────────────────────────────────
 
-def test_expiry_state_and_notice_deadline_in_payload():
+def test_expiry_state_and_reminder_date_in_payload():
     customer = _customer()
     today = timezone.localdate()
     end = today + timedelta(days=60)
-    c = _contract(customer, start_date=today - timedelta(days=300), end_date=end, notice_days=90)
+    c = _contract(customer, start_date=today - timedelta(days=300), end_date=end, reminder_days=90)
 
     data = _client(_internal_user(["view_contract"])).get(f"/api/contracts/{c.id}/").data
-    assert data["notice_deadline"] == (end - timedelta(days=90)).isoformat()
-    assert data["expiry_state"] == "notice"
+    assert data["reminder_date"] == (end - timedelta(days=90)).isoformat()
+    assert data["expiry_state"] == "renew"
     assert data["status_label"] == "Attivo"
 
 
@@ -317,7 +326,8 @@ def test_soft_delete_and_restore():
 # ─── Venditori ───────────────────────────────────────────────────────────────
 
 def test_sellers_crud_and_user_link():
-    linked = User.objects.create_user(username=f"venditore_{uuid.uuid4().hex[:6]}", password="pw")
+    from core.testing import make_archie_user
+    linked = make_archie_user(username=f"venditore_{uuid.uuid4().hex[:6]}", password="pw")
     client = _client(_internal_user(["view_seller", "add_seller", "change_seller", "delete_seller"]))
 
     resp = client.post(
@@ -421,3 +431,104 @@ def test_portal_user_forbidden_on_restore_and_purge(resource, model_name):
 
     obj.refresh_from_db()
     assert obj.deleted_at is not None
+
+
+# ─── Venditore per i promemoria e dettaglio dei promemoria (fase 2) ──────────
+
+SELLER_PERMS = ["view_seller", "add_seller", "change_seller"]
+
+
+def test_seller_requires_email_without_user():
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.post("/api/sellers/", {"name": "Giulia Neri"}, format="json")
+    assert resp.status_code == 400
+    assert "email" in resp.data
+    assert client.post("/api/sellers/", {"name": "Giulia Neri", "email": "g@studioneri.it"}, format="json").status_code == 201
+
+
+def test_seller_rejects_portal_only_or_inactive_user():
+    portal = User.objects.create_user(username=f"solo_portal_{uuid.uuid4().hex[:6]}", password="pw", email="p@x.it")
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.post("/api/sellers/", {"name": "P", "user": portal.id}, format="json")
+    assert resp.status_code == 400 and "user" in resp.data
+    from core.testing import make_archie_user
+    off = make_archie_user(username=f"off_{uuid.uuid4().hex[:6]}", password="pw", email="o@x.it", is_active=False)
+    assert client.post("/api/sellers/", {"name": "O", "user": off.id}, format="json").status_code == 400
+
+
+def test_seller_reminder_email_prefers_user_email():
+    from core.testing import make_archie_user
+    u = make_archie_user(username=f"lu_{uuid.uuid4().hex[:6]}", password="pw", email="Luca@Biotron.it")
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.post("/api/sellers/", {"name": "Luca", "email": "vecchia@x.it", "user": u.id}, format="json")
+    assert resp.status_code == 201, resp.data
+    assert resp.data["reminder_email"] == "luca@biotron.it"
+    manual = client.post("/api/sellers/", {"name": "Giulia", "email": "g@x.it"}, format="json").data
+    assert manual["reminder_email"] == "g@x.it"
+
+
+def test_contract_detail_reminders_states():
+    from unittest import mock
+
+    from contracts.models import ContractReminder
+    from core.app_settings import set_settings
+    set_settings({"contracts.reminder_emails": "contratti@biotron.it"})
+    customer = _customer()
+    seller = Seller.objects.create(name="Giulia Neri", email="g@x.it")
+    c = _contract(customer, end_date=date(2026, 12, 31), reminder_days=60, seller=seller)
+    ContractReminder.objects.create(contract=c, due_on=date(2026, 11, 1), ok=True, to="g@x.it")
+    ContractReminder.objects.create(contract=c, due_on=date(2026, 11, 11), ok=False, error="SMTP giù")
+    with mock.patch("contracts.api.timezone.localdate", return_value=date(2026, 11, 20)):
+        data = _client(_internal_user(["view_contract"])).get(f"/api/contracts/{c.id}/").data
+    r = data["reminders"]
+    assert r["every"] == 10 and r["to"] == ["g@x.it"] and r["cc"] == ["contratti@biotron.it"] and r["seller_kind"] == "manual"
+    assert r["dates"][:4] == [
+        {"date": "2026-11-01", "state": "sent", "error": None},
+        {"date": "2026-11-11", "state": "failed", "error": "SMTP giù"},
+        {"date": "2026-11-21", "state": "next", "error": None},
+        {"date": "2026-12-01", "state": "planned", "error": None},
+    ]
+    assert r["dates"][-1] == {"date": "2026-12-31", "state": "planned", "error": None}
+
+
+def test_contract_detail_reminders_seller_kind_user_and_none():
+    from core.testing import make_archie_user
+    customer = _customer()
+    u = make_archie_user(username=f"k_{uuid.uuid4().hex[:6]}", password="pw", email="k@x.it")
+    with_user = _contract(customer, seller=Seller.objects.create(name="K", user=u))
+    without = _contract(customer)
+    client = _client(_internal_user(["view_contract"]))
+    assert client.get(f"/api/contracts/{with_user.id}/").data["reminders"]["seller_kind"] == "user"
+    assert client.get(f"/api/contracts/{without.id}/").data["reminders"]["seller_kind"] is None
+
+
+def test_contract_list_has_no_reminders_field():
+    customer = _customer()
+    _contract(customer)
+    row = _client(_internal_user(["view_contract"])).get("/api/contracts/").data["results"][0]
+    assert "reminders" not in row
+
+
+def test_defaults_gives_reminder_days_from_settings():
+    from core.app_settings import set_settings
+    client = _client(_internal_user(["view_contract", "add_contract"]))
+    assert client.get("/api/contracts/defaults/").data == {"reminder_days": 90}
+    set_settings({"contracts.reminder_default_days": 60})
+    assert client.get("/api/contracts/defaults/").data == {"reminder_days": 60}
+
+
+def test_legacy_seller_without_email_can_be_deactivated():
+    s = Seller.objects.create(name="Vecchio venditore", email="")
+    client = _client(_internal_user(SELLER_PERMS))
+    resp = client.patch(f"/api/sellers/{s.id}/", {"is_active": False}, format="json")
+    assert resp.status_code == 200, resp.data
+
+
+def test_legacy_portal_user_link_does_not_block_other_edits():
+    portal = User.objects.create_user(username=f"vecchio_portal_{uuid.uuid4().hex[:6]}", password="pw", email="p@x.it")
+    s = Seller.objects.create(name="Collegato al Portal", user=portal)
+    client = _client(_internal_user(SELLER_PERMS))
+    assert client.patch(f"/api/sellers/{s.id}/", {"phone": "051 123"}, format="json").status_code == 200
+    # Cambiare utente ricontrolla la regola.
+    other = User.objects.create_user(username=f"altro_portal_{uuid.uuid4().hex[:6]}", password="pw")
+    assert client.patch(f"/api/sellers/{s.id}/", {"user": other.id}, format="json").status_code == 400

@@ -22,6 +22,7 @@ from config.system_stats_api import HealthAPIView, SystemStatsView
 
 from portal.api import PortalMeView, PortalConfigView, PortalSwitchCustomerView
 
+from core.saved_views_api import SavedViewViewSet
 from core.api import (
     CustomerStatusViewSet,
     SiteStatusViewSet,
@@ -55,6 +56,7 @@ from maintenance.api import (
     MaintenancePlanInventoryViewSet,
     TechViewSet,
 )
+from core.app_settings_api import AppSettingsView, ContractReminderTestEmailView
 from wiki.api import WikiCategoryViewSet, WikiPageViewSet, WikiAttachmentViewSet, WikiLinkViewSet, WikiPageRevisionViewSet, WikiStatsView, WikiQueryViewSet, WikiQueryLanguageViewSet
 from issues.api import IssueViewSet, IssueCategoryViewSet
 from feedback.api import ReportRequestViewSet
@@ -113,6 +115,7 @@ router.register(r"drive-folders", DriveFolderViewSet, basename="drive-folder")
 router.register(r"announcements", AnnouncementViewSet, basename="announcement")
 router.register(r"changelog-entries", ChangelogEntryViewSet, basename="changelog-entry")
 router.register(r"user-tasks", UserTaskViewSet, basename="user-task")
+router.register(r"saved-views", SavedViewViewSet, basename="saved-view")
 router.register(r"area-tasks", AreaTaskViewSet, basename="area-task")
 router.register(r"notifications", NotificationViewSet, basename="notification")
 router.register(r"dashboard-widgets", DashboardWidgetViewSet, basename="dashboard-widget")
@@ -196,6 +199,8 @@ urlpatterns = [
 
     # Me (profile + password)
     path("api/me/", MeAPIView.as_view()),
+    path("api/app-settings/", AppSettingsView.as_view()),
+    path("api/app-settings/contracts/test-email/", ContractReminderTestEmailView.as_view()),
     path("api/me/change-password/", ChangePasswordView.as_view()),
     path("api/me/logins/", MeLoginsView.as_view()),
     path("api/sticky-note/", StickyNoteView.as_view()),

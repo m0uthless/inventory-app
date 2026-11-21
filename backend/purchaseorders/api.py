@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time
+
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Count, Min, Q, Sum
+from django.db.models.functions import ExtractMonth
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -366,18 +370,44 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
             if prev_total:
                 yoy_delta_pct = float((total_amount - prev_total) / prev_total * 100)
 
+        # Per stato (conteggio e importo), importi per mese dell'offerta e giorni dell'invio
+        # più vecchio ancora senza PO: prima li calcolava la pagina leggendo tutte le righe.
+        by_status = {s: {"count": 0, "amount": Decimal("0")} for s in PURCHASE_ORDER_STATUS_ORDER}
+        for row in qs.values("status").annotate(n=Count("id"), tot=Sum("amount")):
+            by_status[row["status"]] = {"count": row["n"], "amount": row["tot"] or Decimal("0")}
+        monthly = [Decimal("0")] * 12
+        for row in qs.annotate(m=ExtractMonth("offer_date")).values("m").annotate(tot=Sum("amount")):
+            monthly[row["m"] - 1] = row["tot"] or Decimal("0")
+        oldest = qs.filter(status=PurchaseOrderStatus.INVIATO, sent_at__isnull=False).aggregate(v=Min("sent_at"))["v"]
+        oldest_days = round((timezone.now() - oldest).total_seconds() / 86400) if oldest else None
+
         return Response({
             "total_amount": str(total_amount),
             "to_send": to_send,
             "waiting": waiting,
+            "by_status": {k: {"count": v["count"], "amount": f"{v['amount']:.2f}"} for k, v in by_status.items()},
+            "to_invoice": {"count": by_status[PurchaseOrderStatus.RICEVUTO]["count"], "amount": f"{by_status[PurchaseOrderStatus.RICEVUTO]['amount']:.2f}"},
+            "monthly_amount": [f"{v:.2f}" for v in monthly],
+            "oldest_sent_days": oldest_days,
             "previous_year": previous_year,
             "previous_year_amount": previous_year_amount,
             "yoy_delta_pct": yoy_delta_pct,
         })
 
+    @action(detail=False, methods=["get"], url_path="totals")
+    def totals(self, request):
+        """Totali dell'elenco con gli stessi filtri della lista (piè della tabella)."""
+        qs = self.filter_queryset(self.get_queryset())
+        agg = qs.aggregate(n=Count("id"), amount=Sum("amount"), costs=Sum("costs_incurred"))
+        return Response({
+            "count": agg["n"] or 0,
+            "amount": f"{(agg['amount'] or Decimal('0')):.2f}",
+            "costs": f"{(agg['costs'] or Decimal('0')):.2f}",
+        })
+
     # ── Workflow: advance / revert ────────────────────────────────────────────
 
-    @action(detail=True, methods=["post"], url_path="advance", permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="advance", permission_classes=[permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp])
     def advance(self, request, pk=None):
         """Avanza di UN passo lo stato (inserito->inviato->ricevuto->fatturato).
 
@@ -397,6 +427,19 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
             )
         new_status = PURCHASE_ORDER_STATUS_ORDER[idx + 1]
         before_status = obj.status
+
+        # Data del passo (facoltativa, dal dialogo): mai nel futuro; senza, adesso.
+        step_at = timezone.now()
+        raw_date = (request.data.get("date") or "").strip()
+        if raw_date:
+            try:
+                step_date = date.fromisoformat(raw_date)
+            except ValueError:
+                return Response({"date": ["Data non valida (AAAA-MM-GG)."]}, status=status.HTTP_400_BAD_REQUEST)
+            if step_date > timezone.localdate():
+                return Response({"date": ["La data non può essere nel futuro."]}, status=status.HTTP_400_BAD_REQUEST)
+            if step_date != timezone.localdate():
+                step_at = timezone.make_aware(datetime.combine(step_date, time(12, 0)))
 
         # PO/Fattura: opzionali, inviabili insieme al PDF quando si avanza
         # rispettivamente a "ricevuto"/"fatturato" (deciso in chat).
@@ -434,7 +477,7 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
                 )
 
             obj.status = new_status
-            setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], timezone.now())
+            setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], step_at)
             obj.updated_by = request.user
             obj.save()
 
@@ -445,7 +488,7 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         )
         return Response(self.get_serializer(obj).data)
 
-    @action(detail=True, methods=["post"], url_path="revert", permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="revert", permission_classes=[permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp])
     def revert(self, request, pk=None):
         """Torna indietro di UN passo. Azzera il timestamp dello step lasciato
         (il documento eventualmente già caricato resta, non viene cancellato)."""

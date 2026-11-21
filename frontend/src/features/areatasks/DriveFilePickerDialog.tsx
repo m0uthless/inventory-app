@@ -9,6 +9,7 @@ import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { formatBytes, type TaskDriveFile } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 type PickerFolder = { id: number; name: string }
 type Crumb = { id: number; name: string }
@@ -64,13 +65,13 @@ export default function DriveFilePickerDialog({ open, excludeIds, busy = false, 
     const load = async () => {
       try {
         if (folderId === null) {
-          const [fRes, fileRes] = await Promise.all([
-            api.get('/drive-folders/', { params: { root: 'true', page_size: 200 } }),
-            api.get('/drive-files/', { params: { root: 'true', page_size: 200 } }),
+          const [rootFolders, rootFiles] = await Promise.all([
+            fetchAll<PickerFolder>('/drive-folders/', { root: 'true' }),
+            fetchAll<Record<string, unknown>>('/drive-files/', { root: 'true' }),
           ])
           if (id !== requestId.current) return
-          setFolders((fRes.data?.results ?? fRes.data ?? []) as PickerFolder[])
-          setFiles(((fileRes.data?.results ?? fileRes.data ?? []) as Record<string, unknown>[]).map(toFile))
+          setFolders(rootFolders)
+          setFiles(rootFiles.map(toFile))
           setCrumbs([])
         } else {
           const res = await api.get(`/drive-folders/${folderId}/children/`)

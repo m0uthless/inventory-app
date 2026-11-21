@@ -24,6 +24,7 @@ from django.utils import timezone
 from rest_framework import serializers, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -32,6 +33,7 @@ from core.soft_delete import apply_soft_delete_filters
 from core.models import InventoryStatus
 from audit.utils import log_event
 from inventory.models import Inventory
+from maintenance.visibility import can_edit_plan, visible_plans_q
 from maintenance.models import MaintenancePlan, MaintenancePlanInventory
 
 
@@ -145,6 +147,7 @@ class MaintenancePlanInventoryViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSe
     def get_queryset(self):
         qs = (
             MaintenancePlanInventory.objects
+            .filter(visible_plans_q(self.request.user, prefix="plan__"))
             .select_related(
                 "plan", "plan__customer",
                 "inventory", "inventory__site", "inventory__type",
@@ -187,10 +190,14 @@ class MaintenancePlanInventoryViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSe
         return apply_soft_delete_filters(qs, request=self.request, action_name=getattr(self, "action", ""))
 
     def perform_create(self, serializer):
+        if not can_edit_plan(self.request.user, serializer.validated_data.get("plan")):
+            raise PermissionDenied("Puoi modificare solo i piani della tua area.")
         instance = serializer.save()
         log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
 
     def perform_update(self, serializer):
+        if not can_edit_plan(self.request.user, serializer.instance.plan):
+            raise PermissionDenied("Puoi modificare solo i piani della tua area.")
         instance = serializer.save()
         log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
 
@@ -232,6 +239,7 @@ class MaintenancePlanInventoryViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSe
         plans_qs = (
             MaintenancePlan.objects
             .filter(deleted_at__isnull=True, is_active=True)
+            .filter(visible_plans_q(request.user))
             .prefetch_related("inventory_types")
         )
         if plan_ids:

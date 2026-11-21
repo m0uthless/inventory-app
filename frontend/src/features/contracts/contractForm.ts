@@ -16,8 +16,8 @@ export type ContractForm = {
   /** Durata in mesi; 0 = data di fine scelta a mano (`end_date`). */
   duration: number
   end_date: string
-  notice_days: number
-  auto_renew: boolean
+  /** Avviso di rinnovo: giorni prima della fine. */
+  reminder_days: number
   total_value: string
   billing_freq: BillingFrequency
   status: ContractStatus
@@ -26,7 +26,7 @@ export type ContractForm = {
 }
 
 export const DURATIONS = [12, 24, 36, 60]
-export const NOTICE_PRESETS = [30, 60, 90, 180]
+export const REMINDER_PRESETS = [30, 60, 90, 180]
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const toIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -68,10 +68,11 @@ export function parseMoney(v: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : NaN
 }
 
-export function emptyForm(customer: number | null): ContractForm {
+/** `reminderDays`: l'avviso predefinito dalle Impostazioni di Archie (GET /contracts/defaults/). */
+export function emptyForm(customer: number | null, reminderDays = 90): ContractForm {
   return {
     code: '', title: '', titleTouched: false, customer, contract_type: '', seller: null, company: null,
-    start_date: nextMonthStart(), duration: 12, end_date: '', notice_days: 90, auto_renew: false,
+    start_date: nextMonthStart(), duration: 12, end_date: '', reminder_days: reminderDays,
     total_value: '', billing_freq: 'annuale', status: 'attivo', devices: [], notes: '',
   }
 }
@@ -80,13 +81,13 @@ export function formFromContract(c: ContractDetail): ContractForm {
   return {
     code: c.code, title: c.title, titleTouched: true, customer: c.customer, contract_type: c.contract_type,
     seller: c.seller, company: c.company, start_date: c.start_date, duration: durationFromDates(c.start_date, c.end_date),
-    end_date: c.end_date, notice_days: c.notice_days ?? 0, auto_renew: c.auto_renew,
+    end_date: c.end_date, reminder_days: c.reminder_days ?? 90,
     total_value: c.total_value != null && c.total_value !== '' ? Number(c.total_value).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '', billing_freq: c.billing_freq, status: c.status,
     devices: c.devices ?? [], notes: c.notes ?? '',
   }
 }
 
-export type FormErrors = Partial<Record<'code' | 'title' | 'customer' | 'contract_type' | 'start_date' | 'end_date' | 'notice_days' | 'total_value' | 'devices' | 'seller' | 'company' | 'notes' | 'status' | 'billing_freq', string>>
+export type FormErrors = Partial<Record<'code' | 'title' | 'customer' | 'contract_type' | 'start_date' | 'end_date' | 'reminder_days' | 'total_value' | 'devices' | 'seller' | 'company' | 'notes' | 'status' | 'billing_freq', string>>
 
 /** Controlli lato client. `fields` limita i controlli a quelli di un passo. */
 export function validate(f: ContractForm, title: string, canViewValue: boolean, fields?: (keyof FormErrors)[]): FormErrors {
@@ -97,7 +98,7 @@ export function validate(f: ContractForm, title: string, canViewValue: boolean, 
   if (!isIsoDate(f.start_date)) e.start_date = "Indica la data di inizio."
   if (!isIsoDate(end)) e.end_date = 'Indica la data di fine.'
   else if (isIsoDate(f.start_date) && end < f.start_date) e.end_date = "La fine non può precedere l'inizio."
-  if (!Number.isInteger(f.notice_days) || f.notice_days < 0 || f.notice_days > 3650) e.notice_days = 'Giorni di preavviso non validi.'
+  if (!Number.isInteger(f.reminder_days) || f.reminder_days < 1 || f.reminder_days > 365) e.reminder_days = "L'avviso va da 1 a 365 giorni prima della fine."
   if (!f.code.trim()) e.code = 'Serve un codice.'
   if (!title.trim()) e.title = 'Serve un titolo.'
   if (canViewValue && Number.isNaN(parseMoney(f.total_value))) e.total_value = 'Valore non valido.'
@@ -109,7 +110,7 @@ export function toPayload(f: ContractForm, title: string, canViewValue: boolean)
   const payload: Record<string, unknown> = {
     code: f.code.trim(), title: title.trim(), customer: f.customer, contract_type: f.contract_type,
     seller: f.seller, company: f.company, start_date: f.start_date, end_date: endOf(f),
-    notice_days: f.notice_days, auto_renew: f.auto_renew, billing_freq: f.billing_freq, status: f.status,
+    reminder_days: f.reminder_days, billing_freq: f.billing_freq, status: f.status,
     devices: f.devices, notes: f.notes.trim(),
   }
   if (canViewValue) { const v = parseMoney(f.total_value); payload.total_value = (v ?? 0).toFixed(2) }

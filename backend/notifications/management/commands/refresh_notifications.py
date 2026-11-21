@@ -5,13 +5,11 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from rest_framework.test import APIRequestFactory
 
 from core.emails import send_templated_email
 from core.models import AreaTask
 from core.modules import is_module_enabled
 from notifications.email_items import group_by_day, notification_item
-from maintenance.api.plans import MaintenancePlanViewSet
 from notifications.models import Notification, NotificationType
 
 User = get_user_model()
@@ -22,9 +20,9 @@ class Command(BaseCommand):
     a partire dalle stesse due sorgenti già usate dalla precedente campanella
     "live" in header:
 
-      - manutenzioni in scadenza entro 30 giorni (`MaintenancePlanViewSet.todo`,
-        riusato via APIRequestFactory per non duplicare la logica di calcolo
-        cicli/override, complessa e già testata altrove) — notificato a tutti
+      - manutenzioni in scadenza entro 30 giorni (`maintenance.api.plans.todo_rows_for_jobs`,
+        lo stesso calcolo di cicli/override della vista `todo`, senza passare
+        dall'API) — notificato a tutti
         gli utenti attivi non-Portal, come faceva la vecchia campanella
         (nessun filtro per permesso specifico sul modulo Manutenzione, è il
         comportamento preesistente);
@@ -76,7 +74,9 @@ class Command(BaseCommand):
             removed += stale.count()
             stale.delete()
 
-        emailed = self._send_digest_emails(maint_to_email, area_to_email)
+        # Le scadenze di manutenzione vanno per email solo all'ufficio (riepilogo delle 8:00,
+        # notifications/maintenance_office.py): agli utenti resta la notifica in-app.
+        emailed = self._send_digest_emails([], area_to_email)
 
         self.stdout.write(self.style.SUCCESS(
             f"[notifications] manutenzione: {len(maint_keys)} attive · "
@@ -86,15 +86,11 @@ class Command(BaseCommand):
         ))
 
     def _sync_maintenance_due(self, recipients, today, in_30):
-        factory = APIRequestFactory()
-        view = MaintenancePlanViewSet.as_view({"get": "todo"})
-        request = factory.get("/api/maintenance-plans/todo/", {
-            "due_from": today.isoformat(),
-            "due_to": in_30.isoformat(),
-            "page_size": "200",
-        })
-        response = view(request)
-        rows = response.data.get("results", []) if hasattr(response, "data") else []
+        # Calcolo diretto (la vista `todo` senza utente risponde 401: le notifiche non nascevano).
+        from maintenance.api.plans import todo_rows_for_jobs
+
+        lo, hi = today.isoformat(), in_30.isoformat()
+        rows = [r for r in todo_rows_for_jobs() if r.get("next_due_date") and lo <= r["next_due_date"] <= hi]
 
         last_emailed = {
             (rid, key): sent for rid, key, sent in Notification.objects
@@ -119,6 +115,9 @@ class Command(BaseCommand):
             if not event_date:
                 continue
             for user in recipients:
+                # Solo a chi vede il piano (area come le issue).
+                if not _sees_plan_area(user, row.get("plan_area_id")):
+                    continue
                 notif, _ = Notification.objects.update_or_create(
                     recipient=user,
                     notification_type=NotificationType.MAINTENANCE_DUE,
@@ -221,3 +220,14 @@ class Command(BaseCommand):
                     f"[notifications] invio digest a {user.email} fallito: {error}"
                 ))
         return sent
+
+
+def _sees_plan_area(user, plan_area_id) -> bool:
+    """Come `maintenance.visibility.visible_plans_q`, su un'area già nota."""
+    from maintenance.visibility import VIEW_ALL_AREAS_PERM
+
+    if plan_area_id is None or user.is_superuser or user.has_perm(VIEW_ALL_AREAS_PERM):
+        return True
+    uid = getattr(getattr(user, "profile", None), "leave_area_id", None)
+    return uid is None or uid == plan_area_id
+

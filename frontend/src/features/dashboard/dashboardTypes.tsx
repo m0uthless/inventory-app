@@ -1,6 +1,7 @@
 import type * as React from 'react'
 import AreaTaskCard from '../../ui/AreaTaskCard'
 import IssuesWidget from './widgets/IssuesWidget'
+import IssueTrendWidget from './widgets/IssueTrendWidget'
 import MaintenanceWidget from './widgets/MaintenanceWidget'
 import AnnouncementsWidget from './widgets/AnnouncementsWidget'
 import TodoWidget from './widgets/TodoWidget'
@@ -40,6 +41,7 @@ export type DashboardLayoutItem = {
 export const WIDGET_REGISTRY: Record<string, React.ComponentType> = {
   contributor:   ContributorWidget,
   issues:        IssuesWidget,
+  'issue-trend': IssueTrendWidget,
   'area-tasks':  AreaTaskCard,
   announcements: AnnouncementsWidget,
   todo:          TodoWidget,

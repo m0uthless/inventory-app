@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { Box, Button, CircularProgress, IconButton, ListItemIcon, Menu, MenuItem, Tooltip, Typography } from '@mui/material'
+import { Box, Button, ButtonBase, CircularProgress, IconButton, ListItemIcon, Menu, MenuItem, TextField, Tooltip, Typography } from '@mui/material'
 import AutorenewIcon from '@mui/icons-material/Autorenew'
+import { alpha } from '@mui/material/styles'
 import { useToast } from '@shared/ui/toast'
 import {
   BandChip, BandEditing, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordModal, RecordNotes, RecordRow, RecordRows,
@@ -10,6 +11,9 @@ import { AuditFeedPanel } from '../customers/CustomerTabs'
 import { FileIcon } from '../drive/DriveIcons'
 import { formatEuro } from '../purchaseorders/types'
 import { daysLabel, dShort, expiryHint, EXPIRY_TONE, parseAmount } from './contractModel'
+import { amountSummary, eurFull, todayIso } from './contractAmount'
+import ContractReminders from './ContractReminders'
+import { REMINDER_PRESETS, addDays, isIsoDate } from './contractForm'
 import { ExpiryBadge, PeriodBar } from './contractUi'
 import {
   BILLING_FREQ_OPTIONS, CONTRACT_STATUS_OPTIONS, CONTRACT_TYPE_OPTIONS,
@@ -18,14 +22,14 @@ import {
 
 /*
  * Finestra del contratto (DESIGN.md › Record window, anteprima design-previews/ctr-base.html): testata con
- * codice, titolo, stato di scadenza, cliente e «Rinnova…»; al centro il periodo con la disdetta e oggi,
- * l'importo (al mese, all'anno, per fattura), i device e le note; a lato dettagli, PDF e attività.
+ * codice, titolo, stato di scadenza, cliente e «Rinnova…»; al centro il periodo con l'avviso di rinnovo e
+ * oggi, i promemoria di rinnovo (anteprima ctr2-base), l'importo (al mese, all'anno, per fattura), i device e le note; a lato dettagli, PDF e attività.
  * I dati si leggono come testo e «Modifica» nel ⋯ li trasforma in campi, con un solo salvataggio.
  * Importo, valore e PDF solo con il permesso sui valori (il PDF riporta il prezzo).
  */
 
 export type ContractPatch = Partial<Pick<ContractDetail,
-  'status' | 'contract_type' | 'seller' | 'company' | 'billing_freq' | 'start_date' | 'end_date' | 'notice_days' | 'auto_renew' | 'total_value' | 'code' | 'title' | 'notes'>>
+  'status' | 'contract_type' | 'seller' | 'company' | 'billing_freq' | 'start_date' | 'end_date' | 'reminder_days' | 'total_value' | 'code' | 'title' | 'notes'>>
 
 type Props = {
   detail: ContractDetail | null
@@ -54,22 +58,20 @@ type Props = {
 
 const FIELDS: Record<string, string> = {
   code: 'il codice', title: 'il titolo', customer: 'il cliente', contract_type: 'il tipo', seller: 'il venditore', company: 'la società',
-  start_date: "l'inizio", end_date: 'la fine', auto_renew: 'il rinnovo automatico', notice_days: 'il preavviso', billing_freq: 'la fatturazione',
+  start_date: "l'inizio", end_date: 'la fine', reminder_days: "l'avviso di rinnovo", billing_freq: 'la fatturazione',
   status: 'lo stato', devices: 'i device', notes: 'le note', document: 'il documento', total_value: 'il valore',
 }
 
 /** Mesi interi (arrotondati) tra due date ISO. */
-const monthsBetween = (a: string, b: string) => Math.max(1, Math.round((new Date(b).getTime() - new Date(a).getTime()) / (30.44 * 86_400_000)))
-const PER_BILL: Record<string, number> = { mensile: 1, trimestrale: 3, annuale: 12 }
 const dIt = (s?: string | null) => (s ? s.slice(0, 10).split('-').reverse().join('/') : '')
 
 type Draft = {
   code: string; title: string; contract_type: string; status: string; seller: string; company: string; billing_freq: string
-  start_date: string; end_date: string; notice_days: string; auto_renew: string; total_value: string; notes: string
+  start_date: string; end_date: string; reminder_days: string; total_value: string; notes: string
 }
 const toDraft = (d: ContractDetail): Draft => ({
   code: d.code ?? '', title: d.title ?? '', contract_type: d.contract_type, status: d.status, seller: d.seller ? String(d.seller) : '', company: d.company ? String(d.company) : '',
-  billing_freq: d.billing_freq, start_date: d.start_date ?? '', end_date: d.end_date ?? '', notice_days: String(d.notice_days ?? ''), auto_renew: d.auto_renew ? '1' : '0',
+  billing_freq: d.billing_freq, start_date: d.start_date ?? '', end_date: d.end_date ?? '', reminder_days: String(d.reminder_days ?? ''),
   total_value: d.total_value ?? '', notes: d.notes ?? '',
 })
 
@@ -92,14 +94,14 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
   const [busy, setBusy] = React.useState(false)
   const save = async () => {
     if (!draft.code.trim() || !draft.title.trim()) { toast.error('Codice e titolo sono obbligatori.'); return }
-    const notice = Number(draft.notice_days)
-    if (!Number.isInteger(notice) || notice < 0) { toast.error('Il preavviso è un numero di giorni.'); return }
+    const lead = Number(draft.reminder_days)
+    if (!Number.isInteger(lead) || lead < 1 || lead > 365) { toast.error("L'avviso va da 1 a 365 giorni prima della fine."); return }
     const total = draft.total_value.trim() ? parseAmount(draft.total_value) : null
     if (total != null && (!Number.isFinite(total) || total < 0)) { toast.error('Il valore non è un importo valido.'); return }
     const value: Record<keyof Draft, unknown> = {
       code: draft.code.trim(), title: draft.title.trim(), contract_type: draft.contract_type, status: draft.status, seller: draft.seller ? Number(draft.seller) : null,
       company: draft.company ? Number(draft.company) : null, billing_freq: draft.billing_freq, start_date: draft.start_date, end_date: draft.end_date,
-      notice_days: notice, auto_renew: draft.auto_renew === '1', total_value: total != null ? total.toFixed(2) : null, notes: draft.notes,
+      reminder_days: lead, total_value: total != null ? total.toFixed(2) : null, notes: draft.notes,
     }
     setBusy(true)
     try { await p.onPatch(Object.fromEntries(changed.map((k) => [k, value[k]])) as ContractPatch, 'Contratto aggiornato'); setEditing(false) } finally { setBusy(false) }
@@ -108,13 +110,12 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
   React.useEffect(() => { setMenu(null); setEditing(false) }, [d.id])
 
   // ── Testata ─────────────────────────────────────────────────────
-  const months = monthsBetween(d.start_date, d.end_date)
   const value = d.total_value !== undefined && d.total_value !== null ? Number(d.total_value) : null
-  const perBill = value != null ? (d.billing_freq === 'una_tantum' ? value : (value / months) * (PER_BILL[d.billing_freq] ?? 1)) : null
   const active = d.status === 'attivo'
   const exp = d.expiry_state
-  const warnExp = exp === 'expired' || exp === 'expiring'
-  const needsAction = exp === 'expired' || exp === 'expiring' || exp === 'notice'
+  const nextReminder = d.reminders?.dates.find((x) => x.state === 'next')?.date ?? null
+  const warnExp = exp === 'expired'
+  const needsAction = exp === 'expired' || exp === 'renew'
   const scrollTo = (id: string) => document.getElementById(`ctr-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const chip = (txt: React.ReactNode, warn?: boolean, onClick?: () => void) => (
     <Box component={onClick ? 'button' : 'span'} type={onClick ? 'button' : undefined} onClick={onClick} sx={{
@@ -142,9 +143,9 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
       tags={<>
         {active ? <>
           {chip(exp === 'expired' ? <>scaduto il <b>{dIt(d.end_date)}</b></> : <>finisce il <b>{dIt(d.end_date)}</b></>, warnExp)}
-          {d.notice_deadline ? chip(<>disdetta entro <b>{dIt(d.notice_deadline)}</b></>, exp === 'notice') : null}
+          {d.reminder_date && exp !== 'expired' ? chip(<>avviso di rinnovo {exp === 'renew' ? 'dal' : 'il'} <b>{dIt(d.reminder_date)}</b></>, exp === 'renew') : null}
+          {nextReminder ? chip(<>prossimo promemoria <b>{dIt(nextReminder)}</b></>, false, () => scrollTo('rem')) : null}
         </> : chip(<>finito il <b>{dIt(d.end_date)}</b></>)}
-        {d.auto_renew ? chip('rinnovo automatico') : null}
         {p.canViewValue && value != null ? chip(<b>{formatEuro(value)}</b>) : null}
         {chip(<><b>{d.devices_detail.length}</b> device</>, false, () => scrollTo('dev'))}
       </>}
@@ -156,7 +157,7 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
         <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
           <MenuItem disabled={!editable || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
           <MenuItem disabled={!editable} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi (cliente, device)…</MenuItem>
-          {active && editable ? <MenuItem onClick={() => { setMenu(null); void p.onPatch({ status: 'disdetto' }, 'Contratto segnato come disdetto') }}><ListItemIcon><CampoIcon name="x" size={16} /></ListItemIcon>Segna come disdetto</MenuItem> : null}
+          {active && editable ? <MenuItem onClick={() => { setMenu(null); void p.onPatch({ status: 'chiuso' }, 'Contratto segnato come chiuso') }}><ListItemIcon><CampoIcon name="x" size={16} /></ListItemIcon>Segna come chiuso</MenuItem> : null}
           <MenuItem onClick={() => { setMenu(null); p.onCopy(d.code) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il codice</MenuItem>
           <MenuItem disabled={!p.canDelete} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
         </Menu>
@@ -166,33 +167,61 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
         {/* ── Colonna principale ── */}
         <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
-          <RecordSection title="Periodo" end={<ExpiryBadge state={d.expiry_state} end={d.end_date} notice={d.notice_deadline} />}>
-            <PeriodBar start={d.start_date} end={d.end_date} notice={d.notice_deadline} state={d.expiry_state} />
+          <RecordSection title="Periodo" end={<ExpiryBadge state={d.expiry_state} end={d.end_date} reminder={d.reminder_date} />}>
+            <PeriodBar start={d.start_date} end={d.end_date} reminder={d.reminder_date} state={d.expiry_state} />
             <Box sx={{ mt: 1.5, p: '9px 12px', borderRadius: '8px', bgcolor: needsAction && active ? (exp === 'expired' ? 'error.light' : 'warning.light') : 'archie.neutralBg' }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600, color: needsAction && active ? (exp === 'expired' ? 'error.main' : 'warning.main') : 'text.primary' }}>
                 {!active ? `Contratto ${d.status_label.toLowerCase()}` : exp === 'expired' ? `Scaduto il ${dShort(d.end_date)}` : `Finisce ${daysLabel(d.end_date)}`}
               </Typography>
               <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                {active ? expiryHint(d.expiry_state, d.end_date, d.notice_deadline) : 'Non genera più promemoria.'}{d.auto_renew ? ' Rinnovo automatico indicato nel contratto.' : ''}
+                {active ? expiryHint(d.expiry_state, d.end_date, d.reminder_date, nextReminder) : 'Non manda più promemoria.'}
               </Typography>
             </Box>
           </RecordSection>
 
+          {d.reminders ? (
+            <Box id="ctr-rem" sx={{ scrollMarginTop: 16 }}>
+              <RecordSection title="Promemoria di rinnovo">
+                <ContractReminders reminders={d.reminders} sellerName={d.seller_name ?? ''} active={active} endDate={d.end_date} />
+              </RecordSection>
+            </Box>
+          ) : null}
+
           {p.canViewValue ? (
             <RecordSection title="Importo">
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, flexWrap: 'wrap', mb: 1.25 }}>
-                <Typography component="b" sx={{ fontSize: 22, fontWeight: 650, letterSpacing: '-0.015em', fontVariantNumeric: 'tabular-nums' }}>{value != null ? formatEuro(value) : '—'}</Typography>
-                <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>su {months} {months === 1 ? 'mese' : 'mesi'} · fatturazione {d.billing_freq_label.toLowerCase()}</Typography>
-              </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', '& > div + div': { borderLeft: '1px solid', borderColor: 'divider' } }}>
-                {[['Al mese', value != null ? formatEuro(value / months) : '—'], ["All'anno", value != null ? formatEuro((value / months) * 12) : '—'], ['Per fattura', perBill != null ? formatEuro(perBill) : '—']].map(([l, x]) => (
-                  <Box key={l} sx={{ px: 1.5, py: 1 }}>
-                    <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{l}</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{x}</Typography>
+              {value != null ? (() => {
+                const am = amountSummary(value, d.billing_freq, d.start_date, d.end_date, todayIso())
+                const pct = Math.round(am.elapsed * 100)
+                const tile = (label: string, amount: number, sub?: React.ReactNode) => (
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: '10px 12px', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'baseline', columnGap: 1.25 }}>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
+                    <Typography sx={{ fontSize: 15, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>{eurFull(amount)}</Typography>
+                    {sub ? <Typography sx={{ gridColumn: '1 / -1', fontSize: 11.5, color: 'text.secondary', mt: 0.25 }}>{sub}</Typography> : null}
                   </Box>
-                ))}
-              </Box>
-              <Typography sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 1, fontSize: 11, color: 'text.disabled' }}><CampoIcon name="lock" size={12} />Ripartizione lineare sul periodo. Importi e PDF solo con il permesso sui valori.</Typography>
+                )
+                return (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1fr)', sm: 'minmax(0,1.25fr) minmax(0,1fr)' }, gap: 1.5 }}>
+                    <Box sx={{ bgcolor: 'archie.field', borderRadius: '10px', p: '16px 18px', display: 'grid', gap: 1.25, alignContent: 'start' }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'primary.main', textTransform: 'uppercase', letterSpacing: '.06em' }}>Valore totale</Typography>
+                      <Typography sx={{ fontSize: 28, fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{eurFull(value)}</Typography>
+                      <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>{am.months} {am.months === 1 ? 'mese' : 'mesi'} · fatturazione {d.billing_freq_label.toLowerCase()}</Typography>
+                      <Box>
+                        <Box role="img" aria-label={`Maturato ${pct}%`} sx={{ height: 8, borderRadius: 4, overflow: 'hidden', bgcolor: (t) => alpha(t.palette.primary.main, 0.16) }}>
+                          <Box sx={{ height: '100%', width: `${am.elapsed * 100}%`, bgcolor: 'primary.main', borderRadius: 4 }} />
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75, fontSize: 12, color: 'text.secondary' }}>
+                          <span>maturato <Box component="b" sx={{ color: 'text.primary' }}>{pct}%</Box></span><span>{dShort(d.end_date)}</span>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'grid', gap: 1, alignContent: 'start' }}>
+                      {tile('Al mese', am.perMonth)}
+                      {tile("All'anno", am.perYear)}
+                      {tile('Per fattura', am.perBill, <>{am.bills} {am.bills === 1 ? 'fattura' : 'fatture'}{am.nextBill && d.status === 'attivo' ? <> · prossima il {dShort(am.nextBill)}</> : null}</>)}
+                    </Box>
+                  </Box>
+                )
+              })() : <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Valore non indicato: si aggiunge da Modifica.</Typography>}
             </RecordSection>
           ) : null}
 
@@ -237,9 +266,8 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
               </>}
               <RecordField editing={editing} type="date" label="Inizio" value={v.start_date} onChange={set('start_date')} dirty={isDirty('start_date')} show={dIt} />
               <RecordField editing={editing} type="date" label="Fine" value={v.end_date} onChange={set('end_date')} dirty={isDirty('end_date')} show={dIt} />
-              <RecordField editing={editing} label="Preavviso (giorni)" value={v.notice_days} onChange={set('notice_days')} dirty={isDirty('notice_days')} show={(x) => `${x} giorni`} />
-              {editing ? <RecordSelect label="Rinnovo automatico" value={draft.auto_renew} onChange={set('auto_renew')} dirty={isDirty('auto_renew')} options={[{ value: '1', label: 'Sì (solo promemoria)' }, { value: '0', label: 'No' }]} />
-                : <RecordValue label="Rinnovo automatico">{d.auto_renew ? 'Sì' : 'No'}</RecordValue>}
+              {editing ? <ReminderLeadField value={draft.reminder_days} end={draft.end_date} dirty={isDirty('reminder_days')} onChange={set('reminder_days')} />
+                : <RecordValue label="Avviso di rinnovo">{d.reminder_days ? `${d.reminder_days} giorni prima` : null}</RecordValue>}
               {editing ? <RecordSelect label="Fatturazione" value={draft.billing_freq} onChange={set('billing_freq')} dirty={isDirty('billing_freq')} options={BILLING_FREQ_OPTIONS} />
                 : <RecordValue label="Fatturazione">{d.billing_freq_label}</RecordValue>}
               {p.canViewValue ? <RecordField editing={editing} label="Valore totale" value={v.total_value} onChange={set('total_value')} dirty={isDirty('total_value')} mono placeholder="0,00"
@@ -284,5 +312,33 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
         </Box>
       </Box>
     </RecordModal>
+  )
+}
+
+/** «Avviso di rinnovo» in modifica: pastiglie 30/60/90/180 o un numero, con la data che ne risulta. */
+function ReminderLeadField({ value, end, dirty, onChange }: { value: string; end: string; dirty: boolean; onChange: (v: string) => void }) {
+  const n = Number(value)
+  const valid = Number.isInteger(n) && n >= 1 && n <= 365
+  return (
+    <Box sx={{ gridColumn: '1 / -1', display: 'grid', gap: 0.75 }}>
+      <Typography id="lbl-reminder-days" sx={{ fontSize: 12, color: 'text.secondary' }}>Avviso di rinnovo</Typography>
+      <Box role="group" aria-labelledby="lbl-reminder-days" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
+        {REMINDER_PRESETS.map((p) => {
+          const on = n === p
+          return (
+            <ButtonBase key={p} aria-pressed={on} onClick={() => onChange(String(p))} sx={{
+              height: 28, px: 1.25, borderRadius: 999, fontSize: 12.5, border: '1px solid', borderColor: on ? 'archie.fieldLine' : 'archie.borderStrong',
+              bgcolor: on ? 'archie.field' : 'background.paper', fontWeight: on ? 600 : 400, '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing },
+            }}>{p} giorni</ButtonBase>
+          )
+        })}
+        <TextField size="small" type="number" value={value} onChange={(e) => onChange(e.target.value)} error={!valid}
+          sx={{ width: 84, ...(dirty ? { '& .MuiOutlinedInput-root': { bgcolor: 'warning.light' } } : null) }}
+          slotProps={{ htmlInput: { min: 1, max: 365, 'aria-label': 'Giorni prima della fine' } }} />
+      </Box>
+      <Typography sx={{ fontSize: 11.5, color: valid ? 'text.secondary' : 'error.main' }}>
+        {valid ? (isIsoDate(end) ? `prima della fine · avviso il ${dShort(addDays(end, -n))}` : 'prima della fine') : 'Da 1 a 365 giorni.'}
+      </Typography>
+    </Box>
   )
 }

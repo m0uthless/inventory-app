@@ -22,6 +22,7 @@ import { apiErrorToFormFeedback, apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../../auth/AuthProvider'
 import type { Seller } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 type UserOption = { id: number; label: string }
 type RawUser = { id: number; full_name?: string; username?: string }
@@ -62,8 +63,7 @@ export default function SellersDialog({ open, onClose }: Props) {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const r = await api.get('/sellers/', { params: { page_size: 200, ordering: 'name' } })
-      setSellers(listOf<Seller>(r.data))
+      setSellers(await fetchAll<Seller>('/sellers/', { ordering: 'name' }))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -102,8 +102,12 @@ export default function SellersDialog({ open, onClose }: Props) {
 
   const save = async () => {
     if (saving || !editing) return
-    if (!form.name.trim()) {
-      setErrors({ name: 'Il nome è obbligatorio.' })
+    const errs: Record<string, string> = {}
+    if (!form.name.trim()) errs.name = 'Il nome è obbligatorio.'
+    // I promemoria di rinnovo vanno all'utente Archie collegato o all'email inserita a mano.
+    if (form.is_active && !form.user && !form.email.trim()) errs.email = "Indica l'email del venditore o collega un utente di Archie."
+    if (Object.keys(errs).length) {
+      setErrors(errs)
       return
     }
     setSaving(true)
@@ -163,7 +167,7 @@ export default function SellersDialog({ open, onClose }: Props) {
                     {s.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap component="div">
-                    {[s.email, s.phone, s.user_username ? `utente: ${s.user_username}` : ''].filter(Boolean).join(' · ') || '—'}
+                    {[s.user_username ? `utente: ${s.user_username}` : '', s.phone, s.reminder_email ? `promemoria a ${s.reminder_email}` : 'nessuna email per i promemoria'].filter(Boolean).join(' · ')}
                   </Typography>
                 </Box>
                 {!s.is_active ? <Chip size="small" label="Disattivato" /> : null}
@@ -185,7 +189,7 @@ export default function SellersDialog({ open, onClose }: Props) {
         ) : (
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
-              label="Nome"
+              label="Nome e cognome"
               required
               size="small"
               value={form.name}
@@ -199,7 +203,7 @@ export default function SellersDialog({ open, onClose }: Props) {
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               error={Boolean(errors.email)}
-              helperText={errors.email}
+              helperText={errors.email || (form.user ? "Con un utente collegato i promemoria vanno alla sua email; questa vale se l'utente non ne ha una." : 'Riceve i promemoria di rinnovo dei suoi contratti.')}
             />
             <TextField
               label="Telefono"
@@ -217,7 +221,7 @@ export default function SellersDialog({ open, onClose }: Props) {
               getOptionLabel={(o) => o.label}
               isOptionEqualToValue={(a, b) => a.id === b.id}
               renderInput={(p) => (
-                <TextField {...p} label="Utente collegato (opzionale)" error={Boolean(errors.user)} helperText={errors.user} />
+                <TextField {...p} label="Utente di Archie (facoltativo)" error={Boolean(errors.user)} helperText={errors.user || 'Se è un utente di Archie riceve i promemoria anche nella campanella.'} />
               )}
             />
             <FormControlLabel

@@ -2,7 +2,7 @@ import type { CampoIconName } from '../../ui/campo'
 
 // Registro Audit (restyle "Campo sterile", anteprima design-previews/au-base.html, variante A · Registro).
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout' | 'rate'
+export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'login' | 'login_failed' | 'logout' | 'rate' | 'view_secret'
 
 export type AuditEvent = {
   id: number
@@ -47,6 +47,7 @@ export const ACTION_META: Record<AuditAction, { label: string; tone: 'success' |
   logout: { label: 'Uscita', tone: 'neutral' },
   login_failed: { label: 'Accesso fallito', tone: 'error' },
   rate: { label: 'Valutato', tone: 'neutral' },
+  view_secret: { label: 'Password letta', tone: 'info' },
 }
 export const actionMeta = (a: string) => ACTION_META[a as AuditAction] ?? { label: a || '—', tone: 'neutral' as const }
 
@@ -140,7 +141,7 @@ export function objectTitle(e: AuditEvent): string {
 const FIELD_LABELS: Record<string, string> = {
   status: 'Stato', priority: 'Priorità', assignee: 'Assegnata a', assigned_to: 'Assegnata a', area: 'Area', title: 'Titolo', name: 'Nome', display_name: 'Nome visualizzato',
   description: 'Descrizione', notes: 'Note', note: 'Note', customer: 'Cliente', site: 'Sito', type: 'Tipo', category: 'Categoria',
-  notice_days: 'Preavviso (giorni)', billing_freq: 'Fatturazione', amount: 'Importo', total_value: 'Valore', start_date: 'Inizio', end_date: 'Fine',
+  notice_days: 'Avviso di rinnovo (giorni)', reminder_days: 'Avviso di rinnovo (giorni)', billing_freq: 'Fatturazione', amount: 'Importo', total_value: 'Valore', start_date: 'Inizio', end_date: 'Fine',
   result: 'Esito', pdf_file: 'PDF', date: 'Data', date_from: 'Dal', date_to: 'Al', reason: 'Motivo', hostname: 'Hostname', ip: 'IP', email: 'Email',
   phone: 'Telefono', is_active: 'Attivo', groups: 'Gruppi', due_date_override: 'Scadenza modificata', next_due_date: 'Prossima scadenza',
   year: 'Anno', month: 'Mese', advances_total: 'Anticipi', rejection_reason: 'Motivo rifiuto', km: 'Km', destination: 'Destinazione',

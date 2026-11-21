@@ -1,12 +1,12 @@
 import * as React from 'react'
-import { Autocomplete, Box, ButtonBase, InputAdornment, MenuItem, Switch, TextField, Typography } from '@mui/material'
+import { Autocomplete, Box, ButtonBase, InputAdornment, MenuItem, TextField, Typography } from '@mui/material'
 import { CampoIcon } from '../../ui/campo'
 import { FileIcon } from '../drive/DriveIcons'
 import { formatEuro } from '../purchaseorders/types'
 import { daysLabel, dShort } from './contractModel'
 import { PeriodBar } from './contractUi'
 import {
-  DURATIONS, NOTICE_PRESETS, TYPE_CARDS, addDays, endOf, invoiceCount, isIsoDate, monthsBetween, parseMoney,
+  DURATIONS, REMINDER_PRESETS, TYPE_CARDS, addDays, endOf, invoiceCount, isIsoDate, monthsBetween, parseMoney,
   type ContractForm, type FormErrors,
 } from './contractForm'
 import { BILLING_FREQ_OPTIONS, CONTRACT_STATUS_OPTIONS, type CompanyOption, type CustomerOption, type ExpiryState, type Seller } from './types'
@@ -31,7 +31,7 @@ export function FieldLabel({ children, required, optional, htmlFor }: { children
   )
 }
 
-/** Scelta singola a pastiglie (durata, preavviso, tipo, stato). */
+/** Scelta singola a pastiglie (durata, avviso di rinnovo, tipo, stato). */
 export function ChoiceChips<T extends string | number>({ options, value, onChange, label, square }: {
   options: { value: T; label: React.ReactNode; icon?: React.ReactNode }[]
   value: T | null
@@ -187,7 +187,7 @@ export function CodeTitle({ f, set, errors, title, autoTitle }: PartProps & { ti
 }
 
 export function PeriodFields({ f, set, errors }: PartProps) {
-  const [customNotice, setCustomNotice] = React.useState(!NOTICE_PRESETS.includes(f.notice_days))
+  const [customLead, setCustomLead] = React.useState(!REMINDER_PRESETS.includes(f.reminder_days))
   return (
     <>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.25, alignItems: 'start' }}>
@@ -212,24 +212,17 @@ export function PeriodFields({ f, set, errors }: PartProps) {
         {f.duration && errors.end_date ? help(errors.end_date, true) : null}
       </Box>
       <Box>
-        <FieldLabel>Preavviso di disdetta</FieldLabel>
+        <FieldLabel>Avviso di rinnovo</FieldLabel>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
-          <ChoiceChips label="Preavviso di disdetta" value={customNotice ? -1 : f.notice_days}
-            onChange={(n) => { if (n === -1) { setCustomNotice(true); return } setCustomNotice(false); set('notice_days', n) }}
-            options={[...NOTICE_PRESETS.map((n) => ({ value: n, label: `${n} giorni` })), { value: -1, label: 'Altro' }]} />
-          {customNotice ? (
-            <TextField size="small" type="number" value={Number.isFinite(f.notice_days) ? f.notice_days : ''} onChange={(e) => set('notice_days', e.target.value === '' ? NaN : Number(e.target.value))}
-              error={Boolean(errors.notice_days)} sx={{ width: 120 }} slotProps={{ htmlInput: { min: 0, max: 3650, 'aria-label': 'Giorni di preavviso' }, input: { endAdornment: <InputAdornment position="end">giorni</InputAdornment> } }} />
+          <ChoiceChips label="Avviso di rinnovo" value={customLead ? -1 : f.reminder_days}
+            onChange={(n) => { if (n === -1) { setCustomLead(true); return } setCustomLead(false); set('reminder_days', n) }}
+            options={[...REMINDER_PRESETS.map((n) => ({ value: n, label: `${n} giorni` })), { value: -1, label: 'Altro' }]} />
+          {customLead ? (
+            <TextField size="small" type="number" value={Number.isFinite(f.reminder_days) ? f.reminder_days : ''} onChange={(e) => set('reminder_days', e.target.value === '' ? NaN : Number(e.target.value))}
+              error={Boolean(errors.reminder_days)} sx={{ width: 120 }} slotProps={{ htmlInput: { min: 1, max: 365, 'aria-label': 'Giorni prima della fine' }, input: { endAdornment: <InputAdornment position="end">giorni</InputAdornment> } }} />
           ) : null}
         </Box>
-        {help(errors.notice_days, true)}
-      </Box>
-      <Box component="label" sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', width: 'fit-content' }}>
-        <Switch size="small" checked={f.auto_renew} onChange={(e) => set('auto_renew', e.target.checked)} />
-        <Box>
-          <Typography sx={{ fontSize: 13 }}>Rinnovo automatico</Typography>
-          <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>Solo promemoria: il rinnovo in Archie resta manuale</Typography>
-        </Box>
+        {errors.reminder_days ? help(errors.reminder_days, true) : <Typography sx={{ fontSize: 11.5, color: 'text.secondary', mt: 0.5 }}>Prima della fine: da quel giorno partono i promemoria per preparare il nuovo contratto.</Typography>}
       </Box>
     </>
   )
@@ -296,27 +289,26 @@ function stateFor(f: ContractForm, end: string): ExpiryState {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const toEnd = Math.round((new Date(`${end}T00:00:00`).getTime() - today.getTime()) / DAY)
   if (toEnd < 0) return 'expired'
-  if (toEnd <= 30) return 'expiring'
-  return new Date(`${addDays(end, -f.notice_days)}T00:00:00`) <= today ? 'notice' : 'ok'
+  return new Date(`${addDays(end, -f.reminder_days)}T00:00:00`) <= today ? 'renew' : 'ok'
 }
 
-/** Linea del periodo con disdetta e la frase che la spiega. */
+/** Linea del periodo con l'avviso di rinnovo e la frase che lo spiega. */
 export function PeriodPreview({ f, narrow }: { f: ContractForm; narrow?: boolean }) {
   const end = endOf(f)
   if (!isIsoDate(f.start_date) || !isIsoDate(end) || end < f.start_date) {
     return <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Indica inizio e durata per vedere il periodo.</Typography>
   }
-  const notice = Number.isFinite(f.notice_days) ? addDays(end, -f.notice_days) : null
+  const reminder = Number.isFinite(f.reminder_days) ? addDays(end, -f.reminder_days) : null
   const m = monthsBetween(f.start_date, end)
   const state = stateFor(f, end)
-  const late = notice != null && f.status === 'attivo' && new Date(`${notice}T00:00:00`) < new Date(new Date().toDateString())
+  const late = reminder != null && f.status === 'attivo' && new Date(`${reminder}T00:00:00`) < new Date(new Date().toDateString())
   return (
     <Box sx={{ display: 'grid', gap: 0.75 }}>
-      <PeriodBar start={f.start_date} end={end} notice={notice} state={state === 'none' ? 'ok' : state} endsOnly={narrow} />
+      <PeriodBar start={f.start_date} end={end} reminder={reminder} state={state === 'none' ? 'ok' : state} endsOnly={narrow} />
       <Typography sx={{ fontSize: 11.5, lineHeight: 1.45, color: late ? 'warning.main' : 'text.secondary', '& b': { color: late ? 'warning.main' : 'text.primary', fontWeight: 600 } }}>
         {late
-          ? <>Il termine di disdetta ({dShort(notice)}) è già passato: il contratto nascerà in <b>Preavviso</b>.</>
-          : <>{m} {m === 1 ? 'mese' : 'mesi'}{notice ? <> · disdetta possibile fino al <b>{dShort(notice)}</b> ({daysLabel(notice)})</> : null}{f.auto_renew ? ' · rinnovo automatico' : ''}.</>}
+          ? <>L'avviso di rinnovo ({dShort(reminder)}) è già passato: il contratto nascerà <b>Da rinnovare</b> e il primo promemoria parte subito.</>
+          : <>{m} {m === 1 ? 'mese' : 'mesi'}{reminder ? <> · avviso di rinnovo il <b>{dShort(reminder)}</b> ({daysLabel(reminder)})</> : null}.</>}
       </Typography>
     </Box>
   )

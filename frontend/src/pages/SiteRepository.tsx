@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Box, Button, ButtonBase, CircularProgress, InputBase, Skeleton, Typography } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -199,14 +199,33 @@ export default function SiteRepository() {
       provinces: [...provinces.keys()].filter(Boolean).length,
     }
   }, [customers, provinces])
+  // Raggruppamento dell'elenco: per provincia (predefinito) o per città del cliente.
+  const [groupBy, setGroupBy] = React.useState<'prov' | 'city'>('prov')
+  const cities = React.useMemo(() => {
+    const m = new Map<string, RepoCustomer[]>()
+    for (const c of customers ?? []) {
+      if (region && regionOf(provKey(c)) !== region) continue
+      const k = (c.city ?? '').trim()
+      // Stessa città scritta con maiuscole diverse: un solo gruppo.
+      const key = [...m.keys()].find((x) => x.toLocaleLowerCase('it') === k.toLocaleLowerCase('it')) ?? k
+      m.set(key, [...(m.get(key) ?? []), c])
+    }
+    return m
+  }, [customers, region])
+  const groups = groupBy === 'city' ? cities : provinces
   const list = React.useMemo(() => {
+    if (groupBy === 'city') {
+      const ks = [...cities.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b, 'it'))
+      if (cities.has('')) ks.push('')
+      return ks
+    }
     const ks = [...provinces.keys()].filter((k) => k && (!region || regionOf(k) === region))
       .sort((a, b) => (PROVINCE_NAME[a] ?? a).localeCompare(PROVINCE_NAME[b] ?? b, 'it'))
     if (!region && provinces.has('')) ks.push('')
     return ks
-  }, [provinces, region])
+  }, [provinces, cities, region, groupBy])
   const provStats = (k: string) => {
-    const cs = provinces.get(k) ?? []
+    const cs = groups.get(k) ?? []
     return {
       cs, sites: cs.reduce((n, c) => n + (c.sites_with_assets_count ?? 0), 0),
       assets: cs.reduce((n, c) => n + (c.assets_count ?? 0), 0),
@@ -234,6 +253,17 @@ export default function SiteRepository() {
     if (!(customerId in content)) void loadCustomer(customerId)
     scrollToProv(p)
   }
+
+  // Apertura diretta su un cliente (`?cliente=<id>`, dalla finestra del cliente).
+  const [sp] = useSearchParams()
+  const clienteParam = Number(sp.get('cliente')) || null
+  const revealedRef = React.useRef<number | null>(null)
+  React.useEffect(() => {
+    if (!clienteParam || !customers || revealedRef.current === clienteParam || !byId.has(clienteParam)) return
+    revealedRef.current = clienteParam
+    reveal(clienteParam)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteParam, customers, byId])
 
   // ── Pannello dell'asset ──
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
@@ -417,10 +447,16 @@ export default function SiteRepository() {
           <Box sx={{ display: 'grid', gap: 1.25, minWidth: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, px: '2px', pt: 0.5, flexWrap: 'wrap' }}>
               <Box>
-                <Typography component="h2" sx={{ fontSize: 18, fontWeight: 650, letterSpacing: '-.01em' }}>{region ? `Province · ${REGION_NAME[region]}` : 'Tutte le province'}</Typography>
-                <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{list.filter(Boolean).length} province con clienti, in ordine alfabetico · clic per vedere i clienti</Typography>
+                <Typography component="h2" sx={{ fontSize: 18, fontWeight: 650, letterSpacing: '-.01em' }}>{groupBy === 'city' ? (region ? `Città · ${REGION_NAME[region]}` : 'Tutte le città') : region ? `Province · ${REGION_NAME[region]}` : 'Tutte le province'}</Typography>
+                <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{list.filter(Boolean).length} {groupBy === 'city' ? 'città' : 'province'} con clienti, in ordine alfabetico · clic per vedere i clienti</Typography>
               </Box>
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                <Box role="group" aria-label="Raggruppa per" sx={{ display: 'inline-flex', p: '2px', border: '1px solid', borderColor: 'divider', borderRadius: '8px', bgcolor: 'archie.surface2' }}>
+                  {([['prov', 'Province'], ['city', 'Città']] as const).map(([k, l]) => (
+                    <ButtonBase key={k} aria-pressed={groupBy === k} onClick={() => { setGroupBy(k); setOpenProv(new Set()) }}
+                      sx={{ height: 26, px: 1.25, borderRadius: '6px', fontSize: 12.5, fontWeight: groupBy === k ? 600 : 400, color: groupBy === k ? 'text.primary' : 'text.secondary', bgcolor: groupBy === k ? 'background.paper' : 'transparent', '&.Mui-focusVisible': { boxShadow: (t) => t.palette.archie.focusRing } }}>{l}</ButtonBase>
+                  ))}
+                </Box>
                 {openProv.size ? <Button size="small" variant="text" onClick={() => { setOpenProv(new Set()); setOpenCust(new Set()); setOpenSite(new Set()) }}>Chiudi tutte</Button> : null}
                 {region ? <Button size="small" variant="text" onClick={() => { setRegion(null); setMapProv(null) }}>Mostra tutte</Button> : null}
               </Box>
@@ -428,7 +464,7 @@ export default function SiteRepository() {
 
             <Box ref={listRef} sx={{ ...panelSx, overflow: 'hidden' }}>
               <Box aria-hidden sx={{ ...provCols, minHeight: 34, px: 1.75, bgcolor: 'archie.surface2', borderBottom: '1px solid', borderColor: 'divider', fontSize: 12, fontWeight: 550, color: 'text.secondary', '& > :nth-of-type(n+3)': { textAlign: 'right' } }}>
-                <span /><span>Provincia</span><span>Clienti</span><span>Siti</span><span>Asset</span><span>Con issue</span>
+                <span /><span>{groupBy === 'city' ? 'Città' : 'Provincia'}</span><span>Clienti</span><span>Siti</span><span>Asset</span><span>Con issue</span>
               </Box>
               {!customers ? [0, 1, 2, 3].map((i) => <Box key={i} sx={{ px: 1.75, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Skeleton width="40%" /><Skeleton width="20%" /></Box>)
                 : !list.length ? <Typography sx={{ p: 3, fontSize: 13, color: 'text.secondary' }}>Nessun cliente in questo territorio.</Typography>
@@ -437,13 +473,13 @@ export default function SiteRepository() {
                   const open = openProv.has(p)
                   return (
                     <Box key={p || '-'} data-prov={p} sx={{ borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 0 }, scrollMarginTop: 12 }}>
-                      <ButtonBase onClick={() => toggleProvince(p)} aria-expanded={open} sx={[provCols, {
+                      <ButtonBase onClick={() => (groupBy === 'city' ? toggle(setOpenProv, p) : toggleProvince(p))} aria-expanded={open} sx={[provCols, {
                         width: '100%', minHeight: 52, px: 1.75, py: 0.75, textAlign: 'left', '&:hover': { bgcolor: 'archie.surface2' }, ...(open && { bgcolor: 'archie.surface2' }),
                       }, focusInset]}>
                         <Chevron open={open} />
                         <NameCell titleSx={open ? { color: 'primary.main' } : undefined}
-                          title={p ? <>{PROVINCE_NAME[p] ?? p} <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>{p}</Box></> : <i>Senza provincia</i>}
-                          sub={p ? REGION_NAME[regionOf(p) ?? ''] ?? '' : 'clienti senza provincia in anagrafica'} />
+                          title={groupBy === 'city' ? (p || <i>Senza città</i>) : p ? <>{PROVINCE_NAME[p] ?? p} <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>{p}</Box></> : <i>Senza provincia</i>}
+                          sub={groupBy === 'city' ? (p ? [...new Set(st.cs.map((c) => provKey(c)).filter(Boolean))].join(', ') : 'clienti senza città in anagrafica') : p ? REGION_NAME[regionOf(p) ?? ''] ?? '' : 'clienti senza provincia in anagrafica'} />
                         <Box component="span" sx={numSx}>{st.cs.length}</Box>
                         <Box component="span" sx={numSx}>{st.sites}</Box>
                         <Box component="span" sx={numSx}>{st.assets}</Box>

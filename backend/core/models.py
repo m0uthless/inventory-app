@@ -96,6 +96,11 @@ class AppSetting(TimeStampedModel):
     key = models.CharField(max_length=128, unique=True)
     value = models.TextField()
 
+    class Meta:
+        permissions = [
+            ("manage_app_settings", "Gestisce le impostazioni di Archie"),
+        ]
+
     def __str__(self):
         return self.key
 class UserProfile(models.Model):
@@ -360,6 +365,11 @@ class AreaTask(TimeStampedModel):
     status      = models.CharField(
         max_length=16, choices=STATUS_CHOICES, default=STATUS_DA_FARE, verbose_name='Stato',
     )
+    # Stesse causali delle Issue (Philips, Elco, Cliente, Exprivia, Altro).
+    waiting_reason = models.CharField(
+        max_length=20, choices=[('philips', 'Philips'), ('elco', 'Elco'), ('cliente', 'Cliente'), ('exprivia', 'Exprivia'), ('altro', 'Altro')],
+        blank=True, default='', verbose_name='In attesa di',
+    )
     due_date = models.DateField(null=True, blank=True, verbose_name='Scadenza')
     priority = models.CharField(
         max_length=20, choices=AreaTaskPriority.choices,
@@ -556,9 +566,6 @@ class StickyNote(models.Model):
     def __str__(self):
         return f"Nota di {self.user}"
 
-    def __str__(self):
-        return f"{self.user} — {self.widget.key} ({self.x},{self.y} {self.w}x{self.h})"
-
 
 class ScheduledJobRun(models.Model):
     """Marker minimale "ultima esecuzione riuscita" per job schedulati via il
@@ -646,3 +653,27 @@ class MaintenanceMode(models.Model):
         super().save(*args, **kwargs)
         from core.maintenance import invalidate_cache
         invalidate_cache()
+
+
+class SavedView(models.Model):
+    """Vista salvata di un utente per una pagina (filtri, scheda, ricerca…).
+
+    Prima stavano nel browser; sul server l'utente le ritrova su ogni dispositivo.
+    `key` la sceglie il client: resta l'id della vista anche subito dopo il salvataggio.
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_views")
+    page = models.CharField(max_length=64)
+    key = models.CharField(max_length=40)
+    name = models.CharField(max_length=80)
+    state = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [models.UniqueConstraint(fields=["user", "page", "key"], name="uq_savedview_user_page_key")]
+        indexes = [models.Index(fields=["user", "page"], name="ix_savedview_user_page")]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} · {self.page} · {self.name}"

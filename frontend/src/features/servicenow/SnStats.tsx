@@ -1,5 +1,6 @@
 import { Box, Tooltip, Typography, useTheme } from '@mui/material'
 import { periodTotals, typeColor, firstName, type StatsResponse } from './snModel'
+import { fmtNumber } from '@shared/utils/number'
 
 const small = { fontSize: 11.5, color: 'text.secondary' } as const
 
@@ -24,7 +25,7 @@ export function TypeDonut({ data, typeNames }: { data: StatsResponse; typeNames:
             </circle>
           )
         })}
-        <Box component="text" x={70} y={68} textAnchor="middle" sx={{ fontSize: 22, fontWeight: 750, fill: (th) => th.palette.text.primary }}>{total.toLocaleString('it-IT')}</Box>
+        <Box component="text" x={70} y={68} textAnchor="middle" sx={{ fontSize: 22, fontWeight: 750, fill: (th) => th.palette.text.primary }}>{fmtNumber(total)}</Box>
         <Box component="text" x={70} y={86} textAnchor="middle" sx={{ fontSize: 11, fill: (th) => th.palette.text.secondary }}>casi</Box>
       </Box>
       <Box sx={{ display: 'grid', gap: 0.4, width: '100%' }}>

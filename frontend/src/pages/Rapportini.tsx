@@ -15,6 +15,7 @@ import { api } from '@shared/api/client'
 import { buildDrfListParams } from '@shared/api/drf'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useDrfList } from '@shared/hooks/useDrfList'
+import { useList } from '../ui/campo/ListRows'
 import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import ConfirmDeleteDialog from '@shared/ui/ConfirmDeleteDialog'
@@ -35,6 +36,9 @@ import RapportinoDialog from '../features/maintenance/RapportinoDialog'
 import { RESULT_LABEL, type Result } from '../features/maintenance/mtModel'
 import { ResultBadge } from '../features/maintenance/mtUi'
 import type { EventRow } from './maintenanceTypes'
+
+// Elenco vuoto stabile mentre si caricano le scelte (stesso riferimento a ogni render).
+const NO_ROWS: never[] = []
 
 type View = 'all' | 'follow' | 'nopdf' | 'np'
 const VIEWS: View[] = ['all', 'follow', 'nopdf', 'np']
@@ -65,9 +69,9 @@ export default function Rapportini() {
   const canReset = hasPerm(PERMS.maintenance.event.delete)
   const canAddIssue = hasPerm(PERMS.issues.issue.add)
   const { exporting, exportCsv } = useExportCsv()
-  const { rows: techs } = useDrfList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' })
-  const { rows: customers } = useDrfList<{ id: number; name: string; display_name?: string | null }>('/customers/', { ordering: 'display_name', page_size: 500 })
-  const { rows: plans } = useDrfList<{ id: number; title: string }>('/maintenance-plans/', { ordering: 'title', page_size: 500 })
+  const techs = useList<{ id: number; full_name: string }>('/techs/', { ordering: 'last_name', page_size: 500, is_active: 'true' }) ?? NO_ROWS
+  const customers = useList<{ id: number; name: string; display_name?: string | null }>('/customers/', { ordering: 'display_name', page_size: 500 }) ?? NO_ROWS
+  const plans = useList<{ id: number; title: string }>('/maintenance-plans/', { ordering: 'title', page_size: 500 }) ?? NO_ROWS
 
   const [viewRaw, setViewRaw] = useUrlStringParam('vista')
   const view: View = VIEWS.includes(viewRaw as View) ? (viewRaw as View) : 'all'

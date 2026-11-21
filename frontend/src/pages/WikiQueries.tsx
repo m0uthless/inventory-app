@@ -11,6 +11,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon } from '../ui/campo'
 import { ArchiveRoot, HeadAction, Mark, OpenFolder, WikiHead } from '../features/wiki/archive/archiveUi'
 import { cVars, rel } from '../features/wiki/archive/archiveModel'
+import { fetchAll } from '../api/fetchAll'
 
 type Language = {
   id: number
@@ -201,10 +202,10 @@ export default function WikiQueries() {
     try {
       const [l, r] = await Promise.all([
         api.get<Language[] | ApiPage<Language>>('/wiki-query-languages/'),
-        api.get<ApiPage<QueryRow>>('/wiki-queries/', { params: { page_size: 500, ordering: 'title' } }),
+        fetchAll<QueryRow>('/wiki-queries/', { ordering: 'title' }),
       ])
       setLanguages(Array.isArray(l.data) ? l.data : l.data.results ?? [])
-      setQueries(r.data.results ?? [])
+      setQueries(r)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
       setQueries([])

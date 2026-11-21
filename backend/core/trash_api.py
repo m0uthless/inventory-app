@@ -28,9 +28,12 @@ MAX_IDS_PER_KIND = 200
 
 
 def _kinds():
+    from contracts.models import Contract
     from crm.models import Contact, Customer, Site
     from inventory.models import Inventory, Monitor
+    from issues.models import Issue
     from maintenance.models import MaintenancePlan, Tech
+    from purchaseorders.models import PurchaseOrderEntry
 
     # chiave della pagina Cestino → (modello, select_related per le regole di ripristino)
     return {
@@ -41,6 +44,9 @@ def _kinds():
         "monitors": (Monitor, ("inventory",)),
         "maintenance-plans": (MaintenancePlan, ("customer",)),
         "techs": (Tech, ()),
+        "purchase-orders": (PurchaseOrderEntry, ()),
+        "contracts": (Contract, ("customer",)),
+        "issues": (Issue, ("customer", "site")),
     }
 
 
@@ -73,9 +79,12 @@ class TrashInfoView(APIView):
             opts = model._meta
             if not request.user.has_perm(f"{opts.app_label}.view_{opts.model_name}"):
                 continue
-            objs = list(
-                model._default_manager.select_related(*related).filter(id__in=ids, deleted_at__isnull=False)
-            )
+            qs = model._default_manager.select_related(*related).filter(id__in=ids, deleted_at__isnull=False)
+            if key == "issues":
+                # Come la lista: solo le issue delle aree che l'utente vede.
+                from issues.visibility import visible_issues_q
+                qs = qs.filter(visible_issues_q(request.user))
+            objs = list(qs)
             if not objs:
                 data[key] = {}
                 continue

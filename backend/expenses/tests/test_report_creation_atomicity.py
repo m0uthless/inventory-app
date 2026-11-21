@@ -14,7 +14,16 @@ from django.db import DatabaseError
 from rest_framework.test import APIClient
 
 from expenses.models import EXPENSE_CATEGORY_ORDER, ExpenseItem, ExpenseReport
-from core.testing import make_archie_user
+from core.testing import make_archie_user as _make_archie_user
+
+
+def make_archie_user(*args, **kwargs):
+    """Utente Archie con l'accesso al modulo (expenses): dal 21/11 i permessi contano davvero."""
+    from django.contrib.auth.models import Permission
+
+    u = _make_archie_user(*args, **kwargs)
+    u.user_permissions.add(*Permission.objects.filter(content_type__app_label="expenses", codename__in=["view_expensereport", "add_expensereport"]))
+    return type(u).objects.get(pk=u.pk)
 
 pytestmark = pytest.mark.django_db
 

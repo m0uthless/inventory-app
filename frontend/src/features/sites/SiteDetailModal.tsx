@@ -9,7 +9,7 @@ import {
   BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordLoader, RecordModal, RecordNotes, RecordSection, RecordSelect, RecordValue,
   SectionCount, bandButtonSx, bandSolidSx, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
-import LeafletMap from '../../ui/LeafletMap'
+import AddressMap from '../../ui/AddressMap'
 import { AuditFeedPanel } from '../customers/CustomerTabs'
 import { Anchor, InventoriesSection, IssuesSection, PeopleList, WhereBlock, type LinkedInventory, type LinkedIssue, type LinkedPerson } from '../records/linked'
 import { ACTIVE_ISSUES } from '../records/linkedShared'
@@ -217,7 +217,7 @@ export function SiteWindow(p: SiteDetailModalProps & { detail: SiteModalDetail }
           {savedAddress ? (
             <RecordSection title="Dove">
               <WhereBlock address={savedAddress} line1={d.address_line1 || savedAddress} line2={[d.postal_code, d.city, d.province ? `(${d.province})` : null].filter(Boolean).join(' ') || undefined}
-                map={<LeafletMap address={savedAddress} height={150} zoom={15} quiet />} />
+                map={<AddressMap address={savedAddress} height={150} zoom={15} quiet title={d.name} />} />
             </RecordSection>
           ) : null}
 

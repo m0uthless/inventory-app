@@ -43,6 +43,7 @@ import { CampoIcon } from '../ui/campo'
 import { ArchiveRoot, FolderTabs, OpenFolder, StarIcon } from '../features/wiki/archive/archiveUi'
 import { AttachmentsCard, LinksCard, ProseContent, TocList, type TocItem } from '../features/wiki/archive/ArticleParts'
 import { NO_CAT, catColor, dshort, r1, rel, type WikiCategory } from '../features/wiki/archive/archiveModel'
+import { fetchAll } from '../api/fetchAll'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -241,9 +242,8 @@ function AddCustomerDialog({
 
   React.useEffect(() => {
     if (!open) return
-    api
-      .get<ApiPage<Customer>>('/customers/', { params: { page_size: 500, ordering: 'name' } })
-      .then((r) => setCustomers(r.data.results ?? []))
+    fetchAll<Customer>('/customers/', { ordering: 'name' })
+      .then(setCustomers)
       .catch(() => {})
   }, [open])
 

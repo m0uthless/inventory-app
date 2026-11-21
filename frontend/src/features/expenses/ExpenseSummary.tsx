@@ -4,6 +4,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import { CampoIcon } from '../../ui/campo'
 import { formatEuro, type ExpenseReportRow } from './expensesShared'
 import { CATEGORY_META, amountInput, filledItems, kmTotal, missingReceipts, parseEuroInput, rateLabel, toNum, tripCount } from './nsModel'
+import { fmtNumber } from '@shared/utils/number'
 
 type Props = {
   report: ExpenseReportRow
@@ -32,7 +33,7 @@ export default function ExpenseSummary({ report, editable, canValidate, busy, on
 
   const checks: { tone: 'warn' | 'ok'; title: string; sub: string }[] = []
   if (miss.length) checks.push({ tone: 'warn', title: `${miss.length} ${miss.length === 1 ? 'voce' : 'voci'} senza scontrino`, sub: miss.map((i) => CATEGORY_META[i.category].label).join(', ') })
-  if (trips) checks.push(rate ? { tone: 'ok', title: `${kmTotal(report).toLocaleString('it-IT')} km in ${trips} ${trips === 1 ? 'trasferta' : 'trasferte'}`, sub: `${formatEuro(report.items.find((i) => i.is_km_category)?.amount ?? 0)} a ${rate}` }
+  if (trips) checks.push(rate ? { tone: 'ok', title: `${fmtNumber(kmTotal(report))} km in ${trips} ${trips === 1 ? 'trasferta' : 'trasferte'}`, sub: `${formatEuro(report.items.find((i) => i.is_km_category)?.amount ?? 0)} a ${rate}` }
     : { tone: 'warn', title: 'Tariffa km non impostata', sub: 'Il rimborso chilometraggio resta a zero: chiedi alla segreteria di impostarla' })
   if (editable && !canSend) checks.push({ tone: 'warn', title: 'Nessuna spesa inserita', sub: 'Compila almeno una voce prima di inviare' })
 

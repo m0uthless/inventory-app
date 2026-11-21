@@ -26,7 +26,6 @@ import { useServerGrid } from '@shared/hooks/useServerGrid'
 import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
 
 import { api } from '@shared/api/client'
@@ -79,6 +78,8 @@ import {
 } from '../features/purchaseorders/types'
 import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
 import { useStatusTokens } from '../theme/AppThemeProvider'
+import { fetchAll } from '../api/fetchAll'
+import { fmtNumber } from '@shared/utils/number'
 
 type OpenCreateState = { openCreate?: boolean }
 
@@ -89,6 +90,7 @@ type TransitionState = {
   toStatus: PurchaseOrderStatus
   initialPurchaseOrder: string
   initialInvoiceNumber: string
+  description?: string
 }
 
 const KIND_LABEL: Record<string, string> = { ordinario: 'Ordinario', extra: 'Extra' }
@@ -175,7 +177,7 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
       renderCell: (p) => (
         <Box sx={{ textAlign: 'right', lineHeight: 1.3 }}>
           <Box sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatEuro(p.row.amount)}</Box>
-          {p.row.amount_mode === 'giornate' && p.row.days ? <Box sx={{ fontSize: 11, color: 'text.secondary' }}>{Number(p.row.days).toLocaleString('it-IT')} gg × {formatEuro(p.row.daily_rate)}</Box> : null}
+          {p.row.amount_mode === 'giornate' && p.row.days ? <Box sx={{ fontSize: 11, color: 'text.secondary' }}>{fmtNumber(Number(p.row.days))} gg × {formatEuro(p.row.daily_rate)}</Box> : null}
         </Box>
       ),
     },
@@ -303,6 +305,8 @@ export default function PurchaseOrders() {
     return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
   }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
 
+  // Totali del piè (stessi filtri dell'elenco, senza paginazione).
+  const [totals, setTotals] = React.useState<{ count: number; amount: string; costs: string } | null>(null)
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -354,6 +358,14 @@ export default function PurchaseOrders() {
   } = useDrfList<PurchaseOrderRow>('/purchase-order-entries/', listParams, (e: unknown) =>
     toast.error(apiErrorToMessage(e)),
   )
+
+  React.useEffect(() => {
+    let alive = true
+    const { page: _p, page_size: _ps, ordering: _o, ...params } = listParams as Record<string, unknown>
+    api.get<{ count: number; amount: string; costs: string }>('/purchase-order-entries/totals/', { params })
+      .then((r) => { if (alive) setTotals(r.data) }).catch(() => { if (alive) setTotals(null) })
+    return () => { alive = false }
+  }, [listParams, rows])
 
   // KPI (indipendenti da paginazione/ordinamento, filtrati solo per anno)
   const [summary, setSummary] = React.useState<PurchaseOrderSummary | null>(null)
@@ -411,10 +423,7 @@ export default function PurchaseOrders() {
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', {
-        params: { ordering: 'name', page_size: 500 },
-      })
-      setCustomers(res.data.results ?? [])
+      setCustomers(await fetchAll<CustomerItem>('/customers/', { ordering: 'name' }))
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     }
@@ -441,9 +450,12 @@ export default function PurchaseOrders() {
     [toast, grid.includeDeleted],
   )
 
+  const lastOpenRef = React.useRef<number | null>(null)
   // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo PO.
   const openDrawer = React.useCallback(
     (id: number, keep?: boolean) => {
+      // Prima di aggiornare `?open=` (vedi Contratti): niente chiudi-e-riapri con le frecce.
+      lastOpenRef.current = id
       setSelectedId(id)
       setDrawerOpen(true)
       loadDetail(id, undefined, keep)
@@ -529,6 +541,7 @@ export default function PurchaseOrders() {
         toStatus: target,
         initialPurchaseOrder: row.purchase_order || '',
         initialInvoiceNumber: row.invoice_number || '',
+        description: row.description || '',
       })
     },
     [],
@@ -693,6 +706,7 @@ export default function PurchaseOrders() {
           if (file) fd.append('document', file)
           if (extra.purchase_order) fd.append('purchase_order', extra.purchase_order)
           if (extra.invoice_number) fd.append('invoice_number', extra.invoice_number)
+          if (extra.date) fd.append('date', extra.date)
           await api.post(`/purchase-order-entries/${id}/advance/`, fd, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
@@ -847,7 +861,6 @@ export default function PurchaseOrders() {
   }, [loadCustomers])
 
   // open drawer from URL (?open=ID)
-  const lastOpenRef = React.useRef<number | null>(null)
   React.useEffect(() => {
     if (!grid.openId) return
     const id = grid.openId
@@ -1075,6 +1088,13 @@ export default function PurchaseOrders() {
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
+        {totals ? (
+          <Box role="status" aria-label="Totali dell'elenco" sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1, sm: 2.5 }, justifyContent: 'flex-end', alignItems: 'baseline', px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'archie.surface2', fontSize: 13 }}>
+            <Box component="span" sx={{ color: 'text.secondary' }}>{totals.count} {totals.count === 1 ? 'Purchase Order' : 'Purchase Order'}</Box>
+            <Box component="span">Totale <Box component="b" sx={{ fontVariantNumeric: 'tabular-nums' }}>{formatEuro(totals.amount)}</Box></Box>
+            <Box component="span">Costi sostenuti <Box component="b" sx={{ fontVariantNumeric: 'tabular-nums' }}>{formatEuro(totals.costs)}</Box></Box>
+          </Box>
+        ) : null}
       </Box>
 
       <RowContextMenu
@@ -1150,6 +1170,8 @@ export default function PurchaseOrders() {
           toStatus={transitionState.toStatus}
           initialPurchaseOrder={transitionState.initialPurchaseOrder}
           initialInvoiceNumber={transitionState.initialInvoiceNumber}
+          entryId={transitionState.id}
+          description={transitionState.description}
           busy={transitionBusy}
           onClose={() => setTransitionState(null)}
           onConfirm={doTransition}

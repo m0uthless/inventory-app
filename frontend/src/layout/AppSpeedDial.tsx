@@ -146,6 +146,7 @@ export default function AppSpeedDial() {
         key: 'newReportRequest',
         label: 'Report / Request',
         to: '/bug-feature',
+        perm: 'feedback.add_reportrequest',
         openCreate: true,
         icon: <FeedbackOutlinedIcon sx={{ fontSize: 20 }} />,
       },

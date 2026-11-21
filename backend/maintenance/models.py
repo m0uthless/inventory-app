@@ -47,6 +47,11 @@ class MaintenancePlan(TimeStampedModel):
         blank=False,
     )
     title = models.CharField(max_length=255)
+    # Area del piano (decisione di Fede del 21/11): visibilità e modifica come le issue.
+    area = models.ForeignKey(
+        "attendance.LeaveArea", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="maintenance_plans", verbose_name="Area",
+    )
 
     schedule_type = models.CharField(max_length=16, choices=ScheduleType.choices)
 
@@ -70,6 +75,7 @@ class MaintenancePlan(TimeStampedModel):
     class Meta:
         verbose_name = "Piano manutenzione"
         verbose_name_plural = "Piani manutenzioni"
+        permissions = [("view_all_areas", "Vede la manutenzione di tutte le aree")]
 
     def __str__(self):
         return f"{self.customer_id} - {self.title}"

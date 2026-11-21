@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agoLabel, groupByKind, purgeBlockText, toRow } from './trashModel'
+import { agoLabel, groupByKind, purgeBlockText, resourceOf, toRow } from './trashModel'
 
 describe('trashModel', () => {
   const now = new Date(2026, 10, 8, 10, 30)
@@ -24,5 +24,14 @@ describe('trashModel', () => {
     expect(purgeBlockText([{ label: 'inventari', count: 3 }, { label: 'siti', count: 0 }, { label: 'contatti', count: 1 }])).toBe('3 inventari, 1 contatto')
     expect(purgeBlockText(undefined)).toBe('')
     expect(groupByKind([{ kind: 'sites', id: 1 }, { kind: 'customers', id: 2 }, { kind: 'sites', id: 4 }])).toEqual({ sites: [1, 4], customers: [2] })
+  })
+
+  it('PO, contratti e issue nel Cestino; solo i contratti si eliminano definitivamente', () => {
+    expect(toRow('purchase-orders', { id: 4, description: 'Offerta RIS', client_name: 'AUSL Imola', purchase_order: 'PO-77' })).toMatchObject({ title: 'Offerta RIS', sub: 'AUSL Imola · PO-77' })
+    expect(toRow('contracts', { id: 5, code: 'CT-2025-010', title: 'Noleggio', customer_name: 'Villa Arcoveggio' })).toMatchObject({ title: 'CT-2025-010 · Noleggio', sub: 'Villa Arcoveggio' })
+    expect(toRow('issues', { id: 6, title: 'Worklist vuota', customer_name: 'AUSL', site_name: 'Marecchia' })).toMatchObject({ title: '#6 Worklist vuota', sub: 'AUSL · Marecchia' })
+    expect(resourceOf('contracts').purgePerm).toBe('contracts.delete_contract')
+    expect(resourceOf('purchase-orders').purgePerm).toBeNull()
+    expect(resourceOf('issues').purgePerm).toBeNull()
   })
 })

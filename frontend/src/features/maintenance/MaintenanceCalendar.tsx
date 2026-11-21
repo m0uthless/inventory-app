@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { Box, Button, ButtonBase, Checkbox, IconButton, Typography } from '@mui/material'
 import CheckIcon from '@mui/icons-material/Check'
-import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { CampoIcon } from '../../ui/campo'
@@ -9,6 +8,7 @@ import { daysLabel } from '../contracts/contractModel'
 import type { TodoRow } from '../../pages/maintenanceTypes'
 import { dueStateOf, isoOf, parseIso, rowKey, todayIso, type DueState, type TodoStats } from './mtModel'
 import { DueStateBadge } from './mtUi'
+import { fetchAll } from '../../api/fetchAll'
 
 type Props = {
   stats: TodoStats | null
@@ -46,9 +46,9 @@ export default function MaintenanceCalendar({ stats, params, reloadKey, checked,
     const base = JSON.parse(key)
     let alive = true
     Promise.all([
-      api.get<{ results: TodoRow[] }>('/maintenance-plans/todo/', { params: { ...base, due_from: from, due_to: to, page_size: 500 } }),
-      api.get<{ results: TodoRow[] }>('/maintenance-plans/todo/', { params: { ...base, due: 'overdue', page_size: 500 } }),
-    ]).then(([m, o]) => { if (alive) { setRows(m.data.results ?? []); setOverdue(o.data.results ?? []) } })
+      fetchAll<TodoRow>('/maintenance-plans/todo/', { ...base, due_from: from, due_to: to }),
+      fetchAll<TodoRow>('/maintenance-plans/todo/', { ...base, due: 'overdue' }),
+    ]).then(([m, o]) => { if (alive) { setRows(m); setOverdue(o) } })
       .catch((e) => toast.error(apiErrorToMessage(e)))
     return () => { alive = false }
   }, [month, key, reloadKey, toast])

@@ -11,11 +11,14 @@ import { CampoIcon } from '../../ui/campo'
 import { ChoiceChips, FieldLabel } from '../contracts/ContractFormParts'
 import type { PlanRow } from '../../pages/maintenanceTypes'
 import { scheduleText } from './mtModel'
+import { fetchAll } from '../../api/fetchAll'
 
 type Customer = { id: number; name: string; display_name?: string | null }
 type Lookup = { id: number; label: string; is_hw?: boolean }
 type Form = {
   customer: number | null
+  /** Area del piano ('' = senza area). */
+  area: number | ''
   inventory_types: number[]
   title: string
   schedule_type: 'interval' | 'fixed_date'
@@ -30,16 +33,18 @@ type Form = {
   notes: string
   custom_fields: Record<string, unknown>
 }
-type Props = { open: boolean; plan: PlanRow | null; customers: Customer[]; onClose: () => void; onSaved: (id: number) => void }
+type Props = { open: boolean; plan: PlanRow | null; customers: Customer[]; onClose: () => void; onSaved: (id: number) => void
+  /** Aree selezionabili e area del proprio profilo (proposta per i piani nuovi). */
+  areas?: { id: number; label: string }[]; myArea?: number | null }
 
-const EMPTY: Form = { customer: null, inventory_types: [], title: '', schedule_type: 'interval', interval_value: 1, interval_unit: 'years', fixed_month: '', fixed_day: '', next_due_date: '', auto: true, alert_days_before: 14, is_active: true, notes: '', custom_fields: {} }
+const EMPTY: Form = { customer: null, area: '', inventory_types: [], title: '', schedule_type: 'interval', interval_value: 1, interval_unit: 'years', fixed_month: '', fixed_day: '', next_due_date: '', auto: true, alert_days_before: 14, is_active: true, notes: '', custom_fields: {} }
 const MONTHS = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre']
 const UNITS: { value: Form['interval_unit']; label: string }[] = [{ value: 'days', label: 'giorni' }, { value: 'weeks', label: 'settimane' }, { value: 'months', label: 'mesi' }, { value: 'years', label: 'anni' }]
 const err = (t?: string) => (t ? <Typography sx={{ mt: 0.5, fontSize: 11.5, color: 'error.main' }}>{t}</Typography> : null)
 
 function fromPlan(p: PlanRow): Form {
   return {
-    customer: p.customer, inventory_types: p.inventory_types ?? [], title: p.title ?? '',
+    customer: p.customer, area: p.area ?? '', inventory_types: p.inventory_types ?? [], title: p.title ?? '',
     schedule_type: p.schedule_type === 'fixed_date' ? 'fixed_date' : 'interval',
     interval_value: p.interval_value ?? '', interval_unit: (p.interval_unit as Form['interval_unit']) ?? 'months',
     fixed_month: p.fixed_month ?? '', fixed_day: p.fixed_day ?? '', next_due_date: p.next_due_date ?? '', auto: false,
@@ -49,7 +54,7 @@ function fromPlan(p: PlanRow): Form {
 }
 
 /** Crea o modifica un piano di manutenzione (stile "Campo sterile"). */
-export default function PlanDialog({ open, plan, customers, onClose, onSaved }: Props) {
+export default function PlanDialog({ open, plan, customers, onClose, onSaved, areas = [], myArea = null }: Props) {
   const toast = useToast()
   const theme = useTheme()
   const narrow = useMediaQuery(theme.breakpoints.down('sm'))
@@ -62,11 +67,12 @@ export default function PlanDialog({ open, plan, customers, onClose, onSaved }: 
 
   React.useEffect(() => {
     if (!open) return
-    setF(plan ? fromPlan(plan) : EMPTY); setErrors({})
+    // Un piano nuovo parte con l'area del proprio profilo (come le issue).
+    setF(plan ? fromPlan(plan) : { ...EMPTY, area: myArea ?? '' }); setErrors({})
     // Tutti i tipi: si propongono quelli hardware, ma restano visibili quelli già nel piano.
-    api.get('/inventory-types/', { params: { ordering: 'label', page_size: 500 } })
-      .then((r) => setTypes(Array.isArray(r.data) ? r.data : (r.data?.results ?? []))).catch(() => {})
-  }, [open, plan])
+    fetchAll<(typeof types)[number]>('/inventory-types/', { ordering: 'label' })
+      .then(setTypes).catch(() => {})
+  }, [open, plan, myArea])
 
   // Prossima scadenza calcolata dal backend sulla base della cadenza.
   const schedKey = `${f.schedule_type}|${f.interval_value}|${f.interval_unit}|${f.fixed_month}|${f.fixed_day}`
@@ -94,7 +100,7 @@ export default function PlanDialog({ open, plan, customers, onClose, onSaved }: 
     if (!f.next_due_date) e.next_due_date = 'Indica la prossima scadenza.'
     if (Object.keys(e).length) { setErrors(e); return }
     const payload = {
-      customer: f.customer, inventory_types: f.inventory_types, title: f.title.trim(), schedule_type: f.schedule_type,
+      customer: f.customer, area: f.area === '' ? null : f.area, inventory_types: f.inventory_types, title: f.title.trim(), schedule_type: f.schedule_type,
       interval_value: f.schedule_type === 'interval' ? Number(f.interval_value) || null : null,
       interval_unit: f.schedule_type === 'interval' ? f.interval_unit : null,
       fixed_month: f.schedule_type === 'fixed_date' ? Number(f.fixed_month) || null : null,
@@ -135,6 +141,17 @@ export default function PlanDialog({ open, plan, customers, onClose, onSaved }: 
             renderInput={(p) => <TextField {...p} placeholder="Cerca il cliente…" error={Boolean(errors.customer)} />} />
           {err(errors.customer)}
         </Box>
+        {areas.length ? (
+          <Box>
+            <FieldLabel htmlFor="pl-area">Area</FieldLabel>
+            <TextField id="pl-area" select size="small" fullWidth value={f.area === '' ? '' : String(f.area)} onChange={(e) => set('area', e.target.value === '' ? '' : Number(e.target.value))}
+              slotProps={{ select: { displayEmpty: true } }}>
+              <MenuItem value=""><em>Senza area</em></MenuItem>
+              {areas.map((a) => <MenuItem key={a.id} value={String(a.id)}>{a.label}</MenuItem>)}
+            </TextField>
+            <Typography sx={{ mt: 0.5, fontSize: 11.5, color: 'text.secondary' }}>Lo vedono e lo modificano i membri dell'area; senza area tutti.</Typography>
+          </Box>
+        ) : null}
         <Box>
           <FieldLabel required htmlFor="pl-title-in">Titolo</FieldLabel>
           <TextField id="pl-title-in" size="small" fullWidth value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="es. Verifica sicurezza elettrica" error={Boolean(errors.title)} />

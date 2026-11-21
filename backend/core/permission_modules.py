@@ -46,7 +46,8 @@ MODULE_LABELS: dict[str, str] = {
     "device": "Device",
     "vlan": "VLAN & Rete",
     "servicenow": "ServiceNow",
-    "attendance": "Presenze & Ferie",
+    # "attendance" (Piano ferie) fuori dalla matrice: i suoi permessi non controllano nulla,
+    # contano i flag del profilo (area ferie, coordinatore). Decisione di Fede del 21/11.
     "expenses": "Note Spese",
     "purchaseorders": "Purchase Order",
     "contracts": "Contratti",

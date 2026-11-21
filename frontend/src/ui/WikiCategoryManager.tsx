@@ -179,7 +179,7 @@ function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string)
               border: '1.5px solid',
               borderColor: value === e ? 'primary.main' : 'transparent',
               transition: 'all 0.1s',
-              '&:hover': { bgcolor: 'grey.100', transform: 'scale(1.1)' },
+              '&:hover': { bgcolor: 'archie.surface2', transform: 'scale(1.1)' },
             }}
           >
             {e}
@@ -212,12 +212,12 @@ function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string)
             height: 36,
             borderRadius: 1.5,
             border: '1.5px solid',
-            borderColor: 'grey.200',
+            borderColor: 'divider',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 22,
-            bgcolor: value ? `${value}` : 'grey.50',
+            bgcolor: value ? `${value}` : 'archie.surface2',
           }}
         >
           {value || '?'}
@@ -439,7 +439,7 @@ function CategoryRow({
       sx={{
         px: 2,
         py: 1.25,
-        '&:hover': { bgcolor: 'grey.50' },
+        '&:hover': { bgcolor: 'archie.surface2' },
         '&:hover .row-actions': { opacity: 1 },
         transition: 'background 0.1s',
       }}

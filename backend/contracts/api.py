@@ -17,6 +17,7 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from audit.utils import log_event
@@ -27,15 +28,11 @@ from core.uploads import validate_upload
 from device.models import Device
 from portal.permissions import IsInternalOrPortalDedicatedApp, PortalModelPermissions
 
-from .models import EXPIRING_DAYS, Contract, ContractStatus, Seller
+from .models import REMINDER_DAYS_MAX, REMINDER_DAYS_MIN, Contract, ContractStatus, Seller
 
 DOCUMENT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB
 DOCUMENT_ALLOWED_EXTENSIONS = ["pdf"]
 DOCUMENT_ALLOWED_CONTENT_TYPES = ["application/pdf"]
-
-# Tetto ai giorni di preavviso: evita OverflowError nel calcolo di
-# `notice_deadline` (end_date - notice_days) con valori assurdi.
-NOTICE_DAYS_MAX = 3650
 
 VALUE_PERM = "contracts.view_contract_value"
 
@@ -83,14 +80,37 @@ class ContractDocumentPermissions(PortalModelPermissions):
 
 class SellerSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source="user.username", read_only=True, default=None)
+    # L'email che riceverà i promemoria di rinnovo (utente Archie o inserita a mano).
+    reminder_email = serializers.SerializerMethodField()
 
     class Meta:
         model = Seller
         fields = [
-            "id", "name", "email", "phone", "user", "user_username", "is_active",
+            "id", "name", "email", "phone", "user", "user_username", "reminder_email", "is_active",
             "created_at", "updated_at", "deleted_at",
         ]
-        read_only_fields = ["id", "user_username", "created_at", "updated_at", "deleted_at"]
+        read_only_fields = ["id", "user_username", "reminder_email", "created_at", "updated_at", "deleted_at"]
+
+    def get_reminder_email(self, obj):
+        if obj.user_id and obj.user.is_active and obj.user.email:
+            return obj.user.email.strip().lower()
+        return (obj.email or "").strip().lower() or None
+
+    def validate(self, attrs):
+        user = attrs["user"] if "user" in attrs else getattr(self.instance, "user", None)
+        email = attrs["email"] if "email" in attrs else getattr(self.instance, "email", "")
+        active = attrs["is_active"] if "is_active" in attrs else getattr(self.instance, "is_active", True)
+        errors = {}
+        # L'utente si controlla solo quando cambia: un collegamento vecchio non blocca le altre modifiche.
+        user_changed = "user" in attrs and getattr(attrs["user"], "pk", None) != getattr(self.instance, "user_id", None)
+        if user_changed and user is not None and not (user.is_active and (user.is_superuser or user.has_perm("core.access_archie"))):
+            errors["user"] = "Scegli un utente di Archie attivo."
+        # Un venditore disattivato non riceve promemoria: l'email serve solo a quelli attivi.
+        if active and user is None and not (email or "").strip():
+            errors["email"] = "Indica l'email del venditore o collega un utente di Archie."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class SellerViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewSet):
@@ -116,7 +136,8 @@ class ContractSerializer(serializers.ModelSerializer):
     contract_type_label = serializers.CharField(source="get_contract_type_display", read_only=True)
     billing_freq_label  = serializers.CharField(source="get_billing_freq_display", read_only=True)
     status_label        = serializers.CharField(source="get_status_display", read_only=True)
-    notice_deadline     = serializers.DateField(read_only=True)
+    reminder_date       = serializers.DateField(read_only=True)
+    reminders           = serializers.SerializerMethodField()
     expiry_state        = serializers.SerializerMethodField()
     # Opzionali: un contratto (es. assistenza) può non coprire alcun device.
     devices = serializers.PrimaryKeyRelatedField(
@@ -134,7 +155,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "contract_type", "contract_type_label",
             "seller", "seller_name",
             "company", "company_label",
-            "start_date", "end_date", "notice_days", "notice_deadline", "auto_renew",
+            "start_date", "end_date", "reminder_days", "reminder_date", "reminders",
             "total_value", "billing_freq", "billing_freq_label",
             "status", "status_label", "expiry_state",
             "devices", "devices_detail",
@@ -143,7 +164,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "created_at", "updated_at", "deleted_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "deleted_at"]
-        extra_kwargs = {"notice_days": {"max_value": NOTICE_DAYS_MAX}}
+        extra_kwargs = {"reminder_days": {"min_value": REMINDER_DAYS_MIN, "max_value": REMINDER_DAYS_MAX}}
 
     def get_fields(self):
         fields = super().get_fields()
@@ -151,6 +172,10 @@ class ContractSerializer(serializers.ModelSerializer):
         # né scrivibile (una PATCH con total_value viene ignorata).
         request = self.context.get("request")
         user = getattr(request, "user", None)
+        # Il calendario dei promemoria serve solo alla finestra del contratto.
+        view = self.context.get("view")
+        if getattr(view, "action", None) != "retrieve":
+            fields.pop("reminders", None)
         if not (user and user.has_perm(VALUE_PERM)):
             fields.pop("total_value", None)
             # Anche il PDF (che riporta il prezzo) è riservato a chi vede i valori.
@@ -160,6 +185,35 @@ class ContractSerializer(serializers.ModelSerializer):
 
     def get_customer_name(self, obj):
         return obj.customer.display_name or obj.customer.name
+
+    def get_reminders(self, obj):
+        """Destinatari e calendario dei promemoria di rinnovo, con l'esito degli invii.
+        Stati: sent, failed, skipped (data passata mai inviata), next, planned."""
+        from contracts import reminders
+        from core.app_settings import get_setting, office_emails
+
+        every = int(get_setting("contracts.reminder_every_days"))
+        to, cc = reminders.recipients(obj, office_emails())
+        email = reminders.seller_email(obj)
+        seller_kind = None
+        if email:
+            s = obj.seller
+            seller_kind = "user" if (s.user_id and s.user.is_active and s.user.email) else "manual"
+        history = {r.due_on: r for r in obj.reminders.all()}
+        today = timezone.localdate()
+        dates, next_marked = [], False
+        for d in reminders.schedule(obj, every):
+            r = history.get(d)
+            if r is not None:
+                state, error = ("sent", None) if r.ok else ("failed", r.error or None)
+            elif d < today:
+                state, error = "skipped", None
+            elif not next_marked:
+                state, error, next_marked = "next", None, True
+            else:
+                state, error = "planned", None
+            dates.append({"date": d.isoformat(), "state": state, "error": error})
+        return {"every": every, "to": to, "cc": cc, "seller_kind": seller_kind, "dates": dates}
 
     def get_expiry_state(self, obj):
         return obj.expiry_state_on(timezone.localdate())
@@ -216,20 +270,18 @@ class ContractSerializer(serializers.ModelSerializer):
 
 def expiry_q(state: str, today) -> Q:
     """Q equivalente a `Contract.expiry_state_on(today) == state` (solo contratti attivi)."""
-    expiring_until = today + timedelta(days=EXPIRING_DAYS)
-    # Termine di disdetta raggiunto: end_date - notice_days <= today  ⇔  end_date <= today + notice_days
-    notice_reached = Q(end_date__lte=ExpressionWrapper(Value(today) + F("notice_days") * timedelta(days=1), output_field=DateField()))
+    # Avviso di rinnovo raggiunto: end_date - reminder_days <= today  ⇔  end_date <= today + reminder_days
+    reminder_reached = Q(end_date__lte=ExpressionWrapper(Value(today) + F("reminder_days") * timedelta(days=1), output_field=DateField()))
     active = Q(status=ContractStatus.ATTIVO)
-    not_expiring = Q(end_date__gt=expiring_until)
     by_state = {
         "expired": Q(end_date__lt=today),
-        "expiring": Q(end_date__gte=today, end_date__lte=expiring_until),
-        "notice": not_expiring & notice_reached,
-        "ok": not_expiring & ~notice_reached,
+        "renew": Q(end_date__gte=today) & reminder_reached,
+        "ok": Q(end_date__gte=today) & ~reminder_reached,
     }
-    if state == "attention":
-        return active & (by_state["expiring"] | by_state["notice"])
     return active & by_state[state]
+
+
+EXPIRY_STATES = ("ok", "renew", "expired")
 
 
 class ContractFilter(filters.FilterSet):
@@ -240,15 +292,15 @@ class ContractFilter(filters.FilterSet):
     # Limitato a 1..9999 (range di datetime.date): fuori range → 400, non 500.
     year = filters.NumberFilter(method="filter_year", min_value=1, max_value=9999)
     # Stato di scadenza come Contract.expiry_state_on, tradotto in query:
-    # ok | notice | expiring | expired, più "attention" = notice + expiring.
+    # ok | renew | expired.
     expiry = filters.ChoiceFilter(
         method="filter_expiry",
-        choices=[(k, k) for k in ("ok", "notice", "expiring", "expired", "attention")],
+        choices=[(k, k) for k in EXPIRY_STATES],
     )
 
     class Meta:
         model  = Contract
-        fields = ["customer", "seller", "company", "status", "contract_type", "auto_renew", "year"]
+        fields = ["customer", "seller", "company", "status", "contract_type", "year"]
 
     def filter_expiry(self, queryset, name, value):
         return queryset.filter(expiry_q(value, timezone.localdate()))
@@ -307,6 +359,13 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
 
     # ── Indicatori della pagina ───────────────────────────────────────────────
 
+    @action(detail=False, methods=["get"], url_path="defaults")
+    def defaults(self, request):
+        """Valori proposti nel modulo «Nuovo contratto» (dalle Impostazioni di Archie)."""
+        from core.app_settings import get_setting
+
+        return Response({"reminder_days": int(get_setting("contracts.reminder_default_days"))})
+
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
         """Conteggi per stato e per scadenza, prossime scadenze e (con il permesso
@@ -320,7 +379,7 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
                 base = base.filter(**{f"{key}_id": int(v)})
         counts = base.aggregate(
             **{f"st_{s}": Count("id", filter=Q(status=s)) for s in ContractStatus.values},
-            **{f"ex_{s}": Count("id", filter=expiry_q(s, today)) for s in ("ok", "notice", "expiring", "expired")},
+            **{f"ex_{s}": Count("id", filter=expiry_q(s, today)) for s in EXPIRY_STATES},
         )
         upcoming = (
             base.filter(status=ContractStatus.ATTIVO, end_date__gte=today)
@@ -329,12 +388,12 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
         data = {
             "active": counts["st_attivo"],
             "by_status": {s: counts[f"st_{s}"] for s in ContractStatus.values},
-            "by_expiry": {s: counts[f"ex_{s}"] for s in ("ok", "notice", "expiring", "expired")},
+            "by_expiry": {s: counts[f"ex_{s}"] for s in EXPIRY_STATES},
             "next_deadlines": [
                 {
                     "id": c.id, "code": c.code, "title": c.title,
                     "customer_name": c.customer.display_name or c.customer.name,
-                    "end_date": c.end_date.isoformat(), "notice_deadline": c.notice_deadline.isoformat(),
+                    "end_date": c.end_date.isoformat(), "reminder_date": c.reminder_date.isoformat(),
                     "expiry_state": c.expiry_state_on(today),
                 }
                 for c in upcoming
@@ -344,6 +403,37 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
             total = base.filter(status=ContractStatus.ATTIVO, end_date__gte=today).aggregate(v=Sum("total_value"))["v"]
             data["active_value"] = f"{(total or 0):.2f}"
         return Response(data)
+
+    @action(detail=False, methods=["get"], url_path="value-by-customer")
+    def value_by_customer(self, request):
+        """Valore dei contratti per cliente, dal più alto (sezione «Valore» della pagina).
+
+        `scope=active` (default): attivi non scaduti, come `active_value` di `stats`;
+        `scope=all`: storico non eliminato senza bozze. Solo con il permesso sui valori.
+        """
+        if not request.user.has_perm(VALUE_PERM):
+            raise PermissionDenied("Serve il permesso per vedere il valore dei contratti.")
+        qs = Contract.objects.filter(deleted_at__isnull=True)
+        if request.query_params.get("scope") == "all":
+            qs = qs.exclude(status=ContractStatus.BOZZA)
+        else:
+            qs = qs.filter(status=ContractStatus.ATTIVO, end_date__gte=timezone.localdate())
+        rows = (
+            qs.values("customer_id", "customer__name", "customer__display_name", "customer__province")
+            .annotate(value=Sum("total_value"), contracts=Count("id"))
+            .filter(value__gt=0)
+            .order_by("-value", "customer__name")
+        )
+        return Response({"results": [
+            {
+                "customer_id": r["customer_id"],
+                "customer_name": r["customer__display_name"] or r["customer__name"],
+                "province": r["customer__province"] or None,
+                "value": f"{r['value']:.2f}",
+                "contracts": r["contracts"],
+            }
+            for r in rows
+        ]})
 
     # ── Documento PDF ─────────────────────────────────────────────────────────
 

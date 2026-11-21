@@ -29,6 +29,7 @@ const Trash = lazy(() => import('./pages/Trash'))
 const Drive = lazy(() => import('./pages/Drive'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Modules = lazy(() => import('./pages/Modules'))
+const AppSettings = lazy(() => import('./pages/AppSettings'))
 const Issues = lazy(() => import('./pages/Issues'))
 const ServiceNowCases = lazy(() => import('./pages/ServiceNowCases'))
 const ServiceNowDashboard = lazy(() => import('./pages/ServiceNowDashboard'))
@@ -39,6 +40,7 @@ const RimborsoSpesePage = lazy(() => import('./pages/RimborsoSpesePage'))
 const BugFeature = lazy(() => import('./pages/BugFeature'))
 const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
 const Contracts = lazy(() => import('./pages/Contracts'))
+const ContractsValue = lazy(() => import('./pages/ContractsValue'))
 const UsersAdmin = lazy(() => import('./pages/UsersAdmin'))
 const PortalAccess = lazy(() => import('./pages/PortalAccess'))
 const NotFound = lazy(() => import('./pages/NotFound'))
@@ -223,11 +225,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'rimborso-spese',
-        element: <RequireAuth>{lazyEl(<RimborsoSpese />)}</RequireAuth>,
+        element: <RequirePerm perm="expenses.view_expensereport">{lazyEl(<RimborsoSpese />)}</RequirePerm>,
       },
       {
         path: 'rimborso-spese/:id',
-        element: <RequireAuth>{lazyEl(<RimborsoSpesePage />)}</RequireAuth>,
+        element: <RequirePerm perm="expenses.view_expensereport">{lazyEl(<RimborsoSpesePage />)}</RequirePerm>,
       },
       {
         path: 'purchase-orders',
@@ -237,8 +239,12 @@ const router = createBrowserRouter([
         path: 'contracts',
         element: <RequirePerm perm="contracts.view_contract">{lazyEl(<Contracts />)}</RequirePerm>,
       },
-      { path: 'bug-feature', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
-      { path: 'bug-feature/resolved', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
+      {
+        path: 'contracts/valore',
+        element: <RequirePerm perm="contracts.view_contract_value">{lazyEl(<ContractsValue />)}</RequirePerm>,
+      },
+      { path: 'bug-feature', element: <RequirePerm perm="feedback.view_reportrequest">{lazyEl(<BugFeature />)}</RequirePerm> },
+      { path: 'bug-feature/resolved', element: <RequirePerm perm="feedback.view_reportrequest">{lazyEl(<BugFeature />)}</RequirePerm> },
       {
         path: 'utenti',
         element: <RequirePerm perm="core.manage_users">{lazyEl(<UsersAdmin />)}</RequirePerm>,
@@ -248,6 +254,7 @@ const router = createBrowserRouter([
         element: <RequirePerm perm="core.manage_users">{lazyEl(<PortalAccess />)}</RequirePerm>,
       },
       { path: 'moduli', element: <RequireSuperuser>{lazyEl(<Modules />)}</RequireSuperuser> },
+      { path: 'impostazioni', element: lazyEl(<AppSettings />) },
       { path: '*', element: lazyEl(<NotFound />) },
     ],
   },

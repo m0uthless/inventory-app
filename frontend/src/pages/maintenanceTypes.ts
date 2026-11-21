@@ -5,6 +5,11 @@ export type PlanRow = {
   customer: number
   customer_code?: string | null
   customer_name?: string | null
+  /** Area del piano (visibilità e modifica come le issue). */
+  area?: number | null
+  area_label?: string | null
+  /** false: piano di un'altra area, in sola lettura. */
+  can_edit?: boolean
   inventory_types: number[]
   inventory_type_labels?: string[]
   covered_count?: number | null
@@ -72,6 +77,8 @@ export type RapportinoContext = {
 export type TodoRow = {
   plan_id: number
   plan_title: string
+  plan_area_id?: number | null
+  plan_area_label?: string | null
   plan_alert_days_before: number
   inventory_id: number
   inventory_name: string

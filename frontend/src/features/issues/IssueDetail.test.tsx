@@ -125,4 +125,16 @@ describe('IssueDetail', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Sistemi' }))
     expect(onPatch).toHaveBeenCalledWith({ area: 5 }, 'Area aggiornata')
   })
+
+  it('nell\'attività gli allegati si leggono come «ha allegato» e «ha tolto l\'allegato»', async () => {
+    const ev = (id: number, changes: Record<string, unknown>) => ({ id, action: 'update', actor_username: 'root', actor_full_name: 'Archie (root)', created_at: `2026-11-20T0${id}:00:00Z`, changes })
+    render(<ThemeProvider theme={theme}><MemoryRouter>
+      <IssueDetail issue={issue} onClose={vi.fn()} comments={[]} commentsLoading={false} newComment="" sendingComment={false}
+        events={[ev(1, { allegati: { from: null, to: 'log.txt' } }), ev(2, { allegati: { from: 'log.txt', to: null } })] as never}
+        onNewCommentChange={vi.fn()} onSendComment={vi.fn()} users={USERS} categories={[]} meId={5} areas={[]}
+        onPatch={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onLinkInventory={vi.fn()} onOpenServiceNow={vi.fn()} />
+    </MemoryRouter></ThemeProvider>)
+    expect(await screen.findByText((_, el) => el?.tagName === 'SPAN' && /ha allegato log\.txt/.test(el.textContent ?? ''))).toBeInTheDocument()
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && /ha tolto l'allegato log\.txt/.test(el.textContent ?? ''))).toBeInTheDocument()
+  })
 })

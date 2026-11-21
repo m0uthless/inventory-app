@@ -33,6 +33,7 @@ import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
+import { fetchAll } from '../api/fetchAll'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -291,8 +292,7 @@ export default function Sites() {
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', { params: { page_size: 500, ordering: 'name' } })
-      setCustomers(res.data.results ?? [])
+      setCustomers(await fetchAll<CustomerItem>('/customers/', { ordering: 'name' }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Button, IconButton, ListItemIcon, Menu, MenuItem, Tooltip, Typography } from '@mui/material'
 import { api } from '@shared/api/client'
+import { apiErrorToMessage } from '@shared/api/error'
 import { apiErrorToFormFeedback } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { buildQuery } from '@shared/utils/nav'
@@ -9,7 +10,7 @@ import {
   BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLoader as Loader, RecordModal, RecordNotes, RecordRow, RecordRows,
   RecordSection, RecordSelect, RecordValue, SectionCount, SoftTag, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft, useShownWhenReady,
 } from '../../ui/campo'
-import LeafletMap from '../../ui/LeafletMap'
+import AddressMap from '../../ui/AddressMap'
 import DeviceDialog from '../devices/DeviceDialog'
 import { deviceLabel, type DeviceListItem } from '../devices/types'
 import type { ContractListItem } from '../contracts/types'
@@ -43,7 +44,7 @@ export type CustomerModalDetail = {
   deleted_at?: string | null
 }
 
-type Vpn = { applicativo?: string | null; utenza?: string | null; password?: string | null; remote_address?: string | null; porta?: string | null }
+type Vpn = { applicativo?: string | null; utenza?: string | null; password?: string | null; has_password?: boolean; remote_address?: string | null; porta?: string | null }
 type SiteRow = { id: number; name?: string | null; display_name?: string | null; city?: string | null; address_line1?: string | null; province?: string | null; status_label?: string | null }
 type DriveRow = { id: number; name: string; updated_at: string; size_human?: string }
 
@@ -112,8 +113,20 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
     api.get<Vpn>(`/customers/${d.id}/vpn/`).then((r) => { if (alive) setVpn(r.data) }).catch(() => { if (alive) setVpn(null) })
     return () => { alive = false }
   }, [d.id, d.has_vpn, p.reloadKey])
-  const [pwShown, setPwShown] = React.useState(false)
-  React.useEffect(() => { if (!pwShown) return; const t = window.setTimeout(() => setPwShown(false), 30000); return () => window.clearTimeout(t) }, [pwShown])
+  // La password non arriva con la scheda: si chiede (`?reveal=1`) solo su «Mostra» o «Copia»,
+  // e ogni richiesta resta nell'Audit. Si tiene in memoria solo finché è visibile.
+  const [secret, setSecret] = React.useState<string | null>(null)
+  const pwShown = secret !== null
+  React.useEffect(() => { if (!pwShown) return; const t = window.setTimeout(() => setSecret(null), 30000); return () => window.clearTimeout(t) }, [pwShown])
+  const revealPw = async (): Promise<string | null> => {
+    if (secret !== null) return secret
+    try {
+      const r = await api.get<Vpn>(`/customers/${d.id}/vpn/`, { params: { reveal: '1' } })
+      return r.data.password ?? null
+    } catch (e) { toast.error(apiErrorToMessage(e)); return null }
+  }
+  const togglePw = async () => { if (pwShown) { setSecret(null); return } setSecret(await revealPw()) }
+  const copyPw = async () => { const pw = await revealPw(); if (pw) p.onCopy(pw) }
 
   // ── Anagrafica e note: modifiche locali, un solo salvataggio ────
   // In lettura i dati sono testo; «Modifica» nel ⋯ li trasforma in campi (stesso schema dell'inventario).
@@ -153,7 +166,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
 
   const [editingDevice, setEditingDevice] = React.useState<DeviceListItem | null>(null)
   // Con ‹ › la finestra resta aperta (niente nuova animazione): lo stato locale riparte col nuovo cliente.
-  React.useEffect(() => { setMenu(null); setPwShown(false); setEditingDevice(null); setEditing(false) }, [d.id])
+  React.useEffect(() => { setMenu(null); setSecret(null); setEditingDevice(null); setEditing(false) }, [d.id])
 
   const siteStats = React.useMemo(() => {
     const inv = new Map<number, number>(); (invs ?? []).forEach((i) => { if (i.site) inv.set(i.site, (inv.get(i.site) ?? 0) + 1) })
@@ -212,6 +225,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
         <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
           <MenuItem disabled={!editable || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
           <MenuItem disabled={!p.canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi (città, indirizzo, tag)…</MenuItem>
+          <MenuItem onClick={() => { setMenu(null); go(`/site-repository${buildQuery({ cliente: d.id })}`) }}><ListItemIcon><CampoIcon name="layers" size={16} /></ListItemIcon>Apri nel Site Repository</MenuItem>
           <MenuItem onClick={() => { setMenu(null); p.onCopy(d.code) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il codice cliente</MenuItem>
           {d.vat_number ? <MenuItem onClick={() => { setMenu(null); p.onCopy(d.vat_number!) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia la P.IVA</MenuItem> : null}
           <MenuItem disabled={!p.canDelete} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>
@@ -263,7 +277,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
                   {(contracts ?? []).map((c) => {
                     const n = daysTo(c.end_date)
                     const tag = c.expiry_state === 'expired' || n < 0 ? <SoftTag tone="neutral">scaduto</SoftTag>
-                      : n <= EXPIRING_DAYS || c.expiry_state === 'notice' || c.expiry_state === 'expiring' ? <SoftTag tone="warning">tra {n} {n === 1 ? 'giorno' : 'giorni'}</SoftTag>
+                      : n <= EXPIRING_DAYS || c.expiry_state === 'renew' ? <SoftTag tone="warning">tra {n} {n === 1 ? 'giorno' : 'giorni'}</SoftTag>
                         : <SoftTag tone="success">in corso</SoftTag>
                     return (
                       <RecordRow key={`c${c.id}`} lead={<CampoIcon name="receipt" size={18} />} title={c.title}
@@ -315,20 +329,20 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
                     vpn.remote_address ? copyBtn(vpn.porta ? `${vpn.remote_address}:${vpn.porta}` : vpn.remote_address, "Copia l'indirizzo") : null)}
                   {credRow('Utenza', vpn.utenza || '—', vpn.utenza ? copyBtn(vpn.utenza, "Copia l'utenza") : null)}
                   {credRow('Password',
-                    vpn.password ? <Box component="span" sx={pwShown ? { bgcolor: 'warning.light', color: 'text.primary', borderRadius: '4px', px: 0.5 } : { letterSpacing: '.08em', color: 'text.secondary' }}>{pwShown ? vpn.password : '••••••••'}</Box>
-                      : <Box component="span" sx={{ fontFamily: 'inherit', color: 'text.secondary' }}>{'password' in vpn ? '—' : 'Serve il permesso Credenziali VPN'}</Box>,
-                    vpn.password ? (
+                    vpn.has_password ? <Box component="span" sx={pwShown ? { bgcolor: 'warning.light', color: 'text.primary', borderRadius: '4px', px: 0.5 } : { letterSpacing: '.08em', color: 'text.secondary' }}>{pwShown ? secret : '••••••••'}</Box>
+                      : <Box component="span" sx={{ fontFamily: 'inherit', color: 'text.secondary' }}>{'has_password' in vpn ? '—' : 'Serve il permesso Credenziali VPN'}</Box>,
+                    vpn.has_password ? (
                       <>
                         <Tooltip title={pwShown ? 'Nascondi' : 'Mostra · si nasconde dopo 30 secondi'}>
-                          <IconButton size="small" aria-pressed={pwShown} aria-label={pwShown ? 'Nascondi la password VPN' : 'Mostra la password VPN'} onClick={() => setPwShown((v) => !v)} sx={{ width: 28, height: 28, color: pwShown ? 'warning.main' : undefined }}>
+                          <IconButton size="small" aria-pressed={pwShown} aria-label={pwShown ? 'Nascondi la password VPN' : 'Mostra la password VPN'} onClick={() => void togglePw()} sx={{ width: 28, height: 28, color: pwShown ? 'warning.main' : undefined }}>
                             <CampoIcon name={pwShown ? 'eyeOff' : 'eye'} size={14} />
                           </IconButton>
                         </Tooltip>
-                        {copyBtn(vpn.password, 'Copia la password VPN')}
+                        <Tooltip title="Copia"><IconButton size="small" aria-label="Copia la password VPN" onClick={() => void copyPw()} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
                       </>
                     ) : null)}
                 </Box>
-                <Typography sx={{ mt: 0.75, fontSize: 11, color: 'text.disabled' }}>La password è visibile solo con il permesso Credenziali VPN.</Typography>
+                <Typography sx={{ mt: 0.75, fontSize: 11, color: 'text.disabled' }}>Ogni volta che la password viene mostrata o copiata resta traccia nell'Audit.</Typography>
               </>
             ) : <Loader />) : (
               <RecordEmpty>Nessun accesso remoto.{p.canEditVpn && !deleted ? <> <Button size="small" onClick={p.onEditVpn} sx={{ ml: 0.5 }}>Registra VPN e credenziali</Button></> : null}</RecordEmpty>
@@ -338,7 +352,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
           {p.address ? (
             <RecordSection title="Dove">
               <WhereBlock address={p.address} line1={street || p.address} line2={[cityPart, d.province ? `(${d.province})` : null].filter(Boolean).join(' ') || undefined}
-                map={<LeafletMap address={p.address} height={150} zoom={15} quiet />} />
+                map={<AddressMap address={p.address} height={150} zoom={15} quiet title={d.display_name || d.name} />} />
             </RecordSection>
           ) : null}
 

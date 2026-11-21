@@ -271,3 +271,13 @@ describe('AreaTaskDetail', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('#55')))
   })
 })
+
+describe('motivo dell\'attesa', () => {
+  it('«In attesa di …» dal menu manda stato e motivo', async () => {
+    apiPatch.mockResolvedValue({ data: { ...baseTask, status: 'in_attesa', waiting_reason: 'cliente', waiting_reason_label: 'Cliente' } })
+    setup()
+    fireEvent.click(await menu('In attesa di Cliente'))
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledWith('/area-tasks/7/', { status: 'in_attesa', waiting_reason: 'cliente' }))
+  })
+})
+

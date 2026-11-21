@@ -1,5 +1,6 @@
 // Modello della Nota spese (restyle "Campo sterile", anteprima design-previews/ns-base.html).
 import { CATEGORY_ORDER, type ExpenseCategory, type ExpenseItemRow, type ExpenseReportRow, type ExpenseReportStatus } from './expensesShared'
+import { fmtNumber } from '@shared/utils/number'
 
 export const MONTHS_LC = ['', 'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -25,7 +26,7 @@ export const amountInput = (v: string | number | null | undefined) => {
 }
 
 export const rateLabel = (rate: string | null | undefined) =>
-  rate == null ? null : `${toNum(rate).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} €/km`
+  rate == null ? null : `${fmtNumber(toNum(rate), { minimumFractionDigits: 2, maximumFractionDigits: 3 })} €/km`
 
 export const sortedItems = (r: Pick<ExpenseReportRow, 'items'>) =>
   [...r.items].sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category))

@@ -26,7 +26,7 @@ type QuickFormProps = {
   mode: 'create' | 'edit'
   /** Nome del dialogo per i lettori di schermo (es. "Nuovo task", "Modifica task #7"). */
   dialogLabel: string
-  title: { value: string; onChange: (v: string) => void; placeholder: string; error?: string; maxLength?: number; label?: string }
+  title: { value: string; onChange: (v: string) => void; placeholder: string; error?: string; maxLength?: number; label?: string; /** Bloccato (es. PO già inviato) senza bloccare il resto. */ readOnly?: boolean }
   /** Testo lungo sotto il titolo (descrizione o note). */
   description?: { value: string; onChange: (v: string) => void; placeholder: string; label?: string }
   pills: React.ReactNode
@@ -76,7 +76,7 @@ export function QuickForm(p: QuickFormProps) {
         {p.notice ? <Box sx={{ mt: 1.25, px: 1.5, py: 1, borderRadius: '8px', bgcolor: 'warning.light', color: 'text.primary', fontSize: 12.5 }}>{p.notice}</Box> : null}
         <Box sx={p.readOnly ? { opacity: 0.6, pointerEvents: 'none', userSelect: 'none' } : undefined} aria-disabled={p.readOnly || undefined}>
         <InputBase
-          autoFocus={!p.readOnly} readOnly={p.readOnly} fullWidth value={p.title.value} onChange={(e) => p.title.onChange(e.target.value)} placeholder={p.title.placeholder}
+          autoFocus={!p.readOnly && !p.title.readOnly} readOnly={p.readOnly || p.title.readOnly} fullWidth value={p.title.value} onChange={(e) => p.title.onChange(e.target.value)} placeholder={p.title.placeholder}
           inputProps={{ 'aria-label': p.title.label ?? p.title.placeholder, maxLength: p.title.maxLength, 'aria-invalid': Boolean(p.title.error) }}
           sx={{ mt: 1.25, fontSize: 21, fontWeight: 650, letterSpacing: '-0.01em', '& input::placeholder': { color: p.title.error ? 'error.main' : 'archie.textFaint', opacity: 1 } }}
         />
@@ -231,17 +231,21 @@ function PickerPopover<V extends string | number>({ anchor, onClose, title, item
 
 // ── Pillola scrivibile ──────────────────────────────────────────────
 
-export function TextPill({ icon, placeholder, value, onChange, error, disabled, mono, title, type = 'text', inputMode }: {
+export function TextPill({ icon, placeholder, value, onChange, error, disabled, mono, title, type = 'text', inputMode, prefix, suffix }: {
   icon?: React.ReactNode; placeholder: string; value: string; onChange: (v: string) => void; error?: boolean; disabled?: boolean
+  /** Etichetta corta prima del valore (es. «Importo») e unità dopo (es. «€»), visibili quando c'è un valore. */
+  prefix?: string; suffix?: string
   mono?: boolean; /** Ignorata: la pillola cresce col testo. */ width?: number; title?: string; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
 }) {
   const set = value.trim() !== ''
   return (
     <Box component="label" title={title} sx={[pillSx(set, Boolean(error)), { cursor: disabled ? 'not-allowed' : 'text', opacity: disabled ? 0.5 : 1, '&:focus-within': { borderColor: 'primary.main', borderStyle: 'solid', bgcolor: 'background.paper' } }]}>
       {icon}
+      {prefix && set ? <Box component="span" sx={{ color: 'text.secondary' }}>{prefix}</Box> : null}
       <InputBase value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} type={type}
         inputProps={{ 'aria-label': placeholder, inputMode }}
         sx={{ fontSize: 12.5, color: 'inherit', fontFamily: mono ? '"Geist Mono", monospace' : undefined, width: 'auto', maxWidth: 260, '& input': { p: 0, width: `${Math.min(Math.max(placeholder.length, value.length, 3) + 1, 34)}ch` }, '& input::placeholder': { color: 'inherit', opacity: 1, fontFamily: 'Geist, system-ui, sans-serif' } }} />
+      {suffix && set ? <Box component="span" sx={{ color: 'text.secondary' }}>{suffix}</Box> : null}
     </Box>
   )
 }

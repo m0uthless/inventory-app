@@ -2,11 +2,13 @@ import * as React from 'react'
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   Stack,
@@ -34,6 +36,8 @@ export type VpnAccess = {
   applicativo: string | null
   utenza: string | null
   password: string | null
+  /** La password non arriva col GET normale: si chiede con `?reveal=1` (resta nell'Audit). */
+  has_password?: boolean
   remote_address: string | null
   porta: string | null
   note: string | null
@@ -146,6 +150,18 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
   const [mode, setMode] = React.useState<'view' | 'edit'>('view')
   const [form, setForm] = React.useState<VpnForm>(emptyForm())
   const [showPassword, setShowPassword] = React.useState(false)
+  // «Togli la password»: manda una password vuota, che il backend salva come assente.
+  const [clearPassword, setClearPassword] = React.useState(false)
+  // Password in chiaro solo su «Mostra», chiesta al momento (`?reveal=1`, registrata nell'Audit).
+  const [revealed, setRevealed] = React.useState<string | null>(null)
+  React.useEffect(() => { setRevealed(null) }, [open, customerId])
+  const toggleReveal = async () => {
+    if (revealed !== null) { setRevealed(null); return }
+    try {
+      const r = await api.get<VpnAccess>(`/customers/${customerId}/vpn/`, { params: { reveal: '1' } })
+      setRevealed(r.data.password ?? null)
+    } catch (e) { toast.error(apiErrorToMessage(e)) }
+  }
   const [confirmDelete, setConfirmDelete] = React.useState(false)
 
   // ── Fetch on open ──
@@ -188,6 +204,7 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
       note: vpn?.note ?? '',
     })
     setShowPassword(false)
+    setClearPassword(false)
     setMode('edit')
   }
 
@@ -202,7 +219,8 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
         porta: form.porta,
         note: form.note,
       }
-      if (form.password_input) payload.password_input = form.password_input
+      if (clearPassword) payload.password_input = ''
+      else if (form.password_input) payload.password_input = form.password_input
 
       let updated: VpnAccess
       if (notFound || !vpn) {
@@ -282,7 +300,7 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
                 Password
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-                {canViewSecrets && vpn.password ? (
+                {canViewSecrets && vpn.has_password ? (
                   <>
                     <Typography
                       variant="body2"
@@ -290,21 +308,21 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
                         fontFamily: 'monospace', fontSize: '0.78rem',
                         bgcolor: 'action.hover', px: 0.75, py: 0.25,
                         borderRadius: 0.75, border: '0.5px solid', borderColor: 'divider',
-                        letterSpacing: showPassword ? undefined : '3px',
+                        letterSpacing: revealed !== null ? undefined : '3px',
                       }}
                     >
-                      {showPassword ? vpn.password : '••••••••'}
+                      {revealed ?? '••••••••'}
                     </Typography>
-                    <Tooltip title={showPassword ? 'Nascondi' : 'Mostra'}>
-                      <IconButton size="small" sx={{ p: 0.5 }} onClick={() => setShowPassword((p) => !p)}>
-                        {showPassword ? <VisibilityOffIcon sx={{ fontSize: 14 }} /> : <VisibilityIcon sx={{ fontSize: 14 }} />}
+                    <Tooltip title={revealed !== null ? 'Nascondi' : 'Mostra'}>
+                      <IconButton size="small" sx={{ p: 0.5 }} aria-label={revealed !== null ? 'Nascondi la password' : 'Mostra la password'} onClick={() => void toggleReveal()}>
+                        {revealed !== null ? <VisibilityOffIcon sx={{ fontSize: 14 }} /> : <VisibilityIcon sx={{ fontSize: 14 }} />}
                       </IconButton>
                     </Tooltip>
-                    {showPassword && <CopyButton value={vpn.password} />}
+                    {revealed !== null && <CopyButton value={revealed} />}
                   </>
                 ) : (
-                  <Typography variant="body2" sx={{ color: vpn.password ? 'text.secondary' : 'text.disabled', letterSpacing: vpn.password ? '3px' : undefined, fontSize: '0.75rem' }}>
-                    {vpn.password ? '••••••••' : '—'}
+                  <Typography variant="body2" sx={{ color: vpn.has_password ? 'text.secondary' : 'text.disabled', letterSpacing: vpn.has_password ? '3px' : undefined, fontSize: '0.75rem' }}>
+                    {vpn.has_password ? '••••••••' : '—'}
                   </Typography>
                 )}
               </Box>
@@ -339,7 +357,8 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
 
             <TextField
               label={notFound ? 'Password' : 'Nuova password (lascia vuoto per non cambiare)'}
-              value={form.password_input}
+              value={clearPassword ? '' : form.password_input}
+              disabled={clearPassword}
               onChange={(e) => setForm((f) => ({ ...f, password_input: e.target.value }))}
               size="small"
               fullWidth
@@ -355,6 +374,11 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
                 ),
               }}
             />
+
+            {!notFound && vpn?.has_password ? (
+              <FormControlLabel sx={{ mt: -1 }} control={<Checkbox size="small" checked={clearPassword} onChange={(e) => setClearPassword(e.target.checked)} />}
+                label={<Typography variant="body2" sx={{ color: clearPassword ? 'error.main' : 'text.secondary' }}>Togli la password</Typography>} />
+            ) : null}
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2, alignItems: 'start' }}>
               <TextField

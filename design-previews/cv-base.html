@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contratti · valore per cliente · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c; --primary-ink: #fff; --bg: #f4f7f6; --surface: #fff; --surface-2: #f5f8f7; --border: #d5dedb; --border-strong: #b9c7c3;
+  --text: #15201e; --muted: #5b6b67; --faint: #66766f; --field: #e2f0eb; --field-line: #1f6b5c; --warning: #9a5b00; --warning-bg: #fbefd9;
+  --map-empty: #e9efed; --focus: 0 0 0 3px rgb(31 107 92 / .28); --shadow: 0 12px 32px -12px rgb(16 40 34 / .22), 0 2px 6px rgb(16 40 34 / .06);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --primary-ink: #0b1513; --bg: #141c1b; --surface: #151e1c; --surface-2: #1a2523; --border: #2a3734; --border-strong: #3b4c48;
+  --text: #e4ecea; --muted: #93a4a0; --faint: #849591; --field: #183a33; --field-line: #5fb8a3; --warning: #e0a43a; --warning-bg: #3a2c12;
+  --map-empty: #1e2928; --focus: 0 0 0 3px rgb(95 184 163 / .35); --shadow: 0 16px 40px -12px rgb(0 0 0 / .6);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 Geist, system-ui, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 22px 20px 110px; }
+.head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.head h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -.02em; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.seg button { height: 28px; padding: 0 11px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.seg button:focus-visible { outline: none; box-shadow: var(--focus); }
+.sp { flex: 1; }
+.lock { font-size: 12px; color: var(--muted); }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.kpi small { color: var(--muted); font-size: 12.5px; } .kpi b { display: block; font-size: 24px; font-weight: 650; margin: 2px 0; letter-spacing: -.01em; } .kpi span { font-size: 12px; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 650; } .card .sub { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
+.grid-a { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.grid-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
+/* Classifica */
+.rank { list-style: none; margin: 0; padding: 0; display: grid; }
+.rank li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+.rank li:first-child { border-top: 0; }
+.rank .n { font: 600 12px "Geist Mono", monospace; color: var(--faint); text-align: right; }
+.rank .who b { font-size: 13.5px; font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank .who small { font-size: 12px; color: var(--muted); }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); margin-top: 5px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
+.rank .v { text-align: right; font-variant-numeric: tabular-nums; } .rank .v b { font-size: 13.5px; display: block; } .rank .v small { font-size: 12px; color: var(--muted); }
+.reg { display: grid; gap: 8px; }
+.reg button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.reg button:hover { border-color: var(--border-strong); } .reg button[aria-pressed="true"] { border-color: var(--field-line); background: var(--field); }
+.reg button:focus-visible { outline: none; box-shadow: var(--focus); }
+.reg b { font-size: 13px; } .reg small { font-size: 12px; color: var(--muted); } .reg .bar { grid-column: 1 / -1; margin-top: 2px; }
+.more { margin-top: 10px; font-size: 12.5px; color: var(--primary); font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--field); font-size: 12.5px; font-weight: 600; }
+.chip button { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; padding: 0; }
+/* Mappa */
+.map svg { width: 100%; height: auto; max-height: 520px; display: block; }
+.map path.r { stroke: var(--surface); stroke-width: 1.2; cursor: pointer; transition: opacity .15s; }
+.map path.r:hover { opacity: .8; } .map path.r.on { stroke: var(--text); stroke-width: 2; }
+.legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { width: 120px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 15%, var(--surface)), var(--primary)); }
+/* Tabella raggruppata */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 500; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--border); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.grp td { background: var(--surface-2); font-weight: 650; }
+tr.grp td .pct { font-weight: 500; color: var(--muted); margin-left: 6px; }
+tr.tot td { font-weight: 700; border-top: 2px solid var(--border-strong); border-bottom: 0; }
+.share { display: inline-block; width: 60px; height: 6px; border-radius: 3px; background: var(--surface-2); vertical-align: middle; margin-right: 8px; overflow: hidden; }
+.share i { display: block; height: 100%; background: var(--primary); }
+/* Barra comandi */
+.pv { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); z-index: 10; font-size: 12.5px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px); }
+.pv a, .pv button { height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.pv button[aria-pressed="true"] { background: var(--field); color: var(--text); font-weight: 600; }
+.pv .sep { width: 1px; height: 18px; background: var(--border); }
+@media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-a, .grid-b { grid-template-columns: minmax(0, 1fr); } .hide-sm { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" data-root></div>
+<div class="pv" role="toolbar" aria-label="Controlli anteprima">
+  <a href="index.html">‹ Indice</a><span class="sep"></span>
+  <button data-v="a">A · Classifica e regioni</button><button data-v="b">B · Mappa</button><button data-v="c">C · Tabella per regione</button>
+  <span class="sep"></span><button data-theme>Tema</button>
+</div>
+<script src="shared/italy-geo.js"></script>
+<script>
+(() => {
+  const REG = Object.fromEntries(ITALY.regions.map((r) => [r.id, r.name]))
+  // [cliente, regione, provincia, valore attivo oggi, contratti attivi, valore storico, contratti totali]
+  const DATA = [
+    ['AUSL Romagna Adriatica', 'EMR', 'RA', 412000, 4, 980000, 9], ['Azienda Ospedaliera Estense', 'EMR', 'FE', 318500, 3, 512000, 6],
+    ['Azienda Sanitaria Friuli Centrale', 'FVG', 'UD', 286000, 3, 286000, 3], ['AUSL Imola', 'EMR', 'BO', 186000, 1, 402000, 3],
+    ['Azienda Ospedaliera Scaligera', 'VEN', 'VR', 152000, 2, 210000, 3], ['Istituto Ortopedico Colli Bolognesi', 'EMR', 'BO', 98700, 2, 98700, 2],
+    ['Azienda Sanitaria Felsinea', 'EMR', 'BO', 76400, 2, 244000, 5], ['ASL Piacenza Val Trebbia', 'EMR', 'PC', 54000, 1, 54000, 1],
+    ['Casa di Cura Villa Arcoveggio', 'EMR', 'BO', 32500, 1, 61000, 2], ['AULSS Padova Euganea', 'VEN', 'PD', 28900, 1, 112000, 3],
+    ['Clinica Villa Serena', 'EMR', 'FC', 12600, 1, 37800, 3], ['Policlinico Modena Nord', 'EMR', 'MO', 0, 0, 88000, 2],
+    ['AS Friuli Occidentale', 'FVG', 'PN', 0, 0, 46000, 1], ['Ospedale di Rimini Sud', 'EMR', 'RN', 9800, 1, 9800, 1],
+  ]
+  const state = { v: 'a', mode: 'now', region: null }
+  try { Object.assign(state, JSON.parse(localStorage.getItem('archie-preview-cv') || '{}'), { region: null }) } catch (e) { /* niente */ }
+  const eur = (n) => n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0)
+  const rows = () => DATA.map(([c, r, p, vn, kn, vh, kh]) => ({ c, r, p, v: state.mode === 'now' ? vn : vh, k: state.mode === 'now' ? kn : kh }))
+    .filter((x) => x.v > 0).sort((a, b) => b.v - a.v)
+  const byRegion = (list) => {
+    const m = new Map()
+    for (const x of list) { const g = m.get(x.r) || { r: x.r, v: 0, n: 0 }; g.v += x.v; g.n += 1; m.set(x.r, g) }
+    return [...m.values()].sort((a, b) => b.v - a.v)
+  }
+
+  const kpis = (list) => {
+    const tot = list.reduce((s, x) => s + x.v, 0)
+    const top5 = list.slice(0, 5).reduce((s, x) => s + x.v, 0)
+    const reg = byRegion(list)[0]
+    return `<div class="kpis">
+      <div class="kpi"><small>${state.mode === 'now' ? 'Valore dei contratti attivi' : 'Valore di tutti i contratti'}</small><b>${eur(tot)}</b><span>${list.length} clienti</span></div>
+      <div class="kpi"><small>Primo cliente</small><b style="font-size:16px">${list[0]?.c ?? '—'}</b><span>${list[0] ? `${eur(list[0].v)} · ${pct(list[0].v, tot)}% del totale` : ''}</span></div>
+      <div class="kpi"><small>Primi 5 clienti</small><b>${pct(top5, tot)}%</b><span>del valore, ${eur(top5)}</span></div>
+      <div class="kpi"><small>Regione principale</small><b style="font-size:16px">${reg ? REG[reg.r] : '—'}</b><span>${reg ? `${eur(reg.v)} · ${pct(reg.v, tot)}% del totale` : ''}</span></div>
+    </div>`
+  }
+  const rankList = (list, max) => {
+    const top = list[0]?.v || 1
+    return `<ol class="rank">${list.slice(0, max).map((x, i) => `<li><span class="n">${i + 1}</span><span class="who"><b>${x.c}</b><small>${REG[x.r]} · ${x.p} · ${x.k} ${x.k === 1 ? 'contratto' : 'contratti'}</small><span class="bar"><i style="width:${(x.v / top) * 100}%"></i></span></span><span class="v"><b>${eur(x.v)}</b><small>${pct(x.v, list.reduce((s, y) => s + y.v, 0))}%</small></span></li>`).join('')}</ol>`
+  }
+  const regionButtons = (list) => {
+    const regs = byRegion(rows()); const top = regs[0]?.v || 1; const tot = regs.reduce((s, g) => s + g.v, 0)
+    return `<div class="reg">${regs.map((g) => `<button type="button" data-reg="${g.r}" aria-pressed="${state.region === g.r}"><b>${REG[g.r]}</b><span><b>${eur(g.v)}</b> <small>${pct(g.v, tot)}%</small></span><small>${g.n} ${g.n === 1 ? 'cliente' : 'clienti'}</small><span></span><span class="bar"><i style="width:${(g.v / top) * 100}%"></i></span></button>`).join('')}</div>`
+  }
+  const filterChip = () => state.region ? `<span class="chip">${REG[state.region]}<button type="button" data-reg="" aria-label="Tutte le regioni">✕</button></span>` : ''
+
+  const vA = () => {
+    const list = rows().filter((x) => !state.region || x.r === state.region)
+    return `<div class="grid-a">
+      <section class="card"><div class="head" style="margin:0 0 4px"><h2>Clienti per valore</h2>${filterChip()}</div><p class="sub">${state.mode === 'now' ? 'Contratti in corso o da rinnovare' : 'Tutti i contratti, anche scaduti e chiusi'}. Clic su un cliente per aprirlo.</p>${rankList(list, 10)}${list.length > 10 ? `<div class="more">Mostra tutti i ${list.length} clienti</div>` : ''}</section>
+      <section class="card"><h2>Per regione</h2><p class="sub">Dalla provincia del cliente. Clic per filtrare la classifica.</p>${regionButtons()}</section>
+    </div>`
+  }
+  const vB = () => {
+    const regs = byRegion(rows()); const max = regs[0]?.v || 1
+    const val = Object.fromEntries(regs.map((g) => [g.r, g.v]))
+    const paths = ITALY.regions.map((r) => {
+      const v = val[r.id] || 0
+      const fill = v ? `color-mix(in srgb, var(--primary) ${15 + Math.round((v / max) * 85)}%, var(--surface))` : 'var(--map-empty)'
+      return `<path class="r${state.region === r.id ? ' on' : ''}" d="${r.path}" style="fill:${fill}" data-reg="${v ? r.id : ''}"><title>${r.name}${v ? ` · ${eur(v)}` : ' · nessun contratto'}</title></path>`
+    }).join('')
+    const list = rows().filter((x) => !state.region || x.r === state.region)
+    return `<div class="grid-b">
+      <section class="card map"><h2>Valore per regione</h2><p class="sub">Più scura, più valore. Clic su una regione per filtrare.</p><svg viewBox="${ITALY.viewBox}" role="img" aria-label="Mappa del valore dei contratti per regione">${paths}</svg><div class="legend">meno<i></i>più</div></section>
+      <section class="card"><div class="head" style="margin:0 0 4px"><h2>${state.region ? `Clienti in ${REG[state.region]}` : 'Clienti per valore'}</h2>${filterChip()}</div><p class="sub">${state.mode === 'now' ? 'Contratti in corso o da rinnovare' : 'Tutti i contratti, anche scaduti e chiusi'}.</p>${rankList(list, 12)}</section>
+    </div>`
+  }
+  const vC = () => {
+    const list = rows(); const tot = list.reduce((s, x) => s + x.v, 0)
+    const body = byRegion(list).map((g) => `<tr class="grp"><td colspan="2">${REG[g.r]} <span class="pct">${g.n} ${g.n === 1 ? 'cliente' : 'clienti'}</span></td><td class="num">${eur(g.v)}</td><td class="num hide-sm">${pct(g.v, tot)}%</td></tr>`
+      + list.filter((x) => x.r === g.r).map((x) => `<tr><td>${x.c}</td><td class="hide-sm" style="color:var(--muted)">${x.p} · ${x.k} ${x.k === 1 ? 'contratto' : 'contratti'}</td><td class="num">${eur(x.v)}</td><td class="num hide-sm"><span class="share"><i style="width:${pct(x.v, tot)}%"></i></span>${pct(x.v, tot)}%</td></tr>`).join('')).join('')
+    return `<section class="card"><h2>Valore per regione e cliente</h2><p class="sub">${state.mode === 'now' ? 'Contratti in corso o da rinnovare' : 'Tutti i contratti, anche scaduti e chiusi'}. Si esporta in CSV come le altre tabelle.</p>
+      <table><thead><tr><th>Cliente</th><th class="hide-sm">Provincia · contratti</th><th class="num">Valore</th><th class="num hide-sm">Quota</th></tr></thead><tbody>${body}<tr class="tot"><td colspan="2">Totale</td><td class="num">${eur(tot)}</td><td class="num hide-sm">100%</td></tr></tbody></table></section>`
+  }
+
+  const render = () => {
+    const list = rows()
+    document.querySelector('[data-root]').innerHTML = `
+      <div class="head"><h1>Contratti</h1><span class="seg" role="group" aria-label="Sezione"><button type="button" aria-pressed="false">Elenco</button><button type="button" aria-pressed="true">Valore</button></span>
+        <span class="sp"></span><span class="seg" role="group" aria-label="Quali contratti"><button type="button" data-mode="now" aria-pressed="${state.mode === 'now'}">Attivi oggi</button><button type="button" data-mode="all" aria-pressed="${state.mode === 'all'}">Storico</button></span></div>
+      <p class="lock">🔒 Solo con il permesso sui valori dei contratti.</p>
+      ${kpis(list)}${state.v === 'b' ? vB() : state.v === 'c' ? vC() : vA()}`
+    document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state.v)))
+    try { localStorage.setItem('archie-preview-cv', JSON.stringify({ v: state.v, mode: state.mode })) } catch (e) { /* niente */ }
+  }
+  document.addEventListener('click', (e) => {
+    const v = e.target.closest('[data-v]'); if (v) { state.v = v.dataset.v; state.region = null; render() }
+    const m = e.target.closest('[data-mode]'); if (m) { state.mode = m.dataset.mode; render() }
+    const r = e.target.closest('[data-reg]'); if (r) { state.region = r.dataset.reg && state.region !== r.dataset.reg ? r.dataset.reg : null; render() }
+    if (e.target.closest('[data-theme]')) { const h = document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark') }
+  })
+  render()
+})()
+</script>
+</body>
+</html>

@@ -14,8 +14,8 @@ import { useUrlNumberParam, useUrlStringParam } from '@shared/hooks/useUrlParam'
 import { api } from '@shared/api/client'
 import { itemActionPath, itemPath, type CollectionPath } from '@shared/api/apiPaths'
 import { buildDrfListParams, includeDeletedParams } from '@shared/api/drf'
-import type { ApiPage } from '@shared/api/drf'
 import { useDrfList } from '@shared/hooks/useDrfList'
+import { credentialPayload } from '../features/inventory/credentialPayload'
 import InventoryDialog from '../features/inventory/InventoryDialog'
 import InventoryDetailModal from '../features/inventory/InventoryDetailModal'
 import RecordStackHost from '../features/records/RecordStackHost'
@@ -33,6 +33,7 @@ import { isRecord } from '@shared/utils/guards'
 import RowContextMenu, { type RowContextMenuItem } from '@shared/ui/RowContextMenu'
 import { PageHead, ViewTabs, FilterOptionList, TableBar, CampoIcon, useSavedViews, SaveViewDialog, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import { useExportCsv } from '@shared/ui/useExportCsv'
+import { fetchAll } from '../api/fetchAll'
 
 type LookupItem = { id: number; label: string; key?: string }
 
@@ -339,8 +340,7 @@ export default function Inventory() {
 
   const loadCustomers = React.useCallback(async () => {
     try {
-      const res = await api.get<ApiPage<CustomerItem>>('/customers/', { params: { ordering: 'name', page_size: 500 } })
-      setCustomers(res.data.results ?? [])
+      setCustomers(await fetchAll<CustomerItem>('/customers/', { ordering: 'name' }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
@@ -355,16 +355,14 @@ export default function Inventory() {
   const loadFilterSites = React.useCallback(async () => {
     try {
       if (customerId === '') { setFilterSites([]); return }
-      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { ordering: 'name', page_size: 500, customer: customerId } })
-      setFilterSites(res.data.results ?? [])
+      setFilterSites(await fetchAll<SiteItem>('/sites/', { ordering: 'name', customer: customerId }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [customerId, toast])
 
   const loadSitesForDialogCustomer = React.useCallback(async (cust: number | '') => {
     try {
       if (cust === '') { setDlgSites([]); return }
-      const res = await api.get<ApiPage<SiteItem>>('/sites/', { params: { ordering: 'name', page_size: 500, customer: cust } })
-      setDlgSites(res.data.results ?? [])
+      setDlgSites(await fetchAll<SiteItem>('/sites/', { ordering: 'name', customer: cust }))
     } catch (e) { toast.error(apiErrorToMessage(e)) }
   }, [toast])
 
@@ -574,7 +572,7 @@ export default function Inventory() {
       customer: cust, site: detail.site ?? '', status: detail.status ?? '', type: detail.type ?? '', name: detail.name ?? '',
       knumber: detail.knumber ?? '', serial_number: detail.serial_number ?? '', hostname: detail.hostname ?? '', local_ip: detail.local_ip ?? '',
       srsa_ip: detail.srsa_ip ?? '', location: detail.location ?? '', telefono: detail.telefono ?? '', os_user: detail.os_user ?? '',
-      os_pwd: detail.os_pwd ?? '', app_usr: detail.app_usr ?? '', app_pwd: detail.app_pwd ?? '', vnc_pwd: detail.vnc_pwd ?? '',
+      os_pwd: '', app_usr: detail.app_usr ?? '', app_pwd: '', vnc_pwd: '',
       manufacturer: detail.manufacturer ?? '', model: detail.model ?? '', warranty_end_date: detail.warranty_end_date ?? '',
       custom_fields: detail.custom_fields ?? {}, notes: detail.notes ?? '', tags: detail.tags ?? [],
     })
@@ -600,8 +598,8 @@ export default function Inventory() {
       manufacturer: t(form.manufacturer), model: t(form.model), warranty_end_date: t(form.warranty_end_date),
       custom_fields: form.custom_fields && Object.keys(form.custom_fields).length ? form.custom_fields : null,
       notes: t(form.notes), tags: form.tags.length ? form.tags : null,
-      // Le credenziali si inviano solo con il permesso (il backend le rifiuta altrimenti).
-      ...(canViewSecrets ? { os_user: t(form.os_user), os_pwd: t(form.os_pwd), app_usr: t(form.app_usr), app_pwd: t(form.app_pwd), vnc_pwd: t(form.vnc_pwd) } : { os_user: t(form.os_user), app_usr: t(form.app_usr) }),
+      // Password vuota = invariata (non arrivano più col dettaglio); senza permesso solo gli utenti.
+      ...credentialPayload(form, canViewSecrets),
     }
 
     setDlgSaving(true)

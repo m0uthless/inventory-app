@@ -270,7 +270,7 @@ class ChangelogUnseenView(APIView):
     - Altrimenti: tutte le voci inserite dopo l'ultima confermata, in ordine
       cronologico di rilascio (le più vecchie per prime), fino a 10.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         latest = ChangelogEntry.objects.order_by('-id').first()
@@ -297,7 +297,7 @@ class ChangelogDismissView(APIView):
     Segna come letto il changelog fino all'ultima voce esistente (calcolata
     lato server, ignorando qualsiasi id passato dal client).
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def post(self, request):
         latest = ChangelogEntry.objects.order_by('-id').first()
@@ -368,11 +368,12 @@ class AreaTaskSerializer(serializers.ModelSerializer):
     converted_to_issue = serializers.PrimaryKeyRelatedField(read_only=True)
     converted_to_issue_title = serializers.SerializerMethodField()
     converted_to_issue_deleted = serializers.SerializerMethodField()
+    waiting_reason_label = serializers.CharField(source='get_waiting_reason_display', read_only=True)
 
     class Meta:
         model  = AreaTask
         fields = [
-            'id', 'area', 'area_label', 'title', 'description', 'status',
+            'id', 'area', 'area_label', 'title', 'description', 'status', 'waiting_reason', 'waiting_reason_label',
             'priority', 'due_date', 'assigned_to', 'assigned_to_name',
             'drive_files', 'drive_files_detail',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
@@ -480,6 +481,16 @@ class AreaTaskSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        # «In attesa»: il motivo serve quando si mette in attesa (non blocca i task già in attesa
+        # senza motivo, che restano modificabili); fuori dall'attesa si svuota.
+        status_value = attrs.get('status', getattr(self.instance, 'status', AreaTask.STATUS_DA_FARE))
+        if status_value == AreaTask.STATUS_IN_ATTESA:
+            reason = attrs.get('waiting_reason', getattr(self.instance, 'waiting_reason', ''))
+            entering = 'status' in attrs and getattr(self.instance, 'status', None) != AreaTask.STATUS_IN_ATTESA
+            if entering and not reason:
+                raise serializers.ValidationError({'waiting_reason': "Il motivo è obbligatorio quando il task è «In attesa»."})
+        elif 'status' in attrs or 'waiting_reason' in attrs:
+            attrs['waiting_reason'] = ''
         assignee = attrs.get('assigned_to')
         if assignee is None:
             return attrs
@@ -966,6 +977,15 @@ class AreaTaskViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
             for comment in task.comments.all():
                 IssueComment.objects.create(issue=issue, author=comment.author, body=comment.body)
 
+            # Gli allegati del task (file del Drive) passano alla issue come collegamenti, non copie:
+            # restano i permessi del Drive (spec 2026-11-20).
+            from issues.models import IssueAttachment
+            for f in task.drive_files.filter(deleted_at__isnull=True):
+                IssueAttachment.objects.create(
+                    issue=issue, drive_file=f, name=f"[Task] {f.name}"[:255], size=f.size or 0,
+                    mime_type=f.mime_type or "", from_task=True, uploaded_by=request.user,
+                )
+
             old_status = task.status
             old_issue = task.converted_to_issue if task.converted_to_issue_id else None
             task.status = AreaTask.STATUS_COMPLETATO
@@ -1221,7 +1241,7 @@ class StickyNoteSerializer(serializers.ModelSerializer):
 
 
 class StickyNoteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         note, _ = StickyNote.objects.get_or_create(user=request.user)
@@ -1248,7 +1268,7 @@ class BirthdaysView(APIView):
     oggi non festeggia nessuno — il widget deve mostrare solo eventi del
     giorno, non un conto alla rovescia.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         today = timezone.localdate()

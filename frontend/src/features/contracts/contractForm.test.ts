@@ -51,4 +51,19 @@ describe('contractForm', () => {
     expect(withValue.total_value).toBe('1200.00')
     expect('total_value' in toPayload(f, 'Assistenza — X', false)).toBe(false)
   })
+
+  it('avviso di rinnovo: predefinito dalle Impostazioni, tra 1 e 365 giorni', () => {
+    expect(emptyForm(null).reminder_days).toBe(90)
+    expect(emptyForm(null, 60).reminder_days).toBe(60)
+    const ok = { ...emptyForm(3), code: 'C-1', contract_type: 'licenza' as const }
+    expect(validate({ ...ok, reminder_days: 0 }, 'T', true).reminder_days).toBe("L'avviso va da 1 a 365 giorni prima della fine.")
+    expect(validate({ ...ok, reminder_days: 366 }, 'T', true).reminder_days).toBeTruthy()
+    expect(validate({ ...ok, reminder_days: 365 }, 'T', true).reminder_days).toBeUndefined()
+  })
+
+  it('il payload porta reminder_days e niente disdetta né rinnovo automatico', () => {
+    const p = toPayload({ ...emptyForm(5, 30), code: 'C-1', contract_type: 'assistenza' as const }, 'T', false)
+    expect(p.reminder_days).toBe(30)
+    expect('notice_days' in p || 'auto_renew' in p).toBe(false)
+  })
 })

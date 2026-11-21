@@ -1,13 +1,13 @@
 import * as React from 'react'
 import { Autocomplete, Box, Button, Stack, TextField } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
-import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../../auth/AuthProvider'
 import { PERMS } from '../../auth/perms'
 import DeviceDialog from './DeviceDialog'
 import { deviceLabel, type DeviceDetail, type DeviceListItem } from './types'
+import { fetchAll } from '../../api/fetchAll'
 
 type Option = { id: number; label: string }
 
@@ -60,13 +60,10 @@ export default function DevicePicker({
     }
     let cancelled = false
     setLoading(true)
-    api
-      .get('/devices/', { params: { customer: customerId, page_size: 500, ordering: 'type__name' } })
-      .then((r) => {
+    fetchAll<DeviceListItem>('/devices/', { customer: customerId, ordering: 'type__name' })
+      .then((rows) => {
         if (cancelled) return
-        const data: unknown = r.data
-        const rows = Array.isArray(data) ? data : ((data as { results?: unknown })?.results ?? [])
-        setDevices((rows as DeviceListItem[]).map((d) => ({ id: d.id, label: deviceLabel(d) })))
+        setDevices(rows.map((d) => ({ id: d.id, label: deviceLabel(d) })))
       })
       .catch((e) => {
         if (!cancelled) toast.error(apiErrorToMessage(e))

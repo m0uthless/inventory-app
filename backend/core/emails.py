@@ -58,6 +58,7 @@ _CATEGORY_COLORS = {
     "feedback": ("Bug e feature", "#fbe5e2", "#8f2a21"),
     "deadlines": ("Scadenze", "#e2f2eb", "#175a4c"),
     "account": ("Account", "#edf1f0", "#4a5956"),
+    "contracts": ("Contratti", "#efe9f7", "#5b3f8c"),
 }
 _TEMPLATE_CATEGORY = {
     "issue_created": "issue",
@@ -72,6 +73,8 @@ _TEMPLATE_CATEGORY = {
     "deadline_digest": "deadlines",
     "notifications_digest": "deadlines",
     "password_reset": "account",
+    "contract_reminder": "contracts",
+    "contract_reminder_test": "contracts",
 }
 
 
@@ -129,6 +132,7 @@ def send_templated_email(
     context: dict,
     subject: str,
     recipient_list: list[str],
+    cc: list[str] | None = None,
 ) -> tuple[bool, str | None]:
     """Renderizza `template_name` (un template che fa
     `{% extends base_template %}` + `{% block content %}`) e invia
@@ -172,6 +176,7 @@ def send_templated_email(
             body=plain_body,
             from_email=from_email,
             to=recipient_list,
+            cc=cc or None,
         )
         message.attach_alternative(html_body, "text/html")
 

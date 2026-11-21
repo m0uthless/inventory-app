@@ -107,6 +107,11 @@ class Command(BaseCommand):
                     f"[deadline_digest] Invio a {user.email} fallito: {error}"
                 ))
 
+        # Riepilogo della Manutenzione all'ufficio (solo se c'è qualcosa di nuovo).
+        from notifications.maintenance_office import send_maintenance_office_digest
+        office_sent = send_maintenance_office_digest(today)
+        sent += office_sent
+
         job_run.last_run_date = today
         job_run.save(update_fields=["last_run_date"])
 

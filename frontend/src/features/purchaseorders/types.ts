@@ -1,4 +1,5 @@
 export type PurchaseOrderKind = 'ordinario' | 'extra'
+import { fmtNumber } from '@shared/utils/number'
 export type PurchaseOrderAmountMode = 'fisso' | 'giornate'
 export type PurchaseOrderStatus = 'inserito' | 'inviato' | 'ricevuto' | 'fatturato'
 
@@ -170,7 +171,7 @@ export function todayISO(): string {
 export function formatEuro(value: string | number | null | undefined): string {
   const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0)
   if (!Number.isFinite(n)) return '0,00 €'
-  return `${n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  return `${fmtNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
 
 export function formatItDate(iso: string | null | undefined): string {

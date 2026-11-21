@@ -12,7 +12,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), patch: vi.fn(), post: vi.fn(), del
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('@shared/api/client', () => ({ api }))
 vi.mock('@shared/ui/toast', () => ({ useToast: () => toast }))
-vi.mock('../../ui/LeafletMap', () => ({ default: () => null }))
+vi.mock('../../ui/AddressMap', () => ({ default: () => null }))
 vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ hasPerm: () => true }) }))
 
 const customer = { id: 2, code: '002', name: 'Azienda USL di Imola', display_name: 'AUSL Imola', city: 'Imola', status: 1, notes: '' }

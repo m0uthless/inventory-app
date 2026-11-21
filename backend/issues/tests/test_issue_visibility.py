@@ -150,7 +150,7 @@ def test_wiki_link_detail_of_invisible_issue_is_404(world):
 def test_wiki_links_of_invisible_issue_visible_with_permission(world):
     link = _wiki_link(world["ib"])
     user = _user(world["a"])
-    user.user_permissions.add(Permission.objects.get(codename="view_all_areas"))
+    user.user_permissions.add(Permission.objects.get(content_type__app_label="issues", codename="view_all_areas"))
     user = User.objects.get(pk=user.pk)
     assert link.pk in _ids(_client(user).get("/api/wiki-links/").json())
 

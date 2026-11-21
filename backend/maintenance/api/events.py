@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -21,6 +22,7 @@ from core.restore_policy import get_restore_block_reason, split_restorable
 from audit.utils import log_event
 
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from maintenance.visibility import can_edit_plan, visible_plans_q
 from maintenance.models import MaintenanceEvent, MaintenancePlan, Tech
 from maintenance.api.helpers import compute_next_due_date
 
@@ -158,6 +160,9 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             )
         )
 
+        # Visibilità per area del piano (come le issue).
+        qs = qs.filter(visible_plans_q(self.request.user, prefix="plan__"))
+
         customer = self.request.query_params.get("customer")
         if customer:
             qs = qs.filter(plan__customer_id=customer)
@@ -181,12 +186,17 @@ class MaintenanceEventViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Salva l'evento e ricalcola automaticamente next_due_date del piano.
         Per result=not_planned non si avanza la data: la manutenzione non è stata eseguita."""
+        plan = serializer.validated_data.get("plan")
+        if not can_edit_plan(self.request.user, plan):
+            raise PermissionDenied("Puoi registrare rapportini solo sui piani della tua area.")
         event = serializer.save(created_by=self.request.user)
         if event.result != "not_planned":
             self._recalculate_plan_due_date(event)
         log_event(actor=self.request.user, action="create", instance=event, request=self.request)
 
     def perform_update(self, serializer):
+        if not can_edit_plan(self.request.user, serializer.instance.plan) or not can_edit_plan(self.request.user, serializer.validated_data.get("plan", serializer.instance.plan)):
+            raise PermissionDenied("Puoi modificare solo i rapportini dei piani della tua area.")
         event = serializer.save()
         log_event(actor=self.request.user, action="update", instance=event, request=self.request)
 

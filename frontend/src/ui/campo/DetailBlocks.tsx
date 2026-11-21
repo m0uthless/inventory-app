@@ -3,7 +3,7 @@ import * as React from 'react'
 import { Box, Button, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material'
 import { CampoIcon, type CampoIconName } from './CampoIcon'
 import { DetailSection } from './FloatingDetail'
-import LeafletMap from '../LeafletMap'
+import AddressMap from '../AddressMap'
 
 /*
  * Blocchi del pannello di dettaglio "Campo sterile" condivisi tra le anagrafiche
@@ -145,7 +145,7 @@ export function MapBlock({ title = 'Sede', street, place, query }: { title?: str
   return (
     <DetailSection title={title}>
       <Box sx={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid', borderColor: 'divider', '& > div:first-of-type': { borderRadius: 0, border: 0 } }}>
-        <LeafletMap address={query} height={170} zoom={15} />
+        <AddressMap address={query} height={170} zoom={15} />
         <Box sx={{
           position: 'absolute', left: 8, right: 8, bottom: 8, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.25,
           p: '7px 7px 7px 10px', borderRadius: '8px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', boxShadow: '0 6px 16px -8px rgb(0 0 0 / .25)',

@@ -20,6 +20,7 @@ import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { Backdrop, Fade, Zoom } from '@mui/material'
 import { api } from '@shared/api/client'
+import { PERMS } from '../auth/perms'
 import { useAuth } from '../auth/AuthProvider'
 import AppFooter from './AppFooter'
 import GlobalSearch from './GlobalSearch'
@@ -38,6 +39,7 @@ import { getPageTitle, type NavLeaf } from './appNav'
 import { useModules } from '../modules/useModules'
 import { ModuleGate } from '../modules/ModuleGate'
 import { MaintenanceBar } from '../modules/MaintenanceBar'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import ToggleOnOutlinedIcon from '@mui/icons-material/ToggleOnOutlined'
 import { AppSidebar } from './AppSidebar'
 import { PageHeaderProvider, usePageHeaderState } from './PageHeaderContext'
@@ -205,7 +207,7 @@ export function AppLayout() {
   // Contatori della sidebar
   const [feedbackSummary, setFeedbackSummary] = React.useState<FeedbackSummary | null>(null)
   React.useEffect(() => {
-    if (feedbackHidden) { setFeedbackSummary(null); return }
+    if (feedbackHidden || !hasPerm('feedback.view_reportrequest')) { setFeedbackSummary(null); return }
     let active = true
     ;(async () => {
       try {
@@ -216,7 +218,7 @@ export function AppLayout() {
       }
     })()
     return () => { active = false }
-  }, [loc.pathname, feedbackHidden])
+  }, [loc.pathname, feedbackHidden, hasPerm])
 
   const [issueSummary, setIssueSummary] = React.useState<IssueSummary | null>(null)
   React.useEffect(() => {
@@ -296,7 +298,7 @@ export function AppLayout() {
           </IconButton>
 
           <Box sx={{ position: { sm: 'absolute' }, left: { sm: '50%' }, transform: { sm: 'translateX(-50%)' }, flex: { xs: 1, sm: 'none' }, display: 'flex', justifyContent: 'center' }}>
-            <GlobalSearch onEggTrigger={openEgg} />
+            <GlobalSearch onEggTrigger={openEgg} canAccess={canAccess} hasPerm={hasPerm} />
           </Box>
 
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -368,6 +370,11 @@ export function AppLayout() {
         {hasPerm('core.manage_users') && (
           <MenuItem onClick={() => { setUserAnchorEl(null); nav('/accesso-portal') }} sx={menuItemSx}>
             <BusinessOutlinedIcon />Accesso Portal
+          </MenuItem>
+        )}
+        {hasPerm(PERMS.core.manageAppSettings) && (
+          <MenuItem onClick={() => { setUserAnchorEl(null); nav('/impostazioni') }} sx={menuItemSx}>
+            <SettingsOutlinedIcon />Impostazioni
           </MenuItem>
         )}
         {me?.is_superuser && (

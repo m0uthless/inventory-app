@@ -207,6 +207,19 @@ class ReportRequestFilter(filters.FilterSet):
         return queryset
 
 
+class ReportRequestModulePermission(permissions.BasePermission):
+    """Vedere le segnalazioni con `feedback.view_reportrequest`, inviarne con `add_reportrequest`
+    (prima bastava essere autenticati). Modifica e screenshot seguono le regole di update()."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user.has_perm("feedback.view_reportrequest"):
+            return False
+        if getattr(view, "action", None) == "create":
+            return user.has_perm("feedback.add_reportrequest")
+        return True
+
+
 class ReportRequestViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -217,7 +230,7 @@ class ReportRequestViewSet(
     serializer_class = ReportRequestSerializer
     # 0.9.1 (WP-03): permission_classes esplicite -> il default globale
     # non si applica, va esteso qui esplicitamente.
-    permission_classes = [permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp]
+    permission_classes = [permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp, ReportRequestModulePermission]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = ReportRequest.objects.select_related('created_by', 'resolved_by').order_by('-created_at')
     filterset_class = ReportRequestFilter

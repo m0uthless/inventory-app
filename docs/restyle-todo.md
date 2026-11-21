@@ -9,56 +9,56 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 ### Presente nell'anteprima, non ancora nell'app
 - **[BE] Prossimo passo** (chi, cosa, quando, "Fatto"): non esiste un campo sulla issue.
 - ~~**[BE] Procedura dalla Wiki**~~ fatto (2026-11-09): articoli Wiki collegati alla issue (`WikiLink` con `entity_type="issue"`, migrazione `wiki/0015`), passi ricavati dall'articolo (lista `- [ ]`, altrimenti il primo elenco numerato; `wiki/procedure.py`) e spunte salvate sul collegamento (`checked_steps`). Endpoint `GET/POST /issues/{id}/wiki/`, `PATCH/DELETE /issues/{id}/wiki/{link}/` (lettura: issue + Wiki; scrittura: modifica issue), audit sulla issue. Sezione «Procedura» nella scheda (`features/issues/IssueProcedure.tsx`) e, in cima sotto le Proprietà, la card «Prossimo passo» con il primo passo da fare e «Fatto» (a procedura finita: «Procedura completata»); stato condiviso in `useIssueWiki.ts`. Test in `issues/tests/test_issue_wiki.py`. In dev c'è l'articolo dimostrativo «Riavvio servizio MWL».
-- **[BE] Dove intervenire completo**: referente di reparto con telefono, device con seriale, credenziali bloccate. Oggi mostriamo cliente, sito, inventario collegato e ServiceNow.
-- **[BE] Scheda Allegati**: le issue non hanno allegati (solo i task di area hanno `drive_files`).
+- ~~**[BE] Dove intervenire completo**~~ fatto il 20/11: referente del sito con «Chiama» ed email, seriale e K-number, credenziali dell'inventario (30 secondi, con permesso).
+- ~~**[BE] Scheda Allegati**~~ fatta il 20/11: caricamento diretto (`issues.IssueAttachment`), eredità «[Task]» dai task di area.
 - ~~**[BE] "Visibile al cliente nel Portale"**~~ su commenti e allegati: scartato da Fede (20/11).
 - ~~**[BE] Indicatore "Entro SLA"**~~: scartato da Fede (20/11). Restano Tempo medio di chiusura e Risolte negli ultimi 30 giorni.
 - ~~**[BE] Variazione del tempo di risoluzione**~~: scartata da Fede (20/11), insieme allo SLA.
-- **[BE] "+ Salva vista"**: fatto, ma le viste sono salvate nel browser (per utente e pagina). Per averle su tutti i dispositivi serve salvarle sul server.
+- ~~**[BE] "+ Salva vista"**~~ sul server dal 21/11 (`core.SavedView`), con caricamento delle viste del browser al primo avvio.
 - **[UI] Avviso "nessun inventario collegato"** (triangolo accanto al titolo nella vecchia tabella): tolto dalla riga come nell'anteprima; resta nel pannello ("Nessun inventario collegato · Collega un inventario").
-- **[UI] Ricerca Ctrl K a finestra** con risultati raggruppati (clienti, siti, device, issue, azioni): oggi Ctrl K porta il cursore nel campo e Invio apre la pagina Ricerca.
+- ~~**[UI] Ricerca Ctrl K a finestra**~~ fatta il 21/11 (palette con gruppi, pagine, azioni; issue nella ricerca). I device non sono nella ricerca globale.
 
 ### Presente nella UI di prima, tolto o non ancora ridisegnato
-- **[DEC] Grafico "Andamento issue"** (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.
-- **[UI] Dialogo "Nuova issue / Modifica"** (`IssueDialog`): funziona, ma è il modulo vecchio con il nuovo tema, non ridisegnato.
-- **[UI] Dialogo "Collega a inventory"**: idem.
+- ~~**[DEC] Grafico "Andamento issue"**~~ widget «Issue ancora aperte» in Dashboard dal 21/11 (variante B). Testo originale: (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.
+- ~~**[UI] Dialogo "Nuova issue / Modifica"**~~ già ridisegnato con QuickForm (anteprima fm-base, variante C).
+- ~~**[UI] Dialogo "Collega a inventory"**~~ ridisegnato il 21/11 (selettore cercabile, prima il sito della issue).
 - Colonne extra di prima (Categoria, Commenti, Data chiusura, Giorni passati): restano a destra di Scadenza, raggiungibili scorrendo o dal menu colonne.
 
 ## Pagina Purchase Order
 
-- **[BE] "Da fatturare" in `summary`**: oggi calcolato dal frontend leggendo le righe dell'anno.
+- ~~**[BE] "Da fatturare" in `summary`**~~ fatto il 21/11.: oggi calcolato dal frontend leggendo le righe dell'anno.
 - **[DEC] Margine**: calcolato in pagina (importo − costi), non è un campo.
-- **[UI] Dialogo Nuovo/Modifica PO** (`PurchaseOrderDialog`) e **dialogo di avanzamento** (`PurchaseOrderTransitionDialog`): funzionano, non ridisegnati (l'anteprima aveva un dialogo breve con solo i campi del passo).
-- **[UI] Totali nel piè** ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
-- **[UI] Ripristino multiplo dal cestino**: la logica c'è, ma la pagina non ha più un selettore di vista "cestino" visibile (va riesposto, es. come scheda o voce di menu).
+- ~~**[UI] Dialogo Nuovo/Modifica PO** e **dialogo di avanzamento**~~ fatti il 21/11: QuickForm il primo, il secondo come nell'anteprima po-base (con la data del passo).
+- ~~**[UI] Totali nel piè**~~ fatto il 21/11. ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
+- ~~**[UI] Ripristino multiplo dal cestino**~~ fatto il 21/11: PO, Contratti e Issue sono nella pagina Cestino, che ha la selezione multipla.
 
 ## Comportamenti globali
 
 - Pannelli di dettaglio (scheda flottante e drawer "campo"): si chiudono con un clic fuori e con Esc. I clic dentro menu, popover, dialoghi e messaggio con Annulla aperti dal pannello non lo chiudono.
-- **[DEC] Mappa dei drawer Clienti/Siti**: oggi Leaflet da unpkg.com, che senza internet resta appesa. Fede (20/11) vuole valutare un altro sistema di mappe, perché questa non gli piace esteticamente: preparare un confronto in `design-previews` invece di spostare Leaflet nel bundle.
+- ~~**[DEC] Mappa dei drawer Clienti/Siti**~~ fatta il 20/11: variante B di `design-previews/map-base.html` (MapLibre + OpenFreeMap ricolorata con i colori dell'app, chunk `vendor-maplibre` caricato solo con la mappa, «Ingrandisci» per la mappa grande). Leaflet e unpkg tolti.
 
 ## Pagina Clienti
 
 Fatta su `design-previews/c-base.html` (variante A · Scheda).
 
-- **[BE] Lettura della password VPN non registrata nell'audit**: l'anteprima diceva "ogni visualizzazione resta nel log"; oggi `GET /customers/<id>/vpn/` restituisce la password a chi ha il permesso senza registrare nulla. Nell'app la frase è stata tolta.
-- **[UI] Drawer cliente vecchio** (`CustomerDrawer`): ancora usato da Profilo.
+- ~~**[BE] Lettura della password VPN non registrata nell'audit**~~ fatto il 21/11 (`?reveal=1` + azione `view_secret`).: l'anteprima diceva "ogni visualizzazione resta nel log"; oggi `GET /customers/<id>/vpn/` restituisce la password a chi ha il permesso senza registrare nulla. Nell'app la frase è stata tolta.
+- ~~**[UI] Drawer cliente vecchio**~~: non più usato (Profilo sulla finestra nuova); file rimosso il 21/11.
 - **[UI] Credenziali degli inventari nella scheda Inventari**: l'anteprima mostrava utenza e password per riga; l'elenco API non le include (servono la scheda dell'inventario e il permesso `inventory.view_secrets`).
 - **[UI] Città e indirizzo**: stanno nei campi personalizzati, quindi si modificano solo da "Modifica", non sul posto. Tag non mostrati nel pannello.
-- **[UI] Site Repository dal pannello**: non c'è un collegamento diretto (la pagina non accetta il cliente nell'URL).
+- ~~**[UI] Site Repository dal pannello**~~ fatto il 21/11 (`?cliente=`, voce nel menu del cliente).
 
 ## Pagina Siti
 
 Portata direttamente nell'app con lo schema dei Clienti (nessuna anteprima dedicata).
 
-- **[UI] Site Repository**: usa ancora i suoi drawer informativi (`InfoDrawers`) per siti e clienti.
+- ~~**[UI] Site Repository, drawer informativi**~~: già tolti, apre le finestre dei record.
 - **[DEC] Cambio cliente di un sito**: nel pannello il cliente è in sola lettura (spostare un sito con inventari e issue fra clienti va deciso); si cambia solo da "Modifica".
 
 ## Pagina Contatti
 
 Portata direttamente nell'app con lo schema di Clienti e Siti.
 
-- **[UI] Ripristino multiplo dal cestino**: la vecchia pagina aveva il codice ma non la selezione delle righe, quindi non era raggiungibile; non riportato (resta la pagina Cestino).
+- ~~**[UI] Ripristino multiplo dal cestino**~~ fatto il 21/11: PO, Contratti e Issue sono nella pagina Cestino, che ha la selezione multipla.
 - **[DEC] Cliente di un contatto**: nel pannello è in sola lettura; si cambia da "Modifica" (il sito deve appartenere al cliente).
 
 ## Pagina Inventari
@@ -66,7 +66,7 @@ Portata direttamente nell'app con lo schema di Clienti e Siti.
 Portata direttamente nell'app con lo schema di Clienti, Siti e Contatti.
 
 - **[UI] Drawer inventario vecchio** (`InventoryDrawer`): rimosso con il porting di Site Repository.
-- **[BE] Lettura delle credenziali non registrata nell'audit**: come per la VPN dei clienti, il dettaglio restituisce le password decifrate a chi ha `inventory.view_secrets` senza registrare la lettura.
+- ~~**[BE] Lettura delle credenziali non registrata nell'audit**~~ fatto il 21/11 (`/inventories/<id>/secrets/` + `view_secret`).: come per la VPN dei clienti, il dettaglio restituisce le password decifrate a chi ha `inventory.view_secrets` senza registrare la lettura.
 - **[UI] Targa K-Number**: ripristinata nel pannello (scheda Dettagli), anche nella pagina Inventari.
 - **[DEC] Cliente di un inventario**: nel pannello è in sola lettura; si cambia da "Modifica".
 
@@ -76,7 +76,7 @@ Portata dall'anteprima `r-base.html` (proposta B: cartina + elenco delle provinc
 
 - **[UI] Esporta Excel di pagina**: nell'anteprima c'era in testata; il backend esporta solo il singolo cliente (azione sulla riga del cliente). Serve un export globale.
 - **[UI] Varianti A (albero) e C (colonne)**: non portate.
-- **[UI] Raggruppamento per città**: la pagina vecchia lo permetteva; ora solo per provincia.
+- ~~**[UI] Raggruppamento per città**~~ fatto il 21/11 (interruttore Province / Città).
 - **[UI] Pannello asset, scheda Manutenzioni**: "Carica" sul singolo intervento usa `upload-pdf`; "Registra intervento" non c'è (rimanda ai Rapportini, nessun link diretto).
 - **[DEC] Manutenzioni**: un piano copre l'asset se è dello stesso cliente e include il suo tipo; scadenza = override del singolo asset, altrimenti quella del piano (`GET /inventories/{id}/maintenance/`).
 - **[DEC] Accesso**: le schede delle credenziali non hanno sistema operativo né data di aggiornamento (dati non presenti nel backend).
@@ -90,8 +90,8 @@ Portata dall'anteprima `t-base.html` con righe e colonne come le Issue.
 - **[DEC] Conversione in issue**: invariata nel backend (`convert-to-issue`: copia titolo, descrizione, priorità, commenti e, se idoneo, l'assegnatario; il task si completa e resta collegato). Nel pannello: riquadro "Trasforma in issue" nei Dettagli e voce nel menu; sui convertiti riquadro con la issue e "Apri la issue"; nella riga il segno "→ Issue #…".
 - **[DEC] Indicatori**: nuova azione `GET /area-tasks/stats/?area=`; `summary` resta com'era (contatore della barra laterale).
 - **[DEC] Completati**: le viste mostrano solo quelli chiusi negli ultimi 3 giorni, come la regola della lista (prima la pagina usava `include_hidden=1`).
-- **[UI] Card Task nella Dashboard**: apre lo stesso nuovo pannello (`AreaTaskDetail`); la card in sé non è ancora ridisegnata.
-- **[UI] Motivo dell'attesa**: le Issue hanno un motivo per "In attesa", i task no (servirebbe un campo nel modello).
+- ~~**[UI] Card Task nella Dashboard**~~ ridisegnata il 21/11 (variante A dell'anteprima dbw-base).
+- ~~**[UI] Motivo dell'attesa**~~ fatto il 21/11 (`AreaTask.waiting_reason`).
 - **[TEST] Vitest**: test della pagina riscritti sul nuovo comportamento (19 al posto di 30); baseline ora 144/144, lint 13.
 
 ## Piano ferie
@@ -113,7 +113,7 @@ Portata dall'anteprima `pf-base.html` (`shared/pf.js`, `shared/pf.css`). Colori 
 Portata dall'anteprima `w-base.html`, variante **E · Archivio** (cartelle, schede d'archivio, scaffale, registro, foglietti). Stili in `features/wiki/archive/archive.css` (generato dal foglio dell'anteprima, limitato a `.wa`, colori dal tema via variabili CSS).
 
 - **[BE] Preferiti**: nuovo modello `WikiPageFavorite` (migrazione `wiki/0014`), azione `POST/DELETE /wiki-pages/{id}/favorite/`, filtro `?favorite=1`, campi `is_favorite`/`favorited_at`; esposto anche `created_by` (per "Le tue bozze"). Test in `wiki/tests/test_favorites.py`.
-- **[SEC] Barriera Portal sulle azioni `view` e `rate`** delle pagine Wiki: dichiarano `permission_classes=[IsAuthenticated]` e quindi saltano `IsInternalOrPortalDedicatedApp`. Non toccate in questo lavoro; la nuova azione `favorite` la include esplicitamente. Da allineare.
+- ~~**[SEC] Barriera Portal sulle azioni `view` e `rate`**~~ allineata il 21/11 (anche `/api/wiki-stats/`). delle pagine Wiki: dichiarano `permission_classes=[IsAuthenticated]` e quindi saltano `IsInternalOrPortalDedicatedApp`. Non toccate in questo lavoro; la nuova azione `favorite` la include esplicitamente. Da allineare.
 - **[DEC] Icone delle cartelle**: ricavate dal nome della categoria (`catIcon` in `archiveModel.ts`); l'emoji del modello non è più mostrata.
 - **[DEC] Passi da spuntare**: gli elenchi numerati di primo livello diventano passi spuntabili; le spunte restano solo sulla pagina aperta (non salvate).
 - **[DEC] Colori delle cartelle**: sono il colore della categoria (dato). Testo bianco o scuro scelto in base al contrasto. Nei grafici ogni cartella ha sempre nome e numero scritti (i colori da soli non bastano per chi non distingue i colori).
@@ -140,9 +140,9 @@ Portata dall'anteprima `mt-base.html`: **A · Elenco** come vista predefinita, *
 - **[BE] Rapportini**: filtri `results=ko,partial` e `has_pdf`, azione `stats`; il serializer espone `customer_id` e `site_id` (servono per aprire la issue).
 - **[FIX] Tipi del piano**: il dialogo proponeva solo i tipi hardware e, salvando, toglieva dal piano gli altri tipi; ora i tipi già presenti restano.
 - **[RM] Rimossi** i vecchi componenti della manutenzione (dialogo rapportino, pannello del piano, `DueBadge`, `YearFilterField`, `maintenanceShared.ts`); in `MaintenanceLegacy.tsx` resta solo «Modifica scadenza».
-- **[SEC] Da allineare**: le azioni `reset`, `restore` e `bulk_restore` dei rapportini dichiarano `permission_classes` senza `IsInternalOrPortalDedicatedApp` (stesso schema già segnalato per Drive upload e Wiki view/rate).
+- ~~**[SEC] Da allineare** (rapportini)~~: già protette dentro `CanRestore/CanPurgeModelPermission`; test aggiunti il 21/11. Testo originale: le azioni `reset`, `restore` e `bulk_restore` dei rapportini dichiarano `permission_classes` senza `IsInternalOrPortalDedicatedApp` (stesso schema già segnalato per Drive upload e Wiki view/rate).
 - **[DEMO] Dati fittizi in dev** marcati `demo-restyle` (siti, inventari, piani, rapportini, scadenze modificate); id in scratchpad `demo_mt_ids.json`.
-- **[TODO] Aree**: divisione per area rimandata (anteprima pronta, disattivata con `AREAS_ON`); serve decidere se l'area sta sul cliente, sul sito o sul piano.
+- ~~**[TODO] Aree**~~ fatto il 21/11: area sul piano, visibilità e modifica come le issue (decisione di Fede). Testo originale: divisione per area rimandata (anteprima pronta, disattivata con `AREAS_ON`); serve decidere se l'area sta sul cliente, sul sito o sul piano.
 
 ## Contratti
 
@@ -166,11 +166,11 @@ Portata sullo schema delle pagine anagrafiche (Siti, PO): testata, indicatori, v
 Portato dall'anteprima `d-base.html`, variante **A · Esplora file** (albero cartelle e clienti, Recenti, tabella o griglia, trascinamento su tutto il riquadro, pannello del file). Stili in `features/drive/drive.css`, icone dei file in `features/drive/DriveIcons.tsx` (disegnate, stile icone di sistema; colori fissi come un'immagine, tipo sempre scritto).
 
 - **[BE] Campo `access`** su file e cartelle (sola lettura): le restrizioni per gruppo lungo la catena, con i nomi dei gruppi. Serve a "Chi può vederlo" senza leggere `/admin-groups/`. Test in `drive/tests/test_access_field.py`.
-- **[SEC] `DriveFileUploadView`** (`/api/drive-files/upload/`, tenuta per compatibilità) dichiara `IsAuthenticated, CanUploadDriveFile` e quindi salta `IsInternalOrPortalDedicatedApp`. La pagina usa `/api/drive-files/`, che è protetto. Da allineare o eliminare.
+- ~~**[SEC] `DriveFileUploadView`**~~ barriera aggiunta il 21/11. (`/api/drive-files/upload/`, tenuta per compatibilità) dichiara `IsAuthenticated, CanUploadDriveFile` e quindi salta `IsInternalOrPortalDedicatedApp`. La pagina usa `/api/drive-files/`, che è protetto. Da allineare o eliminare.
 - **[DEC] Filtro e ricerca**: elenco piatto su tutto il Drive (`?customer=` / `?search=` senza `root`), non più solo la radice.
 - **[DEC] Link**: `/drive?cartella=<id>` e `/drive?file=<id>` (apre la cartella e il pannello); "Copia link" usa questi.
 - **[UI] Attività** nel pannello: dal registro di audit, solo per chi ha `audit.view_auditevent`; gli aggiornamenti del Drive non registrano i campi cambiati, quindi spesso compare "lo ha modificato".
-- **[UI] Spostamento multiplo**: come prima solo un elemento alla volta.
+- ~~**[UI] Spostamento multiplo**~~ fatto il 21/11.
 - **[UI] Rimossi** i componenti vecchi (`PreviewDrawer`, `FolderCard`, `FileCard`, righe, menu, `UploadZone`).
 - **[TEST] Baseline**: frontend lint 11, vitest 152/152 (test Drive riscritti sulla nuova interfaccia); backend pytest 848.
 
@@ -227,7 +227,7 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 
 - **[UI] Portati**: Task di area, Clienti, Siti, Inventari, Contatti (stesse props dei vecchi dialoghi, le pagine non cambiano). Inventari: rete, credenziali (stesse regole sul permesso), apparecchio, tag e campi personalizzati in "Altri campi", aperto da solo in modifica se c'è già qualcosa. Clienti: il nome visualizzato segue il nome finché non lo si cambia a mano.
 - **[UI] Issue e Bug e feature** (2026-11-09): Issue con il cliente cercato sul server e "Non è in anagrafica? Scrivi il nome" in fondo al selettore (testo libero), Sito dopo il cliente, "In attesa di" con lo stato In attesa, inventario collegato come pillola, issue chiusa in sola lettura. Bug e feature: la frase principale come titolo e i dettagli sotto (salvati come un unico testo, prima riga = titolo), Tipo, Dove e Screenshot in pillole, Ctrl+V incolla lo screenshot ovunque nel modulo.
-- **[TODO] Da portare**: Caso ServiceNow; "Creane un altro" è pronto nel componente ma va collegato nelle pagine che lo vogliono.
+- **[DEC] Caso ServiceNow** (21/11): resta su `CampoDialog`, già nello stile dell'app; il flusso screenshot → OCR → modulo è a passi, caso escluso dall'inserimento rapido. «Creane un altro» resta da collegare dove serve.
 - **[DEC] Dove non usarlo**: Purchase Order, Contratti, Piani di manutenzione, Rimborso spese, Rapportino (importi, cadenze, righe, passi).
 
 ## Cestino e Bug e feature
@@ -247,7 +247,7 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 - Utenti e gruppi: interruttore Utenti/Gruppi nella testata, viste Attivi / Solo Portal / Account funzionali / Disattivati / Tutti, scheda utente flottante (Permessi con livelli e origine "gruppo X" o "assegnato a mano", Portal e clienti, permessi speciali; Anagrafica e ruoli; Attività), gruppi come schede con la striscia dei permessi e scheda del gruppo. La stessa scheda utente è usata da Accesso Portal. Rimossi `UserDrawer`/`GroupDrawer` e il vecchio drawer del Profilo.
 - Da valutare: descrizione dei gruppi (serve un campo), restyle della pagina Accesso Portal.
 - 17/11: utente e gruppo si aprono nella finestra (`RecordModal`, anteprime `ud-base` variante D e `gd-base`) al posto della scheda flottante; menu del tasto destro su utenti e gruppi; membri gestiti dalla finestra del gruppo (`user_ids`).
-- **[DEC] Permessi che non controllano nulla**: Piano ferie, Rimborso spese e Bug e feature compaiono nella matrice dei permessi, ma pagina e API sono aperte a ogni utente Archie (contano solo i flag del profilo: area ferie, coordinatore, segreteria spese); anche «Nessuno» non toglie l'accesso. Task di area (in `core`, dipende dall'area ferie) e Monitor (segue i permessi degli Inventari) non hanno una riga propria. Proposta: far valere i permessi per Rimborso spese e Bug e feature (verificare prima i gruppi in prod), togliere la riga Piano ferie dalla matrice. Tutti e cinque restano spegnibili dalla pagina Moduli.
+- ~~**[DEC] Permessi che non controllano nulla**~~ risolto il 21/11 (permessi veri per Rimborso spese e Bug e feature, Piano ferie fuori dalla matrice). Testo originale:: Piano ferie, Rimborso spese e Bug e feature compaiono nella matrice dei permessi, ma pagina e API sono aperte a ogni utente Archie (contano solo i flag del profilo: area ferie, coordinatore, segreteria spese); anche «Nessuno» non toglie l'accesso. Task di area (in `core`, dipende dall'area ferie) e Monitor (segue i permessi degli Inventari) non hanno una riga propria. Proposta: far valere i permessi per Rimborso spese e Bug e feature (verificare prima i gruppi in prod), togliere la riga Piano ferie dalla matrice. Tutti e cinque restano spegnibili dalla pagina Moduli.
 
 ## ServiceNow
 - Fatte da `sn-base.html` (2026-11-09): Casi variante A e Dashboard casi (variante B delle statistiche), che sostituisce le pagine Statistiche e Assenze tecnici (i vecchi indirizzi portano alla Dashboard).
@@ -263,9 +263,9 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 ## Accesso Portal
 - Fatta il 2026-11-09 direttamente nello stile di Utenti e gruppi (senza anteprima, su richiesta di Fede): viste Tutti / Attivi / Sospesi / Anche in Archie, filtro Cliente dall'intestazione, colonne Utente, Livello, Cliente predefinito, Altri clienti, Archie, Ultimo accesso; la scheda utente si apre con la sezione Portal in cima (`portalFirst`).
 
-## Titolo nella linguetta (mockup, da riprendere)
+## ~~Titolo nella linguetta~~ (scartato)
 
-Fede (20/11): riprendiamolo, insieme al colore per modulo, con un'anteprima aggiornata in `design-previews`.
+Fede (20/11), dopo l'anteprima aggiornata `tm-base` (ora tolta, resta in git): scartato insieme al colore per modulo. Non riproporlo.
 
 Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / Linguetta"), da disegno di Fede `design-previews/title-page-card.png`. Fede ne deve parlare internamente prima di portarlo nell'app.
 
@@ -273,7 +273,9 @@ Mockup in `design-previews/ct-base.html` (interruttore "Titolo: Nella pagina / L
 - **[DEC] Pulsanti principali nella riga delle viste**, a destra dopo "Salva vista"; la riga dei pulsanti sopra gli indicatori sparisce. Su telefono tutto resta com'è.
 - **[UI] Se approvato**: va nella struttura generale (`layout/AppLayout.tsx`, `PageHead`) per tutte le pagine; le pagine senza viste tengono i pulsanti dove sono.
 
-## Colore per modulo (da riprendere, 20/11)
+## ~~Colore per modulo~~ (scartato, 20/11)
+
+Scartato da Fede il 20/11 dopo l'anteprima `tm-base`. Resta valida la regola di DESIGN.md «nessun colore proprio per i moduli».
 
 Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); anteprima `design-previews/hm-base.html` (Issue) e interruttore "Colori modulo" in `db-base.html`, file `design-previews/shared/modcolors.css|js`.
 
@@ -284,18 +286,18 @@ Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); 
 ## Struttura e tema
 
 - **[DEC] Palette Blu e Indaco**: implementate, non selezionabili (`selectable: false` in `themeRegistry.ts`).
-- **[UI] Modalità scura**: alcune pagine non migrate hanno ancora colori chiari scritti nel codice (es. `#f8fafc`, `grey.50`).
+- ~~**[UI] Modalità scura**~~ sistemata il 21/11 (componenti Wiki); i bianchi rimasti sono sulla fascia scura delle finestre, voluti.
 - **[UI] Pagina di login**: invariata.
 - **[UI] Dashboard**: widget e card con gradienti (`BirthdaysCard`, `ContributorCard`, `QuickActionsPairCard`, …).
-- **[UI] PDF dei Piani di manutenzione**: intestazione a gradiente.
-- **[UI] `useDataGridZebraSx`** e alcune card hanno ancora gli stili del tema precedente nelle pagine non migrate.
+- ~~**[UI] PDF dei Piani di manutenzione**~~ intestazione sobria dal 21/11.
+- ~~**[UI] `useDataGridZebraSx`**~~: legge il tema; nessuna card rimasta col tema precedente.
 
 ## Via il drawer: finestra dei record (dal 17/11)
 
 Standard nuovo (DESIGN.md › Record window): il record si apre in una finestra larga e centrata, una sola barra di salvataggio. Fatti: utente, gruppo, cliente, sito, contatto (18/11, anteprima `core-base`). Navigazione nella stessa finestra fra cliente, sito e contatto fatta (pila con «‹ Cliente», 18/11). Inventari fatti (18/11, anteprima `inv-base` A seconda versione: lettura poi «Modifica» dal ⋯), anche nella pila e nel Site Repository. Lo schema «lettura, poi Modifica» vale ora anche per cliente, sito e contatto (18/11). Issue fatte (18/11, anteprima `iss-base` A; scartata la pagina divisa), frecce a destra in tutte le finestre. Task di area fatti (18/11, anteprima `tsk-base`). Contratti fatti (18/11, anteprima `ctr-base`; ritocchi estetici da decidere nei prossimi giorni). PO fatti (18/11, anteprima `pof-base`), con il nuovo «Seguito da». Il gruppo Issue/Task/Contratti/PO è chiuso. Manutenzione fatta (18/11, anteprima `mtw-base`: scadenza, piano, rapportino; «Modifica» apre i dialoghi esistenti). Audit fatto (19/11, anteprima `aud-base`). Drive fatto (19/11, pannello fisso, anteprima `drv-base` variante B). ServiceNow, Monitor, Piano ferie fatti (19/11, anteprima `rst-base`). Bug e feature e Profilo fatti (19/11, anteprima `bfp-base`). Con la vecchia scheda resta solo Moduli, per scelta. Loghi delle credenziali da fornire in `frontend/public/logos/`. Pezzi comuni in `ui/campo/RecordParts` + `recordShared` e `features/records/linked` (issue, inventari, persone, dove): il Contatto li riusa. Ordine concordato: Cliente (anteprima `cd-base`) → Siti, Contatti, Inventari → Issue, Task di area, Contratti, PO (valutare anche la «pagina divisa») → per ultime, o restano col pannello: Audit, caso ServiceNow, eventi e todo di Manutenzione, Piano ferie, Monitor; Drive caso a sé.
 
 - ~~**[UI] Record collegati nella stessa finestra**~~ fatto 18/11: `RecordStackHost` + `PushedRecord`; issue, inventari, contratti aprono ancora la loro pagina finché non hanno la finestra.
-- **[UI] Mappa nei test automatici**: la mappa carica Leaflet da unpkg e la posizione da Nominatim; dove internet non c'è le richieste restano appese e Playwright aspetta prima di cliccare (i salvataggi sembrano non partire). Nei test nel browser bloccare `unpkg.com` e `nominatim` con una route; resta valida la voce su includere Leaflet nel bundle.
+- **[UI] Mappa nei test automatici**: la mappa ora usa MapLibre (stile da tiles.openfreemap.org) e la posizione da Nominatim; dove internet non c'è il riquadro mostra «Mappa non disponibile». Nei test nel browser bloccare o dirottare `tiles.openfreemap.org` e `nominatim`.
 
 ## Pagine da migrare (ordine deciso)
 
@@ -349,16 +351,26 @@ Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Cont
 - **Fix prima del rilascio, tutti i rimandati della revisione**:
   - Issue per area: fuga in `/api/wiki-links/`, area disattivata via API, assegnatario fuori area / «Assegna a me» / QuickPick «Area», test mancanti e piccole cose;
   - Generatore SQL: robustezza backend, notifiche, accessibilità e mobile.
-- **Test**: `conftest` globale con LocMemCache al posto del Redis del dev; togliere quello locale di `text2sql`.
+- ~~**Test**: `conftest` globale con LocMemCache~~ fatto.
 - **DB dev**: riaccendere il modulo Wiki.
 - **Verifiche nel browser**: le fa Claude con Playwright (Issue per area, Generatore SQL, Task di area) e manda gli screenshot.
-- **Task di area convertito in issue poi cestinata**: permettere la riconversione in una issue nuova; il badge dice che la issue è nel cestino.
+- ~~**Task di area convertito in issue poi cestinata**~~: riconversione possibile (fatto).
 - **Contratti**: il PDF si scarica **e si vede** solo con `view_contract_value`. I ritocchi estetici della finestra vanno nella fase 2.
-- **Issue, pezzi dell'anteprima**: restano solo Allegati e «Dove intervenire» completo.
+- ~~**Issue, pezzi dell'anteprima**~~: Allegati e «Dove intervenire» fatti il 20/11.
 
 ## Task di area: verifica nel browser (20/11)
 
 - Fatta: issue collegata nel cestino (avviso, riconversione, «Issue #N nel cestino» in elenco), filtri a 1366 px, apertura con Invio.
 - ~~**[UI] Esc nella finestra del task**~~: fatto il 20/11, la finestra si riapriva da `?open=` prima che sparisse dall'URL; ora l'apertura da URL reagisce solo a un id nuovo.
 - Dati dev: il task T-4 è collegato alla issue #17 ma è «In attesa», non completato (dato di prova).
+
+## Contratti fase 2 (20/11)
+
+Spec `docs/superpowers/specs/2026-11-20-contracts-renewal-reminders-design.md`, piano `docs/superpowers/plans/2026-11-20-contracts-renewal-reminders.md`, anteprima `design-previews/ctr2-base.html`. Su develop, non rilasciato.
+
+- ~~Promemoria di rinnovo, Impostazioni di Archie, via la disdetta, stato «Chiuso», via il rinnovo automatico~~ fatti il 20/11.
+- **Deploy in produzione:** `migrate` (`contracts.0003`, `0004`, `core.0049`, `notifications.0005`), ricreare `cron`, impostare gli indirizzi dell'ufficio in `/impostazioni`, dare «Gestisce le impostazioni di Archie».
+- **[DEC] Dev:** l'SMTP del dev è reale e i venditori demo hanno email finte: il cron delle 8 scrive a quegli indirizzi.
+- ~~Limite di 200 clienti/device nel modulo~~ risolto il 20/11 in tutta l'app con `fetchAll` (variante A scelta da Fede: si leggono tutte le pagine; la ricerca mentre si scrive servirà solo se si arriva alle migliaia).
+- ~~**[UI] Contratti, statistiche**~~: sezione «Valore» (clienti per valore e regioni) fatta il 21/11; cruscotto per venditore escluso da Fede.
 

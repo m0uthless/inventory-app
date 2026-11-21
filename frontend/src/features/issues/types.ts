@@ -40,6 +40,8 @@ export type IssueRow = {
   due_date: string | null
   days_open: number
   comments_count: number
+  /** Allegati della issue (caricati o ereditati dal task). */
+  attachments_count?: number
   servicenow_external_url: string | null
   created_at: string
   updated_at: string
