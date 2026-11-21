@@ -7,6 +7,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-21
+
 ### Added
 
 - Dashboard, widget «Issue ancora aperte» (da aggiungere con «Personalizza»): quante issue restano aperte nel tempo per giorni, settimane o mesi, con aperte e risolte del periodo; solo le issue visibili per area (`GET /api/issues/trend/?period=day|week|month`). Migrazione `core.0052`.
