@@ -9,6 +9,7 @@ import {
   BandChip, BandEditing, BandStat, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLoader, RecordModal, RecordNotes, RecordSection,
   RecordValue, bandButtonSx, bandSolidSx, recordMono as mono, useList, useRecordDraft,
 } from '../../ui/campo'
+import { WAITING_REASON_META } from '../issues/types'
 import { IssuePriorityMark } from '../issues/IssueBadges'
 import { TaskStatusBadge, daysTo, ddmmyyyy, isOpenTask } from './taskUi'
 import {
@@ -24,7 +25,7 @@ import {
  * come testo, «Modifica» nel ⋯ li rende campi. Chi non è dell'area lo vede in sola lettura.
  */
 
-export type AreaTaskPatch = Partial<Pick<AreaTaskRow, 'status' | 'priority' | 'assigned_to' | 'due_date' | 'description' | 'title'>>
+export type AreaTaskPatch = Partial<Pick<AreaTaskRow, 'status' | 'waiting_reason' | 'priority' | 'assigned_to' | 'due_date' | 'description' | 'title'>>
 
 type Props = {
   task: AreaTaskRow
@@ -207,7 +208,7 @@ export default function AreaTaskDetailCard(p: Props) {
     <RecordModal open onClose={p.onClose} ariaLabel={`Task ${t.id}`} compact
       title={<><Box component="span" sx={{ ...mono, fontSize: 15, fontWeight: 500, opacity: 0.75 }}>T-{t.id}</Box>{v.title.trim() || t.title}</>}
       status={<>
-        <BandChip>{STATUS_META[t.status].label}</BandChip>
+        <BandChip>{STATUS_META[t.status].label}{t.status === 'in_attesa' && t.waiting_reason_label ? ` · ${t.waiting_reason_label}` : ''}</BandChip>
         {!edit ? <BandChip><CampoIcon name="lock" size={11} />Sola lettura</BandChip> : null}
         {editing ? <BandEditing /> : null}
       </>}
@@ -226,7 +227,9 @@ export default function AreaTaskDetailCard(p: Props) {
         <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
           <MenuItem disabled={!canAct || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
           <MenuItem disabled={!canAct} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi…</MenuItem>
-          {t.status === 'in_corso' && canAct ? <MenuItem onClick={() => { setMenu(null); void p.onPatch({ status: 'in_attesa' }, 'Stato: In attesa') }}><ListItemIcon><CampoIcon name="clock" size={16} /></ListItemIcon>Metti in attesa</MenuItem> : null}
+          {t.status === 'in_corso' && canAct ? Object.entries(WAITING_REASON_META).map(([k, m]) => (
+            <MenuItem key={k} onClick={() => { setMenu(null); void p.onPatch({ status: 'in_attesa', waiting_reason: k }, `In attesa di ${m.label}`) }}><ListItemIcon><CampoIcon name="clock" size={16} /></ListItemIcon>In attesa di {m.label}</MenuItem>
+          )) : null}
           {p.canLinkFiles && canAct ? <MenuItem onClick={() => { setMenu(null); p.onLinkFiles() }}><ListItemIcon><CampoIcon name="folder" size={16} /></ListItemIcon>Collega file da Drive</MenuItem> : null}
           {issueId && !issueTrashed ? <MenuItem onClick={() => { setMenu(null); p.onOpenIssue(issueId) }}><ListItemIcon><CampoIcon name="alert" size={16} /></ListItemIcon>Apri la issue #{issueId}</MenuItem>
             : p.canConvert && (open || issueTrashed) ? <MenuItem onClick={() => { setMenu(null); p.onConvert() }}><ListItemIcon><CampoIcon name="alert" size={16} /></ListItemIcon>Trasforma in issue</MenuItem> : null}
@@ -345,9 +348,15 @@ export default function AreaTaskDetailCard(p: Props) {
           <RecordSection title="Dettagli">
             <RecordGrid>
               {editing ? <RecordField editing label="Titolo" value={draft.title} onChange={set('title')} dirty={isDirty('title')} wide /> : null}
-              <QuickPick label="Stato" disabled={!canAct} value={<TaskStatusBadge status={t.status} />}
-                options={STATUS_ORDER.map((s) => ({ value: s, label: <TaskStatusBadge status={s} />, selected: t.status === s }))}
-                onPick={(val) => void p.onPatch({ status: val as TaskStatus }, `Stato: ${STATUS_META[val as TaskStatus].label}`)} />
+              <QuickPick label="Stato" disabled={!canAct} value={<><TaskStatusBadge status={t.status} />{t.status === 'in_attesa' && t.waiting_reason_label ? <Box component="span" sx={{ ml: 0.75, fontSize: 12, color: 'text.secondary' }}>{t.waiting_reason_label}</Box> : null}</>}
+                options={[
+                  ...STATUS_ORDER.filter((s) => s !== 'in_attesa').map((s) => ({ value: s, label: <TaskStatusBadge status={s} />, selected: t.status === s })),
+                  // «In attesa» si sceglie insieme al motivo, come nelle Issue.
+                  ...Object.entries(WAITING_REASON_META).map(([k, m]) => ({ value: `waiting:${k}`, label: <><TaskStatusBadge status="in_attesa" /><Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{m.label}</Box></>, selected: t.status === 'in_attesa' && t.waiting_reason === k })),
+                ]}
+                onPick={(val) => void (val.startsWith('waiting:')
+                  ? p.onPatch({ status: 'in_attesa', waiting_reason: val.slice(8) }, `In attesa di ${WAITING_REASON_META[val.slice(8)]?.label ?? ''}`)
+                  : p.onPatch({ status: val as TaskStatus }, `Stato: ${STATUS_META[val as TaskStatus].label}`))} />
               <QuickPick label="Priorità" disabled={!canAct} value={<IssuePriorityMark priority={t.priority} />}
                 options={(['critical', 'high', 'medium', 'low'] as TaskPriority[]).map((k) => ({ value: k, label: <IssuePriorityMark priority={k} />, selected: t.priority === k }))}
                 onPick={(val) => void p.onPatch({ priority: val as TaskPriority }, 'Priorità aggiornata')} />

@@ -18,6 +18,9 @@ export type AreaTaskRow = {
   title: string
   description: string
   status: TaskStatus
+  /** Motivo dell'attesa (stesse causali delle Issue), solo con lo stato «In attesa». */
+  waiting_reason?: string
+  waiting_reason_label?: string
   priority: TaskPriority
   due_date: string | null
   assigned_to: number | null
@@ -79,13 +82,14 @@ export type TaskFormData = {
   title: string
   description: string
   status: TaskStatus
+  waiting_reason: string
   priority: TaskPriority
   assigned_to_id: number | ''
   due_date: string
 }
 
 export function createEmptyTaskForm(): TaskFormData {
-  return { title: '', description: '', status: 'da_fare', priority: 'medium', assigned_to_id: '', due_date: '' }
+  return { title: '', description: '', status: 'da_fare', waiting_reason: '', priority: 'medium', assigned_to_id: '', due_date: '' }
 }
 
 export function taskToForm(task: AreaTaskRow): TaskFormData {
@@ -93,6 +97,7 @@ export function taskToForm(task: AreaTaskRow): TaskFormData {
     title: task.title,
     description: task.description || '',
     status: task.status,
+    waiting_reason: task.waiting_reason ?? '',
     priority: task.priority,
     assigned_to_id: task.assigned_to ?? '',
     due_date: task.due_date ?? '',
@@ -104,6 +109,7 @@ export function formToPayload(form: TaskFormData) {
     title: form.title.trim(),
     description: form.description.trim(),
     status: form.status,
+    waiting_reason: form.status === 'in_attesa' ? form.waiting_reason : '',
     priority: form.priority,
     assigned_to: form.assigned_to_id === '' ? null : form.assigned_to_id,
     due_date: form.due_date || null,

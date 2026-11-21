@@ -293,7 +293,7 @@ def test_superuser_may_assign_to_user_of_other_area_when_creating_in_chosen_area
 def test_status_in_attesa_accepted_and_does_not_set_completed_at():
     area = _area()
     task = AreaTask.objects.create(area=area, title="T")
-    resp = _client(_user(area)).patch(f"{URL}{task.id}/", {"status": "in_attesa"}, format="json")
+    resp = _client(_user(area)).patch(f"{URL}{task.id}/", {"status": "in_attesa", "waiting_reason": "cliente"}, format="json")
     assert resp.status_code == 200
     task.refresh_from_db()
     assert task.status == "in_attesa"

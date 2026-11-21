@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Task di area, motivo dell'attesa come nelle Issue (Philips, Elco, Cliente, Exprivia, Altro): obbligatorio quando si mette il task «In attesa» (dal menu «In attesa di …», dallo stato o dal modulo), mostrato nella testata; uscendo dall'attesa si svuota. I task già in attesa senza motivo restano modificabili. Migrazione `core.0051`.
 - Purchase Order: totali in fondo all'elenco (numero, totale, costi sostenuti) con gli stessi filtri della lista (`GET /api/purchase-order-entries/totals/`). Gli indicatori (per stato, «Da fatturare», mesi, invio più vecchio) arrivano dal `summary` del server invece che dalla lettura di tutte le righe dell'anno.
 - «Togli la password»: nella modifica dell'inventario (icona accanto a ogni password impostata) e della VPN del cliente (casella), per svuotare una password; senza, un campo vuoto resta «invariata».
 - Manutenzione, riepilogo all'ufficio: alle 8:00, con il riepilogo giornaliero, gli indirizzi impostati in «Impostazioni di Archie › Manutenzione» ricevono un'email con le manutenzioni scadute e quelle dei prossimi 30 giorni, solo se c'è qualcosa di nuovo rispetto all'ultimo invio (le novità sono segnate «Nuova»). Senza indirizzi non parte nulla. Migrazione `notifications.0006`.

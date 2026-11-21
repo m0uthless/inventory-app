@@ -41,18 +41,18 @@ describe('areatasks types', () => {
 
   it('creates an empty form with medium priority and no assignee', () => {
     expect(createEmptyTaskForm()).toEqual({
-      title: '', description: '', status: 'da_fare', priority: 'medium', assigned_to_id: '', due_date: '',
+      title: '', description: '', status: 'da_fare', waiting_reason: '', priority: 'medium', assigned_to_id: '', due_date: '',
     })
   })
 
   it('maps a task to form data and back to an API payload', () => {
     const form = taskToForm(row)
     expect(form).toEqual({
-      title: 'Ordine toner', description: 'Chiamare il fornitore', status: 'in_attesa',
+      title: 'Ordine toner', description: 'Chiamare il fornitore', status: 'in_attesa', waiting_reason: '',
       priority: 'high', assigned_to_id: 12, due_date: '2026-10-01',
     })
     expect(formToPayload(form)).toEqual({
-      title: 'Ordine toner', description: 'Chiamare il fornitore', status: 'in_attesa',
+      title: 'Ordine toner', description: 'Chiamare il fornitore', status: 'in_attesa', waiting_reason: '',
       priority: 'high', assigned_to: 12, due_date: '2026-10-01',
     })
   })
@@ -85,5 +85,11 @@ describe('areatasks types', () => {
     const err = { response: { data: { assigned_to: ["Non valido."], title: ['Obbligatorio.', 'Troppo corto.'] } } }
     expect(extractFieldErrors(err)).toEqual({ assigned_to: 'Non valido.', title: 'Obbligatorio. Troppo corto.' })
     expect(extractFieldErrors(new Error('x'))).toEqual({})
+  })
+
+  it('il motivo dell\'attesa va col task «In attesa» e si svuota negli altri stati', () => {
+    const form = { ...taskToForm(row), waiting_reason: 'cliente' }
+    expect(formToPayload(form).waiting_reason).toBe('cliente')
+    expect(formToPayload({ ...form, status: 'in_corso' }).waiting_reason).toBe('')
   })
 })

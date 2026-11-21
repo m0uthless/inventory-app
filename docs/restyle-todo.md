@@ -91,7 +91,7 @@ Portata dall'anteprima `t-base.html` con righe e colonne come le Issue.
 - **[DEC] Indicatori**: nuova azione `GET /area-tasks/stats/?area=`; `summary` resta com'era (contatore della barra laterale).
 - **[DEC] Completati**: le viste mostrano solo quelli chiusi negli ultimi 3 giorni, come la regola della lista (prima la pagina usava `include_hidden=1`).
 - **[UI] Card Task nella Dashboard**: apre lo stesso nuovo pannello (`AreaTaskDetail`); la card in sé non è ancora ridisegnata.
-- **[UI] Motivo dell'attesa**: le Issue hanno un motivo per "In attesa", i task no (servirebbe un campo nel modello).
+- ~~**[UI] Motivo dell'attesa**~~ fatto il 21/11 (`AreaTask.waiting_reason`).
 - **[TEST] Vitest**: test della pagina riscritti sul nuovo comportamento (19 al posto di 30); baseline ora 144/144, lint 13.
 
 ## Piano ferie

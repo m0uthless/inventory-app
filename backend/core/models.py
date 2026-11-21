@@ -365,6 +365,11 @@ class AreaTask(TimeStampedModel):
     status      = models.CharField(
         max_length=16, choices=STATUS_CHOICES, default=STATUS_DA_FARE, verbose_name='Stato',
     )
+    # Stesse causali delle Issue (Philips, Elco, Cliente, Exprivia, Altro).
+    waiting_reason = models.CharField(
+        max_length=20, choices=[('philips', 'Philips'), ('elco', 'Elco'), ('cliente', 'Cliente'), ('exprivia', 'Exprivia'), ('altro', 'Altro')],
+        blank=True, default='', verbose_name='In attesa di',
+    )
     due_date = models.DateField(null=True, blank=True, verbose_name='Scadenza')
     priority = models.CharField(
         max_length=20, choices=AreaTaskPriority.choices,

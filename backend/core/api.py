@@ -368,11 +368,12 @@ class AreaTaskSerializer(serializers.ModelSerializer):
     converted_to_issue = serializers.PrimaryKeyRelatedField(read_only=True)
     converted_to_issue_title = serializers.SerializerMethodField()
     converted_to_issue_deleted = serializers.SerializerMethodField()
+    waiting_reason_label = serializers.CharField(source='get_waiting_reason_display', read_only=True)
 
     class Meta:
         model  = AreaTask
         fields = [
-            'id', 'area', 'area_label', 'title', 'description', 'status',
+            'id', 'area', 'area_label', 'title', 'description', 'status', 'waiting_reason', 'waiting_reason_label',
             'priority', 'due_date', 'assigned_to', 'assigned_to_name',
             'drive_files', 'drive_files_detail',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
@@ -480,6 +481,16 @@ class AreaTaskSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        # «In attesa»: il motivo serve quando si mette in attesa (non blocca i task già in attesa
+        # senza motivo, che restano modificabili); fuori dall'attesa si svuota.
+        status_value = attrs.get('status', getattr(self.instance, 'status', AreaTask.STATUS_DA_FARE))
+        if status_value == AreaTask.STATUS_IN_ATTESA:
+            reason = attrs.get('waiting_reason', getattr(self.instance, 'waiting_reason', ''))
+            entering = 'status' in attrs and getattr(self.instance, 'status', None) != AreaTask.STATUS_IN_ATTESA
+            if entering and not reason:
+                raise serializers.ValidationError({'waiting_reason': "Il motivo è obbligatorio quando il task è «In attesa»."})
+        elif 'status' in attrs or 'waiting_reason' in attrs:
+            attrs['waiting_reason'] = ''
         assignee = attrs.get('assigned_to')
         if assignee is None:
             return attrs

@@ -1,8 +1,10 @@
 import * as React from 'react'
 import { Avatar, Box } from '@mui/material'
+import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded'
 import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined'
 import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded'
 import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
+import { WAITING_REASON_META } from '../issues/types'
 import { DatePill, QuickForm, SelectPill } from '../../ui/campo'
 import { IssuePriorityMark } from '../issues/IssueBadges'
 import { TaskStatusBadge } from './taskUi'
@@ -46,6 +48,10 @@ export default function AreaTaskDialog({
           <SelectPill placeholder="Stato" value={form.status} onChange={(v) => v && set('status', v as TaskStatus)}
             options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_META[s].label, node: <TaskStatusBadge status={s} /> }))}
             render={(o) => <TaskStatusBadge status={o.value as TaskStatus} />} />
+          {form.status === 'in_attesa' ? (
+            <SelectPill icon={<HourglassEmptyRoundedIcon />} placeholder="In attesa di" required value={form.waiting_reason} error={Boolean(errors.waiting_reason)}
+              options={Object.entries(WAITING_REASON_META).map(([k, m]) => ({ value: k, label: m.label }))} onChange={(v) => set('waiting_reason', String(v))} />
+          ) : null}
           <SelectPill placeholder="Priorità" value={form.priority} onChange={(v) => v && set('priority', v as TaskPriority)}
             options={[...PRIORITY_ORDER].reverse().map((p) => ({ value: p, label: PRIORITY_META[p].label, node: <IssuePriorityMark priority={p} /> }))}
             render={(o) => <IssuePriorityMark priority={String(o.value)} />} />
