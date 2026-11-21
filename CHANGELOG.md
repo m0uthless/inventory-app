@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Cestino: anche Purchase Order, Contratti e Issue, con il ripristino multiplo come gli altri tipi (selezione dal tasto destro). I Contratti si possono anche eliminare definitivamente; PO e Issue solo ripristinare. Le issue rispettano la visibilità per area anche nelle informazioni del Cestino.
 - Contratti, sezione «Valore» (Contratti › Valore, solo con il permesso sui valori): i clienti per valore dei contratti, con interruttore «Attivi oggi / Storico» (lo storico comprende scaduti e chiusi, mai le bozze), quota sul totale e ripartizione per regione ricavata dalla provincia del cliente; un clic su una regione filtra la classifica, uno su un cliente lo apre. Nuovo endpoint `GET /api/contracts/value-by-customer/?scope=active|all`.
 - Issue, allegati: screenshot, log e documenti si caricano direttamente nella finestra della issue (anche trascinandoli), fino a 25 MB (PDF, immagini, txt/log/csv, ZIP, docx, xlsx; il contenuto deve corrispondere all'estensione). Si scaricano solo passando dall'API, con i permessi e la visibilità per area della issue; li aggiunge e li toglie chi può modificarla (non a issue chiusa). Ogni aggiunta e rimozione compare nell'attività e nell'Audit. Una issue nata da un task di area eredita gli allegati del task come collegamenti ai file del Drive, con il prefisso «[Task]» e i permessi del Drive. Migrazione `issues.0012`.
 - Issue, «Dove intervenire»: il referente del sito (il contatto principale, altrimenti fino a 3 contatti) con «Chiama» ed email; seriale e K-number dell'inventario collegato; le credenziali dell'inventario, visibili per 30 secondi con il permesso Credenziali.
@@ -27,6 +28,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Fixed
 
+- Il cliente segnaposto delle issue («Cliente da specificare», SYS-PLACEHOLDER) non compare più nel Cestino: ripristinarlo o eliminarlo per errore rompeva le issue che lo usano.
 - Issue, «Dove intervenire»: chi non ha il permesso su Contatti o Inventari legge «Serve il permesso Contatti / Inventari» invece di «Nessun contatto» o «Nessuna credenziale»; se la lettura fallisce compare «non disponibili».
 - Contratti e Purchase Order: passando da un record all'altro con le frecce la finestra del dettaglio non si chiude e riapre più (restava aperta solo in Clienti, Siti, Contatti e Inventari).
 - Elenchi tagliati a 200: in circa quaranta punti (scelta di clienti, siti, inventari e device nei moduli, calendario e piani della Manutenzione e PDF dei piani, Rapportini, Drive, Wiki e Query, Contratti, Purchase Order) l'app chiedeva 500 elementi ma il backend ne dà al massimo 200 per pagina, e quelli oltre il duecentesimo sparivano senza avviso. Ora si leggono tutte le pagine (`frontend/src/api/fetchAll.ts`, e `useList` delle schede).

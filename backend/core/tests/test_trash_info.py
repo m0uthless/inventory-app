@@ -56,3 +56,64 @@ def test_trash_info_skips_types_without_view_permission(api_client, superuser, c
 
 def test_trash_info_requires_login(api_client):
     assert api_client.get("/api/trash/info/", {"customers": "1"}).status_code in (401, 403)
+
+
+def test_trash_info_covers_purchase_orders_contracts_and_issues(api_client, superuser, customer_status):
+    """Lista del 21/11, punto 4: PO, contratti e issue anche nel Cestino."""
+    from datetime import date
+
+    from django.utils import timezone
+
+    from contracts.models import Contract
+    from issues.models import Issue
+    from purchaseorders.models import PurchaseOrderEntry
+
+    customer = Customer.objects.create(name="Acme", status=customer_status)
+    now = timezone.now()
+    po = PurchaseOrderEntry.objects.create(offer_date="2026-01-15", description="Offerta", client_name="Acme", amount="1.00", deleted_at=now)
+    ctr = Contract.objects.create(customer=customer, code="CT-T-1", title="Assistenza", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), deleted_at=now)
+    iss = Issue.objects.create(title="Worklist", customer=customer, created_by=superuser, deleted_at=now)
+    api_client.force_authenticate(user=superuser)
+    res = api_client.get("/api/trash/info/", {"purchase-orders": str(po.id), "contracts": str(ctr.id), "issues": str(iss.id)})
+    assert res.status_code == 200, res.data
+    for key, obj in (("purchase-orders", po), ("contracts", ctr), ("issues", iss)):
+        assert res.data[key][str(obj.id)]["restore_block"] is None
+
+
+def test_trash_info_hides_issues_of_other_areas(api_client, customer_status):
+    from django.contrib.auth.models import Permission
+    from django.utils import timezone
+
+    from attendance.models import LeaveArea
+    from issues.models import Issue
+
+    from core.models import UserProfile
+
+    mine = LeaveArea.objects.create(key="trash_mine", label="Bologna")
+    other = LeaveArea.objects.create(key="trash_other", label="Romagna")
+    u = make_archie_user(username="trash_area", password="pw")
+    u.user_permissions.add(Permission.objects.get(codename="view_issue"))
+    profile, _ = UserProfile.objects.get_or_create(user=u)
+    profile.leave_area = mine
+    profile.save(update_fields=["leave_area"])
+    u = get_user_model().objects.get(pk=u.pk)
+    customer = Customer.objects.create(name="Acme", status=customer_status)
+    iss = Issue.objects.create(title="Altrove", customer=customer, area=other, created_by=u, deleted_at=timezone.now())
+    api_client.force_authenticate(user=u)
+    res = api_client.get("/api/trash/info/", {"issues": str(iss.id)})
+    assert res.status_code == 200
+    assert res.data.get("issues", {}) == {}
+
+
+def test_placeholder_customer_never_shows_in_the_trash(api_client, superuser):
+    """Il cliente segnaposto delle issue è soft-deleted di proposito: né elenco, né ripristino, né eliminazione."""
+    from issues.models import get_placeholder_customer
+
+    ph = get_placeholder_customer()
+    api_client.force_authenticate(user=superuser)
+    rows = api_client.get("/api/customers/", {"only_deleted": 1, "page_size": 200}).json()["results"]
+    assert ph.id not in [r["id"] for r in rows]
+    api_client.post("/api/customers/bulk_restore/", {"ids": [ph.id]}, format="json")
+    api_client.post("/api/customers/bulk_purge/", {"ids": [ph.id]}, format="json")
+    ph.refresh_from_db()
+    assert ph.deleted_at is not None

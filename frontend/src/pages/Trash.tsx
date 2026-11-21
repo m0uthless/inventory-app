@@ -16,7 +16,7 @@ import type { MobileCardRenderFn } from '@shared/ui/MobileCardList'
 import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon, PageHead, ViewTabs } from '../ui/campo'
 import {
-  TRASH_RESOURCES, agoLabel, groupByKind, resourceOf, toRow,
+  TRASH_RESOURCES, agoLabel, canPurgeKind, groupByKind, resourceOf, toRow,
   type TrashInfo, type TrashKind, type TrashRow,
 } from '../features/trash/trashModel'
 import { PurgeDialog, TrashItemCell, TrashState, TrashWhen } from '../features/trash/trashUi'
@@ -122,7 +122,7 @@ export default function Trash() {
     ? rows.filter((r) => !selModel.ids?.has(r.rid))
     : rows.filter((r) => new Set(selectionToIds(selection).map(String)).has(r.rid))
   const selectedIds = new Set(selected.map((r) => r.rid))
-  const canPurgeAny = visible.some((r) => hasPerm(r.purgePerm))
+  const canPurgeAny = visible.some((r) => canPurgeKind(r, hasPerm))
   // La colonna delle caselle compare solo con una selezione in corso (tasto destro → Seleziona).
   const selecting = selected.length > 0
   const clearSelection = () => setSelection(emptySelectionModel())
@@ -148,7 +148,7 @@ export default function Trash() {
   }
 
   const purge = async (list: TrashRow[]) => {
-    const ok = list.filter((r) => hasPerm(resourceOf(r.kind).purgePerm))
+    const ok = list.filter((r) => canPurgeKind(resourceOf(r.kind), hasPerm))
     setBusy(true)
     try {
       const groups = groupByKind(ok)
@@ -175,7 +175,7 @@ export default function Trash() {
     setBusy(true)
     try {
       const all: TrashRow[] = []
-      for (const r of visible.filter((x) => hasPerm(x.purgePerm))) {
+      for (const r of visible.filter((x) => canPurgeKind(x, hasPerm))) {
         for (let page = 1; page < 50; page++) {
           const { data } = await api.get<ApiPage<Raw>>(r.endpoint, { params: { only_deleted: 1, include_deleted: 1, page, page_size: 200 } })
           ;(data.results || []).forEach((raw) => { const row = toRow(r.key, raw); if (row) all.push(row) })
@@ -195,7 +195,7 @@ export default function Trash() {
   const actionsCell = (row: TrashRow) => {
     const r = resourceOf(row.kind)
     const canRestore = hasPerm(r.restorePerm)
-    const canPurge = hasPerm(r.purgePerm)
+    const canPurge = canPurgeKind(r, hasPerm)
     const blockedRestore = row.info?.restore_block
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, height: '100%' }} onClick={(e) => e.stopPropagation()}>
@@ -291,7 +291,7 @@ export default function Trash() {
       { key: 'restore', label: many ? `Ripristina i ${selected.length} selezionati` : 'Ripristina', icon: <CampoIcon name="restore" size={16} />, dividerBefore: true, strong: many,
         disabled: busy || (!many && (!hasPerm(r.restorePerm) || Boolean(row.info?.restore_block))), onClick: () => void restore(list) },
       { key: 'purge', label: many ? `Elimina definitivamente i ${selected.length} selezionati` : 'Elimina definitivamente', icon: <CampoIcon name="trash" size={16} />, tone: 'danger',
-        disabled: busy || (!many && !hasPerm(r.purgePerm)), onClick: () => setPurgeRows(list) },
+        disabled: busy || (!many && !canPurgeKind(r, hasPerm)), onClick: () => setPurgeRows(list) },
     ]
   })()
   // Esc esce dalla selezione (se non c'è un dialogo aperto).

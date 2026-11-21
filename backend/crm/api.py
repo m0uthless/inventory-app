@@ -356,7 +356,11 @@ class CustomerViewSet(PortalScopedMixin, PurgeActionMixin, RestoreActionMixin, S
         super().perform_destroy(instance)
 
     def get_queryset(self):
-        qs = Customer.objects.select_related("status")
+        from issues.models import PLACEHOLDER_CUSTOMER_CODE
+
+        # Il cliente segnaposto delle issue è soft-deleted di proposito: fuori anche dal
+        # Cestino, così non si ripristina né si elimina per errore.
+        qs = Customer.objects.select_related("status").exclude(code=PLACEHOLDER_CUSTOMER_CODE)
 
         # Annotate city for ordering/filtering (best-effort: supports common keys)
         qs = qs.annotate(

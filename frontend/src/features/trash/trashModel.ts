@@ -2,7 +2,7 @@ import { collectionActionPath, type CollectionPath } from '@shared/api/apiPaths'
 import { PERMS } from '../../auth/perms'
 import type { CampoIconName } from '../../ui/campo'
 
-export type TrashKind = 'customers' | 'sites' | 'contacts' | 'inventory' | 'monitors' | 'maintenance-plans' | 'techs'
+export type TrashKind = 'customers' | 'sites' | 'contacts' | 'inventory' | 'monitors' | 'maintenance-plans' | 'techs' | 'purchase-orders' | 'contracts' | 'issues'
 
 type Raw = Record<string, unknown>
 const s = (v: unknown) => (v == null ? '' : String(v).trim())
@@ -19,7 +19,8 @@ export type TrashResource = {
   purgeEndpoint: string
   viewPerm: string
   restorePerm: string
-  purgePerm: string
+  /** `null`: il tipo non si elimina definitivamente (l'API non ha `bulk_purge`). */
+  purgePerm: string | null
   title: (r: Raw) => string
   sub: (r: Raw) => string
 }
@@ -73,7 +74,28 @@ export const TRASH_RESOURCES: TrashResource[] = [
     title: (r) => s(r.full_name) || [s(r.first_name), s(r.last_name)].filter(Boolean).join(' ') || 'Tecnico',
     sub: (r) => join(r.email, r.phone),
   }),
+  res({
+    key: 'purchase-orders', label: 'Purchase Order', one: 'Purchase Order', icon: 'bag', endpoint: '/purchase-order-entries/',
+    viewPerm: PERMS.purchaseorders.entry.view, restorePerm: PERMS.purchaseorders.entry.change, purgePerm: null,
+    title: (r) => s(r.description) || 'Purchase Order',
+    sub: (r) => join(r.customer_name || r.client_name, r.purchase_order),
+  }),
+  res({
+    key: 'contracts', label: 'Contratti', one: 'Contratto', icon: 'file', endpoint: '/contracts/',
+    viewPerm: PERMS.contracts.contract.view, restorePerm: PERMS.contracts.contract.change, purgePerm: PERMS.contracts.contract.delete,
+    title: (r) => join(r.code, r.title) || 'Contratto',
+    sub: (r) => join(r.customer_name),
+  }),
+  res({
+    key: 'issues', label: 'Issue', one: 'Issue', icon: 'alert', endpoint: '/issues/',
+    viewPerm: PERMS.issues.issue.view, restorePerm: PERMS.issues.issue.change, purgePerm: null,
+    title: (r) => (s(r.title) ? `#${s(r.id)} ${s(r.title)}` : 'Issue'),
+    sub: (r) => join(r.customer_name, r.site_name),
+  }),
 ]
+
+/** Si può eliminare definitivamente un tipo? (permesso e azione presente nell'API) */
+export const canPurgeKind = (r: TrashResource, hasPerm: (p: string) => boolean) => r.purgePerm !== null && hasPerm(r.purgePerm)
 
 export const resourceOf = (k: TrashKind) => TRASH_RESOURCES.find((r) => r.key === k)!
 

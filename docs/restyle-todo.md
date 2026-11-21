@@ -30,7 +30,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - **[DEC] Margine**: calcolato in pagina (importo − costi), non è un campo.
 - **[UI] Dialogo Nuovo/Modifica PO** (`PurchaseOrderDialog`) e **dialogo di avanzamento** (`PurchaseOrderTransitionDialog`): funzionano, non ridisegnati (l'anteprima aveva un dialogo breve con solo i campi del passo).
 - **[UI] Totali nel piè** ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
-- **[UI] Ripristino multiplo dal cestino**: la logica c'è, ma la pagina non ha più un selettore di vista "cestino" visibile (va riesposto, es. come scheda o voce di menu).
+- ~~**[UI] Ripristino multiplo dal cestino**~~ fatto il 21/11: PO, Contratti e Issue sono nella pagina Cestino, che ha la selezione multipla.
 
 ## Comportamenti globali
 
@@ -58,7 +58,7 @@ Portata direttamente nell'app con lo schema dei Clienti (nessuna anteprima dedic
 
 Portata direttamente nell'app con lo schema di Clienti e Siti.
 
-- **[UI] Ripristino multiplo dal cestino**: la vecchia pagina aveva il codice ma non la selezione delle righe, quindi non era raggiungibile; non riportato (resta la pagina Cestino).
+- ~~**[UI] Ripristino multiplo dal cestino**~~ fatto il 21/11: PO, Contratti e Issue sono nella pagina Cestino, che ha la selezione multipla.
 - **[DEC] Cliente di un contatto**: nel pannello è in sola lettura; si cambia da "Modifica" (il sito deve appartenere al cliente).
 
 ## Pagina Inventari
