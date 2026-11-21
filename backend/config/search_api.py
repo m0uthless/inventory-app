@@ -274,5 +274,27 @@ class SearchAPIView(APIView):
             subtitle = f"{cat} • {wp.slug}"
             add("wiki_page", wp.id, wp.title, subtitle, wp.updated_at, wiki_page_path(wp.id))
 
+        if user.has_perm("issues.view_issue"):
+            from issues.models import Issue
+            from issues.visibility import visible_issues_q
+
+            num = q.lstrip("#")
+            issue_q = Q(title__icontains=q)
+            if num.isdigit():
+                issue_q |= Q(id=int(num))
+            for iss in (
+                Issue.objects.select_related("customer", "site")
+                .filter(deleted_at__isnull=True)
+                .filter(visible_issues_q(user))
+                .filter(issue_q)
+                .order_by("-updated_at")[:per_small]
+            ):
+                where = " · ".join(x for x in [
+                    _safe_str(iss.customer.display_name or iss.customer.name) if iss.customer_id else "",
+                    _safe_str(iss.site.display_name or iss.site.name) if iss.site_id else "",
+                ] if x)
+                add("issue", iss.id, f"#{iss.id} {iss.title}", " · ".join(x for x in [iss.get_status_display(), where] if x),
+                    iss.updated_at, f"/issues?open={iss.id}")
+
         results.sort(key=lambda r: _parse_dt(_safe_str(r.get("updated_at"))), reverse=True)
         return Response({"q": q, "results": results[:limit]})

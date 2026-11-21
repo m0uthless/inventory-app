@@ -16,7 +16,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - ~~**[BE] Variazione del tempo di risoluzione**~~: scartata da Fede (20/11), insieme allo SLA.
 - ~~**[BE] "+ Salva vista"**~~ sul server dal 21/11 (`core.SavedView`), con caricamento delle viste del browser al primo avvio.
 - **[UI] Avviso "nessun inventario collegato"** (triangolo accanto al titolo nella vecchia tabella): tolto dalla riga come nell'anteprima; resta nel pannello ("Nessun inventario collegato · Collega un inventario").
-- **[UI] Ricerca Ctrl K a finestra** con risultati raggruppati (clienti, siti, device, issue, azioni): oggi Ctrl K porta il cursore nel campo e Invio apre la pagina Ricerca.
+- ~~**[UI] Ricerca Ctrl K a finestra**~~ fatta il 21/11 (palette con gruppi, pagine, azioni; issue nella ricerca). I device non sono nella ricerca globale.
 
 ### Presente nella UI di prima, tolto o non ancora ridisegnato
 - **[DEC] Grafico "Andamento issue"** (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.

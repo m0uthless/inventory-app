@@ -298,7 +298,7 @@ export function AppLayout() {
           </IconButton>
 
           <Box sx={{ position: { sm: 'absolute' }, left: { sm: '50%' }, transform: { sm: 'translateX(-50%)' }, flex: { xs: 1, sm: 'none' }, display: 'flex', justifyContent: 'center' }}>
-            <GlobalSearch onEggTrigger={openEgg} />
+            <GlobalSearch onEggTrigger={openEgg} canAccess={canAccess} hasPerm={hasPerm} />
           </Box>
 
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>

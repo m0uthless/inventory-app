@@ -35,7 +35,7 @@ class Module:
 
 
 MODULES: tuple[Module, ...] = (
-    Module("issues", "Issue", ("issues", "issue-categories")),
+    Module("issues", "Issue", ("issues", "issue-categories"), search_kinds=("issue",)),
     Module("area_tasks", "Task di area", ("area-tasks",), notification_types=("area_task_due",)),
     Module(
         "maintenance",

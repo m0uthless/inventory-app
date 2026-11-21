@@ -9,6 +9,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Ricerca a finestra (Ctrl K o clic sul campo in alto): risultati raggruppati come la pagina Ricerca (al massimo 5 per gruppo), pagine dell'app e azioni «Nuovo…» permesse, ricerche recenti; frecce per scegliere, Invio per aprire, «Cerca in tutto Archie» per la pagina Ricerca.
+- Ricerca globale: anche le Issue, per numero (#41) e titolo, solo quelle visibili per area; spariscono con il modulo Issue spento.
 - Viste salvate («+ Salva vista») sul server: si ritrovano su ogni dispositivo e browser. Al primo avvio le viste già salvate nel browser vengono caricate automaticamente. API `GET/POST /api/saved-views/?page=…`, `DELETE /api/saved-views/<id>/?page=…` (solo le proprie, al massimo 50 per pagina). Migrazione `core.0050`.
 - Cestino: anche Purchase Order, Contratti e Issue, con il ripristino multiplo come gli altri tipi (selezione dal tasto destro). I Contratti si possono anche eliminare definitivamente; PO e Issue solo ripristinare. Le issue rispettano la visibilità per area anche nelle informazioni del Cestino.
 - Contratti, sezione «Valore» (Contratti › Valore, solo con il permesso sui valori): i clienti per valore dei contratti, con interruttore «Attivi oggi / Storico» (lo storico comprende scaduti e chiusi, mai le bozze), quota sul totale e ripartizione per regione ricavata dalla provincia del cliente; un clic su una regione filtra la classifica, uno su un cliente lo apre. Nuovo endpoint `GET /api/contracts/value-by-customer/?scope=active|all`.

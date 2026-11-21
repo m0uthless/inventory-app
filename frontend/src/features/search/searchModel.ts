@@ -2,7 +2,7 @@ import type { CampoIconName } from '../../ui/campo'
 
 export type SearchResult = { kind: string; id: number; title: string; subtitle?: string | null; path?: string | null; updated_at?: string | null }
 
-export type SearchGroup = 'customer' | 'site' | 'contact' | 'inventory' | 'maintenance_plan' | 'wiki_page' | 'drive'
+export type SearchGroup = 'customer' | 'site' | 'contact' | 'inventory' | 'issue' | 'maintenance_plan' | 'wiki_page' | 'drive'
 
 /** Gruppi nell'ordine della pagina; cartelle e file del Drive stanno insieme. */
 export const GROUPS: { key: SearchGroup; label: string; icon: CampoIconName }[] = [
@@ -10,6 +10,7 @@ export const GROUPS: { key: SearchGroup; label: string; icon: CampoIconName }[] 
   { key: 'site', label: 'Siti', icon: 'pin' },
   { key: 'contact', label: 'Contatti', icon: 'users' },
   { key: 'inventory', label: 'Inventari', icon: 'server' },
+  { key: 'issue', label: 'Issue', icon: 'alert' },
   { key: 'maintenance_plan', label: 'Manutenzione', icon: 'wrench' },
   { key: 'wiki_page', label: 'Wiki', icon: 'book' },
   { key: 'drive', label: 'Drive', icon: 'folder' },
@@ -26,6 +27,7 @@ export function resultPath(r: SearchResult): string | null {
   if (r.path) return r.path
   const base: Record<string, string> = { customer: '/customers', site: '/sites', contact: '/contacts', inventory: '/inventory' }
   if (base[r.kind]) return `${base[r.kind]}?open=${r.id}`
+  if (r.kind === 'issue') return `/issues?open=${r.id}`
   if (r.kind === 'maintenance_plan') return `/maintenance/plans?apri=${r.id}`
   if (r.kind === 'wiki_page') return `/wiki/${r.id}`
   if (r.kind === 'drive_folder') return `/drive?cartella=${r.id}`
