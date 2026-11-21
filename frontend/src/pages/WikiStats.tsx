@@ -11,6 +11,7 @@ import { CampoIcon } from '../ui/campo'
 import type { ContributorData } from '../features/dashboard/widgets/PeopleWidgets'
 import { ArchiveRoot, StarIcon, WikiHead } from '../features/wiki/archive/archiveUi'
 import { catColor, cVars, r1, type ApiList, type WikiCategory } from '../features/wiki/archive/archiveModel'
+import { fmtNumber } from '@shared/utils/number'
 
 type Totals = { total: number; published: number; drafts: number; total_views: number; rated_pages: number; unrated_pages: number; total_votes: number; average_rating: number }
 type CategoryStat = { name: string; color: string; count: number }
@@ -76,7 +77,7 @@ export default function WikiStats() {
         <div className="w-st">
           <ul className="w-st-tags" aria-label="Riepilogo">
             <li><span className="w-st-k">Pagine pubblicate</span><b>{t.published}</b><small>{t.drafts} {t.drafts === 1 ? 'bozza' : 'bozze'}</small></li>
-            <li><span className="w-st-k">Letture totali</span><b>{t.total_views.toLocaleString('it-IT')}</b><small>{t.published ? `in media ${Math.round(t.total_views / t.published)} per pagina` : '—'}</small></li>
+            <li><span className="w-st-k">Letture totali</span><b>{fmtNumber(t.total_views)}</b><small>{t.published ? `in media ${Math.round(t.total_views / t.published)} per pagina` : '—'}</small></li>
             <li><span className="w-st-k">Voto medio</span><b>{t.total_votes ? r1(t.average_rating) : '—'}</b><small>{t.total_votes} voti su {t.rated_pages} pagine</small></li>
             <li className="w-st-month">
               <span className="w-st-k">Collaboratore del mese</span>

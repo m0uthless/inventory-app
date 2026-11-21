@@ -4,6 +4,7 @@ import { CampoIcon } from '../../ui/campo'
 import { formatEuro, todayISO, type ExpenseItemRow, type ExpenseReceiptRow, type ExpenseReportRow } from './expensesShared'
 import { CATEGORY_META, amountInput, dShort, kmItemOf, kmTotal, parseEuroInput, rateLabel, sortedItems, toNum } from './nsModel'
 import { CategoryIcon, MissingTag, ReceiptChip } from './nsUi'
+import { fmtNumber } from '@shared/utils/number'
 
 export type ItemPatch = Partial<Pick<ExpenseItemRow, 'description' | 'amount' | 'date'>>
 export type Suggestion = { itemId: number; amount: string | null; date: string | null }
@@ -107,7 +108,7 @@ function Trips({ report, editable, busy, onAddTrip, onRemoveTrip }: Pick<Props, 
             </tr>
           ) : null}
         </tbody>
-        <tfoot><tr><td colSpan={2}>{kmTotal(report).toLocaleString('it-IT')} km × {rate ?? 'tariffa non impostata'}</td><td className="n"><b>{formatEuro(km?.amount ?? 0)}</b></td>{editable ? <td /> : null}</tr></tfoot>
+        <tfoot><tr><td colSpan={2}>{fmtNumber(kmTotal(report))} km × {rate ?? 'tariffa non impostata'}</td><td className="n"><b>{formatEuro(km?.amount ?? 0)}</b></td>{editable ? <td /> : null}</tr></tfoot>
       </table>
       <datalist id={`ns-dest-${report.id}`}>{[...known.keys()].map((d) => <option key={d} value={d} />)}</datalist>
     </Box>
@@ -137,7 +138,7 @@ export default function ExpenseSheet(p: Props) {
                   <td className="ds">
                     {km ? (
                       <ButtonBase className="kmtog" aria-expanded={kmOpen} onClick={() => setKmOpen((o) => !o)}>
-                        {it.km_trips.length} {it.km_trips.length === 1 ? 'trasferta' : 'trasferte'} · {kmTotal(report).toLocaleString('it-IT')} km<CampoIcon name={kmOpen ? 'chevD' : 'chevR'} size={14} />
+                        {it.km_trips.length} {it.km_trips.length === 1 ? 'trasferta' : 'trasferte'} · {fmtNumber(kmTotal(report))} km<CampoIcon name={kmOpen ? 'chevD' : 'chevR'} size={14} />
                       </ButtonBase>
                     ) : editable ? <CommitInput value={it.description} label={`Descrizione ${meta.label}`} placeholder={v ? 'Descrizione' : ''} onCommit={(d) => p.onPatch(it, { description: d })} />
                       : <span className={it.description ? '' : 'none'}>{it.description || '—'}</span>}

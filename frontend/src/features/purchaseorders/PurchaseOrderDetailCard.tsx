@@ -12,6 +12,7 @@ import {
   DOCUMENT_SLOT_LABEL, STATUS_LABEL, STATUS_ORDER, formatEuro, nextStatus, prevStatus,
   type DocumentSlot, type PurchaseOrderDetail, type PurchaseOrderKind,
 } from './types'
+import { fmtNumber } from '@shared/utils/number'
 
 /*
  * Finestra del Purchase Order (DESIGN.md › Record window, anteprima design-previews/pof-base.html): testata con
@@ -259,7 +260,7 @@ function PoWindow(p: Props & { detail: PurchaseOrderDetail }) {
             <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, flexWrap: 'wrap', mb: 1.25 }}>
               <Typography component="b" sx={{ fontSize: 22, fontWeight: 650, letterSpacing: '-0.015em', fontVariantNumeric: 'tabular-nums' }}>{formatEuro(amount)}</Typography>
               <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>
-                {d.amount_mode === 'giornate' && d.days && d.daily_rate ? `${Number(d.days).toLocaleString('it-IT')} giornate × ${formatEuro(d.daily_rate)}` : 'valore fisso'}
+                {d.amount_mode === 'giornate' && d.days && d.daily_rate ? `${fmtNumber(Number(d.days))} giornate × ${formatEuro(d.daily_rate)}` : 'valore fisso'}
               </Typography>
             </Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', '& > div + div': { borderLeft: '1px solid', borderColor: 'divider' } }}>

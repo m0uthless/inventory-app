@@ -79,6 +79,7 @@ import {
 import { committenteColor, type DomainStatusTokens } from '../theme/statusTokens'
 import { useStatusTokens } from '../theme/AppThemeProvider'
 import { fetchAll } from '../api/fetchAll'
+import { fmtNumber } from '@shared/utils/number'
 
 type OpenCreateState = { openCreate?: boolean }
 
@@ -175,7 +176,7 @@ function buildColumns(statusTokens: DomainStatusTokens): GridColDef<PurchaseOrde
       renderCell: (p) => (
         <Box sx={{ textAlign: 'right', lineHeight: 1.3 }}>
           <Box sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatEuro(p.row.amount)}</Box>
-          {p.row.amount_mode === 'giornate' && p.row.days ? <Box sx={{ fontSize: 11, color: 'text.secondary' }}>{Number(p.row.days).toLocaleString('it-IT')} gg × {formatEuro(p.row.daily_rate)}</Box> : null}
+          {p.row.amount_mode === 'giornate' && p.row.days ? <Box sx={{ fontSize: 11, color: 'text.secondary' }}>{fmtNumber(Number(p.row.days))} gg × {formatEuro(p.row.daily_rate)}</Box> : null}
         </Box>
       ),
     },

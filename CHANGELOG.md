@@ -17,7 +17,8 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
-- Contratti, card «Importo» del dettaglio rifatta a tessere: il valore totale in evidenza con la barra del maturato (in proporzione al tempo trascorso), e accanto al mese, all'anno e per fattura, con il numero di fatture e la data stimata della prossima. Gli importi hanno il separatore delle migliaia anche sotto i 10.000 €; tolta la nota sul permesso.
+- Numeri e importi con il separatore delle migliaia anche sotto 10.000 («4.142,86 €», «1.250 km») in tutta l'app: Contratti, Purchase Order, Rimborso spese, ServiceNow, statistiche Wiki (helper condiviso `shared/src/utils/number.ts`).
+- Contratti, card «Importo» del dettaglio rifatta a tessere: il valore totale in evidenza con la barra del maturato (in proporzione al tempo trascorso), e accanto al mese, all'anno e per fattura, con il numero di fatture e la data stimata della prossima. Tolta la nota sul permesso.
 - Mappa nel riquadro «Dove» di clienti e siti: nuova mappa nei colori dell'app (chiara e scura col tema), con il segnaposto nel colore principale e «Ingrandisci» per la mappa grande da muovere e ingrandire. Usa MapLibre con OpenFreeMap, senza chiavi; la libreria si carica solo quando si apre una mappa (prima Leaflet da unpkg a ogni apertura).
 - Contratti: niente più disdetta. «Preavviso di disdetta» diventa «Avviso di rinnovo» (`notice_days` → `reminder_days`, `notice_deadline` → `reminder_date` nell'API); gli stati di scadenza sono In corso, Da rinnovare, Scaduto (via «Preavviso» e «In scadenza»; filtro `expiry=ok|renew|expired`); la vista «Da gestire» diventa «Da rinnovare». Lo stato «Disdetto» diventa «Chiuso» anche nei dati; tolto il rinnovo automatico (`auto_renew`). Migrazione `contracts.0003`.
 - Venditori: senza un utente di Archie collegato l'email è obbligatoria (è quella che riceve i promemoria); l'utente collegato deve essere un utente di Archie attivo.

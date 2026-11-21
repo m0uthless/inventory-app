@@ -18,6 +18,7 @@ import { ExpenseStatusBadge } from '../features/expenses/nsUi'
 import { SecKpis, TechKpis } from '../features/expenses/ExpenseKpis'
 import { KmRatesDialog, NewReportDialog } from '../features/expenses/ExpenseDialogs'
 import { Ava } from '../features/pianoferie/pfUi'
+import { fmtNumber } from '@shared/utils/number'
 
 type Meta = { is_secretary: boolean; user_id: number; km_rate: string | null }
 type Scope = 'mine' | 'all'
@@ -163,7 +164,7 @@ export default function RimborsoSpese() {
                       <td className="n c-tot">{formatEuro(r.total_expenses)}</td>
                       <td className="n c-adv">{toNum(r.advances_total) ? `− ${formatEuro(r.advances_total)}` : <span className="none">—</span>}</td>
                       <td className="n c-due"><b>{formatEuro(r.total_due)}</b></td>
-                      <td className="n c-km">{kmTotal(r) ? kmTotal(r).toLocaleString('it-IT') : <span className="none">—</span>}</td>
+                      <td className="n c-km">{kmTotal(r) ? fmtNumber(kmTotal(r)) : <span className="none">—</span>}</td>
                       <td className="c-rc"><Receipts r={r} /></td>
                       <td className="c-up"><LastStep r={r} sec={sec} /></td>
                     </tr>

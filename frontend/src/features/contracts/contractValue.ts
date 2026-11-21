@@ -1,4 +1,5 @@
 import { ITALIAN_REGIONS, regionOfProvinceSigla, type RegionId } from '../../data/italianRegions'
+import { fmtNumber } from '@shared/utils/number'
 
 /** Riga di `GET /api/contracts/value-by-customer/`. */
 export type CustomerValueRow = { customer_id: number; customer_name: string; province: string | null; value: string; contracts: number }
@@ -29,4 +30,4 @@ export function byRegion(list: CustomerValue[]): RegionValue[] {
 export const sumValue = (list: { value: number }[]) => list.reduce((s, x) => s + x.value, 0)
 export const share = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0)
 /** Euro senza decimali, per classifiche e indicatori. */
-export const eur0 = (n: number) => n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+export const eur0 = (n: number) => fmtNumber(n, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })

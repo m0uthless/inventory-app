@@ -1,5 +1,6 @@
 import { addMonths, invoiceCount, monthsBetween } from './contractForm'
 import type { BillingFrequency } from './types'
+import { fmtEuro } from '@shared/utils/number'
 
 const STEP: Record<BillingFrequency, number> = { una_tantum: 0, mensile: 1, trimestrale: 3, annuale: 12 }
 
@@ -25,7 +26,7 @@ export function amountSummary(value: number, freq: BillingFrequency, start: stri
 }
 
 /** Euro con due decimali e separatore delle migliaia anche sotto 10.000 («4.142,86 €»). */
-export const eurFull = (n: number) => `${n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: 'always' } as unknown as Intl.NumberFormatOptions)} €`
+export const eurFull = fmtEuro
 
 /** Oggi in ora locale, formato ISO. */
 export const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }

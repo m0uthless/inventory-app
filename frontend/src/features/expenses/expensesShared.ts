@@ -1,4 +1,5 @@
 // Tipi e costanti condivise per il modulo Rimborso Spese.
+import { fmtNumber } from '@shared/utils/number'
 
 export type ExpenseCategory =
   | 'treni'
@@ -116,7 +117,7 @@ export function isReportEditable(report: Pick<ExpenseReportRow, 'status'>): bool
 export function formatEuro(value: string | number | null | undefined): string {
   const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0)
   if (!Number.isFinite(n)) return '0,00 €'
-  return `${n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  return `${fmtNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
 
 export function formatItDate(iso: string | null): string {
