@@ -110,7 +110,7 @@ export default function WikiAttachmentsTab({
                     borderRadius: 1,
                     overflow: 'hidden',
                     border: '1px solid',
-                    borderColor: 'grey.200',
+                    borderColor: 'divider',
                     position: 'relative',
                     '&:hover .img-actions': { opacity: 1 },
                   }}

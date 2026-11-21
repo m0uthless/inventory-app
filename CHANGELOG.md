@@ -41,6 +41,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Fixed
 
+- Modalità scura: la cronologia delle revisioni Wiki, gli allegati, i clienti collegati e il gestore delle cartelle usavano grigi e giallo fissi (riquadri chiari sul fondo scuro); ora seguono i colori del tema.
 - Le notifiche in-app delle scadenze di manutenzione non venivano create: il job leggeva le scadenze dall'API senza utente e riceveva 401. Ora le calcola direttamente.
 - La nota personale della Dashboard (`StickyNote`) andava in errore quando veniva mostrata come testo (per esempio nell'admin).
 - Issue: «Collega» in «Dove intervenire» apriva la modifica della issue invece del selettore dell'inventario; ora apre subito il selettore, che mostra tutti gli inventari del cliente (prima al massimo 100).

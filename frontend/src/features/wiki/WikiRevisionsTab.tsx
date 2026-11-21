@@ -49,7 +49,7 @@ export function getProseSx(accents: WidgetAccents) {
   '& code': {
     fontFamily: 'monospace',
     fontSize: 12.5,
-    bgcolor: 'grey.100',
+    bgcolor: 'archie.surface2',
     borderRadius: 1,
     px: 0.75,
     py: 0.25,
@@ -78,12 +78,12 @@ export function getProseSx(accents: WidgetAccents) {
   },
   '& table': { width: '100%', borderCollapse: 'collapse', my: 1.5 },
   '& th, & td': { border: '1px solid', borderColor: 'divider', p: 1, fontSize: 13 },
-  '& th': { bgcolor: 'grey.50', fontWeight: 700 },
+  '& th': { bgcolor: 'archie.surface2', fontWeight: 700 },
   '& hr': { border: 'none', borderTop: '1px solid', borderColor: 'divider', my: 2 },
   '& a': { color: 'primary.main' },
   '& img': { maxWidth: '100%', borderRadius: 1, my: 1 },
   // Evidenziazione <mark>: stile CONTENUTO (stessa famiglia RichEditor), fissa.
-  '& mark': { bgcolor: '#fef9c3', borderRadius: '2px', px: 0.5 },
+  '& mark': { bgcolor: 'warning.light', borderRadius: '2px', px: 0.5 },
   }
 }
 
@@ -137,7 +137,7 @@ export default function WikiRevisionsTab({
                   direction="row"
                   alignItems="center"
                   spacing={1.5}
-                  sx={{ px: 2, py: 1.5, '&:hover': { bgcolor: 'grey.50' } }}
+                  sx={{ px: 2, py: 1.5, '&:hover': { bgcolor: 'archie.surface2' } }}
                 >
                   {/* Badge revisione */}
                   <Box
@@ -145,9 +145,9 @@ export default function WikiRevisionsTab({
                       width: 36,
                       height: 36,
                       borderRadius: 1.5,
-                      bgcolor: 'grey.100',
+                      bgcolor: 'archie.surface2',
                       border: '1.5px solid',
-                      borderColor: 'grey.200',
+                      borderColor: 'divider',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
