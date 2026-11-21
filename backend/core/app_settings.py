@@ -27,13 +27,14 @@ class SettingDef:
     max: int | None = None
 
 
-SECTIONS = {"contracts": "Contratti"}
+SECTIONS = {"contracts": "Contratti", "maintenance": "Manutenzione"}
 
 SETTINGS: dict[str, SettingDef] = {
     d.key: d for d in (
         SettingDef("contracts.reminder_emails", "contracts", "Indirizzi dell'ufficio", "emails", ""),
         SettingDef("contracts.reminder_default_days", "contracts", "Avviso predefinito per i nuovi contratti", "int", 90, 1, 365),
         SettingDef("contracts.reminder_every_days", "contracts", "Ripeti il promemoria ogni", "int", 10, 1, 60),
+        SettingDef("maintenance.office_emails", "maintenance", "Indirizzi dell'ufficio", "emails", ""),
     )
 }
 
@@ -93,6 +94,11 @@ def get_setting(key: str):
 
 def office_emails() -> list[str]:
     return parse_emails(get_setting("contracts.reminder_emails"))[0]
+
+
+def maintenance_office_emails() -> list[str]:
+    """Destinatari del riepilogo della Manutenzione (scadute e in scadenza)."""
+    return parse_emails(get_setting("maintenance.office_emails"))[0]
 
 
 def all_settings() -> dict:

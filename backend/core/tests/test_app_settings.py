@@ -46,12 +46,13 @@ def test_get_requires_permission():
 
 def test_get_returns_defaults_without_rows():
     data = _client(_manager()).get(URL).json()
-    assert [s["key"] for s in data["sections"]] == ["contracts"]
-    assert data["sections"][0]["label"] == "Contratti"
+    assert [s["key"] for s in data["sections"]] == ["contracts", "maintenance"]
+    assert [s["label"] for s in data["sections"]] == ["Contratti", "Manutenzione"]
     assert _values(data) == {
         "contracts.reminder_emails": "",
         "contracts.reminder_default_days": 90,
         "contracts.reminder_every_days": 10,
+        "maintenance.office_emails": "",
     }
     assert get_setting("contracts.reminder_every_days") == 10
 

@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Manutenzione, riepilogo all'ufficio: alle 8:00, con il riepilogo giornaliero, gli indirizzi impostati in «Impostazioni di Archie › Manutenzione» ricevono un'email con le manutenzioni scadute e quelle dei prossimi 30 giorni, solo se c'è qualcosa di nuovo rispetto all'ultimo invio (le novità sono segnate «Nuova»). Senza indirizzi non parte nulla. Migrazione `notifications.0006`.
 - Ricerca a finestra (Ctrl K o clic sul campo in alto): risultati raggruppati come la pagina Ricerca (al massimo 5 per gruppo), pagine dell'app e azioni «Nuovo…» permesse, ricerche recenti; frecce per scegliere, Invio per aprire, «Cerca in tutto Archie» per la pagina Ricerca.
 - Ricerca globale: anche le Issue, per numero (#41) e titolo, solo quelle visibili per area; spariscono con il modulo Issue spento.
 - Viste salvate («+ Salva vista») sul server: si ritrovano su ogni dispositivo e browser. Al primo avvio le viste già salvate nel browser vengono caricate automaticamente. API `GET/POST /api/saved-views/?page=…`, `DELETE /api/saved-views/<id>/?page=…` (solo le proprie, al massimo 50 per pagina). Migrazione `core.0050`.
@@ -21,6 +22,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Le scadenze di manutenzione non arrivano più per email a ogni utente: restano nelle notifiche di Archie, e per email vanno solo all'ufficio.
 - Issue, «Collega un inventario» ridisegnato: elenco cercabile per nome, K-number, hostname o seriale, prima gli inventari del sito della issue, quello collegato segnato, «Scollega» quando serve.
 - Purchase Order, «Nuovo PO» e «Modifica» con l'inserimento rapido standard (come clienti, siti, issue): descrizione come titolo, note sotto, committente, cliente (anche non in anagrafica), tipo, data, calcolo dell'importo (fisso o giornate × tariffa con il totale calcolato), costi; numero PO e fattura in «Altri campi». Con il PO già inviato descrizione e importo restano bloccati.
 - Purchase Order, dialogo di avanzamento ridisegnato come nell'anteprima: titolo con l'azione («Registra PO ricevuto»), riga del PO, solo i campi del passo (numero PO o fattura facoltativo, data del passo, PDF facoltativo) e l'avviso del blocco dopo l'invio. La data del passo si può indicare (mai nel futuro): `date` facoltativa in `POST /api/purchase-order-entries/<id>/advance/`.
@@ -30,10 +32,12 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Contratti: niente più disdetta. «Preavviso di disdetta» diventa «Avviso di rinnovo» (`notice_days` → `reminder_days`, `notice_deadline` → `reminder_date` nell'API); gli stati di scadenza sono In corso, Da rinnovare, Scaduto (via «Preavviso» e «In scadenza»; filtro `expiry=ok|renew|expired`); la vista «Da gestire» diventa «Da rinnovare». Lo stato «Disdetto» diventa «Chiuso» anche nei dati; tolto il rinnovo automatico (`auto_renew`). Migrazione `contracts.0003`.
 - Venditori: senza un utente di Archie collegato l'email è obbligatoria (è quella che riceve i promemoria); l'utente collegato deve essere un utente di Archie attivo.
 
-**Dopo il deploy**: lanciare `migrate`, ricreare `backend_nginx` (nuova regola che blocca `/media/issue_attachments/`) e il servizio `cron` (`up -d --force-recreate cron`), impostare gli indirizzi dell'ufficio in Impostazioni di Archie e dare il permesso «Gestisce le impostazioni di Archie» a chi deve gestirle. I contratti già dentro la finestra dell'avviso ricevono un promemoria alle 8 del giorno dopo il deploy.
+**Dopo il deploy**: lanciare `migrate`; impostare gli indirizzi in «Impostazioni di Archie › Manutenzione» (al primo riepilogo arrivano tutte le scadenze, perché sono tutte nuove); ricreare `backend_nginx` (nuova regola che blocca `/media/issue_attachments/`) e il servizio `cron` (`up -d --force-recreate cron`), impostare gli indirizzi dell'ufficio in Impostazioni di Archie e dare il permesso «Gestisce le impostazioni di Archie» a chi deve gestirle. I contratti già dentro la finestra dell'avviso ricevono un promemoria alle 8 del giorno dopo il deploy.
 
 ### Fixed
 
+- Le notifiche in-app delle scadenze di manutenzione non venivano create: il job leggeva le scadenze dall'API senza utente e riceveva 401. Ora le calcola direttamente.
+- La nota personale della Dashboard (`StickyNote`) andava in errore quando veniva mostrata come testo (per esempio nell'admin).
 - Issue: «Collega» in «Dove intervenire» apriva la modifica della issue invece del selettore dell'inventario; ora apre subito il selettore, che mostra tutti gli inventari del cliente (prima al massimo 100).
 - Il cliente segnaposto delle issue («Cliente da specificare», SYS-PLACEHOLDER) non compare più nel Cestino: ripristinarlo o eliminarlo per errore rompeva le issue che lo usano.
 - Issue, «Dove intervenire»: chi non ha il permesso su Contatti o Inventari legge «Serve il permesso Contatti / Inventari» invece di «Nessun contatto» o «Nessuna credenziale»; se la lettura fallisce compare «non disponibili».

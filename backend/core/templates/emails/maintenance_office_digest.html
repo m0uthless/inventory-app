@@ -1,0 +1,16 @@
+{% extends base_template %}
+{% block content %}
+<h1 class="h1" style="margin:0 0 6px;font-size:22px;line-height:28px;font-weight:650;letter-spacing:-0.3px;color:#15201e;">Manutenzione: {{ n_scadute }} scadut{{ n_scadute|pluralize:"a,e" }}, {{ n_in_scadenza }} in scadenza</h1>
+<p style="margin:0;font-size:14px;line-height:22px;color:#5b6b67;">{{ n_nuove }} novit{{ n_nuove|pluralize:"à,à" }} rispetto all'ultimo riepilogo, segnat{{ n_nuove|pluralize:"a,e" }} «Nuova». Le scadenze sono quelle dei prossimi {{ giorni }} giorni.</p>
+{% if scadute %}<p style="margin:22px 0 0;font-size:13px;line-height:20px;font-weight:650;color:#9a3412;text-transform:uppercase;letter-spacing:.06em;">Scadute</p>
+{% for giorno in scadute %}{% for it in giorno.items %}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr>{% if forloop.first %}{% include "emails/_day.html" with giorno=giorno.date %}{% else %}<td width="64" style="width:64px;"></td>{% endif %}
+<td valign="top" style="padding:14px 0;border-bottom:1px solid #d5dedb;word-wrap:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:#5b6b67;">{% if it.new %}<span style="color:#1f6b5c;font-weight:700;">Nuova · </span>{% endif %}{{ it.where }}</p>
+<a href="{{ app_url }}{{ it.url }}" style="font-size:15px;line-height:22px;font-weight:600;color:#15201e;text-decoration:none;">{{ it.title }}</a></td></tr></table>
+{% endfor %}{% endfor %}{% endif %}
+{% if in_scadenza %}<p style="margin:22px 0 0;font-size:13px;line-height:20px;font-weight:650;color:#1f6b5c;text-transform:uppercase;letter-spacing:.06em;">In scadenza</p>
+{% for giorno in in_scadenza %}{% for it in giorno.items %}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;"><tr>{% if forloop.first %}{% include "emails/_day.html" with giorno=giorno.date %}{% else %}<td width="64" style="width:64px;"></td>{% endif %}
+<td valign="top" style="padding:14px 0;border-bottom:1px solid #d5dedb;word-wrap:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:#5b6b67;">{% if it.new %}<span style="color:#1f6b5c;font-weight:700;">Nuova · </span>{% endif %}{{ it.where }}</p>
+<a href="{{ app_url }}{{ it.url }}" style="font-size:15px;line-height:22px;font-weight:600;color:#15201e;text-decoration:none;">{{ it.title }}</a></td></tr></table>
+{% endfor %}{% endfor %}{% endif %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;"><tr><td>{% include "emails/_button.html" with label="Apri le scadenze" url="/maintenance" %}</td></tr></table>
+{% endblock %}

@@ -731,3 +731,18 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             "completed": sum(1 for p in active if covered.get(p.id) and not counts.get(p.id)),
             "archived": base.filter(Q(next_due_date__lt=year_start) | Q(is_active=False)).count(),
         })
+
+
+def todo_rows_for_jobs() -> list[dict]:
+    """Righe (piano, inventory) da fare, per i job di sistema (cron) senza utente.
+
+    Stesso calcolo di `MaintenancePlanViewSet.todo` senza filtri, ma senza passare
+    dall'API: una chiamata alla vista senza utente risponde 401 (barriera Archie).
+    """
+    from django.http import QueryDict
+
+    class _JobRequest:
+        query_params = QueryDict("")
+
+    rows, _done = MaintenancePlanViewSet()._todo_rows(_JobRequest())
+    return rows

@@ -75,3 +75,20 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.recipient_id} · {self.notification_type} · {self.title}"
+
+
+class OfficeDigestMark(models.Model):
+    """Ultimo stato inviato all'ufficio per una scadenza di manutenzione (piano:inventario).
+
+    Il riepilogo all'ufficio parte solo se c'è qualcosa di nuovo: una scadenza mai inviata,
+    con data cambiata o appena diventata «scaduta». Le scadenze che escono dall'elenco
+    perdono il segno, così se rientrano contano di nuovo come novità.
+    """
+
+    source_key = models.CharField(max_length=64, unique=True)
+    state = models.CharField(max_length=16)  # "due" | "overdue"
+    due_date = models.DateField()
+    sent_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.source_key} · {self.state} · {self.due_date}"

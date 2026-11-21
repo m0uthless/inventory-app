@@ -561,9 +561,6 @@ class StickyNote(models.Model):
     def __str__(self):
         return f"Nota di {self.user}"
 
-    def __str__(self):
-        return f"{self.user} — {self.widget.key} ({self.x},{self.y} {self.w}x{self.h})"
-
 
 class ScheduledJobRun(models.Model):
     """Marker minimale "ultima esecuzione riuscita" per job schedulati via il

@@ -19,6 +19,8 @@ const data = (emails = 'contratti@biotron.it; amministrazione@biotron.it', days 
     { key: 'contracts.reminder_emails', label: "Indirizzi dell'ufficio", kind: 'emails', value: emails, default: '', min: null, max: null },
     { key: 'contracts.reminder_default_days', label: 'Avviso predefinito per i nuovi contratti', kind: 'int', value: days, default: 90, min: 1, max: 365 },
     { key: 'contracts.reminder_every_days', label: 'Ripeti il promemoria ogni', kind: 'int', value: every, default: 10, min: 1, max: 60 },
+  ] }, { key: 'maintenance', label: 'Manutenzione', settings: [
+    { key: 'maintenance.office_emails', label: "Indirizzi dell'ufficio", kind: 'emails', value: '', default: '', min: null, max: null },
   ] }],
 })
 
@@ -76,5 +78,20 @@ describe('Impostazioni di Archie', () => {
     show()
     expect(await screen.findByText('Questa pagina non esiste')).toBeInTheDocument()
     expect(api.get).not.toHaveBeenCalled()
+  })
+
+  it('Manutenzione: gli indirizzi per le scadenze si salvano come testo', async () => {
+    api.patch.mockResolvedValue({ data: data() })
+    show()
+    const field = await screen.findByLabelText('Indirizzi per le scadenze')
+    fireEvent.change(field, { target: { value: 'manutenzione@biotron.it' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/app-settings/', { 'maintenance.office_emails': 'manutenzione@biotron.it' }))
+  })
+
+  it('Manutenzione: un indirizzo non valido blocca il salvataggio', async () => {
+    show()
+    fireEvent.change(await screen.findByLabelText('Indirizzi per le scadenze'), { target: { value: 'non-una-email' } })
+    expect(screen.getByRole('button', { name: 'Salva' })).toBeDisabled()
   })
 })
