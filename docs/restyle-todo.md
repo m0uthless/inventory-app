@@ -21,7 +21,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 ### Presente nella UI di prima, tolto o non ancora ridisegnato
 - **[DEC] Grafico "Andamento issue"** (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.
 - ~~**[UI] Dialogo "Nuova issue / Modifica"**~~ già ridisegnato con QuickForm (anteprima fm-base, variante C).
-- **[UI] Dialogo "Collega a inventory"**: idem.
+- ~~**[UI] Dialogo "Collega a inventory"**~~ ridisegnato il 21/11 (selettore cercabile, prima il sito della issue).
 - Colonne extra di prima (Categoria, Commenti, Data chiusura, Giorni passati): restano a destra di Scadenza, raggiungibili scorrendo o dal menu colonne.
 
 ## Pagina Purchase Order

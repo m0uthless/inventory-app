@@ -1,20 +1,14 @@
 import * as React from 'react'
 
 import {
-  Alert,
-  Autocomplete,
   Box,
   Button,
-  CircularProgress,
   IconButton,
   Stack,
-  TextField,
   Tooltip,
   Typography,
   ButtonBase,
 } from '@mui/material'
-
-import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material'
 
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
@@ -51,6 +45,8 @@ import {
   type UserOption,
 } from '../features/issues/types'
 import IssueDialog from '../features/issues/IssueDialog'
+import LinkInventoryDialog from '../features/issues/LinkInventoryDialog'
+import { fetchAll } from '../api/fetchAll'
 import { afterSaveOutcome, areaChoiceParams, defaultAreaChoice, issueAssignees, toUserOption, type AreaChoice } from '../features/issues/issueUsers'
 import IssueDetail, { type IssuePatch, type IssueEvent } from '../features/issues/IssueDetail'
 import IssuesKpis, { useIssueCounts, overdueBefore } from '../features/issues/IssuesKpis'
@@ -128,49 +124,6 @@ function toInventoryOption(v: unknown): InventoryOption | null {
   }
 }
 
-type InventoryLabelSource =
-  | Pick<
-      IssueRow,
-      'inventory_name' | 'inventory_knumber' | 'inventory_serial_number' | 'inventory_hostname'
-    >
-  | InventoryOption
-  | null
-
-function isIssueInventoryLabelSource(
-  item: Exclude<InventoryLabelSource, null>,
-): item is Pick<
-  IssueRow,
-  'inventory_name' | 'inventory_knumber' | 'inventory_serial_number' | 'inventory_hostname'
-> {
-  return 'inventory_name' in item
-}
-
-
-function inventoryLabel(item: InventoryLabelSource) {
-  if (!item) return '—'
-
-  const normalized = isIssueInventoryLabelSource(item)
-    ? {
-        name: item.inventory_name,
-        knumber: item.inventory_knumber,
-        hostname: item.inventory_hostname,
-        serial_number: item.inventory_serial_number,
-      }
-    : {
-        name: item.name,
-        knumber: item.knumber ?? null,
-        hostname: item.hostname ?? null,
-        serial_number: item.serial_number ?? null,
-      }
-
-  const parts = [
-    normalized.name,
-    normalized.knumber,
-    normalized.hostname,
-    normalized.serial_number,
-  ].filter((value): value is string => Boolean(value && value.trim()))
-  return parts.length > 0 ? parts.join(' · ') : '—'
-}
 
 // Raggruppamento "Aperte"/"Chiuse" già usato in /issues/summary/ e nel grafico
 // andamento: risolta + chiusa contano entrambe come "chiuse" agli occhi
@@ -617,26 +570,21 @@ export default function Issues() {
     setFormOpen(true)
   }, [])
 
-  const openLinkInventoryPicker = React.useCallback(async () => {
-    if (!editIssue) return
+  // `issue`: dal pannello «Dove intervenire» si apre senza passare dalla modifica (editIssue non è ancora aggiornata).
+  const openLinkInventoryPicker = React.useCallback(async (issue?: IssueRow) => {
+    const target = issue ?? editIssue
+    if (!target) return
 
     setLinkInventoryOpen(true)
     setLinkInventoryLoading(true)
     try {
-      const r = await api.get('/inventories/', {
-        params: { customer: editIssue.customer, page_size: 100, ordering: 'name' },
-      })
-      const payloadU: unknown = (r as unknown as { data: unknown }).data
-      const list: unknown[] = Array.isArray(payloadU)
-        ? payloadU
-        : isRecord(payloadU) && Array.isArray(payloadU['results'])
-          ? (payloadU['results'] as unknown[])
-          : []
+      // Tutti gli inventari del cliente (niente tetto di pagina).
+      const list = await fetchAll<unknown>('/inventories/', { customer: target.customer, ordering: 'name' })
       const options = list
         .map((item: unknown) => toInventoryOption(item))
         .filter((item: InventoryOption | null): item is InventoryOption => Boolean(item))
       setInventoryOptions(options)
-      setSelectedInventory(options.find((item) => item.id === editIssue.inventory) ?? null)
+      setSelectedInventory(options.find((item) => item.id === target.inventory) ?? null)
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -658,7 +606,7 @@ export default function Issues() {
       setSelectedInventory(inventoryToLink)
       setLinkInventoryOpen(false)
       reload()
-      toast.success(inventoryToLink ? 'Inventory collegato.' : 'Collegamento inventory rimosso.')
+      toast.success(inventoryToLink ? 'Inventario collegato.' : 'Inventario scollegato.')
     } catch (e) {
       toast.error(apiErrorToMessage(e))
     } finally {
@@ -1557,108 +1505,22 @@ export default function Issues() {
         pendingInventory={pendingInventory}
         onClose={() => setFormOpen(false)}
         onSave={handleFormSave}
-        onOpenLinkInventory={openLinkInventoryPicker}
+        onOpenLinkInventory={() => { void openLinkInventoryPicker() }}
         onCustomerInputChange={setCustFormInput}
         onFormChange={setForm}
       />
 
-      <Dialog
+      <LinkInventoryDialog
         open={linkInventoryOpen}
-        onClose={() => {
-          if (!linkInventorySaving) setLinkInventoryOpen(false)
-        }}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Collega a inventory</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} sx={{ pt: 0.5 }}>
-            <Typography variant="body2" color="text.secondary">
-              Inventories del cliente {editIssue?.customer_name}
-            </Typography>
-
-            <Autocomplete
-              options={inventoryOptions}
-              loading={linkInventoryLoading}
-              value={selectedInventory}
-              onChange={(_, value) => setSelectedInventory(value)}
-              isOptionEqualToValue={(a, b) => a.id === b.id}
-              getOptionLabel={(option) => inventoryLabel(option)}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Seleziona inventory"
-                  size="small"
-                  helperText="Puoi lasciare vuoto e usare “Scollega” per rimuovere il collegamento attuale."
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <>
-                        {linkInventoryLoading ? <CircularProgress size={16} /> : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
-                />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Stack spacing={0.25} sx={{ py: 0.25 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {option.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {[
-                        option.type_label,
-                        option.site_name,
-                        option.hostname,
-                        option.knumber,
-                        option.serial_number,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ') || 'Nessun dettaglio aggiuntivo'}
-                    </Typography>
-                  </Stack>
-                </Box>
-              )}
-            />
-
-            {!linkInventoryLoading && inventoryOptions.length === 0 && (
-              <Alert severity="info">Nessun inventory trovato per questo cliente.</Alert>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button
-            variant="text"
-            color="inherit"
-            onClick={() => setLinkInventoryOpen(false)}
-            disabled={linkInventorySaving}
-          >
-            Annulla
-          </Button>
-          <Button
-            variant="outlined"
-            color="warning"
-            onClick={() => {
-              void handleLinkInventory(null)
-            }}
-            disabled={linkInventorySaving || !editIssue?.inventory}
-          >
-            Scollega
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              void handleLinkInventory(selectedInventory)
-            }}
-            disabled={linkInventorySaving || !selectedInventory}
-          >
-            {linkInventorySaving && <CircularProgress size={16} sx={{ mr: 1, color: 'inherit' }} />}
-            Collega
-          </Button>
-        </DialogActions>
-      </Dialog>
+        customerName={editIssue?.customer_name}
+        siteName={editIssue?.site_name}
+        options={inventoryOptions}
+        loading={linkInventoryLoading}
+        currentId={editIssue?.inventory ?? null}
+        saving={linkInventorySaving}
+        onClose={() => { if (!linkInventorySaving) setLinkInventoryOpen(false) }}
+        onLink={(inv) => { void handleLinkInventory(inv) }}
+      />
       <IssueDetail
         issue={detailIssue}
         position={detailIndex >= 0 ? `${detailIndex + 1} di ${rows.length}` : undefined}
@@ -1689,8 +1551,8 @@ export default function Issues() {
         }}
         onLinkInventory={() => {
           if (!detailIssue) return
-          openEdit(detailIssue)
-          window.setTimeout(() => openLinkInventoryPicker(), 120)
+          setEditIssue(detailIssue)
+          void openLinkInventoryPicker(detailIssue)
         }}
         onOpenServiceNow={(n) => void openServiceNowCaseDrawer(n)}
       />
