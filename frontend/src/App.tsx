@@ -225,11 +225,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'rimborso-spese',
-        element: <RequireAuth>{lazyEl(<RimborsoSpese />)}</RequireAuth>,
+        element: <RequirePerm perm="expenses.view_expensereport">{lazyEl(<RimborsoSpese />)}</RequirePerm>,
       },
       {
         path: 'rimborso-spese/:id',
-        element: <RequireAuth>{lazyEl(<RimborsoSpesePage />)}</RequireAuth>,
+        element: <RequirePerm perm="expenses.view_expensereport">{lazyEl(<RimborsoSpesePage />)}</RequirePerm>,
       },
       {
         path: 'purchase-orders',
@@ -243,8 +243,8 @@ const router = createBrowserRouter([
         path: 'contracts/valore',
         element: <RequirePerm perm="contracts.view_contract_value">{lazyEl(<ContractsValue />)}</RequirePerm>,
       },
-      { path: 'bug-feature', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
-      { path: 'bug-feature/resolved', element: <RequireAuth>{lazyEl(<BugFeature />)}</RequireAuth> },
+      { path: 'bug-feature', element: <RequirePerm perm="feedback.view_reportrequest">{lazyEl(<BugFeature />)}</RequirePerm> },
+      { path: 'bug-feature/resolved', element: <RequirePerm perm="feedback.view_reportrequest">{lazyEl(<BugFeature />)}</RequirePerm> },
       {
         path: 'utenti',
         element: <RequirePerm perm="core.manage_users">{lazyEl(<UsersAdmin />)}</RequirePerm>,

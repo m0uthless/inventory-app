@@ -207,7 +207,7 @@ export function AppLayout() {
   // Contatori della sidebar
   const [feedbackSummary, setFeedbackSummary] = React.useState<FeedbackSummary | null>(null)
   React.useEffect(() => {
-    if (feedbackHidden) { setFeedbackSummary(null); return }
+    if (feedbackHidden || !hasPerm('feedback.view_reportrequest')) { setFeedbackSummary(null); return }
     let active = true
     ;(async () => {
       try {
@@ -218,7 +218,7 @@ export function AppLayout() {
       }
     })()
     return () => { active = false }
-  }, [loc.pathname, feedbackHidden])
+  }, [loc.pathname, feedbackHidden, hasPerm])
 
   const [issueSummary, setIssueSummary] = React.useState<IssueSummary | null>(null)
   React.useEffect(() => {

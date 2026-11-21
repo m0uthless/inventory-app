@@ -174,8 +174,9 @@ class ExpenseChildPermission(BasePermission):
     """
 
     def has_permission(self, request, view):
+        # Accesso al modulo: permesso «vede le note spese» (prima bastava essere autenticati).
         user = getattr(request, "user", None)
-        return bool(user and user.is_authenticated)
+        return bool(user and user.is_authenticated and user.has_perm("expenses.view_expensereport"))
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
@@ -485,9 +486,16 @@ class ExpenseReportSerializer(serializers.ModelSerializer):
 
 
 class ExpenseReportPermission(BasePermission):
+    """Accesso al modulo con `view_expensereport`, creazione di una nota con `add_expensereport`;
+    poi contano proprietà e stato (has_object_permission) come prima."""
+
     def has_permission(self, request, view):
         user = getattr(request, "user", None)
-        return bool(user and user.is_authenticated)
+        if not (user and user.is_authenticated and user.has_perm("expenses.view_expensereport")):
+            return False
+        if getattr(view, "action", None) == "create":
+            return user.has_perm("expenses.add_expensereport")
+        return True
 
     def has_object_permission(self, request, view, obj):
         user = request.user

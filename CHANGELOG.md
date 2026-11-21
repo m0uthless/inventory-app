@@ -27,6 +27,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Permessi veri per Rimborso spese e Bug e feature: per vedere il modulo (menu, pagina e API) servono `expenses.view_expensereport` / `feedback.view_reportrequest`, per creare una nota o una segnalazione `add_expensereport` / `add_reportrequest`. Restano invariate le regole di proprietà (le proprie note, la segreteria, chi modifica una segnalazione). La riga «Presenze & Ferie» esce dalla matrice dei permessi: il Piano ferie dipende dai flag del profilo, non dai permessi.
 - Report PDF dei Piani di manutenzione: intestazione sobria (fondo bianco, filo verde, etichette in verde chiaro, «ARCHIE» al posto di «inventory-app») e intestazione della tabella chiara; la cadenza è in italiano («Ogni 12 mesi» invece di «Ogni 12 months»).
 - Le scadenze di manutenzione non arrivano più per email a ogni utente: restano nelle notifiche di Archie, e per email vanno solo all'ufficio.
 - Issue, «Collega un inventario» ridisegnato: elenco cercabile per nome, K-number, hostname o seriale, prima gli inventari del sito della issue, quello collegato segnato, «Scollega» quando serve.
@@ -38,7 +39,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 - Contratti: niente più disdetta. «Preavviso di disdetta» diventa «Avviso di rinnovo» (`notice_days` → `reminder_days`, `notice_deadline` → `reminder_date` nell'API); gli stati di scadenza sono In corso, Da rinnovare, Scaduto (via «Preavviso» e «In scadenza»; filtro `expiry=ok|renew|expired`); la vista «Da gestire» diventa «Da rinnovare». Lo stato «Disdetto» diventa «Chiuso» anche nei dati; tolto il rinnovo automatico (`auto_renew`). Migrazione `contracts.0003`.
 - Venditori: senza un utente di Archie collegato l'email è obbligatoria (è quella che riceve i promemoria); l'utente collegato deve essere un utente di Archie attivo.
 
-**Dopo il deploy**: lanciare `migrate`; impostare gli indirizzi in «Impostazioni di Archie › Manutenzione» (al primo riepilogo arrivano tutte le scadenze, perché sono tutte nuove); ricreare `backend_nginx` (nuova regola che blocca `/media/issue_attachments/`) e il servizio `cron` (`up -d --force-recreate cron`), impostare gli indirizzi dell'ufficio in Impostazioni di Archie e dare il permesso «Gestisce le impostazioni di Archie» a chi deve gestirle. I contratti già dentro la finestra dell'avviso ricevono un promemoria alle 8 del giorno dopo il deploy.
+**Dopo il deploy**: assegnare ai gruppi i permessi di Rimborso spese e Bug e feature (vedere e creare), altrimenti chi non li ha non vede più i due moduli; lanciare `migrate`; impostare gli indirizzi in «Impostazioni di Archie › Manutenzione» (al primo riepilogo arrivano tutte le scadenze, perché sono tutte nuove); ricreare `backend_nginx` (nuova regola che blocca `/media/issue_attachments/`) e il servizio `cron` (`up -d --force-recreate cron`), impostare gli indirizzi dell'ufficio in Impostazioni di Archie e dare il permesso «Gestisce le impostazioni di Archie» a chi deve gestirle. I contratti già dentro la finestra dell'avviso ricevono un promemoria alle 8 del giorno dopo il deploy.
 
 ### Fixed
 

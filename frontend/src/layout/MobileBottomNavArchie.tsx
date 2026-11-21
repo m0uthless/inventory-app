@@ -149,6 +149,7 @@ export default function MobileBottomNavArchie() {
       newCustomer:  'crm.add_customer',
       newSite:      'crm.add_site',
       newContact:   'crm.add_contact',
+      newReport:    'feedback.add_reportrequest',
     }
 
     return keys

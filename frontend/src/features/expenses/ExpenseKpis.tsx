@@ -33,7 +33,8 @@ export function TechKpis({ reports, rate, onOpen, onNew, onView, view }: {
   reports: ExpenseReportRow[]
   rate: string | null
   onOpen: (id: number) => void
-  onNew: () => void
+  /** Assente senza il permesso di creare note. */
+  onNew?: () => void
   onView: (v: string) => void
   view: string
 }) {
@@ -51,7 +52,7 @@ export function TechKpis({ reports, rate, onOpen, onNew, onView, view }: {
         <KpiTile label={`${cap(MONTHS_LC[cur.month])}, ${cur.status === 'bozza' ? 'in compilazione' : cur.status === 'inviata' ? 'inviata' : cur.status}`} value={formatEuro(cur.total_expenses)} onClick={() => onOpen(cur.id)}
           sub={<><b>{filledItems(cur).length}</b> voci · {curMiss ? <Box component="span" sx={{ color: 'warning.main', fontWeight: 600 }}>{curMiss} senza scontrino</Box> : 'scontrini a posto'}</>} />
       ) : (
-        <KpiTile label={cap(MONTHS_LC[now.getMonth() + 1])} value="—" onClick={onNew} sub="Nessuna nota per questo mese: creala" />
+        <KpiTile label={cap(MONTHS_LC[now.getMonth() + 1])} value="—" onClick={onNew} sub={onNew ? 'Nessuna nota per questo mese: creala' : 'Nessuna nota per questo mese'} />
       )}
       {rejected.length ? (
         <KpiTile label={rejected.length === 1 ? `${monthTitle(rejected[0])}, rifiutata` : `${rejected.length} note rifiutate`} value={formatEuro(rejected[0].total_due)} unit="da correggere"

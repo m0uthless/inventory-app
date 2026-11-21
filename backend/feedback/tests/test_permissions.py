@@ -11,7 +11,16 @@ from PIL import Image
 from rest_framework.test import APIClient
 
 from feedback.models import ReportRequest, ReportStatus
-from core.testing import make_archie_user
+from core.testing import make_archie_user as _make_archie_user
+
+
+def make_archie_user(*args, **kwargs):
+    """Utente Archie con l'accesso al modulo (feedback): dal 21/11 i permessi contano davvero."""
+    from django.contrib.auth.models import Permission
+
+    u = _make_archie_user(*args, **kwargs)
+    u.user_permissions.add(*Permission.objects.filter(content_type__app_label="feedback", codename__in=["view_reportrequest", "add_reportrequest"]))
+    return type(u).objects.get(pk=u.pk)
 
 pytestmark = pytest.mark.django_db
 

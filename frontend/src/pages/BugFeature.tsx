@@ -8,6 +8,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import { api } from '@shared/api/client'
 import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
+import { useAuth } from '../auth/AuthProvider'
 import { CampoIcon, PageHead } from '../ui/campo'
 import { BOARD_TONES, type ReportRow } from '../features/bugfeature/bfModel'
 import { BoardColumn, KindIcon, RejectDialog, ReportCard, ReportDetail, ReportDialog, type NewReport } from '../features/bugfeature/bfUi'
@@ -20,6 +21,7 @@ export default function BugFeaturePage() {
   const loc = useLocation()
   const navigate = useNavigate()
   const toast = useToast()
+  const canCreate = useAuth().hasPerm('feedback.add_reportrequest')
   const theme = useTheme()
   const [params, setParams] = useSearchParams()
   const closedPage = loc.pathname.startsWith('/bug-feature/resolved')
@@ -51,10 +53,10 @@ export default function BugFeaturePage() {
   // Aperto da "Segnala" in altre parti dell'app (barra in basso, pulsante rapido).
   React.useEffect(() => {
     if ((loc.state as { openCreate?: boolean } | null)?.openCreate) {
-      setCreating(true)
+      if (canCreate) setCreating(true)
       navigate(loc.pathname + loc.search, { replace: true, state: null })
     }
-  }, [loc, navigate])
+  }, [loc, navigate, canCreate])
 
   const columns = closedPage
     ? [
@@ -113,7 +115,7 @@ export default function BugFeaturePage() {
   return (
     <Stack spacing={0}>
       <PageHead title={closedPage ? 'Segnalazioni chiuse' : 'Bug e feature'} actions={
-        <Button variant="contained" onClick={() => setCreating(true)} startIcon={<CampoIcon name="plus" size={15} />}>Segnala</Button>
+        canCreate ? <Button variant="contained" onClick={() => setCreating(true)} startIcon={<CampoIcon name="plus" size={15} />}>Segnala</Button> : null
       } />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: `repeat(${columns.length}, minmax(0, 1fr))` }, gap: 1.75, alignItems: 'start' }}>
         {columns.map((c) => (
