@@ -21,6 +21,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Purchase Order, «Nuovo PO» e «Modifica» con l'inserimento rapido standard (come clienti, siti, issue): descrizione come titolo, note sotto, committente, cliente (anche non in anagrafica), tipo, data, calcolo dell'importo (fisso o giornate × tariffa con il totale calcolato), costi; numero PO e fattura in «Altri campi». Con il PO già inviato descrizione e importo restano bloccati.
 - Purchase Order, dialogo di avanzamento ridisegnato come nell'anteprima: titolo con l'azione («Registra PO ricevuto»), riga del PO, solo i campi del passo (numero PO o fattura facoltativo, data del passo, PDF facoltativo) e l'avviso del blocco dopo l'invio. La data del passo si può indicare (mai nel futuro): `date` facoltativa in `POST /api/purchase-order-entries/<id>/advance/`.
 - Numeri e importi con il separatore delle migliaia anche sotto 10.000 («4.142,86 €», «1.250 km») in tutta l'app: Contratti, Purchase Order, Rimborso spese, ServiceNow, statistiche Wiki (helper condiviso `shared/src/utils/number.ts`).
 - Contratti, card «Importo» del dettaglio rifatta a tessere: il valore totale in evidenza con la barra del maturato (in proporzione al tempo trascorso), e accanto al mese, all'anno e per fattura, con il numero di fatture e la data stimata della prossima. Tolta la nota sul permesso.

@@ -20,7 +20,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 
 ### Presente nella UI di prima, tolto o non ancora ridisegnato
 - **[DEC] Grafico "Andamento issue"** (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.
-- **[UI] Dialogo "Nuova issue / Modifica"** (`IssueDialog`): funziona, ma è il modulo vecchio con il nuovo tema, non ridisegnato.
+- ~~**[UI] Dialogo "Nuova issue / Modifica"**~~ già ridisegnato con QuickForm (anteprima fm-base, variante C).
 - **[UI] Dialogo "Collega a inventory"**: idem.
 - Colonne extra di prima (Categoria, Commenti, Data chiusura, Giorni passati): restano a destra di Scadenza, raggiungibili scorrendo o dal menu colonne.
 
@@ -28,7 +28,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 
 - **[BE] "Da fatturare" in `summary`**: oggi calcolato dal frontend leggendo le righe dell'anno.
 - **[DEC] Margine**: calcolato in pagina (importo − costi), non è un campo.
-- **[UI] Dialogo Nuovo/Modifica PO** (`PurchaseOrderDialog`) e **dialogo di avanzamento** (`PurchaseOrderTransitionDialog`): funzionano, non ridisegnati (l'anteprima aveva un dialogo breve con solo i campi del passo).
+- ~~**[UI] Dialogo Nuovo/Modifica PO** e **dialogo di avanzamento**~~ fatti il 21/11: QuickForm il primo, il secondo come nell'anteprima po-base (con la data del passo).
 - **[UI] Totali nel piè** ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
 - ~~**[UI] Ripristino multiplo dal cestino**~~ fatto il 21/11: PO, Contratti e Issue sono nella pagina Cestino, che ha la selezione multipla.
 
