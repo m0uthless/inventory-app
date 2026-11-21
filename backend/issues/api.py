@@ -639,6 +639,54 @@ class IssueViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelViewS
     def _notify_assignment_change(self, *, old_assigned_to_id, issue):
         notify_issue_assignment_change(self.request.user, old_assigned_to_id=old_assigned_to_id, issue=issue)
 
+    # ── trend (widget «Andamento issue» della Dashboard) ─────────────────────
+
+    @action(detail=False, methods=["get"], url_path="trend")
+    def trend(self, request):
+        """Per periodo (`day` 14 giorni, `week` 12 settimane, `month` 12 mesi): issue aperte
+        nel periodo, risolte nel periodo (`closed_at`) e quante restano aperte alla fine.
+        Solo le issue visibili all'utente (area) e non eliminate."""
+        import datetime as dt
+
+        period = request.query_params.get("period") or "week"
+        if period not in ("day", "week", "month"):
+            return Response({"period": "Valori ammessi: day, week, month."}, status=status.HTTP_400_BAD_REQUEST)
+        today = timezone.localdate()
+        bounds: list[tuple[dt.date, dt.date]] = []
+        if period == "day":
+            bounds = [(today - dt.timedelta(days=i), today - dt.timedelta(days=i)) for i in range(13, -1, -1)]
+        elif period == "week":
+            monday = today - dt.timedelta(days=today.weekday())
+            for i in range(11, -1, -1):
+                start = monday - dt.timedelta(weeks=i)
+                bounds.append((start, min(start + dt.timedelta(days=6), today)))
+        else:
+            y, m = today.year, today.month
+            months = []
+            for _ in range(12):
+                months.append((y, m))
+                y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+            for y, m in reversed(months):
+                start = dt.date(y, m, 1)
+                nxt = dt.date(y + 1, 1, 1) if m == 12 else dt.date(y, m + 1, 1)
+                bounds.append((start, min(nxt - dt.timedelta(days=1), today)))
+
+        rows = list(
+            Issue.objects.filter(deleted_at__isnull=True).filter(visible_issues_q(request.user))
+            .values_list("opened_at", "created_at", "closed_at")
+        )
+        items = [((o or timezone.localtime(c).date()), cl) for o, c, cl in rows]
+        points = []
+        for start, end in bounds:
+            points.append({
+                "start": start.isoformat(), "end": end.isoformat(),
+                "opened": sum(1 for o, _ in items if start <= o <= end),
+                "closed": sum(1 for _, cl in items if cl and start <= cl <= end),
+                "open": sum(1 for o, cl in items if o <= end and (cl is None or cl > end)),
+            })
+        open_now = sum(1 for o, cl in items if o <= today and cl is None)
+        return Response({"period": period, "points": points, "open_now": open_now})
+
     # ── summary ──────────────────────────────────────────────────────────────
 
     @action(detail=False, methods=["get"], url_path="summary")

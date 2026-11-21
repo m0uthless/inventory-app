@@ -17,7 +17,7 @@ import { apiErrorToMessage } from '@shared/api/error'
 import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../auth/AuthProvider'
 import AreaTaskDetail from '../features/areatasks/AreaTaskDetail'
-import WidgetShell, { CountPill, WidgetNote } from '../features/dashboard/widgets/WidgetShell'
+import WidgetShell, { BigNumber, WidgetNote } from '../features/dashboard/widgets/WidgetShell'
 import { tintVeil } from '../features/dashboard/widgets/tints'
 import {
   NEXT_STATUS, PRIORITY_META, STATUS_META, STATUS_ORDER, personInitials,
@@ -78,9 +78,12 @@ export default function AreaTaskCard() {
       .catch(() => {})
   }, [])
 
+  // La propria area; chi non ne ha una (es. superuser) parte dalla prima, invece che da una card vuota.
   React.useEffect(() => {
-    if (myAreaId && selectedArea === null) setSelectedArea(myAreaId)
-  }, [myAreaId, selectedArea])
+    if (selectedArea !== null) return
+    if (myAreaId) setSelectedArea(myAreaId)
+    else if (areas.length) setSelectedArea(areas[0].id)
+  }, [myAreaId, selectedArea, areas])
 
   const load = React.useCallback((areaId: number | null) => {
     if (!areaId) { setTasks([]); setLoading(false); return }
@@ -144,17 +147,24 @@ export default function AreaTaskCard() {
     catch (e) { toast.error(apiErrorToMessage(e)); load(selectedArea) }
   }
 
-  const grouped = STATUS_ORDER.map((status) => ({ status, items: tasks.filter((t) => t.status === status) }))
   const openTask = tasks.find((t) => t.id === openId) ?? null
-
-  const openCount = tasks.filter((t) => t.status !== 'completato').length
+  // Variante A (anteprima dbw-base): aperti per urgenza (prima gli scaduti, poi per scadenza), i completati di recente in fondo.
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const open = tasks.filter((t) => t.status !== 'completato')
+    .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
+  const done = tasks.filter((t) => t.status === 'completato')
+  const openCount = open.length
+  const late = open.filter((t) => t.due_date && t.due_date < todayIso).length
+  const forToday = open.filter((t) => t.due_date === todayIso).length
+  const byStatus = (['da_fare', 'in_corso', 'in_attesa'] as TaskStatus[]).map((st) => ({ st, n: open.filter((t) => t.status === st).length }))
+  const BAR: Record<string, 'salvia' | 'verde' | 'acciaio'> = { da_fare: 'salvia', in_corso: 'verde', in_attesa: 'acciaio' }
   return (
     <WidgetShell
       tone="salvia"
       look="tint"
       icon={AssignmentTurnedInRoundedIcon}
       title="Task di area"
-      extra={selectedArea && !loading ? <CountPill tone="salvia">{openCount} aperti</CountPill> : null}
+      extra={null}
       link={{ label: 'Vedi tutti', to: '/tasks' }}
       actions={areas.length > 1 || isSuperuser ? (
         <Select
@@ -182,16 +192,62 @@ export default function AreaTaskCard() {
           Nessuna area assegnata al tuo profilo: contatta un amministratore per poter creare task.
         </Typography>
       )}
-      {!readOnly && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: 32, pl: 1.25, pr: 0.5, borderRadius: '8px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'transparent', '&:focus-within': { borderColor: 'primary.main' } }}>
+      {selectedArea && !loading ? (
+        <>
+          <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1.5, flexWrap: 'wrap' }}>
+            <BigNumber value={openCount} unit="da fare" />
+            <Typography sx={{ fontSize: 12, color: 'text.secondary', pb: 0.75, '& b': { color: 'text.primary', fontWeight: 650 } }}>
+              {late ? <><Box component="b" sx={{ color: 'error.main !important' }}>{late}</Box> {late === 1 ? 'scaduto' : 'scaduti'} · </> : null}<b>{forToday}</b> per oggi
+            </Typography>
+          </Box>
+          {openCount ? (
+            <Box>
+              <Box aria-label="Per stato" sx={{ display: 'flex', gap: '2px', height: 8, borderRadius: '4px', overflow: 'hidden' }}>
+                {byStatus.filter((x) => x.n).map((x) => <Box key={x.st} sx={{ flex: x.n, bgcolor: (t) => t.palette.archie.dash[BAR[x.st]].mid }} />)}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 0.75, fontSize: 11.5, color: 'text.secondary' }}>
+                {byStatus.map((x) => (
+                  <Box key={x.st} component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box component="i" sx={{ width: 9, height: 9, borderRadius: '3px', bgcolor: (t) => t.palette.archie.dash[BAR[x.st]].mid }} />{STATUS_META[x.st].label} {x.n}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          ) : null}
+        </>
+      ) : null}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', mx: -1 }}>
+        {loading ? (
+          <WidgetNote>Caricamento…</WidgetNote>
+        ) : tasks.length === 0 ? (
+          <WidgetNote>{selectedArea ? 'Nessun task per quest\'area' : 'Nessuna area disponibile'}</WidgetNote>
+        ) : (
+          <Stack spacing={0.25}>
+            {open.map((task) => (
+              <TaskRow key={task.id} task={task} readOnly={readOnly} onCycle={cycleStatus} onDelete={deleteTask} onOpen={(t) => setOpenId(t.id)} />
+            ))}
+            {done.length ? (
+              <Box>
+                <Typography sx={{ px: 1, pt: 1, pb: 0.25, fontSize: 11.5, fontWeight: 650, color: 'text.secondary' }}>{STATUS_META.completato.label}</Typography>
+                {done.map((task) => (
+                  <TaskRow key={task.id} task={task} readOnly={readOnly} onCycle={cycleStatus} onDelete={deleteTask} onOpen={(t) => setOpenId(t.id)} />
+                ))}
+              </Box>
+            ) : null}
+          </Stack>
+        )}
+      </Box>
+      {!readOnly && selectedArea ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, height: 34, pl: 1.25, pr: 0.5, borderRadius: '9px', border: '1px dashed', borderColor: (t) => t.palette.archie.dash.salvia.mid, '&:focus-within': { borderStyle: 'solid', borderColor: 'primary.main', bgcolor: 'background.paper' } }}>
+          <AddRoundedIcon aria-hidden sx={{ fontSize: 17, color: 'text.secondary' }} />
           <InputBase
             inputRef={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void addTask() }}
-            placeholder={`Aggiungi un task per ${isOwnArea ? (myAreaLabel ?? 'la tua area') : (areas.find((a) => a.id === selectedArea)?.label ?? 'quest\'area')}...`}
+            placeholder={`Aggiungi un task per ${isOwnArea ? (myAreaLabel ?? 'la tua area') : (areas.find((a) => a.id === selectedArea)?.label ?? 'quest\'area')}…`}
             sx={{ flex: 1, fontSize: 13, color: 'text.primary' }}
-            inputProps={{ maxLength: 200 }}
+            inputProps={{ maxLength: 200, 'aria-label': 'Nuovo task' }}
           />
           <InputBase
             type="date" value={dueDate}
@@ -203,38 +259,7 @@ export default function AreaTaskCard() {
             <AddRoundedIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
-      )}
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', mx: -1 }}>
-        {loading ? (
-          <WidgetNote>Caricamento…</WidgetNote>
-        ) : tasks.length === 0 ? (
-          <WidgetNote>{selectedArea ? 'Nessun task per quest\'area' : 'Seleziona un\'area'}</WidgetNote>
-        ) : (
-          <Stack spacing={0.25}>
-            {grouped.map(({ status, items }, gi) => (
-              items.length === 0 ? null : (
-                <Box key={status}>
-                  {gi > 0 && (
-                    <Typography sx={{ px: 1, pt: 1, pb: 0.25, fontSize: 11.5, fontWeight: 650, color: 'text.secondary' }}>
-                      {STATUS_META[status].label}
-                    </Typography>
-                  )}
-                  {items.map((task) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      readOnly={readOnly}
-                      onCycle={cycleStatus}
-                      onDelete={deleteTask}
-                      onOpen={(t) => setOpenId(t.id)}
-                    />
-                  ))}
-                </Box>
-              )
-            ))}
-          </Stack>
-        )}
-      </Box>
+      ) : null}
       <AreaTaskDetail
         task={openTask}
         onClose={() => setOpenId(null)}

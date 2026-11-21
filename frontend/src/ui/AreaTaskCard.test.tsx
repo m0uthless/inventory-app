@@ -63,10 +63,11 @@ beforeEach(() => {
 })
 
 describe('AreaTaskCard', () => {
-  it('groups tasks by the four statuses, including "In attesa"', async () => {
+  it('variante A: aperti con la barra per stato (legenda con i conteggi) e i completati in fondo', async () => {
     render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     expect(await screen.findByText('Bloccato')).toBeInTheDocument()
-    expect(screen.getByText('In attesa')).toBeInTheDocument()
+    expect(screen.getByLabelText('Per stato')).toBeInTheDocument()
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && /^In attesa \d+$/.test(el.textContent ?? ''))).toBeInTheDocument()
     expect(screen.getByText('Completato')).toBeInTheDocument()
   })
 
@@ -75,7 +76,7 @@ describe('AreaTaskCard', () => {
     await screen.findByText('Bloccato')
     expect(screen.getByText('Critica')).toBeInTheDocument()
     expect(screen.getByText('AR')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0)
   })
 
   it('opens the detail when a task title is clicked', async () => {
@@ -126,10 +127,11 @@ describe('AreaTaskCard', () => {
     render(<MemoryRouter><AreaTaskCard /></MemoryRouter>)
     await screen.findByText('Unico')
     fireEvent.click(screen.getByLabelText('Cambia stato'))
-    await waitFor(() => expect(screen.getByText('In corso')).toBeInTheDocument())
+    const inCorso = () => screen.queryByText((_, el) => el?.tagName === 'SPAN' && /^In corso 1$/.test(el.textContent ?? ''))
+    await waitFor(() => expect(inCorso()).toBeInTheDocument())
     rej(new Error('boom'))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Errore'))
-    await waitFor(() => expect(screen.queryByText('In corso')).toBeNull())
+    await waitFor(() => expect(inCorso()).toBeNull())
     expect(screen.getByText('Unico')).toBeInTheDocument()
   })
 

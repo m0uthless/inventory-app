@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Dashboard, widget «Issue ancora aperte» (da aggiungere con «Personalizza»): quante issue restano aperte nel tempo per giorni, settimane o mesi, con aperte e risolte del periodo; solo le issue visibili per area (`GET /api/issues/trend/?period=day|week|month`). Migrazione `core.0052`.
 - Manutenzione per area (come le Issue): ogni piano può avere un'area (proposta quella del proprio profilo). Chi ha un'area vede i piani della sua area e quelli senza area, con le relative scadenze, rapportini, notifiche e risultati di ricerca; chi ha il nuovo permesso «Vede la manutenzione di tutte le aree» (o non ha un'area) li vede tutti. I piani con un'area li modificano solo i membri di quell'area (gli altri li vedono in sola lettura). In Scadenze e Piani l'interruttore «Area» (la propria, Senza area, Tutte; le altre aree per chi le vede tutte) filtra elenco e indicatori; nei Piani c'è la colonna Area. Il riepilogo all'ufficio e i job di sistema restano su tutti i piani. Migrazione `maintenance.0011`.
 - Drive: spostamento di più file e cartelle selezionati insieme («Sposta» nella barra della selezione); ogni elemento rispetta i permessi del Drive e quelli non spostabili vengono segnalati.
 - Site Repository: raggruppamento per città oltre che per provincia (interruttore «Province / Città»), e apertura diretta su un cliente con `?cliente=<id>`; dalla finestra del cliente, «Apri nel Site Repository» nel menu ⋯.
@@ -28,6 +29,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Dashboard, card «Task di area» ridisegnata: task aperti in grande con scaduti e per oggi, barra per stato con legenda, elenco per urgenza (prima gli scaduti) con i completati di recente in fondo, aggiunta rapida in basso. Chi non ha un'area parte dalla prima invece che da una card vuota.
 - Permessi veri per Rimborso spese e Bug e feature: per vedere il modulo (menu, pagina e API) servono `expenses.view_expensereport` / `feedback.view_reportrequest`, per creare una nota o una segnalazione `add_expensereport` / `add_reportrequest`. Restano invariate le regole di proprietà (le proprie note, la segreteria, chi modifica una segnalazione). La riga «Presenze & Ferie» esce dalla matrice dei permessi: il Piano ferie dipende dai flag del profilo, non dai permessi.
 - Report PDF dei Piani di manutenzione: intestazione sobria (fondo bianco, filo verde, etichette in verde chiaro, «ARCHIE» al posto di «inventory-app») e intestazione della tabella chiara; la cadenza è in italiano («Ogni 12 mesi» invece di «Ogni 12 months»).
 - Le scadenze di manutenzione non arrivano più per email a ogni utente: restano nelle notifiche di Archie, e per email vanno solo all'ufficio.

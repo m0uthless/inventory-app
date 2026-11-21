@@ -19,7 +19,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 - ~~**[UI] Ricerca Ctrl K a finestra**~~ fatta il 21/11 (palette con gruppi, pagine, azioni; issue nella ricerca). I device non sono nella ricerca globale.
 
 ### Presente nella UI di prima, tolto o non ancora ridisegnato
-- **[DEC] Grafico "Andamento issue"** (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.
+- ~~**[DEC] Grafico "Andamento issue"**~~ widget «Issue ancora aperte» in Dashboard dal 21/11 (variante B). Testo originale: (aperte/risolte, giornaliero/settimanale/mensile): sostituito dai mini grafici negli indicatori. Da decidere se serve ancora, magari in Dashboard.
 - ~~**[UI] Dialogo "Nuova issue / Modifica"**~~ già ridisegnato con QuickForm (anteprima fm-base, variante C).
 - ~~**[UI] Dialogo "Collega a inventory"**~~ ridisegnato il 21/11 (selettore cercabile, prima il sito della issue).
 - Colonne extra di prima (Categoria, Commenti, Data chiusura, Giorni passati): restano a destra di Scadenza, raggiungibili scorrendo o dal menu colonne.
@@ -90,7 +90,7 @@ Portata dall'anteprima `t-base.html` con righe e colonne come le Issue.
 - **[DEC] Conversione in issue**: invariata nel backend (`convert-to-issue`: copia titolo, descrizione, priorità, commenti e, se idoneo, l'assegnatario; il task si completa e resta collegato). Nel pannello: riquadro "Trasforma in issue" nei Dettagli e voce nel menu; sui convertiti riquadro con la issue e "Apri la issue"; nella riga il segno "→ Issue #…".
 - **[DEC] Indicatori**: nuova azione `GET /area-tasks/stats/?area=`; `summary` resta com'era (contatore della barra laterale).
 - **[DEC] Completati**: le viste mostrano solo quelli chiusi negli ultimi 3 giorni, come la regola della lista (prima la pagina usava `include_hidden=1`).
-- **[UI] Card Task nella Dashboard**: apre lo stesso nuovo pannello (`AreaTaskDetail`); la card in sé non è ancora ridisegnata.
+- ~~**[UI] Card Task nella Dashboard**~~ ridisegnata il 21/11 (variante A dell'anteprima dbw-base).
 - ~~**[UI] Motivo dell'attesa**~~ fatto il 21/11 (`AreaTask.waiting_reason`).
 - **[TEST] Vitest**: test della pagina riscritti sul nuovo comportamento (19 al posto di 30); baseline ora 144/144, lint 13.
 

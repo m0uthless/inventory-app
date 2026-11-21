@@ -145,6 +145,7 @@ export function moduleForPath(pathname: string): ModuleKey | null {
 /** Widget della Dashboard che dipendono da un modulo. */
 export const WIDGET_MODULE: Record<string, ModuleKey> = {
   issues: 'issues',
+  'issue-trend': 'issues',
   'area-tasks': 'area_tasks',
   maintenance: 'maintenance',
   contributor: 'wiki',

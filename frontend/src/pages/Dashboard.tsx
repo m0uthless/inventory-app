@@ -20,7 +20,7 @@ import { ANIM_CLASS } from '../features/dashboard/widgets/tints'
 
 // Ordine e altezza dei widget quando la griglia non c'è (telefono, o catalogo non raggiungibile).
 const STACK: [string, number][] = [
-  ['issues', 330], ['maintenance', 330], ['area-tasks', 330], ['team', 150], ['birthdays', 230],
+  ['issues', 330], ['issue-trend', 300], ['maintenance', 330], ['area-tasks', 330], ['team', 150], ['birthdays', 230],
   ['announcements', 260], ['todo', 260], ['sticky-note', 220], ['contributor', 250],
 ]
 
