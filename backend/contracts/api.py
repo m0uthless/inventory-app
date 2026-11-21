@@ -17,6 +17,7 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from audit.utils import log_event
@@ -402,6 +403,37 @@ class ContractViewSet(_InternalOnlyMixin, RestoreActionMixin, PurgeActionMixin, 
             total = base.filter(status=ContractStatus.ATTIVO, end_date__gte=today).aggregate(v=Sum("total_value"))["v"]
             data["active_value"] = f"{(total or 0):.2f}"
         return Response(data)
+
+    @action(detail=False, methods=["get"], url_path="value-by-customer")
+    def value_by_customer(self, request):
+        """Valore dei contratti per cliente, dal più alto (sezione «Valore» della pagina).
+
+        `scope=active` (default): attivi non scaduti, come `active_value` di `stats`;
+        `scope=all`: storico non eliminato senza bozze. Solo con il permesso sui valori.
+        """
+        if not request.user.has_perm(VALUE_PERM):
+            raise PermissionDenied("Serve il permesso per vedere il valore dei contratti.")
+        qs = Contract.objects.filter(deleted_at__isnull=True)
+        if request.query_params.get("scope") == "all":
+            qs = qs.exclude(status=ContractStatus.BOZZA)
+        else:
+            qs = qs.filter(status=ContractStatus.ATTIVO, end_date__gte=timezone.localdate())
+        rows = (
+            qs.values("customer_id", "customer__name", "customer__display_name", "customer__province")
+            .annotate(value=Sum("total_value"), contracts=Count("id"))
+            .filter(value__gt=0)
+            .order_by("-value", "customer__name")
+        )
+        return Response({"results": [
+            {
+                "customer_id": r["customer_id"],
+                "customer_name": r["customer__display_name"] or r["customer__name"],
+                "province": r["customer__province"] or None,
+                "value": f"{r['value']:.2f}",
+                "contracts": r["contracts"],
+            }
+            for r in rows
+        ]})
 
     # ── Documento PDF ─────────────────────────────────────────────────────────
 

@@ -37,6 +37,7 @@ import ContractDetailCard, { type ContractPatch } from '../features/contracts/Co
 import ContractKpis, { useContractStats } from '../features/contracts/ContractKpis'
 import ContractRenewDialog from '../features/contracts/ContractRenewDialog'
 import SellersDialog from '../features/contracts/SellersDialog'
+import ContractsNav from '../features/contracts/ContractsNav'
 import { EndCell, PeriodBar, StateCell } from '../features/contracts/contractUi'
 import { dShort } from '../features/contracts/contractModel'
 import {
@@ -485,6 +486,7 @@ export default function Contracts() {
     <Stack spacing={0} sx={{ height: '100%' }}>
       <PageHead
         title="Contratti"
+        inline={canViewValue ? <ContractsNav current="list" /> : undefined}
         actions={
           <>
             {canViewSellers ? <Button variant="outlined" color="inherit" startIcon={<CampoIcon name="users" size={16} />} onClick={() => setSellersOpen(true)}>Venditori</Button> : null}
