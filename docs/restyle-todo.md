@@ -42,7 +42,7 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 Fatta su `design-previews/c-base.html` (variante A · Scheda).
 
 - ~~**[BE] Lettura della password VPN non registrata nell'audit**~~ fatto il 21/11 (`?reveal=1` + azione `view_secret`).: l'anteprima diceva "ogni visualizzazione resta nel log"; oggi `GET /customers/<id>/vpn/` restituisce la password a chi ha il permesso senza registrare nulla. Nell'app la frase è stata tolta.
-- **[UI] Drawer cliente vecchio** (`CustomerDrawer`): ancora usato da Profilo.
+- ~~**[UI] Drawer cliente vecchio**~~: non più usato (Profilo sulla finestra nuova); file rimosso il 21/11.
 - **[UI] Credenziali degli inventari nella scheda Inventari**: l'anteprima mostrava utenza e password per riga; l'elenco API non le include (servono la scheda dell'inventario e il permesso `inventory.view_secrets`).
 - **[UI] Città e indirizzo**: stanno nei campi personalizzati, quindi si modificano solo da "Modifica", non sul posto. Tag non mostrati nel pannello.
 - **[UI] Site Repository dal pannello**: non c'è un collegamento diretto (la pagina non accetta il cliente nell'URL).
@@ -51,7 +51,7 @@ Fatta su `design-previews/c-base.html` (variante A · Scheda).
 
 Portata direttamente nell'app con lo schema dei Clienti (nessuna anteprima dedicata).
 
-- **[UI] Site Repository**: usa ancora i suoi drawer informativi (`InfoDrawers`) per siti e clienti.
+- ~~**[UI] Site Repository, drawer informativi**~~: già tolti, apre le finestre dei record.
 - **[DEC] Cambio cliente di un sito**: nel pannello il cliente è in sola lettura (spostare un sito con inventari e issue fra clienti va deciso); si cambia solo da "Modifica".
 
 ## Pagina Contatti
@@ -227,7 +227,7 @@ Linea comune scelta da Fede dall'anteprima `fm-base.html`, variante **C · Rapid
 
 - **[UI] Portati**: Task di area, Clienti, Siti, Inventari, Contatti (stesse props dei vecchi dialoghi, le pagine non cambiano). Inventari: rete, credenziali (stesse regole sul permesso), apparecchio, tag e campi personalizzati in "Altri campi", aperto da solo in modifica se c'è già qualcosa. Clienti: il nome visualizzato segue il nome finché non lo si cambia a mano.
 - **[UI] Issue e Bug e feature** (2026-11-09): Issue con il cliente cercato sul server e "Non è in anagrafica? Scrivi il nome" in fondo al selettore (testo libero), Sito dopo il cliente, "In attesa di" con lo stato In attesa, inventario collegato come pillola, issue chiusa in sola lettura. Bug e feature: la frase principale come titolo e i dettagli sotto (salvati come un unico testo, prima riga = titolo), Tipo, Dove e Screenshot in pillole, Ctrl+V incolla lo screenshot ovunque nel modulo.
-- **[TODO] Da portare**: Caso ServiceNow; "Creane un altro" è pronto nel componente ma va collegato nelle pagine che lo vogliono.
+- **[DEC] Caso ServiceNow** (21/11): resta su `CampoDialog`, già nello stile dell'app; il flusso screenshot → OCR → modulo è a passi, caso escluso dall'inserimento rapido. «Creane un altro» resta da collegare dove serve.
 - **[DEC] Dove non usarlo**: Purchase Order, Contratti, Piani di manutenzione, Rimborso spese, Rapportino (importi, cadenze, righe, passi).
 
 ## Cestino e Bug e feature
