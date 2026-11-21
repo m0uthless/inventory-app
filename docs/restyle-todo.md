@@ -351,12 +351,12 @@ Ordine di lavoro concordato: fix → verifiche nel browser → rilascio → Cont
 - **Fix prima del rilascio, tutti i rimandati della revisione**:
   - Issue per area: fuga in `/api/wiki-links/`, area disattivata via API, assegnatario fuori area / «Assegna a me» / QuickPick «Area», test mancanti e piccole cose;
   - Generatore SQL: robustezza backend, notifiche, accessibilità e mobile.
-- **Test**: `conftest` globale con LocMemCache al posto del Redis del dev; togliere quello locale di `text2sql`.
+- ~~**Test**: `conftest` globale con LocMemCache~~ fatto.
 - **DB dev**: riaccendere il modulo Wiki.
 - **Verifiche nel browser**: le fa Claude con Playwright (Issue per area, Generatore SQL, Task di area) e manda gli screenshot.
-- **Task di area convertito in issue poi cestinata**: permettere la riconversione in una issue nuova; il badge dice che la issue è nel cestino.
+- ~~**Task di area convertito in issue poi cestinata**~~: riconversione possibile (fatto).
 - **Contratti**: il PDF si scarica **e si vede** solo con `view_contract_value`. I ritocchi estetici della finestra vanno nella fase 2.
-- **Issue, pezzi dell'anteprima**: restano solo Allegati e «Dove intervenire» completo.
+- ~~**Issue, pezzi dell'anteprima**~~: Allegati e «Dove intervenire» fatti il 20/11.
 
 ## Task di area: verifica nel browser (20/11)
 
@@ -372,5 +372,5 @@ Spec `docs/superpowers/specs/2026-11-20-contracts-renewal-reminders-design.md`, 
 - **Deploy in produzione:** `migrate` (`contracts.0003`, `0004`, `core.0049`, `notifications.0005`), ricreare `cron`, impostare gli indirizzi dell'ufficio in `/impostazioni`, dare «Gestisce le impostazioni di Archie».
 - **[DEC] Dev:** l'SMTP del dev è reale e i venditori demo hanno email finte: il cron delle 8 scrive a quegli indirizzi.
 - ~~Limite di 200 clienti/device nel modulo~~ risolto il 20/11 in tutta l'app con `fetchAll` (variante A scelta da Fede: si leggono tutte le pagine; la ricerca mentre si scrive servirà solo se si arriva alle migliaia).
-- **[UI] Restano per i Contratti:** statistiche e cruscotto (fase 3 della spec di ottobre).
+- ~~**[UI] Contratti, statistiche**~~: sezione «Valore» (clienti per valore e regioni) fatta il 21/11; cruscotto per venditore escluso da Fede.
 
