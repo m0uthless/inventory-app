@@ -89,6 +89,7 @@ export default function PlanDetailCard(p: Props) {
       status={<>
         <Box component="span" sx={{ fontSize: 11.5, fontWeight: 650, px: 1, py: '2px', borderRadius: '5px', ...(over ? { bgcolor: '#f2b8b0', color: '#5a1410' } : dueState === 'next30' && pl.is_active ? { bgcolor: '#e0a43a', color: '#2b1d00' } : { bgcolor: 'rgb(255 255 255 / .16)' }) }}>{stateLabel}</Box>
         {deleted ? <BandChip>Nel cestino</BandChip> : null}
+        {!deleted && pl.can_edit === false ? <BandChip><CampoIcon name="lock" size={11} />Sola lettura · area {pl.area_label}</BandChip> : null}
       </>}
       subtitle={<>{pl.customer_name}{' · '}{scheduleText(pl)}{(pl.inventory_type_labels ?? []).length ? ` · ${(pl.inventory_type_labels ?? []).join(', ')}` : ''}</>}
       tags={<>
@@ -173,6 +174,7 @@ export default function PlanDetailCard(p: Props) {
           <RecordSection title="Programmazione">
             <RecordGrid>
               <RecordValue label="Cliente" wide><RecordLink onClick={() => { p.onClose(); navigate(`/customers${buildQuery({ open: pl.customer })}`) }}>{pl.customer_name}</RecordLink></RecordValue>
+              <RecordValue label="Area">{pl.area_label ?? 'Senza area'}</RecordValue>
               <RecordValue label="Cadenza" wide>{scheduleText(pl)}</RecordValue>
               <RecordValue label="Prossima scadenza">{pl.next_due_date ? dIt(pl.next_due_date) : null}</RecordValue>
               <RecordValue label="Avviso">{pl.alert_days_before} giorni prima</RecordValue>

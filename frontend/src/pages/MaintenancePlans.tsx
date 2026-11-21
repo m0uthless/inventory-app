@@ -30,6 +30,8 @@ import { PERMS } from '../auth/perms'
 import { CampoIcon, FilterOptionList, KpiStrip, KpiTile, Meter, PageHead, TableBar, ViewTabs, headerFilterGridSx, type ActiveFilter } from '../ui/campo'
 import SectionNav from '../features/maintenance/MaintenanceNav'
 import PlanDialog from '../features/maintenance/PlanDialog'
+import MtAreaSwitch from '../features/maintenance/MtAreaSwitch'
+import { defaultMtArea, mtAreaParams, readMtArea, saveMtArea, type MtAreaChoice } from '../features/maintenance/areaChoice'
 import PlanDetailCard from '../features/maintenance/PlanDetailCard'
 import { generatePlanPdf } from '../features/maintenance/planPdf'
 import { planStateOf, scheduleText } from '../features/maintenance/mtModel'
@@ -45,14 +47,14 @@ type PlanStats = { active: number; customers: number; covered: number; done: num
 type Customer = { id: number; name: string; display_name?: string | null }
 const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
 
-function usePlanStats(reloadKey: unknown, customer: number | '') {
+function usePlanStats(reloadKey: unknown, customer: number | '', area: MtAreaChoice) {
   const [data, setData] = React.useState<PlanStats | null>(null)
   React.useEffect(() => {
     let alive = true
-    api.get<PlanStats>('/maintenance-plans/plan-stats/', { params: customer !== '' ? { customer } : {} })
+    api.get<PlanStats>('/maintenance-plans/plan-stats/', { params: { ...mtAreaParams(area), ...(customer !== '' ? { customer } : {}) } })
       .then((r) => { if (alive) setData(r.data) }).catch(() => { if (alive) setData(null) })
     return () => { alive = false }
-  }, [reloadKey, customer])
+  }, [reloadKey, customer, area])
   return data
 }
 
@@ -88,15 +90,26 @@ export default function MaintenancePlans() {
   const opts = React.useMemo(() => ({ patch: { page: 1 }, keepOpen: true }), [])
   const setView = (v: string) => setViewRaw(v === 'active' ? '' : v, opts)
 
+  const myArea = me?.profile?.leave_area ?? null
+  const canSeeAllAreas = Boolean(me?.is_superuser) || hasPerm('maintenance.view_all_areas')
+  const [areaChoice, setAreaChoiceState] = React.useState<MtAreaChoice>(() => readMtArea() ?? defaultMtArea(myArea))
+  const setAreaChoice = (c: MtAreaChoice) => { setAreaChoiceState(c); saveMtArea(c) }
+  const [areas, setAreas] = React.useState<{ id: number; label: string }[]>([])
+  React.useEffect(() => {
+    let alive = true
+    api.get<{ results: { id: number; label: string }[] } | { id: number; label: string }[]>('/leave-areas/', { params: { page_size: 100 } })
+      .then((r) => { if (alive) setAreas(Array.isArray(r.data) ? r.data : r.data.results ?? []) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
   const grid = useServerGrid({ defaultOrdering: 'next_due_date', allowedOrderingFields: ['next_due_date', 'title', 'updated_at'], defaultPageSize: 25 })
   const listParams = React.useMemo(() => buildDrfListParams({
     search: grid.search, ordering: grid.ordering, page0: grid.paginationModel.page, pageSize: grid.paginationModel.pageSize,
     includeDeleted: grid.includeDeleted, onlyDeleted: grid.onlyDeleted,
-    extra: { state: view, ...(customerF !== '' ? { customer: customerF } : {}) },
-  }), [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, grid.includeDeleted, grid.onlyDeleted, view, customerF])
+    extra: { state: view, ...mtAreaParams(areaChoice), ...(customerF !== '' ? { customer: customerF } : {}) },
+  }), [grid.search, grid.ordering, grid.paginationModel.page, grid.paginationModel.pageSize, grid.includeDeleted, grid.onlyDeleted, view, customerF, areaChoice])
   const { rows, rowCount, loading, reload } = useDrfList<PlanRow>('/maintenance-plans/', listParams, (e) => toast.error(apiErrorToMessage(e)))
   const [statsKey, setStatsKey] = React.useState(0)
-  const stats = usePlanStats(statsKey, customerF)
+  const stats = usePlanStats(statsKey, customerF, areaChoice)
   const reloadAll = React.useCallback(() => { reload(); setStatsKey((n) => n + 1) }, [reload])
   const customers = useList<Customer>('/customers/', { ordering: 'display_name', page_size: 500 }) ?? NO_ROWS
 
@@ -157,6 +170,7 @@ export default function MaintenancePlans() {
   const columns = React.useMemo<GridColDef<PlanRow>[]>(() => [
     { field: 'title', headerName: 'Piano', flex: 1, minWidth: 220, renderCell: (p) => <Box component="span" sx={{ fontWeight: 550, ...ellipsis }}>{p.row.title}</Box> },
     { field: 'customer_name', headerName: 'Cliente', width: 190, sortable: false, renderCell: (p) => <Box component="span" sx={ellipsis}>{p.row.customer_name}</Box> },
+    { field: 'area_label', headerName: 'Area', width: 120, sortable: false, renderCell: (p) => <Box component="span" sx={{ ...ellipsis, color: p.row.area_label ? 'text.primary' : 'text.disabled' }}>{p.row.area_label || '—'}</Box> },
     {
       field: 'inventory_type_labels', headerName: 'Tipi', width: 200, sortable: false,
       renderCell: (p) => <Box sx={{ display: 'flex', gap: 0.5, minWidth: 0, overflow: 'hidden' }}>{(p.row.inventory_type_labels ?? []).map((t) => <Box key={t} component="span" sx={{ fontSize: 11.5, fontWeight: 550, px: 0.75, lineHeight: '20px', borderRadius: '4px', bgcolor: 'archie.neutralBg', color: 'text.secondary', whiteSpace: 'nowrap' }}>{t}</Box>)}</Box>,
@@ -220,6 +234,7 @@ export default function MaintenancePlans() {
         inline={<SectionNav current="plans" />}
         actions={canAdd ? <Button variant="contained" startIcon={<CampoIcon name="plus" size={16} />} onClick={() => setDlg({ plan: null })}>Nuovo piano</Button> : null}
       />
+      <Box sx={{ mb: 1.5 }}><MtAreaSwitch areas={areas} value={areaChoice} onChange={setAreaChoice} myArea={myArea} canSeeAll={canSeeAllAreas} /></Box>
       <KpiStrip label="Indicatori piani">
         <KpiTile label="Piani in corso" value={stats ? stats.active : '—'} unit={stats ? `${stats.customers} clienti` : undefined} sub={stats ? <><b>{stats.covered}</b>&nbsp;inventari coperti</> : null} />
         <KpiTile label="Completati nel ciclo" active={view === 'completed'} onClick={() => setView(view === 'completed' ? 'active' : 'completed')}
@@ -273,8 +288,9 @@ export default function MaintenancePlans() {
           onPrev={idx > 0 ? () => openPlan(rows[idx - 1].id) : undefined}
           onNext={idx >= 0 && idx < rows.length - 1 ? () => openPlan(rows[idx + 1].id) : undefined}
           onClose={() => setOpenId(null)}
-          canChange={canChange}
-          canDelete={canDelete}
+          // Piano di un'altra area: in sola lettura (come le issue).
+          canChange={canChange && detail.can_edit !== false}
+          canDelete={canDelete && detail.can_edit !== false}
           onEdit={() => setDlg({ plan: detail })}
           onDelete={() => setDelPlan(detail)}
           onRestore={() => void doRestore(detail)}
@@ -284,7 +300,7 @@ export default function MaintenancePlans() {
       ) : null}
 
       <RowContextMenu open={Boolean(ctx)} anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined} onClose={() => setCtx(null)} items={ctxItems} />
-      <PlanDialog open={dlg !== null} plan={dlg?.plan ?? null} customers={customers} onClose={() => setDlg(null)}
+      <PlanDialog open={dlg !== null} plan={dlg?.plan ?? null} customers={customers} areas={areas} myArea={myArea} onClose={() => setDlg(null)}
         onSaved={(id) => { setDlg(null); reloadAll(); setCardReload((n) => n + 1); setOpenId(id) }} />
       <ConfirmDeleteDialog open={Boolean(delPlan)} busy={delBusy} title="Spostare il piano nel cestino?" description={`«${delPlan?.title ?? ''}» verrà spostato nel cestino e potrà essere ripristinato.`} onClose={() => setDelPlan(null)} onConfirm={() => void doDelete()} />
     </Stack>

@@ -429,6 +429,12 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             plans = plans.filter(customer_id=customer_param)
         if plan_param:
             plans = plans.filter(id=plan_param)
+        # ?area=<id> | none: scadenze dei piani di un'area o senza area.
+        area_param = request.query_params.get("area") if hasattr(request, "query_params") else None
+        if area_param == "none":
+            plans = plans.filter(area__isnull=True)
+        elif area_param and str(area_param).isdigit():
+            plans = plans.filter(area_id=int(area_param))
 
         # Materializza i piani una volta sola
         plans_list = list(plans)
@@ -753,6 +759,11 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         today = timezone.localdate()
         year_start = today.replace(month=1, day=1)
         base = MaintenancePlan.objects.filter(deleted_at__isnull=True).filter(visible_plans_q(request.user))
+        area_param = request.query_params.get("area")
+        if area_param == "none":
+            base = base.filter(area__isnull=True)
+        elif area_param and area_param.isdigit():
+            base = base.filter(area_id=int(area_param))
         customer_param = request.query_params.get("customer")
         if customer_param:
             base = base.filter(customer_id=customer_param)

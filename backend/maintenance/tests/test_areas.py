@@ -124,3 +124,13 @@ def test_can_edit_flag(areas):
     viewer = _user(areas["bo"], "view_all_areas")
     rows = {p["id"]: p["can_edit"] for p in viewer.get("/api/maintenance-plans/").json()["results"]}
     assert rows == {areas["p_over"].id: False, areas["p_soon"].id: True}
+
+
+def test_todo_and_stats_accept_area_filter(areas):
+    rn = _user(areas["rn"])
+    rows = rn.get("/api/maintenance-plans/todo/", {"area": areas["rn"].id, "page_size": 200}).json()["results"]
+    assert rows and {r["plan_id"] for r in rows} == {areas["p_over"].id}
+    assert all(r["plan_area_label"] == "Romagna" for r in rows)
+    none_rows = rn.get("/api/maintenance-plans/todo/", {"area": "none", "page_size": 200}).json()["results"]
+    assert areas["p_over"].id not in {r["plan_id"] for r in none_rows}
+    assert rn.get("/api/maintenance-plans/todo-stats/", {"area": areas["rn"].id}).status_code == 200

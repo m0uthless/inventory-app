@@ -142,7 +142,7 @@ Portata dall'anteprima `mt-base.html`: **A · Elenco** come vista predefinita, *
 - **[RM] Rimossi** i vecchi componenti della manutenzione (dialogo rapportino, pannello del piano, `DueBadge`, `YearFilterField`, `maintenanceShared.ts`); in `MaintenanceLegacy.tsx` resta solo «Modifica scadenza».
 - ~~**[SEC] Da allineare** (rapportini)~~: già protette dentro `CanRestore/CanPurgeModelPermission`; test aggiunti il 21/11. Testo originale: le azioni `reset`, `restore` e `bulk_restore` dei rapportini dichiarano `permission_classes` senza `IsInternalOrPortalDedicatedApp` (stesso schema già segnalato per Drive upload e Wiki view/rate).
 - **[DEMO] Dati fittizi in dev** marcati `demo-restyle` (siti, inventari, piani, rapportini, scadenze modificate); id in scratchpad `demo_mt_ids.json`.
-- **[TODO] Aree**: divisione per area rimandata (anteprima pronta, disattivata con `AREAS_ON`); serve decidere se l'area sta sul cliente, sul sito o sul piano.
+- ~~**[TODO] Aree**~~ fatto il 21/11: area sul piano, visibilità e modifica come le issue (decisione di Fede). Testo originale: divisione per area rimandata (anteprima pronta, disattivata con `AREAS_ON`); serve decidere se l'area sta sul cliente, sul sito o sul piano.
 
 ## Contratti
 
