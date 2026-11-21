@@ -289,7 +289,7 @@ Proposta approvata da Fede come idea ma rimandata ("ottima idea ma prematura"); 
 - ~~**[UI] Modalità scura**~~ sistemata il 21/11 (componenti Wiki); i bianchi rimasti sono sulla fascia scura delle finestre, voluti.
 - **[UI] Pagina di login**: invariata.
 - **[UI] Dashboard**: widget e card con gradienti (`BirthdaysCard`, `ContributorCard`, `QuickActionsPairCard`, …).
-- **[UI] PDF dei Piani di manutenzione**: intestazione a gradiente.
+- ~~**[UI] PDF dei Piani di manutenzione**~~ intestazione sobria dal 21/11.
 - ~~**[UI] `useDataGridZebraSx`**~~: legge il tema; nessuna card rimasta col tema precedente.
 
 ## Via il drawer: finestra dei record (dal 17/11)

@@ -27,6 +27,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Report PDF dei Piani di manutenzione: intestazione sobria (fondo bianco, filo verde, etichette in verde chiaro, «ARCHIE» al posto di «inventory-app») e intestazione della tabella chiara; la cadenza è in italiano («Ogni 12 mesi» invece di «Ogni 12 months»).
 - Le scadenze di manutenzione non arrivano più per email a ogni utente: restano nelle notifiche di Archie, e per email vanno solo all'ufficio.
 - Issue, «Collega un inventario» ridisegnato: elenco cercabile per nome, K-number, hostname o seriale, prima gli inventari del sito della issue, quello collegato segnato, «Scollega» quando serve.
 - Purchase Order, «Nuovo PO» e «Modifica» con l'inserimento rapido standard (come clienti, siti, issue): descrizione come titolo, note sotto, committente, cliente (anche non in anagrafica), tipo, data, calcolo dell'importo (fisso o giornate × tariffa con il totale calcolato), costi; numero PO e fattura in «Altri campi». Con il PO già inviato descrizione e importo restano bloccati.

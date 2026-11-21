@@ -1,5 +1,6 @@
 /* Report PDF stampabile di un piano di manutenzione (spostato da pages/MaintenancePlans.tsx, invariato). */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { scheduleText } from './mtModel'
 import type { Theme } from '@mui/material/styles'
 import { escapeHtml } from '@shared/utils/html'
 import type { PlanRow } from '../../pages/maintenanceTypes'
@@ -86,9 +87,8 @@ export async function generatePlanPdf(plan: PlanRow, theme: Theme, onPopupBlocke
   const isCompleted    = coveredCount > 0 && completedCount >= coveredCount
   const barColor       = pct === 100 ? theme.palette.success.main : pct >= 50 ? theme.palette.warning.main : theme.palette.error.main
 
-  const scheduleLabel = plan.schedule_type === 'interval'
-    ? `Ogni ${plan.interval_value ?? ''} ${plan.interval_unit ?? ''}`
-    : `${plan.fixed_day ?? ''}/${plan.fixed_month ?? ''} ogni anno`
+  // In italiano come nella pagina («Ogni 12 mesi», «Ogni anno il 15 marzo»).
+  const scheduleLabel = scheduleText(plan as Parameters<typeof scheduleText>[0])
 
   const now = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
 
@@ -108,15 +108,16 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1e293b;backgr
 .page{padding:22px 26px 18px}
 
 /* ── Header ── */
-.hdr{background:linear-gradient(135deg,${theme.palette.primary.main},#134e4a);color:${theme.palette.common.white};
-     padding:16px 20px;border-radius:8px;margin-bottom:14px;
+.hdr{background:#fff;color:${theme.palette.text.primary};
+     padding:4px 0 14px;border-bottom:2px solid ${theme.palette.primary.main};margin-bottom:14px;
      display:flex;justify-content:space-between;align-items:flex-start}
-.hdr-left h1{font-size:16px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
-.hdr-left .sub{font-size:10px;opacity:.65;margin-bottom:8px}
+.hdr-left h1{font-size:18px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}
+.hdr-left .sub{font-size:10px;color:${theme.palette.text.secondary};margin-bottom:6px}
 .hdr-left .tags{display:flex;flex-wrap:wrap;gap:5px}
-.tag{background:rgba(255,255,255,.18);color:#fff;padding:2px 8px;
+.tag{background:#e2f0eb;color:#17463c;padding:2px 8px;
      border-radius:4px;font-size:9.5px;font-weight:600}
-.hdr-right{text-align:right;font-size:9px;opacity:.55;line-height:1.7;white-space:nowrap;padding-left:16px}
+.hdr-right{text-align:right;font-size:9px;color:${theme.palette.text.secondary};line-height:1.7;white-space:nowrap;padding-left:16px}
+.hdr-right b{display:block;font-size:12px;font-weight:700;color:${theme.palette.primary.main};letter-spacing:.02em}
 .status-ok  {background:${theme.palette.success.light};color:${theme.palette.success.dark};padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700}
 .status-wip {background:${theme.palette.warning.light};color:${theme.palette.warning.dark};padding:2px 10px;border-radius:4px;font-size:10px;font-weight:700}
 
@@ -147,7 +148,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1e293b;backgr
 
 /* ── Table ── */
 table{width:100%;border-collapse:collapse}
-thead th{background:${theme.palette.primary.main};color:${theme.palette.common.white};padding:6px 8px;
+thead th{background:#f5f8f7;color:${theme.palette.text.secondary};border-bottom:1px solid ${theme.palette.divider};padding:6px 8px;
          font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:left}
 thead th:first-child{border-radius:5px 0 0 0}
 thead th:last-child {border-radius:0 5px 0 0}
@@ -182,7 +183,7 @@ td.small{font-size:9.5px}
       <span class="tag">${escapeHtml((plan.inventory_type_labels ?? []).join(', ')) || '—'}</span>
     </div>
   </div>
-  <div class="hdr-right">inventory-app<br/>Report Piano #${plan.id}<br/>${now}</div>
+  <div class="hdr-right"><b>ARCHIE</b>Report piano #${plan.id}<br/>${now}</div>
 </div>
 
 <div class="kpi-row">
