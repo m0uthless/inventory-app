@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -21,6 +22,7 @@ from django.db.models import OuterRef, Subquery, Count, DateField, Q
 from django.db.models.functions import TruncYear
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from core.models import InventoryType
+from maintenance.visibility import can_edit_plan, visible_plans_q
 from maintenance.models import MaintenancePlan, MaintenanceEvent, Tech
 from maintenance.api.helpers import compute_next_due_date
 
@@ -28,6 +30,12 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
     custom_fields_entity = "maintenance_plan"
     customer_code = serializers.CharField(source="customer.code",    read_only=True)
     customer_name = serializers.CharField(source="customer.name",    read_only=True)
+    area_label    = serializers.CharField(source="area.label", read_only=True, default=None)
+    can_edit      = serializers.SerializerMethodField()
+
+    def get_can_edit(self, obj) -> bool:
+        request = self.context.get("request")
+        return can_edit_plan(getattr(request, "user", None), obj)
 
     # M2M: lista degli id in input, lista label in output
     inventory_types     = serializers.PrimaryKeyRelatedField(
@@ -92,6 +100,9 @@ class MaintenancePlanSerializer(CustomFieldsValidationMixin, serializers.ModelSe
             "customer",
             "customer_code",
             "customer_name",
+            "area",
+            "area_label",
+            "can_edit",
             "inventory_types",
             "inventory_type_labels",
             "covered_count",
@@ -132,9 +143,16 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = (
             MaintenancePlan.objects
-            .select_related("customer")
+            .select_related("customer", "area")
             .prefetch_related("inventory_types")
+            .filter(visible_plans_q(self.request.user))
         )
+        # ?area=<id> oppure ?area=none (senza area)
+        area_param = self.request.query_params.get("area")
+        if area_param == "none":
+            qs = qs.filter(area__isnull=True)
+        elif area_param and area_param.isdigit():
+            qs = qs.filter(area_id=int(area_param))
 
         # last_done_date: annotata solo su list per evitare query extra su retrieve/destroy.
         # covered_count: annotata tramite Subquery per eliminare N+1 nel serializer.
@@ -279,12 +297,23 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         log_event(actor=self.request.user, action="create", instance=instance, request=self.request)
 
     def perform_update(self, serializer):
+        self._check_plan_area(serializer.instance)
         instance = serializer.save()
         log_event(actor=self.request.user, action="update", instance=instance, request=self.request)
+
+    def perform_destroy(self, instance):
+        self._check_plan_area(instance)
+        super().perform_destroy(instance)
+
+    def _check_plan_area(self, plan):
+        """I piani con un'area li modificano solo i membri di quell'area (o il superuser)."""
+        if not can_edit_plan(self.request.user, plan):
+            raise PermissionDenied("Puoi modificare solo i piani della tua area.")
 
     @action(detail=True, methods=["post"], permission_classes=[CanRestoreModelPermission])
     def restore(self, request, pk=None):
         obj = self.get_object()
+        self._check_plan_area(obj)
         reason = get_restore_block_reason(obj)
         if reason:
             return Response({"detail": reason}, status=409)
@@ -302,7 +331,9 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         qs = list(
             MaintenancePlan.objects.select_related("customer")
             .filter(id__in=ids, deleted_at__isnull=False)
+            .filter(visible_plans_q(request.user))
         )
+        qs = [p for p in qs if can_edit_plan(request.user, p)]
         restorable, blocked = split_restorable(qs)
         restored_ids = [obj.id for obj in restorable]
         if restored_ids:
@@ -317,9 +348,10 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], permission_classes=[CanPurgeModelPermission])
     def purge(self, request, pk=None):
-        obj = MaintenancePlan.objects.filter(pk=pk, deleted_at__isnull=False).first()
+        obj = MaintenancePlan.objects.filter(pk=pk, deleted_at__isnull=False).filter(visible_plans_q(request.user)).first()
         if obj is None:
             return Response({"detail": "Elemento non trovato nel cestino."}, status=404)
+        self._check_plan_area(obj)
         ok, reason, blockers = try_purge_instance(obj)
         if not ok:
             return Response({"detail": reason, "blocked": blockers}, status=409)
@@ -334,7 +366,10 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
             return Response({"detail": "ids must be a non-empty list"}, status=400)
         purged = []
         blocked = []
-        for obj in MaintenancePlan.objects.filter(id__in=ids, deleted_at__isnull=False):
+        for obj in MaintenancePlan.objects.filter(id__in=ids, deleted_at__isnull=False).filter(visible_plans_q(request.user)):
+            if not can_edit_plan(request.user, obj):
+                blocked.append({"id": obj.id, "reason": "Piano di un'altra area.", "blocked": []})
+                continue
             obj_id = obj.id
             ok, reason, blockers = try_purge_instance(obj)
             if ok:
@@ -382,7 +417,9 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         plans = (
             MaintenancePlan.objects
             .filter(deleted_at__isnull=True, is_active=True, next_due_date__isnull=False)
-            .select_related("customer")
+            # Visibilità per area; i job di sistema (senza utente) vedono tutto.
+            .filter(visible_plans_q(getattr(request, "user", None)))
+            .select_related("customer", "area")
             .prefetch_related("inventory_types")
         )
         customer_param = request.query_params.get("customer")
@@ -461,6 +498,8 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
                     rows.append({
                         "plan_id":               plan.id,
                         "plan_title":            plan.title,
+                        "plan_area_id":          plan.area_id,
+                        "plan_area_label":       plan.area.label if plan.area_id else None,
                         "plan_alert_days_before": plan.alert_days_before,
                         "inventory_id":          inv.id,
                         "inventory_name":        inv.name,
@@ -713,7 +752,7 @@ class MaintenancePlanViewSet(SoftDeleteAuditMixin, viewsets.ModelViewSet):
         archiviati e copertura del ciclo (fatte / coperte), con la regola di todo."""
         today = timezone.localdate()
         year_start = today.replace(month=1, day=1)
-        base = MaintenancePlan.objects.filter(deleted_at__isnull=True)
+        base = MaintenancePlan.objects.filter(deleted_at__isnull=True).filter(visible_plans_q(request.user))
         customer_param = request.query_params.get("customer")
         if customer_param:
             base = base.filter(customer_id=customer_param)

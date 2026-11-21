@@ -115,6 +115,9 @@ class Command(BaseCommand):
             if not event_date:
                 continue
             for user in recipients:
+                # Solo a chi vede il piano (area come le issue).
+                if not _sees_plan_area(user, row.get("plan_area_id")):
+                    continue
                 notif, _ = Notification.objects.update_or_create(
                     recipient=user,
                     notification_type=NotificationType.MAINTENANCE_DUE,
@@ -217,3 +220,14 @@ class Command(BaseCommand):
                     f"[notifications] invio digest a {user.email} fallito: {error}"
                 ))
         return sent
+
+
+def _sees_plan_area(user, plan_area_id) -> bool:
+    """Come `maintenance.visibility.visible_plans_q`, su un'area già nota."""
+    from maintenance.visibility import VIEW_ALL_AREAS_PERM
+
+    if plan_area_id is None or user.is_superuser or user.has_perm(VIEW_ALL_AREAS_PERM):
+        return True
+    uid = getattr(getattr(user, "profile", None), "leave_area_id", None)
+    return uid is None or uid == plan_area_id
+

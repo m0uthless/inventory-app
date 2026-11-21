@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from maintenance.visibility import visible_plans_q
 from typing import Any, Dict, List, Optional
 
 from django.db.models import Q
@@ -209,6 +210,7 @@ class SearchAPIView(APIView):
                 MaintenancePlan.objects.select_related("customer")
                 .prefetch_related("inventory_types")
                 .filter(deleted_at__isnull=True)
+                .filter(visible_plans_q(user))
                 .filter(
                     Q(title__icontains=q)
                     | Q(notes__icontains=q)

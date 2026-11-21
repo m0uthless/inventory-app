@@ -3,6 +3,7 @@ from django.db import IntegrityError, transaction
 import datetime
 
 import django_filters as filters
+from maintenance.visibility import visible_plans_q
 from django.db.models import Count, Exists, F, OuterRef, Q
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -577,6 +578,7 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
                     customer_id=inv.customer_id, inventory_types=inv.type_id,
                     is_active=True, deleted_at__isnull=True,
                 )
+                .filter(visible_plans_q(request.user))
                 .distinct()
                 .order_by("next_due_date", "title")
             )
@@ -593,6 +595,7 @@ class InventoryViewSet(PortalTenantWriteMixin, PortalScopedMixin, PurgeActionMix
 
         events = (
             MaintenanceEvent.objects.filter(inventory=inv, deleted_at__isnull=True)
+            .filter(visible_plans_q(request.user, prefix="plan__"))
             .select_related("plan", "tech", "created_by", "inventory", "inventory__site", "inventory__customer")
             .order_by("-performed_at", "-id")[:50]
         )
