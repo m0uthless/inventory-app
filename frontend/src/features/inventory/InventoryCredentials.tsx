@@ -30,15 +30,17 @@ const mono = { fontFamily: '"Geist Mono", monospace' }
 export default function InventoryCredentials({ inventoryId }: { inventoryId: number }) {
   const { hasPerm } = useAuth()
   const toast = useToast()
-  const allowed = hasPerm('inventory.view_secrets')
+  const canView = hasPerm('inventory.view_inventory')
+  const allowed = canView && hasPerm('inventory.view_secrets')
   const [data, setData] = React.useState<Secrets | null>(null)
+  const [failed, setFailed] = React.useState(false)
   const [shown, setShown] = React.useState<Partial<Record<keyof Secrets, boolean>>>({})
 
   React.useEffect(() => {
     if (!allowed) return
     let alive = true
-    setData(null); setShown({})
-    api.get<Secrets>(`/inventories/${inventoryId}/`).then((r) => { if (alive) setData(r.data) }).catch(() => { if (alive) setData({}) })
+    setData(null); setShown({}); setFailed(false)
+    api.get<Secrets>(`/inventories/${inventoryId}/`).then((r) => { if (alive) setData(r.data) }).catch(() => { if (alive) { setFailed(true); setData({}) } })
     return () => { alive = false }
   }, [inventoryId, allowed])
 
@@ -57,8 +59,11 @@ export default function InventoryCredentials({ inventoryId }: { inventoryId: num
       </Box>
     </Box>
   )
-  if (!allowed) return head(<Box component="span" sx={{ display: 'inline-flex', gap: 0.5, alignItems: 'center' }}><CampoIcon name="lock" size={12} />Serve il permesso Credenziali</Box>)
+  const locked = (text: string) => head(<Box component="span" sx={{ display: 'inline-flex', gap: 0.5, alignItems: 'center' }}><CampoIcon name="lock" size={12} />{text}</Box>)
+  if (!canView) return locked('Serve il permesso Inventari')
+  if (!allowed) return locked('Serve il permesso Credenziali')
   if (data === null) return null
+  if (failed) return head('Credenziali non disponibili')
   const rows = ROWS.filter((r) => data[r.key])
   if (!rows.length) return head('Nessuna credenziale registrata')
 

@@ -2,6 +2,8 @@ import * as React from 'react'
 import { Box, IconButton, Tooltip, Typography } from '@mui/material'
 
 import { fetchAll } from '../../api/fetchAll'
+import { useAuth } from '../../auth/AuthProvider'
+import { PERMS } from '../../auth/perms'
 import { CampoIcon, RecordRow } from '../../ui/campo'
 
 type Contact = { id: number; name: string; phone?: string | null; email?: string | null; department?: string | null; is_primary?: boolean }
@@ -14,18 +16,27 @@ const telOf = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`
  * con chiamata ed email; senza principale, fino a 3 contatti del sito.
  */
 export default function SiteReferent({ siteId }: { siteId: number }) {
+  const { hasPerm } = useAuth()
+  const allowed = hasPerm(PERMS.crm.contact.view)
   const [contacts, setContacts] = React.useState<Contact[] | null>(null)
+  const [failed, setFailed] = React.useState(false)
   React.useEffect(() => {
+    if (!allowed) return
     let alive = true
-    setContacts(null)
+    setContacts(null); setFailed(false)
     fetchAll<Contact>('/contacts/', { site: siteId, ordering: 'name' })
       .then((rows) => { if (alive) setContacts(rows) })
-      .catch(() => { if (alive) setContacts([]) })
+      .catch(() => { if (alive) { setFailed(true); setContacts([]) } })
     return () => { alive = false }
-  }, [siteId])
+  }, [siteId, allowed])
+  const muted = (text: React.ReactNode, icon: 'users' | 'lock' = 'users') => (
+    <RecordRow lead={<CampoIcon name={icon} size={18} />} title={<Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>{text}</Box>} />
+  )
+  if (!allowed) return muted('Serve il permesso Contatti', 'lock')
   if (contacts === null) return null
+  if (failed) return muted('Contatti non disponibili')
   if (!contacts.length) {
-    return <RecordRow lead={<CampoIcon name="users" size={18} />} title={<Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>Nessun contatto per questo sito</Box>} />
+    return muted('Nessun contatto per questo sito')
   }
   const primary = contacts.find((c) => c.is_primary)
   const shown = primary ? [primary] : contacts.slice(0, MAX_SHOWN)

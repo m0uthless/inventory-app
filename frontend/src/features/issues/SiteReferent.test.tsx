@@ -8,6 +8,8 @@ import { THEME_REGISTRY } from '../../theme/themeRegistry'
 const theme = THEME_REGISTRY.default.build('light')
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('@shared/api/client', () => ({ api }))
+const auth = vi.hoisted(() => ({ contacts: true }))
+vi.mock('../../auth/AuthProvider', () => ({ useAuth: () => ({ hasPerm: (p: string) => auth.contacts && p === 'crm.view_contact' }) }))
 
 const c = (id: number, name: string, over: Record<string, unknown> = {}) => ({ id, name, phone: '', email: '', department: '', is_primary: false, ...over })
 const show = (contacts: unknown[]) => {
@@ -16,7 +18,7 @@ const show = (contacts: unknown[]) => {
 }
 
 describe('SiteReferent', () => {
-  beforeEach(() => api.get.mockReset())
+  beforeEach(() => { api.get.mockReset(); auth.contacts = true })
 
   it('mostra il contatto principale con chiamata ed email', async () => {
     show([c(1, 'Mario Bianchi'), c(2, 'Dr.ssa Valli', { is_primary: true, phone: '051 123', email: 'valli@ausl.it', department: 'Radiologia' })])
@@ -44,5 +46,19 @@ describe('SiteReferent', () => {
   it('sito senza contatti: lo dice', async () => {
     show([])
     expect(await screen.findByText('Nessun contatto per questo sito')).toBeInTheDocument()
+  })
+
+  it('senza il permesso Contatti lo dice e non chiede nulla', () => {
+    auth.contacts = false
+    show([c(1, 'Mario Bianchi')])
+    expect(screen.getByText('Serve il permesso Contatti')).toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalled()
+  })
+
+  it('se la lettura fallisce non dice «nessun contatto»', async () => {
+    api.get.mockRejectedValue({ response: { status: 500 } })
+    render(<ThemeProvider theme={theme}><SiteReferent siteId={5} /></ThemeProvider>)
+    expect(await screen.findByText('Contatti non disponibili')).toBeInTheDocument()
+    expect(screen.queryByText('Nessun contatto per questo sito')).toBeNull()
   })
 })
