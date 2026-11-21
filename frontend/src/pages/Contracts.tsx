@@ -211,8 +211,12 @@ export default function Contracts() {
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setDetailLoading(false) }
   }, [toast, grid.includeDeleted])
 
+  const lastOpenRef = React.useRef<number | null>(null)
   // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo contratto.
   const openDrawer = React.useCallback((id: number, keep?: boolean) => {
+    // Prima di aggiornare `?open=`: altrimenti l'effetto qui sotto lo prende per un'apertura
+    // da link, svuota il dettaglio e la finestra si chiude e si riapre.
+    lastOpenRef.current = id
     setSelectedId(id)
     setDrawerOpen(true)
     void loadDetail(id, undefined, keep)
@@ -220,7 +224,6 @@ export default function Contracts() {
   }, [grid, loadDetail])
 
   // Apertura dal link `?open=<id>` (es. scheda Contratti del cliente).
-  const lastOpenRef = React.useRef<number | null>(null)
   React.useEffect(() => {
     if (!grid.openId) return
     const id = grid.openId

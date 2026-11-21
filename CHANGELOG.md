@@ -25,6 +25,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Fixed
 
+- Contratti e Purchase Order: passando da un record all'altro con le frecce la finestra del dettaglio non si chiude e riapre più (restava aperta solo in Clienti, Siti, Contatti e Inventari).
 - Elenchi tagliati a 200: in circa quaranta punti (scelta di clienti, siti, inventari e device nei moduli, calendario e piani della Manutenzione e PDF dei piani, Rapportini, Drive, Wiki e Query, Contratti, Purchase Order) l'app chiedeva 500 elementi ma il backend ne dà al massimo 200 per pagina, e quelli oltre il duecentesimo sparivano senza avviso. Ora si leggono tutte le pagine (`frontend/src/api/fetchAll.ts`, e `useList` delle schede).
 
 ## [1.1.0] - 2026-11-20

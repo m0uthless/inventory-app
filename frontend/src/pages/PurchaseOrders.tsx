@@ -438,9 +438,12 @@ export default function PurchaseOrders() {
     [toast, grid.includeDeleted],
   )
 
+  const lastOpenRef = React.useRef<number | null>(null)
   // `keep`: passando al precedente/successivo la finestra resta quella di prima finché arriva il nuovo PO.
   const openDrawer = React.useCallback(
     (id: number, keep?: boolean) => {
+      // Prima di aggiornare `?open=` (vedi Contratti): niente chiudi-e-riapri con le frecce.
+      lastOpenRef.current = id
       setSelectedId(id)
       setDrawerOpen(true)
       loadDetail(id, undefined, keep)
@@ -844,7 +847,6 @@ export default function PurchaseOrders() {
   }, [loadCustomers])
 
   // open drawer from URL (?open=ID)
-  const lastOpenRef = React.useRef<number | null>(null)
   React.useEffect(() => {
     if (!grid.openId) return
     const id = grid.openId

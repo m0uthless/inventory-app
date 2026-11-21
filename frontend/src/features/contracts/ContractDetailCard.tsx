@@ -203,7 +203,7 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
                   </Box>
                 ))}
               </Box>
-              <Typography sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 1, fontSize: 11, color: 'text.disabled' }}><CampoIcon name="lock" size={12} />Ripartizione lineare sul periodo. Importi e PDF solo con il permesso sui valori.</Typography>
+              <Typography sx={{ mt: 1, fontSize: 11.5, color: 'text.secondary' }}>Ripartizione lineare sul periodo.</Typography>
             </RecordSection>
           ) : null}
 
