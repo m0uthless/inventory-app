@@ -313,7 +313,7 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         invalidate_wiki_stats_cache()
         return response
 
-    @action(detail=True, methods=["post"], url_path="view", permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="view", permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp])
     def record_view(self, request, pk=None):
         """Incrementa il contatore visualizzazioni atomicamente."""
         WikiPage.objects.filter(pk=pk).update(view_count=django_models.F("view_count") + 1)
@@ -335,7 +335,7 @@ class WikiPageViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewsets.ModelVi
         fav, _ = WikiPageFavorite.objects.get_or_create(page=page, user=request.user)
         return Response({"is_favorite": True, "favorited_at": fav.created_at.isoformat()})
 
-    @action(detail=True, methods=["post"], url_path="rate", permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="rate", permission_classes=[IsAuthenticated, IsInternalOrPortalDedicatedApp])
     def rate_page(self, request, pk=None):
         page = self.get_object()
         raw_rating = request.data.get("rating") if isinstance(request.data, dict) else None

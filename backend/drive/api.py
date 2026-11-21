@@ -686,7 +686,7 @@ class DriveFileUploadView(APIView):
     but this endpoint remains for backward compatibility.
     """
 
-    permission_classes = [IsAuthenticated, CanUploadDriveFile]
+    permission_classes = [IsAuthenticated, CanUploadDriveFile, IsInternalOrPortalDedicatedApp]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):

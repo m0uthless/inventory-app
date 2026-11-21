@@ -46,6 +46,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Security
 
+- Barriera Portal/Archie anche dove mancava (endpoint con `permission_classes` propri): Wiki «visualizza», «valuta» e statistiche, vecchio upload del Drive, avanzamento e ritorno dei PO, compleanni e nota personale della Dashboard, novità di Archie. Una sessione senza accesso ad Archie, Portal compreso, riceve 403: prima poteva, per esempio, leggere i compleanni del personale.
 - Password VPN dei clienti: non arriva più con la scheda del cliente (il GET dice solo se c'è, `has_password`); si chiede solo su «Mostra» o «Copia» (`GET /api/customers/<id>/vpn/?reveal=1`) e ogni lettura resta nell'Audit come «Password letta» (nuova azione `view_secret`, mai il valore). Migrazione `audit.0009`.
 
 ## [1.1.0] - 2026-11-20

@@ -175,7 +175,8 @@ class TestAuditEventActionRate:
     def test_rate_page_creates_audit_event_with_rate_action(self):
         """rate_page() deve creare un AuditEvent con action='rate'."""
         owner = _superuser()
-        voter = User.objects.create_user(username=_uid("voter_"), password="pw")
+        from core.testing import make_archie_user
+        voter = make_archie_user(username=_uid("voter_"), password="pw")
         page = _make_page(owner)
         client = _auth_client(voter)
 

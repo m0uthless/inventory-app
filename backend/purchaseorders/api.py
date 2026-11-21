@@ -9,6 +9,7 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -379,7 +380,7 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
 
     # ── Workflow: advance / revert ────────────────────────────────────────────
 
-    @action(detail=True, methods=["post"], url_path="advance", permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="advance", permission_classes=[permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp])
     def advance(self, request, pk=None):
         """Avanza di UN passo lo stato (inserito->inviato->ricevuto->fatturato).
 
@@ -460,7 +461,7 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         )
         return Response(self.get_serializer(obj).data)
 
-    @action(detail=True, methods=["post"], url_path="revert", permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="revert", permission_classes=[permissions.IsAuthenticated, IsInternalOrPortalDedicatedApp])
     def revert(self, request, pk=None):
         """Torna indietro di UN passo. Azzera il timestamp dello step lasciato
         (il documento eventualmente già caricato resta, non viene cancellato)."""

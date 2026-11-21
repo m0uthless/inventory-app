@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status as drf_status
 
+from portal.permissions import IsInternalOrPortalDedicatedApp
 from wiki.models import WikiPage, WikiPageRating, WikiPageRevision, WikiQuery
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,8 @@ class WikiStatsView(APIView):
     WikiPage (vedi invalidate_wiki_stats_cache più sotto).
     """
 
-    permission_classes = [IsAuthenticated]
+    # Esplicite: la barriera Portal/Archie va ripetuta quando si dichiarano permission_classes.
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
     CACHE_KEY = "wiki:stats:v1"
     CACHE_TTL = 300  # 5 minuti — sovrascrivibile via settings.WIKI_STATS_CACHE_TTL
 

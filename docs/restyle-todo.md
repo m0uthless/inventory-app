@@ -113,7 +113,7 @@ Portata dall'anteprima `pf-base.html` (`shared/pf.js`, `shared/pf.css`). Colori 
 Portata dall'anteprima `w-base.html`, variante **E · Archivio** (cartelle, schede d'archivio, scaffale, registro, foglietti). Stili in `features/wiki/archive/archive.css` (generato dal foglio dell'anteprima, limitato a `.wa`, colori dal tema via variabili CSS).
 
 - **[BE] Preferiti**: nuovo modello `WikiPageFavorite` (migrazione `wiki/0014`), azione `POST/DELETE /wiki-pages/{id}/favorite/`, filtro `?favorite=1`, campi `is_favorite`/`favorited_at`; esposto anche `created_by` (per "Le tue bozze"). Test in `wiki/tests/test_favorites.py`.
-- **[SEC] Barriera Portal sulle azioni `view` e `rate`** delle pagine Wiki: dichiarano `permission_classes=[IsAuthenticated]` e quindi saltano `IsInternalOrPortalDedicatedApp`. Non toccate in questo lavoro; la nuova azione `favorite` la include esplicitamente. Da allineare.
+- ~~**[SEC] Barriera Portal sulle azioni `view` e `rate`**~~ allineata il 21/11 (anche `/api/wiki-stats/`). delle pagine Wiki: dichiarano `permission_classes=[IsAuthenticated]` e quindi saltano `IsInternalOrPortalDedicatedApp`. Non toccate in questo lavoro; la nuova azione `favorite` la include esplicitamente. Da allineare.
 - **[DEC] Icone delle cartelle**: ricavate dal nome della categoria (`catIcon` in `archiveModel.ts`); l'emoji del modello non è più mostrata.
 - **[DEC] Passi da spuntare**: gli elenchi numerati di primo livello diventano passi spuntabili; le spunte restano solo sulla pagina aperta (non salvate).
 - **[DEC] Colori delle cartelle**: sono il colore della categoria (dato). Testo bianco o scuro scelto in base al contrasto. Nei grafici ogni cartella ha sempre nome e numero scritti (i colori da soli non bastano per chi non distingue i colori).
@@ -140,7 +140,7 @@ Portata dall'anteprima `mt-base.html`: **A · Elenco** come vista predefinita, *
 - **[BE] Rapportini**: filtri `results=ko,partial` e `has_pdf`, azione `stats`; il serializer espone `customer_id` e `site_id` (servono per aprire la issue).
 - **[FIX] Tipi del piano**: il dialogo proponeva solo i tipi hardware e, salvando, toglieva dal piano gli altri tipi; ora i tipi già presenti restano.
 - **[RM] Rimossi** i vecchi componenti della manutenzione (dialogo rapportino, pannello del piano, `DueBadge`, `YearFilterField`, `maintenanceShared.ts`); in `MaintenanceLegacy.tsx` resta solo «Modifica scadenza».
-- **[SEC] Da allineare**: le azioni `reset`, `restore` e `bulk_restore` dei rapportini dichiarano `permission_classes` senza `IsInternalOrPortalDedicatedApp` (stesso schema già segnalato per Drive upload e Wiki view/rate).
+- ~~**[SEC] Da allineare** (rapportini)~~: già protette dentro `CanRestore/CanPurgeModelPermission`; test aggiunti il 21/11. Testo originale: le azioni `reset`, `restore` e `bulk_restore` dei rapportini dichiarano `permission_classes` senza `IsInternalOrPortalDedicatedApp` (stesso schema già segnalato per Drive upload e Wiki view/rate).
 - **[DEMO] Dati fittizi in dev** marcati `demo-restyle` (siti, inventari, piani, rapportini, scadenze modificate); id in scratchpad `demo_mt_ids.json`.
 - **[TODO] Aree**: divisione per area rimandata (anteprima pronta, disattivata con `AREAS_ON`); serve decidere se l'area sta sul cliente, sul sito o sul piano.
 
@@ -166,7 +166,7 @@ Portata sullo schema delle pagine anagrafiche (Siti, PO): testata, indicatori, v
 Portato dall'anteprima `d-base.html`, variante **A · Esplora file** (albero cartelle e clienti, Recenti, tabella o griglia, trascinamento su tutto il riquadro, pannello del file). Stili in `features/drive/drive.css`, icone dei file in `features/drive/DriveIcons.tsx` (disegnate, stile icone di sistema; colori fissi come un'immagine, tipo sempre scritto).
 
 - **[BE] Campo `access`** su file e cartelle (sola lettura): le restrizioni per gruppo lungo la catena, con i nomi dei gruppi. Serve a "Chi può vederlo" senza leggere `/admin-groups/`. Test in `drive/tests/test_access_field.py`.
-- **[SEC] `DriveFileUploadView`** (`/api/drive-files/upload/`, tenuta per compatibilità) dichiara `IsAuthenticated, CanUploadDriveFile` e quindi salta `IsInternalOrPortalDedicatedApp`. La pagina usa `/api/drive-files/`, che è protetto. Da allineare o eliminare.
+- ~~**[SEC] `DriveFileUploadView`**~~ barriera aggiunta il 21/11. (`/api/drive-files/upload/`, tenuta per compatibilità) dichiara `IsAuthenticated, CanUploadDriveFile` e quindi salta `IsInternalOrPortalDedicatedApp`. La pagina usa `/api/drive-files/`, che è protetto. Da allineare o eliminare.
 - **[DEC] Filtro e ricerca**: elenco piatto su tutto il Drive (`?customer=` / `?search=` senza `root`), non più solo la radice.
 - **[DEC] Link**: `/drive?cartella=<id>` e `/drive?file=<id>` (apre la cartella e il pannello); "Copia link" usa questi.
 - **[UI] Attività** nel pannello: dal registro di audit, solo per chi ha `audit.view_auditevent`; gli aggiornamenti del Drive non registrano i campi cambiati, quindi spesso compare "lo ha modificato".

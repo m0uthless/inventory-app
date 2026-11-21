@@ -270,7 +270,7 @@ class ChangelogUnseenView(APIView):
     - Altrimenti: tutte le voci inserite dopo l'ultima confermata, in ordine
       cronologico di rilascio (le più vecchie per prime), fino a 10.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         latest = ChangelogEntry.objects.order_by('-id').first()
@@ -297,7 +297,7 @@ class ChangelogDismissView(APIView):
     Segna come letto il changelog fino all'ultima voce esistente (calcolata
     lato server, ignorando qualsiasi id passato dal client).
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def post(self, request):
         latest = ChangelogEntry.objects.order_by('-id').first()
@@ -1230,7 +1230,7 @@ class StickyNoteSerializer(serializers.ModelSerializer):
 
 
 class StickyNoteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         note, _ = StickyNote.objects.get_or_create(user=request.user)
@@ -1257,7 +1257,7 @@ class BirthdaysView(APIView):
     oggi non festeggia nessuno — il widget deve mostrare solo eventi del
     giorno, non un conto alla rovescia.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInternalOrPortalDedicatedApp]
 
     def get(self, request):
         today = timezone.localdate()
