@@ -90,6 +90,7 @@ type TransitionState = {
   toStatus: PurchaseOrderStatus
   initialPurchaseOrder: string
   initialInvoiceNumber: string
+  description?: string
 }
 
 const KIND_LABEL: Record<string, string> = { ordinario: 'Ordinario', extra: 'Extra' }
@@ -530,6 +531,7 @@ export default function PurchaseOrders() {
         toStatus: target,
         initialPurchaseOrder: row.purchase_order || '',
         initialInvoiceNumber: row.invoice_number || '',
+        description: row.description || '',
       })
     },
     [],
@@ -694,6 +696,7 @@ export default function PurchaseOrders() {
           if (file) fd.append('document', file)
           if (extra.purchase_order) fd.append('purchase_order', extra.purchase_order)
           if (extra.invoice_number) fd.append('invoice_number', extra.invoice_number)
+          if (extra.date) fd.append('date', extra.date)
           await api.post(`/purchase-order-entries/${id}/advance/`, fd, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
@@ -1150,6 +1153,8 @@ export default function PurchaseOrders() {
           toStatus={transitionState.toStatus}
           initialPurchaseOrder={transitionState.initialPurchaseOrder}
           initialInvoiceNumber={transitionState.initialInvoiceNumber}
+          entryId={transitionState.id}
+          description={transitionState.description}
           busy={transitionBusy}
           onClose={() => setTransitionState(null)}
           onConfirm={doTransition}

@@ -21,6 +21,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Changed
 
+- Purchase Order, dialogo di avanzamento ridisegnato come nell'anteprima: titolo con l'azione («Registra PO ricevuto»), riga del PO, solo i campi del passo (numero PO o fattura facoltativo, data del passo, PDF facoltativo) e l'avviso del blocco dopo l'invio. La data del passo si può indicare (mai nel futuro): `date` facoltativa in `POST /api/purchase-order-entries/<id>/advance/`.
 - Numeri e importi con il separatore delle migliaia anche sotto 10.000 («4.142,86 €», «1.250 km») in tutta l'app: Contratti, Purchase Order, Rimborso spese, ServiceNow, statistiche Wiki (helper condiviso `shared/src/utils/number.ts`).
 - Contratti, card «Importo» del dettaglio rifatta a tessere: il valore totale in evidenza con la barra del maturato (in proporzione al tempo trascorso), e accanto al mese, all'anno e per fattura, con il numero di fatture e la data stimata della prossima. Tolta la nota sul permesso.
 - Mappa nel riquadro «Dove» di clienti e siti: nuova mappa nei colori dell'app (chiara e scura col tema), con il segnaposto nel colore principale e «Ingrandisci» per la mappa grande da muovere e ingrandire. Usa MapLibre con OpenFreeMap, senza chiavi; la libreria si carica solo quando si apre una mappa (prima Leaflet da unpkg a ogni apertura).

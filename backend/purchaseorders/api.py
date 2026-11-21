@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time
+
 from decimal import Decimal
 
 from django.db import transaction
@@ -398,6 +400,19 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
         new_status = PURCHASE_ORDER_STATUS_ORDER[idx + 1]
         before_status = obj.status
 
+        # Data del passo (facoltativa, dal dialogo): mai nel futuro; senza, adesso.
+        step_at = timezone.now()
+        raw_date = (request.data.get("date") or "").strip()
+        if raw_date:
+            try:
+                step_date = date.fromisoformat(raw_date)
+            except ValueError:
+                return Response({"date": ["Data non valida (AAAA-MM-GG)."]}, status=status.HTTP_400_BAD_REQUEST)
+            if step_date > timezone.localdate():
+                return Response({"date": ["La data non può essere nel futuro."]}, status=status.HTTP_400_BAD_REQUEST)
+            if step_date != timezone.localdate():
+                step_at = timezone.make_aware(datetime.combine(step_date, time(12, 0)))
+
         # PO/Fattura: opzionali, inviabili insieme al PDF quando si avanza
         # rispettivamente a "ricevuto"/"fatturato" (deciso in chat).
         po_number = (request.data.get("purchase_order") or "").strip()
@@ -434,7 +449,7 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
                 )
 
             obj.status = new_status
-            setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], timezone.now())
+            setattr(obj, STATUS_TIMESTAMP_FIELD[new_status], step_at)
             obj.updated_by = request.user
             obj.save()
 
