@@ -15,12 +15,13 @@ vi.mock('@shared/ui/toast', () => ({ useToast: () => toast }))
 const detail = {
   id: 7, customer: 2, customer_name: 'AUSL Imola', site: 10, site_name: 'S. Maria', name: 'PACS · nodo 1', knumber: 'K-104233', serial_number: 'CZ2391A0F',
   hostname: 'aimpacs01', local_ip: '10.20.5.10', srsa_ip: '', location: 'Sala server', telefono: '', type: 1, type_key: 'pacs', type_label: 'PACS',
-  status: 1, status_key: 'in_use', status_label: 'In uso', os_user: 'Administrator', os_pwd: 'Pacs!2026', app_usr: '', app_pwd: '', vnc_pwd: '',
+  status: 1, status_key: 'in_use', status_label: 'In uso', os_user: 'Administrator', secrets_set: ['os_pwd'], app_usr: '',
   manufacturer: 'Philips', model: 'IntelliSpace', warranty_end_date: '2027-06-30', notes: 'Nodo primario', tags: [], monitors: [],
 }
 const closed = Array.from({ length: 7 }, (_, i) => ({ id: 900 + i, title: `Vecchio problema ${i}`, status: 'closed', status_label: 'Chiusa' }))
 const get = (url: string, cfg?: { params?: { status?: string[] } }) => {
   if (url === '/issues/') return Promise.resolve({ data: cfg?.params?.status?.includes('closed') ? closed : [{ id: 1041, title: 'Worklist vuota', status: 'in_progress', status_label: 'In lavorazione' }] })
+  if (url === '/inventories/7/secrets/') return Promise.resolve({ data: { os_pwd: 'Pacs!2026', app_pwd: null, vnc_pwd: null } })
   if (url === '/sites/') return Promise.resolve({ data: [{ id: 10, name: 'S. Maria' }, { id: 11, name: 'Castel San Pietro' }] })
   return Promise.resolve({ data: [] })
 }
@@ -91,11 +92,34 @@ describe('InventoryDetailModal', () => {
   })
 
   it('senza permesso Credenziali la password non si vede né si cambia', async () => {
-    show({ canViewSecrets: false, detail: { ...detail, os_pwd: undefined } })
+    show({ canViewSecrets: false, detail: { ...detail, secrets_set: undefined } })
     expect(await screen.findByText('Serve il permesso Credenziali')).toBeInTheDocument()
     await openEdit()
     const sec = screen.getByText('Sistema operativo').parentElement!
     expect(within(sec).getByText('Serve il permesso Credenziali per cambiarla')).toBeInTheDocument()
     expect(screen.queryByLabelText('Password os_pwd')).not.toBeInTheDocument()
+  })
+
+  it('password: non arriva col dettaglio; «Mostra» e «Copia» la chiedono al server', async () => {
+    const onCopy = vi.fn()
+    show({ onCopy })
+    await screen.findByText('Administrator')
+    const secretCalls = () => api.get.mock.calls.filter(([u]) => u === '/inventories/7/secrets/').length
+    expect(secretCalls()).toBe(0)
+    expect(screen.queryByText('Pacs!2026')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mostra la password' }))
+    expect(await screen.findByText('Pacs!2026')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Copia la password' }))
+    await waitFor(() => expect(onCopy).toHaveBeenCalledWith('Pacs!2026'))
+    expect(secretCalls()).toBe(1)
+  })
+
+  it('in modifica la password impostata è «invariata» e non si manda se non la si cambia', async () => {
+    show()
+    await openEdit()
+    expect(screen.getByLabelText('Password os_pwd')).toHaveAttribute('placeholder', 'Invariata · scrivi per cambiarla')
+    fireEvent.change(screen.getByLabelText('Posizione'), { target: { value: 'Sala B' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salva le modifiche' }))
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/inventories/7/', { location: 'Sala B' }))
   })
 })

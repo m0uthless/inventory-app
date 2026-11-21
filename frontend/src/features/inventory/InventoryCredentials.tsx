@@ -8,7 +8,8 @@ import { useToast } from '@shared/ui/toast'
 import { useAuth } from '../../auth/AuthProvider'
 import { CampoIcon } from '../../ui/campo'
 
-type Secrets = { os_user?: string | null; os_pwd?: string | null; app_usr?: string | null; app_pwd?: string | null; vnc_pwd?: string | null }
+type Secrets = { os_user?: string | null; os_pwd?: string | null; app_usr?: string | null; app_pwd?: string | null; vnc_pwd?: string | null; secrets_set?: string[] }
+type SecretKey = 'os_pwd' | 'app_pwd' | 'vnc_pwd'
 type Row = { key: keyof Secrets; group: string; label: string; secret: boolean }
 
 const ROWS: Row[] = [
@@ -35,18 +36,28 @@ export default function InventoryCredentials({ inventoryId }: { inventoryId: num
   const [data, setData] = React.useState<Secrets | null>(null)
   const [failed, setFailed] = React.useState(false)
   const [shown, setShown] = React.useState<Partial<Record<keyof Secrets, boolean>>>({})
+  // Valori delle password: chiesti a `/secrets/` su «Mostra» o «Copia» (lettura registrata nell'Audit),
+  // tenuti solo finché sono visibili.
+  const [revealed, setRevealed] = React.useState<Partial<Record<SecretKey, string | null>> | null>(null)
+  const fetchSecrets = async (): Promise<Partial<Record<SecretKey, string | null>> | null> => {
+    if (revealed) return revealed
+    try {
+      const r = await api.get<Partial<Record<SecretKey, string | null>>>(`/inventories/${inventoryId}/secrets/`)
+      return r.data
+    } catch { toast.error('Password non disponibile.'); return null }
+  }
 
   React.useEffect(() => {
     if (!allowed) return
     let alive = true
-    setData(null); setShown({}); setFailed(false)
+    setData(null); setShown({}); setRevealed(null); setFailed(false)
     api.get<Secrets>(`/inventories/${inventoryId}/`).then((r) => { if (alive) setData(r.data) }).catch(() => { if (alive) { setFailed(true); setData({}) } })
     return () => { alive = false }
   }, [inventoryId, allowed])
 
   React.useEffect(() => {
     if (!Object.values(shown).some(Boolean)) return
-    const t = window.setTimeout(() => setShown({}), SHOW_MS)
+    const t = window.setTimeout(() => { setShown({}); setRevealed(null) }, SHOW_MS)
     return () => window.clearTimeout(t)
   }, [shown])
 
@@ -64,10 +75,23 @@ export default function InventoryCredentials({ inventoryId }: { inventoryId: num
   if (!allowed) return locked('Serve il permesso Credenziali')
   if (data === null) return null
   if (failed) return head('Credenziali non disponibili')
-  const rows = ROWS.filter((r) => data[r.key])
+  const isSet = (r: Row) => (r.secret ? (data.secrets_set ?? []).includes(r.key) : Boolean(data[r.key]))
+  const rows = ROWS.filter(isSet)
   if (!rows.length) return head('Nessuna credenziale registrata')
 
   const copy = (value: string, what: string) => { void copyToClipboard(value).then(() => toast.success(`${what} copiata`)) }
+  const toggle = async (k: SecretKey) => {
+    if (shown[k]) { setShown((st) => ({ ...st, [k]: false })); return }
+    const sec = await fetchSecrets()
+    if (!sec) return
+    setRevealed(sec)
+    setShown((st) => ({ ...st, [k]: true }))
+  }
+  const copySecret = async (k: SecretKey) => {
+    const sec = await fetchSecrets()
+    const v = sec?.[k]
+    if (v) copy(v, 'Password')
+  }
   return (
     <Box>
       {head('Le password si nascondono da sole dopo 30 secondi')}
@@ -77,7 +101,7 @@ export default function InventoryCredentials({ inventoryId }: { inventoryId: num
             <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>{group}</Typography>
             <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden' }}>
               {rows.filter((r) => r.group === group).map((r) => {
-                const value = String(data[r.key] ?? '')
+                const value = r.secret ? String(revealed?.[r.key as SecretKey] ?? '') : String(data[r.key] ?? '')
                 const isShown = Boolean(shown[r.key])
                 return (
                   <Box key={r.key} sx={{ position: 'relative', display: 'grid', gridTemplateColumns: '64px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 36, pl: 1.25, pr: 0.5,
@@ -89,11 +113,11 @@ export default function InventoryCredentials({ inventoryId }: { inventoryId: num
                     <Box sx={{ display: 'inline-flex' }}>
                       {r.secret ? (
                         <Tooltip title={isShown ? 'Nascondi' : 'Mostra · si nasconde dopo 30 secondi'}>
-                          <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => setShown((st) => ({ ...st, [r.key]: !st[r.key] }))}
+                          <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => void toggle(r.key as SecretKey)}
                             sx={{ width: 28, height: 28, color: isShown ? 'warning.main' : undefined }}><CampoIcon name={isShown ? 'eyeOff' : 'eye'} size={14} /></IconButton>
                         </Tooltip>
                       ) : null}
-                      <Tooltip title="Copia"><IconButton size="small" aria-label={r.secret ? 'Copia la password' : "Copia l'utente"} onClick={() => copy(value, r.secret ? 'Password' : 'Utenza')} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
+                      <Tooltip title="Copia"><IconButton size="small" aria-label={r.secret ? 'Copia la password' : "Copia l'utente"} onClick={() => void (r.secret ? copySecret(r.key as SecretKey) : copy(value, 'Utenza'))} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
                     </Box>
                     {isShown ? <Box aria-hidden sx={{ position: 'absolute', left: 0, bottom: 0, height: 2, bgcolor: 'warning.main', animation: `${countdown} 30s linear forwards`, '@media (prefers-reduced-motion: reduce)': { animation: 'none', width: '100%' } }} /> : null}
                   </Box>

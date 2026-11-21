@@ -46,6 +46,8 @@ export type InventoryModalDetail = {
   status_label?: string | null
   os_user?: string | null
   os_pwd?: string | null
+  /** Password impostate (i valori si chiedono a `/secrets/`, lettura registrata nell'Audit). */
+  secrets_set?: string[]
   app_usr?: string | null
   app_pwd?: string | null
   vnc_pwd?: string | null
@@ -158,7 +160,7 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
       p.onSaved()
     } catch (e) { toast.error(apiErrorToFormFeedback(e).message) } finally { setBusy(false) }
   }
-  const stopEditing = () => { reset(); setEditing(false); setShown({}) }
+  const stopEditing = () => { reset(); setEditing(false); setShown({}); setRevealed(null) }
 
   const blocked = () => { if (editing && changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
   const go = (path: string) => { if (!blocked()) navigate(path) }
@@ -168,9 +170,22 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
 
   const [menu, setMenu] = React.useState<HTMLElement | null>(null)
   const [shown, setShown] = React.useState<Record<string, boolean>>({})
+  // Valori delle password chiesti su «Mostra» o «Copia», tenuti solo finché sono visibili.
+  const [revealed, setRevealed] = React.useState<Partial<Record<keyof Draft, string | null>> | null>(null)
+  const secretsSet = d.secrets_set ?? []
+  const fetchSecrets = async () => {
+    if (revealed) return revealed
+    try { return (await api.get<Partial<Record<keyof Draft, string | null>>>(`/inventories/${d.id}/secrets/`)).data } catch (e) { toast.error(apiErrorToFormFeedback(e).message); return null }
+  }
+  const toggleSecret = async (k: keyof Draft) => {
+    if (shown[k]) { setShown((st) => ({ ...st, [k]: false })); return }
+    if (!editing) { const sec = await fetchSecrets(); if (!sec) return; setRevealed(sec) }
+    setShown((st) => ({ ...st, [k]: true }))
+  }
+  const copySecret = async (k: keyof Draft) => { const v = (await fetchSecrets())?.[k]; if (v) p.onCopy(v) }
   const [allClosed, setAllClosed] = React.useState(false)
   // Con ‹ › la finestra resta aperta: lo stato locale riparte col nuovo inventario.
-  React.useEffect(() => { setMenu(null); setEditing(false); setShown({}); setAllClosed(false) }, [d.id])
+  React.useEffect(() => { setMenu(null); setEditing(false); setShown({}); setRevealed(null); setAllClosed(false) }, [d.id])
 
   const status = p.statuses.find((s) => String(s.id) === v.status)
   const statusKey = status?.key ?? d.status_key
@@ -204,7 +219,9 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
   // ── Accesso: rete e credenziali ─────────────────────────────────
   const net = ([['hostname', 'Hostname'], ['local_ip', 'IP locale'], ['srsa_ip', 'IP SRSA']] as const).filter(([f]) => has(f) && (editing || v[f]))
   const credRow = (label: string, k: keyof Draft, secret?: boolean) => {
-    const value = v[k]
+    const isSetSecret = secret && secretsSet.includes(k)
+    const value = secret && !editing ? String(revealed?.[k] ?? '') : v[k]
+    const present = secret && !editing ? isSetSecret : Boolean(value)
     const isShown = Boolean(shown[k])
     return (
       <Box key={k} sx={{ position: 'relative', display: 'grid', gridTemplateColumns: '84px minmax(0,1fr) auto', alignItems: 'center', gap: 1, minHeight: 40, pl: 1.5, pr: 0.5, '& + &': { borderTop: '1px solid', borderColor: 'divider' }, ...(isShown && !editing ? { bgcolor: 'warning.light' } : {}) }}>
@@ -212,21 +229,24 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
         {secret && locked ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{editing ? 'Serve il permesso Credenziali per cambiarla' : 'Serve il permesso Credenziali'}</Typography>
           : editing ? (
             <InputBase value={draft[k]} type={secret && !isShown ? 'password' : 'text'} onChange={(e) => set(k)(e.target.value)} autoComplete="new-password" inputProps={{ 'aria-label': `${label} ${k}` }}
+              placeholder={isSetSecret ? 'Invariata · scrivi per cambiarla' : undefined}
               sx={(t) => ({ height: 30, px: 1, fontSize: 12.5, borderRadius: '6px', border: '1px solid', bgcolor: 'background.paper', borderColor: isDirty(k) ? 'warning.main' : 'divider', '& input': mono, '&.Mui-focused': { borderColor: 'primary.main', boxShadow: t.palette.archie.focusRing } })} />
           ) : (
-            <Box sx={{ ...mono, fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: value ? 'text.primary' : 'text.disabled' }}>
-              {!value ? '—' : secret && !isShown ? <Box component="span" sx={{ letterSpacing: '.12em', color: 'text.secondary' }}>••••••••</Box> : value}
+            <Box sx={{ ...mono, fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: present ? 'text.primary' : 'text.disabled' }}>
+              {!present ? '—' : secret && !isShown ? <Box component="span" sx={{ letterSpacing: '.12em', color: 'text.secondary' }}>••••••••</Box> : value}
             </Box>
           )}
         <Box sx={{ display: 'inline-flex' }}>
-          {secret && !locked && (editing || value) ? (
+          {secret && !locked && (editing || present) ? (
             <Tooltip title={isShown ? 'Nascondi' : editing ? 'Mostra' : 'Mostra · si nasconde dopo 30 secondi'}>
-              <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => setShown((s) => ({ ...s, [k]: !s[k] }))} sx={{ width: 28, height: 28, color: isShown ? 'warning.main' : undefined }}>
+              <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => void toggleSecret(k)} sx={{ width: 28, height: 28, color: isShown ? 'warning.main' : undefined }}>
                 <CampoIcon name={isShown ? 'eyeOff' : 'eye'} size={14} />
               </IconButton>
             </Tooltip>
           ) : null}
-          {!editing && value && !(secret && locked) ? copyBtn(value, `Copia ${secret ? 'la password' : "l'utente"}`) : null}
+          {!editing && present && !(secret && locked) ? (secret
+            ? <Tooltip title="Copia"><IconButton size="small" aria-label="Copia la password" onClick={() => void copySecret(k)} sx={{ width: 28, height: 28 }}><CampoIcon name="copy" size={14} /></IconButton></Tooltip>
+            : copyBtn(value, "Copia l'utente")) : null}
         </Box>
         {isShown && !editing ? <Box aria-hidden sx={{ position: 'absolute', left: 0, bottom: 0, height: 2, bgcolor: 'warning.main', animation: `${countdown} 30s linear forwards`, '@media (prefers-reduced-motion: reduce)': { animation: 'none', width: '100%' } }} /> : null}
       </Box>
@@ -235,13 +255,13 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
   // La password mostrata si nasconde da sola dopo 30 secondi (non in modifica).
   React.useEffect(() => {
     if (editing || !Object.values(shown).some(Boolean)) return
-    const t = window.setTimeout(() => setShown({}), 30000)
+    const t = window.setTimeout(() => { setShown({}); setRevealed(null) }, 30000)
     return () => window.clearTimeout(t)
   }, [shown, editing])
 
   type Group = { key: string; title: string; logo: string; rows: React.ReactNode[] }
   const groups: Group[] = []
-  const anyOf = (...ks: (keyof Draft)[]) => editing || ks.some((k) => v[k])
+  const anyOf = (...ks: (keyof Draft)[]) => editing || ks.some((k) => (SECRET.includes(k) ? secretsSet.includes(k) : v[k]))
   if ((has('os_user') || has('os_pwd')) && anyOf('os_user', 'os_pwd')) groups.push({ key: 'os', title: 'Sistema operativo', logo: 'os', rows: [has('os_user') ? credRow('Utente', 'os_user') : null, has('os_pwd') ? credRow('Password', 'os_pwd', true) : null] })
   if ((has('app_usr') || has('app_pwd')) && anyOf('app_usr', 'app_pwd')) groups.push({ key: 'app', title: 'Applicazione', logo: 'app', rows: [has('app_usr') ? credRow('Utente', 'app_usr') : null, has('app_pwd') ? credRow('Password', 'app_pwd', true) : null] })
   if (has('vnc_pwd') && anyOf('vnc_pwd')) groups.push({ key: 'vnc', title: 'Accesso remoto VNC', logo: 'vnc', rows: [credRow('Password', 'vnc_pwd', true)] })

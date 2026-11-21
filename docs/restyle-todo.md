@@ -66,7 +66,7 @@ Portata direttamente nell'app con lo schema di Clienti e Siti.
 Portata direttamente nell'app con lo schema di Clienti, Siti e Contatti.
 
 - **[UI] Drawer inventario vecchio** (`InventoryDrawer`): rimosso con il porting di Site Repository.
-- **[BE] Lettura delle credenziali non registrata nell'audit**: come per la VPN dei clienti, il dettaglio restituisce le password decifrate a chi ha `inventory.view_secrets` senza registrare la lettura.
+- ~~**[BE] Lettura delle credenziali non registrata nell'audit**~~ fatto il 21/11 (`/inventories/<id>/secrets/` + `view_secret`).: come per la VPN dei clienti, il dettaglio restituisce le password decifrate a chi ha `inventory.view_secrets` senza registrare la lettura.
 - **[UI] Targa K-Number**: ripristinata nel pannello (scheda Dettagli), anche nella pagina Inventari.
 - **[DEC] Cliente di un inventario**: nel pannello è in sola lettura; si cambia da "Modifica".
 

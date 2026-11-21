@@ -96,9 +96,9 @@ class TestInventorySecretsContracts:
         # Value in DB remains the old encrypted secret; retrieve with a privileged user to verify.
         admin = _user_with_inventory_perms("view_inventory", "view_secrets")
         api_client.force_authenticate(user=admin)
-        detail = api_client.get(f"/api/inventories/{inventory_record.id}/")
-        assert detail.status_code == 200
-        assert detail.json()["os_pwd"] == "super-secret-os"
+        secrets = api_client.get(f"/api/inventories/{inventory_record.id}/secrets/")
+        assert secrets.status_code == 200
+        assert secrets.json()["os_pwd"] == "super-secret-os"
 
     def test_update_with_view_secrets_masks_password_in_audit(self, api_client, inventory_record):
         user = _user_with_inventory_perms("view_inventory", "change_inventory", "view_secrets")
@@ -114,3 +114,39 @@ class TestInventorySecretsContracts:
         event = AuditEvent.objects.filter(action="update", object_id=str(inventory_record.id)).latest("created_at")
         assert event.changes["os_pwd"]["from"] == "••••"
         assert event.changes["os_pwd"]["to"] == "••••"
+
+
+@pytest.mark.django_db
+class TestInventorySecretsOnDemand:
+    """Le password non viaggiano col dettaglio: si chiedono a `/secrets/` e ogni lettura va nell'Audit."""
+
+    def test_detail_says_only_which_passwords_are_set(self, api_client, inventory_record):
+        inventory_record.app_pwd = ""
+        inventory_record.save()
+        api_client.force_authenticate(user=_user_with_inventory_perms("view_inventory", "view_secrets"))
+        data = api_client.get(f"/api/inventories/{inventory_record.id}/").json()
+        assert "os_pwd" not in data and "vnc_pwd" not in data
+        assert data["secrets_set"] == ["os_pwd", "vnc_pwd"]
+        assert not AuditEvent.objects.filter(action="view_secret").exists()
+
+    def test_secrets_returns_values_and_is_audited(self, api_client, inventory_record):
+        user = _user_with_inventory_perms("view_inventory", "view_secrets")
+        api_client.force_authenticate(user=user)
+        res = api_client.get(f"/api/inventories/{inventory_record.id}/secrets/")
+        assert res.status_code == 200
+        assert res.json() == {"os_pwd": "super-secret-os", "app_pwd": "super-secret-app", "vnc_pwd": "super-secret-vnc"}
+        ev = AuditEvent.objects.get(action="view_secret", object_id=str(inventory_record.id))
+        assert ev.actor_id == user.id
+        assert "super-secret" not in str(ev.changes) + str(ev.metadata)
+        assert ev.metadata.get("fields") == ["os_pwd", "app_pwd", "vnc_pwd"]
+
+    def test_secrets_requires_view_secrets(self, api_client, inventory_record):
+        api_client.force_authenticate(user=_user_with_inventory_perms("view_inventory"))
+        assert api_client.get(f"/api/inventories/{inventory_record.id}/secrets/").status_code == 403
+        assert "secrets_set" not in api_client.get(f"/api/inventories/{inventory_record.id}/").json()
+        assert not AuditEvent.objects.filter(action="view_secret").exists()
+
+    def test_saving_other_fields_keeps_passwords(self, api_client, inventory_record):
+        api_client.force_authenticate(user=_user_with_inventory_perms("view_inventory", "change_inventory", "view_secrets"))
+        assert api_client.patch(f"/api/inventories/{inventory_record.id}/", {"name": "Rinominato"}, format="json").status_code == 200
+        assert api_client.get(f"/api/inventories/{inventory_record.id}/secrets/").json()["os_pwd"] == "super-secret-os"
