@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Drive: spostamento di più file e cartelle selezionati insieme («Sposta» nella barra della selezione); ogni elemento rispetta i permessi del Drive e quelli non spostabili vengono segnalati.
 - Site Repository: raggruppamento per città oltre che per provincia (interruttore «Province / Città»), e apertura diretta su un cliente con `?cliente=<id>`; dalla finestra del cliente, «Apri nel Site Repository» nel menu ⋯.
 - Task di area, motivo dell'attesa come nelle Issue (Philips, Elco, Cliente, Exprivia, Altro): obbligatorio quando si mette il task «In attesa» (dal menu «In attesa di …», dallo stato o dal modulo), mostrato nella testata; uscendo dall'attesa si svuota. I task già in attesa senza motivo restano modificabili. Migrazione `core.0051`.
 - Purchase Order: totali in fondo all'elenco (numero, totale, costi sostenuti) con gli stessi filtri della lista (`GET /api/purchase-order-entries/totals/`). Gli indicatori (per stato, «Da fatturare», mesi, invio più vecchio) arrivano dal `summary` del server invece che dalla lettura di tutte le righe dell'anno.

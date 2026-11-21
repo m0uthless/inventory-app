@@ -226,6 +226,19 @@ export default function Drive() {
     } catch (e) { toast.error(apiErrorToMessage(e)) } finally { setMoveBusy(false) }
   }
 
+  // Spostamento della selezione: un'azione «move» per elemento (ognuna controlla i permessi del Drive).
+  const [bulkMove, setBulkMove] = React.useState(false)
+  const doBulkMove = async () => {
+    setMoveBusy(true)
+    const results = await Promise.allSettled([
+      ...selectedFolderIds.map((id) => api.post(`/drive-folders/${id}/move/`, { parent: moveTarget })),
+      ...selectedFileIds.map((id) => api.post(`/drive-files/${id}/move/`, { folder: moveTarget })),
+    ])
+    const failed = results.filter((r) => r.status === 'rejected').length
+    if (failed) toast.error(`${failed} ${failed === 1 ? 'elemento non spostato' : 'elementi non spostati'} (permessi o cartella non valida).`)
+    else toast.success(`${results.length} elementi spostati`)
+    setMoveBusy(false); setBulkMove(false); setSelected(new Set()); refresh()
+  }
   const selectedFolderIds = [...selected].filter((k) => k.startsWith('folder-')).map((k) => Number(k.slice(7)))
   const selectedFileIds = [...selected].filter((k) => k.startsWith('file-')).map((k) => Number(k.slice(5)))
   const toggle = (key: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n })
@@ -391,8 +404,9 @@ export default function Drive() {
           {selected.size ? (
             <div className="d-bulk" role="toolbar" aria-label="Elementi selezionati">
               <b>{selected.size} selezionat{selected.size === 1 ? 'o' : 'i'}</b>
-              {canChange && selected.size === 1 ? (
+              {canChange ? (
                 <Button size="small" variant="outlined" color="inherit" startIcon={<CampoIcon name="folder" size={14} />} onClick={() => {
+                  if (selected.size > 1) { setMoveTarget(null); setBulkMove(true); return }
                   const fo = folders.find((x) => x.id === selectedFolderIds[0]); const fi = files.find((x) => x.id === selectedFileIds[0])
                   if (fo) openMove({ kind: 'folder', data: fo }); else if (fi) openMove({ kind: 'file', data: fi })
                 }}>Sposta</Button>
@@ -500,6 +514,7 @@ export default function Drive() {
       <CreateFolderDialog open={createFolderOpen} name={createFolderName} busy={createFolderBusy} onNameChange={setCreateFolderName} onClose={() => setCreateFolderOpen(false)} onCreate={doCreateFolder} />
       <RenameDialog item={renameItem} name={renameName} busy={renameBusy} onNameChange={setRenameName} onClose={() => setRenameItem(null)} onRename={doRename} />
       <MoveDialog item={moveItem} folders={tree.filter((f) => !(moveItem?.kind === 'folder' && f.id === moveItem.data.id))} target={moveTarget} busy={moveBusy} onSelectTarget={setMoveTarget} onClose={() => setMoveItem(null)} onMove={doMove} />
+      <MoveDialog item={null} count={bulkMove ? selected.size : 0} folders={tree.filter((f) => !selectedFolderIds.includes(f.id))} target={moveTarget} busy={moveBusy} onSelectTarget={setMoveTarget} onClose={() => setBulkMove(false)} onMove={() => void doBulkMove()} />
       <ConfirmDeleteDialog open={!!deleteItem} busy={deleteBusy} title="Spostare nel cestino?" description={`«${deleteItem?.data.name}» verrà spostato nel cestino e potrà essere ripristinato.`} onClose={() => setDeleteItem(null)} onConfirm={doDelete} />
     </div>
   )

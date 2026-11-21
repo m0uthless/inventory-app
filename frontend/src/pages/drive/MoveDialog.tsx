@@ -8,6 +8,7 @@ import type { DrawerItem, DriveFolder } from './types'
 
 export function MoveDialog({
   item,
+  count,
   folders,
   target,
   busy,
@@ -16,6 +17,8 @@ export function MoveDialog({
   onMove,
 }: {
   item: DrawerItem | null
+  /** Spostamento di più elementi selezionati: la finestra si apre anche senza `item`. */
+  count?: number
   folders: DriveFolder[]
   target: number | null
   busy: boolean
@@ -24,8 +27,8 @@ export function MoveDialog({
   onMove: () => void
 }) {
   return (
-    <Dialog open={!!item} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Sposta in…</DialogTitle>
+    <Dialog open={!!item || Boolean(count)} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{count && count > 1 ? `Sposta ${count} elementi in…` : 'Sposta in…'}</DialogTitle>
       <DialogContent>
         <Stack spacing={0.5} sx={{ mt: 1, maxHeight: 300, overflowY: 'auto' }}>
           <Box

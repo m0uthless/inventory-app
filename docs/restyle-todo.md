@@ -170,7 +170,7 @@ Portato dall'anteprima `d-base.html`, variante **A · Esplora file** (albero car
 - **[DEC] Filtro e ricerca**: elenco piatto su tutto il Drive (`?customer=` / `?search=` senza `root`), non più solo la radice.
 - **[DEC] Link**: `/drive?cartella=<id>` e `/drive?file=<id>` (apre la cartella e il pannello); "Copia link" usa questi.
 - **[UI] Attività** nel pannello: dal registro di audit, solo per chi ha `audit.view_auditevent`; gli aggiornamenti del Drive non registrano i campi cambiati, quindi spesso compare "lo ha modificato".
-- **[UI] Spostamento multiplo**: come prima solo un elemento alla volta.
+- ~~**[UI] Spostamento multiplo**~~ fatto il 21/11.
 - **[UI] Rimossi** i componenti vecchi (`PreviewDrawer`, `FolderCard`, `FileCard`, righe, menu, `UploadZone`).
 - **[TEST] Baseline**: frontend lint 11, vitest 152/152 (test Drive riscritti sulla nuova interfaccia); backend pytest 848.
 
