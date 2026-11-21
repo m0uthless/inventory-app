@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Andamento e Task · ARCHIE</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/Geist-300_800-normal.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-400_600-normal.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+:root {
+  color-scheme: light;
+  --primary: #1f6b5c; --bg: #eef2f1; --surface: #fff; --surface-2: #f5f8f7; --border: #d5dedb; --text: #15201e; --muted: #5b6b67; --faint: #7a8a86;
+  --verde-bg: #e2f0eb; --verde-ink: #17463c; --verde-mid: #2f7f6d; --dark: #1c4f45; --dark-ink: #eaf5f1;
+  --salvia-bg: #ecf3ef; --salvia-ink: #1f5a4d; --salvia-mid: #6aa898;
+  --acciaio-bg: #e7eef4; --acciaio-ink: #2b4258; --acciaio-mid: #6f8fa8;
+  --danger: #b42318; --warn: #9a5b00; --warn-bg: #fbefd9; --focus: 0 0 0 3px rgb(31 107 92 / .28);
+  --shadow: 0 12px 32px -12px rgb(16 40 34 / .22), 0 2px 6px rgb(16 40 34 / .06);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #5fb8a3; --bg: #101716; --surface: #151e1c; --surface-2: #1a2523; --border: #2a3734; --text: #e4ecea; --muted: #93a4a0; --faint: #7d8e8a;
+  --verde-bg: #183a33; --verde-ink: #a6e3d3; --verde-mid: #5fb8a3; --dark: #173b34; --dark-ink: #e4f2ee;
+  --salvia-bg: #1a2d28; --salvia-ink: #b5d4cb; --salvia-mid: #6aa898;
+  --acciaio-bg: #1c2834; --acciaio-ink: #c4d4e4; --acciaio-mid: #7e9cbb;
+  --danger: #f07a6c; --warn: #e0a43a; --warn-bg: #3a2c12; --focus: 0 0 0 3px rgb(95 184 163 / .35); --shadow: 0 16px 40px -12px rgb(0 0 0 / .6);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 Geist, system-ui, sans-serif; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 24px 16px 120px; display: grid; gap: 22px; }
+.note { margin: 0; font-size: 12.5px; color: var(--muted); }
+h2.sec { margin: 6px 0 0; font-size: 13px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.w { border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.w.paper { background: var(--surface); border: 1px solid var(--border); }
+.w.salvia { background: var(--salvia-bg); color: var(--salvia-ink); }
+.w.acciaio { background: var(--acciaio-bg); color: var(--acciaio-ink); }
+.w.dark { background: var(--dark); color: var(--dark-ink); }
+.span2 { grid-column: span 2; } .span4 { grid-column: span 4; }
+.wh { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; }
+.wh .end { margin-left: auto; font-size: 12.5px; font-weight: 600; opacity: .85; }
+.ic { width: 18px; height: 18px; display: inline-grid; place-items: center; }
+.big { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.sub { font-size: 12.5px; opacity: .9; }
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: rgb(0 0 0 / .06); gap: 2px; }
+.w.dark .seg { background: rgb(255 255 255 / .12); }
+.seg button { border: 0; background: none; font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 6px; color: inherit; opacity: .75; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); opacity: 1; font-weight: 600; }
+.legend { display: flex; gap: 14px; font-size: 12px; opacity: .95; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kp { display: flex; gap: 18px; flex-wrap: wrap; }
+.kp div b { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kp div span { font-size: 12px; opacity: .8; }
+.up { color: var(--danger); } .down { color: var(--verde-mid); }
+/* Task */
+.tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tl li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 10px; border-radius: 9px; background: rgb(255 255 255 / .6); }
+:root[data-theme="dark"] .tl li { background: rgb(255 255 255 / .05); }
+.tl b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.tl small { font-size: 11.5px; opacity: .9; }
+.chk { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid currentColor; opacity: .6; }
+.due { font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: rgb(0 0 0 / .06); white-space: nowrap; }
+.due.late { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.due.today { color: var(--warn); background: var(--warn-bg); }
+.add { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; border: 1px dashed color-mix(in srgb, currentColor 35%, transparent); font-size: 12.5px; opacity: .85; }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.bar i { display: block; height: 100%; }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.col h4 { margin: 0 0 6px; font-size: 12px; font-weight: 650; display: flex; justify-content: space-between; }
+.col .tl li { grid-template-columns: minmax(0, 1fr); padding: 7px 9px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: rgb(255 255 255 / .7); font-size: 12px; font-weight: 600; }
+:root[data-theme="dark"] .pill { background: rgb(255 255 255 / .08); }
+.pv { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); z-index: 10; font-size: 12.5px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px); }
+.pv a, .pv button { height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.pv button[aria-pressed="true"] { background: var(--verde-bg); color: var(--text); font-weight: 600; }
+.pv .lbl { color: var(--faint); padding: 0 4px; }
+.pv .sep { width: 1px; height: 18px; background: var(--border); }
+@media (max-width: 900px) { .row { grid-template-columns: minmax(0, 1fr); } .span2, .span4 { grid-column: auto; } .cols { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note">Anteprima di due widget della Dashboard nei colori Aurora (verde, salvia, acciaio). Dati di prova. Usa la barra in basso per le varianti.</p>
+  <h2 class="sec">Andamento issue</h2>
+  <div class="row" data-trend></div>
+  <h2 class="sec">Task di area</h2>
+  <div class="row" data-task></div>
+</div>
+<div class="pv" role="toolbar" aria-label="Controlli anteprima">
+  <a href="index.html">‹ Indice</a><span class="sep"></span>
+  <span class="lbl">Andamento</span><button data-t="a">A · Barre</button><button data-t="b">B · Arretrato</button><button data-t="c">C · Compatto</button>
+  <span class="sep"></span>
+  <span class="lbl">Task</span><button data-k="a">A · Elenco</button><button data-k="b">B · Per scadenza</button>
+  <span class="sep"></span><button data-theme>Tema</button>
+</div>
+<script>
+(() => {
+  const st = { t: 'a', k: 'a', p: 'week' }
+  try { Object.assign(st, JSON.parse(localStorage.getItem('archie-preview-dbw') || '{}')) } catch (e) { /* niente */ }
+  const PER = {
+    day: { label: 'Giorni', n: 14, opened: [3,5,2,4,6,1,0,4,3,5,7,2,3,4], closed: [2,4,3,3,5,1,0,3,4,4,5,3,2,5], fmt: (i) => ['lu','ma','me','gi','ve','sa','do'][i % 7] },
+    week: { label: 'Settimane', n: 12, opened: [14,18,12,20,16,22,19,15,24,17,21,18], closed: [12,15,14,17,18,19,16,17,20,19,18,22], fmt: (i) => `S${36 + i}` },
+    month: { label: 'Mesi', n: 12, opened: [62,58,71,66,80,74,69,77,83,79,88,72], closed: [55,61,64,70,72,76,70,74,80,82,85,79], fmt: (i) => ['dic','gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov'][i] },
+  }
+  const seg = () => `<span class="seg" role="group" aria-label="Periodo">${Object.entries(PER).map(([k, v]) => `<button data-p="${k}" aria-pressed="${st.p === k}">${v.label}</button>`).join('')}</span>`
+  const head = (title, end) => `<div class="wh"><span class="ic">📈</span>${title}${end ? `<span class="end">${end}</span>` : ''}</div>`
+
+  const bars = (p, h = 150) => {
+    const max = Math.max(...p.opened, ...p.closed); const w = 100 / p.n; const bw = w * 0.34
+    return `<svg viewBox="0 0 100 ${h / 3}" preserveAspectRatio="none" role="img" aria-label="Aperte e risolte per periodo" style="height:${h}px">
+      ${p.opened.map((v, i) => `<rect x="${i * w + w * 0.14}" y="${(h / 3) * (1 - v / max)}" width="${bw}" height="${(h / 3) * v / max}" rx=".6" fill="var(--acciaio-mid)"><title>${p.fmt(i)}: ${v} aperte</title></rect>
+      <rect x="${i * w + w * 0.14 + bw + 0.4}" y="${(h / 3) * (1 - p.closed[i] / max)}" width="${bw}" height="${(h / 3) * p.closed[i] / max}" rx=".6" fill="var(--verde-mid)"><title>${p.fmt(i)}: ${p.closed[i]} risolte</title></rect>`).join('')}
+    </svg><div style="display:flex;justify-content:space-between;font-size:11px;opacity:.85">${p.opened.map((_, i) => `<span>${i % 2 === 0 || p.n < 13 ? p.fmt(i) : ''}</span>`).join('')}</div>`
+  }
+  const totals = (p) => { const o = p.opened.reduce((a, b) => a + b, 0), c = p.closed.reduce((a, b) => a + b, 0); return { o, c, d: o - c } }
+
+  const trendA = () => { const p = PER[st.p], t = totals(p)
+    return `<div class="w acciaio span2">${head('Andamento issue', seg())}
+      <div class="kp"><div><b>${t.o}</b><span>aperte</span></div><div><b>${t.c}</b><span>risolte</span></div><div><b class="${t.d > 0 ? 'up' : 'down'}">${t.d > 0 ? '+' : ''}${t.d}</b><span>${t.d > 0 ? 'più aperte che risolte' : 'più risolte che aperte'}</span></div></div>
+      ${bars(p)}<div class="legend"><span><i style="background:var(--acciaio-mid)"></i>Aperte</span><span><i style="background:var(--verde-mid)"></i>Risolte</span></div></div>` }
+
+  const trendB = () => { const p = PER[st.p]; let back = 24; const series = p.opened.map((o, i) => (back += o - p.closed[i]))
+    const max = Math.max(...series) * 1.15, min = Math.min(...series) * 0.85, H = 50
+    const pts = series.map((v, i) => `${(i / (p.n - 1)) * 100},${H - ((v - min) / (max - min)) * H}`).join(' ')
+    return `<div class="w dark span2">${head('Issue ancora aperte', seg())}
+      <div style="display:flex;align-items:baseline;gap:10px"><span class="big">${series.at(-1)}</span><span class="sub">aperte ora · ${series.at(-1) - series[0] >= 0 ? '+' : ''}${series.at(-1) - series[0]} da inizio periodo</span></div>
+      <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" style="height:130px" role="img" aria-label="Arretrato nel tempo"><polygon points="0,${H} ${pts} 100,${H}" fill="rgb(255 255 255 / .12)"/><polyline points="${pts}" fill="none" stroke="var(--dark-ink)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+      <div style="display:flex;justify-content:space-between;font-size:11px;opacity:.85"><span>${p.fmt(0)}</span><span>${p.fmt(p.n - 1)}</span></div>
+      <div class="legend"><span>Aperte ${totals(p).o}</span><span>Risolte ${totals(p).c}</span></div></div>` }
+
+  const trendC = () => { const p = PER.week, t = totals(p)
+    const max = Math.max(...p.opened, ...p.closed)
+    const line = (arr) => arr.map((v, i) => `${(i / (p.n - 1)) * 100},${30 - (v / max) * 28}`).join(' ')
+    return `<div class="w acciaio">${head('Andamento issue', '12 settimane')}
+      <div style="display:flex;gap:16px;align-items:baseline"><span class="big">${t.c}</span><span class="sub">risolte<br>su ${t.o} aperte</span></div>
+      <svg viewBox="0 0 100 30" preserveAspectRatio="none" style="height:70px" role="img" aria-label="Aperte e risolte"><polyline points="${line(p.opened)}" fill="none" stroke="var(--acciaio-mid)" stroke-width="1.4" vector-effect="non-scaling-stroke"/><polyline points="${line(p.closed)}" fill="none" stroke="var(--verde-mid)" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>
+      <div class="legend"><span><i style="background:var(--acciaio-mid)"></i>Aperte</span><span><i style="background:var(--verde-mid)"></i>Risolte</span></div></div>` }
+
+  const TASKS = [
+    { t: 'Rinnovo certificati SSL portale', who: 'Luca B.', due: 'scaduto 2 gg', cls: 'late', s: 'in_corso' },
+    { t: 'Aggiornare procedura backup PACS', who: 'Sara M.', due: 'oggi', cls: 'today', s: 'da_fare' },
+    { t: 'Verifica licenze workstation', who: '—', due: 'domani', cls: '', s: 'da_fare' },
+    { t: 'Inventario switch sala CED', who: 'Marco R.', due: '28 nov', cls: '', s: 'in_attesa' },
+    { t: 'Formazione nuovi referenti', who: 'Sara M.', due: '2 dic', cls: '', s: 'da_fare' },
+  ]
+  const taskA = () => `<div class="w salvia span2"><div class="wh"><span class="ic">☑︎</span>Task di area <span class="pill">Area Romagna ▾</span><span class="end">Tutti →</span></div>
+    <div style="display:flex;align-items:baseline;gap:10px"><span class="big">9</span><span class="sub">da fare · 1 scaduto · 1 per oggi</span></div>
+    <div class="bar" aria-label="Per stato"><i style="width:56%;background:var(--salvia-mid)"></i><i style="width:22%;background:var(--verde-mid)"></i><i style="width:22%;background:var(--acciaio-mid)"></i></div>
+    <div class="legend"><span><i style="background:var(--salvia-mid)"></i>Da fare 5</span><span><i style="background:var(--verde-mid)"></i>In corso 2</span><span><i style="background:var(--acciaio-mid)"></i>In attesa 2</span></div>
+    <ul class="tl">${TASKS.map((x) => `<li><span class="chk" aria-hidden="true"></span><span><b>${x.t}</b><small>${x.who}</small></span><span class="due ${x.cls}">${x.due}</span></li>`).join('')}</ul>
+    <div class="add">＋ Aggiungi un task per l'area… <span style="margin-left:auto;font-size:11px">Invio</span></div></div>`
+
+  const taskB = () => {
+    const groups = [['Scaduti', TASKS.filter((x) => x.cls === 'late')], ['Oggi e domani', TASKS.filter((x) => x.cls === 'today' || x.due === 'domani')], ['Più avanti', TASKS.filter((x) => !x.cls && x.due !== 'domani')]]
+    return `<div class="w salvia span2"><div class="wh"><span class="ic">☑︎</span>Task di area <span class="pill">Area Romagna ▾</span><span class="end">Tutti →</span></div>
+      <div class="cols">${groups.map(([h, l]) => `<div class="col"><h4><span>${h}</span><span>${l.length}</span></h4><ul class="tl">${l.map((x) => `<li><span><b>${x.t}</b><small>${x.who} · <span class="${x.cls === 'late' ? 'up' : ''}">${x.due}</span></small></span></li>`).join('') || '<li><small>Niente</small></li>'}</ul></div>`).join('')}</div>
+      <div class="add">＋ Aggiungi un task per l'area… <span style="margin-left:auto;font-size:11px">Invio</span></div></div>`
+  }
+
+  const ctx = '<div class="w paper"><div class="wh">Manutenzioni</div><span class="big" style="color:var(--danger)">7</span><span class="sub" style="color:var(--muted)">scadute · widget esistente</span></div>'
+  const render = () => {
+    const tr = st.t === 'b' ? trendB() : st.t === 'c' ? trendC() : trendA()
+    document.querySelector('[data-trend]').innerHTML = tr + (st.t === 'c' ? ctx + ctx.replace('Manutenzioni', 'Il team oggi').replace('7', '0').replace('scadute · widget esistente', 'assenti oggi') : ctx)
+    document.querySelector('[data-task]').innerHTML = (st.k === 'b' ? taskB() : taskA()) + ctx
+    document.querySelectorAll('[data-t]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === st.t)))
+    document.querySelectorAll('[data-k]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === st.k)))
+    try { localStorage.setItem('archie-preview-dbw', JSON.stringify(st)) } catch (e) { /* niente */ }
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-t]'); if (t) { st.t = t.dataset.t; render() }
+    const k = e.target.closest('[data-k]'); if (k) { st.k = k.dataset.k; render() }
+    const p = e.target.closest('[data-p]'); if (p) { st.p = p.dataset.p; render() }
+    if (e.target.closest('[data-theme]')) { const h = document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark') }
+  })
+  render()
+})()
+</script>
+</body>
+</html>

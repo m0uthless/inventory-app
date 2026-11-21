@@ -122,4 +122,13 @@ describe('InventoryDetailModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salva le modifiche' }))
     await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/inventories/7/', { location: 'Sala B' }))
   })
+
+  it('in modifica «Togli la password» la toglie al salvataggio', async () => {
+    show()
+    await openEdit()
+    fireEvent.click(screen.getByRole('button', { name: 'Togli la password os_pwd' }))
+    expect(screen.getByLabelText('Password os_pwd')).toHaveAttribute('placeholder', 'Verrà tolta al salvataggio')
+    fireEvent.click(screen.getByRole('button', { name: 'Salva le modifiche' }))
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/inventories/7/', { os_pwd: null }))
+  })
 })

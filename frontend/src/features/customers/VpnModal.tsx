@@ -2,11 +2,13 @@ import * as React from 'react'
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   Stack,
@@ -148,6 +150,8 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
   const [mode, setMode] = React.useState<'view' | 'edit'>('view')
   const [form, setForm] = React.useState<VpnForm>(emptyForm())
   const [showPassword, setShowPassword] = React.useState(false)
+  // «Togli la password»: manda una password vuota, che il backend salva come assente.
+  const [clearPassword, setClearPassword] = React.useState(false)
   // Password in chiaro solo su «Mostra», chiesta al momento (`?reveal=1`, registrata nell'Audit).
   const [revealed, setRevealed] = React.useState<string | null>(null)
   React.useEffect(() => { setRevealed(null) }, [open, customerId])
@@ -200,6 +204,7 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
       note: vpn?.note ?? '',
     })
     setShowPassword(false)
+    setClearPassword(false)
     setMode('edit')
   }
 
@@ -214,7 +219,8 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
         porta: form.porta,
         note: form.note,
       }
-      if (form.password_input) payload.password_input = form.password_input
+      if (clearPassword) payload.password_input = ''
+      else if (form.password_input) payload.password_input = form.password_input
 
       let updated: VpnAccess
       if (notFound || !vpn) {
@@ -351,7 +357,8 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
 
             <TextField
               label={notFound ? 'Password' : 'Nuova password (lascia vuoto per non cambiare)'}
-              value={form.password_input}
+              value={clearPassword ? '' : form.password_input}
+              disabled={clearPassword}
               onChange={(e) => setForm((f) => ({ ...f, password_input: e.target.value }))}
               size="small"
               fullWidth
@@ -367,6 +374,11 @@ export default function VpnModal({ open, onClose, customerId, customerName }: Pr
                 ),
               }}
             />
+
+            {!notFound && vpn?.has_password ? (
+              <FormControlLabel sx={{ mt: -1 }} control={<Checkbox size="small" checked={clearPassword} onChange={(e) => setClearPassword(e.target.checked)} />}
+                label={<Typography variant="body2" sx={{ color: clearPassword ? 'error.main' : 'text.secondary' }}>Togli la password</Typography>} />
+            ) : null}
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2, alignItems: 'start' }}>
               <TextField

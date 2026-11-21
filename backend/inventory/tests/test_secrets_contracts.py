@@ -150,3 +150,11 @@ class TestInventorySecretsOnDemand:
         api_client.force_authenticate(user=_user_with_inventory_perms("view_inventory", "change_inventory", "view_secrets"))
         assert api_client.patch(f"/api/inventories/{inventory_record.id}/", {"name": "Rinominato"}, format="json").status_code == 200
         assert api_client.get(f"/api/inventories/{inventory_record.id}/secrets/").json()["os_pwd"] == "super-secret-os"
+
+
+@pytest.mark.django_db
+def test_null_clears_a_password(api_client, inventory_record):
+    """«Togli la password»: PATCH con null la toglie; le altre restano."""
+    api_client.force_authenticate(user=_user_with_inventory_perms("view_inventory", "change_inventory", "view_secrets"))
+    assert api_client.patch(f"/api/inventories/{inventory_record.id}/", {"vnc_pwd": None}, format="json").status_code == 200
+    assert api_client.get(f"/api/inventories/{inventory_record.id}/").json()["secrets_set"] == ["os_pwd", "app_pwd"]

@@ -139,7 +139,9 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
   // ── Modifica: «Modifica» nel ⋯ trasforma i dati in campi; un solo salvataggio ──
   const [editing, setEditing] = React.useState(false)
   const { draft, changed: allChanged, set, isDirty, reset } = useRecordDraft<Draft>(d, () => toDraft(d))
-  const changed = allChanged.filter((k) => !(locked && SECRET.includes(k)))
+  // «Togli la password»: le password impostate da svuotare al salvataggio (vanno mandate come null).
+  const [cleared, setCleared] = React.useState<(keyof Draft)[]>([])
+  const changed = [...allChanged.filter((k) => !(locked && SECRET.includes(k)) && !cleared.includes(k)), ...cleared]
   const [busy, setBusy] = React.useState(false)
   const v = editing ? draft : toDraft(d)
   const save = async () => {
@@ -154,13 +156,14 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
         location: t(draft.location), telefono: t(draft.telefono), hostname: t(draft.hostname), local_ip: t(draft.local_ip), srsa_ip: t(draft.srsa_ip),
         os_user: t(draft.os_user), os_pwd: t(draft.os_pwd), app_usr: t(draft.app_usr), app_pwd: t(draft.app_pwd), vnc_pwd: t(draft.vnc_pwd), notes: draft.notes,
       }
-      await api.patch(`/inventories/${d.id}/`, Object.fromEntries(changed.map((k) => [k, value[k]])))
+      await api.patch(`/inventories/${d.id}/`, Object.fromEntries(changed.map((k) => [k, cleared.includes(k) ? null : value[k]])))
       toast.success('Inventario salvato.')
       setEditing(false)
+      setCleared([])
       p.onSaved()
     } catch (e) { toast.error(apiErrorToFormFeedback(e).message) } finally { setBusy(false) }
   }
-  const stopEditing = () => { reset(); setEditing(false); setShown({}); setRevealed(null) }
+  const stopEditing = () => { reset(); setEditing(false); setShown({}); setRevealed(null); setCleared([]) }
 
   const blocked = () => { if (editing && changed.length) { toast.error('Salva o annulla le modifiche prima di aprire un altro record.'); return true } return false }
   const go = (path: string) => { if (!blocked()) navigate(path) }
@@ -185,7 +188,7 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
   const copySecret = async (k: keyof Draft) => { const v = (await fetchSecrets())?.[k]; if (v) p.onCopy(v) }
   const [allClosed, setAllClosed] = React.useState(false)
   // Con ‹ › la finestra resta aperta: lo stato locale riparte col nuovo inventario.
-  React.useEffect(() => { setMenu(null); setEditing(false); setShown({}); setRevealed(null); setAllClosed(false) }, [d.id])
+  React.useEffect(() => { setMenu(null); setEditing(false); setShown({}); setRevealed(null); setCleared([]); setAllClosed(false) }, [d.id])
 
   const status = p.statuses.find((s) => String(s.id) === v.status)
   const statusKey = status?.key ?? d.status_key
@@ -228,8 +231,8 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
         {secret && locked ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{editing ? 'Serve il permesso Credenziali per cambiarla' : 'Serve il permesso Credenziali'}</Typography>
           : editing ? (
-            <InputBase value={draft[k]} type={secret && !isShown ? 'password' : 'text'} onChange={(e) => set(k)(e.target.value)} autoComplete="new-password" inputProps={{ 'aria-label': `${label} ${k}` }}
-              placeholder={isSetSecret ? 'Invariata · scrivi per cambiarla' : undefined}
+            <InputBase value={cleared.includes(k) ? '' : draft[k]} disabled={cleared.includes(k)} type={secret && !isShown ? 'password' : 'text'} onChange={(e) => set(k)(e.target.value)} autoComplete="new-password" inputProps={{ 'aria-label': `${label} ${k}` }}
+              placeholder={cleared.includes(k) ? 'Verrà tolta al salvataggio' : isSetSecret ? 'Invariata · scrivi per cambiarla' : undefined}
               sx={(t) => ({ height: 30, px: 1, fontSize: 12.5, borderRadius: '6px', border: '1px solid', bgcolor: 'background.paper', borderColor: isDirty(k) ? 'warning.main' : 'divider', '& input': mono, '&.Mui-focused': { borderColor: 'primary.main', boxShadow: t.palette.archie.focusRing } })} />
           ) : (
             <Box sx={{ ...mono, fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: present ? 'text.primary' : 'text.disabled' }}>
@@ -237,7 +240,15 @@ export function InventoryWindow(p: InventoryDetailModalProps & { detail: Invento
             </Box>
           )}
         <Box sx={{ display: 'inline-flex' }}>
-          {secret && !locked && (editing || present) ? (
+          {secret && !locked && editing && isSetSecret ? (
+            <Tooltip title={cleared.includes(k) ? 'Non toglierla' : 'Togli la password'}>
+              <IconButton size="small" aria-pressed={cleared.includes(k)} aria-label={`${cleared.includes(k) ? 'Non togliere' : 'Togli'} la password ${k}`}
+                onClick={() => setCleared((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]))} sx={{ width: 28, height: 28, color: cleared.includes(k) ? 'error.main' : undefined }}>
+                <CampoIcon name={cleared.includes(k) ? 'restore' : 'trash'} size={14} />
+              </IconButton>
+            </Tooltip>
+          ) : null}
+          {secret && !locked && (editing || present) && !cleared.includes(k) ? (
             <Tooltip title={isShown ? 'Nascondi' : editing ? 'Mostra' : 'Mostra · si nasconde dopo 30 secondi'}>
               <IconButton size="small" aria-pressed={isShown} aria-label={`${isShown ? 'Nascondi' : 'Mostra'} la password`} onClick={() => void toggleSecret(k)} sx={{ width: 28, height: 28, color: isShown ? 'warning.main' : undefined }}>
                 <CampoIcon name={isShown ? 'eyeOff' : 'eye'} size={14} />

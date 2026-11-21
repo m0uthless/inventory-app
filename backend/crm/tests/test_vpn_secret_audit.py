@@ -65,3 +65,13 @@ def test_plain_get_says_only_whether_there_is_a_password():
     body = c.get(f"/api/customers/{vpn.customer_id}/vpn/").json()
     assert body["password"] is None and body["has_password"] is True
     assert not _events(vpn).exists()
+
+
+def test_empty_password_input_clears_the_password():
+    """«Togli la password» nella VPN: `password_input` vuota la toglie."""
+    vpn = _vpn()
+    c, u = _client("view_vpn_secrets")
+    u.user_permissions.add(Permission.objects.get(codename="change_customervpnaccess"))
+    c.force_authenticate(user=type(u).objects.get(pk=u.pk))
+    assert c.patch(f"/api/customers/{vpn.customer_id}/vpn/", {"password_input": ""}, format="json").status_code == 200
+    assert c.get(f"/api/customers/{vpn.customer_id}/vpn/").json()["has_password"] is False
