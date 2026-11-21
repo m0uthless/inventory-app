@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Box, Button, ButtonBase, CircularProgress, IconButton, ListItemIcon, Menu, MenuItem, TextField, Tooltip, Typography } from '@mui/material'
 import AutorenewIcon from '@mui/icons-material/Autorenew'
+import { alpha } from '@mui/material/styles'
 import { useToast } from '@shared/ui/toast'
 import {
   BandChip, BandEditing, CampoIcon, RecordEmpty, RecordField, RecordGrid, RecordLink, RecordModal, RecordNotes, RecordRow, RecordRows,
@@ -10,6 +11,7 @@ import { AuditFeedPanel } from '../customers/CustomerTabs'
 import { FileIcon } from '../drive/DriveIcons'
 import { formatEuro } from '../purchaseorders/types'
 import { daysLabel, dShort, expiryHint, EXPIRY_TONE, parseAmount } from './contractModel'
+import { amountSummary, eurFull, todayIso } from './contractAmount'
 import ContractReminders from './ContractReminders'
 import { REMINDER_PRESETS, addDays, isIsoDate } from './contractForm'
 import { ExpiryBadge, PeriodBar } from './contractUi'
@@ -61,8 +63,6 @@ const FIELDS: Record<string, string> = {
 }
 
 /** Mesi interi (arrotondati) tra due date ISO. */
-const monthsBetween = (a: string, b: string) => Math.max(1, Math.round((new Date(b).getTime() - new Date(a).getTime()) / (30.44 * 86_400_000)))
-const PER_BILL: Record<string, number> = { mensile: 1, trimestrale: 3, annuale: 12 }
 const dIt = (s?: string | null) => (s ? s.slice(0, 10).split('-').reverse().join('/') : '')
 
 type Draft = {
@@ -110,9 +110,7 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
   React.useEffect(() => { setMenu(null); setEditing(false) }, [d.id])
 
   // ── Testata ─────────────────────────────────────────────────────
-  const months = monthsBetween(d.start_date, d.end_date)
   const value = d.total_value !== undefined && d.total_value !== null ? Number(d.total_value) : null
-  const perBill = value != null ? (d.billing_freq === 'una_tantum' ? value : (value / months) * (PER_BILL[d.billing_freq] ?? 1)) : null
   const active = d.status === 'attivo'
   const exp = d.expiry_state
   const nextReminder = d.reminders?.dates.find((x) => x.state === 'next')?.date ?? null
@@ -191,19 +189,39 @@ function ContractWindow(p: Props & { detail: ContractDetail }) {
 
           {p.canViewValue ? (
             <RecordSection title="Importo">
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, flexWrap: 'wrap', mb: 1.25 }}>
-                <Typography component="b" sx={{ fontSize: 22, fontWeight: 650, letterSpacing: '-0.015em', fontVariantNumeric: 'tabular-nums' }}>{value != null ? formatEuro(value) : '—'}</Typography>
-                <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>su {months} {months === 1 ? 'mese' : 'mesi'} · fatturazione {d.billing_freq_label.toLowerCase()}</Typography>
-              </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', border: '1px solid', borderColor: 'divider', borderRadius: '8px', overflow: 'hidden', '& > div + div': { borderLeft: '1px solid', borderColor: 'divider' } }}>
-                {[['Al mese', value != null ? formatEuro(value / months) : '—'], ["All'anno", value != null ? formatEuro((value / months) * 12) : '—'], ['Per fattura', perBill != null ? formatEuro(perBill) : '—']].map(([l, x]) => (
-                  <Box key={l} sx={{ px: 1.5, py: 1 }}>
-                    <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{l}</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{x}</Typography>
+              {value != null ? (() => {
+                const am = amountSummary(value, d.billing_freq, d.start_date, d.end_date, todayIso())
+                const pct = Math.round(am.elapsed * 100)
+                const tile = (label: string, amount: number, sub?: React.ReactNode) => (
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', p: '10px 12px', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'baseline', columnGap: 1.25 }}>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
+                    <Typography sx={{ fontSize: 15, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>{eurFull(amount)}</Typography>
+                    {sub ? <Typography sx={{ gridColumn: '1 / -1', fontSize: 11.5, color: 'text.secondary', mt: 0.25 }}>{sub}</Typography> : null}
                   </Box>
-                ))}
-              </Box>
-              <Typography sx={{ mt: 1, fontSize: 11.5, color: 'text.secondary' }}>Ripartizione lineare sul periodo.</Typography>
+                )
+                return (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1fr)', sm: 'minmax(0,1.25fr) minmax(0,1fr)' }, gap: 1.5 }}>
+                    <Box sx={{ bgcolor: 'archie.field', borderRadius: '10px', p: '16px 18px', display: 'grid', gap: 1.25, alignContent: 'start' }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'primary.main', textTransform: 'uppercase', letterSpacing: '.06em' }}>Valore totale</Typography>
+                      <Typography sx={{ fontSize: 28, fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{eurFull(value)}</Typography>
+                      <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>{am.months} {am.months === 1 ? 'mese' : 'mesi'} · fatturazione {d.billing_freq_label.toLowerCase()}</Typography>
+                      <Box>
+                        <Box role="img" aria-label={`Maturato ${pct}%`} sx={{ height: 8, borderRadius: 4, overflow: 'hidden', bgcolor: (t) => alpha(t.palette.primary.main, 0.16) }}>
+                          <Box sx={{ height: '100%', width: `${am.elapsed * 100}%`, bgcolor: 'primary.main', borderRadius: 4 }} />
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75, fontSize: 12, color: 'text.secondary' }}>
+                          <span>maturato <Box component="b" sx={{ color: 'text.primary' }}>{pct}%</Box></span><span>{dShort(d.end_date)}</span>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'grid', gap: 1, alignContent: 'start' }}>
+                      {tile('Al mese', am.perMonth)}
+                      {tile("All'anno", am.perYear)}
+                      {tile('Per fattura', am.perBill, <>{am.bills} {am.bills === 1 ? 'fattura' : 'fatture'}{am.nextBill && d.status === 'attivo' ? <> · prossima il {dShort(am.nextBill)}</> : null}</>)}
+                    </Box>
+                  </Box>
+                )
+              })() : <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Valore non indicato: si aggiunge da Modifica.</Typography>}
             </RecordSection>
           ) : null}
 
