@@ -225,6 +225,7 @@ export function CustomerWindow(p: CustomerDetailModalProps & { detail: CustomerM
         <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
           <MenuItem disabled={!editable || editing} onClick={() => { setMenu(null); setEditing(true) }}><ListItemIcon><CampoIcon name="columns" size={16} /></ListItemIcon>Modifica</MenuItem>
           <MenuItem disabled={!p.canChange} onClick={() => { setMenu(null); p.onEdit() }}><ListItemIcon><CampoIcon name="filter" size={16} /></ListItemIcon>Tutti i campi (città, indirizzo, tag)…</MenuItem>
+          <MenuItem onClick={() => { setMenu(null); go(`/site-repository${buildQuery({ cliente: d.id })}`) }}><ListItemIcon><CampoIcon name="layers" size={16} /></ListItemIcon>Apri nel Site Repository</MenuItem>
           <MenuItem onClick={() => { setMenu(null); p.onCopy(d.code) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia il codice cliente</MenuItem>
           {d.vat_number ? <MenuItem onClick={() => { setMenu(null); p.onCopy(d.vat_number!) }}><ListItemIcon><CampoIcon name="copy" size={16} /></ListItemIcon>Copia la P.IVA</MenuItem> : null}
           <MenuItem disabled={!p.canDelete} onClick={() => { setMenu(null); p.onDelete() }} sx={{ color: 'error.main' }}><ListItemIcon sx={{ color: 'error.main' }}><CampoIcon name="trash" size={16} /></ListItemIcon>Elimina</MenuItem>

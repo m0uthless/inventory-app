@@ -45,7 +45,7 @@ Fatta su `design-previews/c-base.html` (variante A · Scheda).
 - ~~**[UI] Drawer cliente vecchio**~~: non più usato (Profilo sulla finestra nuova); file rimosso il 21/11.
 - **[UI] Credenziali degli inventari nella scheda Inventari**: l'anteprima mostrava utenza e password per riga; l'elenco API non le include (servono la scheda dell'inventario e il permesso `inventory.view_secrets`).
 - **[UI] Città e indirizzo**: stanno nei campi personalizzati, quindi si modificano solo da "Modifica", non sul posto. Tag non mostrati nel pannello.
-- **[UI] Site Repository dal pannello**: non c'è un collegamento diretto (la pagina non accetta il cliente nell'URL).
+- ~~**[UI] Site Repository dal pannello**~~ fatto il 21/11 (`?cliente=`, voce nel menu del cliente).
 
 ## Pagina Siti
 
@@ -76,7 +76,7 @@ Portata dall'anteprima `r-base.html` (proposta B: cartina + elenco delle provinc
 
 - **[UI] Esporta Excel di pagina**: nell'anteprima c'era in testata; il backend esporta solo il singolo cliente (azione sulla riga del cliente). Serve un export globale.
 - **[UI] Varianti A (albero) e C (colonne)**: non portate.
-- **[UI] Raggruppamento per città**: la pagina vecchia lo permetteva; ora solo per provincia.
+- ~~**[UI] Raggruppamento per città**~~ fatto il 21/11 (interruttore Province / Città).
 - **[UI] Pannello asset, scheda Manutenzioni**: "Carica" sul singolo intervento usa `upload-pdf`; "Registra intervento" non c'è (rimanda ai Rapportini, nessun link diretto).
 - **[DEC] Manutenzioni**: un piano copre l'asset se è dello stesso cliente e include il suo tipo; scadenza = override del singolo asset, altrimenti quella del piano (`GET /inventories/{id}/maintenance/`).
 - **[DEC] Accesso**: le schede delle credenziali non hanno sistema operativo né data di aggiornamento (dati non presenti nel backend).
