@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { KpiStrip, KpiTile, SegmentBar } from '../../ui/campo'
-import type { PurchaseOrderRow, PurchaseOrderStatus, PurchaseOrderSummary } from './types'
-import { fetchAll } from '../../api/fetchAll'
+import { api } from '@shared/api/client'
+import type { PurchaseOrderStatus, PurchaseOrderSummary } from './types'
 
-/** Statistiche dell'anno calcolate dalle righe (stessi filtri anno/tipo della lista). */
+/** Statistiche dell'anno dal `summary` del server (stessi filtri anno/tipo della lista). */
 export type PoYearStats = {
   byStatus: Record<PurchaseOrderStatus, { n: number; amount: number }>
   oldestSentDays: number | null
@@ -24,21 +24,16 @@ export function usePoYearStats(year: number, kind: string | null, reloadKey: unk
   React.useEffect(() => {
     let alive = true
     ;(async () => {
-      const rows = await fetchAll<PurchaseOrderRow>('/purchase-order-entries/', { year, ...(kind ? { kind } : {}) })
+      // Calcolato dal server (`summary`): niente più lettura di tutte le righe dell'anno.
+      type Summary = { by_status: Record<PurchaseOrderStatus, { count: number; amount: string }>; monthly_amount: string[]; oldest_sent_days: number | null }
+      const { data } = await api.get<Summary>('/purchase-order-entries/summary/', { params: { year, ...(kind ? { kind } : {}) } })
       const byStatus = EMPTY()
-      const monthly = Array(12).fill(0) as number[]
-      let oldest: number | null = null
-      const now = Date.now()
-      for (const r of rows) {
-        const a = Number(r.amount) || 0
-        byStatus[r.status].n++
-        byStatus[r.status].amount += a
-        monthly[new Date(r.offer_date).getMonth()] += a
-        if (r.status === 'inviato' && r.sent_at) {
-          const days = Math.round((now - new Date(r.sent_at).getTime()) / 864e5)
-          oldest = oldest == null ? days : Math.max(oldest, days)
-        }
+      for (const st of Object.keys(byStatus) as PurchaseOrderStatus[]) {
+        const v = data.by_status?.[st]
+        if (v) byStatus[st] = { n: v.count, amount: Number(v.amount) || 0 }
       }
+      const monthly = (data.monthly_amount ?? []).map((x) => Number(x) || 0)
+      const oldest = data.oldest_sent_days
       const lastMonth = year === new Date().getFullYear() ? new Date().getMonth() : 11
       const cum: number[] = []
       monthly.slice(0, lastMonth + 1).reduce((acc, v) => { cum.push(acc + v); return acc + v }, 0)

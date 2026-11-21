@@ -26,10 +26,10 @@ Legenda: **[UI]** solo frontend · **[BE]** serve backend · **[DEC]** serve una
 
 ## Pagina Purchase Order
 
-- **[BE] "Da fatturare" in `summary`**: oggi calcolato dal frontend leggendo le righe dell'anno.
+- ~~**[BE] "Da fatturare" in `summary`**~~ fatto il 21/11.: oggi calcolato dal frontend leggendo le righe dell'anno.
 - **[DEC] Margine**: calcolato in pagina (importo − costi), non è un campo.
 - ~~**[UI] Dialogo Nuovo/Modifica PO** e **dialogo di avanzamento**~~ fatti il 21/11: QuickForm il primo, il secondo come nell'anteprima po-base (con la data del passo).
-- **[UI] Totali nel piè** ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
+- ~~**[UI] Totali nel piè**~~ fatto il 21/11. ("Totale € … · Costi sostenuti € …" dell'anteprima): non ancora.
 - ~~**[UI] Ripristino multiplo dal cestino**~~ fatto il 21/11: PO, Contratti e Issue sono nella pagina Cestino, che ha la selezione multipla.
 
 ## Comportamenti globali

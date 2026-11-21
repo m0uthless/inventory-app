@@ -9,6 +9,7 @@ il versionamento segue [Semantic Versioning](https://semver.org/lang/it/).
 
 ### Added
 
+- Purchase Order: totali in fondo all'elenco (numero, totale, costi sostenuti) con gli stessi filtri della lista (`GET /api/purchase-order-entries/totals/`). Gli indicatori (per stato, «Da fatturare», mesi, invio più vecchio) arrivano dal `summary` del server invece che dalla lettura di tutte le righe dell'anno.
 - «Togli la password»: nella modifica dell'inventario (icona accanto a ogni password impostata) e della VPN del cliente (casella), per svuotare una password; senza, un campo vuoto resta «invariata».
 - Manutenzione, riepilogo all'ufficio: alle 8:00, con il riepilogo giornaliero, gli indirizzi impostati in «Impostazioni di Archie › Manutenzione» ricevono un'email con le manutenzioni scadute e quelle dei prossimi 30 giorni, solo se c'è qualcosa di nuovo rispetto all'ultimo invio (le novità sono segnate «Nuova»). Senza indirizzi non parte nulla. Migrazione `notifications.0006`.
 - Ricerca a finestra (Ctrl K o clic sul campo in alto): risultati raggruppati come la pagina Ricerca (al massimo 5 per gruppo), pagine dell'app e azioni «Nuovo…» permesse, ricerche recenti; frecce per scegliere, Invio per aprire, «Cerca in tutto Archie» per la pagina Ricerca.

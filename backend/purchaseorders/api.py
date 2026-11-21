@@ -5,7 +5,8 @@ from datetime import date, datetime, time
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Count, Min, Q, Sum
+from django.db.models.functions import ExtractMonth
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -369,13 +370,39 @@ class PurchaseOrderEntryViewSet(RestoreActionMixin, SoftDeleteAuditMixin, viewse
             if prev_total:
                 yoy_delta_pct = float((total_amount - prev_total) / prev_total * 100)
 
+        # Per stato (conteggio e importo), importi per mese dell'offerta e giorni dell'invio
+        # più vecchio ancora senza PO: prima li calcolava la pagina leggendo tutte le righe.
+        by_status = {s: {"count": 0, "amount": Decimal("0")} for s in PURCHASE_ORDER_STATUS_ORDER}
+        for row in qs.values("status").annotate(n=Count("id"), tot=Sum("amount")):
+            by_status[row["status"]] = {"count": row["n"], "amount": row["tot"] or Decimal("0")}
+        monthly = [Decimal("0")] * 12
+        for row in qs.annotate(m=ExtractMonth("offer_date")).values("m").annotate(tot=Sum("amount")):
+            monthly[row["m"] - 1] = row["tot"] or Decimal("0")
+        oldest = qs.filter(status=PurchaseOrderStatus.INVIATO, sent_at__isnull=False).aggregate(v=Min("sent_at"))["v"]
+        oldest_days = round((timezone.now() - oldest).total_seconds() / 86400) if oldest else None
+
         return Response({
             "total_amount": str(total_amount),
             "to_send": to_send,
             "waiting": waiting,
+            "by_status": {k: {"count": v["count"], "amount": f"{v['amount']:.2f}"} for k, v in by_status.items()},
+            "to_invoice": {"count": by_status[PurchaseOrderStatus.RICEVUTO]["count"], "amount": f"{by_status[PurchaseOrderStatus.RICEVUTO]['amount']:.2f}"},
+            "monthly_amount": [f"{v:.2f}" for v in monthly],
+            "oldest_sent_days": oldest_days,
             "previous_year": previous_year,
             "previous_year_amount": previous_year_amount,
             "yoy_delta_pct": yoy_delta_pct,
+        })
+
+    @action(detail=False, methods=["get"], url_path="totals")
+    def totals(self, request):
+        """Totali dell'elenco con gli stessi filtri della lista (piè della tabella)."""
+        qs = self.filter_queryset(self.get_queryset())
+        agg = qs.aggregate(n=Count("id"), amount=Sum("amount"), costs=Sum("costs_incurred"))
+        return Response({
+            "count": agg["n"] or 0,
+            "amount": f"{(agg['amount'] or Decimal('0')):.2f}",
+            "costs": f"{(agg['costs'] or Decimal('0')):.2f}",
         })
 
     # ── Workflow: advance / revert ────────────────────────────────────────────

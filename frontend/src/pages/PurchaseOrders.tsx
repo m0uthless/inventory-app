@@ -305,6 +305,8 @@ export default function PurchaseOrders() {
     return { title: 'Nessun risultato', subtitle: 'Prova a cambiare ricerca o filtri.' }
   }, [grid.view, grid.search, loc.pathname, loc.search, navigate])
 
+  // Totali del piè (stessi filtri dell'elenco, senza paginazione).
+  const [totals, setTotals] = React.useState<{ count: number; amount: string; costs: string } | null>(null)
   const listParams = React.useMemo(
     () =>
       buildDrfListParams({
@@ -356,6 +358,14 @@ export default function PurchaseOrders() {
   } = useDrfList<PurchaseOrderRow>('/purchase-order-entries/', listParams, (e: unknown) =>
     toast.error(apiErrorToMessage(e)),
   )
+
+  React.useEffect(() => {
+    let alive = true
+    const { page: _p, page_size: _ps, ordering: _o, ...params } = listParams as Record<string, unknown>
+    api.get<{ count: number; amount: string; costs: string }>('/purchase-order-entries/totals/', { params })
+      .then((r) => { if (alive) setTotals(r.data) }).catch(() => { if (alive) setTotals(null) })
+    return () => { alive = false }
+  }, [listParams, rows])
 
   // KPI (indipendenti da paginazione/ordinamento, filtrati solo per anno)
   const [summary, setSummary] = React.useState<PurchaseOrderSummary | null>(null)
@@ -1078,6 +1088,13 @@ export default function PurchaseOrders() {
             sx: { ...headerFilterGridSx, cursor: 'pointer' },
           }}
         />
+        {totals ? (
+          <Box role="status" aria-label="Totali dell'elenco" sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1, sm: 2.5 }, justifyContent: 'flex-end', alignItems: 'baseline', px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'archie.surface2', fontSize: 13 }}>
+            <Box component="span" sx={{ color: 'text.secondary' }}>{totals.count} {totals.count === 1 ? 'Purchase Order' : 'Purchase Order'}</Box>
+            <Box component="span">Totale <Box component="b" sx={{ fontVariantNumeric: 'tabular-nums' }}>{formatEuro(totals.amount)}</Box></Box>
+            <Box component="span">Costi sostenuti <Box component="b" sx={{ fontVariantNumeric: 'tabular-nums' }}>{formatEuro(totals.costs)}</Box></Box>
+          </Box>
+        ) : null}
       </Box>
 
       <RowContextMenu
